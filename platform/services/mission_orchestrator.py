@@ -311,6 +311,49 @@ class MissionOrchestrator:
                 },
             )
 
+            # RL Policy hook: recommend pattern adaptation before phase starts
+            try:
+                from ..agents.rl_policy import get_rl_policy
+                _rl = get_rl_policy()
+                _rej_rate = 0.0
+                _qual = 0.0
+                try:
+                    from ..db.migrations import get_db as _rldb
+                    _db = _rldb()
+                    _row = _db.execute(
+                        "SELECT rejected, iterations, quality_score FROM agent_scores"
+                        " WHERE epic_id=? ORDER BY iterations DESC LIMIT 1",
+                        (mission.id,)
+                    ).fetchone()
+                    _db.close()
+                    if _row and _row["iterations"] > 0:
+                        _rej_rate = _row["rejected"] / max(1, _row["iterations"])
+                        _qual = _row["quality_score"] or 0.0
+                except Exception:
+                    pass
+                _rl_rec = _rl.recommend(
+                    wf_id=mission.workflow_id or "",
+                    phase_index=i,
+                    rejection_rate=_rej_rate,
+                    quality_score=_qual,
+                )
+                if _rl_rec and _rl_rec.get("fired") and _rl_rec.get("action") != "keep":
+                    _new_pattern = {
+                        "switch_parallel": "parallel",
+                        "switch_sequential": "sequential",
+                        "switch_hierarchical": "hierarchical",
+                        "switch_debate": "debate",
+                    }.get(_rl_rec["action"])
+                    if _new_pattern and _new_pattern != pattern_type:
+                        logger.warning(
+                            "RL hook: phase=%s pattern %s→%s (conf=%.2f)",
+                            phase.phase_id, pattern_type, _new_pattern,
+                            _rl_rec.get("confidence", 0),
+                        )
+                        pattern_type = _new_pattern
+            except Exception as _rl_err:
+                logger.debug(f"RL hook skipped: {_rl_err}")
+
             # Build PatternDef for this phase
             agent_nodes = [{"id": aid, "agent_id": aid} for aid in aids]
 
@@ -1034,7 +1077,7 @@ class MissionOrchestrator:
 
             # Feedback loop: track TMA fix for recurring incident detection
             if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
-                if getattr(mission, "type", None) in ("bug", "program") and mission.project_id:
+                if mission.type in ("bug", "program") and mission.project_id:
                     try:
                         from ..missions.feedback import on_tma_incident_fixed
 

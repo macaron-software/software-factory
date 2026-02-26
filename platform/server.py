@@ -40,7 +40,7 @@ if os.environ.get("OTEL_ENABLED"):
         _otel_resource = Resource.create(
             {
                 "service.name": os.environ.get("OTEL_SERVICE_NAME", "macaron-platform"),
-                "service.version": "2.1.0",
+                "service.version": "1.2.0",
                 "deployment.environment": os.environ.get("PLATFORM_ENV", "production"),
             }
         )
@@ -186,43 +186,6 @@ async def lifespan(app: FastAPI):
 
     seed_demo_data()
 
-    # Auto-seed wiki if empty
-    try:
-        from .db.migrations import get_db as _wiki_gdb
-        from .web.routes.wiki_content import WIKI_PAGES
-
-        _wdb = _wiki_gdb()
-        _count = _wdb.execute("SELECT COUNT(*) FROM wiki_pages").fetchone()[0]
-        if _count == 0:
-            from datetime import datetime, timezone
-
-            _now = datetime.now(timezone.utc).isoformat()
-            for _p in WIKI_PAGES:
-                try:
-                    _wdb.execute(
-                        "INSERT OR IGNORE INTO wiki_pages "
-                        "(slug, title, content, category, icon, sort_order, parent_slug, created_at, updated_at) "
-                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        (
-                            _p["slug"],
-                            _p["title"],
-                            _p["content"],
-                            _p["category"],
-                            _p["icon"],
-                            _p["sort_order"],
-                            _p.get("parent_slug"),
-                            _now,
-                            _now,
-                        ),
-                    )
-                except Exception:
-                    pass
-            _wdb.commit()
-            logger.info("Wiki: seeded %d pages", len(WIKI_PAGES))
-        _wdb.close()
-    except Exception:
-        pass
-
     # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
     from .agents.store import DEFAULT_MODEL as _current_model
 
@@ -319,6 +282,14 @@ async def lifespan(app: FastAPI):
             logger.info("Endurance watchdog started as background task")
     except Exception as e:
         logger.warning("Failed to start endurance watchdog: %s", e)
+
+    # Start evolution scheduler (nightly GA + RL retraining at 02:00 UTC)
+    try:
+        from .agents.evolution_scheduler import start_evolution_scheduler as _evo_sched
+        _asyncio.create_task(_evo_sched())
+        logger.info("Evolution scheduler started as background task")
+    except Exception as e:
+        logger.warning("Failed to start evolution scheduler: %s", e)
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
@@ -500,7 +471,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Software Factory",
         description="Multi-Agent Software Factory — 94 AI agents orchestrating the full product lifecycle with SAFe, TDD, and auto-heal.",
-        version="2.1.0",
+        version="1.1.0",
         docs_url="/docs",
         redoc_url="/redoc",
         lifespan=lifespan,
@@ -514,7 +485,9 @@ def create_app() -> FastAPI:
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
 
-    _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090").split(",")
+    _cors_origins = os.environ.get(
+        "CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30"
+    ).split(",")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],
@@ -882,12 +855,14 @@ def create_app() -> FastAPI:
     from .web.ws import router as sse_router
     from .web.routes.websocket import router as ws_router
     from .web.routes.dag import router as dag_router
+    from .web.routes.evolution import router as evolution_router
 
     app.include_router(auth_router)
     app.include_router(oauth_router)
     app.include_router(mercato_router)
     app.include_router(ws_router)
     app.include_router(dag_router)
+    app.include_router(evolution_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 

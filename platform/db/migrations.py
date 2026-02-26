@@ -645,248 +645,60 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_cat ON wiki_pages(category)")
 
-    # ── Agent-Pattern performance scores ─────────────────────────────
+    # ── Evolution / GA tables ─────────────────────────────────────────
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS agent_pattern_scores (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            accepted INTEGER DEFAULT 0,
-            rejected INTEGER DEFAULT 0,
-            iterations INTEGER DEFAULT 0,
+        CREATE TABLE IF NOT EXISTS evolution_proposals (
+            id TEXT PRIMARY KEY,
+            base_wf_id TEXT NOT NULL,
+            genome_json TEXT NOT NULL,
+            fitness REAL DEFAULT 0.0,
+            generation INTEGER DEFAULT 0,
+            run_id TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(agent_id, pattern_id)
+            reviewed_at TIMESTAMP
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_aps_agent ON agent_pattern_scores(agent_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_aps_pattern ON agent_pattern_scores(pattern_id)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status)")
 
-    # Darwin team fitness: fine-grained by technology + phase_type
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS team_fitness (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            fitness_score REAL DEFAULT 0.0,
-            runs INTEGER DEFAULT 0,
-            wins INTEGER DEFAULT 0,
-            losses INTEGER DEFAULT 0,
-            avg_iterations REAL DEFAULT 0.0,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            retired INTEGER DEFAULT 0,
-            retired_at TIMESTAMP,
-            pinned INTEGER DEFAULT 0,
-            weight_multiplier REAL DEFAULT 1.0,
-            UNIQUE(agent_id, pattern_id, technology, phase_type)
-        );
-        CREATE INDEX IF NOT EXISTS idx_tf_tech_phase ON team_fitness(technology, phase_type);
-        CREATE INDEX IF NOT EXISTS idx_tf_agent ON team_fitness(agent_id);
-        CREATE INDEX IF NOT EXISTS idx_tf_fitness ON team_fitness(fitness_score DESC);
-
-        CREATE TABLE IF NOT EXISTS team_fitness_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            snapshot_date TEXT NOT NULL,
-            fitness_score REAL DEFAULT 0.0,
-            runs INTEGER DEFAULT 0,
-            UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
-        );
-        CREATE INDEX IF NOT EXISTS idx_tfh_key ON team_fitness_history(agent_id, pattern_id, technology, phase_type);
-
-        CREATE TABLE IF NOT EXISTS team_okr (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            team_key TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            okr_text TEXT NOT NULL,
-            kpi_name TEXT NOT NULL,
-            kpi_target REAL NOT NULL,
-            kpi_current REAL DEFAULT 0.0,
-            kpi_unit TEXT DEFAULT '%',
-            period TEXT DEFAULT 'quarter',
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(team_key, technology, phase_type, kpi_name)
-        );
-
-        CREATE TABLE IF NOT EXISTS team_selections (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mission_id TEXT,
-            workflow_id TEXT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            selection_mode TEXT DEFAULT 'fitness',
-            thompson_score REAL,
-            selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_tsel_mission ON team_selections(mission_id);
-        CREATE INDEX IF NOT EXISTS idx_tsel_at ON team_selections(selected_at DESC);
-
-        -- A/B shadow testing: direct head-to-head comparison between two teams
-        CREATE TABLE IF NOT EXISTS team_ab_tests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mission_id TEXT,
-            workflow_id TEXT,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            team_a_agent TEXT NOT NULL,
-            team_a_pattern TEXT NOT NULL,
-            team_b_agent TEXT NOT NULL,
-            team_b_pattern TEXT NOT NULL,
-            trigger TEXT DEFAULT 'auto',
-            winner TEXT,
-            team_a_score REAL,
-            team_b_score REAL,
-            evaluator_agent TEXT,
-            status TEXT DEFAULT 'pending',
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS evolution_runs (
+            id TEXT PRIMARY KEY,
+            wf_id TEXT NOT NULL,
+            generations INTEGER DEFAULT 0,
+            best_fitness REAL DEFAULT 0.0,
+            fitness_history_json TEXT DEFAULT '[]',
             started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_tab_status ON team_ab_tests(status);
-        CREATE INDEX IF NOT EXISTS idx_tab_tech ON team_ab_tests(technology, phase_type);
-
-        -- LLM-level Thompson Sampling: same team, different LLM models
-        -- Tracks fitness per (agent_id, pattern_id, technology, phase_type, llm_model)
-        CREATE TABLE IF NOT EXISTS team_llm_fitness (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            llm_model TEXT NOT NULL DEFAULT 'default',
-            llm_provider TEXT NOT NULL DEFAULT 'default',
-            fitness_score REAL DEFAULT 0.0,
-            runs INTEGER DEFAULT 0,
-            wins INTEGER DEFAULT 0,
-            losses INTEGER DEFAULT 0,
-            avg_iterations REAL DEFAULT 0.0,
-            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(agent_id, pattern_id, technology, phase_type, llm_model)
-        );
-        CREATE INDEX IF NOT EXISTS idx_tllm_key ON team_llm_fitness(agent_id, pattern_id, technology, phase_type);
-        CREATE INDEX IF NOT EXISTS idx_tllm_model ON team_llm_fitness(llm_model);
-
-        -- LLM A/B tests: same team (agent+pattern), two LLM models head-to-head
-        CREATE TABLE IF NOT EXISTS team_llm_ab_tests (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            mission_id TEXT,
-            agent_id TEXT NOT NULL,
-            pattern_id TEXT NOT NULL,
-            technology TEXT NOT NULL DEFAULT 'generic',
-            phase_type TEXT NOT NULL DEFAULT 'generic',
-            llm_a TEXT NOT NULL,
-            llm_a_provider TEXT NOT NULL DEFAULT 'default',
-            llm_b TEXT NOT NULL,
-            llm_b_provider TEXT NOT NULL DEFAULT 'default',
-            trigger TEXT DEFAULT 'auto',
-            winner_llm TEXT,
-            llm_a_score REAL,
-            llm_b_score REAL,
-            status TEXT DEFAULT 'pending',
-            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            completed_at TIMESTAMP
-        );
-        CREATE INDEX IF NOT EXISTS idx_tllmab_status ON team_llm_ab_tests(status);
-        CREATE INDEX IF NOT EXISTS idx_tllmab_agent ON team_llm_ab_tests(agent_id, pattern_id);
-    """)
-
-    # Default OKR seeds (idempotent)
-    okr_seeds = [
-        (
-            "code",
-            "generic",
-            "migration",
-            "Deliver clean, tested migrations with minimal rework",
-            "acceptance_rate",
-            80.0,
-            "%",
-        ),
-        (
-            "code",
-            "generic",
-            "new_feature",
-            "Ship production-ready features fast",
-            "acceptance_rate",
-            80.0,
-            "%",
-        ),
-        (
-            "code",
-            "generic",
-            "bugfix",
-            "Resolve bugs without regression",
-            "avg_iterations",
-            2.0,
-            "iterations",
-        ),
-        (
-            "code",
-            "generic",
-            "refactoring",
-            "Improve quality without breaking behavior",
-            "coherence_score",
-            75.0,
-            "%",
-        ),
-        (
-            "security",
-            "generic",
-            "audit",
-            "Find real vulnerabilities, block false-passes",
-            "veto_rate",
-            30.0,
-            "%",
-        ),
-        (
-            "architecture",
-            "generic",
-            "design",
-            "Produce consensual, implementable designs",
-            "consensus_rounds",
-            3.0,
-            "rounds",
-        ),
-        (
-            "testing",
-            "generic",
-            "generic",
-            "Achieve comprehensive non-redundant coverage",
-            "coverage_score",
-            80.0,
-            "%",
-        ),
-        (
-            "docs",
-            "generic",
-            "generic",
-            "Produce accurate, complete, maintainable docs",
-            "completeness_score",
-            85.0,
-            "%",
-        ),
-    ]
-    for domain, tech, phase, okr_text, kpi_name, kpi_target, kpi_unit in okr_seeds:
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO team_okr
-                (team_key, technology, phase_type, okr_text, kpi_name, kpi_target, kpi_unit)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """,
-            (domain, tech, phase, okr_text, kpi_name, kpi_target, kpi_unit),
+            completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_evrun_wf ON evolution_runs(wf_id)")
 
-    conn.commit()
+    # ── RL experience replay buffer ───────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rl_experience (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            state_json TEXT NOT NULL,
+            action TEXT NOT NULL,
+            reward REAL NOT NULL,
+            next_state_json TEXT NOT NULL,
+            mission_id TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id)")
 
+    # ── Simulation runs log ───────────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS simulation_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            wf_id TEXT NOT NULL,
+            n_runs INTEGER DEFAULT 0,
+            rows_written INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
 
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
