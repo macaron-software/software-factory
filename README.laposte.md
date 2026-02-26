@@ -28,6 +28,8 @@ Elle s'inscrit dans le cadre de la démarche **UDD IA Native** et suit la métho
 
 ### CTO Jarvis — Conseiller IA Stratégique
 
+![CTO Jarvis](docs/screenshots/fr/jarvis.png)
+
 L'onglet **CTO Jarvis** (accessible depuis la page d'accueil `/`) offre un panneau de chat persistant avec un conseiller IA de niveau directeur technique :
 
 - **Mémoire persistante** — les décisions techniques et contextes de session sont conservés entre les conversations
@@ -73,7 +75,9 @@ L'onglet **CTO Jarvis** (accessible depuis la page d'accueil `/`) offre un panne
 
 > *« Met à jour le wiki de l'architecture avec les dernières décisions sur la migration PostgreSQL. »*
 
+### Idéation Business (`/mkt-ideation`) — Équipe Marketing IA
 
+![Idéation Business](docs/screenshots/fr/mkt_ideation.png)
 
 L'onglet **Idéation Business** déploie une équipe de 6 agents marketing pilotée par Sophie Laurent (CMO) :
 
@@ -91,6 +95,8 @@ L'onglet **Idéation Business** déploie une équipe de 6 agents marketing pilot
 - **Accessible depuis** : Accueil → onglet Idéation Business
 
 ### Idéation Projet (`/ideation`) — Équipe Tech Multi-Agents
+
+![Idéation Projet](docs/screenshots/fr/ideation_projet.png)
 
 L'onglet **Idéation Projet** orchestre un PM et 4 experts techniques pour transformer une idée en Epic SAFe :
 

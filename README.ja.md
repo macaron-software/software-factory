@@ -930,6 +930,8 @@ Every project automatically gets 4 operational missions:
 - **Feather SVGアイコン** — 絵文字を一貫したベクターアイコンに置き換え
 
 ### CTO Jarvis — 戦略的AIアドバイザー
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
 - **永続的チャットパネル** — ホームページ専用タブ
 - **永続的メモリ** — 技術的な決定とセッションコンテキストを会話間で保持
 - **CTOレベルのアドバイザー** — アーキテクチャの意思決定、技術選択のサポート
@@ -961,6 +963,10 @@ Every project automatically gets 4 operational missions:
 
 > *「PostgreSQLへの移行に関する最新の決定でアーキテクチャwikiを更新してください。」*
 
+
+### ビジネスアイデア — 6エージェント・マーケティングチーム
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **ルート** `/mkt-ideation` — ホームページのビジネスアイデアタブからアクセス可能
 - **CMO Sophie Laurent** — 5名の専門マーケティングエキスパートを率いるチームリーダー

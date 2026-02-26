@@ -930,6 +930,8 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 - **Ícones SVG Feather** — emojis substituídos por ícones vetoriais consistentes
 
 ### CTO Jarvis — Consultor IA Estratégico
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
 - **Painel de chat persistente** — aba dedicada na página inicial
 - **Memória persistente** — decisões técnicas e contexto de sessão preservados entre conversas
 - **Consultor de nível CTO** — auxílio em decisões de arquitetura, escolha de tecnologia
@@ -961,6 +963,10 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 
 > *«Atualize o wiki de arquitetura com as últimas decisões sobre a migração para PostgreSQL.»*
 
+
+### Ideação de Negócios — Equipe de Marketing 6 Agentes
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **Rota** `/mkt-ideation` — acessível pela aba Ideação de Negócios na página inicial
 - **CMO Sophie Laurent** — líder de equipe com 5 especialistas de marketing

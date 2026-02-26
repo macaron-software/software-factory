@@ -930,6 +930,8 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **Feather SVG 아이콘** — 이모지를 일관된 벡터 아이콘으로 교체
 
 ### CTO Jarvis — 전략적 AI 어드바이저
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
 - **영구적 채팅 패널** — 홈 페이지 전용 탭
 - **영구적 메모리** — 기술적 결정과 세션 컨텍스트를 대화 간에 유지
 - **CTO 수준 어드바이저** — 아키텍처 결정, 기술 선택 지원
@@ -961,6 +963,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 > *"PostgreSQL 마이그레이션에 대한 최신 결정으로 아키텍처 위키를 업데이트해 주세요."*
 
+
+### 비즈니스 아이디어 — 6에이전트 마케팅 팀
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **라우트** `/mkt-ideation` — 홈 페이지 비즈니스 아이디어 탭에서 접근
 - **CMO Sophie Laurent** — 5명의 전문 마케팅 전문가를 이끄는 팀 리더

@@ -844,6 +844,9 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Icônes SVG Feather** — remplacement des emojis par des icônes vectorielles cohérentes
 
 ### CTO Jarvis — Conseiller IA Stratégique
+
+![CTO Jarvis](docs/screenshots/fr/jarvis.png)
+
 - **Panneau de chat persistant** — onglet dédié sur la page d'accueil
 - **Mémoire persistante** — décisions techniques et contexte de session conservés
 - **Conseiller de niveau CTO** — aide à la prise de décision architecturale, choix technologiques
@@ -875,6 +878,9 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 
 > *« Met à jour le wiki de l'architecture avec les dernières décisions sur la migration PostgreSQL. »*
 
+### Idéation Business — Équipe Marketing 6 Agents
+
+![Idéation Business](docs/screenshots/fr/mkt_ideation.png)
 
 - **Route** `/mkt-ideation` — accessible depuis l'onglet Idéation Business de la page d'accueil
 - **CMO Sophie Laurent** — chef d'équipe supervisant 5 experts marketing spécialisés

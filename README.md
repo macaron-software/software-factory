@@ -977,6 +977,9 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **Feather SVG icons** — emoji replaced with consistent vector icons throughout
 
 ### CTO Jarvis — Strategic AI Advisor
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
+
 - **Persistent chat panel** — dedicated tab on the home page
 - **Persistent memory** — technical decisions and session context retained across conversations
 - **CTO-level advisor** — helps with architectural decisions, technology choices, trade-offs
@@ -1008,6 +1011,9 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 
 > *"Update the architecture wiki with the latest decisions on the PostgreSQL migration."*
 
+### Business Ideation — 6-Agent Marketing Team
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **Route** `/mkt-ideation` — accessible from the Business Ideation tab on the home page
 - **CMO Sophie Laurent** — team lead overseeing 5 specialized marketing experts

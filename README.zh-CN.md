@@ -930,6 +930,8 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **Feather SVG 图标** — 使用一致的矢量图标替换表情符号
 
 ### CTO Jarvis — 战略AI顾问
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
 - **持久聊天面板** — 首页专属标签页
 - **持久记忆** — 跨对话保留技术决策和会话上下文
 - **CTO 级顾问** — 协助架构决策、技术选型
@@ -961,6 +963,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 > *「用最新的 PostgreSQL 迁移决策更新架构 wiki。」*
 
+
+### 业务创意 — 6智能体营销团队
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **路由** `/mkt-ideation` — 通过首页业务创意标签页访问
 - **CMO Sophie Laurent** — 带领 5 位专业营销专家的团队负责人

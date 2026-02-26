@@ -930,6 +930,8 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Feather SVG-Icons** — Emojis durch einheitliche Vektorsymbole ersetzt
 
 ### CTO Jarvis — Strategischer KI-Berater
+
+![CTO Jarvis](docs/screenshots/en/jarvis.png)
 - **Persistentes Chat-Panel** — dedizierter Tab auf der Startseite
 - **Persistentes Gedächtnis** — technische Entscheidungen und Sitzungskontext bleiben erhalten
 - **CTO-Level-Berater** — Unterstützung bei Architekturentscheidungen, Technologiewahl
@@ -961,6 +963,10 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 
 > *„Aktualisiere das Architektur-Wiki mit den neuesten Entscheidungen zur PostgreSQL-Migration."*
 
+
+### Business-Ideation — 6-Agenten-Marketing-Team
+
+![Business Ideation](docs/screenshots/en/mkt_ideation.png)
 
 - **Route** `/mkt-ideation` — über den Business-Ideation-Tab der Startseite erreichbar
 - **CMO Sophie Laurent** — Teamleiterin mit 5 spezialisierten Marketing-Experten
