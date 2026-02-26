@@ -88,6 +88,26 @@ Think of it as a **virtual software factory** where 161 AI agents collaborate th
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Home — CTO Jarvis / Business Ideation / Project Ideation tabs</strong><br>
+<img src="docs/screenshots/en/home.png" alt="Home" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — Strategic AI Advisor</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Business Ideation — 6-Agent Marketing Team</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="Business Ideation" width="100%">
+</td>
+<td width="50%">
+<strong>Project Ideation — Multi-Agent Tech Team</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="Project Ideation" width="100%">
+</td>
+</tr>
 </table>
 
 ## Quick Start
@@ -947,6 +967,38 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **Routing matrix** — configure heavy/light model per category (Reasoning, Production/Code, Tasks, Redaction) with dropdowns
 - **Darwin LLM A/B section** — live view of ongoing model experiments from the Settings page
 - **Save & invalidate** — one-click save pushes config to DB and flushes the executor cache
+
+## What's New in v2.3.0 (Feb 2026)
+
+### Restructured Navigation — Home + Dashboard
+- **Home page** (`/`) — three tabs: CTO Jarvis · Business Ideation · Project Ideation
+- **Dashboard page** (`/portfolio`) — three tabs: Overview · CTO · Business
+- **Simplified sidebar** — two entries only: Home and Dashboard
+- **Feather SVG icons** — emoji replaced with consistent vector icons throughout
+
+### CTO Jarvis — Strategic AI Advisor
+- **Persistent chat panel** — dedicated tab on the home page
+- **Persistent memory** — technical decisions and session context retained across conversations
+- **CTO-level advisor** — helps with architectural decisions, technology choices, trade-offs
+- **Platform awareness** — knows the current state of portfolio, projects and agent teams
+
+### Business Ideation — 6-Agent Marketing Team
+- **Route** `/mkt-ideation` — accessible from the Business Ideation tab on the home page
+- **CMO Sophie Laurent** — team lead overseeing 5 specialized marketing experts
+- **Full marketing plan JSON** — SWOT, TAM/SAM/SOM, brand strategy, go-to-market, KPIs, budget
+- **Agent graph** — ig-node visualization with avatar photos, collaboration edges, detail popovers
+
+### Project Ideation — Multi-Agent Tech Team
+- **Route** `/ideation` — accessible from the Project Ideation tab on the home page
+- **5-agent team** — Product Manager + Architect + Backend Dev + QA + SRE
+- **Epic output** — generates a structured SAFe Epic with Features, Stories and acceptance criteria
+- **Interactive graph** — ig-node card graph with agent photos and context popovers
+
+### PostgreSQL Migration + 40 Indexes
+- **SQLite → PostgreSQL migration** — complete schema and data migration scripts
+- **Native PostgreSQL FTS** — `tsvector/tsquery` replaces FTS5, more performant and scalable
+- **40+ PG indexes** — comprehensive coverage of all hot query paths
+- **Darwin Teams** — Thompson Sampling for agent team selection per context (technology + phase)
 
 ## Contributing
 

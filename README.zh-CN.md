@@ -88,6 +88,26 @@ Software Factory 是一个**自主多智能体平台**，它编排整个软件�
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>首页 — CTO Jarvis / 业务创意 / 项目创意 标签页</strong><br>
+<img src="docs/screenshots/en/home.png" alt="首页" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 战略AI顾问</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>业务创意 — 6智能体营销团队</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="业务创意" width="100%">
+</td>
+<td width="50%">
+<strong>项目创意 — 多智能体技术团队</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="项目创意" width="100%">
+</td>
+</tr>
 </table>
 
 ## 快速开始
@@ -900,6 +920,32 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **提供商网格** — 显示启用/禁用状态及缺少 API 密钥的提示
 - **路由矩阵** — 按类别（推理、生产/代码、任务、撰写）配置重/轻模型
 - **Darwin LLM A/B 区域** — 正在进行的模型实验的实时视图
+
+## v2.3.0 新特性（2026 年 2 月）
+
+### 重构导航 — 首页 + 控制台
+- **首页** (`/`) — 三个标签页：CTO Jarvis · 业务创意 · 项目创意
+- **控制台** (`/portfolio`) — 三个标签页：概览 · CTO · 业务
+- **精简侧边栏** — 仅两个入口：首页和控制台
+- **Feather SVG 图标** — 使用一致的矢量图标替换表情符号
+
+### CTO Jarvis — 战略AI顾问
+- **持久聊天面板** — 首页专属标签页
+- **持久记忆** — 跨对话保留技术决策和会话上下文
+- **CTO 级顾问** — 协助架构决策、技术选型
+- **平台感知** — 了解当前投资组合、项目和智能体团队状态
+
+### 业务创意 — 6智能体营销团队
+- **路由** `/mkt-ideation` — 通过首页业务创意标签页访问
+- **CMO Sophie Laurent** — 带领 5 位专业营销专家的团队负责人
+- **完整营销计划 JSON** — SWOT、TAM/SAM/SOM、品牌策略、GTM、KPI、预算
+- **智能体图谱** — ig-node 可视化，含头像照片、协作边、详情弹窗
+
+### PostgreSQL 迁移 + 40 索引
+- **SQLite → PostgreSQL 迁移** — 完整的模式和数据迁移脚本
+- **原生 PostgreSQL FTS** — `tsvector/tsquery` 替代 FTS5，性能更强、可扩展性更好
+- **40+ PG 索引** — 全面覆盖所有热点查询路径
+- **Darwin Teams** — 基于上下文（技术+阶段）的智能体团队选择 Thompson 采样
 
 ## 参与贡献
 

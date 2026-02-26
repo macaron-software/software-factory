@@ -88,6 +88,26 @@ Software Factory는 아이디어 구상부터 배포까지 전체 소프트웨�
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>홈 — CTO Jarvis / 비즈니스 아이디어 / 프로젝트 아이디어 탭</strong><br>
+<img src="docs/screenshots/en/home.png" alt="홈" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 전략적 AI 어드바이저</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>비즈니스 아이디어 — 6에이전트 마케팅 팀</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="비즈니스 아이디어" width="100%">
+</td>
+<td width="50%">
+<strong>프로젝트 아이디어 — 멀티 에이전트 기술 팀</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="프로젝트 아이디어" width="100%">
+</td>
+</tr>
 </table>
 
 ## 빠른 시작
@@ -900,6 +920,32 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **프로바이더 그리드** — 활성/비활성 상태 및 누락된 API 키 힌트 표시
 - **라우팅 매트릭스** — 카테고리별(추론, 생산/코드, 작업, 문서 작성) 무거운/가벼운 모델 구성
 - **Darwin LLM A/B 섹션** — 진행 중인 모델 실험의 실시간 보기
+
+## v2.3.0의 새로운 기능 (2026년 2월)
+
+### 재구성된 내비게이션 — 홈 + 대시보드
+- **홈 페이지** (`/`) — 세 개의 탭: CTO Jarvis · 비즈니스 아이디어 · 프로젝트 아이디어
+- **대시보드** (`/portfolio`) — 세 개의 탭: 개요 · CTO · 비즈니스
+- **간소화된 사이드바** — 홈과 대시보드 두 항목만
+- **Feather SVG 아이콘** — 이모지를 일관된 벡터 아이콘으로 교체
+
+### CTO Jarvis — 전략적 AI 어드바이저
+- **영구적 채팅 패널** — 홈 페이지 전용 탭
+- **영구적 메모리** — 기술적 결정과 세션 컨텍스트를 대화 간에 유지
+- **CTO 수준 어드바이저** — 아키텍처 결정, 기술 선택 지원
+- **플랫폼 인식** — 포트폴리오, 프로젝트, 에이전트 팀의 현재 상태 파악
+
+### 비즈니스 아이디어 — 6에이전트 마케팅 팀
+- **라우트** `/mkt-ideation` — 홈 페이지 비즈니스 아이디어 탭에서 접근
+- **CMO Sophie Laurent** — 5명의 전문 마케팅 전문가를 이끄는 팀 리더
+- **완전한 마케팅 플랜 JSON** — SWOT, TAM/SAM/SOM, 브랜드 전략, GTM, KPI, 예산
+- **에이전트 그래프** — 아바타 사진, 협업 엣지, 상세 팝오버의 ig-node 시각화
+
+### PostgreSQL 마이그레이션 + 40 인덱스
+- **SQLite → PostgreSQL 마이그레이션** — 완전한 스키마 및 데이터 마이그레이션 스크립트
+- **네이티브 PostgreSQL FTS** — `tsvector/tsquery`가 FTS5를 대체, 더 성능적이고 확장 가능
+- **40+ PG 인덱스** — 모든 핫 쿼리 경로의 포괄적 커버리지
+- **Darwin Teams** — 컨텍스트(기술+단계)별 에이전트 팀 선택을 위한 Thompson 샘플링
 
 ## 기여하기
 

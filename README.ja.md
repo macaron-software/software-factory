@@ -88,6 +88,26 @@ Software Factory は**自律型マルチエージェントプラットフォー�
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>ホーム — CTO Jarvis / ビジネスアイデア / プロジェクトアイデア タブ</strong><br>
+<img src="docs/screenshots/en/home.png" alt="ホーム" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 戦略的AIアドバイザー</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ビジネスアイデア — 6エージェント・マーケティングチーム</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="ビジネスアイデア" width="100%">
+</td>
+<td width="50%">
+<strong>プロジェクトアイデア — マルチエージェント技術チーム</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="プロジェクトアイデア" width="100%">
+</td>
+</tr>
 </table>
 
 ## クイックスタート
@@ -900,6 +920,32 @@ Every project automatically gets 4 operational missions:
 - **プロバイダーグリッド** — アクティブ/非アクティブ状態と API キー欠落のヒント表示
 - **ルーティングマトリックス** — カテゴリ別（推論・本番/コード・タスク・文書作成）の重い/軽いモデル設定
 - **Darwin LLM A/B セクション** — 進行中のモデル実験のライブビュー
+
+## v2.3.0 の新機能 (2026年2月)
+
+### ナビゲーションの再構成 — ホーム + ダッシュボード
+- **ホームページ** (`/`) — 3つのタブ: CTO Jarvis · ビジネスアイデア · プロジェクトアイデア
+- **ダッシュボード** (`/portfolio`) — 3つのタブ: 概要 · CTO · ビジネス
+- **シンプルなサイドバー** — 2つのエントリのみ: ホームとダッシュボード
+- **Feather SVGアイコン** — 絵文字を一貫したベクターアイコンに置き換え
+
+### CTO Jarvis — 戦略的AIアドバイザー
+- **永続的チャットパネル** — ホームページ専用タブ
+- **永続的メモリ** — 技術的な決定とセッションコンテキストを会話間で保持
+- **CTOレベルのアドバイザー** — アーキテクチャの意思決定、技術選択のサポート
+- **プラットフォーム認識** — ポートフォリオ、プロジェクト、エージェントチームの現状を把握
+
+### ビジネスアイデア — 6エージェントのマーケティングチーム
+- **ルート** `/mkt-ideation` — ホームページのビジネスアイデアタブからアクセス可能
+- **CMO Sophie Laurent** — 5名の専門マーケティングエキスパートを率いるチームリーダー
+- **完全なマーケティングプランJSON** — SWOT、TAM/SAM/SOM、ブランド戦略、GTM、KPI、予算
+- **エージェントグラフ** — アバター写真、コラボレーションエッジ、詳細ポップオーバーのig-nodeビジュアライゼーション
+
+### PostgreSQL移行 + 40インデックス
+- **SQLite → PostgreSQL移行** — スキーマとデータの完全な移行スクリプト
+- **ネイティブPostgreSQL FTS** — `tsvector/tsquery`がFTS5を置き換え、より高性能でスケーラブル
+- **40以上のPGインデックス** — すべてのホットクエリパスの包括的なカバレッジ
+- **Darwin Teams** — コンテキスト（技術+フェーズ）ごとのエージェントチーム選択のThompsonサンプリング
 
 ## 貢献
 

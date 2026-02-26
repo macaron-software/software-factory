@@ -87,6 +87,26 @@ Imaginez une **usine logicielle virtuelle** où 161 agents IA collaborent à tra
 <img src="docs/screenshots/fr/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Accueil — Onglets CTO Jarvis / Idéation Business / Idéation Projet</strong><br>
+<img src="docs/screenshots/fr/home.png" alt="Accueil" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — Conseiller IA Stratégique</strong><br>
+<img src="docs/screenshots/fr/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Idéation Business — Équipe Marketing 6 Agents</strong><br>
+<img src="docs/screenshots/fr/mkt_ideation.png" alt="Idéation Business" width="100%">
+</td>
+<td width="50%">
+<strong>Idéation Projet — Équipe Tech Multi-Agents</strong><br>
+<img src="docs/screenshots/fr/ideation_projet.png" alt="Idéation Projet" width="100%">
+</td>
+</tr>
 </table>
 
 ## Démarrage rapide
@@ -814,6 +834,32 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Grille providers** — statut actif/inactif avec indices de clé manquante
 - **Matrice de routage** — lourd/léger par catégorie (Raisonnement, Production/Code, Tâches, Rédaction)
 - **Section Darwin LLM A/B** — vue live des expériences de modèles en cours
+
+## Nouveautés v2.3.0 (fév 2026)
+
+### Navigation Restructurée — Home + Dashboard
+- **Page Accueil** (`/`) — trois onglets : CTO Jarvis · Idéation Business · Idéation Projet
+- **Page Dashboard** (`/portfolio`) — trois onglets : Vue d'ensemble · DSI · Business
+- **Sidebar épurée** — deux entrées seulement : Home et Dashboard
+- **Icônes SVG Feather** — remplacement des emojis par des icônes vectorielles cohérentes
+
+### CTO Jarvis — Conseiller IA Stratégique
+- **Panneau de chat persistant** — onglet dédié sur la page d'accueil
+- **Mémoire persistante** — décisions techniques et contexte de session conservés
+- **Conseiller de niveau CTO** — aide à la prise de décision architecturale, choix technologiques
+- **Connaissance plateforme** — accès à l'état du portfolio, des projets et des équipes agents
+
+### Idéation Business — Équipe Marketing 6 Agents
+- **Route** `/mkt-ideation` — accessible depuis l'onglet Idéation Business de la page d'accueil
+- **CMO Sophie Laurent** — chef d'équipe supervisant 5 experts marketing spécialisés
+- **Plan marketing JSON complet** — SWOT, TAM/SAM/SOM, stratégie de marque, go-to-market, KPIs, budget
+- **Graphe d'agents** — visualisation ig-node avec photos avatars, arêtes de collaboration, popovers
+
+### Migration PostgreSQL + 40 Index
+- **Migration SQLite → PostgreSQL** — scripts complets de migration schéma et données
+- **FTS natif PostgreSQL** — `tsvector/tsquery` remplace FTS5, plus performant et scalable
+- **40+ index PG** — couverture exhaustive de tous les chemins de requêtes chauds
+- **Darwin Teams** — Thompson Sampling pour la sélection d'équipes agents par contexte (technologie + phase)
 
 ## Configuration Projet
 
