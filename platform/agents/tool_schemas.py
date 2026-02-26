@@ -312,6 +312,59 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_create_pr",
+                "description": "Create a GitHub Pull Request from current branch. Fires a Slack/webhook notification and auto-triggers a code review.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "PR title"},
+                        "body": {"type": "string", "description": "PR description (markdown)"},
+                        "base": {"type": "string", "description": "Base branch (default: main)"},
+                        "cwd": {"type": "string", "description": "Working directory"},
+                    },
+                    "required": ["title"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_get_pr_diff",
+                "description": "Fetch the diff and metadata of a GitHub Pull Request for code review.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pr": {"type": "string", "description": "PR number or full GitHub URL"},
+                        "cwd": {"type": "string", "description": "Working directory"},
+                    },
+                    "required": ["pr"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_post_pr_review",
+                "description": "Post a structured code review on a GitHub PR (APPROVE, REQUEST_CHANGES, or COMMENT).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "pr": {"type": "string", "description": "PR number or GitHub URL"},
+                        "body": {"type": "string", "description": "Review body (markdown)"},
+                        "event": {
+                            "type": "string",
+                            "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"],
+                            "description": "Review type (default: COMMENT)",
+                        },
+                        "cwd": {"type": "string", "description": "Working directory"},
+                    },
+                    "required": ["pr", "body"],
+                },
+            },
+        },
         # ── Phase orchestration tools (CDP Mission Control) ──
         {
             "type": "function",
@@ -1954,9 +2007,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_log",
         "git_diff",
         "git_commit",
+        "git_create_pr",
         "list_files",
-        "deep_search",
-        "fractal_code",
         "memory_search",
         "memory_store",
         "get_project_context",
@@ -2098,6 +2150,22 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_board_issues",
         "jira_sync_from_platform",
     ],
+    "reviewer": [
+        "code_read",
+        "code_search",
+        "list_files",
+        "deep_search",
+        "git_diff",
+        "git_log",
+        "git_status",
+        "git_get_pr_diff",
+        "git_post_pr_review",
+        "github_prs",
+        "github_issues",
+        "memory_search",
+        "memory_store",
+        "get_project_context",
+    ],
 }
 
 # Quality tools — available to qa, devops, architecture, cdp roles
@@ -2144,6 +2212,8 @@ def _classify_agent_role(agent: AgentDef) -> str:
         return "product"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"
+    if any(k in combined for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")):
+        return "reviewer"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
     if any(

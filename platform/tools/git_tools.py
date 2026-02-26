@@ -201,12 +201,137 @@ class GitCreatePRTool(BaseTool):
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=60)
             if r.returncode == 0:
                 pr_url = r.stdout.strip()
+                # Fire PR notification
+                try:
+                    from ..services.notifications import emit_notification
+                    from ..services.notification_service import get_notification_service, NotificationPayload
+                    agent_name = getattr(agent, "id", "agent") if agent else "agent"
+                    emit_notification(
+                        f"PR Created: {title}",
+                        type="pr",
+                        message=f"Agent {agent_name} created a PR: {pr_url}",
+                        url=pr_url,
+                        severity="info",
+                        source="git",
+                    )
+                    svc = get_notification_service()
+                    if svc.is_configured:
+                        import asyncio
+                        payload = NotificationPayload(
+                            event="pr_created", title=f"PR Created: {title}",
+                            message=f"{pr_url}\n\nAgent: {agent_name}",
+                            severity="info",
+                        )
+                        try:
+                            loop = asyncio.get_running_loop()
+                            loop.create_task(svc.notify(payload))
+                        except RuntimeError:
+                            pass
+                except Exception:
+                    pass
+                # Auto-launch code review mission
+                try:
+                    import asyncio
+                    from ..missions.store import MissionDef, get_mission_store
+                    pr_number = pr_url.rstrip("/").split("/")[-1]
+                    ms = get_mission_store()
+                    review_mission = MissionDef(
+                        name=f"PR Review: {title[:80]}",
+                        description=f"Automated code review for PR #{pr_number}",
+                        goal=f"Review PR #{pr_number} ({pr_url}) and post structured feedback",
+                        type="program",
+                        workflow_id="pr-auto-review",
+                        created_by="code-reviewer",
+                        config={
+                            "pr_ref": pr_number,
+                            "pr_url": pr_url,
+                            "pr_title": title,
+                            "cwd": cwd,
+                            "auto_provisioned": True,
+                        },
+                    )
+                    ms.create_mission(review_mission)
+                except Exception:
+                    pass  # Non-blocking
                 return f"PR created: {pr_url}"
             # gh not available — output branch URL hint
             return (
                 f"gh CLI not available ({r.stderr.strip()[:200]}). "
                 f"Branch '{branch}' is ready — create PR manually at GitHub."
             )
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class GitGetPRDiffTool(BaseTool):
+    name = "git_get_pr_diff"
+    description = "Fetch the diff of a GitHub Pull Request for code review (by PR number or URL)"
+    category = "git"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        pr = params.get("pr", "")
+        cwd = params.get("cwd", ".")
+        if not pr:
+            return "Error: pr (number or URL) required"
+        try:
+            # Extract PR number from URL if needed
+            pr_ref = str(pr).split("/")[-1] if "github.com" in str(pr) else str(pr)
+            # Get PR metadata
+            meta_r = subprocess.run(
+                ["gh", "pr", "view", pr_ref, "--json", "title,number,author,baseRefName,headRefName,body"],
+                capture_output=True, text=True, cwd=cwd, timeout=30,
+            )
+            # Get diff
+            diff_r = subprocess.run(
+                ["gh", "pr", "diff", pr_ref],
+                capture_output=True, text=True, cwd=cwd, timeout=60,
+            )
+            if diff_r.returncode != 0:
+                return f"Error fetching PR diff: {diff_r.stderr.strip()[:300]}"
+            diff = diff_r.stdout
+            # Truncate large diffs
+            MAX = 12000
+            if len(diff) > MAX:
+                diff = diff[:MAX] + f"\n\n... [diff truncated at {MAX} chars — {len(diff_r.stdout)} total] ..."
+            meta = meta_r.stdout if meta_r.returncode == 0 else ""
+            return f"PR #{pr_ref} metadata:\n{meta}\n\nDiff:\n{diff}"
+        except FileNotFoundError:
+            return "Error: gh CLI not installed"
+        except Exception as e:
+            return f"Error: {e}"
+
+
+class GitPostPRReviewTool(BaseTool):
+    name = "git_post_pr_review"
+    description = "Post a code review comment on a GitHub Pull Request (approve, request-changes, or comment)"
+    category = "git"
+    requires_approval = False  # Agent-initiated review is safe
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        pr = params.get("pr", "")
+        body = params.get("body", "")
+        event = params.get("event", "COMMENT")  # APPROVE | REQUEST_CHANGES | COMMENT
+        cwd = params.get("cwd", ".")
+        if not pr or not body:
+            return "Error: pr and body required"
+        # Map to gh review event flags
+        event_map = {
+            "APPROVE": "--approve",
+            "REQUEST_CHANGES": "--request-changes",
+            "COMMENT": "--comment",
+        }
+        event_flag = event_map.get(event.upper(), "--comment")
+        try:
+            pr_ref = str(pr).split("/")[-1] if "github.com" in str(pr) else str(pr)
+            r = subprocess.run(
+                ["gh", "pr", "review", pr_ref, event_flag, "--body", body],
+                capture_output=True, text=True, cwd=cwd, timeout=60,
+            )
+            if r.returncode == 0:
+                return f"Review posted on PR #{pr_ref} ({event})"
+            return f"Error posting review: {r.stderr.strip()[:300]}"
+        except FileNotFoundError:
+            return "Error: gh CLI not installed"
         except Exception as e:
             return f"Error: {e}"
 
@@ -219,3 +344,5 @@ def register_git_tools(registry):
     registry.register(GitCommitTool())
     registry.register(GitPushTool())
     registry.register(GitCreatePRTool())
+    registry.register(GitGetPRDiffTool())
+    registry.register(GitPostPRReviewTool())

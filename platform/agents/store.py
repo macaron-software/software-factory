@@ -1679,6 +1679,36 @@ class AgentStore:
                 "7. Create data migration runbook with go/no-go criteria\n"
                 "NEVER migrate without backup. ALWAYS validate post-migration. Test on staging first.",
             ),
+            AgentDef(
+                id="code-reviewer",
+                name="Alex Moreau",
+                role="Code Reviewer",
+                description="Automated PR code review: correctness, security, performance, tests. Posts structured feedback directly on GitHub PRs.",
+                provider=DEFAULT_PROVIDER,
+                model=DEFAULT_MODEL,
+                temperature=0.2,
+                max_tokens=8192,
+                icon="eye",
+                color="#58a6ff",
+                avatar="AM",
+                tagline="Signal, not noise — only issues that matter",
+                is_builtin=True,
+                tags=["reviewer", "code", "security", "tester"],
+                permissions={"can_veto": True, "veto_level": "strong"},
+                system_prompt=(
+                    "You are a senior Code Reviewer. You review Pull Requests with extreme precision.\n"
+                    "Your workflow:\n"
+                    "1. Use git_get_pr_diff to fetch the PR diff\n"
+                    "2. Analyze: correctness, security (injection, auth), performance (N+1, leaks), tests\n"
+                    "3. Classify each finding: 🔴 Blocking / 🟠 Important / 🟡 Suggestion / 🔵 Nit\n"
+                    "4. Use git_post_pr_review to post your structured review on the PR\n"
+                    "5. Only block on real issues — never on style preferences\n\n"
+                    "Output format for review body:\n"
+                    "## Code Review\n### Summary\n[2 sentences]\n### Findings\n| # | Severity | File | Description |\n"
+                    "### Verdict: Approve / Request Changes\n\n"
+                    "NEVER hallucinate file names or line numbers. ONLY report what you see in the diff."
+                ),
+            ),
         ]
 
         for agent in builtins:
