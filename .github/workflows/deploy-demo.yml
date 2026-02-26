@@ -17,6 +17,24 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
 
+      - name: Backup SQLite before deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key debian@${{ secrets.OVH_IP }} "
+            TS=\$(date +%Y%m%d-%H%M%S)
+            mkdir -p /opt/software-factory/backups
+            docker exec software-factory-platform-1 sh -c \"
+              mkdir -p /app/data/backups &&
+              sqlite3 /app/data/platform.db \\\".backup /app/data/backups/platform-\${TS}.db\\\" &&
+              echo SQLite backup OK
+            \"
+            tar czf /opt/software-factory/backups/yaml-\${TS}.tar.gz \
+              /opt/software-factory/skills/definitions/ \
+              /opt/software-factory/projects/ 2>/dev/null || true
+            ls -lh /opt/software-factory/backups/ | tail -5
+            # Garder les 10 derniers backups
+            ls -t /opt/software-factory/backups/yaml-*.tar.gz 2>/dev/null | tail -n +11 | xargs rm -f || true
+          "
+
       - name: Rsync code to OVH
         run: |
           rsync -azP --delete \
@@ -26,6 +44,7 @@ jobs:
             --exclude='data/' \
             --exclude='.env' \
             --exclude='node_modules' \
+            --exclude='backups/' \
             -e "ssh -i ~/.ssh/deploy_key" \
             . debian@${{ secrets.OVH_IP }}:/opt/software-factory/
 
