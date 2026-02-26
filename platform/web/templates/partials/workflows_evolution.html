@@ -1,11 +1,33 @@
 {# Evolution Tab — GA proposals + RL stats + run history #}
 
+{# ── Feather icons macro ───────────────────────────────────────────────────── #}
+{% macro fi(name, size=14) %}
+<svg xmlns="http://www.w3.org/2000/svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+  style="display:inline-block;vertical-align:middle;flex-shrink:0">
+  {% if name == 'activity' %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+  {% elif name == 'play' %}<polygon points="5 3 19 12 5 21 5 3"></polygon>
+  {% elif name == 'check-circle' %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+  {% elif name == 'x-circle' %}<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
+  {% elif name == 'cpu' %}<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>
+  {% elif name == 'clipboard' %}<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+  {% elif name == 'clock' %}<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+  {% elif name == 'trending-up' %}<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>
+  {% elif name == 'git-branch' %}<line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path>
+  {% elif name == 'inbox' %}<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+  {% elif name == 'loader' %}<line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+  {% endif %}
+</svg>
+{% endmacro %}
+
 <div class="evolution-page" style="padding:1rem">
 
   {# ── Header + trigger button ───────────────────────────────────────────── #}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
     <div>
-      <h2 style="margin:0;font-size:1.3rem">🧬 Évolution — Adaptive Intelligence</h2>
+      <h2 style="margin:0;font-size:1.3rem;display:flex;align-items:center;gap:.45rem">
+        {{ fi('activity', 18) }} Évolution — Adaptive Intelligence
+      </h2>
       <p style="margin:0.3rem 0 0;color:var(--text-muted,#888);font-size:.85rem">
         Genetic Algorithm · Reinforcement Learning · Thompson Sampling
       </p>
@@ -17,23 +39,23 @@
           <option value="{{ wf.id }}">{{ wf.name or wf.id }}</option>
         {% endfor %}
       </select>
-      <button onclick="triggerEvolution()"
-        style="padding:.35rem .9rem;border-radius:6px;background:var(--accent,#6c63ff);color:#fff;border:none;cursor:pointer;font-size:.85rem">
-        ▶ Lancer GA
+      <button id="evo-run-btn" onclick="triggerEvolution()"
+        style="padding:.35rem .9rem;border-radius:6px;background:var(--accent,#6c63ff);color:#fff;border:none;cursor:pointer;font-size:.85rem;display:flex;align-items:center;gap:.4rem">
+        {{ fi('play', 13) }} Lancer GA
       </button>
     </div>
   </div>
 
   {# ── Badges couches ────────────────────────────────────────────────────── #}
   <div style="display:flex;gap:.6rem;margin-bottom:1.5rem;flex-wrap:wrap">
-    <span style="padding:.25rem .75rem;border-radius:20px;background:#22c55e20;color:#16a34a;font-size:.78rem;font-weight:600">
-      ✅ Layer 1 · Thompson Sampling LIVE
+    <span style="padding:.25rem .75rem;border-radius:20px;background:#22c55e20;color:#16a34a;font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:.35rem">
+      {{ fi('check-circle', 12) }} Layer 1 · Thompson Sampling LIVE
     </span>
-    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if runs %}#6c63ff20;color:#6c63ff{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600">
-      🧬 Layer 2 · GA {% if runs %}ACTIF ({{ runs|length }} runs){% else %}EN ATTENTE{% endif %}
+    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if runs %}#6c63ff20;color:#6c63ff{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:.35rem">
+      {{ fi('git-branch', 12) }} Layer 2 · GA {% if runs %}ACTIF ({{ runs|length }} runs){% else %}EN ATTENTE{% endif %}
     </span>
-    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if rl_stats.get('states',0) > 0 %}#f97316aa;color:#c2410c{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600">
-      🤖 Layer 3 · RL {% if rl_stats.get('states',0) > 0 %}ACTIF ({{ rl_stats.states }} états){% else %}EN ATTENTE{% endif %}
+    <span style="padding:.25rem .75rem;border-radius:20px;background:{% if rl_stats.get('states',0) > 0 %}#f97316aa;color:#c2410c{% else %}#f5f5f5;color:#aaa{% endif %};font-size:.78rem;font-weight:600;display:flex;align-items:center;gap:.35rem">
+      {{ fi('cpu', 12) }} Layer 3 · RL {% if rl_stats.get('states',0) > 0 %}ACTIF ({{ rl_stats.states }} états){% else %}EN ATTENTE{% endif %}
     </span>
   </div>
 
@@ -42,8 +64,9 @@
 
     {# ── Proposals GA ──────────────────────────────────────────────────────── #}
     <div>
-      <h3 style="font-size:1rem;margin:0 0 .75rem">📋 Proposals en attente
-        <span style="background:#f97316;color:#fff;border-radius:10px;font-size:.72rem;padding:.1rem .5rem;margin-left:.4rem">
+      <h3 style="font-size:1rem;margin:0 0 .75rem;display:flex;align-items:center;gap:.4rem">
+        {{ fi('clipboard', 15) }} Proposals en attente
+        <span style="background:#f97316;color:#fff;border-radius:10px;font-size:.72rem;padding:.1rem .5rem;margin-left:.2rem">
           {{ proposals | selectattr('status','equalto','pending') | list | length }}
         </span>
       </h3>
@@ -54,7 +77,7 @@
 
       {% if not proposals %}
       <div style="text-align:center;padding:2rem;color:var(--text-muted,#888);border:1px dashed var(--border,#ddd);border-radius:8px">
-        <div style="font-size:2rem;margin-bottom:.5rem">🌱</div>
+        <div style="margin-bottom:.6rem;opacity:.4">{{ fi('inbox', 36) }}</div>
         <div>Aucune proposal pour l'instant.</div>
         <div style="font-size:.8rem;margin-top:.3rem">Lancez une évolution GA ou attendez le run nightly (02:00 UTC).</div>
       </div>
@@ -63,16 +86,16 @@
       {# Tabs proposals #}
       <div style="display:flex;gap:.3rem;margin-bottom:.75rem">
         <button onclick="filterProposals('pending',this)" class="prop-tab prop-tab-active"
-          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;background:var(--accent,#6c63ff);color:#fff">
-          ⏳ En attente ({{ pending|length }})
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;background:var(--accent,#6c63ff);color:#fff;display:flex;align-items:center;gap:.3rem">
+          {{ fi('clock', 12) }} En attente ({{ pending|length }})
         </button>
         <button onclick="filterProposals('approved',this)" class="prop-tab"
-          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem">
-          ✅ Approuvées ({{ approved|length }})
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;display:flex;align-items:center;gap:.3rem">
+          {{ fi('check-circle', 12) }} Approuvées ({{ approved|length }})
         </button>
         <button onclick="filterProposals('rejected',this)" class="prop-tab"
-          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem">
-          ❌ Rejetées ({{ rejected|length }})
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;display:flex;align-items:center;gap:.3rem">
+          {{ fi('x-circle', 12) }} Rejetées ({{ rejected|length }})
         </button>
       </div>
 
@@ -96,13 +119,17 @@
             </span>
             {% if p.status == 'pending' %}
             <button onclick="approveProposal('{{ p.id }}')" title="Approuver"
-              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #22c55e;color:#16a34a;cursor:pointer;font-size:.8rem;background:transparent">✓</button>
+              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #22c55e;color:#16a34a;cursor:pointer;font-size:.8rem;background:transparent;display:flex;align-items:center">
+              {{ fi('check-circle', 13) }}
+            </button>
             <button onclick="rejectProposal('{{ p.id }}')" title="Rejeter"
-              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #ef4444;color:#dc2626;cursor:pointer;font-size:.8rem;background:transparent">✗</button>
+              style="padding:.2rem .5rem;border-radius:4px;border:1px solid #ef4444;color:#dc2626;cursor:pointer;font-size:.8rem;background:transparent;display:flex;align-items:center">
+              {{ fi('x-circle', 13) }}
+            </button>
             {% elif p.status == 'approved' %}
-            <span style="color:#16a34a;font-size:.8rem">✅ Approuvée</span>
+            <span style="color:#16a34a;font-size:.8rem;display:flex;align-items:center;gap:.25rem">{{ fi('check-circle', 12) }} Approuvée</span>
             {% elif p.status == 'rejected' %}
-            <span style="color:#dc2626;font-size:.8rem">❌ Rejetée</span>
+            <span style="color:#dc2626;font-size:.8rem;display:flex;align-items:center;gap:.25rem">{{ fi('x-circle', 12) }} Rejetée</span>
             {% endif %}
           </div>
         </div>
@@ -133,7 +160,9 @@
 
       {# RL Stats card #}
       <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-        <h4 style="margin:0 0 .65rem;font-size:.9rem">🤖 RL Policy Stats</h4>
+        <h4 style="margin:0 0 .65rem;font-size:.9rem;display:flex;align-items:center;gap:.4rem">
+          {{ fi('cpu', 14) }} RL Policy Stats
+        </h4>
         {% if rl_stats %}
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
           <div style="font-size:.78rem;color:var(--text-muted,#888)">États Q-table</div>
@@ -155,7 +184,9 @@
 
       {# GA Run history #}
       <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
-        <h4 style="margin:0 0 .65rem;font-size:.9rem">📈 Runs GA récents</h4>
+        <h4 style="margin:0 0 .65rem;font-size:.9rem;display:flex;align-items:center;gap:.4rem">
+          {{ fi('trending-up', 14) }} Runs GA récents
+        </h4>
         {% if runs %}
         {% for r in runs[:10] %}
         <div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border,#f3f4f6)">
@@ -209,20 +240,18 @@ async function rejectProposal(id) {
 async function triggerEvolution() {
   const wfId = document.getElementById('evo-wf-select').value;
   if (!wfId) { alert('Sélectionnez un workflow'); return; }
-  const btn = event.target;
+  const btn = document.getElementById('evo-run-btn');
   btn.disabled = true;
-  btn.textContent = '⏳ En cours…';
+  btn.innerHTML = btn.innerHTML.replace(/Lancer GA.*/, 'En cours…');
   const r = await fetch(`/api/evolution/run/${wfId}`, {method:'POST'});
   const data = await r.json();
   btn.disabled = false;
-  btn.textContent = '▶ Lancer GA';
-  if (data.ok) {
-    btn.textContent = '✅ Lancé';
-    setTimeout(() => { btn.textContent = '▶ Lancer GA'; }, 3000);
-  }
+  btn.innerHTML = btn.innerHTML.replace(/En cours…/, data.ok ? 'Lancé !' : 'Lancer GA');
+  if (data.ok) setTimeout(() => {
+    btn.innerHTML = btn.innerHTML.replace(/Lancé !/, 'Lancer GA');
+  }, 3000);
 }
 
-// Init: show only pending
 document.addEventListener('DOMContentLoaded', () => {
   const pendingBtn = document.querySelector('.prop-tab-active');
   if (pendingBtn) filterProposals('pending', pendingBtn);
