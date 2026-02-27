@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Usage interne](https://img.shields.io/badge/Usage-Interne%20La%20Poste-yellow.svg)]()
+[![Usage interne](https://img.shields.io/badge/Usage-La%20Poste%20UDD%20IA%20Native-yellow.svg)]()
 
 ---
 
@@ -310,8 +310,3 @@ Pour démarrer, ajoutez vos propres :
 Voir `platform/skills/definitions/_template.yaml` pour le format.
 
 ---
-
-## Usage interne
-
-Ce projet est à usage interne La Poste — UDD IA Native.
-Toute diffusion externe est soumise à validation de la DSI.
