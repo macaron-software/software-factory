@@ -225,7 +225,7 @@ async def cto_mention_list(type: str = "all"):
     if type in ("project", "all"):
         try:
             ps = get_project_store()
-            for p in ps.list_all()[:60]:
+            for p in ps.list_all():  # no limit — frontend already slices to 12
                 has_content = bool(p.description or p.vision)
                 if has_content:
                     sub = (p.description or p.vision or "")[:50].replace("\n", " ")

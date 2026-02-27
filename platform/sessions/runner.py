@@ -263,6 +263,11 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         except Exception as exc:
             logger.debug("Failed to load project memory files: %s", exc)
 
+    # Apply role-based tool restrictions
+    from ..agents.tool_schemas import _classify_agent_role, ROLE_TOOL_MAP
+    _role_cat = _classify_agent_role(agent)
+    _allowed_tools = ROLE_TOOL_MAP.get(_role_cat)  # None = all tools (fallback)
+
     return ExecutionContext(
         agent=agent,
         session_id=session.id,
@@ -273,6 +278,7 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         project_memory=project_memory_str,
         skills_prompt=skills_prompt,
         vision=vision,
+        allowed_tools=_allowed_tools,
     )
 
 
