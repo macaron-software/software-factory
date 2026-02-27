@@ -59,7 +59,91 @@
 .ws-tree-size { margin-left: auto; font-size: .65rem; color: var(--text-secondary); opacity: .6; }
 .ws-tree-loading { display: flex; justify-content: center; padding: 1rem; }
 
-/* ── Right: main ──────────────────────────────────────────────────────────── */
+/* ── 3-panel IDE center column ────────────────────────────────────────────── */
+.ws-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+/* Panels row */
+.ws-panels-row {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+.ws-main-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.ws-side-pane {
+  width: 280px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--border);
+  transition: width .15s ease;
+}
+.ws-side-pane.ws-collapsed { width: 0; overflow: hidden; }
+
+/* Bottom panel (terminal) */
+.ws-bottom-panel {
+  height: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  transition: height .15s ease;
+}
+.ws-bottom-panel.ws-collapsed { height: 28px; }
+.ws-bottom-panel.ws-collapsed .ws-terminal { display: none; }
+
+/* Pane tab strips */
+.ws-pane-tabs {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  min-height: 28px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0 .25rem;
+}
+.ws-pane-tabs::-webkit-scrollbar { height: 0; }
+.ws-pane-tabs .ws-tab { padding: .3rem .65rem; font-size: .72rem; }
+.ws-pane-collapse {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 5px;
+  line-height: 28px;
+  display: flex;
+  align-items: center;
+  opacity: .6;
+}
+.ws-pane-collapse:hover { opacity: 1; color: var(--text-primary); }
+.ws-pane-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Right: main (legacy, kept for compat) */
 .ws-main {
   flex: 1;
   display: flex;

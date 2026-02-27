@@ -1,22 +1,34 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/css/project_workspace.css?v=5">
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=6">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <style>
-/* ── Critical layout rules — inlined to ensure they always apply ── */
+/* ── IDE 3-panel layout ── */
 html,body{height:100%;overflow:hidden}
 .layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
 .content{display:flex!important;flex-direction:column!important;height:100%!important;overflow:hidden!important;min-height:0!important}
 .main-area{padding:0!important;overflow:hidden!important;flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
-/* Workspace layout */
-.ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;min-height:0!important;background:var(--bg)}
-.ws-filetree{width:220px!important;min-width:160px!important;max-width:320px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
-.ws-main{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
+.ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;background:var(--bg)}
+.ws-filetree{width:200px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
+.ws-center{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0}
 .ws-infobar{flex-shrink:0!important}
-.ws-tabs{flex-shrink:0!important}
-.ws-tab-content{display:none!important;flex:1 1 0%!important;min-height:0!important;overflow:hidden!important}
-.ws-tab-content.active{display:flex!important;flex-direction:column!important}
+/* Panels row = main pane + side pane */
+.ws-panels-row{flex:1 1 0%!important;display:flex!important;flex-direction:row!important;overflow:hidden!important;min-height:0}
+.ws-main-pane{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0}
+.ws-side-pane{width:280px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-left:1px solid var(--border);transition:width .15s ease}
+.ws-side-pane.ws-collapsed{width:0!important}
+/* Bottom terminal */
+.ws-bottom-panel{height:200px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-top:1px solid var(--border);transition:height .15s ease}
+.ws-bottom-panel.ws-collapsed{height:28px!important}
+/* Pane tabs */
+.ws-pane-tabs{display:flex!important;align-items:center;flex-shrink:0!important;border-bottom:1px solid var(--border);background:var(--bg-secondary);min-height:28px;overflow-x:auto;overflow-y:hidden}
+.ws-pane-collapse{margin-left:auto;flex-shrink:0;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0 6px;line-height:28px;display:flex;align-items:center}
+.ws-pane-collapse:hover{color:var(--text-primary)}
+.ws-pane-content{flex:1 1 0%!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;min-height:0}
+/* Tab contents */
+.ws-tab-content{display:none!important}
+.ws-tab-content.active{display:flex!important;flex:1 1 0%!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
 </style>
 {% endblock %}
 
@@ -31,7 +43,7 @@ html,body{height:100%;overflow:hidden}
 {% block content %}
 <div class="ws-layout">
 
-  <!-- Left: file tree -->
+  <!-- ── Left: file tree ─────────────────────────────────── -->
   <div class="ws-filetree" id="wsFiletree">
     <div class="ws-filetree-header">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -42,16 +54,13 @@ html,body{height:100%;overflow:hidden}
     </div>
   </div>
 
-  <!-- Right: main panel -->
-  <div class="ws-main">
+  <!-- ── Center column ────────────────────────────────────── -->
+  <div class="ws-center">
 
-    <!-- Project info bar -->
+    <!-- Info bar -->
     <div class="ws-infobar">
       <div class="ws-infobar-left">
         <span class="ws-infobar-name">{{ project.name }}</span>
-        {% if project.factory_type and project.factory_type != "standalone" %}
-        <span class="ws-badge ws-badge-type">{{ project.factory_type|upper }}</span>
-        {% endif %}
         {% if project.path %}
         <span class="ws-badge ws-badge-path">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -68,41 +77,130 @@ html,body{height:100%;overflow:hidden}
       </div>
     </div>
 
-    <!-- Tabs bar -->
-    <div class="ws-tabs">
-      <button class="ws-tab active" onclick="wsTab(this,'terminal')" data-tab="terminal">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-        Terminal
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'toolcalls')" data-tab="toolcalls">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-        Tool Calls
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'files')" data-tab="files">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-        Fichiers
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'docker')" data-tab="docker">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-        Docker
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'agents')" data-tab="agents">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        Agents
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'git')" data-tab="git">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
-        Git
-      </button>
-      <button class="ws-tab" onclick="wsTab(this,'preview')" data-tab="preview">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-        Preview
-      </button>
-    </div>
+    <!-- ── Panels row: main pane + side pane ─────────────── -->
+    <div class="ws-panels-row">
 
-    <!-- Terminal -->
-    <div class="ws-tab-content active" id="ws-terminal">
-      <div class="ws-terminal">
+      <!-- Main pane: Code/Files · ToolCalls · Docker · Preview -->
+      <div class="ws-main-pane">
+        <div class="ws-pane-tabs" id="wsMainTabs">
+          <button class="ws-tab active" onclick="wsMainTab(this,'files')" data-tab="files">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            Code
+          </button>
+          <button class="ws-tab" onclick="wsMainTab(this,'toolcalls')" data-tab="toolcalls">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            Tool Calls
+          </button>
+          <button class="ws-tab" onclick="wsMainTab(this,'docker')" data-tab="docker">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Docker
+          </button>
+          <button class="ws-tab" onclick="wsMainTab(this,'preview')" data-tab="preview">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            Preview
+          </button>
+        </div>
+        <div class="ws-pane-content">
+          <!-- Code/Files -->
+          <div class="ws-tab-content active" id="ws-files">
+            <div class="ws-files-layout">
+              <div class="ws-files-tree" id="wsFilesTree"><div class="ws-empty-state" style="font-size:.7rem;padding:.75rem">Chargement…</div></div>
+              <div class="ws-files-viewer" id="wsFilesViewer">
+                <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier</span></div>
+              </div>
+            </div>
+          </div>
+          <!-- Tool Calls -->
+          <div class="ws-tab-content" id="ws-toolcalls">
+            <div class="ws-toolcalls" id="wsToolcallsBody">
+              <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span>Chargement…</span></div>
+            </div>
+          </div>
+          <!-- Docker -->
+          <div class="ws-tab-content" id="ws-docker">
+            <div class="ws-docker" id="wsDockerBody">
+              <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Chargement…</span></div>
+            </div>
+          </div>
+          <!-- Preview -->
+          <div class="ws-tab-content" id="ws-preview">
+            <div class="ws-preview" id="wsPreviewPanel">
+              <div class="ws-preview-bar">
+                <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:3000">
+                <button class="ws-preview-btn" onclick="wsPreviewLoad()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                  Charger
+                </button>
+                <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </button>
+                <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </button>
+              </div>
+              <div class="ws-preview-empty" id="wsPreviewEmpty">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <span>Aucun port détecté automatiquement</span>
+                <span class="ws-empty-hint">Saisissez une URL ci-dessus et cliquez sur Charger</span>
+              </div>
+              <iframe class="ws-preview-frame" id="wsPreviewFrame"
+                {% if preview_url %}src="{{ preview_url }}"{% endif %}
+                style="{{ '' if preview_url else 'display:none' }}"
+                sandbox="allow-scripts allow-forms allow-popups"></iframe>
+            </div>
+          </div>
+        </div>
+      </div><!-- end ws-main-pane -->
+
+      <!-- Side pane: Git · Agents -->
+      <div class="ws-side-pane" id="wsSidePane">
+        <div class="ws-pane-tabs" id="wsSideTabs">
+          <button class="ws-tab active" onclick="wsSideTab(this,'git')" data-tab="git">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
+            Git
+          </button>
+          <button class="ws-tab" onclick="wsSideTab(this,'agents')" data-tab="agents">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Agents
+          </button>
+          <button class="ws-pane-collapse" onclick="wsToggleSidePane()" title="Réduire panneau">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+        </div>
+        <div class="ws-pane-content">
+          <!-- Git -->
+          <div class="ws-tab-content active" id="ws-git">
+            <div class="ws-git" id="wsGitBody">
+              <div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Chargement…</span></div>
+            </div>
+          </div>
+          <!-- Agents -->
+          <div class="ws-tab-content" id="ws-agents">
+            <div class="ws-agents" id="wsAgentsBody">
+              <div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Chargement…</span></div>
+            </div>
+          </div>
+        </div>
+      </div><!-- end ws-side-pane -->
+
+    </div><!-- end ws-panels-row -->
+
+    <!-- ── Bottom panel: Terminal (always visible) ─────────── -->
+    <div class="ws-bottom-panel" id="wsBottomPanel">
+      <div class="ws-pane-tabs">
+        <button class="ws-tab active" style="cursor:default">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Terminal
+        </button>
+        <button class="ws-tab" onclick="wsMainTab(document.querySelector('[data-tab=toolcalls]'),'toolcalls')" style="font-size:.68rem">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Tool Calls
+        </button>
+        <button class="ws-pane-collapse" onclick="wsToggleBottomPanel()" title="Réduire terminal" id="wsBottomCollapseBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="wsBottomCollapseIcon"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+      </div>
+      <div class="ws-terminal" id="wsTerminalWrap">
         <div class="ws-term-history" id="wsTermHistory"></div>
         <div class="ws-term-input-row">
           <span class="ws-term-prompt">$</span>
@@ -113,76 +211,10 @@ html,body{height:100%;overflow:hidden}
           </button>
         </div>
       </div>
-    </div>
+    </div><!-- end ws-bottom-panel -->
 
-    <!-- Tool Calls -->
-    <div class="ws-tab-content" id="ws-toolcalls">
-      <div class="ws-toolcalls" id="wsToolcallsBody">
-        <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span>Chargement…</span></div>
-      </div>
-    </div>
-
-    <!-- Fichiers -->
-    <div class="ws-tab-content" id="ws-files">
-      <div class="ws-files-layout">
-        <div class="ws-files-tree" id="wsFilesTree"><div class="ws-empty-state" style="font-size:.7rem;padding:.75rem">Chargement…</div></div>
-        <div class="ws-files-viewer" id="wsFilesViewer">
-          <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier</span></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Docker -->
-    <div class="ws-tab-content" id="ws-docker">
-      <div class="ws-docker" id="wsDockerBody">
-        <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Chargement…</span></div>
-      </div>
-    </div>
-
-    <!-- Agents -->
-    <div class="ws-tab-content" id="ws-agents">
-      <div class="ws-agents" id="wsAgentsBody">
-        <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Chargement…</span></div>
-      </div>
-    </div>
-
-    <!-- Git -->
-    <div class="ws-tab-content" id="ws-git">
-      <div class="ws-git" id="wsGitBody">
-        <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Chargement…</span></div>
-      </div>
-    </div>
-
-    <!-- Preview -->
-    <div class="ws-tab-content" id="ws-preview">
-      <div class="ws-preview" id="wsPreviewPanel">
-        <div class="ws-preview-bar">
-          <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:3000">
-          <button class="ws-preview-btn" onclick="wsPreviewLoad()">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-            Charger
-          </button>
-          <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-          </button>
-          <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          </button>
-        </div>
-        <div class="ws-preview-empty" id="wsPreviewEmpty">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-          <span>Aucun port détecté automatiquement</span>
-          <span class="ws-empty-hint">Saisissez une URL ci-dessus et cliquez sur Charger</span>
-        </div>
-        <iframe class="ws-preview-frame" id="wsPreviewFrame"
-          {% if preview_url %}src="{{ preview_url }}"{% endif %}
-          style="{{ '' if preview_url else 'display:none' }}"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-      </div>
-    </div>
-
-  </div>
-</div>
+  </div><!-- end ws-center -->
+</div><!-- end ws-layout -->
 
 <script>
 var _wsProjectId = {{ project.id | tojson }};
@@ -195,18 +227,48 @@ function wsFetch(url, opts) {
   return fetch(url, opts);
 }
 
-function wsTab(btn, name) {
-  document.querySelectorAll('.ws-tab').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('.ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
-  btn.classList.add('active');
-  document.getElementById('ws-' + name).classList.add('active');
-  localStorage.setItem('ws_tab_' + _wsProjectId, name);
+function wsMainTab(btn, name) {
+  document.querySelectorAll('#wsMainTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.ws-main-pane .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var el = document.getElementById('ws-' + name);
+  if (el) el.classList.add('active');
+  localStorage.setItem('ws_main_tab_' + _wsProjectId, name);
   if (name === 'toolcalls') wsLoadToolcalls();
   if (name === 'files') wsLoadFilesTree('.');
   if (name === 'docker') wsLoadDocker();
-  if (name === 'agents') wsLoadAgents();
-  if (name === 'git') wsLoadGit();
   if (name === 'preview') wsLoadPreview();
+}
+
+function wsSideTab(btn, name) {
+  document.querySelectorAll('#wsSideTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.ws-side-pane .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var el = document.getElementById('ws-' + name);
+  if (el) el.classList.add('active');
+  localStorage.setItem('ws_side_tab_' + _wsProjectId, name);
+  if (name === 'git') wsLoadGit();
+  if (name === 'agents') wsLoadAgents();
+}
+
+// Keep wsTab as alias for backward compat (left tree onclicks)
+function wsTab(btn, name) {
+  if (name === 'git' || name === 'agents') wsSideTab(btn, name);
+  else wsMainTab(btn, name);
+}
+
+function wsToggleSidePane() {
+  var pane = document.getElementById('wsSidePane');
+  var collapsed = pane.classList.toggle('ws-collapsed');
+  localStorage.setItem('ws_side_collapsed', collapsed ? '1' : '');
+}
+
+function wsToggleBottomPanel() {
+  var panel = document.getElementById('wsBottomPanel');
+  var icon = document.getElementById('wsBottomCollapseIcon');
+  var collapsed = panel.classList.toggle('ws-collapsed');
+  if (icon) icon.setAttribute('points', collapsed ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+  localStorage.setItem('ws_bottom_collapsed', collapsed ? '1' : '');
 }
 
 function wsLoadTermHistory() {
@@ -461,12 +523,33 @@ function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); 
 function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 (function() {
-  var saved = localStorage.getItem('ws_tab_' + _wsProjectId) || 'terminal';
-  var btn = document.querySelector('[data-tab="' + saved + '"]');
-  if (btn && saved !== 'terminal') wsTab(btn, saved);
+  // Restore main pane tab
+  var mainTab = localStorage.getItem('ws_main_tab_' + _wsProjectId) || 'files';
+  var mainBtn = document.querySelector('#wsMainTabs [data-tab="' + mainTab + '"]');
+  if (mainBtn) wsMainTab(mainBtn, mainTab);
+
+  // Restore side pane tab
+  var sideTab = localStorage.getItem('ws_side_tab_' + _wsProjectId) || 'git';
+  var sideBtn = document.querySelector('#wsSideTabs [data-tab="' + sideTab + '"]');
+  if (sideBtn) wsSideTab(sideBtn, sideTab);
+
+  // Restore collapse states
+  if (localStorage.getItem('ws_side_collapsed')) document.getElementById('wsSidePane').classList.add('ws-collapsed');
+  if (localStorage.getItem('ws_bottom_collapsed')) {
+    document.getElementById('wsBottomPanel').classList.add('ws-collapsed');
+    var icon = document.getElementById('wsBottomCollapseIcon');
+    if (icon) icon.setAttribute('points', '6 9 12 15 18 9');
+  }
+
+  // Auto-load visible panels
   wsLoadTermHistory();
   wsLoadLeftTree();
-  setInterval(function() { if(document.getElementById('ws-agents').classList.contains('active')) wsLoadAgents(); }, 10000);
+  wsLoadGit();
+
+  setInterval(function() {
+    var agentsEl = document.getElementById('ws-agents');
+    if (agentsEl && agentsEl.classList.contains('active')) wsLoadAgents();
+  }, 10000);
 })();
 </script>
 {% endblock %}
