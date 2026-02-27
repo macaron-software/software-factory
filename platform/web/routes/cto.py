@@ -98,7 +98,7 @@ def _build_history_html(session_id: str) -> str:
         else:
             rendered = md_lib.markdown(
                 msg.content or "",
-                extensions=["fenced_code", "tables", "nl2br"],
+                extensions=["fenced_code", "tables"],
             )
             tool_calls = (
                 (msg.metadata or {}).get("tool_calls") if msg.metadata else None
@@ -547,7 +547,7 @@ async def cto_message(request: Request):
 
             rendered = md_lib.markdown(
                 str(result.content),
-                extensions=["fenced_code", "tables", "nl2br"],
+                extensions=["fenced_code", "tables"],
             )
             agent_html = (
                 f'<div class="chat-msg chat-msg-agent">'
@@ -614,7 +614,7 @@ async def cto_message(request: Request):
                         ))
                         inv_rendered = md_lib.markdown(
                             str(inv_result.content),
-                            extensions=["fenced_code", "tables", "nl2br"],
+                            extensions=["fenced_code", "tables"],
                         )
                         initials = "".join(w[0].upper() for w in inv_agent.name.split()[:2])
                         av_url = _avatar_url(inv_agent.id)
