@@ -5,7 +5,7 @@
     {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
     {% set st = run.status.value %}
     {% set is_stuck = (st == 'running' and run.id not in (active_ids | default([]))) %}
-    <div class="mission-card-wrap">
+    <div class="mission-card-wrap" data-wf="{{ run.workflow_id }}" data-st="{{ st }}">
     <a href="/missions/{{ run.id }}/control" class="mission-card{% if is_stuck %} stuck{% endif %}">
         <div class="mission-status-icon {{ 'stuck' if is_stuck else st }}">
             {% if is_stuck %}<svg class="icon icon-xs"><use href="#icon-alert-triangle"/></svg>{% elif st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}

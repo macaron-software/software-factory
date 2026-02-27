@@ -384,7 +384,7 @@ async def pi_board_page(request: Request):
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
 
-    runs = get_mission_run_store().list_runs(limit=50)
+    runs = get_mission_run_store().list_runs(limit=500)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
