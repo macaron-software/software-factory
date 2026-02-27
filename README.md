@@ -1032,6 +1032,12 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **40+ PG indexes** — comprehensive coverage of all hot query paths
 - **Darwin Teams** — Thompson Sampling for agent team selection per context (technology + phase)
 
+## Ecosystem & Related Tools
+
+| Tool | Description | Why it matters |
+|------|-------------|----------------|
+| [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Rust Token Killer — CLI proxy that reduces LLM token consumption by 60-90% on common dev commands | Integrating into agent tool wrappers to reduce session costs |
+
 ## Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
