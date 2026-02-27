@@ -60,6 +60,8 @@
 .cto-messages .chat-msg-text.md-rendered li{margin-bottom:.1rem}
 .cto-messages .chat-msg-text.md-rendered h1,.cto-messages .chat-msg-text.md-rendered h2,.cto-messages .chat-msg-text.md-rendered h3,.cto-messages .chat-msg-text.md-rendered h4{margin:.35rem 0 .15rem;font-size:.88rem}
 .cto-messages .chat-msg-text.md-rendered br{display:none}
+.cto-drop-overlay{display:none;position:absolute;inset:0;z-index:20;background:rgba(99,102,241,.08);border:2px dashed var(--accent,#6366f1);border-radius:10px;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;font-size:.85rem;color:var(--accent,#6366f1);font-weight:600;pointer-events:none}
+.cto-drop-overlay.active{display:flex}
 .cto-messages .chat-msg-text.md-rendered code{background:var(--bg-primary);padding:.1em .3em;border-radius:3px;font-size:.78em}
 .cto-messages .chat-msg-text.md-rendered pre{background:var(--bg-primary);border-radius:6px;padding:.7rem;overflow-x:auto;font-size:.76rem;margin:.35rem 0}
 .cto-messages .chat-msg-tools{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.35rem}
@@ -200,7 +202,7 @@
     </div>
 
     <div class="cto-messages" id="cto-msgs" style="position:relative">
-      <div class="cto-drop-overlay" id="cto-drop-overlay">
+      <div class="cto-drop-overlay" id="cto-drop-overlay" style="display:none">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         Déposer le fichier ici
       </div>
