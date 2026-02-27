@@ -226,8 +226,13 @@ async def cto_mention_list(type: str = "all"):
         try:
             ps = get_project_store()
             for p in ps.list_all()[:60]:
+                has_content = bool(p.description or p.vision)
+                if has_content:
+                    sub = (p.description or p.vision or "")[:50].replace("\n", " ")
+                else:
+                    sub = "⚠ aucun contenu"
                 items.append({"type": "project", "id": p.id, "name": p.name,
-                               "sub": p.factory_type or ""})
+                               "sub": sub, "empty": not has_content})
         except Exception:
             pass
     if type in ("agent", "all"):
@@ -385,6 +390,7 @@ def _resolve_mentions(content: str) -> str:
                 or "  - Aucune mission"
             )
             workspace = match.path or ""
+            is_empty = not missions and not match.description and not match.vision
             ctx_block = (
                 f"\n\n--- Contexte projet SF @{mention} ---\n"
                 f"Nom: {match.name}\n"
@@ -397,14 +403,18 @@ def _resolve_mentions(content: str) -> str:
                 f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
                 f"Missions (aperçu):\n{m_lines}\n"
                 f"\n"
-                f"INSTRUCTIONS (OBLIGATOIRE) pour répondre à cette question sur le projet SF :\n"
-                f'1. APPELLE platform_missions(project_id="{match.id}") — liste toutes les missions SF\n'
-                f'2. APPELLE platform_metrics(project_id="{match.id}") — métriques réelles (runs, agents, messages)\n'
-                f"3. Synthétise les résultats en français pour l'utilisateur\n"
-                f"INTERDIT : Ne crée PAS de fichiers (pas de code_write, README, src/). "
-                f"Ne demande PAS de credentials. Ne génère PAS de SQL. "
-                f"Ces outils SF suffisent pour répondre à une question sur l'état d'un projet.\n"
-                f"---\n"
+                + (
+                    f"⚠ PROJET VIDE : Ce projet existe dans la SF (ID={match.id}) mais n'a pas encore de description, de vision ni de missions. "
+                    f"RÉPONDS clairement que le projet est enregistré dans SF mais n'a pas encore de contenu. "
+                    f"Ne dis PAS que le projet n'existe pas. Propose de créer une mission pour initialiser ce projet.\n\n"
+                    if is_empty else
+                    f"INSTRUCTIONS (OBLIGATOIRE) pour répondre à cette question sur le projet SF :\n"
+                    f'1. APPELLE platform_missions(project_id="{match.id}") — liste toutes les missions SF\n'
+                    f'2. APPELLE platform_metrics(project_id="{match.id}") — métriques réelles (runs, agents, messages)\n'
+                    f"3. Synthétise les résultats en français pour l'utilisateur\n"
+                    f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials. Ne génère PAS de SQL.\n\n"
+                )
+                + f"---\n"
             )
             injected.append(ctx_block)
         return content + "".join(injected)
