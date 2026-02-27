@@ -206,7 +206,8 @@ async def lifespan(app: FastAPI):
         # Also fix phases stuck at "running" inside phases_json
         _stuck_phases = 0
         _rows = _rdb.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE '%\"running\"%'"
+            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE ?",
+            ('%"running"%',),
         ).fetchall()
         for _row in _rows:
             import json as _json

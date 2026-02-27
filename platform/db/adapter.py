@@ -137,6 +137,15 @@ def _translate_upsert(sql: str) -> str:
         "org_team_members": ["team_id", "agent_id"],
         "confluence_pages": ["mission_id", "tab"],
         "feature_deps": ["feature_id", "depends_on"],
+        "team_fitness_history": [
+            "agent_id",
+            "pattern_id",
+            "technology",
+            "phase_type",
+            "snapshot_date",
+        ],
+        "user_project_roles": ["user_id", "project_id"],
+        "todo_deps": ["todo_id", "depends_on"],
     }
 
     pk_cols = _COMPOSITE_PKS.get(table, [cols[0]])
