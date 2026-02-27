@@ -375,19 +375,19 @@
     <div id="missionFilters" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-bottom:0.85rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()">
         <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem">Type</span>
         <button class="mf-btn active" data-filter="type" data-val="" onclick="setMF('type','',this)">Tous</button>
-        <button class="mf-btn" data-filter="type" data-val="product-lifecycle" onclick="setMF('type','product-lifecycle',this)">🚀 Full Projet</button>
-        <button class="mf-btn" data-filter="type" data-val="tma-maintenance" onclick="setMF('type','tma-maintenance',this)">🔧 Fix / TMA</button>
-        <button class="mf-btn" data-filter="type" data-val="security-hacking" onclick="setMF('type','security-hacking',this)">🛡️ Sécu</button>
-        <button class="mf-btn" data-filter="type" data-val="feature-request" onclick="setMF('type','feature-request',this)">✨ Feature</button>
-        <button class="mf-btn" data-filter="type" data-val="pi-planning" onclick="setMF('type','pi-planning',this)">📅 PI Planning</button>
+        <button class="mf-btn" data-filter="type" data-val="product-lifecycle" onclick="setMF('type','product-lifecycle',this)">Full Projet</button>
+        <button class="mf-btn" data-filter="type" data-val="tma-maintenance" onclick="setMF('type','tma-maintenance',this)">Fix / TMA</button>
+        <button class="mf-btn" data-filter="type" data-val="security-hacking" onclick="setMF('type','security-hacking',this)">Sécu</button>
+        <button class="mf-btn" data-filter="type" data-val="feature-request" onclick="setMF('type','feature-request',this)">Feature</button>
+        <button class="mf-btn" data-filter="type" data-val="pi-planning" onclick="setMF('type','pi-planning',this)">PI Planning</button>
         <div style="width:1px;height:16px;background:var(--border);margin:0 0.25rem"></div>
         <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem">Statut</span>
         <button class="mf-btn active" data-filter="st" data-val="" onclick="setMF('st','',this)">Tous</button>
-        <button class="mf-btn mf-running" data-filter="st" data-val="running" onclick="setMF('st','running',this)">▶ Running</button>
-        <button class="mf-btn mf-pending" data-filter="st" data-val="pending" onclick="setMF('st','pending',this)">⏸ Pending</button>
-        <button class="mf-btn mf-completed" data-filter="st" data-val="completed" onclick="setMF('st','completed',this)">✓ Terminé</button>
-        <button class="mf-btn mf-failed" data-filter="st" data-val="failed" onclick="setMF('st','failed',this)">✕ Failed</button>
-        <button class="mf-btn mf-paused" data-filter="st" data-val="paused" onclick="setMF('st','paused',this)">⏹ Paused</button>
+        <button class="mf-btn mf-running" data-filter="st" data-val="running" onclick="setMF('st','running',this)">Running</button>
+        <button class="mf-btn mf-pending" data-filter="st" data-val="pending" onclick="setMF('st','pending',this)">Pending</button>
+        <button class="mf-btn mf-completed" data-filter="st" data-val="completed" onclick="setMF('st','completed',this)">Terminé</button>
+        <button class="mf-btn mf-failed" data-filter="st" data-val="failed" onclick="setMF('st','failed',this)">Failed</button>
+        <button class="mf-btn mf-paused" data-filter="st" data-val="paused" onclick="setMF('st','paused',this)">Paused</button>
         <div style="margin-left:auto;font-size:0.75rem;color:var(--text-secondary)" id="mfStats"></div>
     </div>
     <div class="pi-section-body" id="body-missions" hx-on::after-swap="initMF()">
