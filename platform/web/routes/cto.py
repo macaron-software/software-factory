@@ -222,15 +222,19 @@ def _resolve_mentions(content: str) -> str:
                 )
                 or "  - Aucune mission"
             )
+            workspace = match.path or ""
             ctx_block = (
                 f"\n\n--- Contexte projet @{mention} ---\n"
                 f"Nom: {match.name}\n"
+                f"ID: {match.id}\n"
                 f"Description: {match.description or '(non renseignée)'}\n"
                 f"Type: {match.factory_type or '?'} | Statut: {match.status or '?'}\n"
                 f"Domaines: {', '.join(match.domains) if match.domains else '?'}\n"
-                f"Git: {match.git_url or '(non configuré)'}\n"
+                f"Git URL: {match.git_url or '(non configuré)'}\n"
+                f"Workspace (cwd pour outils git/code): {workspace or '(non configuré — utilise create_project pour en créer un)'}\n"
                 f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
                 f"Missions:\n{m_lines}\n"
+                f"IMPORTANT: Pour toute opération git/code sur ce projet, utilise cwd='{workspace}' (pas '.')\n"
                 f"---\n"
             )
             injected.append(ctx_block)
