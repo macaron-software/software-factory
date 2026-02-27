@@ -185,19 +185,36 @@ async def cto_load_session(session_id: str, request: Request):
 
 # ── Key agents invitable in CTO chat ────────────────────────────────────────
 _INVITABLE_ROLES = {
-    "Program Manager", "Project Manager", "Lean Portfolio Manager",
-    "Chief Technology Officer", "Solution Architect", "Architect",
-    "Product Manager", "Mobile Architect", "Release Manager",
-    "Test Manager", "Change Manager", "Solution Manager",
+    "Program Manager",
+    "Project Manager",
+    "Lean Portfolio Manager",
+    "Chief Technology Officer",
+    "Solution Architect",
+    "Architect",
+    "Product Manager",
+    "Mobile Architect",
+    "Release Manager",
+    "Test Manager",
+    "Change Manager",
+    "Solution Manager",
 }
-_INVITABLE_PREFIXES = ("strat-", "chef_de_programme", "chef_projet", "architecte",
-                        "lean_portfolio", "product-manager-art", "test_manager",
-                        "change_manager", "solution_manager")
+_INVITABLE_PREFIXES = (
+    "strat-",
+    "chef_de_programme",
+    "chef_projet",
+    "architecte",
+    "lean_portfolio",
+    "product-manager-art",
+    "test_manager",
+    "change_manager",
+    "solution_manager",
+)
 
 
 def _get_invitable_agents():
     """Return agents that can be invited into the CTO chat."""
     from ...agents.store import get_agent_store
+
     store = get_agent_store()
     agents = store.list_all()
     result = []
@@ -208,9 +225,17 @@ def _get_invitable_agents():
         is_key = (
             role in _INVITABLE_ROLES
             or any(a.id.startswith(p) for p in _INVITABLE_PREFIXES)
-            or role in ("chef_de_programme", "chef_projet", "lean_portfolio_manager",
-                        "architecte", "product-manager-art", "test_manager",
-                        "change_manager", "solution_manager")
+            or role
+            in (
+                "chef_de_programme",
+                "chef_projet",
+                "lean_portfolio_manager",
+                "architecte",
+                "product-manager-art",
+                "test_manager",
+                "change_manager",
+                "solution_manager",
+            )
         )
         if is_key:
             result.append(a)
@@ -221,6 +246,7 @@ def _get_invitable_agents():
 async def cto_mention_list(type: str = "all"):
     """Return projects (type=project), agents (type=agent), or both (type=all)."""
     from ...projects.manager import get_project_store
+
     items = []
     if type in ("project", "all"):
         try:
@@ -231,15 +257,23 @@ async def cto_mention_list(type: str = "all"):
                     sub = (p.description or p.vision or "")[:50].replace("\n", " ")
                 else:
                     sub = "⚠ aucun contenu"
-                items.append({"type": "project", "id": p.id, "name": p.name,
-                               "sub": sub, "empty": not has_content})
+                items.append(
+                    {
+                        "type": "project",
+                        "id": p.id,
+                        "name": p.name,
+                        "sub": sub,
+                        "empty": not has_content,
+                    }
+                )
         except Exception:
             pass
     if type in ("agent", "all"):
         try:
             for a in _get_invitable_agents():
-                items.append({"type": "agent", "id": a.id, "name": a.name,
-                               "sub": a.role or ""})
+                items.append(
+                    {"type": "agent", "id": a.id, "name": a.name, "sub": a.role or ""}
+                )
         except Exception:
             pass
     return JSONResponse(items)
@@ -248,7 +282,10 @@ async def cto_mention_list(type: str = "all"):
 def _find_agent_mentions(content: str):
     """Return list of (mention_text, agent) for #AgentName mentions."""
     import re
-    mentions = re.findall(r"#([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$|\set\s|\spour\s|\sou\s))", content)
+
+    mentions = re.findall(
+        r"#([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$|\set\s|\spour\s|\sou\s))", content
+    )
     if not mentions:
         mentions = re.findall(r"#([\w\-]+)", content)
     if not mentions:
@@ -262,7 +299,9 @@ def _find_agent_mentions(content: str):
             aname = a.name.lower()
             aid = a.id.lower()
             if a.id not in seen and (
-                m_lower == aname or m_lower in aname or aname.startswith(m_lower)
+                m_lower == aname
+                or m_lower in aname
+                or aname.startswith(m_lower)
                 or m_lower in aid
             ):
                 found.append((mention, a))
@@ -273,14 +312,47 @@ def _find_agent_mentions(content: str):
 
 # Keywords → auto-invited role when a project is @mentioned
 _PROJECT_KEYWORDS_TO_ROLE = {
-    "Program Manager":    ("pilotage", "avancement", "en est", "statut", "status",
-                           "planning", "délai", "retard", "sprint", "livraison"),
-    "Architect":          ("architecture", "technique", "stack", "dette technique",
-                           "migration", "conception", "design", "scalab"),
-    "Lean Portfolio Manager": ("budget", "coût", "invest", "portfolio", "capacit",
-                                "priorisation", "roadmap"),
-    "Test Manager":       ("qualité", "quality", "test", "bug", "régression",
-                           "recette", "e2e", "couverture"),
+    "Program Manager": (
+        "pilotage",
+        "avancement",
+        "en est",
+        "statut",
+        "status",
+        "planning",
+        "délai",
+        "retard",
+        "sprint",
+        "livraison",
+    ),
+    "Architect": (
+        "architecture",
+        "technique",
+        "stack",
+        "dette technique",
+        "migration",
+        "conception",
+        "design",
+        "scalab",
+    ),
+    "Lean Portfolio Manager": (
+        "budget",
+        "coût",
+        "invest",
+        "portfolio",
+        "capacit",
+        "priorisation",
+        "roadmap",
+    ),
+    "Test Manager": (
+        "qualité",
+        "quality",
+        "test",
+        "bug",
+        "régression",
+        "recette",
+        "e2e",
+        "couverture",
+    ),
 }
 
 
@@ -331,9 +403,11 @@ def _auto_invite_for_project_mention(content: str, explicit_agent_ids: set) -> l
     for a in all_agents:
         if a.id in explicit_agent_ids:
             continue
-        if (a.role == target_role
-                or target_role.lower() in (a.role or "").lower()
-                or target_role.lower() in a.id.lower()):
+        if (
+            a.role == target_role
+            or target_role.lower() in (a.role or "").lower()
+            or target_role.lower() in a.id.lower()
+        ):
             return [a]
 
     # Fallback: invite chef_de_programme (Alexandre Moreau)
@@ -380,12 +454,13 @@ def _resolve_mentions(content: str) -> str:
                     break
             if not match:
                 continue
-            workspace = match.path or ""
             # Get SF missions only if they exist (optional enrichment)
             missions = ms.list(project_id=match.id, limit=5)
-            m_lines = "\n".join(
-                f"  - [{m.status}] {m.name}" for m in missions
-            ) if missions else ""
+            m_lines = (
+                "\n".join(f"  - [{m.status}] {m.name}" for m in missions)
+                if missions
+                else ""
+            )
 
             ctx_block = (
                 f"\n\n--- Contexte projet SF @{mention} ---\n"
@@ -397,15 +472,15 @@ def _resolve_mentions(content: str) -> str:
                 f"Git URL: {match.git_url or '(non configuré)'}\n"
                 f"Vision: {match.vision[:400] + '...' if match.vision and len(match.vision) > 400 else (match.vision or '(non définie)')}\n"
                 + (f"Missions SF actives:\n{m_lines}\n" if m_lines else "")
-                + f"\n"
-                f"INSTRUCTION : Réponds à la question de l'utilisateur en utilisant "
-                f"UNIQUEMENT les informations ci-dessus sur le projet. "
-                f"Ce bloc contient tout ce que tu sais sur ce projet. "
-                f"Ne dis PAS que tu manques d'informations. "
-                f"Ne demande PAS de contexte supplémentaire. "
-                f"Si l'utilisateur demande l'état/avancement, synthétise à partir de la description, vision et type.\n"
-                f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials.\n"
-                f"---\n"
+                + "\n"
+                "INSTRUCTION : Réponds à la question de l'utilisateur en utilisant "
+                "UNIQUEMENT les informations ci-dessus sur le projet. "
+                "Ce bloc contient tout ce que tu sais sur ce projet. "
+                "Ne dis PAS que tu manques d'informations. "
+                "Ne demande PAS de contexte supplémentaire. "
+                "Si l'utilisateur demande l'état/avancement, synthétise à partir de la description, vision et type.\n"
+                "INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials.\n"
+                "---\n"
             )
             injected.append(ctx_block)
         return content + "".join(injected)
@@ -417,18 +492,19 @@ def _resolve_mentions(content: str) -> str:
 def _badge_mentions(text: str) -> str:
     """Convert @Project and #Agent mentions to colored badge HTML for display."""
     import re
+
     parts = []
     last = 0
     # Match @ProjectName or #AgentName — greedy up to logical stop
     pattern = re.compile(
-        r'([@#])([\w\-][^@#\n]*?)(?=\s{2,}|\s+(?:ou|en|et|pour|qu|qui|dit|de|du|la|le|les)\s|[?!,;]|\s*$)',
+        r"([@#])([\w\-][^@#\n]*?)(?=\s{2,}|\s+(?:ou|en|et|pour|qu|qui|dit|de|du|la|le|les)\s|[?!,;]|\s*$)",
         re.IGNORECASE,
     )
     for m in pattern.finditer(text):
         trigger = m.group(1)
         name = m.group(2).strip()
         cls = "mention-badge-project" if trigger == "@" else "mention-badge-agent"
-        parts.append(html_mod.escape(text[last:m.start()]))
+        parts.append(html_mod.escape(text[last : m.start()]))
         parts.append(f'<span class="{cls}">{trigger}{html_mod.escape(name)}</span>')
         last = m.start() + len(trigger) + len(m.group(2))
     parts.append(html_mod.escape(text[last:]))
@@ -528,6 +604,7 @@ async def cto_message(request: Request):
 
             tool_calls = result.tool_calls or []
             tools_html = ""
+            creation_cards_html = ""
             if tool_calls:
                 pills = "".join(
                     f'<span class="chat-tool-pill">'
@@ -535,6 +612,62 @@ async def cto_message(request: Request):
                     for tc in tool_calls
                 )
                 tools_html = f'<div class="chat-msg-tools">{pills}</div>'
+
+                # Render creation cards for create_project / create_mission / create_team
+                for tc in tool_calls:
+                    if not isinstance(tc, dict):
+                        continue
+                    tc_name = tc.get("name", "")
+                    try:
+                        tc_res = json.loads(tc.get("result", "{}"))
+                    except Exception:
+                        tc_res = {}
+                    if not tc_res.get("ok"):
+                        continue
+                    if tc_name == "create_project":
+                        pid = tc_res.get("project_id", "")
+                        pname = html_mod.escape(tc_res.get("name", ""))
+                        creation_cards_html += (
+                            f'<div class="cto-creation-card">'
+                            f'<span class="cto-creation-icon">📁</span>'
+                            f'<div class="cto-creation-info">'
+                            f'<div class="cto-creation-title">{pname}</div>'
+                            f'<div class="cto-creation-sub">Projet créé · ID {html_mod.escape(pid)}</div>'
+                            f"</div>"
+                            f'<a class="cto-creation-link" href="/projects/{html_mod.escape(pid)}" target="_blank">Ouvrir →</a>'
+                            f"</div>"
+                        )
+                    elif tc_name == "create_mission":
+                        mid = tc_res.get("mission_id", "")
+                        mname = html_mod.escape(tc_res.get("name", ""))
+                        run_id = tc_res.get("mission_run_id", "")
+                        run_badge = (
+                            '<span class="cto-creation-badge">🚀 lancée</span>'
+                            if run_id
+                            else ""
+                        )
+                        creation_cards_html += (
+                            f'<div class="cto-creation-card">'
+                            f'<span class="cto-creation-icon">🎯</span>'
+                            f'<div class="cto-creation-info">'
+                            f'<div class="cto-creation-title">{mname}{run_badge}</div>'
+                            f'<div class="cto-creation-sub">Mission créée · ID {html_mod.escape(mid)}</div>'
+                            f"</div>"
+                            f'<a class="cto-creation-link" href="/missions/{html_mod.escape(mid)}" target="_blank">Suivre →</a>'
+                            f"</div>"
+                        )
+                    elif tc_name == "create_team":
+                        tname = html_mod.escape(tc_res.get("team_name", "équipe"))
+                        count = tc_res.get("count", 0)
+                        creation_cards_html += (
+                            f'<div class="cto-creation-card">'
+                            f'<span class="cto-creation-icon">👥</span>'
+                            f'<div class="cto-creation-info">'
+                            f'<div class="cto-creation-title">Équipe {tname}</div>'
+                            f'<div class="cto-creation-sub">{count} agent(s) créé(s)</div>'
+                            f"</div>"
+                            f"</div>"
+                        )
 
             rendered = md_lib.markdown(
                 str(result.content),
@@ -547,6 +680,7 @@ async def cto_message(request: Request):
                 f'<div class="chat-msg-sender">Karim Benali — CTO</div>'
                 f'<div class="chat-msg-text md-rendered">{rendered}</div>'
                 f"{tools_html}"
+                f"{creation_cards_html}"
                 f"</div></div>"
             )
             title_hint = html_mod.escape(display[:55])
@@ -579,57 +713,70 @@ async def cto_message(request: Request):
                         f"IMPORTANT : Ne commence PAS ta réponse par ton nom ni ton rôle "
                         f"(ex: '{inv_agent.name} —'), l'en-tête est déjà affiché dans l'interface."
                     )
-                    yield sse("agent_thinking", {
-                        "agent_id": inv_agent.id,
-                        "agent_name": inv_agent.name,
-                        "agent_role": inv_agent.role or "",
-                        "avatar_url": _avatar_url(inv_agent.id),
-                    })
+                    yield sse(
+                        "agent_thinking",
+                        {
+                            "agent_id": inv_agent.id,
+                            "agent_name": inv_agent.name,
+                            "agent_role": inv_agent.role or "",
+                            "avatar_url": _avatar_url(inv_agent.id),
+                        },
+                    )
                     inv_result = None
                     async for ev_t, ev_d in executor.run_streaming(inv_ctx, inv_prompt):
                         if ev_t == "delta":
-                            yield sse("agent_chunk", {
-                                "text": ev_d,
-                                "agent_id": inv_agent.id,
-                                "agent_name": inv_agent.name,
-                            })
+                            yield sse(
+                                "agent_chunk",
+                                {
+                                    "text": ev_d,
+                                    "agent_id": inv_agent.id,
+                                    "agent_name": inv_agent.name,
+                                },
+                            )
                         elif ev_t == "result":
                             inv_result = ev_d
                     if inv_result:
-                        store.add_message(MessageDef(
-                            session_id=session.id,
-                            from_agent=inv_agent.id,
-                            to_agent="user",
-                            message_type="text",
-                            content=inv_result.content,
-                        ))
+                        store.add_message(
+                            MessageDef(
+                                session_id=session.id,
+                                from_agent=inv_agent.id,
+                                to_agent="user",
+                                message_type="text",
+                                content=inv_result.content,
+                            )
+                        )
                         inv_rendered = md_lib.markdown(
                             str(inv_result.content),
                             extensions=["fenced_code", "tables"],
                         )
-                        initials = "".join(w[0].upper() for w in inv_agent.name.split()[:2])
+                        initials = "".join(
+                            w[0].upper() for w in inv_agent.name.split()[:2]
+                        )
                         av_url = _avatar_url(inv_agent.id)
                         av_html = (
                             f'<img class="invited-avatar-img" src="{html_mod.escape(av_url)}" '
                             f'alt="{html_mod.escape(inv_agent.name)}">'
-                            if av_url else
-                            f'<div class="invited-avatar invited-avatar-initials">{initials}</div>'
+                            if av_url
+                            else f'<div class="invited-avatar invited-avatar-initials">{initials}</div>'
                         )
                         inv_html = (
                             f'<div class="invited-divider">{html_mod.escape(inv_agent.name)} a rejoint</div>'
                             f'<div class="chat-msg chat-msg-invited">'
-                            f'{av_html}'
+                            f"{av_html}"
                             f'<div class="chat-msg-body">'
                             f'<div class="chat-msg-sender">{html_mod.escape(inv_agent.name)} — '
-                            f'{html_mod.escape(inv_agent.role or "")}</div>'
+                            f"{html_mod.escape(inv_agent.role or '')}</div>"
                             f'<div class="chat-msg-text md-rendered">{inv_rendered}</div>'
                             f"</div></div>"
                         )
-                        yield sse("agent_done", {
-                            "html": inv_html,
-                            "agent_id": inv_agent.id,
-                            "agent_name": inv_agent.name,
-                        })
+                        yield sse(
+                            "agent_done",
+                            {
+                                "html": inv_html,
+                                "agent_id": inv_agent.id,
+                                "agent_name": inv_agent.name,
+                            },
+                        )
                 except Exception as inv_exc:
                     logger.warning("Invited agent %s error: %s", inv_agent.id, inv_exc)
 

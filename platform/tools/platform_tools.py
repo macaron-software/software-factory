@@ -377,7 +377,42 @@ class PlatformCreateMissionTool(BaseTool):
             status="active",
         )
         mission = store.create_mission(mission)
-        return json.dumps({"ok": True, "mission_id": mission.id, "name": mission.name})
+
+        # Auto-launch orchestrator (create mission_run + start execution)
+        run_info = {}
+        try:
+            from ..missions.store import get_mission_run_store
+            from ..models import MissionRun, MissionStatus
+            import uuid
+            import asyncio
+
+            run_store = get_mission_run_store()
+            run = MissionRun(
+                id=str(uuid.uuid4())[:8],
+                mission_id=mission.id,
+                status=MissionStatus.PAUSED,
+                project_id=mission.project_id or "",
+            )
+            run = run_store.create(run)
+            run_info = {"mission_run_id": run.id}
+
+            # Schedule launch in background (don't block tool response)
+            async def _launch():
+                try:
+                    from ..services.mission_orchestrator import MissionOrchestrator
+
+                    orch = MissionOrchestrator()
+                    await orch.run(run.id)
+                except Exception:
+                    pass
+
+            asyncio.get_event_loop().create_task(_launch())
+        except Exception as _e:
+            run_info = {"launch_warning": str(_e)}
+
+        return json.dumps(
+            {"ok": True, "mission_id": mission.id, "name": mission.name, **run_info}
+        )
 
 
 def register_platform_tools(registry):
