@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 
-{% block head_extra %}
+{% block scripts %}
     <script src="/static/js/chart.umd.min.js"></script>
-    <style>
+{% endblock %}
+
+{% block content %}
+<style>
         .analytics-container {
             padding: 2rem 3rem;
             max-width: 1800px;
@@ -112,9 +115,7 @@
             color: var(--text-primary);
         }
     </style>
-{% endblock %}
 
-{% block content %}
 <div class="analytics-container">
     <div class="page-header">
         <h1>Analytics Dashboard</h1>
