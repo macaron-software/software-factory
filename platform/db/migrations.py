@@ -58,6 +58,7 @@ def _init_pg():
     schema = SCHEMA_PG_PATH.read_text()
     conn.executescript(schema)
     conn.commit()
+    _migrate_pg(conn)
     return conn
 
 
