@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
-from . import rtk_wrap
+from . import rtk_run
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
@@ -127,8 +127,8 @@ class GitStatusTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         cwd = params.get("cwd", ".")
         try:
-            r = subprocess.run(
-                rtk_wrap(["git", "--no-pager", "status", "--short"]),
+            r = rtk_run(
+                ["git", "--no-pager", "status", "--short"],
                 capture_output=True,
                 text=True,
                 cwd=cwd,
@@ -149,11 +149,11 @@ class GitDiffTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         cwd = params.get("cwd", ".")
         path = params.get("path", "")
-        cmd = rtk_wrap(["git", "--no-pager", "diff"])
+        cmd = ["git", "--no-pager", "diff"]
         if path:
             cmd.extend(["--", path])
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=30)
+            r = rtk_run(cmd, capture_output=True, text=True, cwd=cwd, timeout=30)
             return r.stdout[:10000] or "No changes"
         except Exception as e:
             return f"Error: {e}"
@@ -168,17 +168,15 @@ class GitLogTool(BaseTool):
         cwd = params.get("cwd", ".")
         limit = params.get("limit", 10)
         try:
-            r = subprocess.run(
-                rtk_wrap(
-                    [
-                        "git",
-                        "--no-pager",
-                        "log",
-                        f"--max-count={limit}",
-                        "--oneline",
-                        "--decorate",
-                    ]
-                ),
+            r = rtk_run(
+                [
+                    "git",
+                    "--no-pager",
+                    "log",
+                    f"--max-count={limit}",
+                    "--oneline",
+                    "--decorate",
+                ],
                 capture_output=True,
                 text=True,
                 cwd=cwd,

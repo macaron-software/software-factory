@@ -914,6 +914,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         "mcp_calls": metrics_snapshot.get("mcp", {}),
         "anonymization": metrics_snapshot.get("anonymization", {}),
         "llm_costs": metrics_snapshot.get("llm_costs", {}),
+        "rtk": metrics_snapshot.get("rtk", {}),
         "azure": azure_infra,
         "docker": docker_info,
         "docker_system": docker_system,

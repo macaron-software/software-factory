@@ -276,6 +276,24 @@
         </div>
     </div>
 
+    <!-- Row 7b: rtk Token Savings -->
+    <div class="mon-grid mon-grid-1" id="monRtkRow" style="display:none">
+        <div class="mon-card">
+            <h3><svg class="icon"><use href="#icon-zap"/></svg> rtk — Token Savings
+                <a href="https://github.com/rtk-ai/rtk" target="_blank" style="font-size:0.65rem;font-weight:400;margin-left:0.5rem;opacity:0.6">rtk-ai/rtk ↗</a>
+            </h3>
+            <div class="mon-row">
+                <div class="mon-col"><div class="label">Calls wrapped</div><div class="val" id="monRtkCalls">0</div></div>
+                <div class="mon-col"><div class="label">Bytes saved</div><div class="val" id="monRtkBytesSaved">0</div></div>
+                <div class="mon-col"><div class="label">Compression</div><div class="val" id="monRtkRatio">0%</div></div>
+                <div class="mon-col"><div class="label">Tokens saved (est.)</div><div class="val" id="monRtkTokens">0</div></div>
+            </div>
+            <div style="margin-top:0.4rem;font-size:0.7rem;opacity:0.5">
+                Measured on git_status / git_diff / git_log tool calls. Token estimate: bytes_saved ÷ 4.
+            </div>
+        </div>
+    </div>
+
     <!-- Row 8: Azure Infrastructure -->
     <div class="mon-grid mon-grid-2">
         <div class="mon-card">
@@ -588,6 +606,17 @@ async function refresh() {
             ).join('');
         } else {
             costTb.innerHTML = '<tr><td colspan="4" class="mon-empty">No LLM costs yet</td></tr>';
+        }
+
+        // rtk Token Savings
+        const rtk = d.rtk || {};
+        if (rtk.calls > 0) {
+            $('monRtkRow').style.display = '';
+            $('monRtkCalls').textContent = fmt(rtk.calls || 0);
+            const saved = rtk.bytes_saved || 0;
+            $('monRtkBytesSaved').textContent = saved >= 1024 ? (saved/1024).toFixed(1)+'KB' : saved+'B';
+            $('monRtkRatio').textContent = (rtk.ratio_pct || 0).toFixed(1) + '%';
+            $('monRtkTokens').textContent = fmt(rtk.tokens_saved_est || 0);
         }
 
         // Anonymization
