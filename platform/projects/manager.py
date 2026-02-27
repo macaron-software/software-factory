@@ -184,7 +184,7 @@ class ProjectStore:
         cache_put("projects:all", projects, ttl=60)
         return projects
 
-    def search(self, q: str = "", factory_type: str = "", limit: int = 24, offset: int = 0) -> tuple[list[Project], int]:
+    def search(self, q: str = "", factory_type: str = "", has_workspace: str = "", limit: int = 24, offset: int = 0) -> tuple[list[Project], int]:
         """Search projects by name/description/vision/domains. Returns (projects, total)."""
         conn = get_db()
         try:
@@ -207,8 +207,13 @@ class ProjectStore:
             if os.environ.get("AZURE_DEPLOY", ""):
                 from .registry import _PERSONAL_IDS
                 projects = [p for p in projects if p.id not in _PERSONAL_IDS]
-                # Re-count without personal projects (approximate)
-                total = max(0, total - sum(1 for p in projects if p.id in _PERSONAL_IDS))
+            # Post-filter by workspace existence (can't do in SQL)
+            if has_workspace == "1":
+                projects = [p for p in projects if p.exists]
+                total = len(projects)
+            elif has_workspace == "0":
+                projects = [p for p in projects if not p.exists]
+                total = len(projects)
             return projects, total
         finally:
             conn.close()

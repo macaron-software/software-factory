@@ -16,15 +16,19 @@
 .pj-search svg{color:var(--text-secondary);flex-shrink:0}
 .pj-btn{padding:.3rem .75rem;font-size:.8rem;border:1px solid var(--border);border-radius:5px;background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer}
 .pj-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pj-btn.danger.active{background:#dc2626;border-color:#dc2626;color:#fff}
 .pj-count{font-size:.8rem;color:var(--text-secondary);margin-left:auto}
 .ppager{display:flex;gap:.25rem;align-items:center;margin-top:1rem;justify-content:center}
 .ppager a,.ppager span{padding:.3rem .6rem;border:1px solid var(--border);border-radius:5px;font-size:.8rem;color:var(--text-secondary);text-decoration:none;background:var(--bg-secondary)}
 .ppager a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 .ppager span.current{background:var(--accent);color:#fff;border-color:var(--accent)}
 .ppager span.ellipsis{border:none;background:none}
+.item-card.ghost{opacity:.45}
+.ghost-badge{font-size:.7rem;padding:1px 5px;border-radius:3px;background:#dc262622;color:#dc2626;border:1px solid #dc262244}
 </style>
 
 <form method="get" action="/projects" id="pjf">
+<input type="hidden" name="ws" id="ws_hidden" value="{{ has_workspace }}">
 <div class="pj-toolbar">
   <div class="pj-search">
     <svg class="icon icon-sm"><use href="#icon-search"/></svg>
@@ -34,6 +38,9 @@
   <button type="submit" class="pj-btn {% if factory_type=='sf' %}active{% endif %}" name="type" value="sf">SF</button>
   <button type="submit" class="pj-btn {% if factory_type=='mf' %}active{% endif %}" name="type" value="mf">MF</button>
   <button type="submit" class="pj-btn {% if factory_type=='standalone' %}active{% endif %}" name="type" value="standalone">Standalone</button>
+  <span style="width:1px;height:20px;background:var(--border)"></span>
+  <button type="button" class="pj-btn {% if has_workspace=='1' %}active{% endif %}" onclick="setWs('1')">Avec workspace</button>
+  <button type="button" class="pj-btn danger {% if has_workspace=='0' %}active{% endif %}" onclick="setWs('0')">Sans workspace</button>
   {% if persp == 'developer' %}
   <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:var(--text-secondary)">
     <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--accent)"> Mes projets
@@ -45,7 +52,7 @@
 
 <div class="item-grid" data-view-grid data-view="card">
     {% for proj in projects %}
-    <a href="/projects/{{ proj.info.id }}" class="item-card" data-lead="{{ proj.info.lead_agent_id or '' }}">
+    <a href="/projects/{{ proj.info.id }}" class="item-card{% if not proj.has_workspace %} ghost{% endif %}" data-lead="{{ proj.info.lead_agent_id or '' }}">
         <div class="item-icon">
             <span class="project-type-dot {{ proj.info.factory_type }}"></span>
         </div>
@@ -68,6 +75,9 @@
             </div>
         </div>
         <div class="item-meta">
+            {% if not proj.has_workspace %}
+            <span class="ghost-badge">fantôme</span>
+            {% endif %}
             <span hx-get="/api/dashboard/quality-badge?project_id={{ proj.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
             {% if proj.info.has_git %}
             <span class="item-badge" hx-get="/api/projects/{{ proj.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
@@ -92,7 +102,7 @@
 
 {% if total_pages > 1 %}
 <div class="ppager">
-  {% set base = "/projects?q=" ~ q ~ "&type=" ~ factory_type ~ "&page=" %}
+  {% set base = "/projects?q=" ~ q ~ "&type=" ~ factory_type ~ "&ws=" ~ has_workspace ~ "&page=" %}
   {% if page > 1 %}<a href="{{ base }}{{ page-1 }}">‹</a>{% endif %}
   {% for p in range(1, total_pages+1) %}
     {% if p == page %}<span class="current">{{ p }}</span>
@@ -107,6 +117,11 @@
 <script>
 const pjInp = document.querySelector('.pj-search input');
 let _pjt; pjInp.addEventListener('input', () => { clearTimeout(_pjt); _pjt = setTimeout(() => document.getElementById('pjf').submit(), 400); });
+function setWs(v) {
+    const h = document.getElementById('ws_hidden');
+    h.value = (h.value === v) ? '' : v; // toggle
+    document.getElementById('pjf').submit();
+}
 {% if persp == 'developer' %}
 function filterProjects() {
     const show = document.getElementById('filterMyProjects').checked;

@@ -88,6 +88,7 @@ async def projects_page(request: Request):
 
     q = request.query_params.get("q", "").strip()
     factory_type = request.query_params.get("type", "").strip()
+    has_workspace = request.query_params.get("ws", "").strip()
     try:
         page = max(1, int(request.query_params.get("page", 1)))
     except ValueError:
@@ -97,7 +98,7 @@ async def projects_page(request: Request):
 
     store = get_project_store()
     projects, total = store.search(
-        q=q, factory_type=factory_type, limit=per_page, offset=offset
+        q=q, factory_type=factory_type, has_workspace=has_workspace, limit=per_page, offset=offset
     )
     total_pages = max(1, (total + per_page - 1) // per_page)
 
@@ -106,9 +107,10 @@ async def projects_page(request: Request):
         {
             "request": request,
             "page_title": "Projects",
-            "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
+            "projects": [{"info": p, "git": None, "tasks": None, "has_workspace": p.exists} for p in projects],
             "q": q,
             "factory_type": factory_type,
+            "has_workspace": has_workspace,
             "page": page,
             "total": total,
             "total_pages": total_pages,
