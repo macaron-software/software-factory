@@ -79,7 +79,7 @@ for dir in "${DIRS_TO_SYNC[@]}"; do
 done
 
 # Fichiers racine
-ROOT_FILES=(Makefile Dockerfile docker-compose.yml .gitignore .env.example pyproject.toml setup_env.sh nginx.conf)
+ROOT_FILES=(Makefile Dockerfile docker-compose.yml .gitignore .env.example pyproject.toml setup_env.sh nginx.conf .gitlab-ci.yml)
 for f in "${ROOT_FILES[@]}"; do
     [ -f "$GITHUB_REPO/$f" ] || continue
     echo "  → $f"

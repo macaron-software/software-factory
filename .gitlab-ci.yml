@@ -1,43 +1,33 @@
 stages:
   - deploy
 
+# Architecture:
+#   GitLab CI → triggers GitHub Actions (network-agnostic)
+#   GitHub Actions → SSH to Azure VM (unrestricted outbound)
+#
 # Required GitLab CI/CD variables:
-#   AZURE_SSH_KEY  — private key (PEM, not base64)
-#   AZURE_VM_IP    — e.g. 4.233.64.30
-#   AZURE_USER     — e.g. azureadmin
+#   GH_DISPATCH_TOKEN  — GitHub PAT (repo + workflow scope)
 
 deploy-azure:
   stage: deploy
   image: alpine
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh
-    # AZURE_SSH_KEY is a "file" type variable — GitLab injects it as a file path
-    - cp "$AZURE_SSH_KEY" ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
-    - export STAGING_DIR="/home/${AZURE_USER}/macaron_update"
+    - apk add --no-cache curl
   script:
     - |
-      rsync -az --delete \
-        --exclude '.git' \
-        --exclude '__pycache__' \
-        --exclude '*.pyc' \
-        --exclude 'data/' \
-        --exclude 'workspaces/' \
-        platform cli skills dashboard mcp_lrm \
-        ${AZURE_USER}@${AZURE_VM_IP}:${STAGING_DIR}/
-    - |
-      ssh ${AZURE_USER}@${AZURE_VM_IP} "
-        CONTAINER=\$(docker ps --format '{{.Names}}' | grep -E 'platform-platform' | head -1)
-        if [ -z \"\$CONTAINER\" ]; then echo 'ERROR: no platform container running'; exit 1; fi
-        echo \"Deploying to \$CONTAINER\"
-        docker cp ${STAGING_DIR}/platform/. \$CONTAINER:/app/macaron_platform/
-        docker exec \$CONTAINER find /app/macaron_platform -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
-        docker stop \$CONTAINER && sleep 3 && docker start \$CONTAINER
-        echo 'Waiting for health...'
-        sleep 8
-        docker exec \$CONTAINER curl -sf http://localhost:8099/api/health > /dev/null && echo 'OK' || echo 'WARN: health check failed'
-      "
+      echo "Triggering GitHub Actions deploy-azure workflow..."
+      HTTP=$(curl -s -o /tmp/gh_resp.txt -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $GH_DISPATCH_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/macaron-software/software-factory/actions/workflows/deploy-azure.yml/dispatches" \
+        -d '{"ref":"main"}')
+      cat /tmp/gh_resp.txt
+      if [ "$HTTP" = "204" ]; then
+        echo "✓ GitHub Actions deploy triggered (HTTP 204)"
+      else
+        echo "✗ Dispatch failed (HTTP $HTTP)"
+        exit 1
+      fi
   only:
     - main

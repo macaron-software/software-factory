@@ -3,6 +3,7 @@ name: Deploy → Azure Prod
 on:
   push:
     branches: [main]
+  workflow_dispatch:  # allow manual trigger + GitLab CI dispatch
 
 jobs:
   deploy:
