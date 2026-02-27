@@ -4,14 +4,19 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <style>
-/* Full-height chain: layout → content → main-area → ws-layout */
-.layout { height: 100vh !important; overflow: hidden !important; }
-.content { height: 100% !important; overflow: hidden !important; }
-.main-area { padding: 0 !important; overflow: hidden !important; flex: 1 1 0% !important; min-height: 0 !important; }
-.ws-layout { height: 100%; min-height: 0; }
-.ws-main { min-height: 0; }
-.ws-tab-content.active { min-height: 0; }
-.ws-filetree { min-height: 0; }
+/* ── Critical layout rules — inlined to ensure they always apply ── */
+html,body{height:100%;overflow:hidden}
+.layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
+.content{display:flex!important;flex-direction:column!important;height:100%!important;overflow:hidden!important;min-height:0!important}
+.main-area{padding:0!important;overflow:hidden!important;flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+/* Workspace layout */
+.ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;min-height:0!important;background:var(--bg)}
+.ws-filetree{width:220px!important;min-width:160px!important;max-width:320px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
+.ws-main{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0!important;min-height:0!important}
+.ws-infobar{flex-shrink:0!important}
+.ws-tabs{flex-shrink:0!important}
+.ws-tab-content{display:none!important;flex:1 1 0%!important;min-height:0!important;overflow:hidden!important}
+.ws-tab-content.active{display:flex!important;flex-direction:column!important}
 </style>
 {% endblock %}
 
