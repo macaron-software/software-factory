@@ -285,8 +285,8 @@ html,body{height:100%;overflow:hidden}
         </div>
         <div class="ws-db-main">
           <div class="ws-pane-tabs" id="wsDbMainTabs">
-            <button class="ws-tab active" onclick="wsDbMainTab(this,'sql')">SQLite / SQL</button>
-            <button class="ws-tab" onclick="wsDbMainTab(this,'dbgate')">
+            <button class="ws-tab" onclick="wsDbMainTab(this,'sql')">SQLite / SQL</button>
+            <button class="ws-tab active" onclick="wsDbMainTab(this,'dbgate')">
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
               DbGate
             </button>
@@ -294,7 +294,7 @@ html,body{height:100%;overflow:hidden}
             <span style="font-size:.68rem;color:var(--text-secondary);padding:0 .5rem" id="wsDbStatus"></span>
           </div>
           <div class="ws-pane-content">
-            <div class="ws-tab-content active" id="ws-db-sql">
+            <div class="ws-tab-content" id="ws-db-sql">
               <span style="font-size:.76rem;font-weight:600;color:var(--text-primary);padding:.3rem .5rem;display:block" id="wsDbTableLabel">SQL</span>
               <div class="ws-db-editor">
                 <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
@@ -313,7 +313,7 @@ html,body{height:100%;overflow:hidden}
                 </div>
               </div>
             </div>
-            <div class="ws-tab-content" id="ws-db-dbgate" style="flex-direction:column">
+            <div class="ws-tab-content active" id="ws-db-dbgate" style="flex-direction:column">
               <div class="ws-dbgate-header">
                 <div style="flex:1">
                   <strong style="font-size:.8rem">DbGate</strong>
@@ -470,7 +470,7 @@ function wsSetView(name) {
   if (name === 'docker') { wsLoadDocker(); wsLoadPortainerStats(); }
   if (name === 'agents') { wsLoadAgents(); wsLoadAgentsToolcalls(); }
   if (name === 'backlog') { wsLoadBacklog(); }
-  if (name === 'db') { wsLoadDatabase(); }
+  if (name === 'db') { wsLoadDatabase(); wsDbGateAutoLogin(); }
   if (name === 'secrets') { wsLoadSecrets(); }
 }
 
@@ -611,7 +611,7 @@ function wsShowPortBadge(port) {
 }
 
 function wsOpenPreviewPort(port) {
-  var url = 'http://localhost:' + port;
+  var url = window.location.protocol + '//' + window.location.hostname + ':' + port;
   document.getElementById('wsPreviewUrl').value = url;
   wsSetView('preview');
   setTimeout(function() { wsPreviewLoad(url); }, 200);
@@ -769,15 +769,14 @@ function wsDockAction(name, action) {
 }
 
 function wsDockComposeUp(btn) {
-  btn.disabled = true; btn.textContent = '⏳ Démarrage…';
-  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker/compose_up', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
-    .then(function(r){ return r.json(); })
-    .then(function(d){ if(d.ok){setTimeout(wsLoadDocker,2000);}else{btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up';} });
+  // Run in Output panel which streams logs in real time
+  wsSetView('code');
+  wsRunOutput('docker compose up --build -d');
 }
 
 function wsDockPreview(ports) {
   var m = ports.match(/(\d{4,5})->/)||ports.match(/0\.0\.0\.0:(\d+)/);
-  if (m) { var url='http://localhost:'+m[1]; document.getElementById('wsPreviewUrl').value=url; wsSetView('preview'); setTimeout(function(){wsPreviewLoad(url);},100); }
+  if (m) { var url=window.location.protocol+'//'+window.location.hostname+':'+m[1]; document.getElementById('wsPreviewUrl').value=url; wsSetView('preview'); setTimeout(function(){wsPreviewLoad(url);},100); }
 }
 
 // ── Agents ──────────────────────────────────────────────────────
@@ -941,34 +940,66 @@ document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if
 function wsLoadPortainerStats() {
   var el = document.getElementById('wsPortainerStats');
   if (!el) return;
-  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker')
+  wsFetch('/api/docker/stats')
     .then(function(r){ return r.json(); })
     .then(function(d) {
-      var c = d.containers || [];
-      var up = c.filter(function(x){ return x.running; }).length;
-      el.innerHTML = '<span class="ws-badge ws-badge-ok">' + up + ' running</span> <span class="ws-badge">' + c.length + ' total</span>';
+      el.innerHTML = '<span class="ws-badge ws-badge-ok">' + (d.running||0) + ' running</span> <span class="ws-badge">' + (d.total||0) + ' total</span>';
     }).catch(function(){ el.innerHTML = '<span class="ws-badge">—</span>'; });
+}
+
+var _wsDbGateToken = null;
+
+function wsDbGateAutoLogin(callback) {
+  // Get token from backend and inject into iframe localStorage (same-origin)
+  wsFetch('/api/dbgate/token')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.token) { if (callback) callback(); return; }
+      _wsDbGateToken = d.token;
+      var frame = document.getElementById('wsDbGateFrame');
+      if (!frame) { if (callback) callback(); return; }
+      // Inject token after iframe loads
+      var injected = false;
+      function inject() {
+        if (injected) return; injected = true;
+        try {
+          frame.contentWindow.localStorage.setItem('accessToken', _wsDbGateToken);
+          // Reload so DbGate picks up the new token
+          frame.src = '/dbgate/';
+        } catch(e) {}
+        if (callback) callback();
+      }
+      if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+        inject();
+      } else {
+        frame.onload = inject;
+        // Also set src to trigger load if not already loading
+        if (!frame.src || frame.src === 'about:blank') frame.src = '/dbgate/';
+      }
+    }).catch(function(){ if (callback) callback(); });
 }
 
 function wsLoadDbGateConnections() {
   var el = document.getElementById('wsDbGateConnections');
   if (!el) return;
-  el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Configuration des connexions…</div>';
-  // First auto-configure connections from .env
-  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/dbgate/configure', {method:'POST'})
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (d.configured > 0) {
-        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">' +
-          '<span class="ws-badge ws-badge-ok">✓ ' + d.configured + ' connexion(s) configurée(s)</span> ' +
-          '<span style="margin-left:.3rem">Rechargez DbGate pour les voir</span> ' +
-          '<button class="ws-secret-btn" onclick="document.getElementById(\'wsDbGateFrame\').src=\'/dbgate/\'" title="Recharger">↺</button></div>';
-      } else {
-        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Aucune connexion DB détectée — ajoutez-les manuellement dans DbGate</div>';
-      }
-    }).catch(function(){
-      el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate</div>';
-    });
+  el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Connexion à DbGate…</div>';
+  // Auto-login first
+  wsDbGateAutoLogin(function() {
+    // Then configure connections
+    wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/dbgate/configure', {method:'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(d) {
+        if (d.configured > 0) {
+          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">' +
+            '<span class="ws-badge ws-badge-ok">✓ ' + d.configured + ' connexion(s) auto-configurée(s)</span> ' +
+            '<button class="ws-secret-btn" onclick="var f=document.getElementById(\'wsDbGateFrame\');f.src=f.src" title="Recharger">↺ Recharger</button></div>';
+        } else {
+          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate ci-dessous</div>';
+        }
+      }).catch(function(){
+        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate</div>';
+      });
+  });
 }
 
 // ── Secrets / Vault ─────────────────────────────────────────────

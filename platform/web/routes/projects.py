@@ -2142,3 +2142,43 @@ async def ws_dbgate_configure(project_id: str):
         return JSONResponse({"configured": saved, "total": len(conns)})
     except Exception as e:
         return JSONResponse({"configured": 0, "error": str(e)})
+
+
+@router.get("/api/dbgate/token")
+async def dbgate_get_token():
+    """Return a fresh DbGate access token for iframe auto-login."""
+    import httpx
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.post(
+                "http://localhost:3002/auth/login",
+                json={"login": "admin", "password": "dbgate2024"},
+            )
+            if r.status_code == 200:
+                token = r.json().get("accessToken", "")
+                return JSONResponse({"token": token})
+    except Exception:
+        pass
+    return JSONResponse({"token": ""})
+
+
+@router.get("/api/docker/stats")
+async def docker_global_stats():
+    """Return global Docker stats: total and running containers."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Status}}"],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+        lines = [s.strip() for s in result.stdout.strip().splitlines() if s.strip()]
+        total = len(lines)
+        running = sum(1 for s in lines if s.startswith("Up"))
+        return JSONResponse({"total": total, "running": running})
+    except Exception:
+        pass
+    return JSONResponse({"total": 0, "running": 0})
