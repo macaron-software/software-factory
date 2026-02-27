@@ -1,0 +1,309 @@
+/* ── Project Workspace — Replit-style layout ─────────────────────────────── */
+
+.ws-layout {
+  display: flex;
+  height: calc(100vh - 56px);
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── Left panel: file tree ─────────────────────────────────────────────── */
+.ws-filetree {
+  width: 220px;
+  min-width: 160px;
+  max-width: 340px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  resize: horizontal;
+}
+.ws-filetree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-secondary);
+}
+.ws-filetree-header svg { width:13px; height:13px; }
+.ws-filetree-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+  font-size: 0.78rem;
+}
+.ws-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.6rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  margin: 0 4px;
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ws-tree-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.ws-tree-item.active { background: var(--purple-dim, rgba(139,92,246,.15)); color: var(--purple); }
+.ws-tree-item svg { width:12px; height:12px; flex-shrink:0; }
+.ws-tree-dir { font-weight:600; color:var(--text-primary); }
+.ws-tree-indent { display:inline-block; width:14px; }
+
+/* ── Right panel: tabs ────────────────────────────────────────────────── */
+.ws-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ws-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 0 0.75rem;
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+.ws-tab {
+  padding: 0.55rem 0.9rem;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: color .15s;
+  white-space: nowrap;
+}
+.ws-tab:hover { color: var(--text-primary); }
+.ws-tab.active { color: var(--text-primary); border-bottom-color: var(--purple); }
+.ws-tab svg { width:12px; height:12px; }
+.ws-tab-content { flex:1; overflow:hidden; display:none; }
+.ws-tab-content.active { display:flex; flex-direction:column; }
+
+/* ── Terminal tab ─────────────────────────────────────────────────────── */
+.ws-terminal {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #0d1117;
+  color: #c9d1d9;
+  font-family: 'SF Mono', 'Fira Code', 'Monaco', monospace;
+  font-size: 0.78rem;
+}
+.ws-term-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.ws-term-entry { margin-bottom: 0.5rem; }
+.ws-term-cmd {
+  color: #58a6ff;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+}
+.ws-term-cmd .ws-term-tool { color:#f0883e; font-size:0.7rem; background:rgba(240,136,62,.1); padding:1px 5px; border-radius:3px; }
+.ws-term-cmd .ws-term-ts { color:#484f58; font-size:0.68rem; margin-left:auto; }
+.ws-term-output { color: #8b949e; padding-left: 1rem; white-space: pre-wrap; word-break: break-all; }
+.ws-term-output.success { color: #3fb950; }
+.ws-term-output.error { color: #f85149; }
+.ws-term-divider { border:none; border-top:1px solid #21262d; margin:0.3rem 0; }
+
+.ws-term-input-row {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid #21262d;
+  gap: 0.5rem;
+  background: #161b22;
+  flex-shrink: 0;
+}
+.ws-term-prompt { color: #58a6ff; font-size: 0.82rem; }
+.ws-term-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #c9d1d9;
+  font-family: inherit;
+  font-size: 0.78rem;
+  outline: none;
+  caret-color: #58a6ff;
+}
+.ws-term-run {
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.3rem 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.ws-term-run:hover { background: #2ea043; }
+.ws-term-run svg { width:11px; height:11px; }
+
+/* ── Tool Calls tab ───────────────────────────────────────────────────── */
+.ws-toolcalls { flex:1; overflow-y:auto; padding:0.75rem; }
+.ws-tc-row {
+  display:grid;
+  grid-template-columns: 130px 1fr 70px 80px;
+  gap:0.5rem;
+  align-items:start;
+  padding:0.5rem 0.6rem;
+  border-bottom:1px solid var(--border);
+  font-size:0.75rem;
+}
+.ws-tc-row:hover { background:var(--bg-hover); }
+.ws-tc-tool { font-weight:700; color:var(--purple); }
+.ws-tc-params { color:var(--text-secondary); font-family:monospace; font-size:0.7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws-tc-ok { color:#3fb950; font-weight:700; }
+.ws-tc-fail { color:#f85149; font-weight:700; }
+.ws-tc-dur { color:var(--text-secondary); text-align:right; }
+.ws-tc-ts { color:var(--text-secondary); font-size:0.68rem; }
+
+/* ── Files tab ────────────────────────────────────────────────────────── */
+.ws-files-layout { display:flex; height:100%; }
+.ws-files-tree { width:200px; border-right:1px solid var(--border); overflow-y:auto; padding:0.25rem 0; flex-shrink:0; }
+.ws-files-viewer { flex:1; overflow:auto; padding:0.75rem; }
+.ws-files-viewer pre { margin:0; font-size:0.75rem; }
+.ws-file-empty { color:var(--text-secondary); font-size:0.8rem; padding:2rem; text-align:center; }
+
+/* ── Docker tab ───────────────────────────────────────────────────────── */
+.ws-docker { flex:1; overflow-y:auto; padding:0.75rem; display:flex; flex-direction:column; gap:0.75rem; }
+.ws-docker-container {
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+}
+.ws-docker-header {
+  display:flex;
+  align-items:center;
+  gap:0.6rem;
+  padding:0.65rem 0.9rem;
+  border-bottom:1px solid var(--border);
+}
+.ws-docker-status { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.ws-docker-status.up { background:#3fb950; }
+.ws-docker-status.down { background:#484f58; }
+.ws-docker-status.error { background:#f85149; }
+.ws-docker-name { font-weight:700; font-size:0.82rem; }
+.ws-docker-image { color:var(--text-secondary); font-size:0.72rem; font-family:monospace; }
+.ws-docker-port { margin-left:auto; color:var(--purple); font-size:0.72rem; font-family:monospace; cursor:pointer; }
+.ws-docker-port:hover { text-decoration:underline; }
+.ws-docker-actions { display:flex; gap:0.4rem; padding:0.5rem 0.9rem; border-bottom:1px solid var(--border); }
+.ws-docker-btn { padding:0.28rem 0.6rem; border-radius:4px; border:1px solid var(--border); background:var(--bg); font-size:0.72rem; cursor:pointer; display:flex;align-items:center;gap:0.25rem; color:var(--text-primary); }
+.ws-docker-btn:hover { border-color:var(--purple); color:var(--purple); }
+.ws-docker-btn svg { width:11px;height:11px; }
+.ws-docker-logs { padding:0.6rem 0.9rem; font-family:monospace; font-size:0.7rem; color:#8b949e; background:#0d1117; max-height:160px; overflow-y:auto; white-space:pre-wrap; }
+
+/* ── Agents tab ───────────────────────────────────────────────────────── */
+.ws-agents { flex:1; overflow-y:auto; padding:0.75rem; display:flex; flex-direction:column; gap:0.5rem; }
+.ws-agent-row {
+  display:flex;
+  align-items:center;
+  gap:0.75rem;
+  padding:0.65rem 0.9rem;
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:8px;
+}
+.ws-agent-avatar { width:32px; height:32px; border-radius:50%; object-fit:cover; flex-shrink:0; }
+.ws-agent-info { flex:1; min-width:0; }
+.ws-agent-name { font-weight:700; font-size:0.8rem; }
+.ws-agent-mission { font-size:0.72rem; color:var(--text-secondary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws-agent-phase { font-size:0.68rem; color:var(--purple); }
+.ws-progress-bar { height:3px; background:var(--border); border-radius:2px; margin-top:0.25rem; }
+.ws-progress-fill { height:100%; background:var(--purple); border-radius:2px; transition:width .3s; }
+
+/* ── Git tab ──────────────────────────────────────────────────────────── */
+.ws-git { flex:1; overflow-y:auto; padding:0.75rem; display:flex; flex-direction:column; gap:0.75rem; }
+.ws-git-commit {
+  display:flex;
+  align-items:flex-start;
+  gap:0.6rem;
+  padding:0.5rem 0.7rem;
+  border-bottom:1px solid var(--border);
+  font-size:0.75rem;
+}
+.ws-git-sha { font-family:monospace; color:var(--purple); font-size:0.7rem; flex-shrink:0; width:52px; }
+.ws-git-msg { flex:1; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ws-git-author { color:var(--text-secondary); font-size:0.68rem; flex-shrink:0; }
+.ws-git-date { color:var(--text-secondary); font-size:0.68rem; flex-shrink:0; white-space:nowrap; }
+.ws-git-form {
+  background:var(--bg-secondary);
+  border:1px solid var(--border);
+  border-radius:8px;
+  padding:0.75rem;
+  display:flex;
+  flex-direction:column;
+  gap:0.5rem;
+}
+.ws-git-form textarea {
+  width:100%; padding:0.5rem; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg); color:var(--text-primary); font-size:0.78rem;
+  font-family:inherit; resize:vertical; min-height:56px; box-sizing:border-box;
+}
+.ws-git-form-row { display:flex; align-items:center; gap:0.5rem; }
+.ws-git-commit-btn { background:var(--purple); color:#fff; border:none; border-radius:5px; padding:0.35rem 0.85rem; font-size:0.76rem; font-weight:600; cursor:pointer; }
+.ws-git-commit-btn:hover { opacity:.85; }
+
+/* ── Preview tab ──────────────────────────────────────────────────────── */
+.ws-preview { flex:1; display:flex; flex-direction:column; }
+.ws-preview-bar {
+  display:flex;
+  align-items:center;
+  gap:0.5rem;
+  padding:0.45rem 0.75rem;
+  background:var(--bg-secondary);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.ws-preview-url {
+  flex:1; padding:0.3rem 0.6rem; border-radius:5px; border:1px solid var(--border);
+  background:var(--bg); color:var(--text-primary); font-size:0.75rem; font-family:monospace;
+}
+.ws-preview-btn {
+  padding:0.3rem 0.6rem; border-radius:5px; border:1px solid var(--border);
+  background:var(--bg); cursor:pointer; color:var(--text-secondary); display:flex; align-items:center; gap:0.25rem; font-size:0.72rem;
+}
+.ws-preview-btn:hover { border-color:var(--purple); color:var(--purple); }
+.ws-preview-btn svg { width:12px;height:12px; }
+.ws-preview-frame { flex:1; border:none; background:#fff; }
+.ws-preview-frame.mobile { max-width:375px; margin:0 auto; border:1px solid var(--border); border-top:none; }
+.ws-preview-empty { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text-secondary); gap:0.5rem; font-size:0.82rem; }
+.ws-preview-empty svg { width:32px;height:32px;opacity:.3; }
+
+/* ── Scrollbars ───────────────────────────────────────────────────────── */
+.ws-term-history::-webkit-scrollbar,
+.ws-filetree-body::-webkit-scrollbar,
+.ws-toolcalls::-webkit-scrollbar { width:4px; }
+.ws-term-history::-webkit-scrollbar-track,
+.ws-filetree-body::-webkit-scrollbar-track,
+.ws-toolcalls::-webkit-scrollbar-track { background:transparent; }
+.ws-term-history::-webkit-scrollbar-thumb { background:#30363d; border-radius:2px; }
+.ws-filetree-body::-webkit-scrollbar-thumb,
+.ws-toolcalls::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }

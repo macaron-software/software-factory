@@ -1,0 +1,526 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/css/project_workspace.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/projects/{{ project.id }}" class="btn btn-sm btn-ghost" style="gap:.35rem;font-size:.75rem;">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  {{ project.name }}
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="ws-layout">
+
+  <!-- ── Left: file tree ─────────────────────────────────────────── -->
+  <div class="ws-filetree" id="wsFiletree">
+    <div class="ws-filetree-header">
+      <span>Fichiers</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M9 21V9"/></svg>
+    </div>
+    <div class="ws-filetree-body" id="wsTreeBody">
+      <div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;">Chargement…</div>
+    </div>
+  </div>
+
+  <!-- ── Right: tabs ─────────────────────────────────────────────── -->
+  <div class="ws-main">
+    <div class="ws-tabs" id="wsTabs">
+      <button class="ws-tab active" onclick="wsTab(this,'terminal')" data-tab="terminal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        Terminal
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'toolcalls')" data-tab="toolcalls">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        Tool Calls
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'files')" data-tab="files">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+        Fichiers
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'docker')" data-tab="docker">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        Docker
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'agents')" data-tab="agents">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Agents
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'git')" data-tab="git">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
+        Git
+      </button>
+      <button class="ws-tab" onclick="wsTab(this,'preview')" data-tab="preview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Preview
+      </button>
+    </div>
+
+    <!-- Terminal -->
+    <div class="ws-tab-content active" id="ws-terminal">
+      <div class="ws-terminal">
+        <div class="ws-term-history" id="wsTermHistory">
+          <div style="color:#484f58;font-size:.72rem;margin-bottom:.5rem;">
+            {{ project.name }} · {{ project.path }} · tool calls agents + terminal interactif
+          </div>
+          <!-- Injected by JS -->
+        </div>
+        <div class="ws-term-input-row">
+          <span class="ws-term-prompt">$</span>
+          <input class="ws-term-input" id="wsTermInput" type="text" placeholder="Commande…" autocomplete="off" spellcheck="false">
+          <button class="ws-term-run" id="wsTermRun" onclick="wsRunCmd()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Run
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tool Calls -->
+    <div class="ws-tab-content" id="ws-toolcalls">
+      <div class="ws-toolcalls" id="wsToolcallsBody">
+        <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Fichiers -->
+    <div class="ws-tab-content" id="ws-files">
+      <div class="ws-files-layout">
+        <div class="ws-files-tree" id="wsFilesTree">
+          <div style="padding:.5rem;color:var(--text-secondary);font-size:.72rem;">Chargement…</div>
+        </div>
+        <div class="ws-files-viewer" id="wsFilesViewer">
+          <div class="ws-file-empty">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <span>Sélectionnez un fichier</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Docker -->
+    <div class="ws-tab-content" id="ws-docker">
+      <div class="ws-docker" id="wsDockerBody">
+        <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Agents -->
+    <div class="ws-tab-content" id="ws-agents">
+      <div class="ws-agents" id="wsAgentsBody">
+        <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Git -->
+    <div class="ws-tab-content" id="ws-git">
+      <div class="ws-git" id="wsGitBody">
+        <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Preview -->
+    <div class="ws-tab-content" id="ws-preview">
+      <div class="ws-preview" id="wsPreviewPanel">
+        <div class="ws-preview-bar">
+          <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:PORT">
+          <button class="ws-preview-btn" onclick="wsPreviewReload()" title="Recharger">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+          </button>
+          <button class="ws-preview-btn" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile / Desktop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+          </button>
+          <button class="ws-preview-btn" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir dans un onglet">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          </button>
+        </div>
+        {% if preview_url %}
+        <iframe class="ws-preview-frame" id="wsPreviewFrame" src="{{ preview_url }}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+        {% else %}
+        <div class="ws-preview-empty" id="wsPreviewEmpty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          <span>Aucun port d'application détecté</span>
+          <span style="font-size:.72rem;">Lancez l'app ou saisissez l'URL manuellement</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div><!-- /ws-main -->
+</div><!-- /ws-layout -->
+
+<script>
+var _wsProjectId = '{{ project.id }}';
+var _wsPreviewMobile = false;
+
+/* ── Tab switching ──────────────────────────────────────────────── */
+function wsTab(btn, name) {
+  document.querySelectorAll('.ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  document.getElementById('ws-' + name).classList.add('active');
+  localStorage.setItem('ws_tab_' + _wsProjectId, name);
+  if (name === 'toolcalls') wsLoadToolcalls();
+  if (name === 'files') wsLoadFilesTree('.');
+  if (name === 'docker') wsLoadDocker();
+  if (name === 'agents') wsLoadAgents();
+  if (name === 'git') wsLoadGit();
+  if (name === 'preview') wsLoadPreview();
+}
+
+/* ── Terminal: load tool call history ──────────────────────────── */
+function wsLoadTermHistory() {
+  fetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var h = document.getElementById('wsTermHistory');
+      var entries = (data.items || []);
+      if (!entries.length) {
+        h.innerHTML += '<div style="color:#484f58;font-size:.72rem;">Aucun tool call agent pour ce projet.</div>';
+        return;
+      }
+      entries.forEach(function(tc) {
+        var ok = tc.success;
+        var entry = document.createElement('div');
+        entry.className = 'ws-term-entry';
+        var params = '';
+        try { var p = JSON.parse(tc.parameters_json||'{}'); params = Object.values(p).slice(0,2).join(' '); } catch(e){}
+        entry.innerHTML =
+          '<div class="ws-term-cmd">' +
+          '<span class="ws-term-tool">' + tc.tool_name + '</span>' +
+          '<span style="color:#58a6ff">$ ' + (params||'').substring(0,80) + '</span>' +
+          '<span class="ws-term-ts">' + (tc.timestamp||'').substring(0,16) + '</span>' +
+          '</div>' +
+          (tc.output ? '<div class="ws-term-output' + (ok?'':' error') + '">' + wsEsc(tc.output.substring(0,300)) + '</div>' : '') +
+          '<hr class="ws-term-divider">';
+        h.appendChild(entry);
+      });
+      h.scrollTop = h.scrollHeight;
+    });
+}
+
+/* ── Terminal: run command ──────────────────────────────────────── */
+function wsRunCmd() {
+  var inp = document.getElementById('wsTermInput');
+  var cmd = inp.value.trim();
+  if (!cmd) return;
+  inp.value = '';
+  var h = document.getElementById('wsTermHistory');
+
+  // Append command line
+  var entry = document.createElement('div');
+  entry.className = 'ws-term-entry';
+  entry.innerHTML = '<div class="ws-term-cmd"><span style="color:#3fb950">$</span> <span>' + wsEsc(cmd) + '</span></div>';
+  var outDiv = document.createElement('div');
+  outDiv.className = 'ws-term-output';
+  outDiv.textContent = '…';
+  entry.appendChild(outDiv);
+  entry.innerHTML += '<hr class="ws-term-divider">';
+  h.appendChild(entry);
+  h.scrollTop = h.scrollHeight;
+
+  var runBtn = document.getElementById('wsTermRun');
+  runBtn.disabled = true;
+
+  var es = new EventSource('/api/projects/' + _wsProjectId + '/workspace/run?cmd=' + encodeURIComponent(cmd));
+  var output = '';
+  es.onmessage = function(e) {
+    if (e.data === '[DONE]') { es.close(); runBtn.disabled = false; return; }
+    output += e.data + '\n';
+    outDiv.textContent = output;
+    h.scrollTop = h.scrollHeight;
+  };
+  es.onerror = function() { es.close(); runBtn.disabled = false; outDiv.classList.add('error'); };
+}
+
+document.getElementById('wsTermInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') wsRunCmd();
+});
+
+/* ── Tool Calls tab ─────────────────────────────────────────────── */
+function wsLoadToolcalls() {
+  var body = document.getElementById('wsToolcallsBody');
+  body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;font-size:.8rem;">Aucun tool call enregistré pour ce projet.</div>'; return; }
+      var html = '<div style="display:grid;grid-template-columns:130px 1fr 70px 80px;gap:.5rem;padding:.4rem .6rem;font-size:.68rem;font-weight:700;color:var(--text-secondary);border-bottom:1px solid var(--border);">' +
+        '<span>Outil</span><span>Paramètres</span><span>Statut</span><span style="text-align:right">Durée</span></div>';
+      items.forEach(function(tc) {
+        var params = '';
+        try { var p = JSON.parse(tc.parameters_json||'{}'); params = JSON.stringify(p).substring(0,80); } catch(e){}
+        html += '<div class="ws-tc-row">' +
+          '<span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span>' +
+          '<span class="ws-tc-params" title="' + wsEsc(params) + '">' + wsEsc(params) + '</span>' +
+          '<span class="' + (tc.success ? 'ws-tc-ok' : 'ws-tc-fail') + '">' + (tc.success ? '✓ OK' : '✗ Err') + '</span>' +
+          '<span class="ws-tc-dur">' + (tc.duration_ms || 0) + 'ms</span>' +
+          '</div>';
+      });
+      body.innerHTML = html;
+    });
+}
+
+/* ── Files tab ──────────────────────────────────────────────────── */
+function wsLoadFilesTree(path) {
+  var tree = document.getElementById('wsFilesTree');
+  fetch('/api/projects/' + _wsProjectId + '/workspace/files?path=' + encodeURIComponent(path))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { tree.innerHTML = '<div style="padding:.5rem;color:var(--text-secondary);font-size:.72rem;">Dossier vide</div>'; return; }
+      var html = '';
+      // Dirs first
+      items.filter(function(i){ return i.type==='dir'; }).forEach(function(i) {
+        html += '<div class="ws-tree-item ws-tree-dir" onclick="wsLoadFilesTree(\'' + wsEsc(i.path) + '\')">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' +
+          wsEsc(i.name) + '</div>';
+      });
+      items.filter(function(i){ return i.type==='file'; }).forEach(function(i) {
+        html += '<div class="ws-tree-item" onclick="wsOpenFile(\'' + wsEsc(i.path) + '\')">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/></svg>' +
+          wsEsc(i.name) + '</div>';
+      });
+      tree.innerHTML = html;
+    });
+}
+
+function wsOpenFile(path) {
+  var viewer = document.getElementById('wsFilesViewer');
+  viewer.innerHTML = '<div style="padding:.5rem;color:var(--text-secondary);font-size:.72rem;">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/file?path=' + encodeURIComponent(path))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.error) { viewer.innerHTML = '<div class="ws-file-empty"><span>' + wsEsc(data.error) + '</span></div>'; return; }
+      var ext = path.split('.').pop().toLowerCase();
+      var langMap = {js:'javascript',ts:'typescript',py:'python',html:'html',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'bash',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java'};
+      var lang = langMap[ext] || 'plaintext';
+      var pre = document.createElement('pre');
+      var code = document.createElement('code');
+      code.className = 'language-' + lang;
+      code.textContent = data.content || '';
+      pre.appendChild(code);
+      viewer.innerHTML = '<div style="padding:.5rem .75rem;font-size:.68rem;color:var(--text-secondary);border-bottom:1px solid var(--border);">' + wsEsc(path) + '</div>';
+      viewer.appendChild(pre);
+      if (window.hljs) hljs.highlightElement(code);
+    });
+}
+
+/* ── Docker tab ─────────────────────────────────────────────────── */
+function wsLoadDocker() {
+  var body = document.getElementById('wsDockerBody');
+  body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/docker')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var containers = data.containers || [];
+      if (!containers.length) {
+        body.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;font-size:.8rem;">Aucun container Docker détecté pour ce projet.</div>';
+        return;
+      }
+      var html = '';
+      containers.forEach(function(c) {
+        var up = c.status && c.status.toLowerCase().startsWith('up');
+        html += '<div class="ws-docker-container">' +
+          '<div class="ws-docker-header">' +
+          '<div class="ws-docker-status ' + (up ? 'up' : 'down') + '"></div>' +
+          '<span class="ws-docker-name">' + wsEsc(c.name) + '</span>' +
+          '<span class="ws-docker-image">' + wsEsc(c.image || '') + '</span>' +
+          (c.ports ? '<span class="ws-docker-port" onclick="wsDockPreview(\'' + wsEsc(c.ports) + '\')">' + wsEsc(c.ports) + '</span>' : '') +
+          '</div>' +
+          '<div class="ws-docker-actions">' +
+          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'start\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button>' +
+          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'stop\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button>' +
+          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'rebuild\')">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Rebuild</button>' +
+          '</div>' +
+          '<div class="ws-docker-logs">' + wsEsc(c.logs || '— Aucun log —') + '</div>' +
+          '</div>';
+      });
+      body.innerHTML = html;
+    });
+}
+
+function wsDockAction(name, action) {
+  fetch('/api/projects/' + _wsProjectId + '/workspace/docker/' + encodeURIComponent(action), {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({container: name})
+  }).then(function(){ setTimeout(wsLoadDocker, 1500); });
+}
+
+function wsDockPreview(ports) {
+  var m = ports.match(/0\.0\.0\.0:(\d+)/);
+  if (m) {
+    var url = 'http://localhost:' + m[1];
+    document.getElementById('wsPreviewUrl').value = url;
+    wsTab(document.querySelector('[data-tab="preview"]'), 'preview');
+    setTimeout(function(){ wsPreviewLoad(url); }, 100);
+  }
+}
+
+/* ── Agents tab ─────────────────────────────────────────────────── */
+function wsLoadAgents() {
+  var body = document.getElementById('wsAgentsBody');
+  fetch('/api/projects/' + _wsProjectId + '/workspace/agents')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div style="color:var(--text-secondary);padding:1rem;font-size:.8rem;">Aucun agent actif sur ce projet.</div>'; return; }
+      body.innerHTML = items.map(function(a) {
+        var pct = a.progress || 0;
+        return '<div class="ws-agent-row">' +
+          (a.avatar ? '<img class="ws-agent-avatar" src="' + wsEsc(a.avatar) + '" alt="">' : '<div class="ws-agent-avatar" style="background:var(--purple-dim,#3b1f8c);"></div>') +
+          '<div class="ws-agent-info">' +
+          '<div class="ws-agent-name">' + wsEsc(a.agent_name || a.agent_id) + '</div>' +
+          '<div class="ws-agent-mission">' + wsEsc(a.mission_title || a.session_id) + '</div>' +
+          '<div class="ws-agent-phase">' + wsEsc(a.phase || '') + '</div>' +
+          '<div class="ws-progress-bar"><div class="ws-progress-fill" style="width:' + pct + '%"></div></div>' +
+          '</div>' +
+          '<span style="font-size:.7rem;color:var(--text-secondary);">' + wsEsc(a.status || '') + '</span>' +
+          '</div>';
+      }).join('');
+    });
+}
+
+/* ── Git tab ────────────────────────────────────────────────────── */
+function wsLoadGit() {
+  var body = document.getElementById('wsGitBody');
+  body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem;">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/git')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var commits = data.commits || [];
+      var changes = data.changes || [];
+      var branch = data.branch || 'main';
+      var html = '<div style="font-size:.76rem;font-weight:700;margin-bottom:.5rem;color:var(--text-primary);">Branche : <span style="color:var(--purple);">' + wsEsc(branch) + '</span></div>';
+      if (changes.length) {
+        html += '<div style="font-size:.72rem;color:var(--text-secondary);margin-bottom:.25rem;">' + changes.length + ' fichier(s) modifié(s)</div>';
+        html += changes.map(function(f) {
+          return '<div style="font-size:.73rem;padding:.2rem .4rem;background:var(--bg-secondary);border-radius:3px;margin:.1rem 0;font-family:monospace;color:var(--text-primary);">' +
+            '<span style="color:' + (f.status==='M'?'#f0883e':f.status==='A'?'#3fb950':'#f85149') + ';margin-right:.5rem;">' + wsEsc(f.status) + '</span>' +
+            wsEsc(f.path) + '</div>';
+        }).join('');
+      }
+      // Quick commit form
+      html += '<div class="ws-git-form">' +
+        '<div style="font-size:.74rem;font-weight:700;">Commit rapide</div>' +
+        '<textarea id="wsGitMsg" placeholder="Message de commit…"></textarea>' +
+        '<div class="ws-git-form-row">' +
+        '<label style="font-size:.72rem;display:flex;align-items:center;gap:.3rem;"><input type="checkbox" id="wsGitPush"> Push</label>' +
+        '<button class="ws-git-commit-btn" onclick="wsGitCommit()">Commit</button>' +
+        '</div></div>';
+      html += '<div style="font-size:.72rem;font-weight:700;margin:.5rem 0 .25rem;color:var(--text-secondary);">Historique</div>';
+      commits.forEach(function(c) {
+        html += '<div class="ws-git-commit">' +
+          '<span class="ws-git-sha">' + wsEsc((c.hash||'').substring(0,7)) + '</span>' +
+          '<span class="ws-git-msg" title="' + wsEsc(c.message||'') + '">' + wsEsc(c.message||'') + '</span>' +
+          '<span class="ws-git-author">' + wsEsc(c.author||'') + '</span>' +
+          '<span class="ws-git-date">' + wsEsc((c.date||'').substring(0,10)) + '</span>' +
+          '</div>';
+      });
+      body.innerHTML = html;
+    });
+}
+
+function wsGitCommit() {
+  var msg = document.getElementById('wsGitMsg').value.trim();
+  if (!msg) return;
+  var push = document.getElementById('wsGitPush').checked;
+  fetch('/api/projects/' + _wsProjectId + '/workspace/git/commit', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({message: msg, push: push})
+  }).then(function(r){ return r.json(); })
+    .then(function(d){ alert(d.ok ? 'Commit créé !' : (d.error || 'Erreur')); if (d.ok) wsLoadGit(); });
+}
+
+/* ── Preview tab ────────────────────────────────────────────────── */
+function wsLoadPreview() {
+  var url = document.getElementById('wsPreviewUrl').value.trim();
+  if (url) wsPreviewLoad(url);
+}
+
+function wsPreviewLoad(url) {
+  var panel = document.getElementById('wsPreviewPanel');
+  var existing = document.getElementById('wsPreviewFrame');
+  var empty = document.getElementById('wsPreviewEmpty');
+  if (empty) empty.style.display = 'none';
+  if (existing) { existing.src = url; return; }
+  var frame = document.createElement('iframe');
+  frame.id = 'wsPreviewFrame';
+  frame.className = 'ws-preview-frame';
+  frame.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms allow-popups');
+  frame.src = url;
+  panel.appendChild(frame);
+}
+
+function wsPreviewReload() {
+  var url = document.getElementById('wsPreviewUrl').value.trim();
+  if (url) wsPreviewLoad(url);
+  var f = document.getElementById('wsPreviewFrame');
+  if (f) { f.src = f.src; }
+}
+
+function wsPreviewToggleMobile() {
+  _wsPreviewMobile = !_wsPreviewMobile;
+  var f = document.getElementById('wsPreviewFrame');
+  var btn = document.getElementById('wsPreviewMobileBtn');
+  if (f) {
+    if (_wsPreviewMobile) { f.classList.add('mobile'); btn.style.color = 'var(--purple)'; }
+    else { f.classList.remove('mobile'); btn.style.color = ''; }
+  }
+}
+
+/* ── Left file tree (mirrors Files tab) ────────────────────────── */
+function wsLoadLeftTree() {
+  fetch('/api/projects/' + _wsProjectId + '/workspace/files?path=.')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var body = document.getElementById('wsTreeBody');
+      var items = data.items || [];
+      var html = '';
+      items.slice(0,30).forEach(function(i) {
+        html += '<div class="ws-tree-item' + (i.type==='dir' ? ' ws-tree-dir' : '') + '" onclick="' +
+          (i.type==='dir' ? 'wsTab(document.querySelector(\'[data-tab=files]\'),\'files\');setTimeout(function(){wsLoadFilesTree(\'' + wsEsc(i.path) + '\')},50)' :
+           'wsTab(document.querySelector(\'[data-tab=files]\'),\'files\');setTimeout(function(){wsOpenFile(\'' + wsEsc(i.path) + '\')},50)') +
+          '">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          (i.type==='dir' ? '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>' :
+           '<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>') +
+          '</svg>' +
+          wsEsc(i.name) + '</div>';
+      });
+      body.innerHTML = html || '<div style="padding:.5rem;color:var(--text-secondary);font-size:.72rem;">Dossier vide</div>';
+    });
+}
+
+/* ── Util ───────────────────────────────────────────────────────── */
+function wsEsc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Init ───────────────────────────────────────────────────────── */
+(function() {
+  // Restore last tab
+  var saved = localStorage.getItem('ws_tab_' + _wsProjectId) || 'terminal';
+  var btn = document.querySelector('[data-tab="' + saved + '"]');
+  if (btn && saved !== 'terminal') wsTab(btn, saved);
+
+  // Load terminal history
+  wsLoadTermHistory();
+  // Load left file tree
+  wsLoadLeftTree();
+  // Agents polling
+  setInterval(function() {
+    if (document.getElementById('ws-agents').classList.contains('active')) wsLoadAgents();
+  }, 10000);
+})();
+</script>
+{% endblock %}
