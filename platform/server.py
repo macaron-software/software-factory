@@ -1004,6 +1004,16 @@ def create_app() -> FastAPI:
     templates.env.globals["i18n_catalog"] = _i18n_catalog_global()
     templates.env.globals["SUPPORTED_LANGS"] = SUPPORTED_LANGS
 
+    # Version + git commit for header display
+    import subprocess as _sp
+    try:
+        _sha = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL).decode().strip()
+        _tag = _sp.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL).decode().strip()
+    except Exception:
+        _sha, _tag = "unknown", ""
+    templates.env.globals["app_commit"] = _sha
+    templates.env.globals["app_version"] = _tag or _sha
+
     # Middleware to set current language per-request
     from starlette.middleware.base import BaseHTTPMiddleware
 

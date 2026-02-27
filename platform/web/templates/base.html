@@ -166,7 +166,7 @@
         <!-- Main content -->
         <main class="content">
             <header class="topbar">
-                <h2>{{ page_title }}</h2>
+                <h2>{{ page_title }} <span class="app-version" title="commit {{ app_commit }}">{{ app_version }}</span></h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
                     <!-- SAFe Perspective Selector -->
