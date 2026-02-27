@@ -1,10 +1,17 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/css/project_workspace.css?v=3">
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=4">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <style>
-.main-area { padding: 0 !important; overflow: hidden !important; }
+/* Full-height chain: layout → content → main-area → ws-layout */
+.layout { height: 100vh !important; overflow: hidden !important; }
+.content { height: 100% !important; overflow: hidden !important; }
+.main-area { padding: 0 !important; overflow: hidden !important; flex: 1 1 0% !important; min-height: 0 !important; }
+.ws-layout { height: 100%; min-height: 0; }
+.ws-main { min-height: 0; }
+.ws-tab-content.active { min-height: 0; }
+.ws-filetree { min-height: 0; }
 </style>
 {% endblock %}
 
