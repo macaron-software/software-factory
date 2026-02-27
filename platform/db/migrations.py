@@ -922,6 +922,32 @@ def _migrate_pg(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Projects: lifecycle phases (added 2026-02)
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_phase TEXT DEFAULT ''"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS phases_json TEXT DEFAULT '[]'"
+        )
+    except Exception:
+        pass
+    # Missions: category + active_phases (added 2026-02)
+    try:
+        conn.execute(
+            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'functional'"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS active_phases_json TEXT DEFAULT '[]'"
+        )
+    except Exception:
+        pass
     conn.commit()
 
 
