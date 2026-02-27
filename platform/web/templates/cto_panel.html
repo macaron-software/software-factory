@@ -212,7 +212,7 @@
         <textarea
           id="cto-input"
           class="cto-input"
-          placeholder="Posez une question, glissez un fichier, tapez @ pour mentionner un projet ou inviter un agent…"
+          placeholder="@ projet   # agent   ou glissez un fichier…"
           rows="1"
           onkeydown="ctoInputKeydown(event)"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';ctoInputChange(this)"
@@ -316,44 +316,54 @@
     if(files && files.length > 0){ _processFile(files[0]); }
   });
 
-  /* ── @ Mention ── */
-  var _mentionList = null;
+  /* ── @ Projects  /  # Agents ── */
+  var _mentionCache = {project: null, agent: null};
   var _mentionActive = false;
+  var _mentionTrigger = '@';   // current trigger char
   var _mentionIdx = 0;
-  var _invitedStreams = {};  // agent_id → {bubble, text}
+  var _invitedStreams = {};  // agent_id → {text}
 
-  function _loadMentionList(cb){
-    if(_mentionList){ cb(_mentionList); return; }
-    fetch('/api/cto/mention-list').then(function(r){ return r.json(); }).then(function(d){
-      _mentionList = Array.isArray(d) ? d : [];
-      cb(_mentionList);
-    }).catch(function(){ _mentionList = []; cb([]); });
+  function _loadMentionItems(type, cb){
+    if(_mentionCache[type]){ cb(_mentionCache[type]); return; }
+    fetch('/api/cto/mention-list?type='+type).then(function(r){ return r.json(); }).then(function(d){
+      _mentionCache[type] = Array.isArray(d) ? d : [];
+      cb(_mentionCache[type]);
+    }).catch(function(){ _mentionCache[type] = []; cb([]); });
   }
 
   function ctoInputChange(inp){
     var val = inp.value, cur = inp.selectionStart;
-    var atIdx = val.lastIndexOf('@', cur - 1);
-    if(atIdx === -1 || (atIdx > 0 && !/\s/.test(val[atIdx-1]))){ _closeMention(); return; }
-    var query = val.slice(atIdx + 1, cur).toLowerCase();
-    _loadMentionList(function(items){
-      var filtered = items.filter(function(p){ return p.name.toLowerCase().includes(query); }).slice(0,12);
-      _renderMention(filtered);
+    var atIdx  = val.lastIndexOf('@', cur - 1);
+    var hashIdx = val.lastIndexOf('#', cur - 1);
+    var triggerIdx = -1, trigger = '@';
+    if(atIdx >= 0 && atIdx > hashIdx){ triggerIdx = atIdx; trigger = '@'; }
+    else if(hashIdx >= 0){ triggerIdx = hashIdx; trigger = '#'; }
+    if(triggerIdx === -1 || (triggerIdx > 0 && !/[\s,]/.test(val[triggerIdx-1]))){ _closeMention(); return; }
+    var query = val.slice(triggerIdx + 1, cur).toLowerCase();
+    _mentionTrigger = trigger;
+    var type = trigger === '#' ? 'agent' : 'project';
+    _loadMentionItems(type, function(items){
+      var filtered = items.filter(function(p){
+        return p.name.toLowerCase().includes(query) || (p.sub||'').toLowerCase().includes(query);
+      }).slice(0, 12);
+      _renderMention(filtered, trigger);
     });
   }
 
-  function _renderMention(items){
+  function _renderMention(items, trigger){
     var popup = document.getElementById('cto-mention-popup');
     if(!popup) return;
     if(!items.length){ _closeMention(); return; }
     _mentionActive = true; _mentionIdx = 0;
     popup.innerHTML = items.map(function(p, i){
-      var isAgent = p.type === 'agent';
+      var isAgent = trigger === '#';
       var icon = isAgent
         ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>'
         : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
-      var badge = isAgent ? '<span class="mi-badge-agent">agent</span>' : '';
-      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention(\''+_mesc(p.name)+'\',\''+p.type+'\')">' +
-        icon + '<span class="mi-name">'+_mesc(p.name)+'</span>'+badge+'<span class="mi-stack">'+_mesc(p.sub||'')+'</span>'+
+      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention(\''+_mesc(p.name)+'\',\''+trigger+'\')">' +
+        icon +
+        '<span class="mi-name">'+_mesc(p.name)+'</span>' +
+        '<span class="mi-stack">'+_mesc(p.sub||'')+'</span>' +
         '</div>';
     }).join('');
     popup.classList.add('open');
@@ -365,13 +375,14 @@
     if(popup){ popup.classList.remove('open'); popup.innerHTML = ''; }
   }
 
-  function ctoPickMention(name, type){
+  function ctoPickMention(name, trigger){
     var inp = document.getElementById('cto-input');
     var val = inp.value, cur = inp.selectionStart;
-    var atIdx = val.lastIndexOf('@', cur - 1);
-    if(atIdx === -1) return;
-    inp.value = val.slice(0, atIdx) + '@' + name + ' ' + val.slice(cur);
-    inp.selectionStart = inp.selectionEnd = atIdx + name.length + 2;
+    var tchar = trigger || '@';
+    var idx = val.lastIndexOf(tchar, cur - 1);
+    if(idx === -1) return;
+    inp.value = val.slice(0, idx) + tchar + name + ' ' + val.slice(cur);
+    inp.selectionStart = inp.selectionEnd = idx + name.length + 2;
     _closeMention(); inp.focus();
   }
 

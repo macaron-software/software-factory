@@ -218,46 +218,50 @@ def _get_invitable_agents():
 
 
 @router.get("/api/cto/mention-list", response_class=JSONResponse)
-async def cto_mention_list():
-    """Return combined list of projects + key agents for @ autocomplete."""
+async def cto_mention_list(type: str = "all"):
+    """Return projects (type=project), agents (type=agent), or both (type=all)."""
     from ...projects.manager import get_project_store
     items = []
-    try:
-        ps = get_project_store()
-        for p in ps.list_all()[:50]:
-            items.append({"type": "project", "id": p.id, "name": p.name,
-                           "sub": p.factory_type or ""})
-    except Exception:
-        pass
-    try:
-        for a in _get_invitable_agents():
-            items.append({"type": "agent", "id": a.id, "name": a.name,
-                           "sub": a.role or ""})
-    except Exception:
-        pass
+    if type in ("project", "all"):
+        try:
+            ps = get_project_store()
+            for p in ps.list_all()[:60]:
+                items.append({"type": "project", "id": p.id, "name": p.name,
+                               "sub": p.factory_type or ""})
+        except Exception:
+            pass
+    if type in ("agent", "all"):
+        try:
+            for a in _get_invitable_agents():
+                items.append({"type": "agent", "id": a.id, "name": a.name,
+                               "sub": a.role or ""})
+        except Exception:
+            pass
     return JSONResponse(items)
 
 
 def _find_agent_mentions(content: str):
-    """Return list of (mention_text, agent) for @mentions that resolve to an agent."""
+    """Return list of (mention_text, agent) for #AgentName mentions."""
     import re
-    from ...agents.store import get_agent_store
-    mentions = re.findall(r"@([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$|\set\s|\spour\s))", content)
+    mentions = re.findall(r"#([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$|\set\s|\spour\s|\sou\s))", content)
     if not mentions:
-        mentions = re.findall(r"@([\w\-]+)", content)
+        mentions = re.findall(r"#([\w\-]+)", content)
     if not mentions:
         return []
-    store = get_agent_store()
     all_agents = _get_invitable_agents()
     found = []
+    seen = set()
     for mention in mentions:
         m_lower = mention.lower().strip()
         for a in all_agents:
             aname = a.name.lower()
             aid = a.id.lower()
-            if (m_lower == aname or m_lower in aname or aname.startswith(m_lower)
-                    or m_lower in aid):
+            if a.id not in seen and (
+                m_lower == aname or m_lower in aname or aname.startswith(m_lower)
+                or m_lower in aid
+            ):
                 found.append((mention, a))
+                seen.add(a.id)
                 break
     return found
 
