@@ -423,12 +423,25 @@ def _resolve_mentions(content: str) -> str:
     """Replace @ProjectName mentions with rich project context for the LLM."""
     import re
 
+    # Capture full project name including em-dash/en-dash until a verb/sentence-break
+    _STOP = (
+        r"parle|dis|où|que|comment|quoi|quel|donne|fait|lance|crée|analyse"
+        r"|explique|résume|liste|montre|deploie|pour |et |c'est|c'est|ça |ca "
+    )
     mentions = re.findall(
-        r"@([\w\-][\w\-\s]*?)(?=\s*(?:—|--|et |pour |dit |:|\?|$))", content
+        rf"@((?:[\w][\w\-\s—–]*?)(?=\s+(?:{_STOP})|\s*$|\s*\?|\s*:))",
+        content,
+        re.IGNORECASE,
     )
     if not mentions:
-        # fallback: single-word mentions
+        # fallback: capture up to 80 chars after @, stopping at punctuation/newline
+        mentions = re.findall(r"@([\w][\w\-\s—–]{0,79}?)(?=\s*[\?:!\n]|$)", content)
+    if not mentions:
         mentions = re.findall(r"@([\w\-]+)", content)
+    if not mentions:
+        return content
+    # Strip trailing spaces/dashes from each mention
+    mentions = [m.strip(" \t—–-") for m in mentions if m.strip()]
     if not mentions:
         return content
     try:
@@ -440,18 +453,37 @@ def _resolve_mentions(content: str) -> str:
         all_projects = ps.list_all()
         injected = []
         for mention in mentions:
-            mention_lower = mention.lower().replace("-", " ").replace("_", " ")
-            # Find project by name (fuzzy: starts with or contains)
-            match = None
+            m_key = (
+                mention.lower()
+                .replace("-", " ")
+                .replace("_", " ")
+                .replace("—", " ")
+                .replace("–", " ")
+                .strip()
+            )
+            # Score each project: exact=3, starts_with=2, contains=1; bonus +1 if SF type
+            best, best_score = None, 0
             for p in all_projects:
-                pname = p.name.lower().replace("-", " ").replace("_", " ")
-                if (
-                    pname == mention_lower
-                    or pname.startswith(mention_lower)
-                    or mention_lower in pname
-                ):
-                    match = p
-                    break
+                pname = (
+                    p.name.lower()
+                    .replace("-", " ")
+                    .replace("_", " ")
+                    .replace("—", " ")
+                    .replace("–", " ")
+                    .strip()
+                )
+                score = 0
+                if pname == m_key:
+                    score = 3
+                elif pname.startswith(m_key) or m_key.startswith(pname):
+                    score = 2
+                elif m_key in pname or pname.split()[0] == m_key.split()[0]:
+                    score = 1
+                if score > 0 and (p.factory_type or "STANDALONE") != "STANDALONE":
+                    score += 1
+                if score > best_score:
+                    best, best_score = p, score
+            match = best
             if not match:
                 continue
             # Get SF missions only if they exist (optional enrichment)
