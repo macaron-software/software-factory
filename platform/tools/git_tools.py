@@ -6,6 +6,7 @@ Git branch isolation: agents commit to agent/{agent_id}/ branches, never main/ma
 
 from __future__ import annotations
 
+import os
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
@@ -13,6 +14,54 @@ from . import rtk_run
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
+
+# Factory keys directory (mounted in Docker: /app/.config/factory)
+_FACTORY_KEYS_DIR = os.path.expanduser("~/.config/factory")
+
+
+def _configure_git_credentials(cwd: str) -> None:
+    """Configure git credentials from GITHUB_TOKEN env var or factory keys file.
+    Sets up token-based HTTPS authentication for the current repo.
+    Called before git push to ensure credentials are available.
+    """
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        token_file = os.path.join(_FACTORY_KEYS_DIR, "github.token")
+        if os.path.exists(token_file):
+            with open(token_file) as f:
+                token = f.read().strip()
+    if not token:
+        return  # No token available, rely on existing git config (SSH keys, etc.)
+
+    # Rewrite remote URL to embed token for HTTPS auth
+    try:
+        r = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=5,
+        )
+        url = r.stdout.strip()
+        if url.startswith("https://") and "github.com" in url and "@" not in url:
+            # Inject token: https://token@github.com/...
+            authed = url.replace("https://", f"https://{token}@")
+            subprocess.run(
+                ["git", "remote", "set-url", "origin", authed],
+                cwd=cwd,
+                timeout=5,
+                check=False,
+            )
+        # Set user identity if not already configured
+        for key, val in [
+            ("user.email", "agent@software-factory.local"),
+            ("user.name", "SF Agent"),
+        ]:
+            subprocess.run(
+                ["git", "config", "--local", key, val], cwd=cwd, timeout=5, check=False
+            )
+    except Exception:
+        pass  # Non-fatal: push will fail with auth error if creds are wrong
 
 
 def _current_branch(cwd: str) -> str:
@@ -244,6 +293,10 @@ class GitPushTool(BaseTool):
             branch = _current_branch(cwd)
             if not branch:
                 return "Error: could not determine current branch"
+
+            # Configure git credentials if GITHUB_TOKEN available
+            _configure_git_credentials(cwd)
+
             r = subprocess.run(
                 ["git", "push", "--set-upstream", remote, branch],
                 capture_output=True,

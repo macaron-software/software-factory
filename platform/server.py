@@ -756,7 +756,11 @@ def create_app() -> FastAPI:
                 "/sw.js",
             )
         )
-        if not skip and not request.cookies.get("onboarding_done"):
+        if (
+            not skip
+            and not request.cookies.get("onboarding_done")
+            and os.environ.get("PLATFORM_ENV") != "test"
+        ):
             from starlette.responses import RedirectResponse
 
             return RedirectResponse(url="/onboarding", status_code=302)
@@ -1105,26 +1109,48 @@ def create_app() -> FastAPI:
 
     app.state.templates = templates
 
-    # Routes
+    # Routes — core (required)
     from .web.routes import router as web_router
     from .web.routes.auth import router as auth_router
-    from .web.routes.mercato import router as mercato_router
-    from .web.routes.oauth import router as oauth_router
     from .web.ws import router as sse_router
-    from .web.routes.websocket import router as ws_router
-    from .web.routes.dag import router as dag_router
-    from .web.routes.evolution import router as evolution_router
-    from .web.routes.api.push import router as push_router
 
     app.include_router(auth_router)
-    app.include_router(oauth_router)
-    app.include_router(mercato_router)
-    app.include_router(ws_router)
-    app.include_router(dag_router)
-    app.include_router(evolution_router)
-    app.include_router(push_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
+
+    # Routes — optional (safe mode: import failures are logged, not fatal)
+    _loaded_modules: list[str] = []
+    _failed_modules: list[str] = []
+
+    _OPTIONAL_ROUTERS: list[tuple[str, str, dict]] = [
+        ("mercato", ".web.routes.mercato", {}),
+        ("oauth", ".web.routes.oauth", {}),
+        ("websocket", ".web.routes.websocket", {}),
+        ("dag", ".web.routes.dag", {}),
+        ("evolution", ".web.routes.evolution", {}),
+        ("push", ".web.routes.api.push", {}),
+        ("tasks", ".web.routes.api.tasks", {}),
+    ]
+
+    for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:
+        try:
+            import importlib as _imp
+
+            _pkg = __name__.rsplit(".", 1)[0]
+            _m = _imp.import_module(_mod_path, package=_pkg)
+            app.include_router(_m.router, **_kwargs)
+            _loaded_modules.append(_mod_name)
+        except Exception as _exc:
+            _failed_modules.append(_mod_name)
+            logger.warning("Optional module '%s' failed to load: %s", _mod_name, _exc)
+
+    # Store module load status on app state for /api/health/modules
+    app.state.loaded_modules = _loaded_modules
+    app.state.failed_modules = _failed_modules
+    if _failed_modules:
+        logger.warning(
+            "Safe mode: %d module(s) skipped: %s", len(_failed_modules), _failed_modules
+        )
 
     return app
 

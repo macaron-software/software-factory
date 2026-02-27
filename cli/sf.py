@@ -649,6 +649,44 @@ def cmd_llm_traces(args):
     output(args, b.llm_traces(getattr(args, "limit", 20)))
 
 
+# ── Tasks (Copilot→SF delegation) ──
+
+
+def cmd_tasks_brief(args):
+    """Submit a task brief to the SF — creates a TMA mission for agents to execute."""
+    b = get_backend(args)
+    brief = {
+        "type": getattr(args, "type", "chore"),
+        "title": " ".join(args.title),
+        "description": getattr(args, "description", ""),
+        "project_id": getattr(args, "project", "software-factory"),
+    }
+    if getattr(args, "files", None):
+        brief["files"] = args.files.split(",")
+    if getattr(args, "expected", None):
+        brief["expected"] = args.expected
+    if getattr(args, "test_cmd", None):
+        brief["test_cmd"] = args.test_cmd
+    result = b.task_brief_submit(brief)
+    if getattr(args, "json_output", False):
+        out.out_json(result)
+        return
+    mid = result.get("mission_id", "?")
+    status = result.get("status", "?")
+    url = result.get("session_url", "")
+    print(f"Mission created: {mid}  status={status}")
+    print(f"  sf missions show {mid}")
+    print(f"  sf missions start {mid}   (to launch agents)")
+    if url:
+        print(f"  URL: {b.base_url}{url}")
+
+
+def cmd_tasks_status(args):
+    """Get status of a copilot-brief mission."""
+    b = get_backend(args)
+    output(args, b.task_brief_status(args.id))
+
+
 # ── Memory ──
 
 
@@ -1310,6 +1348,34 @@ def build_parser() -> argparse.ArgumentParser:
     llm_sub.add_parser("rtk", help="RTK token compression stats").set_defaults(
         func=cmd_llm_rtk
     )
+
+    # ── tasks (Copilot→SF delegation) ──
+    tasks = sub.add_parser("tasks", help="Delegate tasks to SF agents")
+    tasks_sub = tasks.add_subparsers(dest="subcmd")
+
+    tb = tasks_sub.add_parser("brief", help="Submit a task brief to the SF")
+    tb.add_argument("title", nargs="+", help="Task title")
+    tb.add_argument(
+        "--type",
+        "-t",
+        default="chore",
+        choices=["bug_fix", "feature", "refactor", "docs", "test", "chore"],
+        help="Task type",
+    )
+    tb.add_argument("--desc", "-d", dest="description", default="", help="Description")
+    tb.add_argument(
+        "--files", "-f", default=None, help="Comma-separated file:line refs"
+    )
+    tb.add_argument("--expected", "-e", default=None, help="Expected behavior")
+    tb.add_argument(
+        "--test-cmd", default=None, dest="test_cmd", help="Test command to run"
+    )
+    tb.add_argument("--project", "-p", default="software-factory", help="Project ID")
+    tb.set_defaults(func=cmd_tasks_brief)
+
+    ts = tasks_sub.add_parser("status", help="Status of a copilot-brief mission")
+    ts.add_argument("id")
+    ts.set_defaults(func=cmd_tasks_status)
 
     # ── memory ──
     mem = sub.add_parser("memory", help="Memory/knowledge management")

@@ -529,6 +529,44 @@ class DBBackend:
         except Exception:
             return []
 
+    # ── Tasks (Copilot→SF delegation) ──
+
+    def task_brief_submit(self, brief: dict) -> dict:
+        import uuid
+        from datetime import datetime
+
+        mid = f"tma-copilot-{uuid.uuid4().hex[:8]}"
+        title = brief.get("title", "Untitled")
+        goal = f"[Copilot brief] {brief.get('description', '')}"
+        project_id = brief.get("project_id", "software-factory")
+        now = datetime.utcnow().isoformat()
+        try:
+            self._conn.execute(
+                "INSERT INTO missions (id, project_id, name, status, type, goal, wsjf_score, created_at) VALUES (?, ?, ?, 'planning', 'program', ?, 5.0, ?)",
+                (mid, project_id, f"[Copilot] {title}", goal, now),
+            )
+            self._conn.commit()
+            return {
+                "mission_id": mid,
+                "session_url": f"/missions/{mid}",
+                "status": "created",
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def task_brief_status(self, mid: str) -> dict:
+        row = self._conn.execute(
+            "SELECT id, name, status, created_at FROM missions WHERE id=?", (mid,)
+        ).fetchone()
+        if not row:
+            return {"error": "not found"}
+        return {
+            "mission_id": row[0],
+            "title": row[1],
+            "status": row[2],
+            "created_at": row[3],
+        }
+
     # ── Memory ──
 
     def memory_search(self, query: str) -> list:

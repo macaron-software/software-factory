@@ -368,6 +368,14 @@ class APIBackend:
     def llm_traces(self, limit: int = 20) -> list:
         return self._get("/api/llm/traces", {"limit": limit})
 
+    # ── Tasks (Copilot→SF delegation) ──
+
+    def task_brief_submit(self, brief: dict) -> dict:
+        return self._post("/api/tasks/copilot-brief", brief)
+
+    def task_brief_status(self, mid: str) -> dict:
+        return self._get(f"/api/tasks/copilot-brief/{mid}")
+
     # ── Memory ──
 
     def memory_search(self, query: str) -> list:

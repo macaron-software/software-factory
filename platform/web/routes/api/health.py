@@ -46,6 +46,25 @@ async def health_check():
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
 
 
+@router.get("/api/health/modules")
+async def health_modules(request: Request):
+    """List optional modules loaded vs failed (safe mode status)."""
+    loaded = getattr(request.app.state, "loaded_modules", None)
+    failed = getattr(request.app.state, "failed_modules", None)
+    if loaded is None:
+        return JSONResponse(
+            {"safe_mode": False, "note": "Module tracking not available"}
+        )
+    return JSONResponse(
+        {
+            "safe_mode": len(failed) > 0,
+            "loaded": loaded,
+            "failed": failed,
+            "total": len(loaded) + len(failed),
+        }
+    )
+
+
 @router.get("/api/metrics/load")
 async def system_load():
     """Lightweight system load endpoint — used by coordinator for worker dispatch decisions."""
