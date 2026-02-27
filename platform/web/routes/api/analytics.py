@@ -673,8 +673,25 @@ async def releases_data(project_id: str):
         except Exception:
             pass  # missions/features tables may not exist yet
 
-        return JSONResponse({"project_id": project_id, "releases": releases})
+        import datetime as _dt
+
+        def _serial(obj):
+            if isinstance(obj, (_dt.datetime, _dt.date)):
+                return obj.isoformat()
+            raise TypeError(
+                f"Object of type {type(obj).__name__} is not JSON serializable"
+            )
+
+        return JSONResponse(
+            content=_json.loads(
+                _json.dumps(
+                    {"project_id": project_id, "releases": releases}, default=_serial
+                )
+            )
+        )
     except Exception as exc:
-        return JSONResponse({"project_id": project_id, "releases": [], "error": str(exc)})
+        return JSONResponse(
+            {"project_id": project_id, "releases": [], "error": str(exc)}
+        )
     finally:
         db.close()
