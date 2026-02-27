@@ -180,8 +180,15 @@
 </div>
 
 <script>
-var _wsProjectId = '{{ project.id }}';
+var _wsProjectId = {{ project.id | tojson }};
 var _wsPreviewMobile = false;
+
+// All API calls use same-origin credentials so session cookies are sent
+function wsFetch(url, opts) {
+  opts = opts || {};
+  opts.credentials = 'same-origin';
+  return fetch(url, opts);
+}
 
 function wsTab(btn, name) {
   document.querySelectorAll('.ws-tab').forEach(function(b){ b.classList.remove('active'); });
@@ -198,7 +205,8 @@ function wsTab(btn, name) {
 }
 
 function wsLoadTermHistory() {
-  fetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var h = document.getElementById('wsTermHistory');
@@ -257,7 +265,8 @@ document.getElementById('wsTermInput').addEventListener('keydown', function(e) {
 
 function wsLoadToolcalls() {
   var body = document.getElementById('wsToolcallsBody');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
@@ -278,7 +287,8 @@ function wsLoadToolcalls() {
 
 function wsLoadFilesTree(path) {
   var tree = document.getElementById('wsFilesTree');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/files?path=' + encodeURIComponent(path))
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/files?path=' + encodeURIComponent(path))
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
@@ -300,7 +310,8 @@ function wsLoadFilesTree(path) {
 function wsOpenFile(path) {
   var viewer = document.getElementById('wsFilesViewer');
   viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
-  fetch('/api/projects/' + _wsProjectId + '/workspace/file?path=' + encodeURIComponent(path))
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/file?path=' + encodeURIComponent(path))
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       if (data.error) { viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">' + wsEsc(data.error) + '</span></div>'; return; }
@@ -318,7 +329,8 @@ function wsOpenFile(path) {
 
 function wsLoadDocker() {
   var body = document.getElementById('wsDockerBody');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/docker')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var containers = data.containers || [];
@@ -341,7 +353,7 @@ function wsLoadDocker() {
 }
 
 function wsDockAction(name, action) {
-  fetch('/api/projects/' + _wsProjectId + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
     .then(function(){ setTimeout(wsLoadDocker, 1500); });
 }
 
@@ -352,7 +364,8 @@ function wsDockPreview(ports) {
 
 function wsLoadAgents() {
   var body = document.getElementById('wsAgentsBody');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/agents')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/agents')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
@@ -371,7 +384,8 @@ function wsLoadAgents() {
 
 function wsLoadGit() {
   var body = document.getElementById('wsGitBody');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/git')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/git')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var commits = data.commits || [], changes = data.changes || [], branch = data.branch || '';
@@ -396,7 +410,8 @@ function wsGitCommit() {
   var msg = document.getElementById('wsGitMsg').value.trim(); if (!msg) { alert('Message requis'); return; }
   var push = document.getElementById('wsGitPush').checked;
   wsSetStatus('Commit…', 'running');
-  fetch('/api/projects/' + _wsProjectId + '/workspace/git/commit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,push:push})})
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/git/commit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,push:push})})
+    
     .then(function(r){ return r.json(); })
     .then(function(d){ wsSetStatus('Prêt','idle'); if(d.ok){wsLoadGit();}else{alert(d.error||'Erreur');} });
 }
@@ -417,7 +432,8 @@ function wsPreviewToggleMobile() {
 }
 
 function wsLoadLeftTree() {
-  fetch('/api/projects/' + _wsProjectId + '/workspace/files?path=.')
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/files?path=.')
+    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var body = document.getElementById('wsTreeBody');
@@ -428,7 +444,7 @@ function wsLoadLeftTree() {
         var isDir = i.type==='dir';
         html += '<div class="ws-tree-item' + (isDir?' ws-tree-dir':'') + '" onclick="wsTab(document.querySelector(\'[data-tab=files]\'),\'files\');setTimeout(function(){' + (isDir?'wsLoadFilesTree':'wsOpenFile') + '(\'' + wsEsc(i.path) + '\')},50)">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-          (isDir?'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>":'<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>')+
+          (isDir?'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>':'<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>')+
           '</svg>' + wsEsc(i.name) + '</div>';
       });
       body.innerHTML = html;
