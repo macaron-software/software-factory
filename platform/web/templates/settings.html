@@ -695,8 +695,15 @@ function renderProviders(providers) {
     if (!providers.length) { grid.innerHTML = '<p style="color:var(--text-secondary)">No providers configured</p>'; return; }
     const colors = {'azure-ai':'rgba(0,120,212,.15)','azure-openai':'rgba(0,120,212,.12)','minimax':'rgba(34,197,94,.12)','nvidia':'rgba(118,185,0,.12)'};
     const textColors = {'azure-ai':'#0078d4','azure-openai':'#0065b3','minimax':'#22c55e','nvidia':'#76b900'};
-    grid.innerHTML = providers.map(p => `
-        <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}">
+    grid.innerHTML = providers.map(p => {
+        const canToggle = p.has_key;
+        const statusLabel = !p.has_key ? 'no key' : (p.manually_disabled ? 'disabled' : 'active');
+        const statusClass = !p.has_key ? 'badge-red' : (p.manually_disabled ? 'badge-yellow' : 'badge-green');
+        const toggleChecked = p.enabled ? 'checked' : '';
+        const toggleDisabled = !p.has_key ? 'disabled' : '';
+        const toggleTitle = !p.has_key ? `Set ${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY to enable` : (p.enabled ? 'Click to disable' : 'Click to enable');
+        return `
+        <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}" id="prov-card-${p.id}">
             <div class="llm-prov-header">
                 <div style="display:flex;align-items:center;gap:0.6rem">
                     <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
@@ -705,11 +712,54 @@ function renderProviders(providers) {
                         <div class="llm-prov-models">${p.models.join(' · ')}</div>
                     </div>
                 </div>
-                <span class="badge ${p.enabled ? 'badge-green' : 'badge-red'}" style="font-size:0.68rem">${p.enabled ? 'active' : 'no key'}</span>
+                <div style="display:flex;align-items:center;gap:0.7rem">
+                    <span class="badge ${statusClass}" style="font-size:0.68rem" id="prov-badge-${p.id}">${statusLabel}</span>
+                    <label title="${toggleTitle}" style="cursor:${canToggle?'pointer':'not-allowed'};display:flex;align-items:center;gap:0;margin:0" onclick="toggleProvider(event,'${p.id}')">
+                        <input type="checkbox" ${toggleChecked} ${toggleDisabled}
+                            style="display:none"
+                            id="prov-toggle-${p.id}">
+                        <span style="
+                            display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;
+                            background:${p.enabled?'var(--purple)':'var(--border)'};
+                            transition:background .2s;
+                            opacity:${canToggle?'1':'.45'}
+                        " id="prov-track-${p.id}">
+                            <span style="
+                                position:absolute;top:2px;left:${p.enabled?'16px':'2px'};
+                                width:14px;height:14px;border-radius:50%;background:#fff;
+                                transition:left .2s;
+                            " id="prov-thumb-${p.id}"></span>
+                        </span>
+                    </label>
+                </div>
             </div>
-            ${p.enabled ? '' : '<p style="font-size:0.72rem;color:var(--text-secondary);margin:0">Set <code>' + p.id.toUpperCase().replace(/-/g,'_') + '_API_KEY</code> env var to enable</p>'}
-        </div>
-    `).join('');
+            ${!p.has_key ? `<p style="font-size:0.72rem;color:var(--text-secondary);margin:0.4rem 0 0">Set <code>${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY</code> env var to enable</p>` : ''}
+        </div>`;
+    }).join('');
+}
+
+async function toggleProvider(event, providerId) {
+    event.preventDefault();
+    const card = document.getElementById('prov-card-' + providerId);
+    const track = document.getElementById('prov-track-' + providerId);
+    const thumb = document.getElementById('prov-thumb-' + providerId);
+    const badge = document.getElementById('prov-badge-' + providerId);
+    const input = document.getElementById('prov-toggle-' + providerId);
+    if (input.disabled) return;
+    try {
+        const r = await fetch('/api/llm/providers/' + providerId + '/toggle', {method:'POST'});
+        const d = await r.json();
+        if (!d.ok) { console.error('toggle failed', d); return; }
+        const enabled = d.enabled;
+        input.checked = enabled;
+        card.classList.toggle('active', enabled);
+        card.classList.toggle('inactive', !enabled);
+        track.style.background = enabled ? 'var(--purple)' : 'var(--border)';
+        thumb.style.left = enabled ? '16px' : '2px';
+        badge.textContent = enabled ? 'active' : 'disabled';
+        badge.className = 'badge ' + (enabled ? 'badge-green' : 'badge-yellow');
+        badge.style.fontSize = '0.68rem';
+    } catch(e) { console.error(e); }
 }
 
 function _modelSelect(key, currentVal) {

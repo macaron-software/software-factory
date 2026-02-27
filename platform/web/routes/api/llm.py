@@ -57,10 +57,36 @@ def _save_routing(routing: dict) -> None:
     db.close()
 
 
+def _load_disabled_providers() -> set:
+    """Load the set of manually disabled provider IDs from DB."""
+    try:
+        db = _get_db()
+        row = db.execute(
+            "SELECT value FROM session_state WHERE key='llm_disabled_providers'"
+        ).fetchone()
+        db.close()
+        if row:
+            return set(json.loads(row[0]))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_disabled_providers(disabled: set) -> None:
+    db = _get_db()
+    db.execute(
+        "INSERT OR REPLACE INTO session_state (key, value) VALUES ('llm_disabled_providers', ?)",
+        (json.dumps(list(disabled)),),
+    )
+    db.commit()
+    db.close()
+
+
 def _builtin_providers() -> list[dict]:
     """Return status of all builtin LLM providers."""
     from ....llm.client import _PROVIDERS
 
+    disabled = _load_disabled_providers()
     result = []
     for pid, pcfg in _PROVIDERS.items():
         key_env = pcfg.get("key_env", "")
@@ -72,7 +98,8 @@ def _builtin_providers() -> list[dict]:
                 "models": pcfg.get("models", []),
                 "default_model": pcfg.get("default", pcfg.get("models", ["?"])[0]),
                 "has_key": has_key,
-                "enabled": has_key,
+                "manually_disabled": pid in disabled,
+                "enabled": has_key and pid not in disabled,
             }
         )
     return result
@@ -147,5 +174,30 @@ async def save_llm_routing(payload: dict):
         except Exception:
             pass
         return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/llm/providers/{provider_id}/toggle")
+async def toggle_provider(provider_id: str):
+    """Enable or disable a provider (independent of API key presence)."""
+    try:
+        providers = _builtin_providers()
+        ids = {p["id"] for p in providers}
+        if provider_id not in ids:
+            return JSONResponse(
+                {"ok": False, "error": "Unknown provider"}, status_code=404
+            )
+        disabled = _load_disabled_providers()
+        if provider_id in disabled:
+            disabled.discard(provider_id)
+            now_enabled = True
+        else:
+            disabled.add(provider_id)
+            now_enabled = False
+        _save_disabled_providers(disabled)
+        return JSONResponse(
+            {"ok": True, "provider_id": provider_id, "enabled": now_enabled}
+        )
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
