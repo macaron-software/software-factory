@@ -2174,6 +2174,78 @@ async def dbgate_get_token():
     return JSONResponse({"token": ""})
 
 
+@router.get("/api/projects/{project_id}/workspace/timeline")
+async def ws_timeline(project_id: str, filter: str = "all"):
+    """Return unified timeline events: git commits + missions + deployments."""
+    import asyncio
+    from ...projects.manager import get_project_store
+    from ...projects import git_service
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"events": []})
+
+    events: list[dict] = []
+
+    # Git commits
+    if filter in ("all", "commit") and proj.has_git:
+        try:
+            commits = git_service.get_log(proj.path, 30)
+            for c in commits:
+                cd = c.__dict__ if hasattr(c, "__dict__") else dict(c)
+                events.append({
+                    "type": "commit",
+                    "title": cd.get("message") or cd.get("subject") or "commit",
+                    "description": cd.get("hash", "")[:8],
+                    "author": cd.get("author") or cd.get("author_name", ""),
+                    "ts": cd.get("date") or cd.get("timestamp") or "",
+                })
+        except Exception:
+            pass
+
+    # Missions
+    if filter in ("all", "mission"):
+        try:
+            from ...missions.store import MissionStore
+            missions = MissionStore().list_missions(project_id=project_id, limit=30)
+            for m in missions:
+                md = m.__dict__ if hasattr(m, "__dict__") else dict(m)
+                events.append({
+                    "type": "mission",
+                    "title": md.get("title") or md.get("name") or "Mission",
+                    "description": md.get("status", ""),
+                    "author": md.get("created_by", ""),
+                    "ts": md.get("updated_at") or md.get("created_at") or "",
+                })
+        except Exception:
+            pass
+
+    # Deployments from git log (commits with "deploy" in message)
+    if filter in ("all", "deploy") and proj.has_git:
+        try:
+            all_commits = git_service.get_log(proj.path, 50)
+            for c in all_commits:
+                cd = c.__dict__ if hasattr(c, "__dict__") else dict(c)
+                msg = (cd.get("message") or "").lower()
+                if any(kw in msg for kw in ("deploy", "release", "publish", "prod")):
+                    events.append({
+                        "type": "deploy",
+                        "title": cd.get("message") or "deploy",
+                        "description": cd.get("hash", "")[:8],
+                        "author": cd.get("author") or cd.get("author_name", ""),
+                        "ts": cd.get("date") or cd.get("timestamp") or "",
+                    })
+        except Exception:
+            pass
+
+    # Sort by timestamp descending
+    def sort_key(e: dict) -> str:
+        return str(e.get("ts") or "")
+
+    events.sort(key=sort_key, reverse=True)
+    return JSONResponse({"events": events[:60]})
+
+
 @router.get("/api/docker/stats")
 async def docker_global_stats():
     """Return global Docker stats: total and running containers."""

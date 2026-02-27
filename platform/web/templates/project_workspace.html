@@ -25,6 +25,22 @@ html,body{height:100%;overflow:hidden}
 .ws-pane-content{flex:1 1 0%!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;min-height:0}
 .ws-tab-content{display:none!important}
 .ws-tab-content.active{display:flex!important;flex:1 1 0%!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
+/* Timeline */
+.ws-tl-item{display:flex;gap:.8rem;padding:.5rem 0;border-left:2px solid var(--border);margin-left:.5rem;padding-left:1rem;position:relative}
+.ws-tl-item::before{content:'';position:absolute;left:-.45rem;top:.7rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--border);flex-shrink:0}
+.ws-tl-item.commit::before{background:#3b82f6}
+.ws-tl-item.mission::before{background:#7c3aed}
+.ws-tl-item.deploy::before{background:#22c55e}
+.ws-tl-item.error::before{background:#ef4444}
+.ws-tl-meta{min-width:0;flex:1}
+.ws-tl-title{font-size:.78rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-tl-desc{font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;line-height:1.4}
+.ws-tl-time{font-size:.68rem;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;margin-top:.1rem}
+.ws-tl-badge{display:inline-block;padding:.1rem .4rem;border-radius:.25rem;font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-right:.3rem}
+.ws-tl-badge.commit{background:rgba(59,130,246,.15);color:#3b82f6}
+.ws-tl-badge.mission{background:rgba(124,58,237,.15);color:#7c3aed}
+.ws-tl-badge.deploy{background:rgba(34,197,94,.15);color:#22c55e}
+.ws-tl-badge.error{background:rgba(239,68,68,.15);color:#ef4444}
 </style>
 {% endblock %}
 
@@ -64,6 +80,9 @@ html,body{height:100%;overflow:hidden}
     </button>
     <button class="ws-activity-btn" data-view="secrets" onclick="wsSetView('secrets')" title="Secrets / .env">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="timeline" onclick="wsSetView('timeline')" title="Timeline">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
     </button>
   </div>
 
@@ -380,6 +399,23 @@ html,body{height:100%;overflow:hidden}
         </div>
       </div>
 
+      <!-- ── Timeline view ─────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-timeline" style="flex-direction:column;overflow-y:auto;padding:1rem 1.5rem;gap:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-shrink:0">
+          <div style="font-size:.82rem;font-weight:700;color:var(--text-primary)">⏱ Timeline</div>
+          <div style="display:flex;gap:.4rem">
+            <select id="wsTimelineFilter" onchange="wsLoadTimeline()" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.73rem">
+              <option value="all">Tout</option>
+              <option value="commit">Git commits</option>
+              <option value="mission">Missions</option>
+              <option value="deploy">Déploiements</option>
+            </select>
+            <button class="ws-term-run" style="padding:.2rem .6rem;font-size:.72rem" onclick="wsLoadTimeline()">↻</button>
+          </div>
+        </div>
+        <div id="wsTimelineBody" style="display:flex;flex-direction:column;gap:0;flex:1"></div>
+      </div>
+
     </div><!-- end ws-view-container -->
 
     <!-- ── Bottom Panel: Shell + Output ──────────────────────── -->
@@ -471,6 +507,7 @@ function wsSetView(name) {
   if (name === 'backlog') { wsLoadBacklog(); }
   if (name === 'db') { wsLoadDatabase(); wsDbGateAutoLogin(); }
   if (name === 'secrets') { wsLoadSecrets(); }
+  if (name === 'timeline') { wsLoadTimeline(); }
 }
 
 function wsBottomTab(btn, name) {
@@ -1163,6 +1200,35 @@ function wsSecretsNewFile() {
 
 function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el)return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
 function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── Timeline ─────────────────────────────────────────────────────
+function wsLoadTimeline() {
+  var body = document.getElementById('wsTimelineBody');
+  var filter = document.getElementById('wsTimelineFilter')?.value || 'all';
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.5rem">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/timeline?filter=' + filter)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var items = d.events || [];
+      if (!items.length) { body.innerHTML = '<div style="color:var(--text-secondary);font-size:.78rem;padding:.5rem">Aucun événement trouvé.</div>'; return; }
+      var html = '';
+      items.forEach(function(ev) {
+        var t = ev.type || 'commit';
+        var ts = ev.ts ? new Date(ev.ts).toLocaleString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        html += '<div class="ws-tl-item ' + wsEsc(t) + '">';
+        html += '<div class="ws-tl-meta">';
+        html += '<div class="ws-tl-title"><span class="ws-tl-badge ' + wsEsc(t) + '">' + wsEsc(t) + '</span>' + wsEsc(ev.title || ev.message || '') + '</div>';
+        if (ev.description) html += '<div class="ws-tl-desc">' + wsEsc(ev.description) + '</div>';
+        if (ev.author) html += '<div class="ws-tl-desc" style="color:var(--purple-light)">👤 ' + wsEsc(ev.author) + '</div>';
+        html += '</div>';
+        html += '<div class="ws-tl-time">' + wsEsc(ts) + '</div>';
+        html += '</div>';
+      });
+      body.innerHTML = html;
+    })
+    .catch(function(e) { body.innerHTML = '<div style="color:#ef4444;font-size:.75rem">Erreur: ' + e.message + '</div>'; });
+}
 
 // ── Init ────────────────────────────────────────────────────────
 (function() {
