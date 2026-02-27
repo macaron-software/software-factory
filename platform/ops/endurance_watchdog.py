@@ -63,6 +63,18 @@ def _ensure_table():
         detail TEXT DEFAULT ''
     )""")
     db.commit()
+    # Reset PG sequence if out of sync (can happen after restore/restart)
+    try:
+        from ..db.migrations import is_postgresql
+
+        if is_postgresql():
+            db.execute(
+                "SELECT setval(pg_get_serial_sequence('endurance_metrics', 'id'), "
+                "COALESCE((SELECT MAX(id) FROM endurance_metrics), 0) + 1, false)"
+            )
+            db.commit()
+    except Exception:
+        pass
     db.close()
 
 
@@ -326,29 +338,21 @@ async def _auto_resume_paused() -> int:
                 )
                 db.commit()
 
-                # Trigger resume via resume-all API (batch approach)
-                base_url = HEALTH_URL.replace("/api/health", "")
-                proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-sf",
-                    "-X",
-                    "POST",
-                    "-m",
-                    "30",
-                    f"{base_url}/api/workflows/resume-all",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await proc.wait()
+                # Trigger resume directly via service (same process, no HTTP auth needed)
+                try:
+                    from ..services.auto_resume import auto_resume_missions
 
-                if proc.returncode == 0:
-                    resumed = slots  # Assume all were resumed
-                    _log_metric("auto_resume", slots, "batch via resume-all")
+                    await auto_resume_missions()
+                    resumed = slots
+                    _log_metric("auto_resume", slots, "batch via auto_resume_missions")
                     logger.warning(
-                        "WATCHDOG: resume-all triggered for %d candidates", slots
+                        "WATCHDOG: auto-resuming %d paused runs (running=%d, slots=%d)",
+                        len(paused),
+                        running,
+                        slots,
                     )
-                else:
-                    _log_metric("auto_resume_fail", 0, "resume-all failed")
+                except Exception as _re:
+                    _log_metric("auto_resume_fail", 0, str(_re))
 
                 # Don't loop per-session — resume-all handles the batch
                 break
