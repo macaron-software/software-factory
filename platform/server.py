@@ -584,11 +584,11 @@ def create_app() -> FastAPI:
         if path.startswith("/projects/") and path.endswith("/workspace"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "
-                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-                "font-src 'self' data: https://fonts.gstatic.com; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
-                "connect-src 'self' https://cdn.jsdelivr.net; "
+                "connect-src 'self'; "
                 "worker-src blob: 'self'; "
                 "frame-src 'self' http://localhost:* http://127.0.0.1:* https:; "
                 "frame-ancestors 'none'"
