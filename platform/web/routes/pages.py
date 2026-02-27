@@ -882,7 +882,7 @@ async def settings_page(request: Request):
 
 @router.post("/api/settings/orchestrator")
 async def save_orchestrator_settings(request: Request):
-    """Save mission concurrency settings and apply them live."""
+    """Save mission concurrency + backpressure + worker_nodes settings and apply them live."""
     from ...config import get_config, save_config
     from ..helpers import get_mission_semaphore
 
@@ -898,6 +898,20 @@ async def save_orchestrator_settings(request: Request):
         oc.resume_stagger_watchdog = max(1.0, float(body["resume_stagger_watchdog"]))
     if "resume_batch_startup" in body:
         oc.resume_batch_startup = max(1, min(20, int(body["resume_batch_startup"])))
+    if "cpu_green" in body:
+        oc.cpu_green = max(10.0, min(60.0, float(body["cpu_green"])))
+    if "cpu_yellow" in body:
+        oc.cpu_yellow = max(oc.cpu_green + 5, min(80.0, float(body["cpu_yellow"])))
+    if "cpu_red" in body:
+        oc.cpu_red = max(oc.cpu_yellow + 5, min(95.0, float(body["cpu_red"])))
+    if "ram_red" in body:
+        oc.ram_red = max(50.0, min(95.0, float(body["ram_red"])))
+    if "worker_nodes" in body:
+        raw = body["worker_nodes"]
+        if isinstance(raw, list):
+            oc.worker_nodes = [u.strip() for u in raw if u.strip()]
+        elif isinstance(raw, str):
+            oc.worker_nodes = [u.strip() for u in raw.splitlines() if u.strip()]
 
     save_config(cfg)
     # Apply semaphore change live
@@ -909,6 +923,11 @@ async def save_orchestrator_settings(request: Request):
         "resume_stagger_startup": oc.resume_stagger_startup,
         "resume_stagger_watchdog": oc.resume_stagger_watchdog,
         "resume_batch_startup": oc.resume_batch_startup,
+        "cpu_green": oc.cpu_green,
+        "cpu_yellow": oc.cpu_yellow,
+        "cpu_red": oc.cpu_red,
+        "ram_red": oc.ram_red,
+        "worker_nodes": oc.worker_nodes,
     }
 
 

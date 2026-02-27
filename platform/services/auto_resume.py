@@ -48,6 +48,35 @@ _CLEANUP_EVERY_N_CYCLES = 12
 _LAUNCH_PER_CYCLE = 5  # max new launches per watchdog cycle (avoid thundering herd)
 _LAUNCH_STAGGER = 2.0  # seconds between each new launch
 
+# CPU/RAM backpressure thresholds
+_CPU_GREEN = 40.0  # below → launch freely
+_CPU_YELLOW = 70.0  # 40-70 → slow down (2× stagger)
+_CPU_RED = 85.0  # above → skip launch this cycle
+_RAM_RED = 85.0  # RAM % above → skip launch
+
+
+def _get_system_load() -> tuple[float, float]:
+    """Return (cpu_percent_1s, ram_percent). Falls back to (0, 0) if psutil unavailable."""
+    try:
+        import psutil
+
+        cpu = psutil.cpu_percent(interval=1)
+        ram = psutil.virtual_memory().percent
+        return cpu, ram
+    except Exception:
+        return 0.0, 0.0
+
+
+def _get_backpressure_config() -> tuple[float, float, float, float]:
+    """Return (cpu_green, cpu_yellow, cpu_red, ram_red) from config or defaults."""
+    try:
+        from ..config import get_config
+
+        oc = get_config().orchestrator
+        return oc.cpu_green, oc.cpu_yellow, oc.cpu_red, oc.ram_red
+    except Exception:
+        return _CPU_GREEN, _CPU_YELLOW, _CPU_RED, _RAM_RED
+
 
 def _get_resume_config():
     """Read concurrency settings from platform config (live, allows runtime changes)."""
@@ -213,16 +242,110 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     )
 
     resumed = 0
+    skipped_load = 0
     for run_id in to_resume:
+        # Backpressure: check CPU/RAM before each launch
+        cpu, ram = _get_system_load()
+        cpu_green, cpu_yellow, cpu_red, ram_red = _get_backpressure_config()
+        if cpu >= cpu_red or ram >= ram_red:
+            logger.warning(
+                "auto_resume: backpressure RED — cpu=%.0f%% ram=%.0f%% — stopping batch (%d/%d launched)",
+                cpu,
+                ram,
+                resumed,
+                len(to_resume),
+            )
+            break  # Stop this cycle entirely, retry next watchdog pass
+        effective_stagger = stagger
+        if cpu >= cpu_yellow:
+            effective_stagger = stagger * 2  # slow down in yellow zone
+            skipped_load += 1
+            logger.info(
+                "auto_resume: backpressure YELLOW cpu=%.0f%% — doubling stagger to %.0fs",
+                cpu,
+                effective_stagger,
+            )
         try:
-            await _launch_run(run_id)
+            # Try to dispatch to a less-loaded worker node first
+            dispatched = await _try_dispatch_to_worker(run_id)
+            if not dispatched:
+                await _launch_run(run_id)
             resumed += 1
-            logger.warning("auto_resume: launched run %s", run_id)
+            logger.warning(
+                "auto_resume: launched run %s (cpu=%.0f%% ram=%.0f%% dispatched=%s)",
+                run_id,
+                cpu,
+                ram,
+                dispatched,
+            )
         except Exception as e:
             logger.warning("auto_resume: skipped %s: %s", run_id, e)
-        await asyncio.sleep(stagger)
+        await asyncio.sleep(effective_stagger)
 
+    if skipped_load:
+        logger.info("auto_resume: %d launches slowed due to CPU pressure", skipped_load)
     return resumed
+
+
+async def _try_dispatch_to_worker(run_id: str) -> bool:
+    """Try to dispatch a mission run to a less-loaded worker node.
+    Returns True if dispatched remotely, False if should run locally.
+    Worker nodes are configured in OrchestratorConfig.worker_nodes (list of URLs).
+    """
+    try:
+        from ..config import get_config
+
+        workers = getattr(get_config().orchestrator, "worker_nodes", [])
+        if not workers:
+            return False
+
+        import urllib.request
+
+        local_cpu, local_ram = _get_system_load()
+        local_score = local_cpu * 0.6 + local_ram * 0.4
+
+        best_url = None
+        best_score = local_score  # only dispatch if worker is lighter than us
+
+        for worker_url in workers:
+            try:
+                req = urllib.request.Request(
+                    f"{worker_url.rstrip('/')}/api/metrics/load",
+                    headers={"Accept": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read().decode())
+                    score = data.get("load_score", 100)
+                    if score < best_score:
+                        best_score = score
+                        best_url = worker_url
+            except Exception as e:
+                logger.debug("auto_resume: worker %s unreachable: %s", worker_url, e)
+
+        if not best_url:
+            return False  # run locally
+
+        # Dispatch: POST /api/missions/runs/{run_id}/resume to the worker
+        payload = json.dumps({"run_id": run_id}).encode()
+        req = urllib.request.Request(
+            f"{best_url.rstrip('/')}/api/missions/runs/{run_id}/resume",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status in (200, 202):
+                logger.warning(
+                    "auto_resume: dispatched run %s to worker %s (score=%.0f vs local=%.0f)",
+                    run_id,
+                    best_url,
+                    best_score,
+                    local_score,
+                )
+                return True
+    except Exception as e:
+        logger.debug("auto_resume: dispatch failed for %s: %s", run_id, e)
+    return False
 
 
 async def _launch_run(run_id: str) -> None:

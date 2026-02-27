@@ -145,6 +145,13 @@ class OrchestratorConfig:
     resume_stagger_startup: float = 30.0  # seconds between launches on boot
     resume_stagger_watchdog: float = 10.0  # seconds between launches on watchdog
     resume_batch_startup: int = 3  # max missions launched per startup pass
+    # CPU/RAM backpressure thresholds (%)
+    cpu_green: float = 40.0  # below → launch freely
+    cpu_yellow: float = 70.0  # 40-70 → slow down (2× stagger)
+    cpu_red: float = 85.0  # above → skip this cycle
+    ram_red: float = 85.0  # RAM % above → skip this cycle
+    # Worker nodes for multi-server dispatch (list of base URLs)
+    worker_nodes: list = field(default_factory=list)
 
 
 @dataclass

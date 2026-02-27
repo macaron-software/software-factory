@@ -46,6 +46,41 @@ async def health_check():
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
 
 
+@router.get("/api/metrics/load")
+async def system_load():
+    """Lightweight system load endpoint — used by coordinator for worker dispatch decisions."""
+    import os
+    import time as _time
+
+    import psutil
+
+    cpu = psutil.cpu_percent(interval=1)
+    mem = psutil.virtual_memory()
+    from ....web.routes.helpers import get_mission_semaphore
+
+    sem = get_mission_semaphore()
+    try:
+        from ....web.routes.helpers import _active_mission_tasks
+
+        active = len(_active_mission_tasks)
+    except Exception:
+        active = -1
+    return JSONResponse(
+        {
+            "cpu_percent": round(cpu, 1),
+            "ram_percent": round(mem.percent, 1),
+            "ram_available_mb": round(mem.available / 1024 / 1024),
+            "active_missions": active,
+            "semaphore_value": sem._value if hasattr(sem, "_value") else -1,
+            "load_score": round(
+                (cpu * 0.6 + mem.percent * 0.4), 1
+            ),  # 0-100, lower = better
+            "node_id": os.environ.get("NODE_ID", os.environ.get("HOSTNAME", "unknown")),
+            "ts": _time.time(),
+        }
+    )
+
+
 @router.get("/api/sandbox/status")
 async def sandbox_status():
     """Docker sandbox status."""
@@ -427,190 +462,209 @@ async def monitoring_live(request: Request, hours: int = 24):
         docker_info = _docker_cache["data"]["containers"]
         docker_system = _docker_cache["data"]["system"]
     else:
-      try:
-        import pathlib
+        try:
+            import pathlib
 
-        sock_path = "/var/run/docker.sock"
-        if pathlib.Path(sock_path).exists():
-            import http.client
-            import urllib.parse
+            sock_path = "/var/run/docker.sock"
+            if pathlib.Path(sock_path).exists():
+                import http.client
+                import urllib.parse
 
-            class DockerSocket(http.client.HTTPConnection):
-                def __init__(self):
-                    super().__init__("localhost")
+                class DockerSocket(http.client.HTTPConnection):
+                    def __init__(self):
+                        super().__init__("localhost")
 
-                def connect(self):
-                    import socket as _sock
+                    def connect(self):
+                        import socket as _sock
 
-                    self.sock = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
-                    self.sock.connect(sock_path)
-                    self.sock.settimeout(5)
+                        self.sock = _sock.socket(_sock.AF_UNIX, _sock.SOCK_STREAM)
+                        self.sock.connect(sock_path)
+                        self.sock.settimeout(5)
 
-            # --- Container list ---
-            conn = DockerSocket()
-            conn.request("GET", "/containers/json?all=true")
-            resp = conn.getresponse()
-            containers_raw = []
-            if resp.status == 200:
-                containers_raw = json.loads(resp.read().decode())
-            conn.close()
+                # --- Container list ---
+                conn = DockerSocket()
+                conn.request("GET", "/containers/json?all=true")
+                resp = conn.getresponse()
+                containers_raw = []
+                if resp.status == 200:
+                    containers_raw = json.loads(resp.read().decode())
+                conn.close()
 
-            for c in containers_raw:
-                cid = c.get("Id", "")[:12]
-                name = (c.get("Names", ["/?"]) or ["/?"])[0].lstrip("/")
-                state = c.get("State", "?")
-                status = c.get("Status", "?")
-                image = (c.get("Image", "?") or "?")[:40]
-                ports_raw = c.get("Ports", [])
-                ports_str = (
-                    ", ".join(
-                        f"{p.get('PublicPort', '')}→{p.get('PrivatePort', '')}"
-                        for p in ports_raw
-                        if p.get("PublicPort")
+                for c in containers_raw:
+                    cid = c.get("Id", "")[:12]
+                    name = (c.get("Names", ["/?"]) or ["/?"])[0].lstrip("/")
+                    state = c.get("State", "?")
+                    status = c.get("Status", "?")
+                    image = (c.get("Image", "?") or "?")[:40]
+                    ports_raw = c.get("Ports", [])
+                    ports_str = (
+                        ", ".join(
+                            f"{p.get('PublicPort', '')}→{p.get('PrivatePort', '')}"
+                            for p in ports_raw
+                            if p.get("PublicPort")
+                        )
+                        if ports_raw
+                        else ""
                     )
-                    if ports_raw
-                    else ""
-                )
-                restarts = (
-                    c.get("RestartCount", 0)
-                    if c.get("HostConfig", {}).get("RestartPolicy")
-                    else 0
-                )
-                created = c.get("Created", 0)
+                    restarts = (
+                        c.get("RestartCount", 0)
+                        if c.get("HostConfig", {}).get("RestartPolicy")
+                        else 0
+                    )
+                    created = c.get("Created", 0)
 
-                # Per-container stats (stream=false = single snapshot)
-                cpu_pct = 0.0
-                mem_mb = 0.0
-                mem_limit_mb = 0.0
-                net_rx_mb = 0.0
-                net_tx_mb = 0.0
-                pids = 0
-                if state == "running":
-                    try:
-                        sc = DockerSocket()
-                        sc.request("GET", f"/containers/{cid}/stats?stream=false")
-                        sr = sc.getresponse()
-                        if sr.status == 200:
-                            st = json.loads(sr.read().decode())
-                            # CPU %
-                            cpu_delta = st.get("cpu_stats", {}).get(
-                                "cpu_usage", {}
-                            ).get("total_usage", 0) - st.get("precpu_stats", {}).get(
-                                "cpu_usage", {}
-                            ).get("total_usage", 0)
-                            sys_delta = st.get("cpu_stats", {}).get(
-                                "system_cpu_usage", 0
-                            ) - st.get("precpu_stats", {}).get("system_cpu_usage", 0)
-                            ncpus = st.get("cpu_stats", {}).get("online_cpus", 1) or 1
-                            if sys_delta > 0 and cpu_delta > 0:
-                                cpu_pct = round(
-                                    (cpu_delta / sys_delta) * ncpus * 100, 1
+                    # Per-container stats (stream=false = single snapshot)
+                    cpu_pct = 0.0
+                    mem_mb = 0.0
+                    mem_limit_mb = 0.0
+                    net_rx_mb = 0.0
+                    net_tx_mb = 0.0
+                    pids = 0
+                    if state == "running":
+                        try:
+                            sc = DockerSocket()
+                            sc.request("GET", f"/containers/{cid}/stats?stream=false")
+                            sr = sc.getresponse()
+                            if sr.status == 200:
+                                st = json.loads(sr.read().decode())
+                                # CPU %
+                                cpu_delta = st.get("cpu_stats", {}).get(
+                                    "cpu_usage", {}
+                                ).get("total_usage", 0) - st.get(
+                                    "precpu_stats", {}
+                                ).get("cpu_usage", {}).get("total_usage", 0)
+                                sys_delta = st.get("cpu_stats", {}).get(
+                                    "system_cpu_usage", 0
+                                ) - st.get("precpu_stats", {}).get(
+                                    "system_cpu_usage", 0
                                 )
-                            # Memory
-                            mem_usage = st.get("memory_stats", {}).get("usage", 0)
-                            mem_cache = (
-                                st.get("memory_stats", {})
-                                .get("stats", {})
-                                .get("cache", 0)
-                            )
-                            mem_mb = round((mem_usage - mem_cache) / 1048576, 1)
-                            mem_limit_mb = round(
-                                st.get("memory_stats", {}).get("limit", 0) / 1048576, 0
-                            )
-                            # Network I/O
-                            nets = st.get("networks", {})
-                            for iface in nets.values():
-                                net_rx_mb += iface.get("rx_bytes", 0) / 1048576
-                                net_tx_mb += iface.get("tx_bytes", 0) / 1048576
-                            net_rx_mb = round(net_rx_mb, 1)
-                            net_tx_mb = round(net_tx_mb, 1)
-                            pids = st.get("pids_stats", {}).get("current", 0)
-                        sc.close()
-                    except Exception:
-                        pass
+                                ncpus = (
+                                    st.get("cpu_stats", {}).get("online_cpus", 1) or 1
+                                )
+                                if sys_delta > 0 and cpu_delta > 0:
+                                    cpu_pct = round(
+                                        (cpu_delta / sys_delta) * ncpus * 100, 1
+                                    )
+                                # Memory
+                                mem_usage = st.get("memory_stats", {}).get("usage", 0)
+                                mem_cache = (
+                                    st.get("memory_stats", {})
+                                    .get("stats", {})
+                                    .get("cache", 0)
+                                )
+                                mem_mb = round((mem_usage - mem_cache) / 1048576, 1)
+                                mem_limit_mb = round(
+                                    st.get("memory_stats", {}).get("limit", 0)
+                                    / 1048576,
+                                    0,
+                                )
+                                # Network I/O
+                                nets = st.get("networks", {})
+                                for iface in nets.values():
+                                    net_rx_mb += iface.get("rx_bytes", 0) / 1048576
+                                    net_tx_mb += iface.get("tx_bytes", 0) / 1048576
+                                net_rx_mb = round(net_rx_mb, 1)
+                                net_tx_mb = round(net_tx_mb, 1)
+                                pids = st.get("pids_stats", {}).get("current", 0)
+                            sc.close()
+                        except Exception:
+                            pass
 
-                docker_info.append(
-                    {
-                        "name": name,
-                        "id": cid,
-                        "status": status,
-                        "state": state,
-                        "image": image,
-                        "ports": ports_str,
-                        "restarts": restarts,
-                        "cpu_pct": cpu_pct,
-                        "mem_mb": mem_mb,
-                        "mem_limit_mb": mem_limit_mb,
-                        "net_rx_mb": net_rx_mb,
-                        "net_tx_mb": net_tx_mb,
-                        "pids": pids,
-                        "created": created,
-                    }
-                )
+                    docker_info.append(
+                        {
+                            "name": name,
+                            "id": cid,
+                            "status": status,
+                            "state": state,
+                            "image": image,
+                            "ports": ports_str,
+                            "restarts": restarts,
+                            "cpu_pct": cpu_pct,
+                            "mem_mb": mem_mb,
+                            "mem_limit_mb": mem_limit_mb,
+                            "net_rx_mb": net_rx_mb,
+                            "net_tx_mb": net_tx_mb,
+                            "pids": pids,
+                            "created": created,
+                        }
+                    )
 
-            # --- Docker system info (images, disk) ---
-            try:
-                conn2 = DockerSocket()
-                conn2.request("GET", "/info")
-                resp2 = conn2.getresponse()
-                if resp2.status == 200:
-                    info = json.loads(resp2.read().decode())
-                    docker_system["containers_total"] = info.get("Containers", 0)
-                    docker_system["containers_running"] = info.get(
-                        "ContainersRunning", 0
-                    )
-                    docker_system["containers_stopped"] = info.get(
-                        "ContainersStopped", 0
-                    )
-                    docker_system["images"] = info.get("Images", 0)
-                    docker_system["server_version"] = info.get("ServerVersion", "?")
-                    docker_system["os"] = info.get("OperatingSystem", "?")
-                    docker_system["kernel"] = info.get("KernelVersion", "?")
-                    docker_system["cpus"] = info.get("NCPU", 0)
-                    docker_system["mem_total_gb"] = round(
-                        info.get("MemTotal", 0) / 1073741824, 1
-                    )
-                conn2.close()
-            except Exception:
-                pass
+                # --- Docker system info (images, disk) ---
+                try:
+                    conn2 = DockerSocket()
+                    conn2.request("GET", "/info")
+                    resp2 = conn2.getresponse()
+                    if resp2.status == 200:
+                        info = json.loads(resp2.read().decode())
+                        docker_system["containers_total"] = info.get("Containers", 0)
+                        docker_system["containers_running"] = info.get(
+                            "ContainersRunning", 0
+                        )
+                        docker_system["containers_stopped"] = info.get(
+                            "ContainersStopped", 0
+                        )
+                        docker_system["images"] = info.get("Images", 0)
+                        docker_system["server_version"] = info.get("ServerVersion", "?")
+                        docker_system["os"] = info.get("OperatingSystem", "?")
+                        docker_system["kernel"] = info.get("KernelVersion", "?")
+                        docker_system["cpus"] = info.get("NCPU", 0)
+                        docker_system["mem_total_gb"] = round(
+                            info.get("MemTotal", 0) / 1073741824, 1
+                        )
+                    conn2.close()
+                except Exception:
+                    pass
 
-            # --- Docker disk usage ---
-            try:
-                conn3 = DockerSocket()
-                conn3.request("GET", "/system/df")
-                resp3 = conn3.getresponse()
-                if resp3.status == 200:
-                    df = json.loads(resp3.read().decode())
-                    # Images disk
-                    img_size = sum(i.get("Size", 0) for i in df.get("Images", []))
-                    img_shared = sum(
-                        i.get("SharedSize", 0) for i in df.get("Images", [])
-                    )
-                    docker_system["images_size_gb"] = round(img_size / 1073741824, 2)
-                    docker_system["images_shared_gb"] = round(
-                        img_shared / 1073741824, 2
-                    )
-                    # Containers disk
-                    ct_size = sum(c.get("SizeRw", 0) for c in df.get("Containers", []))
-                    docker_system["containers_disk_mb"] = round(ct_size / 1048576, 1)
-                    # Volumes
-                    vols = df.get("Volumes", [])
-                    docker_system["volumes_count"] = len(vols)
-                    vol_size = sum(v.get("UsageData", {}).get("Size", 0) for v in vols)
-                    docker_system["volumes_size_gb"] = round(vol_size / 1073741824, 2)
-                    # Build cache
-                    bc = df.get("BuildCache", [])
-                    bc_size = sum(b.get("Size", 0) for b in bc)
-                    docker_system["build_cache_gb"] = round(bc_size / 1073741824, 2)
-                    docker_system["total_disk_gb"] = round(
-                        (img_size + ct_size + vol_size + bc_size) / 1073741824, 2
-                    )
-                conn3.close()
-            except Exception:
-                pass
-        monitoring_live._docker_cache = {"data": {"containers": docker_info, "system": docker_system}, "ts": now}
-      except Exception:
-        pass
+                # --- Docker disk usage ---
+                try:
+                    conn3 = DockerSocket()
+                    conn3.request("GET", "/system/df")
+                    resp3 = conn3.getresponse()
+                    if resp3.status == 200:
+                        df = json.loads(resp3.read().decode())
+                        # Images disk
+                        img_size = sum(i.get("Size", 0) for i in df.get("Images", []))
+                        img_shared = sum(
+                            i.get("SharedSize", 0) for i in df.get("Images", [])
+                        )
+                        docker_system["images_size_gb"] = round(
+                            img_size / 1073741824, 2
+                        )
+                        docker_system["images_shared_gb"] = round(
+                            img_shared / 1073741824, 2
+                        )
+                        # Containers disk
+                        ct_size = sum(
+                            c.get("SizeRw", 0) for c in df.get("Containers", [])
+                        )
+                        docker_system["containers_disk_mb"] = round(
+                            ct_size / 1048576, 1
+                        )
+                        # Volumes
+                        vols = df.get("Volumes", [])
+                        docker_system["volumes_count"] = len(vols)
+                        vol_size = sum(
+                            v.get("UsageData", {}).get("Size", 0) for v in vols
+                        )
+                        docker_system["volumes_size_gb"] = round(
+                            vol_size / 1073741824, 2
+                        )
+                        # Build cache
+                        bc = df.get("BuildCache", [])
+                        bc_size = sum(b.get("Size", 0) for b in bc)
+                        docker_system["build_cache_gb"] = round(bc_size / 1073741824, 2)
+                        docker_system["total_disk_gb"] = round(
+                            (img_size + ct_size + vol_size + bc_size) / 1073741824, 2
+                        )
+                    conn3.close()
+                except Exception:
+                    pass
+            monitoring_live._docker_cache = {
+                "data": {"containers": docker_info, "system": docker_system},
+                "ts": now,
+            }
+        except Exception:
+            pass
 
     # Git info (all workspace repos) - cached 5 min
     git_info = []
@@ -628,25 +682,35 @@ async def monitoring_live(request: Request, hours: int = 24):
                     return None
                 r = subprocess.run(
                     ["git", "log", "--oneline", "-5", "--no-decorate"],
-                    capture_output=True, text=True, timeout=5, cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=repo_path,
                 )
                 if r.returncode != 0 or not r.stdout.strip():
                     return None
                 commits = [
                     {"hash": line[:7], "message": line[8:]}
-                    for line in r.stdout.strip().split("\n") if line
+                    for line in r.stdout.strip().split("\n")
+                    if line
                 ]
                 branch = ""
                 r2 = subprocess.run(
                     ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                    capture_output=True, text=True, timeout=5, cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=repo_path,
                 )
                 if r2.returncode == 0:
                     branch = r2.stdout.strip()
                 last_time = ""
                 r3 = subprocess.run(
                     ["git", "log", "-1", "--format=%ci"],
-                    capture_output=True, text=True, timeout=5, cwd=repo_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    cwd=repo_path,
                 )
                 if r3.returncode == 0:
                     last_time = r3.stdout.strip()
@@ -659,7 +723,11 @@ async def monitoring_live(request: Request, hours: int = 24):
                 }
 
             # Platform repo candidates
-            for candidate, lbl in [("/app", "platform"), ("/opt/macaron", "platform"), (os.getcwd(), "platform")]:
+            for candidate, lbl in [
+                ("/app", "platform"),
+                ("/opt/macaron", "platform"),
+                (os.getcwd(), "platform"),
+            ]:
                 info = _git_repo_info(candidate, lbl)
                 if info:
                     git_info.append(info)
@@ -668,8 +736,13 @@ async def monitoring_live(request: Request, hours: int = 24):
             # All project workspaces
             try:
                 from ....projects.manager import get_project_store
+
                 for proj in get_project_store().list_all():
-                    if not proj.path or proj.path in ("/app", "/opt/macaron", os.getcwd()):
+                    if not proj.path or proj.path in (
+                        "/app",
+                        "/opt/macaron",
+                        os.getcwd(),
+                    ):
                         continue
                     ppath = pathlib.Path(proj.path)
                     if not ppath.exists():
@@ -679,7 +752,10 @@ async def monitoring_live(request: Request, hours: int = 24):
                     if not has:
                         r_chk = subprocess.run(
                             ["git", "rev-parse", "--git-dir"],
-                            capture_output=True, text=True, timeout=3, cwd=proj.path,
+                            capture_output=True,
+                            text=True,
+                            timeout=3,
+                            cwd=proj.path,
                         )
                         has = r_chk.returncode == 0
                     if has:
