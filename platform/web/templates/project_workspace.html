@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<script src="/static/vs/loader.js"></script>
-<script>require.config({paths:{vs:'/static/vs'}});</script>
+<script src="/static/js/codemirror6.min.js"></script>
 <link rel="stylesheet" href="/static/css/project_workspace.css?v=9">
 <style>
 html,body{height:100%;overflow:hidden}
@@ -660,61 +659,36 @@ function wsOpenFile(path) {
       var saveIcon = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
       var saveBtn = !isBin ? '<button class="ws-preview-btn" id="wsFileSaveBtn" onclick="wsMonacoSave()" style="margin-left:.4rem;padding:.2rem .45rem;font-size:.7rem">' + saveIcon + ' Save</button>' : '';
       viewer.innerHTML = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + saveBtn + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
-      var monacoDiv = document.createElement('div');
-      monacoDiv.id = 'wsMonacoContainer';
-      monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden';
-      viewer.appendChild(monacoDiv);
-      if (window._wsMonacoEditor) { try { window._wsMonacoEditor.dispose(); } catch(e){} window._wsMonacoEditor = null; }
-      // Fallback: show textarea if Monaco doesn't load within 2s
-      var monacoLoaded = false;
-      var fallbackTimer = setTimeout(function() {
-        if (monacoLoaded) return;
-        monacoDiv.innerHTML = '';
+      var editorDiv = document.createElement('div');
+      editorDiv.id = 'wsMonacoContainer';
+      editorDiv.style.cssText = 'flex:1;min-height:0;overflow:auto';
+      viewer.appendChild(editorDiv);
+      if (window._wsMonacoEditor) { try { window._wsMonacoEditor.destroy(); } catch(e){} window._wsMonacoEditor = null; }
+      if (!isBin && window.CodeMirrorEditor) {
+        var CM = window.CodeMirrorEditor;
+        var langExt = CM.langMap[lang] ? CM.langMap[lang]() : [];
+        var extensions = [CM.basicSetup, CM.oneDark, CM.keymap.of([CM.indentWithTab])];
+        if (Array.isArray(langExt)) { extensions = extensions.concat(langExt); } else { extensions.push(langExt); }
+        var view = new CM.EditorView({
+          state: CM.EditorState.create({ doc: data.content || '', extensions: extensions }),
+          parent: editorDiv
+        });
+        // Ctrl+S / Cmd+S → save
+        editorDiv.addEventListener('keydown', function(e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); wsMonacoSave(); }
+        });
+        window._wsMonacoEditor = { getValue: function(){ return view.state.doc.toString(); }, destroy: function(){ view.destroy(); } };
+      } else if (isBin) {
+        editorDiv.innerHTML = '<div style="padding:2rem;color:var(--text-muted);text-align:center">Binary file — preview not available</div>';
+      } else {
+        // Fallback textarea (CodeMirror not available)
         var ta = document.createElement('textarea');
         ta.value = data.content || '';
         ta.style.cssText = 'width:100%;height:100%;background:#1e1e1e;color:#d4d4d4;border:none;padding:.75rem;font-family:"SF Mono","Fira Code","Monaco","Courier New",monospace;font-size:13px;resize:none;outline:none;box-sizing:border-box;tab-size:2';
         ta.spellcheck = false;
-        monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
-        monacoDiv.appendChild(ta);
-        if (!isBin) {
-          ta.addEventListener('input', function() { window._wsTextareaContent = ta.value; });
-          window._wsMonacoEditor = { getValue: function(){ return ta.value; }, dispose: function(){} };
-        }
-      }, 2000);
-      if (window.require && typeof window.require === 'function') {
-        require(['vs/editor/editor.main'], function() {
-          monacoLoaded = true;
-          clearTimeout(fallbackTimer);
-          window._wsMonacoEditor = monaco.editor.create(monacoDiv, {
-            value: data.content || '',
-            language: lang,
-            theme: 'vs-dark',
-            automaticLayout: true,
-            minimap: {enabled: true},
-            scrollBeyondLastLine: false,
-            fontSize: 13,
-            fontFamily: "'SF Mono','Fira Code','Monaco','Courier New',monospace",
-            lineNumbers: 'on',
-            wordWrap: 'off',
-            tabSize: 2,
-            readOnly: isBin,
-            renderWhitespace: 'boundary'
-          });
-          if (!isBin) {
-            window._wsMonacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, wsMonacoSave);
-          }
-        });
-      } else {
-        // require not available — use textarea immediately
-        clearTimeout(fallbackTimer);
-        monacoLoaded = false; // trigger fallback inline
-        var ta2 = document.createElement('textarea');
-        ta2.value = data.content || '';
-        ta2.style.cssText = 'width:100%;height:100%;background:#1e1e1e;color:#d4d4d4;border:none;padding:.75rem;font-family:"SF Mono","Fira Code","Monaco","Courier New",monospace;font-size:13px;resize:none;outline:none;box-sizing:border-box;tab-size:2';
-        ta2.spellcheck = false;
-        monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
-        monacoDiv.appendChild(ta2);
-        window._wsMonacoEditor = { getValue: function(){ return ta2.value; }, dispose: function(){} };
+        editorDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
+        editorDiv.appendChild(ta);
+        window._wsMonacoEditor = { getValue: function(){ return ta.value; }, destroy: function(){} };
       }
     })
     .catch(function(e) { if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>'; });

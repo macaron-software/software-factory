@@ -868,3 +868,13 @@
 }
 .ws-secret-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
 .ws-secret-del:hover { color: var(--red); }
+
+/* CodeMirror 6 editor */
+#wsMonacoContainer .cm-editor {
+  height: 100%;
+  font-family: 'SF Mono','Fira Code','Monaco','Courier New',monospace;
+  font-size: 13px;
+}
+#wsMonacoContainer .cm-editor.cm-focused { outline: none; }
+#wsMonacoContainer .cm-scroller { overflow: auto; }
+#wsMonacoContainer { height: 100%; }

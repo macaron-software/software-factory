@@ -580,7 +580,7 @@ def create_app() -> FastAPI:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         path = request.url.path
-        # Workspace pages need iframes (preview, dbgate, portainer) + Monaco CDN
+        # Workspace pages need iframes (preview, dbgate, portainer)
         if path.startswith("/projects/") and path.endswith("/workspace"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
@@ -589,7 +589,6 @@ def create_app() -> FastAPI:
                 "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
                 "connect-src 'self'; "
-                "worker-src blob: 'self'; "
                 "frame-src 'self' http://localhost:* http://127.0.0.1:* https:; "
                 "frame-ancestors 'none'"
             )
