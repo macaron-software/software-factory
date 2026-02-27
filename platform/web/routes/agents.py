@@ -423,12 +423,14 @@ async def org_tree_api():
 async def api_agents():
     """List all agents (JSON)."""
     from ...agents.store import get_agent_store
+    from ...agents.tool_schemas import _get_capability_grade
     agents = get_agent_store().list_all()
     return JSONResponse([{
         "id": a.id, "name": a.name, "role": a.role,
         "provider": a.provider, "model": a.model,
         "description": a.description, "icon": a.icon,
         "color": a.color, "tags": a.tags, "is_builtin": a.is_builtin,
+        "capability_grade": _get_capability_grade(a),
     } for a in agents])
 
 
