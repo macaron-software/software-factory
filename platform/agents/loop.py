@@ -88,7 +88,9 @@ class AgentLoop:
         self._inbox: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=100)
         self._stop_event = asyncio.Event()
         self._rounds = 0
-        self._pair_counts: dict[str, int] = {}  # track msg counts per conversation partner
+        self._pair_counts: dict[
+            str, int
+        ] = {}  # track msg counts per conversation partner
 
         # Lazy — initialised in start()
         self._executor: AgentExecutor | None = None  # type: ignore[name-defined]
@@ -116,7 +118,9 @@ class AgentLoop:
             self._run_loop(),
             name=f"agent-loop:{self.session_id}:{self.agent.id}",
         )
-        logger.info("AgentLoop started  agent=%s session=%s", self.agent.id, self.session_id)
+        logger.info(
+            "AgentLoop started  agent=%s session=%s", self.agent.id, self.session_id
+        )
 
     async def _replay_pending_messages(self) -> None:
         """Load recent messages from DB and enqueue ones addressed to this agent."""
@@ -170,7 +174,9 @@ class AgentLoop:
             self._bus.unregister_agent(self.agent.id)
         self.status = AgentStatus.STOPPED
         self.instance.status = AgentStatus.STOPPED
-        logger.info("AgentLoop stopped  agent=%s session=%s", self.agent.id, self.session_id)
+        logger.info(
+            "AgentLoop stopped  agent=%s session=%s", self.agent.id, self.session_id
+        )
 
     # ------------------------------------------------------------------
     # Main loop
@@ -271,7 +277,9 @@ class AgentLoop:
                         timeout=self.think_timeout,
                     )
                     if result is None:
-                        logger.error("Executor returned no result agent=%s", self.agent.id)
+                        logger.error(
+                            "Executor returned no result agent=%s", self.agent.id
+                        )
                         await self._set_status(AgentStatus.ERROR)
                         continue
                     logger.warning(
@@ -306,7 +314,9 @@ class AgentLoop:
 
                 # 6. Parse and execute actions
                 actions = self._parse_actions(result.content)
-                logger.warning("LOOP parsed %d actions for agent=%s", len(actions), self.agent.id)
+                logger.warning(
+                    "LOOP parsed %d actions for agent=%s", len(actions), self.agent.id
+                )
                 if actions:
                     await self._set_status(AgentStatus.ACTING)
                     for action in actions:
@@ -335,7 +345,9 @@ class AgentLoop:
                 raise
             except Exception:
                 logger.exception(
-                    "AgentLoop error  agent=%s session=%s", self.agent.id, self.session_id
+                    "AgentLoop error  agent=%s session=%s",
+                    self.agent.id,
+                    self.session_id,
                 )
                 self.instance.error_count += 1
                 await self._set_status(AgentStatus.ERROR)
@@ -397,39 +409,60 @@ class AgentLoop:
     # ------------------------------------------------------------------
 
     async def _build_context(self) -> ExecutionContext:
-        """Assemble ExecutionContext with history, memory, skills."""
+        """Assemble ExecutionContext with history, memory, skills.
+
+        Context is scoped by Uruk capability grade (ADR-0010/ADR-0013 from Orthanc):
+        - Organizers (cto, arch, cdp, product, reviewer): full project context, 50 msgs
+        - Executors (dev, qa, security, ux, devops): task-scoped, 15 msgs, no vision
+        This reduces token usage by ~60% for executor-grade agents.
+        """
         from ..memory.manager import get_memory_manager
         from ..sessions.store import get_session_store
         from ..skills.library import get_skill_library
         from .executor import ExecutionContext
+        from .tool_schemas import _get_capability_grade
+
+        # Determine capability grade
+        grade = _get_capability_grade(self.agent)
+        is_organizer = grade == "organizer"
+
+        # History window: organizers need full project thread, executors need only recent
+        history_limit = 50 if is_organizer else 15
 
         history_dicts: list[dict] = []
         try:
             store = get_session_store()
-            messages = store.get_messages(self.session_id, limit=50)
+            messages = store.get_messages(self.session_id, limit=history_limit)
             history_dicts = [
-                {"from_agent": m.from_agent, "content": m.content, "message_type": m.message_type}
+                {
+                    "from_agent": m.from_agent,
+                    "content": m.content,
+                    "message_type": m.message_type,
+                }
                 for m in messages
             ]
         except Exception as exc:
             logger.debug("Failed to load history: %s", exc)
 
-        # Project memory
+        # Project memory — organizers get more context entries, executors get fewer
         project_context = ""
         if self.project_id:
             try:
                 mem = get_memory_manager()
-                entries = mem.project_get(self.project_id, limit=10)
+                memory_limit = 10 if is_organizer else 3
+                entries = mem.project_get(self.project_id, limit=memory_limit)
                 if entries:
                     project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
+                        for e in entries
                     )
             except Exception as exc:
                 logger.debug("Failed to load project context: %s", exc)
 
-        # Project memory files
+        # Project memory files (CLAUDE.md, etc.) — organizers only
+        # Executors don't need the full project constitution to implement a task
         project_memory_str = ""
-        if self.project_path:
+        if is_organizer and self.project_path:
             try:
                 from ..memory.project_files import get_project_memory
 
@@ -472,14 +505,16 @@ class AgentLoop:
                     for sid in self.agent.skills[:5]:
                         skill = lib.get(sid)
                         if skill and skill.get("content"):
-                            parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
+                            parts.append(
+                                f"### {skill['name']}\n{skill['content'][:1500]}"
+                            )
                     skills_prompt = "\n\n".join(parts)
                 except Exception:
                     pass
 
-        # Vision
+        # Vision — organizers only (executors don't need strategic vision to implement a task)
         vision = ""
-        if self.project_id:
+        if is_organizer and self.project_id:
             try:
                 from ..projects.manager import get_project_store
 
@@ -519,6 +554,7 @@ class AgentLoop:
             vision=vision,
             tools_enabled=agent_tools_enabled,
             mission_run_id=mission_run_id,
+            capability_grade=grade,
         )
 
     # ------------------------------------------------------------------

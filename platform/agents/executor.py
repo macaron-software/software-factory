@@ -307,6 +307,8 @@ class ExecutionContext:
     on_tool_call: object | None = None  # async callable(tool_name, args, result)
     # Mission run ID (for CDP phase tools)
     mission_run_id: str | None = None
+    # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
+    capability_grade: str = "executor"
 
 
 @dataclass
@@ -337,6 +339,54 @@ class AgentExecutor:
         from ..sessions.runner import _push_sse
 
         await _push_sse(session_id, event)
+
+    @staticmethod
+    def _write_step_checkpoint(
+        session_id: str,
+        agent_id: str,
+        step_index: int,
+        tool_calls: list[dict],
+        partial_content: str,
+    ) -> None:
+        """Persist a step checkpoint after each tool-call round.
+
+        Enables crash recovery: if the agent crashes mid-run, the control plane
+        can see how far it got and restart from the last completed step.
+        Inspired by the Uruk stateless model (Orthanc ADR-0014).
+        """
+        try:
+            import json as _json
+            from ..db.migrations import get_db
+
+            db = get_db()
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS agent_step_checkpoints (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    step_index INTEGER NOT NULL,
+                    tool_calls TEXT NOT NULL,
+                    partial_content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )"""
+            )
+            db.execute(
+                """INSERT OR REPLACE INTO agent_step_checkpoints
+                   (id, session_id, agent_id, step_index, tool_calls, partial_content)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    f"{session_id}:{agent_id}:{step_index}",
+                    session_id,
+                    agent_id,
+                    step_index,
+                    _json.dumps(tool_calls[-5:]),  # keep last 5 tool calls only
+                    partial_content[:500] if partial_content else "",
+                ),
+            )
+            db.commit()
+            db.close()
+        except Exception:
+            pass  # checkpointing is best-effort, never block execution
 
     async def run(self, ctx: ExecutionContext, user_message: str) -> ExecutionResult:
         """Run the agent with tool-calling loop."""
@@ -499,6 +549,16 @@ class AgentExecutor:
                     agent.id,
                     round_num + 1,
                     len(llm_resp.tool_calls),
+                )
+
+                # Step checkpoint: persist progress after each tool round
+                # so crash recovery can see how far this agent got
+                self._write_step_checkpoint(
+                    session_id=ctx.session_id,
+                    agent_id=agent.id,
+                    step_index=round_num,
+                    tool_calls=all_tool_calls,
+                    partial_content="",
                 )
 
                 # Limit message window to prevent OOM (keep first 2 + last 15)

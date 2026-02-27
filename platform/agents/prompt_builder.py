@@ -143,16 +143,23 @@ RULES:
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
 
-    if ctx.vision:
-        parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
-
-    if ctx.project_context:
-        parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
-
-    if ctx.project_memory:
-        parts.append(
-            f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
-        )
+    if ctx.capability_grade == "organizer":
+        # Organizers: full project context (constitution, vision, memory files)
+        if ctx.vision:
+            parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
+        if ctx.project_context:
+            parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
+        if ctx.project_memory:
+            parts.append(
+                f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
+            )
+    else:
+        # Executors: task-scoped context only — no vision, condensed memory
+        # Avoids injecting the full project constitution into every dev/qa call
+        if ctx.project_context:
+            parts.append(
+                f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"
+            )
 
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")

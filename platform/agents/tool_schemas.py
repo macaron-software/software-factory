@@ -2459,7 +2459,8 @@ def _classify_agent_role(agent) -> str:
     """Classify an agent into a tool-mapping role category."""
     role = (agent.role or "").lower()
     name = (agent.name or "").lower()
-    combined = f"{role} {name}"
+    agent_id = (agent.id or "").lower()
+    combined = f"{role} {name} {agent_id}"
 
     if any(
         k in combined
@@ -2532,6 +2533,26 @@ def _get_tools_for_agent(agent: AgentDef) -> list[str] | None:
     """Return the list of allowed tool names for this agent, or None for all."""
     role_cat = _classify_agent_role(agent)
     return ROLE_TOOL_MAP.get(role_cat)
+
+
+# Uruk model: Organizers receive full project-scoped context (constitution, ADRs, vision,
+# full history). Executors receive task-scoped context only (recent history, no vision).
+# See: https://gitlab.com/Akanoa/orthanc — ADR-0010, ADR-0013
+_ORGANIZER_ROLES: frozenset[str] = frozenset(
+    {"cto", "architecture", "cdp", "product", "reviewer"}
+)
+
+
+def _get_capability_grade(agent) -> str:
+    """Return 'organizer' or 'executor' for an agent.
+
+    Organizers (cto, architect, cdp, product, reviewer) receive full project-scoped
+    context and longer history windows. Executors (dev, qa, security, ux, devops)
+    receive task-scoped context only — reduces token usage by 60-80% for dev agents.
+    """
+    return (
+        "organizer" if _classify_agent_role(agent) in _ORGANIZER_ROLES else "executor"
+    )
 
 
 def _filter_schemas(schemas: list[dict], allowed: list[str] | None) -> list[dict]:
