@@ -8,6 +8,36 @@
 {% endblock %}
 
 {% block content %}
+<style>
+.sessions-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+.sessions-search{display:flex;align-items:center;gap:.25rem;flex:1;min-width:180px;max-width:360px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0 .5rem}
+.sessions-search input{border:0;background:transparent;outline:none;padding:.4rem .25rem;font-size:.875rem;color:var(--text-primary);width:100%}
+.sessions-search svg{color:var(--text-secondary);flex-shrink:0}
+.sf-btn{padding:.3rem .75rem;font-size:.8rem;border:1px solid var(--border);border-radius:5px;background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer}
+.sf-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.sessions-count{font-size:.8rem;color:var(--text-secondary);margin-left:auto}
+.spager{display:flex;gap:.25rem;align-items:center;margin-top:1rem;justify-content:center}
+.spager a,.spager span{padding:.3rem .6rem;border:1px solid var(--border);border-radius:5px;font-size:.8rem;color:var(--text-secondary);text-decoration:none;background:var(--bg-secondary)}
+.spager a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.spager span.current{background:var(--accent);color:#fff;border-color:var(--accent)}
+.spager span.ellipsis{border:none;background:none}
+</style>
+
+<form method="get" action="/sessions" id="sf">
+<div class="sessions-toolbar">
+  <div class="sessions-search">
+    <svg class="icon icon-sm"><use href="#icon-search"/></svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher dans les sessions et messages…" autocomplete="off">
+  </div>
+  <button type="submit" class="sf-btn {% if not status %}active{% endif %}" name="status" value="">Tous</button>
+  <button type="submit" class="sf-btn {% if status=='active' %}active{% endif %}" name="status" value="active">Actif</button>
+  <button type="submit" class="sf-btn {% if status=='completed' %}active{% endif %}" name="status" value="completed">Terminé</button>
+  <button type="submit" class="sf-btn {% if status=='failed' %}active{% endif %}" name="status" value="failed">Échoué</button>
+  <button type="submit" class="sf-btn {% if status=='planning' %}active{% endif %}" name="status" value="planning">Planning</button>
+  <span class="sessions-count">{{ total }} session{{ 's' if total != 1 }}</span>
+</div>
+</form>
+
 <div class="item-grid" data-view-grid data-view="card">
     {% for s in sessions %}
     <a href="/sessions/{{ s.session.id }}" class="item-card">
@@ -35,9 +65,35 @@
     </a>
     {% else %}
     <div class="empty-state">
+        {% if q or status %}
+        <p>Aucun résultat pour « {{ q or status }} »</p>
+        <a href="/sessions" class="btn btn-primary">Effacer</a>
+        {% else %}
         <p>{{ _("no_sessions_yet") }}</p>
         <a href="/sessions/new" class="btn btn-primary">{{ _("start") }}</a>
+        {% endif %}
     </div>
     {% endfor %}
 </div>
+
+{% if total_pages > 1 %}
+<div class="spager">
+  {% set base = "/sessions?q=" ~ q ~ "&status=" ~ status ~ "&page=" %}
+  {% if page > 1 %}<a href="{{ base }}{{ page-1 }}">‹</a>{% endif %}
+  {% for p in range(1, total_pages+1) %}
+    {% if p == page %}<span class="current">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page-2 and p <= page+2) %}<a href="{{ base }}{{ p }}">{{ p }}</a>
+    {% elif p == page-3 or p == page+3 %}<span class="ellipsis">…</span>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}<a href="{{ base }}{{ page+1 }}">›</a>{% endif %}
+</div>
+{% endif %}
+
+<script>
+// Auto-submit search on input (debounced)
+const inp = document.querySelector('.sessions-search input');
+let _t; inp.addEventListener('input', () => { clearTimeout(_t); _t = setTimeout(() => document.getElementById('sf').submit(), 400); });
+</script>
 {% endblock %}
+

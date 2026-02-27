@@ -87,6 +87,32 @@ class SessionStore:
         finally:
             db.close()
 
+    def search(self, q: str = "", status: str = "", limit: int = 30, offset: int = 0) -> tuple[list[SessionDef], int]:
+        """Full-text search across sessions + message content. Returns (sessions, total_count)."""
+        db = get_db()
+        try:
+            conditions = []
+            params: list = []
+            if q:
+                like = f"%{q}%"
+                conditions.append("""(
+                    s.name LIKE ? OR s.goal LIKE ? OR s.description LIKE ?
+                    OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.content LIKE ?)
+                )""")
+                params += [like, like, like, like]
+            if status:
+                conditions.append("s.status = ?")
+                params.append(status)
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            total = db.execute(f"SELECT COUNT(*) FROM sessions s {where}", params).fetchone()[0]
+            rows = db.execute(
+                f"SELECT s.* FROM sessions s {where} ORDER BY s.created_at DESC LIMIT ? OFFSET ?",
+                params + [limit, offset]
+            ).fetchall()
+            return [_row_to_session(r) for r in rows], total
+        finally:
+            db.close()
+
     def get(self, session_id: str) -> Optional[SessionDef]:
         db = get_db()
         try:

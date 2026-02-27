@@ -21,12 +21,20 @@ logger = logging.getLogger(__name__)
 
 @router.get("/sessions", response_class=HTMLResponse)
 async def sessions_page(request: Request):
-    """Session list."""
+    """Session list with search + pagination."""
     from ...sessions.store import get_session_store
-    from ...agents.store import get_agent_store
+    q = request.query_params.get("q", "").strip()
+    status = request.query_params.get("status", "").strip()
+    try:
+        page = max(1, int(request.query_params.get("page", 1)))
+    except ValueError:
+        page = 1
+    per_page = 20
+    offset = (page - 1) * per_page
+
     store = get_session_store()
-    sessions_raw = store.list_all()
-    # Enrich with pattern/project names and message counts
+    sessions_raw, total = store.search(q=q, status=status, limit=per_page, offset=offset)
+
     patterns_map = {}
     try:
         from ...db.migrations import get_db as _gdb
@@ -51,10 +59,18 @@ async def sessions_page(request: Request):
             "project_name": projects_map.get(s.project_id, ""),
             "message_count": store.count_messages(s.id),
         })
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
     return _templates(request).TemplateResponse("sessions.html", {
         "request": request,
         "page_title": "Live",
         "sessions": sessions,
+        "q": q,
+        "status": status,
+        "page": page,
+        "total": total,
+        "total_pages": total_pages,
+        "per_page": per_page,
     })
 
 
