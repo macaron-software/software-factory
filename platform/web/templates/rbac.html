@@ -379,7 +379,8 @@ async function loadAudit() {
     const stats = await sRes.json();
     const denials = await dRes.json();
 
-    const entries = Object.entries(stats).sort((a,b) => b[1]-a[1]).slice(0, 6);
+    // Only show numeric stats in the stat cards (skip array values like by_tool/by_agent/by_reason)
+    const entries = Object.entries(stats).filter(([,v]) => typeof v === 'number').sort((a,b) => b[1]-a[1]).slice(0, 6);
     document.getElementById('audit-stats').innerHTML = entries.length
         ? entries.map(([k,v]) => `<div class="stat-card"><div class="sv">${v}</div><div class="sl">${k.replace(/_/g,' ')}</div></div>`).join('')
         : '<div style="color:var(--text-secondary);font-size:0.82rem;grid-column:1/-1;padding:0.5rem 0">No denials recorded yet — permissions audit is clean.</div>';
