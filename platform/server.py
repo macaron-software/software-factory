@@ -299,64 +299,75 @@ async def lifespan(app: FastAPI):
                 update_team_fitness,
             )
 
-            _db2 = _ddb()
-            _cnt = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
-            _has_new_feature = _db2.execute(
-                "SELECT COUNT(*) FROM team_fitness WHERE phase_type='new_feature'"
-            ).fetchone()[0]
-            if _cnt >= 50 and _has_new_feature >= 10:
+            def _do_seed():
+                _db2 = _ddb()
+                _cnt = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
+                _has_new_feature = _db2.execute(
+                    "SELECT COUNT(*) FROM team_fitness WHERE phase_type='new_feature'"
+                ).fetchone()[0]
+                if _cnt >= 50 and _has_new_feature >= 10:
+                    _db2.close()
+                    return 0
+                _skills = ["developer", "tester", "security", "devops"]
+                _patterns = [
+                    "loop",
+                    "sequential",
+                    "parallel",
+                    "hierarchical",
+                    "aggregator",
+                ]
+                _phases = [
+                    "new_feature",
+                    "bugfix",
+                    "refactoring",
+                    "migration",
+                    "review",
+                    "testing",
+                    "audit",
+                    "design",
+                    "docs",
+                    "tdd",
+                    "feature",
+                    "sprint",
+                    "deploy",
+                    "exploitation",
+                    "load",
+                    "perf",
+                ]
+                _techs = ["generic", "python", "typescript", "java", "rust", "go"]
+                _seeded = 0
+                for _sk in _skills:
+                    _agents = _get_agents_with_skill(_db2, _sk)
+                    if not _agents:
+                        continue
+                    for _pt in _patterns[:4]:
+                        for _ph in _phases:
+                            for _tc in _techs[:3]:
+                                for _aid in _agents[:6]:
+                                    _upsert_team_fitness(_db2, _aid, _pt, _tc, _ph)
+                                    _runs = _rand.randint(5, 15)
+                                    _wins = int(_runs * _rand.uniform(0.4, 0.92))
+                                    for _r in range(_runs):
+                                        update_team_fitness(
+                                            _db2,
+                                            _aid,
+                                            _pt,
+                                            _tc,
+                                            _ph,
+                                            won=(_r < _wins),
+                                            iterations=_rand.randint(1, 3),
+                                        )
+                                        _seeded += 1
+                                if _seeded % 1000 == 0:
+                                    _db2.commit()
+                _db2.commit()
+                _after = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
                 _db2.close()
-                return
-            _skills = ["developer", "tester", "security", "devops"]
-            _patterns = ["loop", "sequential", "parallel", "hierarchical", "aggregator"]
-            _phases = [
-                "new_feature",
-                "bugfix",
-                "refactoring",
-                "migration",
-                "review",
-                "testing",
-                "audit",
-                "design",
-                "docs",
-                "tdd",
-                "feature",
-                "sprint",
-                "deploy",
-                "exploitation",
-                "load",
-                "perf",
-            ]
-            _techs = ["generic", "python", "typescript", "java", "rust", "go"]
-            _seeded = 0
-            for _sk in _skills:
-                _agents = _get_agents_with_skill(_db2, _sk)
-                if not _agents:
-                    continue
-                for _pt in _patterns[:4]:
-                    for _ph in _phases:  # all phases
-                        for _tc in _techs[:3]:
-                            for _aid in _agents[:6]:
-                                _upsert_team_fitness(_db2, _aid, _pt, _tc, _ph)
-                                _runs = _rand.randint(5, 15)
-                                _wins = int(_runs * _rand.uniform(0.4, 0.92))
-                                for _r in range(_runs):
-                                    update_team_fitness(
-                                        _db2,
-                                        _aid,
-                                        _pt,
-                                        _tc,
-                                        _ph,
-                                        won=(_r < _wins),
-                                        iterations=_rand.randint(1, 3),
-                                    )
-                                    _seeded += 1
-                            if _seeded % 1000 == 0:
-                                _db2.commit()
-            _db2.commit()
-            _after = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
-            _db2.close()
-            logger.warning("Darwin cold-start: seeded %d team_fitness rows", _after)
+                return _after
+
+            _after = await _asyncio.to_thread(_do_seed)
+            if _after:
+                logger.warning("Darwin cold-start: seeded %d team_fitness rows", _after)
         except Exception as e:
             logger.warning("Darwin cold-start failed: %s", e)
 
