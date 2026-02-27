@@ -1,5 +1,5 @@
 """DB backend — direct sqlite3 access for offline mode."""
-import json
+
 import os
 import sqlite3
 from typing import Any
@@ -25,6 +25,7 @@ class DBBackend:
         self.db_path = db_path or _find_db()
         if not os.path.exists(self.db_path):
             raise FileNotFoundError(f"DB not found: {self.db_path}")
+        self.base_url = f"sqlite://{self.db_path}"
         self._conn = sqlite3.connect(self.db_path, timeout=10)
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
@@ -54,20 +55,27 @@ class DBBackend:
     # ── Projects ──
 
     def projects_list(self) -> list:
-        return self._q("SELECT id, name, path, description, status, factory_type, vision, created_at FROM projects ORDER BY created_at DESC")
+        return self._q(
+            "SELECT id, name, path, description, status, factory_type, vision, created_at FROM projects ORDER BY created_at DESC"
+        )
 
-    def project_create(self, name: str, desc: str = "", path: str = "",
-                       proj_type: str = "web") -> dict:
+    def project_create(
+        self, name: str, desc: str = "", path: str = "", proj_type: str = "web"
+    ) -> dict:
         import uuid
+
         pid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO projects (id, name, description, path, factory_type, status) VALUES (?,?,?,?,?,?)",
-            (pid, name, desc, path, proj_type, "active"))
+            (pid, name, desc, path, proj_type, "active"),
+        )
         self._conn.commit()
         return {"id": pid, "name": name, "status": "created"}
 
     def project_show(self, pid: str) -> dict:
-        r = self._q1("SELECT * FROM projects WHERE id=? OR LOWER(name)=LOWER(?)", (pid, pid))
+        r = self._q1(
+            "SELECT * FROM projects WHERE id=? OR LOWER(name)=LOWER(?)", (pid, pid)
+        )
         return r or {"error": f"Project {pid} not found"}
 
     def project_vision(self, pid: str, text: str | None = None) -> dict:
@@ -85,30 +93,120 @@ class DBBackend:
     def project_chat_url(self, pid: str) -> str:
         return ""  # not available offline
 
+    def project_phase_get(self, pid: str) -> dict:
+        row = self._conn.execute(
+            "SELECT current_phase FROM projects WHERE id=?", (pid,)
+        ).fetchone()
+        if not row:
+            return {"error": "not found"}
+        return {"project_id": pid, "current_phase": row[0] or "discovery"}
+
+    def project_phase_set(self, pid: str, phase: str) -> dict:
+        self._conn.execute(
+            "UPDATE projects SET current_phase=? WHERE id=?", (phase, pid)
+        )
+        self._conn.commit()
+        return {"project_id": pid, "current_phase": phase, "ok": True}
+
+    def project_health(self, pid: str) -> dict:
+        rows = self._conn.execute(
+            "SELECT status, COUNT(*) as cnt FROM missions WHERE project_id=? GROUP BY status",
+            (pid,),
+        ).fetchall()
+        counts = {r[0]: r[1] for r in rows}
+        total = sum(counts.values())
+        healthy = counts.get("completed", 0)
+        score = round((healthy / total * 100) if total else 0)
+        return {
+            "project_id": pid,
+            "health_score": score,
+            "mission_counts": counts,
+            "total": total,
+        }
+
+    def project_missions_suggest(self, pid: str) -> dict:
+        row = self._conn.execute(
+            "SELECT current_phase FROM projects WHERE id=?", (pid,)
+        ).fetchone()
+        phase = (row[0] or "discovery") if row else "discovery"
+        existing = {
+            r[0].lower()
+            for r in self._conn.execute(
+                "SELECT name FROM missions WHERE project_id=?", (pid,)
+            ).fetchall()
+        }
+        SUGGESTIONS = {
+            "discovery": [
+                "Exploration marché",
+                "Analyse concurrentielle",
+                "Identification des besoins",
+                "Proof of Concept",
+            ],
+            "mvp": [
+                "Architecture technique",
+                "Sprint MVP 1",
+                "Tests utilisateurs",
+                "CI/CD setup",
+            ],
+            "v1": [
+                "Feature dev Sprint 1",
+                "Optimisation performance",
+                "Documentation",
+                "Beta test",
+            ],
+            "run": [
+                "Monitoring production",
+                "Sprint amélioration",
+                "Scalabilité",
+                "Sécurité audit",
+            ],
+            "maintenance": [
+                "Patch sécurité",
+                "Dette technique",
+                "Migration",
+                "Archivage",
+            ],
+        }
+        candidates = SUGGESTIONS.get(phase, SUGGESTIONS["discovery"])
+        return {
+            "project_id": pid,
+            "current_phase": phase,
+            "suggestions": [s for s in candidates if s.lower() not in existing][:5],
+        }
+
     # ── Missions ──
 
-    def missions_list(self, project: str | None = None, status: str | None = None) -> list:
+    def missions_list(
+        self, project: str | None = None, status: str | None = None
+    ) -> list:
         sql = "SELECT id, project_id, name, status, type, wsjf_score, workflow_id, created_at FROM missions"
         conds, params = [], []
         if project:
-            conds.append("project_id=?"); params.append(project)
+            conds.append("project_id=?")
+            params.append(project)
         if status:
-            conds.append("status=?"); params.append(status)
+            conds.append("status=?")
+            params.append(status)
         if conds:
             sql += " WHERE " + " AND ".join(conds)
         sql += " ORDER BY created_at DESC"
         return self._q(sql, tuple(params))
 
     def mission_show(self, mid: str) -> dict:
-        return self._q1("SELECT * FROM missions WHERE id=?", (mid,)) or {"error": "not found"}
+        return self._q1("SELECT * FROM missions WHERE id=?", (mid,)) or {
+            "error": "not found"
+        }
 
-    def mission_create(self, name: str, project_id: str, mission_type: str = "epic",
-                       **kwargs) -> dict:
+    def mission_create(
+        self, name: str, project_id: str, mission_type: str = "epic", **kwargs
+    ) -> dict:
         import uuid
+
         mid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO missions (id, name, project_id, type, status) VALUES (?,?,?,?,?)",
-            (mid, name, project_id, mission_type, "draft"))
+            (mid, name, project_id, mission_type, "draft"),
+        )
         self._conn.commit()
         return {"id": mid, "name": name, "status": "draft"}
 
@@ -123,17 +221,22 @@ class DBBackend:
         self._conn.commit()
         return {"status": "reset"}
 
-    def mission_wsjf(self, mid: str, bv: int = 5, tc: int = 5,
-                     rr: int = 5, jd: int = 5) -> dict:
+    def mission_wsjf(
+        self, mid: str, bv: int = 5, tc: int = 5, rr: int = 5, jd: int = 5
+    ) -> dict:
         score = round((bv + tc + rr) / max(jd, 1), 2)
         self._conn.execute(
             "UPDATE missions SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
-            (score, bv, tc, rr, jd, mid))
+            (score, bv, tc, rr, jd, mid),
+        )
         self._conn.commit()
         return {"wsjf_score": score}
 
     def mission_children(self, mid: str) -> list:
-        return self._q("SELECT id, name, status, type FROM missions WHERE parent_mission_id=?", (mid,))
+        return self._q(
+            "SELECT id, name, status, type FROM missions WHERE parent_mission_id=?",
+            (mid,),
+        )
 
     def mission_chat_url(self, mid: str) -> str:
         return ""
@@ -144,35 +247,47 @@ class DBBackend:
     # ── Features ──
 
     def features_list(self, epic_id: str) -> list:
-        return self._q("SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,))
+        return self._q(
+            "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
+        )
 
     def feature_create(self, epic_id: str, name: str, sp: int = 3) -> dict:
         import uuid
+
         fid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO features (id, epic_id, name, story_points, status) VALUES (?,?,?,?,?)",
-            (fid, epic_id, name, sp, "backlog"))
+            (fid, epic_id, name, sp, "backlog"),
+        )
         self._conn.commit()
         return {"id": fid, "name": name}
 
     def feature_update(self, fid: str, **kwargs) -> dict:
         sets = ", ".join(f"{k}=?" for k in kwargs)
-        self._conn.execute(f"UPDATE features SET {sets} WHERE id=?", (*kwargs.values(), fid))
+        self._conn.execute(
+            f"UPDATE features SET {sets} WHERE id=?", (*kwargs.values(), fid)
+        )
         self._conn.commit()
         return {"status": "ok"}
 
     def feature_deps(self, fid: str) -> list:
         return self._q("SELECT * FROM feature_deps WHERE feature_id=?", (fid,))
 
-    def feature_add_dep(self, fid: str, dep_id: str, dep_type: str = "blocked_by") -> dict:
+    def feature_add_dep(
+        self, fid: str, dep_id: str, dep_type: str = "blocked_by"
+    ) -> dict:
         self._conn.execute(
             "INSERT INTO feature_deps (feature_id, depends_on, dep_type) VALUES (?,?,?)",
-            (fid, dep_id, dep_type))
+            (fid, dep_id, dep_type),
+        )
         self._conn.commit()
         return {"status": "ok"}
 
     def feature_rm_dep(self, fid: str, dep_id: str) -> dict:
-        self._conn.execute("DELETE FROM feature_deps WHERE feature_id=? AND depends_on=?", (fid, dep_id))
+        self._conn.execute(
+            "DELETE FROM feature_deps WHERE feature_id=? AND depends_on=?",
+            (fid, dep_id),
+        )
         self._conn.commit()
         return {"status": "ok"}
 
@@ -182,7 +297,8 @@ class DBBackend:
         if feature_id:
             rows = self._conn.execute(
                 "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
-                (feature_id,)).fetchall()
+                (feature_id,),
+            ).fetchall()
         else:
             rows = self._conn.execute(
                 "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
@@ -191,16 +307,20 @@ class DBBackend:
 
     def story_create(self, feature_id: str, title: str, sp: int = 2) -> dict:
         import uuid
+
         sid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO user_stories (id, feature_id, title, story_points, status) VALUES (?,?,?,?,?)",
-            (sid, feature_id, title, sp, "backlog"))
+            (sid, feature_id, title, sp, "backlog"),
+        )
         self._conn.commit()
         return {"id": sid, "title": title}
 
     def story_update(self, sid: str, **kwargs) -> dict:
         sets = ", ".join(f"{k}=?" for k in kwargs)
-        self._conn.execute(f"UPDATE user_stories SET {sets} WHERE id=?", (*kwargs.values(), sid))
+        self._conn.execute(
+            f"UPDATE user_stories SET {sets} WHERE id=?", (*kwargs.values(), sid)
+        )
         self._conn.commit()
         return {"status": "ok"}
 
@@ -208,23 +328,28 @@ class DBBackend:
 
     def sprint_create(self, mission_id: str, name: str, number: int = 1) -> dict:
         import uuid
+
         sid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO sprints (id, mission_id, name, number, status) VALUES (?,?,?,?,?)",
-            (sid, mission_id, name, number, "planned"))
+            (sid, mission_id, name, number, "planned"),
+        )
         self._conn.commit()
         return {"id": sid, "name": name}
 
     def sprint_assign(self, sprint_id: str, story_ids: list[str]) -> dict:
         for sid in story_ids:
-            self._conn.execute("UPDATE user_stories SET sprint_id=? WHERE id=?", (sprint_id, sid))
+            self._conn.execute(
+                "UPDATE user_stories SET sprint_id=? WHERE id=?", (sprint_id, sid)
+            )
         self._conn.commit()
         return {"assigned": len(story_ids)}
 
     def sprint_unassign(self, sprint_id: str, story_id: str) -> dict:
         self._conn.execute(
             "UPDATE user_stories SET sprint_id=NULL WHERE id=? AND sprint_id=?",
-            (story_id, sprint_id))
+            (story_id, sprint_id),
+        )
         self._conn.commit()
         return {"status": "ok"}
 
@@ -235,7 +360,8 @@ class DBBackend:
         return self._q(
             "SELECT us.* FROM user_stories us JOIN features f ON us.feature_id=f.id "
             "WHERE f.epic_id=? AND us.sprint_id IS NULL",
-            (sprint["mission_id"],))
+            (sprint["mission_id"],),
+        )
 
     # ── Backlog ──
 
@@ -249,12 +375,16 @@ class DBBackend:
     # ── Agents ──
 
     def agents_list(self, level: str | None = None) -> list:
-        rows = self._q("SELECT id, name, role, provider, model, icon, color, tagline FROM agents ORDER BY name")
+        rows = self._q(
+            "SELECT id, name, role, provider, model, icon, color, tagline FROM agents ORDER BY name"
+        )
         # level filtering would need hierarchy_rank mapping
         return rows
 
     def agent_show(self, aid: str) -> dict:
-        return self._q1("SELECT * FROM agents WHERE id=?", (aid,)) or {"error": "not found"}
+        return self._q1("SELECT * FROM agents WHERE id=?", (aid,)) or {
+            "error": "not found"
+        }
 
     def agent_delete(self, aid: str) -> dict:
         self._conn.execute("DELETE FROM agents WHERE id=?", (aid,))
@@ -274,19 +404,60 @@ class DBBackend:
         session = self._q1("SELECT * FROM sessions WHERE id=?", (sid,))
         if not session:
             return {"error": "not found"}
-        msgs = self._q("SELECT from_agent, content, timestamp FROM messages WHERE session_id=? ORDER BY timestamp", (sid,))
+        msgs = self._q(
+            "SELECT from_agent, content, timestamp FROM messages WHERE session_id=? ORDER BY timestamp",
+            (sid,),
+        )
         session["messages"] = msgs
         return session
 
-    def session_create(self, project: str | None = None,
-                       agents: list[str] | None = None,
-                       pattern: str = "solo") -> dict:
+    def session_create(
+        self,
+        project: str | None = None,
+        agents: list[str] | None = None,
+        pattern: str = "solo",
+    ) -> dict:
         return {"error": "Cannot create sessions in offline mode — server required"}
 
     def session_stop(self, sid: str) -> dict:
         self._conn.execute("UPDATE sessions SET status='stopped' WHERE id=?", (sid,))
         self._conn.commit()
         return {"status": "stopped"}
+
+    def session_checkpoints(self, sid: str) -> dict:
+        has_table = self._conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_step_checkpoints'"
+        ).fetchone()
+        if not has_table:
+            return {"session_id": sid, "checkpoints": [], "agent_count": 0}
+        rows = self._conn.execute(
+            "SELECT agent_id, step_index, tool_calls, partial_content FROM agent_step_checkpoints WHERE session_id=? ORDER BY agent_id, step_index DESC",
+            (sid,),
+        ).fetchall()
+        import json as _json
+
+        seen: dict = {}
+        for r in rows:
+            aid = r[0]
+            if aid in seen:
+                continue
+            try:
+                tools = _json.loads(r[2] or "[]")
+                last_tool = tools[-1].get("name", "") if tools else ""
+            except Exception:
+                last_tool = ""
+            seen[aid] = {
+                "agent_id": aid,
+                "step": r[1],
+                "last_tool": last_tool,
+                "preview": (r[3] or "")[:100],
+            }
+        checkpoints = list(seen.values())
+        return {
+            "session_id": sid,
+            "checkpoints": checkpoints,
+            "agent_count": len(checkpoints),
+        }
 
     def session_chat_url(self, sid: str) -> str:
         return ""
@@ -303,7 +474,9 @@ class DBBackend:
         return {"error": "Cannot create epic in offline mode — server required"}
 
     def ideation_list(self) -> list:
-        return self._q("SELECT id, prompt, status, project_id, created_at FROM ideation_sessions ORDER BY created_at DESC")
+        return self._q(
+            "SELECT id, prompt, status, project_id, created_at FROM ideation_sessions ORDER BY created_at DESC"
+        )
 
     def ideation_session_url(self, session_id: str) -> str:
         return ""
@@ -311,16 +484,23 @@ class DBBackend:
     # ── Metrics (computed from DB) ──
 
     def metrics_dora(self, project_id: str | None = None) -> dict:
-        total = self._q("SELECT COUNT(*) as c FROM missions WHERE status='completed'")[0]["c"]
+        total = self._q("SELECT COUNT(*) as c FROM missions WHERE status='completed'")[
+            0
+        ]["c"]
         return {"deployments": total, "note": "offline approximation"}
 
     def metrics_velocity(self) -> dict:
-        rows = self._q("SELECT s.name, s.velocity, s.planned_sp FROM sprints s WHERE s.velocity IS NOT NULL ORDER BY s.number DESC LIMIT 10")
+        rows = self._q(
+            "SELECT s.name, s.velocity, s.planned_sp FROM sprints s WHERE s.velocity IS NOT NULL ORDER BY s.number DESC LIMIT 10"
+        )
         return {"sprints": rows}
 
     def metrics_burndown(self, epic_id: str | None = None) -> dict:
         if epic_id:
-            features = self._q("SELECT status, COUNT(*) as c FROM features WHERE epic_id=? GROUP BY status", (epic_id,))
+            features = self._q(
+                "SELECT status, COUNT(*) as c FROM features WHERE epic_id=? GROUP BY status",
+                (epic_id,),
+            )
             return {"features": features}
         return {"note": "provide epic_id"}
 
@@ -331,7 +511,9 @@ class DBBackend:
 
     def llm_stats(self) -> dict:
         try:
-            rows = self._q("SELECT COUNT(*) as calls, SUM(tokens_in) as ti, SUM(tokens_out) as to_, SUM(cost_estimate) as cost FROM llm_usage")
+            rows = self._q(
+                "SELECT COUNT(*) as calls, SUM(tokens_in) as ti, SUM(tokens_out) as to_, SUM(cost_estimate) as cost FROM llm_usage"
+            )
             return rows[0] if rows else {}
         except Exception:
             return {"note": "llm_usage table not available"}
@@ -341,7 +523,9 @@ class DBBackend:
 
     def llm_traces(self, limit: int = 20) -> list:
         try:
-            return self._q("SELECT * FROM llm_traces ORDER BY timestamp DESC LIMIT ?", (limit,))
+            return self._q(
+                "SELECT * FROM llm_traces ORDER BY timestamp DESC LIMIT ?", (limit,)
+            )
         except Exception:
             return []
 
@@ -349,12 +533,21 @@ class DBBackend:
 
     def memory_search(self, query: str) -> list:
         try:
-            return self._q("SELECT * FROM memory_project_fts WHERE memory_project_fts MATCH ? LIMIT 20", (query,))
+            return self._q(
+                "SELECT * FROM memory_project_fts WHERE memory_project_fts MATCH ? LIMIT 20",
+                (query,),
+            )
         except Exception:
-            return self._q("SELECT * FROM memory_project WHERE content LIKE ? LIMIT 20", (f"%{query}%",))
+            return self._q(
+                "SELECT * FROM memory_project WHERE content LIKE ? LIMIT 20",
+                (f"%{query}%",),
+            )
 
     def memory_project(self, pid: str) -> list:
-        return self._q("SELECT * FROM memory_project WHERE project_id=? ORDER BY updated_at DESC", (pid,))
+        return self._q(
+            "SELECT * FROM memory_project WHERE project_id=? ORDER BY updated_at DESC",
+            (pid,),
+        )
 
     def memory_global(self) -> list:
         return self._q("SELECT * FROM memory_global ORDER BY updated_at DESC LIMIT 50")
@@ -362,7 +555,8 @@ class DBBackend:
     def memory_global_set(self, key: str, value: str) -> dict:
         self._conn.execute(
             "INSERT OR REPLACE INTO memory_global (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-            (key, value))
+            (key, value),
+        )
         self._conn.commit()
         return {"status": "ok"}
 
@@ -388,22 +582,29 @@ class DBBackend:
     # ── Incidents ──
 
     def incidents_list(self) -> list:
-        return self._q("SELECT id, title, severity, status, source, created_at FROM platform_incidents ORDER BY created_at DESC LIMIT 50")
+        return self._q(
+            "SELECT id, title, severity, status, source, created_at FROM platform_incidents ORDER BY created_at DESC LIMIT 50"
+        )
 
-    def incident_create(self, title: str, severity: str = "P2",
-                        source: str = "cli") -> dict:
+    def incident_create(
+        self, title: str, severity: str = "P2", source: str = "cli"
+    ) -> dict:
         import uuid
+
         iid = str(uuid.uuid4())[:8]
         self._conn.execute(
             "INSERT INTO platform_incidents (id, title, severity, status, source, created_at) VALUES (?,?,?,?,?,datetime('now'))",
-            (iid, title, severity, "open", source))
+            (iid, title, severity, "open", source),
+        )
         self._conn.commit()
         return {"id": iid, "status": "created"}
 
     # ── Autoheal ──
 
     def autoheal_stats(self) -> dict:
-        healed = self._q("SELECT COUNT(*) as c FROM platform_incidents WHERE status='resolved'")[0]["c"]
+        healed = self._q(
+            "SELECT COUNT(*) as c FROM platform_incidents WHERE status='resolved'"
+        )[0]["c"]
         total = self._q("SELECT COUNT(*) as c FROM platform_incidents")[0]["c"]
         return {"healed": healed, "total": total}
 
@@ -413,23 +614,37 @@ class DBBackend:
     # ── Search ──
 
     def search(self, query: str) -> dict:
-        msgs = self._q("SELECT id, from_agent, content FROM messages WHERE content LIKE ? LIMIT 10", (f"%{query}%",))
-        projs = self._q("SELECT id, name FROM projects WHERE name LIKE ? LIMIT 5", (f"%{query}%",))
-        missions = self._q("SELECT id, name FROM missions WHERE name LIKE ? LIMIT 5", (f"%{query}%",))
+        msgs = self._q(
+            "SELECT id, from_agent, content FROM messages WHERE content LIKE ? LIMIT 10",
+            (f"%{query}%",),
+        )
+        projs = self._q(
+            "SELECT id, name FROM projects WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+        )
+        missions = self._q(
+            "SELECT id, name FROM missions WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+        )
         return {"messages": msgs, "projects": projs, "missions": missions}
 
     # ── Export ──
 
     def export_epics(self, fmt: str = "json") -> Any:
-        return self._q("SELECT id, project_id, name, status, type, wsjf_score FROM missions WHERE type='epic' ORDER BY created_at DESC")
+        return self._q(
+            "SELECT id, project_id, name, status, type, wsjf_score FROM missions WHERE type='epic' ORDER BY created_at DESC"
+        )
 
     def export_features(self, fmt: str = "json") -> Any:
-        return self._q("SELECT id, epic_id, name, status, story_points, priority FROM features ORDER BY priority")
+        return self._q(
+            "SELECT id, epic_id, name, status, story_points, priority FROM features ORDER BY priority"
+        )
 
     # ── Releases ──
 
     def releases(self, project_id: str) -> list:
-        return self._q("SELECT * FROM missions WHERE project_id=? AND status='completed' ORDER BY completed_at DESC", (project_id,))
+        return self._q(
+            "SELECT * FROM missions WHERE project_id=? AND status='completed' ORDER BY completed_at DESC",
+            (project_id,),
+        )
 
     # ── Notifications ──
 
@@ -442,9 +657,13 @@ class DBBackend:
     # ── Darwin Teams ──
 
     def teams_contexts(self) -> list:
-        return self._q("SELECT DISTINCT technology, phase_type, COUNT(*) as teams FROM team_fitness GROUP BY technology, phase_type")
+        return self._q(
+            "SELECT DISTINCT technology, phase_type, COUNT(*) as teams FROM team_fitness GROUP BY technology, phase_type"
+        )
 
-    def teams_leaderboard(self, technology: str = "generic", phase_type: str = "generic", limit: int = 30) -> dict:
+    def teams_leaderboard(
+        self, technology: str = "generic", phase_type: str = "generic", limit: int = 30
+    ) -> dict:
         rows = self._q(
             """SELECT tf.agent_id, tf.pattern_id, tf.technology, tf.phase_type,
                       tf.fitness_score, tf.runs, tf.wins, tf.losses, tf.retired,
@@ -475,10 +694,16 @@ class DBBackend:
             q += " WHERE " + " AND ".join(filters)
         rows = self._q(q, tuple(p))
         for r in rows:
-            r["progress_pct"] = round(r["kpi_current"] / r["kpi_target"] * 100, 1) if r.get("kpi_target") else 0.0
+            r["progress_pct"] = (
+                round(r["kpi_current"] / r["kpi_target"] * 100, 1)
+                if r.get("kpi_target")
+                else 0.0
+            )
         return rows
 
-    def teams_evolution(self, technology: str = "generic", phase_type: str = "generic", days: int = 30) -> dict:
+    def teams_evolution(
+        self, technology: str = "generic", phase_type: str = "generic", days: int = 30
+    ) -> dict:
         rows = self._q(
             """SELECT tfh.agent_id, tfh.pattern_id, tfh.snapshot_date,
                       tfh.fitness_score, a.name as agent_name
@@ -492,11 +717,20 @@ class DBBackend:
         for r in rows:
             key = f"{r['agent_id']}:{r['pattern_id']}"
             if key not in series:
-                series[key] = {"agent_id": r["agent_id"], "agent_name": r.get("agent_name") or r["agent_id"],
-                                "pattern_id": r["pattern_id"], "dates": [], "scores": []}
+                series[key] = {
+                    "agent_id": r["agent_id"],
+                    "agent_name": r.get("agent_name") or r["agent_id"],
+                    "pattern_id": r["pattern_id"],
+                    "dates": [],
+                    "scores": [],
+                }
             series[key]["dates"].append(r["snapshot_date"])
             series[key]["scores"].append(round(r["fitness_score"], 1))
-        return {"series": list(series.values()), "technology": technology, "phase_type": phase_type}
+        return {
+            "series": list(series.values()),
+            "technology": technology,
+            "phase_type": phase_type,
+        }
 
     def teams_selections(self, limit: int = 20) -> dict:
         rows = self._q(
@@ -520,16 +754,30 @@ class DBBackend:
         p.append(limit)
         return {"data": self._q(q, tuple(p))}
 
-    def teams_retire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+    def teams_retire(
+        self,
+        agent_id: str,
+        pattern_id: str,
+        technology: str = "generic",
+        phase_type: str = "generic",
+    ) -> dict:
         self._conn.execute(
             "UPDATE team_fitness SET retired=1, weight_multiplier=0.1 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
-            (agent_id, pattern_id, technology, phase_type))
+            (agent_id, pattern_id, technology, phase_type),
+        )
         self._conn.commit()
         return {"ok": True}
 
-    def teams_unretire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
+    def teams_unretire(
+        self,
+        agent_id: str,
+        pattern_id: str,
+        technology: str = "generic",
+        phase_type: str = "generic",
+    ) -> dict:
         self._conn.execute(
             "UPDATE team_fitness SET retired=0, weight_multiplier=1.0 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
-            (agent_id, pattern_id, technology, phase_type))
+            (agent_id, pattern_id, technology, phase_type),
+        )
         self._conn.commit()
         return {"ok": True}

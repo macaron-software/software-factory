@@ -238,6 +238,80 @@ async def project_health(project_id: str):
     }
 
 
+@router.get("/api/projects/{project_id}/phase")
+async def project_get_phase(project_id: str):
+    """Get current phase of a project."""
+    from ...projects.manager import get_project_store
+
+    ps = get_project_store()
+    p = ps.get(project_id)
+    if not p:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "project not found")
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "current_phase": p.current_phase or "discovery",
+            "phases": p.phases or p.DEFAULT_PHASES,
+        }
+    )
+
+
+@router.get("/api/projects/{project_id}/missions/suggest")
+async def project_missions_suggest(project_id: str):
+    """Suggest next missions based on current phase and existing missions."""
+    from ...projects.manager import get_project_store
+    from ...missions.store import get_mission_store
+
+    ps = get_project_store()
+    p = ps.get(project_id)
+    if not p:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "project not found")
+    phase = p.current_phase or "discovery"
+    ms = get_mission_store()
+    all_m = ms.list_missions(limit=500)
+    existing = {m.name.lower() for m in all_m if m.project_id == project_id}
+    SUGGESTIONS = {
+        "discovery": [
+            "Exploration marché",
+            "Analyse concurrentielle",
+            "Identification des besoins",
+            "Proof of Concept",
+        ],
+        "mvp": [
+            "Architecture technique",
+            "Sprint MVP 1",
+            "Tests utilisateurs",
+            "CI/CD setup",
+        ],
+        "v1": [
+            "Feature dev Sprint 1",
+            "Optimisation performance",
+            "Documentation",
+            "Beta test",
+        ],
+        "run": [
+            "Monitoring production",
+            "Sprint amélioration",
+            "Scalabilité",
+            "Sécurité audit",
+        ],
+        "maintenance": ["Patch sécurité", "Dette technique", "Migration", "Archivage"],
+    }
+    candidates = SUGGESTIONS.get(phase, SUGGESTIONS["discovery"])
+    suggestions = [s for s in candidates if s.lower() not in existing][:5]
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "current_phase": phase,
+            "suggestions": suggestions,
+        }
+    )
+
+
 @router.post("/api/projects/{project_id}/scaffold")
 async def project_scaffold(project_id: str):
     """Scaffold a single project (idempotent)."""
@@ -2177,7 +2251,6 @@ async def dbgate_get_token():
 @router.get("/api/projects/{project_id}/workspace/timeline")
 async def ws_timeline(project_id: str, filter: str = "all"):
     """Return unified timeline events: git commits + missions + deployments."""
-    import asyncio
     from ...projects.manager import get_project_store
     from ...projects import git_service
 
@@ -2193,13 +2266,15 @@ async def ws_timeline(project_id: str, filter: str = "all"):
             commits = git_service.get_log(proj.path, 30)
             for c in commits:
                 cd = c.__dict__ if hasattr(c, "__dict__") else dict(c)
-                events.append({
-                    "type": "commit",
-                    "title": cd.get("message") or cd.get("subject") or "commit",
-                    "description": cd.get("hash", "")[:8],
-                    "author": cd.get("author") or cd.get("author_name", ""),
-                    "ts": cd.get("date") or cd.get("timestamp") or "",
-                })
+                events.append(
+                    {
+                        "type": "commit",
+                        "title": cd.get("message") or cd.get("subject") or "commit",
+                        "description": cd.get("hash", "")[:8],
+                        "author": cd.get("author") or cd.get("author_name", ""),
+                        "ts": cd.get("date") or cd.get("timestamp") or "",
+                    }
+                )
         except Exception:
             pass
 
@@ -2207,16 +2282,19 @@ async def ws_timeline(project_id: str, filter: str = "all"):
     if filter in ("all", "mission"):
         try:
             from ...missions.store import MissionStore
+
             missions = MissionStore().list_missions(project_id=project_id, limit=30)
             for m in missions:
                 md = m.__dict__ if hasattr(m, "__dict__") else dict(m)
-                events.append({
-                    "type": "mission",
-                    "title": md.get("title") or md.get("name") or "Mission",
-                    "description": md.get("status", ""),
-                    "author": md.get("created_by", ""),
-                    "ts": md.get("updated_at") or md.get("created_at") or "",
-                })
+                events.append(
+                    {
+                        "type": "mission",
+                        "title": md.get("title") or md.get("name") or "Mission",
+                        "description": md.get("status", ""),
+                        "author": md.get("created_by", ""),
+                        "ts": md.get("updated_at") or md.get("created_at") or "",
+                    }
+                )
         except Exception:
             pass
 
@@ -2228,13 +2306,15 @@ async def ws_timeline(project_id: str, filter: str = "all"):
                 cd = c.__dict__ if hasattr(c, "__dict__") else dict(c)
                 msg = (cd.get("message") or "").lower()
                 if any(kw in msg for kw in ("deploy", "release", "publish", "prod")):
-                    events.append({
-                        "type": "deploy",
-                        "title": cd.get("message") or "deploy",
-                        "description": cd.get("hash", "")[:8],
-                        "author": cd.get("author") or cd.get("author_name", ""),
-                        "ts": cd.get("date") or cd.get("timestamp") or "",
-                    })
+                    events.append(
+                        {
+                            "type": "deploy",
+                            "title": cd.get("message") or "deploy",
+                            "description": cd.get("hash", "")[:8],
+                            "author": cd.get("author") or cd.get("author_name", ""),
+                            "ts": cd.get("date") or cd.get("timestamp") or "",
+                        }
+                    )
         except Exception:
             pass
 
@@ -2255,7 +2335,7 @@ async def ws_search(
     regex: bool = False,
 ):
     """Full-text search across project files using ripgrep or grep fallback."""
-    import subprocess, re as _re
+    import subprocess
 
     from ...projects.manager import get_project_store
 
@@ -2278,7 +2358,9 @@ async def ws_search(
 
     # Fallback to grep if rg not available
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, cwd=proj.path)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=15, cwd=proj.path
+        )
         output = result.stdout
     except FileNotFoundError:
         cmd2 = ["grep", "-rn", "--include=" + (glob or "*"), "-m", "30"]
@@ -2288,7 +2370,9 @@ async def ws_search(
             cmd2.append("-F")
         cmd2 += ["--", q, "."]
         try:
-            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=15, cwd=proj.path)
+            result = subprocess.run(
+                cmd2, capture_output=True, text=True, timeout=15, cwd=proj.path
+            )
             output = result.stdout
         except Exception:
             output = ""
@@ -2308,7 +2392,9 @@ async def ws_search(
                 continue
             files_dict[fpath] = []
         if len(files_dict[fpath]) < MAX_LINES_PER_FILE:
-            files_dict[fpath].append({"line": int(lnum) if lnum.isdigit() else 0, "text": text[:200]})
+            files_dict[fpath].append(
+                {"line": int(lnum) if lnum.isdigit() else 0, "text": text[:200]}
+            )
             total += 1
 
     matches = [{"file": f, "lines": lines} for f, lines in files_dict.items()]

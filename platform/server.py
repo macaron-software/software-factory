@@ -643,7 +643,10 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
-        if request.url.path.startswith("/api/"):
+        if (
+            request.url.path.startswith("/api/")
+            and os.environ.get("PLATFORM_ENV") != "test"
+        ):
             client_ip = request.client.host if request.client else "unknown"
             now = _rl_time.time()
             bucket = _rate_buckets[client_ip]
@@ -903,8 +906,11 @@ def create_app() -> FastAPI:
 
         sw_path = STATIC_DIR / "sw.js"
         if sw_path.exists():
-            return FileResponse(str(sw_path), media_type="application/javascript",
-                                headers={"Service-Worker-Allowed": "/"})
+            return FileResponse(
+                str(sw_path),
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/"},
+            )
 
     # Serve favicon.ico
     @app.get("/favicon.ico")

@@ -112,12 +112,26 @@ class APIBackend:
     def project_git_status(self, pid: str) -> dict:
         return self._get(f"/api/projects/{pid}/git-status")
 
+    def project_phase_get(self, pid: str) -> dict:
+        return self._get(f"/api/projects/{pid}/phase")
+
+    def project_phase_set(self, pid: str, phase: str) -> dict:
+        return self._post(f"/api/projects/{pid}/phase", {"phase": phase})
+
+    def project_health(self, pid: str) -> dict:
+        return self._get(f"/api/projects/{pid}/health")
+
+    def project_missions_suggest(self, pid: str) -> dict:
+        return self._get(f"/api/projects/{pid}/missions/suggest")
+
     def project_chat_url(self, pid: str) -> str:
         return f"{self.base_url}/api/projects/{pid}/chat/stream"
 
     # ── Missions ──
 
-    def missions_list(self, project: str | None = None, status: str | None = None) -> list:
+    def missions_list(
+        self, project: str | None = None, status: str | None = None
+    ) -> list:
         data = self._get("/api/missions")
         missions = data.get("missions", data) if isinstance(data, dict) else data
         if project:
@@ -144,7 +158,9 @@ class APIBackend:
     def mission_reset(self, mid: str) -> dict:
         return self._post(f"/api/missions/{mid}/reset")
 
-    def mission_wsjf(self, mid: str, bv: int = 5, tc: int = 5, rr: int = 5, jd: int = 5) -> dict:
+    def mission_wsjf(
+        self, mid: str, bv: int = 5, tc: int = 5, rr: int = 5, jd: int = 5
+    ) -> dict:
         return self._post(
             f"/api/missions/{mid}/wsjf",
             {
@@ -184,7 +200,9 @@ class APIBackend:
     def feature_deps(self, fid: str) -> list:
         return self._get(f"/api/features/{fid}/deps")
 
-    def feature_add_dep(self, fid: str, dep_id: str, dep_type: str = "blocked_by") -> dict:
+    def feature_add_dep(
+        self, fid: str, dep_id: str, dep_type: str = "blocked_by"
+    ) -> dict:
         return self._post(
             f"/api/features/{fid}/deps",
             {
@@ -282,7 +300,10 @@ class APIBackend:
         return self._get(f"/api/sessions/{sid}")
 
     def session_create(
-        self, project: str | None = None, agents: list[str] | None = None, pattern: str = "solo"
+        self,
+        project: str | None = None,
+        agents: list[str] | None = None,
+        pattern: str = "solo",
     ) -> dict:
         body = {"pattern": pattern}
         if project:
@@ -293,6 +314,9 @@ class APIBackend:
 
     def session_stop(self, sid: str) -> dict:
         return self._post(f"/api/sessions/{sid}/stop")
+
+    def session_checkpoints(self, sid: str) -> dict:
+        return self._get(f"/api/sessions/{sid}/checkpoints")
 
     def session_chat_url(self, sid: str) -> str:
         return f"{self.base_url}/api/sessions/{sid}/stream"
@@ -401,7 +425,9 @@ class APIBackend:
     def incidents_list(self) -> list:
         return self._get("/api/incidents")
 
-    def incident_create(self, title: str, severity: str = "P2", source: str = "cli") -> dict:
+    def incident_create(
+        self, title: str, severity: str = "P2", source: str = "cli"
+    ) -> dict:
         return self._post(
             "/api/incidents",
             {
@@ -450,8 +476,13 @@ class APIBackend:
     def teams_contexts(self) -> list:
         return self._get("/api/teams/contexts")
 
-    def teams_leaderboard(self, technology: str = "generic", phase_type: str = "generic", limit: int = 30) -> dict:
-        return self._get("/api/teams/leaderboard", {"technology": technology, "phase_type": phase_type, "limit": limit})
+    def teams_leaderboard(
+        self, technology: str = "generic", phase_type: str = "generic", limit: int = 30
+    ) -> dict:
+        return self._get(
+            "/api/teams/leaderboard",
+            {"technology": technology, "phase_type": phase_type, "limit": limit},
+        )
 
     def teams_okr(self, technology: str = "", phase_type: str = "") -> list:
         params = {}
@@ -461,8 +492,13 @@ class APIBackend:
             params["phase_type"] = phase_type
         return self._get("/api/teams/okr", params)
 
-    def teams_evolution(self, technology: str = "generic", phase_type: str = "generic", days: int = 30) -> dict:
-        return self._get("/api/teams/evolution", {"technology": technology, "phase_type": phase_type, "days": days})
+    def teams_evolution(
+        self, technology: str = "generic", phase_type: str = "generic", days: int = 30
+    ) -> dict:
+        return self._get(
+            "/api/teams/evolution",
+            {"technology": technology, "phase_type": phase_type, "days": days},
+        )
 
     def teams_selections(self, limit: int = 20) -> dict:
         return self._get("/api/teams/selections", {"limit": limit})
@@ -473,8 +509,26 @@ class APIBackend:
             params["status"] = status
         return self._get("/api/teams/ab-tests", params)
 
-    def teams_retire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
-        return self._post(f"/api/teams/{agent_id}/{pattern_id}/retire", {"technology": technology, "phase_type": phase_type})
+    def teams_retire(
+        self,
+        agent_id: str,
+        pattern_id: str,
+        technology: str = "generic",
+        phase_type: str = "generic",
+    ) -> dict:
+        return self._post(
+            f"/api/teams/{agent_id}/{pattern_id}/retire",
+            {"technology": technology, "phase_type": phase_type},
+        )
 
-    def teams_unretire(self, agent_id: str, pattern_id: str, technology: str = "generic", phase_type: str = "generic") -> dict:
-        return self._post(f"/api/teams/{agent_id}/{pattern_id}/unretire", {"technology": technology, "phase_type": phase_type})
+    def teams_unretire(
+        self,
+        agent_id: str,
+        pattern_id: str,
+        technology: str = "generic",
+        phase_type: str = "generic",
+    ) -> dict:
+        return self._post(
+            f"/api/teams/{agent_id}/{pattern_id}/unretire",
+            {"technology": technology, "phase_type": phase_type},
+        )

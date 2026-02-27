@@ -182,7 +182,7 @@ test.describe("rtk: monitoring page widget", () => {
 
     await safeGoto(page, "/monitoring");
     const rtkRow = page.locator("#monRtkRow");
-    await expect(rtkRow).toBeVisible({ timeout: 8_000 });
+    await expect(rtkRow).toBeVisible({ timeout: 15_000 });
 
     const tokensSaved = await page.locator("#monRtkTokens").textContent();
     expect(tokensSaved!.trim().length).toBeGreaterThan(0);

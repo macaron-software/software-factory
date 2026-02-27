@@ -126,6 +126,7 @@ test.describe("CTO Jarvis: send message + streaming", () => {
   test.beforeEach(async ({ page }) => { await setupSession(page); });
 
   test("sends a simple message and gets a CTO response", async ({ page }) => {
+    test.slow(); // LLM response can be slow
     const errors = collectErrors(page);
     await safeGoto(page, "/cto");
 
@@ -148,6 +149,7 @@ test.describe("CTO Jarvis: send message + streaming", () => {
   });
 
   test("chip shortcut sends a preset question", async ({ page }) => {
+    test.slow(); // LLM response can be slow
     const errors = collectErrors(page);
     await safeGoto(page, "/cto");
 
@@ -186,6 +188,7 @@ test.describe("CTO Jarvis: @project mention in message", () => {
   });
 
   test("CTO response uses project context (no 'je ne sais pas')", async ({ page }) => {
+    test.slow(); // LLM response can be slow
     await safeGoto(page, "/cto");
     const input = page.locator("#cto-input");
     await input.fill("@DataForge — Real-time Data Pipeline donne moi un résumé du projet");

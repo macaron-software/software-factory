@@ -11,7 +11,7 @@ test.describe("Journey: Browse Portfolio → Project → Chat", () => {
     const errors = collectErrors(page);
 
     // 1. Load portfolio
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
     await expect(page).toHaveTitle(/.+/);
 
     // 2. Find first project card (the card itself is an <a>)
@@ -36,7 +36,7 @@ test.describe("Journey: Browse Portfolio → Project → Chat", () => {
 test.describe("Journey: Navigate all sidebar links", () => {
   test("sidebar navigation works for all menu items", async ({ page }) => {
     const errors = collectErrors(page);
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
 
     // Get all nav links
     const navLinks = page.locator(".nav-links a");

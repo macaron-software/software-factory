@@ -496,9 +496,17 @@
       body: JSON.stringify({content: msg, display: displayMsg || msg, session_id: _sessionId})
     })
     .then(function(r){
+      // Handle HTTP errors (4xx/5xx) immediately
+      if(!r.ok){
+        thinking.style.display = 'none';
+        btn.classList.remove('loading');
+        _ctoShowRetry(msgs, 'Erreur serveur (' + r.status + ')');
+        return;
+      }
       var reader = r.body.getReader();
       var decoder = new TextDecoder();
       var buf = '';
+      var receivedDone = false;
 
       function processChunk(value){
         buf += decoder.decode(value || new Uint8Array(), {stream: !!value});
@@ -535,6 +543,7 @@
             if(el) el.textContent = streamText;
             msgs.scrollTop = msgs.scrollHeight;
           } else if(eventName === 'done'){
+            receivedDone = true;
             if(streamBubble){ streamBubble.remove(); streamBubble = null; streamText = ''; }
             msgs.insertAdjacentHTML('beforeend', d.html);
             thinking.style.display = 'none';
@@ -587,7 +596,16 @@
 
       function pump(){
         return reader.read().then(function(result){
-          if(result.done){ processChunk(null); return; }
+          if(result.done){
+            processChunk(null);
+            // Stream ended without a 'done' event → show retry
+            if(!receivedDone){
+              thinking.style.display = 'none';
+              btn.classList.remove('loading');
+              _ctoShowRetry(msgs, 'Connexion interrompue');
+            }
+            return;
+          }
           processChunk(result.value);
           return pump();
         });
