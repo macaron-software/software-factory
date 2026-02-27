@@ -127,16 +127,15 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     db = get_db()
     try:
-        # All paused runs with workflow — only recent (last 24h) to avoid infinite re-queue of old runs
+        # All paused runs with workflow
         paused_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
             FROM mission_runs mr
             LEFT JOIN missions m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
-              AND mr.updated_at >= datetime('now', '-24 hours')
             ORDER BY mr.created_at DESC
-            LIMIT 50
+            LIMIT 500
         """).fetchall()
 
         # Pending runs stuck > 10 min (not picked up by scheduler)
