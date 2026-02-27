@@ -444,6 +444,11 @@ class ProjectStore:
             scaffold_project(p)
         except Exception as e:
             logger.warning("scaffold_project failed for %s: %s", p.id, e)
+        # Provision baseline missions (TMA + Security + Debt + MVP if applicable)
+        try:
+            self.heal_missions(p)
+        except Exception as e:
+            logger.warning("heal_missions failed for %s: %s", p.id, e)
         return p
 
     def auto_provision(self, project_id: str, project_name: str):
@@ -510,6 +515,97 @@ class ProjectStore:
                 logger.warning(
                     "Failed to auto-provision %s for %s: %s", m.type, project_id, e
                 )
+        return created
+
+    def heal_missions(self, proj: "Project") -> list[str]:
+        """Ensure every project has TMA + Security + Debt missions.
+        MVP/ideation projects also get a MVP Réalisation mission.
+        Returns list of mission names created."""
+        from ..missions.store import MissionDef, get_mission_store
+
+        ms = get_mission_store()
+        existing = ms.list_missions(limit=2000)
+        proj_m = [m for m in existing if m.project_id == proj.id]
+        proj_types = {m.type for m in proj_m}
+        proj_names = {m.name for m in proj_m}
+        created = []
+
+        is_mvp = (
+            proj.factory_type in ("mvp", "ideation")
+            or "mvp" in proj.name.lower()
+            or proj.status in ("ideation", "mvp", "discovery")
+        )
+
+        needed = [
+            MissionDef(
+                name=f"TMA — {proj.name}",
+                description=f"Maintenance applicative permanente pour {proj.name}. Triage incidents → diagnostic → fix TDD → validation.",
+                goal="Assurer la stabilité et la disponibilité en continu.",
+                status="active",
+                type="program",
+                project_id=proj.id,
+                workflow_id="tma-maintenance",
+                wsjf_score=8,
+                created_by="responsable_tma",
+                config={"auto_provisioned": True, "permanent": True},
+            ),
+            MissionDef(
+                name=f"Sécurité — {proj.name}",
+                description=f"Audit sécurité pour {proj.name}. Scan OWASP, CVE watch, revue code sécurité.",
+                goal="Score sécurité ≥ 80%, zéro CVE critique non corrigée.",
+                status="active",
+                type="security",
+                project_id=proj.id,
+                workflow_id="review-cycle",
+                wsjf_score=12,
+                created_by="devsecops",
+                config={"auto_provisioned": True, "schedule": "weekly"},
+            ),
+            MissionDef(
+                name=f"Dette Technique — {proj.name}",
+                description=f"Réduction de la dette technique pour {proj.name}. Audit → priorisation WSJF → sprint correctif.",
+                goal="Réduire la dette technique de 20% par PI. Complexité < 15, couverture > 80%.",
+                status="planning",
+                type="debt",
+                project_id=proj.id,
+                workflow_id="tech-debt-reduction",
+                wsjf_score=5,
+                created_by="enterprise_architect",
+                config={"auto_provisioned": True, "schedule": "monthly"},
+            ),
+        ]
+        if is_mvp:
+            needed.append(
+                MissionDef(
+                    name=f"MVP — {proj.name}",
+                    description=f"Réalisation du MVP pour {proj.name}. Discovery → design → dev → validation utilisateurs → go/no-go.",
+                    goal="Livrer un MVP validé par au moins 5 utilisateurs cibles en moins de 6 sprints.",
+                    status="active",
+                    type="feature",
+                    project_id=proj.id,
+                    workflow_id="full-project",
+                    wsjf_score=20,
+                    created_by="product_owner",
+                    config={"auto_provisioned": True, "is_mvp": True},
+                )
+            )
+
+        for m in needed:
+            already = (
+                any(mt == m.type for mt in proj_types)
+                if m.type not in ("feature", "epic")
+                else any(n == m.name for n in proj_names)
+            )
+            if not already:
+                try:
+                    ms.create_mission(m)
+                    created.append(m.name)
+                    logger.info("heal_missions: created '%s' for %s", m.name, proj.id)
+                except Exception as e:
+                    logger.warning(
+                        "heal_missions: failed '%s' for %s: %s", m.name, proj.id, e
+                    )
+
         return created
 
     @staticmethod

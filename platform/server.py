@@ -115,57 +115,22 @@ async def lifespan(app: FastAPI):
     if n:
         logger.info("Seeded %d skills into DB", n)
 
-    # Seed projects from SF/MF registry into DB
+    # Ensure every project has TMA + Security + Debt (+ MVP if applicable) missions
     from .projects.manager import get_project_store
 
     ps = get_project_store()
     ps.seed_from_registry()
 
-    # Auto-provision TMA/Security/Debt missions for projects missing them
-    from .missions.store import MissionDef, get_mission_store
-
-    ms = get_mission_store()
-    all_missions = ms.list_missions(limit=500)
     _prov_count = 0
     for proj in ps.list_all():
-        proj_missions = [m for m in all_missions if m.project_id == proj.id]
-        has_tma = any(
-            m.type == "program" or m.name.startswith("TMA") or "[TMA" in m.name
-            for m in proj_missions
-        )
-        if not has_tma:
-            try:
-                ps.auto_provision(proj.id, proj.name)
-                _prov_count += 1
-            except Exception as e:
-                logger.warning("auto_provision failed for %s: %s", proj.id, e)
-        else:
-            # Ensure security mission exists even if TMA already present
-            has_secu = any(
-                m.type == "security" or m.name.startswith("Sécu") for m in proj_missions
-            )
-            if not has_secu:
-                try:
-                    ms.create_mission(
-                        MissionDef(
-                            name=f"Sécurité — {proj.name}",
-                            type="security",
-                            status="active",
-                            project_id=proj.id,
-                            workflow_id="review-cycle",
-                            wsjf_score=12,
-                            created_by="devsecops",
-                            config={"auto_provisioned": True, "schedule": "weekly"},
-                            description=f"Audit sécurité périodique pour {proj.name}.",
-                            goal="Score sécurité ≥ 80%, zéro CVE critique.",
-                        )
-                    )
-                    _prov_count += 1
-                except Exception as e:
-                    logger.warning("security provision failed for %s: %s", proj.id, e)
+        try:
+            created = ps.heal_missions(proj)
+            _prov_count += len(created)
+        except Exception as e:
+            logger.warning("heal_missions failed for %s: %s", proj.id, e)
     if _prov_count:
         logger.warning(
-            "Auto-provisioned TMA/Security/Debt for %d projects", _prov_count
+            "heal_missions: created %d missions across all projects", _prov_count
         )
 
     # Scaffold all projects: ensure workspace + git + docker + docs + code exist
