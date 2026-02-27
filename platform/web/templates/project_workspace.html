@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
+<script>require.config({paths:{vs:'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs'}});</script>
 <link rel="stylesheet" href="/static/css/project_workspace.css?v=8">
 <style>
 html,body{height:100%;overflow:hidden}
@@ -164,11 +165,25 @@ html,body{height:100%;overflow:hidden}
       </div>
 
       <!-- ── VIEW: Docker ──────────────────────────────────────── -->
-      <div class="ws-view-panel" id="ws-view-docker">
-        <div class="ws-docker" id="wsDockerBody">
-          <div class="ws-empty-state">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            <span>Chargement…</span>
+      <div class="ws-view-panel" id="ws-view-docker" style="flex-direction:column">
+        <div class="ws-pane-tabs" id="wsDockerTabs">
+          <button class="ws-tab active" onclick="wsDockerTab(this,'containers')">Containers</button>
+          <button class="ws-tab" onclick="wsDockerTab(this,'portainer')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Portainer
+          </button>
+        </div>
+        <div class="ws-pane-content">
+          <div class="ws-tab-content active" id="ws-docker-containers">
+            <div class="ws-docker" id="wsDockerBody">
+              <div class="ws-empty-state">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                <span>Chargement…</span>
+              </div>
+            </div>
+          </div>
+          <div class="ws-tab-content" id="ws-docker-portainer" style="flex:1;min-height:0">
+            <iframe src="/portainer/" id="wsPortainerFrame" style="flex:1;width:100%;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
           </div>
         </div>
       </div>
@@ -248,27 +263,37 @@ html,body{height:100%;overflow:hidden}
           </div>
         </div>
         <div class="ws-db-main">
-          <div class="ws-pane-tabs">
-            <span class="ws-tab" style="cursor:default;color:var(--text-primary);font-size:.76rem;font-weight:600" id="wsDbTableLabel">SQL</span>
+          <div class="ws-pane-tabs" id="wsDbMainTabs">
+            <button class="ws-tab active" onclick="wsDbMainTab(this,'sql')">SQLite / SQL</button>
+            <button class="ws-tab" onclick="wsDbMainTab(this,'dbgate')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              DbGate
+            </button>
             <span style="flex:1"></span>
             <span style="font-size:.68rem;color:var(--text-secondary);padding:0 .5rem" id="wsDbStatus"></span>
           </div>
           <div class="ws-pane-content">
-            <div class="ws-db-editor">
-              <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
-              <div style="display:flex;gap:.4rem;margin-top:.4rem;align-items:center">
-                <button class="ws-term-run" style="padding:.25rem .55rem;font-size:.72rem" onclick="wsDbRun()">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  Run
-                </button>
-                <span style="font-size:.7rem;color:var(--text-secondary)">Ctrl+Enter</span>
+            <div class="ws-tab-content active" id="ws-db-sql">
+              <span style="font-size:.76rem;font-weight:600;color:var(--text-primary);padding:.3rem .5rem;display:block" id="wsDbTableLabel">SQL</span>
+              <div class="ws-db-editor">
+                <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
+                <div style="display:flex;gap:.4rem;margin-top:.4rem;align-items:center">
+                  <button class="ws-term-run" style="padding:.25rem .55rem;font-size:.72rem" onclick="wsDbRun()">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Run
+                  </button>
+                  <span style="font-size:.7rem;color:var(--text-secondary)">Ctrl+Enter</span>
+                </div>
+              </div>
+              <div class="ws-db-results" id="wsDbResults">
+                <div class="ws-empty-state">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  <span>Sélectionnez une table ou écrivez une requête</span>
+                </div>
               </div>
             </div>
-            <div class="ws-db-results" id="wsDbResults">
-              <div class="ws-empty-state">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                <span>Sélectionnez une table ou écrivez une requête</span>
-              </div>
+            <div class="ws-tab-content" id="ws-db-dbgate" style="flex:1;min-height:0">
+              <iframe src="/dbgate/" id="wsDbGateFrame" style="flex:1;width:100%;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
             </div>
           </div>
         </div>
@@ -333,7 +358,6 @@ html,body{height:100%;overflow:hidden}
   </div><!-- end ws-center -->
 </div><!-- end ws-layout -->
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 var _wsProjectId = {{ project.id | tojson }};
 var _wsPreviewMobile = false;
@@ -341,6 +365,7 @@ var _wsOutputEs = null;
 var _wsDetectedPort = null;
 var _wsDbFiles = [];
 var _wsDbCurrentFile = null;
+var _wsCurrentFilePath = null;
 
 function wsFetch(url, opts) {
   opts = opts || {};
@@ -379,6 +404,22 @@ function wsCodeSideTab(btn, name) {
   document.querySelectorAll('#ws-view-code .ws-code-side .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
   btn.classList.add('active');
   var el = document.getElementById('ws-code-' + name);
+  if (el) el.classList.add('active');
+}
+
+function wsDockerTab(btn, name) {
+  document.querySelectorAll('#wsDockerTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-docker .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-docker-' + name);
+  if (el) el.classList.add('active');
+}
+
+function wsDbMainTab(btn, name) {
+  document.querySelectorAll('#wsDbMainTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-db .ws-db-main .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-db-' + name);
   if (el) el.classList.add('active');
 }
 
@@ -518,6 +559,7 @@ function wsLoadFilesTree(path) {
 function wsLoadLeftTree() { wsLoadFilesTree('.'); }
 
 function wsOpenFile(path) {
+  _wsCurrentFilePath = path;
   wsSetView('code');
   var viewer = document.getElementById('wsFilesViewer');
   if (!viewer) return;
@@ -527,17 +569,55 @@ function wsOpenFile(path) {
     .then(function(data) {
       if (data.error) { viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">' + wsEsc(data.error) + '</span></div>'; return; }
       var ext = path.split('.').pop().toLowerCase();
-      var lm = {js:'javascript',ts:'typescript',tsx:'typescript',jsx:'javascript',py:'python',html:'xml',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'bash',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java',php:'php',rb:'ruby',cpp:'cpp',c:'c',h:'c'};
+      var lm = {js:'javascript',ts:'typescript',tsx:'typescript',jsx:'javascript',py:'python',html:'html',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'shell',bash:'shell',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java',php:'php',rb:'ruby',cpp:'cpp',c:'c',h:'c',toml:'ini',xml:'xml',dockerfile:'dockerfile',env:'ini',gitignore:'ini'};
       var lang = lm[ext] || 'plaintext';
-      var barHtml = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
-      viewer.innerHTML = barHtml;
-      var pre = document.createElement('pre'); pre.className = 'ws-file-pre';
-      var code = document.createElement('code'); code.className = 'language-' + lang;
-      code.textContent = data.content || '(empty)';
-      pre.appendChild(code); viewer.appendChild(pre);
-      try { if (window.hljs) { hljs.highlightElement(code); } } catch(e){}
+      var isBin = ['jpg','jpeg','png','gif','svg','ico','woff','woff2','ttf','eot','zip','tar','gz','pdf'].includes(ext);
+      var saveIcon = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+      var saveBtn = !isBin ? '<button class="ws-preview-btn" id="wsFileSaveBtn" onclick="wsMonacoSave()" style="margin-left:.4rem;padding:.2rem .45rem;font-size:.7rem">' + saveIcon + ' Save</button>' : '';
+      viewer.innerHTML = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + saveBtn + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
+      var monacoDiv = document.createElement('div');
+      monacoDiv.id = 'wsMonacoContainer';
+      monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden';
+      viewer.appendChild(monacoDiv);
+      if (window._wsMonacoEditor) { try { window._wsMonacoEditor.dispose(); } catch(e){} window._wsMonacoEditor = null; }
+      require(['vs/editor/editor.main'], function() {
+        window._wsMonacoEditor = monaco.editor.create(monacoDiv, {
+          value: data.content || '',
+          language: lang,
+          theme: 'vs-dark',
+          automaticLayout: true,
+          minimap: {enabled: true},
+          scrollBeyondLastLine: false,
+          fontSize: 13,
+          fontFamily: "'SF Mono','Fira Code','Monaco','Courier New',monospace",
+          lineNumbers: 'on',
+          wordWrap: 'off',
+          tabSize: 2,
+          readOnly: isBin,
+          renderWhitespace: 'boundary'
+        });
+        if (!isBin) {
+          window._wsMonacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, wsMonacoSave);
+        }
+      });
     })
     .catch(function(e) { if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>'; });
+}
+
+function wsMonacoSave() {
+  if (!window._wsMonacoEditor || !_wsCurrentFilePath) return;
+  var content = window._wsMonacoEditor.getValue();
+  var btn = document.getElementById('wsFileSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/file/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: _wsCurrentFilePath, content: content})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; }
+      wsSetStatus(d.ok ? 'Sauvegardé ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2000);
+    }).catch(function(){ if (btn) { btn.disabled = false; } wsSetStatus('Erreur save','running'); });
 }
 
 // ── Tool Calls ──────────────────────────────────────────────────

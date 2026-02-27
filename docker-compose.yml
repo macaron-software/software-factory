@@ -33,6 +33,24 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: --http-disabled=false --base-url=/portainer
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: unless-stopped
+
+  dbgate:
+    image: dbgate/dbgate:latest
+    environment:
+      - ROOT_PATH=/dbgate
+    volumes:
+      - dbgate-data:/root/.dbgate
+    restart: unless-stopped
+
 volumes:
   platform-data:
   pg-data:
+  portainer-data:
+  dbgate-data:

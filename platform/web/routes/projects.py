@@ -1310,6 +1310,35 @@ async def ws_read_file(project_id: str, path: str):
     return JSONResponse({"content": content, "path": path})
 
 
+@router.post("/api/projects/{project_id}/workspace/file/save")
+async def ws_save_file(project_id: str, request: Request):
+    """Save file content (write to disk)."""
+    from ...projects.manager import get_project_store
+    from ...web.routes.helpers import _parse_body
+
+    body = await _parse_body(request)
+    path = body.get("path", "")
+    content = body.get("content", "")
+    if not path:
+        return JSONResponse({"error": "path required"})
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "project not found"}, status_code=404)
+    root = Path(proj.path)
+    target = (root / path).resolve()
+    try:
+        target.relative_to(root.resolve())
+    except ValueError:
+        return JSONResponse({"error": "access denied"})
+    if not target.is_file():
+        return JSONResponse({"error": "not a file"})
+    try:
+        target.write_text(content, encoding="utf-8")
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+    return JSONResponse({"ok": True})
+
+
 @router.get("/api/projects/{project_id}/workspace/docker")
 async def ws_docker_status(project_id: str):
     """Return docker container status for this project."""
