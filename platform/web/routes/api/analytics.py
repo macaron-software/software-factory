@@ -268,28 +268,49 @@ async def burndown_data(epic_id: str):
 
 @router.get("/api/metrics/velocity")
 async def velocity_data():
-    """Get velocity across sprints."""
+    """Get velocity across weeks — from mission_runs completed per week."""
+    from datetime import datetime, timedelta
+
     from ....db.migrations import get_db
 
     db = get_db()
     try:
-        sprints = db.execute(
-            "SELECT id, name, status, velocity, planned_sp, started_at FROM sprints "
-            "ORDER BY started_at DESC LIMIT 20"
+        # Last 12 weeks of completed mission runs, grouped by week
+        cutoff = (datetime.utcnow() - timedelta(weeks=12)).isoformat()
+        rows = db.execute(
+            """SELECT completed_at FROM mission_runs
+               WHERE status='completed' AND completed_at IS NOT NULL AND completed_at >= ?
+               ORDER BY completed_at""",
+            (cutoff,),
         ).fetchall()
-        return JSONResponse(
-            [
+
+        # Group by ISO week
+        week_counts: dict[str, int] = {}
+        for r in rows:
+            try:
+                dt = datetime.fromisoformat(str(r["completed_at"])[:19])
+                wk = dt.strftime("%Y-W%V")
+                week_counts[wk] = week_counts.get(wk, 0) + 1
+            except Exception:
+                pass
+
+        # Build last 12 weeks in order (fill missing with 0)
+        result = []
+        now = datetime.utcnow()
+        for i in range(11, -1, -1):
+            dt = now - timedelta(weeks=i)
+            wk = dt.strftime("%Y-W%V")
+            result.append(
                 {
-                    "id": s["id"],
-                    "name": s["name"],
-                    "status": s["status"],
-                    "velocity": s["velocity"],
-                    "planned_sp": s["planned_sp"],
-                    "started_at": s["started_at"],
+                    "id": wk,
+                    "name": wk,
+                    "status": "closed",
+                    "velocity": week_counts.get(wk, 0),
+                    "planned_sp": 0,
+                    "started_at": (now - timedelta(weeks=i)).isoformat(),
                 }
-                for s in sprints
-            ]
-        )
+            )
+        return JSONResponse(result)
     except Exception:
         return JSONResponse([])
     finally:
@@ -298,47 +319,36 @@ async def velocity_data():
 
 @router.get("/api/metrics/cycle-time")
 async def cycle_time_data(project_id: str = ""):
-    """Cycle time distribution — time from created to completed for features and stories."""
+    """Cycle time distribution — time from created to completed for missions."""
+    from datetime import datetime
+
     from ....db.migrations import get_db
 
     db = get_db()
     try:
-        where = (
-            "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)"
-            if project_id
-            else ""
-        )
+        where = "AND m.project_id=?" if project_id else ""
         params = (project_id,) if project_id else ()
 
-        features = db.execute(
-            f"""
-            SELECT f.name,
-                   julianday(f.completed_at) - julianday(f.created_at) as days
-            FROM features f
-            WHERE f.status='done' AND f.completed_at IS NOT NULL AND f.created_at IS NOT NULL {where}
-            ORDER BY days
-        """,
+        missions = db.execute(
+            f"""SELECT m.name, m.created_at, mr.completed_at
+                FROM missions m
+                JOIN mission_runs mr ON mr.mission_id = m.id
+                WHERE mr.status='completed' AND mr.completed_at IS NOT NULL
+                  AND m.created_at IS NOT NULL {where}
+                ORDER BY mr.completed_at""",
             params,
         ).fetchall()
 
-        stories = db.execute(
-            f"""
-            SELECT s.title,
-                   julianday(s.completed_at) - julianday(s.created_at) as days
-            FROM user_stories s
-            JOIN features f ON s.feature_id = f.id
-            WHERE s.status='done' AND s.completed_at IS NOT NULL AND s.created_at IS NOT NULL {where}
-            ORDER BY days
-        """,
-            params,
-        ).fetchall()
-
-        feat_days = [
-            round(r["days"], 1) for r in features if r["days"] and r["days"] > 0
-        ]
-        story_days = [
-            round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0
-        ]
+        feat_days = []
+        for r in missions:
+            try:
+                ca = datetime.fromisoformat(str(r["created_at"])[:19])
+                done = datetime.fromisoformat(str(r["completed_at"])[:19])
+                d = (done - ca).total_seconds() / 86400
+                if d > 0:
+                    feat_days.append(round(d, 1))
+            except Exception:
+                pass
 
         def histogram(values, bins=10):
             if not values:
@@ -374,16 +384,7 @@ async def cycle_time_data(project_id: str = ""):
                     else 0,
                     "histogram": histogram(feat_days),
                 },
-                "stories": {
-                    "count": len(story_days),
-                    "avg_days": round(sum(story_days) / len(story_days), 1)
-                    if story_days
-                    else 0,
-                    "median_days": round(sorted(story_days)[len(story_days) // 2], 1)
-                    if story_days
-                    else 0,
-                    "histogram": histogram(story_days),
-                },
+                "stories": {"count": 0, "histogram": []},
             }
         )
     except Exception:
