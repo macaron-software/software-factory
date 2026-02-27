@@ -339,7 +339,7 @@ function wsLoadDocker() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var containers = data.containers || [];
-      if (!containers.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Aucun container Docker pour ce projet</span><span class="ws-empty-hint">Les containers dont le nom contient l'ID du projet apparaissent ici</span></div>'; return; }
+      if (!containers.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Aucun container Docker pour ce projet</span><span class="ws-empty-hint">Les containers dont le nom contient l\'ID du projet apparaissent ici</span></div>'; return; }
       body.innerHTML = containers.map(function(c) {
         var up = c.status && c.status.toLowerCase().startsWith('up');
         return '<div class="ws-docker-container">' +
