@@ -40,8 +40,21 @@ def _db_path() -> str:
     return os.path.join(base, "data", "platform.db")
 
 
+def _get_db():
+    """Get a platform DB connection (SQLite or PostgreSQL depending on env)."""
+    try:
+        from ..db.migrations import get_db
+
+        return get_db()
+    except Exception:
+        # Fallback to direct SQLite (standalone mode)
+        conn = sqlite3.connect(_db_path())
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
 def _ensure_table():
-    db = sqlite3.connect(_db_path())
+    db = _get_db()
     db.execute("""CREATE TABLE IF NOT EXISTS endurance_metrics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL,
@@ -55,7 +68,7 @@ def _ensure_table():
 
 def _log_metric(metric: str, value: float, detail: str = ""):
     try:
-        db = sqlite3.connect(_db_path())
+        db = _get_db()
         ts = datetime.now(timezone.utc).isoformat()
         db.execute(
             "INSERT INTO endurance_metrics (ts, metric, value, detail) VALUES (?,?,?,?)",
@@ -68,8 +81,7 @@ def _log_metric(metric: str, value: float, detail: str = ""):
 
 
 def get_metrics(metric: Optional[str] = None, limit: int = 100) -> list[dict]:
-    db = sqlite3.connect(_db_path())
-    db.row_factory = sqlite3.Row
+    db = _get_db()
     if metric:
         rows = db.execute(
             "SELECT * FROM endurance_metrics WHERE metric=? ORDER BY ts DESC LIMIT ?",
@@ -107,8 +119,7 @@ async def _check_stalled_missions() -> list[dict]:
     """Find mission runs that are running but haven't progressed recently."""
     stalls = []
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
+        db = _get_db()
         rows = db.execute("""
             SELECT mr.id, mr.workflow_name as name, mr.status, mr.current_phase, mr.updated_at
             FROM mission_runs mr
@@ -255,9 +266,7 @@ async def _auto_resume_paused() -> int:
     """Resume paused mission runs in controlled batches. Returns count resumed."""
     resumed = 0
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Check how many are already running (avoid overload)
         running = db.execute(
             "SELECT COUNT(*) as c FROM mission_runs WHERE status='running'"
@@ -364,9 +373,7 @@ async def _recover_stale_sessions() -> int:
     """Detect sessions active too long without progress and mark as interrupted."""
     recovered = 0
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Find "active" sessions with no recent messages (stale)
         rows = db.execute("""
             SELECT s.id, s.name,
@@ -429,7 +436,7 @@ async def _cleanup_failed_sessions() -> int:
     """Mark sessions for failed runs as 'failed' (avoid zombie active sessions)."""
     cleaned = 0
     try:
-        db = sqlite3.connect(_db_path())
+        db = _get_db()
         cleaned = db.execute("""
             UPDATE sessions SET status='failed'
             WHERE id IN (
@@ -453,9 +460,7 @@ async def _cleanup_failed_sessions() -> int:
 async def _daily_report():
     """Generate daily endurance report and store in metrics."""
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Count phases completed today
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         phases = db.execute(
@@ -493,10 +498,21 @@ async def _daily_report():
 
 
 def _table_exists(db, name: str) -> bool:
+    try:
+        from ..db.migrations import is_postgresql
+
+        if is_postgresql():
+            r = db.execute(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name=?",
+                (name,),
+            ).fetchone()
+            return bool(r and r[0] > 0)
+    except Exception:
+        pass
     r = db.execute(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", (name,)
     ).fetchone()
-    return r[0] > 0
+    return bool(r and r[0] > 0)
 
 
 # ── Main Loop ────────────────────────────────────────────────────────

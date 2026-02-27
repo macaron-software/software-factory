@@ -433,6 +433,12 @@ class PgConnectionWrapper:
             return
         self._returned = True
         try:
+            # Rollback any open transaction before returning to pool to avoid
+            # psycopg "rolling back returned connection" warnings.
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
             pool = _get_pg_pool()
             pool.putconn(self._conn)
         except (psycopg.OperationalError, OSError):
