@@ -1890,7 +1890,7 @@ async def ws_db_query(project_id: str, request: Request):
 async def ws_backlog(project_id: str):
     """Return missions and tasks for the project backlog view."""
     from ...projects.manager import get_project_store
-    from ...missions.manager import get_mission_store
+    from ...missions.store import get_mission_store
 
     proj = get_project_store().get(project_id)
     if not proj:

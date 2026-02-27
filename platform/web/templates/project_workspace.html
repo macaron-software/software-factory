@@ -327,7 +327,7 @@ html,body{height:100%;overflow:hidden}
               <div class="ws-dbgate-connections" id="wsDbGateConnections">
                 <div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-secondary)">Scan des connexions…</div>
               </div>
-              <iframe src="/dbgate/" id="wsDbGateFrame" style="flex:1;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
+              <iframe src="about:blank" id="wsDbGateFrame" style="flex:1;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
             </div>
           </div>
         </div>
@@ -948,35 +948,38 @@ function wsLoadPortainerStats() {
 }
 
 var _wsDbGateToken = null;
+var _wsDbGateReady = false;
 
 function wsDbGateAutoLogin(callback) {
-  // Get token from backend and inject into iframe localStorage (same-origin)
+  if (_wsDbGateReady) { if (callback) callback(); return; }
+  var frame = document.getElementById('wsDbGateFrame');
   wsFetch('/api/dbgate/token')
     .then(function(r){ return r.json(); })
     .then(function(d) {
-      if (!d.token) { if (callback) callback(); return; }
+      if (!d.token || !frame) {
+        if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
+        _wsDbGateReady = true;
+        if (callback) callback();
+        return;
+      }
       _wsDbGateToken = d.token;
-      var frame = document.getElementById('wsDbGateFrame');
-      if (!frame) { if (callback) callback(); return; }
-      // Inject token after iframe loads
-      var injected = false;
-      function inject() {
-        if (injected) return; injected = true;
+      // Load dbgate, inject token once loaded, then reload once more
+      frame.onload = function() {
         try {
           frame.contentWindow.localStorage.setItem('accessToken', _wsDbGateToken);
-          // Reload so DbGate picks up the new token
-          frame.src = '/dbgate/';
-        } catch(e) {}
-        if (callback) callback();
-      }
-      if (frame.contentDocument && frame.contentDocument.readyState === 'complete') {
-        inject();
-      } else {
-        frame.onload = inject;
-        // Also set src to trigger load if not already loading
-        if (!frame.src || frame.src === 'about:blank') frame.src = '/dbgate/';
-      }
-    }).catch(function(){ if (callback) callback(); });
+          frame.onload = function() { _wsDbGateReady = true; frame.onload = null; if (callback) callback(); };
+          frame.contentWindow.location.reload();
+        } catch(e) {
+          _wsDbGateReady = true;
+          frame.onload = null;
+          if (callback) callback();
+        }
+      };
+      frame.src = '/dbgate/';
+    }).catch(function(){
+      if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
+      if (callback) callback();
+    });
 }
 
 function wsLoadDbGateConnections() {
