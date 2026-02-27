@@ -95,6 +95,19 @@
 
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+/* retry */
+.cto-retry-bar{display:flex;align-items:center;gap:.55rem;padding:.45rem .8rem;background:rgba(239,68,68,.07);border-radius:8px;font-size:.78rem;color:var(--danger,#ef4444);margin:.2rem 0}
+.cto-retry-bar .retry-msg{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem}
+.cto-retry-btn{background:none;border:1px solid currentColor;border-radius:6px;padding:.22rem .6rem;font-size:.72rem;cursor:pointer;color:inherit;transition:all .12s;white-space:nowrap}
+.cto-retry-btn:hover{background:rgba(239,68,68,.12)}
+.cto-retry-btn.edit{color:var(--text-muted);border-color:var(--border)}
+.cto-retry-btn.edit:hover{background:var(--bg-tertiary)}
+.cto-retry-bar{display:flex;align-items:center;gap:.55rem;padding:.45rem .8rem;background:rgba(239,68,68,.07);border-radius:8px;font-size:.78rem;color:var(--danger,#ef4444);margin:.2rem 0}
+.cto-retry-bar svg{flex-shrink:0;opacity:.75}
+.cto-retry-bar .retry-msg{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cto-retry-btn{background:none;border:1px solid currentColor;border-radius:6px;padding:.22rem .6rem;font-size:.72rem;cursor:pointer;color:inherit;transition:all .12s;white-space:nowrap}
+.cto-retry-btn:hover{background:rgba(239,68,68,.12)}
+.cto-retry-btn.edit{color:var(--text-muted);border-color:var(--border)}
 
 /* Responsive: hide sidebar on small screens */
 @media(max-width:640px){.cto-sidebar{display:none}}
@@ -213,6 +226,7 @@
 (function(){
   var _sessionId = '{{ session_id }}';
   var _attachment = null; // {name, text, chars, truncated}
+  var _lastMsg = null;    // {content, display} — for retry
 
   /* ── Attachment ── */
   function ctoHandleFileInput(input){
@@ -404,6 +418,11 @@
     btn.classList.add('loading');
     thinking.style.display = 'flex';
     msgs.scrollTop = msgs.scrollHeight;
+    _lastMsg = {content: msg, display: displayMsg || msg};
+
+    // Remove any previous retry bar
+    var prevRetry = msgs.querySelector('.cto-retry-bar');
+    if(prevRetry) prevRetry.remove();
 
     // Streaming bubble placeholder
     var streamBubble = null;
@@ -464,10 +483,7 @@
           } else if(eventName === 'error'){
             thinking.style.display = 'none';
             btn.classList.remove('loading');
-            msgs.insertAdjacentHTML('beforeend',
-              '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">' +
-              (d.message || 'Erreur') + '</div></div></div>'
-            );
+            _ctoShowRetry(msgs, d.message || 'Erreur');
           }
         });
       }
@@ -484,10 +500,38 @@
     .catch(function(){
       thinking.style.display = 'none';
       btn.classList.remove('loading');
-      msgs.insertAdjacentHTML('beforeend',
-        '<div class="chat-msg chat-msg-agent"><div class="chat-msg-body"><div class="chat-msg-text" style="color:var(--danger)">Erreur de communication.</div></div></div>'
-      );
+      _ctoShowRetry(msgs, 'Erreur de communication.');
     });
+  }
+
+  function _ctoShowRetry(msgs, errMsg){
+    var shortMsg = _lastMsg ? (_lastMsg.display.length > 60 ? _lastMsg.display.slice(0,60)+'…' : _lastMsg.display) : '';
+    var safeErr = errMsg.replace(/</g,'&lt;');
+    var safeShort = shortMsg.replace(/</g,'&lt;');
+    msgs.insertAdjacentHTML('beforeend',
+      '<div class="cto-retry-bar">' +
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' +
+        '<span class="retry-msg" title="' + safeErr + '">' + safeErr + (safeShort ? ' — «' + safeShort + '»' : '') + '</span>' +
+        '<button class="cto-retry-btn edit" onclick="ctoRetryEdit()">Modifier</button>' +
+        '<button class="cto-retry-btn" onclick="ctoRetryResend()">Relancer</button>' +
+      '</div>'
+    );
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  function ctoRetryEdit(){
+    if(!_lastMsg) return;
+    var inp = document.getElementById('cto-input');
+    if(inp){ inp.value = _lastMsg.content; inp.focus(); inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 110) + 'px'; }
+    var bar = document.querySelector('.cto-retry-bar');
+    if(bar) bar.remove();
+  }
+
+  function ctoRetryResend(){
+    if(!_lastMsg) return;
+    var bar = document.querySelector('.cto-retry-bar');
+    if(bar) bar.remove();
+    _ctoDispatch(_lastMsg.content, _lastMsg.display);
   }
 
   /* ── New conversation ── */
@@ -561,6 +605,8 @@
   window.ctoPickMention = ctoPickMention;
   window.ctoInputChange = ctoInputChange;
   window.ctoInputKeydown = ctoInputKeydown;
+  window.ctoRetryEdit = ctoRetryEdit;
+  window.ctoRetryResend = ctoRetryResend;
 
   // Scroll to bottom on load
   var msgs = document.getElementById('cto-msgs');
