@@ -1366,7 +1366,13 @@ async def session_checkpoints(request: Request, session_id: str):
             f'<div style="font-size:0.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:4px">Agent activity</div>'
             f"{rows_html}</div>"
         )
-    return JSONResponse(items)
+    return JSONResponse(
+        {
+            "session_id": session_id,
+            "checkpoints": items,
+            "agent_count": len(items),
+        }
+    )
 
 
 async def session_sse(request: Request, session_id: str):
