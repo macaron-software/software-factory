@@ -86,3 +86,50 @@ async def notifications_page(request: Request):
             "unread": unread,
         },
     )
+
+
+@router.post("/api/notifications/test")
+async def test_notification_channel(request: Request):
+    """Test a notification channel with a sample payload."""
+    from ...services.notification_service import get_notification_service, NotificationPayload
+    import os
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    channel = body.get("channel", "all")
+    svc = get_notification_service()
+
+    # Override URLs from body if provided (for UI-configured channels not yet in env)
+    if body.get("slack_url"):
+        svc.slack_webhook = body["slack_url"]
+    if body.get("webhook_url"):
+        svc.webhook_url = body["webhook_url"]
+
+    payload = NotificationPayload(
+        event="test",
+        title="🧪 Test — Software Factory",
+        message="Ceci est un test de notification. Si vous voyez ce message, le canal fonctionne !",
+        project_id="test",
+        severity="info",
+        url=str(request.base_url),
+    )
+
+    try:
+        if channel == "slack" and svc.has_slack:
+            await svc._send_slack(payload)
+        elif channel == "webhook" and svc.has_webhook:
+            await svc._send_webhook(payload)
+        elif channel == "whatsapp" and svc.has_whatsapp:
+            await svc._send_whatsapp(payload)
+        elif channel == "push" and svc.has_browser_push:
+            await svc._send_browser_push(payload)
+        elif channel == "all":
+            await svc.notify(payload)
+        else:
+            return JSONResponse({"ok": False, "error": f"Canal '{channel}' non configuré. Vérifiez les variables d'environnement."})
+        return JSONResponse({"ok": True, "message": f"Notification envoyée via {channel}"})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)

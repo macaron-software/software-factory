@@ -74,6 +74,9 @@
         <button class="settings-tab" onclick="showSettingsTab('llm')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cpu"/></svg> LLM
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('notifications')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-bell"/></svg> Notifications
+        </button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -372,6 +375,119 @@
             </div>
         {% endfor %}
         </div>
+    </div>
+
+    <!-- ═══ Notifications ═══ -->
+    <div class="settings-panel" id="panel-notifications">
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">
+            Configure notifications when missions complete, fail, or need attention.<br>
+            Set environment variables on the server, then test each channel below.
+        </p>
+
+        <!-- Status badges -->
+        <div id="notif-status-row" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+            <span class="badge badge-idle" id="ns-slack">⬜ Slack</span>
+            <span class="badge badge-idle" id="ns-email">⬜ Email</span>
+            <span class="badge badge-idle" id="ns-webhook">⬜ Webhook</span>
+            <span class="badge badge-idle" id="ns-whatsapp">⬜ WhatsApp</span>
+            <span class="badge badge-idle" id="ns-push">⬜ Browser Push</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.2rem">
+
+            <!-- Slack -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">💬 Slack</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">Incoming Webhook. Créez-en un sur <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--purple)">api.slack.com</a>.</div>
+                <div class="integ-field"><label>NOTIFY_SLACK_WEBHOOK</label>
+                  <input type="url" id="notif-slack-url" placeholder="https://hooks.slack.com/services/..." style="width:100%"></div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('slack')" style="margin-top:0.5rem">🧪 Tester</button>
+                <div id="notif-slack-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- Webhook -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">🔗 Webhook générique</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">POST JSON vers n'importe quel endpoint (n8n, Make, Zapier…).</div>
+                <div class="integ-field"><label>NOTIFY_WEBHOOK_URL</label>
+                  <input type="url" id="notif-webhook-url" placeholder="https://hooks.n8n.io/..." style="width:100%"></div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('webhook')" style="margin-top:0.5rem">🧪 Tester</button>
+                <div id="notif-webhook-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- WhatsApp Twilio -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">📱 WhatsApp (Twilio)</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">
+                    Via <a href="https://www.twilio.com/whatsapp" target="_blank" style="color:var(--purple)">Twilio WhatsApp API</a>. Sandbox gratuit pour les tests.
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:6px;padding:0.5rem 0.7rem;font-family:var(--font-mono);line-height:1.8">
+                    NOTIFY_TWILIO_ACCOUNT_SID=ACxxx<br>
+                    NOTIFY_TWILIO_AUTH_TOKEN=xxx<br>
+                    NOTIFY_TWILIO_WHATSAPP_FROM=whatsapp:+14155238886<br>
+                    NOTIFY_WHATSAPP_TO=whatsapp:+336xxxxxxxx
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('whatsapp')" style="margin-top:0.8rem">🧪 Tester</button>
+                <div id="notif-whatsapp-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- Browser Push -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">🔔 Browser Push (Web Push)</div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">
+                    Notifications natives dans votre navigateur. Gratuit, pas de compte tiers.
+                </div>
+                <div id="push-keys-info" style="font-size:0.75rem;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:6px;padding:0.5rem 0.7rem;font-family:var(--font-mono)">
+                    NOTIFY_VAPID_PUBLIC_KEY=…<br>
+                    NOTIFY_VAPID_PRIVATE_KEY=…<br>
+                    NOTIFY_VAPID_EMAIL=admin@example.com
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.8rem;flex-wrap:wrap">
+                    <button class="btn btn-ghost btn-sm" onclick="sfRequestPush().then(ok => document.getElementById('notif-push-result').textContent = ok ? '✅ Abonné !' : '❌ Refusé')">🔔 Activer les notifs</button>
+                    <button class="btn btn-ghost btn-sm" onclick="notifTest('push')">🧪 Tester</button>
+                </div>
+                <div id="notif-push-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)" id="notif-push-result"></div>
+                <div id="push-sub-count" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.3rem"></div>
+            </div>
+
+        </div>
+
+        <script>
+        async function loadNotifStatus() {
+          try {
+            const r = await fetch('/api/push/status');
+            const d = await r.json();
+            const map = {slack:'ns-slack',email:'ns-email',webhook:'ns-webhook',whatsapp:'ns-whatsapp',browser_push:'ns-push'};
+            const labels = {slack:'💬 Slack',email:'📧 Email',webhook:'🔗 Webhook',whatsapp:'📱 WhatsApp',browser_push:'🔔 Browser Push'};
+            for(const [k, elId] of Object.entries(map)) {
+              const el = document.getElementById(elId);
+              if(!el) continue;
+              el.textContent = (d[k] ? '✅ ' : '⬜ ') + labels[k];
+              el.className = 'badge ' + (d[k] ? 'badge-ok' : 'badge-idle');
+            }
+            const pc = document.getElementById('push-sub-count');
+            if(pc) pc.textContent = d.push_subscriptions + ' abonnement(s) navigateur actif(s)';
+          } catch(e) {}
+        }
+
+        async function notifTest(channel) {
+          const el = document.getElementById('notif-'+channel+'-result');
+          if(el) el.textContent = '⏳ Envoi…';
+          try {
+            const r = await fetch('/api/notifications/test', {method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({channel, slack_url: document.getElementById('notif-slack-url')?.value, webhook_url: document.getElementById('notif-webhook-url')?.value})
+            });
+            const d = await r.json();
+            if(el) el.textContent = d.ok ? '✅ ' + (d.message||'Envoyé !') : '❌ ' + (d.error||'Erreur');
+          } catch(e) {
+            if(el) el.textContent = '❌ ' + e.message;
+          }
+        }
+
+        if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadNotifStatus);
+        else loadNotifStatus();
+        </script>
     </div>
 
     <!-- ═══ LLM ═══ -->

@@ -25,3 +25,6 @@ opentelemetry-exporter-otlp-proto-http>=1.20
 # File upload parsing
 pypdf>=4.0
 python-docx>=1.1
+
+# Browser Web Push (optional — for browser push notifications)
+pywebpush>=2.0

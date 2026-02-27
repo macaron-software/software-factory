@@ -468,6 +468,62 @@ async function setPerspective(p) {
     await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
     location.reload();
 }
+
+// ── Browser Web Push Registration ──────────────────────────────────
+(async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const sw = await navigator.serviceWorker.register('/sw.js', {scope: '/'});
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const keyData = await keyRes.json();
+    if (!keyData.enabled) return;
+    // Check existing subscription
+    const existing = await sw.pushManager.getSubscription();
+    if (existing) return; // already subscribed
+    // Ask permission (non-blocking, only after first interaction)
+    if (Notification.permission === 'default') {
+      window.__sfPushReady = async function() {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+        await _sfSubscribePush(sw, keyData.publicKey);
+      };
+      return; // Permission will be requested on first click via sfRequestPush()
+    }
+    if (Notification.permission === 'granted') {
+      await _sfSubscribePush(sw, keyData.publicKey);
+    }
+  } catch(e) { console.debug('Push init:', e); }
+})();
+
+async function _sfSubscribePush(sw, vapidKey) {
+  try {
+    const sub = await sw.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _urlB64ToUint8Array(vapidKey)
+    });
+    await fetch('/api/push/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(sub.toJSON())});
+    localStorage.setItem('sf_push_subscribed', '1');
+  } catch(e) { console.debug('Push subscribe:', e); }
+}
+
+function _urlB64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Call this from a user interaction (button click) to request push permission
+window.sfRequestPush = async function() {
+  if (!('serviceWorker' in navigator)) return false;
+  const sw = await navigator.serviceWorker.ready;
+  const keyRes = await fetch('/api/push/vapid-public-key');
+  const keyData = await keyRes.json();
+  if (!keyData.enabled) return false;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return false;
+  await _sfSubscribePush(sw, keyData.publicKey);
+  return true;
+};
 </script>
 </body>
 </html>

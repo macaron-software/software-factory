@@ -490,6 +490,18 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
+    # Load persisted browser push subscriptions
+    try:
+        from .web.routes.api.push import _get_db_subscriptions
+        from .services.notification_service import get_notification_service as _get_ns
+
+        _push_subs = _get_db_subscriptions()
+        _get_ns().load_push_subscriptions(_push_subs)
+        if _push_subs:
+            logger.info("Loaded %d browser push subscriptions", len(_push_subs))
+    except Exception as exc:
+        logger.warning("Failed to load push subscriptions: %s", exc)
+
     yield
 
     # Stop MCP servers
@@ -680,6 +692,7 @@ def create_app() -> FastAPI:
                     "/health",
                     "/favicon.ico",
                     "/manifest.json",
+                    "/sw.js",
                     "/api/health",
                 )
             )
@@ -737,6 +750,7 @@ def create_app() -> FastAPI:
                 "/health",
                 "/favicon.ico",
                 "/manifest.json",
+                "/sw.js",
             )
         )
         if not skip and not request.cookies.get("onboarding_done"):
@@ -882,6 +896,15 @@ def create_app() -> FastAPI:
                 str(manifest_path), media_type="application/manifest+json"
             )
         return {"error": "manifest not found"}
+
+    @app.get("/sw.js")
+    async def service_worker():
+        from fastapi.responses import FileResponse
+
+        sw_path = STATIC_DIR / "sw.js"
+        if sw_path.exists():
+            return FileResponse(str(sw_path), media_type="application/javascript",
+                                headers={"Service-Worker-Allowed": "/"})
 
     # Serve favicon.ico
     @app.get("/favicon.ico")
@@ -1085,6 +1108,7 @@ def create_app() -> FastAPI:
     from .web.routes.websocket import router as ws_router
     from .web.routes.dag import router as dag_router
     from .web.routes.evolution import router as evolution_router
+    from .web.routes.api.push import router as push_router
 
     app.include_router(auth_router)
     app.include_router(oauth_router)
@@ -1092,6 +1116,7 @@ def create_app() -> FastAPI:
     app.include_router(ws_router)
     app.include_router(dag_router)
     app.include_router(evolution_router)
+    app.include_router(push_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 
