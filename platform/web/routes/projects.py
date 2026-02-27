@@ -2246,6 +2246,75 @@ async def ws_timeline(project_id: str, filter: str = "all"):
     return JSONResponse({"events": events[:60]})
 
 
+@router.get("/api/projects/{project_id}/workspace/search")
+async def ws_search(
+    project_id: str,
+    q: str = "",
+    glob: str = "",
+    case: bool = False,
+    regex: bool = False,
+):
+    """Full-text search across project files using ripgrep or grep fallback."""
+    import subprocess, re as _re
+
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path or not q:
+        return JSONResponse({"matches": [], "total_matches": 0})
+
+    MAX_FILES = 50
+    MAX_LINES_PER_FILE = 30
+
+    # Build ripgrep command
+    cmd = ["rg", "--line-number", "--no-heading", "--color=never", "--max-count=30"]
+    if not case:
+        cmd.append("--ignore-case")
+    if not regex:
+        cmd.append("--fixed-strings")
+    if glob:
+        cmd += ["--glob", glob]
+    cmd += ["--", q, "."]
+
+    # Fallback to grep if rg not available
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15, cwd=proj.path)
+        output = result.stdout
+    except FileNotFoundError:
+        cmd2 = ["grep", "-rn", "--include=" + (glob or "*"), "-m", "30"]
+        if not case:
+            cmd2.append("-i")
+        if not regex:
+            cmd2.append("-F")
+        cmd2 += ["--", q, "."]
+        try:
+            result = subprocess.run(cmd2, capture_output=True, text=True, timeout=15, cwd=proj.path)
+            output = result.stdout
+        except Exception:
+            output = ""
+    except Exception:
+        output = ""
+
+    # Parse output: "filepath:linenum:text"
+    files_dict: dict[str, list[dict]] = {}
+    total = 0
+    for line in output.splitlines():
+        parts = line.split(":", 2)
+        if len(parts) < 3:
+            continue
+        fpath, lnum, text = parts[0].lstrip("./"), parts[1], parts[2]
+        if fpath not in files_dict:
+            if len(files_dict) >= MAX_FILES:
+                continue
+            files_dict[fpath] = []
+        if len(files_dict[fpath]) < MAX_LINES_PER_FILE:
+            files_dict[fpath].append({"line": int(lnum) if lnum.isdigit() else 0, "text": text[:200]})
+            total += 1
+
+    matches = [{"file": f, "lines": lines} for f, lines in files_dict.items()]
+    return JSONResponse({"matches": matches, "total_matches": total})
+
+
 @router.get("/api/docker/stats")
 async def docker_global_stats():
     """Return global Docker stats: total and running containers."""
