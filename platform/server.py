@@ -676,7 +676,7 @@ def create_app() -> FastAPI:
             skip_setup = (
                 path.startswith("/static")
                 or path.startswith("/api/auth")
-                or path in ("/setup", "/health", "/favicon.ico", "/api/health")
+                or path in ("/setup", "/health", "/favicon.ico", "/manifest.json", "/api/health")
             )
             if not skip_setup:
                 try:
@@ -724,7 +724,7 @@ def create_app() -> FastAPI:
         skip = (
             path.startswith("/static")
             or path.startswith("/api/")
-            or path in ("/login", "/setup", "/onboarding", "/health", "/favicon.ico")
+            or path in ("/login", "/setup", "/onboarding", "/health", "/favicon.ico", "/manifest.json")
         )
         if not skip and not request.cookies.get("onboarding_done"):
             from starlette.responses import RedirectResponse
