@@ -104,7 +104,13 @@ async def auto_resume_missions() -> None:
     Watchdog loop: resumes paused/failed mission_runs and launches unstarted continuous missions.
     First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
-    await asyncio.sleep(5)  # Let platform fully initialize first
+    if os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
+        logger.warning("auto_resume: disabled via PLATFORM_AUTO_RESUME_ENABLED=0")
+        return
+
+    # Let platform fully initialize + allow operator intervention window
+    _startup_delay = int(os.environ.get("PLATFORM_AUTO_RESUME_DELAY", "60"))
+    await asyncio.sleep(_startup_delay)
 
     # Semaphore is set to 2 in helpers.py — no hot-patch needed
 
