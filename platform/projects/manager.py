@@ -7,6 +7,7 @@ Extends the ProjectRegistry (read-only discovery) with write operations:
 - Assign Agent Lead
 - Track project-level memory
 """
+
 from __future__ import annotations
 
 import json
@@ -23,11 +24,27 @@ logger = logging.getLogger(__name__)
 
 # Default Lean values available
 LEAN_VALUES = [
-    {"id": "quality", "label": "Qualité > Vitesse", "desc": "Review obligatoire, adversarial activé"},
+    {
+        "id": "quality",
+        "label": "Qualité > Vitesse",
+        "desc": "Review obligatoire, adversarial activé",
+    },
     {"id": "feedback", "label": "Feedback rapide", "desc": "Loops courtes, fail fast"},
-    {"id": "no-waste", "label": "Éliminer le waste", "desc": "KISS, pas de code inutile"},
-    {"id": "respect", "label": "Respect des personnes", "desc": "Collaboration, négociation > veto"},
-    {"id": "kaizen", "label": "Amélioration continue", "desc": "Retrospective auto, XP agent"},
+    {
+        "id": "no-waste",
+        "label": "Éliminer le waste",
+        "desc": "KISS, pas de code inutile",
+    },
+    {
+        "id": "respect",
+        "label": "Respect des personnes",
+        "desc": "Collaboration, négociation > veto",
+    },
+    {
+        "id": "kaizen",
+        "label": "Amélioration continue",
+        "desc": "Retrospective auto, XP agent",
+    },
     {"id": "flow", "label": "Flux continu", "desc": "WIP limits, pas de blocage"},
     {"id": "zero-skip", "label": "Zero Skip", "desc": "JAMAIS de skip, FIX > SKIP"},
     {"id": "tdd", "label": "TDD First", "desc": "Red-Green-Refactor obligatoire"},
@@ -37,6 +54,7 @@ LEAN_VALUES = [
 @dataclass
 class Project:
     """A project with vision, values, and agent configuration."""
+
     id: str
     name: str
     path: str
@@ -44,13 +62,13 @@ class Project:
     factory_type: str = "standalone"  # sf | mf | standalone
     domains: list[str] = field(default_factory=list)
     # New fields
-    vision: str = ""              # VISION.md content or custom text
+    vision: str = ""  # VISION.md content or custom text
     values: list[str] = field(default_factory=list)  # Lean value IDs
-    lead_agent_id: str = ""       # Default agent for this project
+    lead_agent_id: str = ""  # Default agent for this project
     agents: list[str] = field(default_factory=list)  # Assigned agent IDs
-    active_pattern_id: str = ""   # Currently active pattern
-    status: str = "active"        # active | paused | archived
-    git_url: str = ""             # GitHub/GitLab remote URL for PR creation
+    active_pattern_id: str = ""  # Currently active pattern
+    status: str = "active"  # active | paused | archived
+    git_url: str = ""  # GitHub/GitLab remote URL for PR creation
     created_at: str = ""
     updated_at: str = ""
 
@@ -64,8 +82,13 @@ class Project:
         if (p / ".git").exists():
             return True
         try:
-            r = subprocess.run(["git", "rev-parse", "--git-dir"],
-                               cwd=self.path, capture_output=True, text=True, timeout=5)
+            r = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=self.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
             return r.returncode == 0
         except Exception:
             return False
@@ -92,13 +115,18 @@ def _detect_git_url(path: str) -> str:
     try:
         r = subprocess.run(
             ["git", "remote", "get-url", "origin"],
-            cwd=path, capture_output=True, text=True, timeout=5,
+            cwd=path,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if r.returncode == 0:
             url = r.stdout.strip()
             # Normalize SSH → HTTPS for PR creation
             if url.startswith("git@github.com:"):
-                url = "https://github.com/" + url[len("git@github.com:"):].removesuffix(".git")
+                url = "https://github.com/" + url[
+                    len("git@github.com:") :
+                ].removesuffix(".git")
             return url
     except Exception:
         pass
@@ -141,6 +169,7 @@ class ProjectStore:
 
     def list_all(self) -> list[Project]:
         from ..cache import get as cache_get, put as cache_put
+
         cached = cache_get("projects:all")
         if cached is not None:
             return cached
@@ -148,43 +177,67 @@ class ProjectStore:
         rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
         conn.close()
         projects = [self._row_to_project(r) for r in rows]
-        import os
         if os.environ.get("AZURE_DEPLOY", ""):
             from .registry import _PERSONAL_IDS
+
             projects = [p for p in projects if p.id not in _PERSONAL_IDS]
         cache_put("projects:all", projects, ttl=60)
         return projects
 
     def get(self, project_id: str) -> Optional[Project]:
         conn = get_db()
-        row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM projects WHERE id = ?", (project_id,)
+        ).fetchone()
         conn.close()
         return self._row_to_project(row) if row else None
 
     def create(self, p: Project) -> Project:
         from ..cache import invalidate
+
         if not p.id:
             p.id = p.name.lower().replace(" ", "-").replace("_", "-")[:30]
         # Auto-create workspace directory if path not provided
         if not p.path:
             import os
-            _default_ws = "/app/workspace" if os.path.isdir("/app") else os.path.join(os.getcwd(), "workspace")
-            workspace = os.path.join(os.environ.get("WORKSPACE_ROOT", _default_ws), p.id)
+
+            _default_ws = (
+                "/app/workspace"
+                if os.path.isdir("/app")
+                else os.path.join(os.getcwd(), "workspace")
+            )
+            workspace = os.path.join(
+                os.environ.get("WORKSPACE_ROOT", _default_ws), p.id
+            )
             os.makedirs(workspace, exist_ok=True)
             p.path = workspace
         # Auto-detect git_url from workspace remote if not provided
         if not p.git_url and p.path:
             p.git_url = _detect_git_url(p.path)
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, (p.id, p.name, p.path, p.description, p.factory_type,
-              json.dumps(p.domains), p.vision, json.dumps(p.values),
-              p.lead_agent_id, json.dumps(p.agents), p.active_pattern_id, p.status,
-              p.git_url or ""))
+        """,
+            (
+                p.id,
+                p.name,
+                p.path,
+                p.description,
+                p.factory_type,
+                json.dumps(p.domains),
+                p.vision,
+                json.dumps(p.values),
+                p.lead_agent_id,
+                json.dumps(p.agents),
+                p.active_pattern_id,
+                p.status,
+                p.git_url or "",
+            ),
+        )
         conn.commit()
         conn.close()
         invalidate("projects:all")
@@ -193,42 +246,55 @@ class ProjectStore:
     def auto_provision(self, project_id: str, project_name: str):
         """Auto-create TMA, Security, and Tech Debt missions for a new project."""
         from ..missions.store import MissionDef, get_mission_store
+
         ms = get_mission_store()
         provisions = [
             MissionDef(
                 name=f"TMA — {project_name}",
                 description=f"Maintenance applicative permanente pour {project_name}. Triage incidents → diagnostic → fix TDD → validation.",
                 goal="Assurer la stabilité et la disponibilité en continu.",
-                status="active", type="program",
-                project_id=project_id, workflow_id="tma-maintenance",
-                wsjf_score=8, created_by="responsable_tma",
+                status="active",
+                type="program",
+                project_id=project_id,
+                workflow_id="tma-maintenance",
+                wsjf_score=8,
+                created_by="responsable_tma",
                 config={"auto_provisioned": True, "permanent": True},
             ),
             MissionDef(
                 name=f"Sécurité — {project_name}",
                 description=f"Audit sécurité périodique pour {project_name}. Scan OWASP, CVE watch, revue code sécurité.",
                 goal="Maintenir un score sécurité ≥ 80% et zéro CVE critique non corrigée.",
-                status="active", type="security",
-                project_id=project_id, workflow_id="review-cycle",
-                wsjf_score=12, created_by="devsecops",
+                status="active",
+                type="security",
+                project_id=project_id,
+                workflow_id="review-cycle",
+                wsjf_score=12,
+                created_by="devsecops",
                 config={"auto_provisioned": True, "schedule": "weekly"},
             ),
             MissionDef(
                 name=f"Dette Technique — {project_name}",
                 description=f"Suivi et réduction de la dette technique pour {project_name}. Audit → priorisation WSJF → sprint correctif.",
                 goal="Réduire la dette technique de 20% par PI. Complexité cyclomatique < 15, couverture > 80%.",
-                status="planning", type="debt",
-                project_id=project_id, workflow_id="tech-debt-reduction",
-                wsjf_score=5, created_by="enterprise_architect",
+                status="planning",
+                type="debt",
+                project_id=project_id,
+                workflow_id="tech-debt-reduction",
+                wsjf_score=5,
+                created_by="enterprise_architect",
                 config={"auto_provisioned": True, "schedule": "monthly"},
             ),
             MissionDef(
                 name=f"Self-Healing — {project_name}",
                 description=f"Auto-détection et auto-correction des incidents pour {project_name}. Monitoring → incident → diagnostic → fix → validation automatique.",
                 goal="MTTR < 15 min. Résolution automatique des incidents P3/P4. Escalade P1/P2 avec diagnostic pré-rempli.",
-                status="active", type="program",
-                project_id=project_id, workflow_id="tma-autoheal",
-                wsjf_score=10, created_by="sre",
+                status="active",
+                type="program",
+                project_id=project_id,
+                workflow_id="tma-autoheal",
+                wsjf_score=10,
+                created_by="sre",
                 config={"auto_provisioned": True, "permanent": True, "auto_heal": True},
             ),
         ]
@@ -238,7 +304,9 @@ class ProjectStore:
                 created.append(ms.create_mission(m))
                 logger.warning("Auto-provisioned %s for project %s", m.type, project_id)
             except Exception as e:
-                logger.warning("Failed to auto-provision %s for %s: %s", m.type, project_id, e)
+                logger.warning(
+                    "Failed to auto-provision %s for %s: %s", m.type, project_id, e
+                )
         return created
 
     @staticmethod
@@ -260,7 +328,9 @@ class ProjectStore:
             steps.append(_CICD_RUST)
         if any(d in dl for d in ("python", "django", "fastapi", "flask")):
             steps.append(_CICD_PYTHON)
-        if any(d in dl for d in ("node", "typescript", "svelte", "react", "vue", "next")):
+        if any(
+            d in dl for d in ("node", "typescript", "svelte", "react", "vue", "next")
+        ):
             steps.append(_CICD_NODE)
         if any(d in dl for d in ("swift", "ios", "swiftui")):
             steps.append(_CICD_SWIFT)
@@ -276,24 +346,39 @@ class ProjectStore:
 
     def update(self, p: Project) -> Project:
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             UPDATE projects SET
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
                 active_pattern_id=?, status=?, updated_at=CURRENT_TIMESTAMP
             WHERE id=?
-        """, (p.name, p.path, p.description, p.factory_type,
-              json.dumps(p.domains), p.vision, json.dumps(p.values),
-              p.lead_agent_id, json.dumps(p.agents), p.active_pattern_id,
-              p.status, p.id))
+        """,
+            (
+                p.name,
+                p.path,
+                p.description,
+                p.factory_type,
+                json.dumps(p.domains),
+                p.vision,
+                json.dumps(p.values),
+                p.lead_agent_id,
+                json.dumps(p.agents),
+                p.active_pattern_id,
+                p.status,
+                p.id,
+            ),
+        )
         conn.commit()
         conn.close()
         return p
 
     def update_vision(self, project_id: str, vision: str):
         conn = get_db()
-        conn.execute("UPDATE projects SET vision=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                      (vision, project_id))
+        conn.execute(
+            "UPDATE projects SET vision=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (vision, project_id),
+        )
         conn.commit()
         conn.close()
 
@@ -307,6 +392,7 @@ class ProjectStore:
         """Import projects from ProjectRegistry (SF/MF yaml discovery) into DB."""
         from .registry import get_project_registry
         from ..agents.store import get_agent_store, AgentDef
+
         registry = get_project_registry()
         agent_store = get_agent_store()
 
@@ -318,26 +404,51 @@ class ProjectStore:
             pm = _PROJECT_PM.get(info.id, {})
             pm_name = pm.get("name", f"PM {info.name}")
             pm_avatar = pm.get("avatar", "user")
-            pm_tagline = pm.get("tagline", info.description[:60] if info.description else f"Product Manager — {info.name}")
+            pm_tagline = pm.get(
+                "tagline",
+                info.description[:60]
+                if info.description
+                else f"Product Manager — {info.name}",
+            )
             pm_tools = [
-                "code_read", "code_search", "list_files", "deep_search",
-                "memory_search", "memory_store", "get_project_context",
-                "git_status", "git_log", "git_diff",
-                "lrm_locate", "lrm_summarize", "lrm_context", "lrm_conventions",
-                "github_issues", "github_prs", "github_code_search",
-                "jira_search", "confluence_read",
+                "code_read",
+                "code_search",
+                "list_files",
+                "deep_search",
+                "memory_search",
+                "memory_store",
+                "get_project_context",
+                "git_status",
+                "git_log",
+                "git_diff",
+                "lrm_locate",
+                "lrm_summarize",
+                "lrm_context",
+                "lrm_conventions",
+                "github_issues",
+                "github_prs",
+                "github_code_search",
+                "jira_search",
+                "confluence_read",
                 "screenshot",
-                "platform_agents", "platform_missions", "platform_memory_search",
-                "platform_metrics", "platform_sessions", "platform_workflows",
+                "platform_agents",
+                "platform_missions",
+                "platform_memory_search",
+                "platform_metrics",
+                "platform_sessions",
+                "platform_workflows",
             ]
             agent = AgentDef(
                 id=agent_id,
                 name=pm_name,
                 role="product-manager",
                 description=f"Product Manager pour {info.name}. Connaît le code, la vision, le backlog, les docs et les tickets.",
-                provider="azure-openai", model="gpt-5-mini",
-                temperature=0.5, max_tokens=8192,
-                icon="user", color=_project_color(info.id),
+                provider="azure-openai",
+                model="gpt-5-mini",
+                temperature=0.5,
+                max_tokens=8192,
+                icon="user",
+                color=_project_color(info.id),
                 avatar=pm_avatar,
                 tagline=pm_tagline,
                 is_builtin=True,
@@ -362,16 +473,23 @@ class ProjectStore:
                 # Only set lead_agent_id if truly empty (don't overwrite user customizations)
                 if not existing.lead_agent_id:
                     from ..db.migrations import get_db
+
                     conn = get_db()
-                    conn.execute("UPDATE projects SET lead_agent_id = ? WHERE id = ?", (agent_id, existing.id))
+                    conn.execute(
+                        "UPDATE projects SET lead_agent_id = ? WHERE id = ?",
+                        (agent_id, existing.id),
+                    )
                     conn.commit()
                     conn.close()
                 continue  # Don't overwrite user customizations for project itself
 
             # New project — create it
             p = Project(
-                id=info.id, name=info.name, path=info.path,
-                description=info.description, factory_type=info.factory_type,
+                id=info.id,
+                name=info.name,
+                path=info.path,
+                description=info.description,
+                factory_type=info.factory_type,
                 domains=info.domains,
             )
             if p.exists:
@@ -389,7 +507,9 @@ class ProjectStore:
                 p.values = ["quality", "feedback"]
 
             self.create(p)
-            logger.info("Seeded project %s (%s) with agent %s", p.id, p.factory_type, agent_id)
+            logger.info(
+                "Seeded project %s (%s) with agent %s", p.id, p.factory_type, agent_id
+            )
 
         # Auto-create sessions for projects with linked workflows
         self._seed_workflow_sessions()
@@ -402,6 +522,7 @@ class ProjectStore:
         if self.get("software-factory"):
             return
         from ..config import PLATFORM_ROOT
+
         plat_path = str(PLATFORM_ROOT)
         p = Project(
             id="software-factory",
@@ -423,14 +544,35 @@ class ProjectStore:
             values=["quality", "feedback", "no-waste", "kaizen", "flow", "tdd"],
             lead_agent_id="dsi",
             agents=[
-                "dsi", "strat-cpo", "strat-cto", "strat-portfolio", "architecte",
-                "plat-lead-dev", "plat-dev-backend", "plat-dev-frontend",
-                "plat-dev-agents", "plat-dev-patterns", "plat-dev-infra", "plat-product",
-                "plat-tma-lead", "plat-tma-dev-back", "plat-tma-dev-front",
-                "plat-tma-dev-agents", "plat-tma-qa",
-                "qa_lead", "securite", "devops", "sre", "scrum_master", "ux_designer",
-                "performance_engineer", "pipeline_engineer", "devsecops", "test_automation",
-                "tech_writer", "lean_portfolio_manager",
+                "dsi",
+                "strat-cpo",
+                "strat-cto",
+                "strat-portfolio",
+                "architecte",
+                "plat-lead-dev",
+                "plat-dev-backend",
+                "plat-dev-frontend",
+                "plat-dev-agents",
+                "plat-dev-patterns",
+                "plat-dev-infra",
+                "plat-product",
+                "plat-tma-lead",
+                "plat-tma-dev-back",
+                "plat-tma-dev-front",
+                "plat-tma-dev-agents",
+                "plat-tma-qa",
+                "qa_lead",
+                "securite",
+                "devops",
+                "sre",
+                "scrum_master",
+                "ux_designer",
+                "performance_engineer",
+                "pipeline_engineer",
+                "devsecops",
+                "test_automation",
+                "tech_writer",
+                "lean_portfolio_manager",
             ],
             status="active",
         )
@@ -441,6 +583,7 @@ class ProjectStore:
         """Load vision from linked workflow config."""
         try:
             from ..workflows.store import get_workflow_store
+
             wf_store = get_workflow_store()
             for wf in wf_store.list_all():
                 cfg = wf.config or {}
@@ -456,6 +599,7 @@ class ProjectStore:
         try:
             from ..workflows.store import get_workflow_store
             from ..sessions.store import get_session_store, SessionDef
+
             wf_store = get_workflow_store()
             sess_store = get_session_store()
             existing = sess_store.list_all()
@@ -487,8 +631,12 @@ class ProjectStore:
                     config={"workflow_id": wf.id, "lead_agent": lead},
                 )
                 session = sess_store.create(session)
-                logger.info("Auto-created session %s for project %s (workflow %s)",
-                           session.id, project_ref, wf.id)
+                logger.info(
+                    "Auto-created session %s for project %s (workflow %s)",
+                    session.id,
+                    project_ref,
+                    wf.id,
+                )
         except Exception as e:
             logger.warning("Failed to seed workflow sessions: %s", e)
 
@@ -500,7 +648,11 @@ class ProjectStore:
             path=row["path"],
             description=row["description"] or "",
             factory_type=row["factory_type"] or "standalone",
-            domains=json.loads(row["domains_json"] or "[]"),
+            domains=(
+                _d
+                if isinstance(_d := json.loads(row["domains_json"] or "[]"), list)
+                else []
+            ),
             vision=row["vision"] or "",
             values=json.loads(row["values_json"] or "[]"),
             lead_agent_id=row["lead_agent_id"] or "",
@@ -514,40 +666,131 @@ class ProjectStore:
 
 
 _PROJECT_PM: dict[str, dict] = {
-    "lpd": {"name": "Nathalie Renaud", "avatar": "user", "tagline": "Product Manager — LPD Data Platform"},
-    "logs-facteur": {"name": "Thomas Girard", "avatar": "user", "tagline": "Product Manager — Logs Facteur Support N1"},
-    "sharelook": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook Platform"},
-    "software-factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory"},
-    "factory": {"name": "Émilie Laurent", "avatar": "user", "tagline": "Product Manager — Software Factory (Self)"},
-    "solaris": {"name": "Julie Martin", "avatar": "user", "tagline": "Product Manager — Solaris Design System"},
-    "veligo": {"name": "Antoine Lefèvre", "avatar": "user", "tagline": "Product Manager — Veligo Platform"},
-    "fervenza": {"name": "Lucas Morel", "avatar": "user", "tagline": "Product Manager — Fervenza IoT"},
-    "finary": {"name": "Sophie Blanc", "avatar": "user", "tagline": "Product Manager — Finary"},
-    "popinz": {"name": "Hugo Petit", "avatar": "user", "tagline": "Product Manager — Popinz SaaS"},
-    "psy": {"name": "Camille Roux", "avatar": "user", "tagline": "Product Manager — PSY Platform"},
-    "yolonow": {"name": "Léa Fournier", "avatar": "user", "tagline": "Product Manager — YoloNow"},
-    "sharelook-2": {"name": "Claire Dubois", "avatar": "user", "tagline": "Product Manager — Sharelook 2.0"},
+    "lpd": {
+        "name": "Nathalie Renaud",
+        "avatar": "user",
+        "tagline": "Product Manager — LPD Data Platform",
+    },
+    "logs-facteur": {
+        "name": "Thomas Girard",
+        "avatar": "user",
+        "tagline": "Product Manager — Logs Facteur Support N1",
+    },
+    "sharelook": {
+        "name": "Claire Dubois",
+        "avatar": "user",
+        "tagline": "Product Manager — Sharelook Platform",
+    },
+    "software-factory": {
+        "name": "Émilie Laurent",
+        "avatar": "user",
+        "tagline": "Product Manager — Software Factory",
+    },
+    "factory": {
+        "name": "Émilie Laurent",
+        "avatar": "user",
+        "tagline": "Product Manager — Software Factory (Self)",
+    },
+    "solaris": {
+        "name": "Julie Martin",
+        "avatar": "user",
+        "tagline": "Product Manager — Solaris Design System",
+    },
+    "veligo": {
+        "name": "Antoine Lefèvre",
+        "avatar": "user",
+        "tagline": "Product Manager — Veligo Platform",
+    },
+    "fervenza": {
+        "name": "Lucas Morel",
+        "avatar": "user",
+        "tagline": "Product Manager — Fervenza IoT",
+    },
+    "finary": {
+        "name": "Sophie Blanc",
+        "avatar": "user",
+        "tagline": "Product Manager — Finary",
+    },
+    "popinz": {
+        "name": "Hugo Petit",
+        "avatar": "user",
+        "tagline": "Product Manager — Popinz SaaS",
+    },
+    "psy": {
+        "name": "Camille Roux",
+        "avatar": "user",
+        "tagline": "Product Manager — PSY Platform",
+    },
+    "yolonow": {
+        "name": "Léa Fournier",
+        "avatar": "user",
+        "tagline": "Product Manager — YoloNow",
+    },
+    "sharelook-2": {
+        "name": "Claire Dubois",
+        "avatar": "user",
+        "tagline": "Product Manager — Sharelook 2.0",
+    },
     # Demo projects
-    "neobank-api": {"name": "Alexandre Morin", "avatar": "user", "tagline": "Product Manager — NeoBank API Platform"},
-    "mediboard": {"name": "Isabelle Faure", "avatar": "user", "tagline": "Product Manager — MediBoard Hospital"},
-    "greenfleet": {"name": "Mathieu Garnier", "avatar": "user", "tagline": "Product Manager — GreenFleet EV"},
-    "eduspark": {"name": "Sarah Lemaire", "avatar": "user", "tagline": "Product Manager — EduSpark E-Learning"},
-    "payflow": {"name": "Vincent Carpentier", "avatar": "user", "tagline": "Product Manager — PayFlow Payments"},
-    "dataforge": {"name": "Nadia Bensalem", "avatar": "user", "tagline": "Product Manager — DataForge Pipeline"},
-    "urbanpulse": {"name": "Raphaël Nguyen", "avatar": "user", "tagline": "Product Manager — UrbanPulse Mobility"},
+    "neobank-api": {
+        "name": "Alexandre Morin",
+        "avatar": "user",
+        "tagline": "Product Manager — NeoBank API Platform",
+    },
+    "mediboard": {
+        "name": "Isabelle Faure",
+        "avatar": "user",
+        "tagline": "Product Manager — MediBoard Hospital",
+    },
+    "greenfleet": {
+        "name": "Mathieu Garnier",
+        "avatar": "user",
+        "tagline": "Product Manager — GreenFleet EV",
+    },
+    "eduspark": {
+        "name": "Sarah Lemaire",
+        "avatar": "user",
+        "tagline": "Product Manager — EduSpark E-Learning",
+    },
+    "payflow": {
+        "name": "Vincent Carpentier",
+        "avatar": "user",
+        "tagline": "Product Manager — PayFlow Payments",
+    },
+    "dataforge": {
+        "name": "Nadia Bensalem",
+        "avatar": "user",
+        "tagline": "Product Manager — DataForge Pipeline",
+    },
+    "urbanpulse": {
+        "name": "Raphaël Nguyen",
+        "avatar": "user",
+        "tagline": "Product Manager — UrbanPulse Mobility",
+    },
 }
 
 
 def _project_color(project_id: str) -> str:
     """Assign a distinct color per project."""
     colors = {
-        "factory": "#bc8cff", "fervenza": "#f0883e", "veligo": "#58a6ff",
-        "ppz": "#3fb950", "psy": "#a371f7", "yolonow": "#f85149",
-        "solaris": "#d29922", "sharelook": "#79c0ff", "finary": "#56d364",
-        "lpd": "#db6d28", "logs-facteur": "#8b949e",
+        "factory": "#bc8cff",
+        "fervenza": "#f0883e",
+        "veligo": "#58a6ff",
+        "ppz": "#3fb950",
+        "psy": "#a371f7",
+        "yolonow": "#f85149",
+        "solaris": "#d29922",
+        "sharelook": "#79c0ff",
+        "finary": "#56d364",
+        "lpd": "#db6d28",
+        "logs-facteur": "#8b949e",
         "software-factory": "#c084fc",
-        "neobank-api": "#f778ba", "mediboard": "#2ea043", "greenfleet": "#1f883d",
-        "eduspark": "#bf8700", "payflow": "#da3633", "dataforge": "#388bfd",
+        "neobank-api": "#f778ba",
+        "mediboard": "#2ea043",
+        "greenfleet": "#1f883d",
+        "eduspark": "#bf8700",
+        "payflow": "#da3633",
+        "dataforge": "#388bfd",
         "urbanpulse": "#a5d6ff",
     }
     return colors.get(project_id, "#8b949e")
