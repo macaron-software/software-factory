@@ -9,6 +9,7 @@ from __future__ import annotations
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
+from . import rtk_wrap
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
@@ -127,7 +128,7 @@ class GitStatusTool(BaseTool):
         cwd = params.get("cwd", ".")
         try:
             r = subprocess.run(
-                ["git", "--no-pager", "status", "--short"],
+                rtk_wrap(["git", "--no-pager", "status", "--short"]),
                 capture_output=True,
                 text=True,
                 cwd=cwd,
@@ -148,7 +149,7 @@ class GitDiffTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         cwd = params.get("cwd", ".")
         path = params.get("path", "")
-        cmd = ["git", "--no-pager", "diff"]
+        cmd = rtk_wrap(["git", "--no-pager", "diff"])
         if path:
             cmd.extend(["--", path])
         try:
@@ -168,14 +169,16 @@ class GitLogTool(BaseTool):
         limit = params.get("limit", 10)
         try:
             r = subprocess.run(
-                [
-                    "git",
-                    "--no-pager",
-                    "log",
-                    f"--max-count={limit}",
-                    "--oneline",
-                    "--decorate",
-                ],
+                rtk_wrap(
+                    [
+                        "git",
+                        "--no-pager",
+                        "log",
+                        f"--max-count={limit}",
+                        "--oneline",
+                        "--decorate",
+                    ]
+                ),
                 capture_output=True,
                 text=True,
                 cwd=cwd,
