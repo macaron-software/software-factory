@@ -8,6 +8,9 @@
           hx-get="/api/dashboard/quality-badge?project_id={{ project.id }}"
           hx-trigger="load"
           hx-swap="innerHTML"></span>
+    <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost" title="Workspace">
+        <svg class="icon icon-sm"><use href="#icon-terminal"/></svg> Workspace
+    </a>
     <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost" title="Kanban Board">
         <svg class="icon icon-sm"><use href="#icon-columns"/></svg> Board
     </a>

@@ -1,4 +1,5 @@
 """Web routes — Project management routes."""
+
 from __future__ import annotations
 
 import asyncio
@@ -8,20 +9,34 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse, FileResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    StreamingResponse,
+)
 
-from .helpers import _templates, _avatar_url, _agent_map_for_template, _active_mission_tasks, serve_workspace_file, _parse_body, _is_json_request
-from ..schemas import ProjectOut, ProjectCreate, OkResponse
+from .helpers import _templates, _parse_body, _is_json_request
+from ..schemas import ProjectOut, OkResponse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 _DOMAIN_MARKERS = {
-    "Cargo.toml": "rust", "pyproject.toml": "python", "requirements.txt": "python",
-    "package.json": "node", "tsconfig.json": "typescript", "angular.json": "angular",
-    "svelte.config.js": "svelte", "next.config.js": "next", "Gemfile": "ruby",
-    "go.mod": "go", "build.gradle": "kotlin", "Package.swift": "swift",
+    "Cargo.toml": "rust",
+    "pyproject.toml": "python",
+    "requirements.txt": "python",
+    "package.json": "node",
+    "tsconfig.json": "typescript",
+    "angular.json": "angular",
+    "svelte.config.js": "svelte",
+    "next.config.js": "next",
+    "Gemfile": "ruby",
+    "go.mod": "go",
+    "build.gradle": "kotlin",
+    "Package.swift": "swift",
 }
+
 
 def _detect_domains(project_path: str) -> list[str]:
     """Auto-detect tech stack from project files."""
@@ -34,6 +49,7 @@ def _detect_domains(project_path: str) -> list[str]:
 def _auto_git_init(project):
     """Initialize git repo with .gitignore + README if not already a repo."""
     import subprocess
+
     p = Path(project.path)
     if not p.exists():
         p.mkdir(parents=True, exist_ok=True)
@@ -44,13 +60,22 @@ def _auto_git_init(project):
         # .gitignore
         gitignore = p / ".gitignore"
         if not gitignore.exists():
-            gitignore.write_text("node_modules/\n__pycache__/\n*.pyc\n.env\n.DS_Store\ntarget/\ndist/\nbuild/\n")
+            gitignore.write_text(
+                "node_modules/\n__pycache__/\n*.pyc\n.env\n.DS_Store\ntarget/\ndist/\nbuild/\n"
+            )
         # README
         readme = p / "README.md"
         if not readme.exists():
-            readme.write_text(f"# {project.name}\n\n{project.description or 'A new project.'}\n")
+            readme.write_text(
+                f"# {project.name}\n\n{project.description or 'A new project.'}\n"
+            )
         subprocess.run(["git", "add", "."], cwd=str(p), capture_output=True, timeout=10)
-        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=str(p), capture_output=True, timeout=10)
+        subprocess.run(
+            ["git", "commit", "-m", "Initial commit"],
+            cwd=str(p),
+            capture_output=True,
+            timeout=10,
+        )
         logger.info("git init done for %s at %s", project.id, p)
     except Exception as e:
         logger.warning("git init failed for %s: %s", project.id, e)
@@ -60,37 +85,52 @@ def _auto_git_init(project):
 async def projects_page(request: Request):
     """Projects list (legacy)."""
     from ...projects.manager import get_project_store
+
     store = get_project_store()
     projects = store.list_all()
-    return _templates(request).TemplateResponse("projects.html", {
-        "request": request,
-        "page_title": "Projects",
-        "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
-    })
+    return _templates(request).TemplateResponse(
+        "projects.html",
+        {
+            "request": request,
+            "page_title": "Projects",
+            "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
+        },
+    )
 
 
 @router.get("/api/projects/{project_id}/git-status")
 async def project_git_status(project_id: str):
     """Lazy-load git status for a single project (called via HTMX)."""
-    import asyncio, functools
+    import asyncio
+    import functools
     from ...projects.manager import get_project_store
     from ...projects import git_service
+
     project = get_project_store().get(project_id)
     if not project or not project.has_git:
         return HTMLResponse("")
     loop = asyncio.get_event_loop()
-    git = await loop.run_in_executor(None, functools.partial(git_service.get_status, project.path))
+    git = await loop.run_in_executor(
+        None, functools.partial(git_service.get_status, project.path)
+    )
     if not git:
         return HTMLResponse('<span class="text-muted">no git</span>')
     branch = git.get("branch", "?")
     clean = git.get("clean", True)
-    parts = [f'<div class="git-branch">'
-             f'<svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> {branch}</div>']
+    parts = [
+        f'<div class="git-branch">'
+        f'<svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> {branch}</div>'
+    ]
     if not clean:
         counts = []
-        if git.get("staged"): counts.append(f'<span class="git-count staged">+{git["staged"]}</span>')
-        if git.get("modified"): counts.append(f'<span class="git-count modified">~{git["modified"]}</span>')
-        if git.get("untracked"): counts.append(f'<span class="git-count untracked">?{git["untracked"]}</span>')
+        if git.get("staged"):
+            counts.append(f'<span class="git-count staged">+{git["staged"]}</span>')
+        if git.get("modified"):
+            counts.append(f'<span class="git-count modified">~{git["modified"]}</span>')
+        if git.get("untracked"):
+            counts.append(
+                f'<span class="git-count untracked">?{git["untracked"]}</span>'
+            )
         if counts:
             parts.append(f'<div class="git-dirty">{"".join(counts)}</div>')
     else:
@@ -99,10 +139,12 @@ async def project_git_status(project_id: str):
     if msg:
         short = msg[:50] + ("..." if len(msg) > 50 else "")
         date = git.get("commit_date", "")
-        parts.append(f'<div class="project-card-commit">'
-                     f'<svg class="icon icon-xs"><use href="#icon-git-commit"/></svg>'
-                     f'<span class="commit-msg">{short}</span>'
-                     f'<span class="commit-date">{date}</span></div>')
+        parts.append(
+            f'<div class="project-card-commit">'
+            f'<svg class="icon icon-xs"><use href="#icon-git-commit"/></svg>'
+            f'<span class="commit-msg">{short}</span>'
+            f'<span class="commit-date">{date}</span></div>'
+        )
     return HTMLResponse("\n".join(parts))
 
 
@@ -131,23 +173,40 @@ async def project_overview(request: Request, project_id: str):
         features_enriched = []
         for f in features:
             stories = backlog.list_stories(f.id)
-            features_enriched.append({
-                "id": f.id, "name": f.name, "description": f.description,
-                "acceptance_criteria": f.acceptance_criteria,
-                "story_points": f.story_points, "status": f.status,
-                "stories": [{"id": s.id, "title": s.title,
-                             "story_points": s.story_points, "status": s.status,
-                             "acceptance_criteria": s.acceptance_criteria}
-                            for s in stories],
-            })
+            features_enriched.append(
+                {
+                    "id": f.id,
+                    "name": f.name,
+                    "description": f.description,
+                    "acceptance_criteria": f.acceptance_criteria,
+                    "story_points": f.story_points,
+                    "status": f.status,
+                    "stories": [
+                        {
+                            "id": s.id,
+                            "title": s.title,
+                            "story_points": s.story_points,
+                            "status": s.status,
+                            "acceptance_criteria": s.acceptance_criteria,
+                        }
+                        for s in stories
+                    ],
+                }
+            )
         team_data = (ep.config or {}).get("team", [])
         stack = (ep.config or {}).get("stack", [])
-        epics_enriched.append({
-            "id": ep.id, "name": ep.name, "description": ep.description,
-            "goal": ep.goal, "status": ep.status,
-            "features": features_enriched,
-            "team": team_data, "stack": stack,
-        })
+        epics_enriched.append(
+            {
+                "id": ep.id,
+                "name": ep.name,
+                "description": ep.description,
+                "goal": ep.goal,
+                "status": ep.status,
+                "features": features_enriched,
+                "team": team_data,
+                "stack": stack,
+            }
+        )
 
     # Resolve team agents with photos
     team_agents = []
@@ -159,19 +218,26 @@ async def project_overview(request: Request, project_id: str):
             avatar_url = ""
             if agent and (avatar_dir / f"{agent.id}.jpg").exists():
                 avatar_url = f"/static/avatars/{agent.id}.jpg"
-            team_agents.append({
-                "role": role, "label": t.get("label", role),
-                "name": agent.name if agent else t.get("label", role),
-                "avatar_url": avatar_url,
-                "persona": (agent.persona or "") if agent else "",
-            })
+            team_agents.append(
+                {
+                    "role": role,
+                    "label": t.get("label", role),
+                    "name": agent.name if agent else t.get("label", role),
+                    "avatar_url": avatar_url,
+                    "persona": (agent.persona or "") if agent else "",
+                }
+            )
 
-    return _templates(request).TemplateResponse("project_overview.html", {
-        "request": request, "page_title": f"Projet: {project.name}",
-        "project": project,
-        "epics": epics_enriched,
-        "team_agents": team_agents,
-    })
+    return _templates(request).TemplateResponse(
+        "project_overview.html",
+        {
+            "request": request,
+            "page_title": f"Projet: {project.name}",
+            "project": project,
+            "epics": epics_enriched,
+            "team_agents": team_agents,
+        },
+    )
 
 
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
@@ -181,6 +247,7 @@ async def project_detail(request: Request, project_id: str):
     from ...projects import git_service, factory_tasks
     from ...sessions.store import get_session_store
     from ...agents.store import get_agent_store
+
     proj_store = get_project_store()
     project = proj_store.get(project_id)
     if not project:
@@ -217,6 +284,7 @@ async def project_detail(request: Request, project_id: str):
     lead_avatar_url = ""
     if lead:
         from pathlib import Path as _Path
+
         _av_dir = _Path(__file__).parent.parent / "static" / "avatars"
         for ext in ("jpg", "svg"):
             if (_av_dir / f"{lead.id}.{ext}").exists():
@@ -226,6 +294,7 @@ async def project_detail(request: Request, project_id: str):
     workflows = []
     try:
         from ...workflows.store import get_workflow_store
+
         wf_store = get_workflow_store()
         for wf in wf_store.list_all():
             cfg = wf.config or {}
@@ -244,6 +313,7 @@ async def project_detail(request: Request, project_id: str):
     if project.path:
         try:
             from ...memory.project_files import get_project_memory
+
             pmem = get_project_memory(project_id, project.path)
             memory_files = pmem.files
         except Exception:
@@ -252,39 +322,43 @@ async def project_detail(request: Request, project_id: str):
     project_missions = []
     try:
         from ...missions.store import get_mission_store
+
         m_store = get_mission_store()
         project_missions = m_store.list_missions(project_id=project_id)
     except Exception:
         pass
-    return _templates(request).TemplateResponse("project_detail.html", {
-        "request": request,
-        "page_title": project.name,
-        "project": project,
-        "git": git,
-        "commits": commits,
-        "changes": changes,
-        "branches": branches,
-        "tasks": tasks,
-        "recent_tasks": recent_tasks,
-        "sessions": sessions,
-        "active_session": active_session,
-        "agents": agents,
-        "lead_agent": lead,
-        "lead_avatar_url": lead_avatar_url,
-        "messages": messages,
-        "memory_files": memory_files,
-        "workflows": workflows,
-        "missions": project_missions,
-    })
+    return _templates(request).TemplateResponse(
+        "project_detail.html",
+        {
+            "request": request,
+            "page_title": project.name,
+            "project": project,
+            "git": git,
+            "commits": commits,
+            "changes": changes,
+            "branches": branches,
+            "tasks": tasks,
+            "recent_tasks": recent_tasks,
+            "sessions": sessions,
+            "active_session": active_session,
+            "agents": agents,
+            "lead_agent": lead,
+            "lead_avatar_url": lead_avatar_url,
+            "messages": messages,
+            "memory_files": memory_files,
+            "workflows": workflows,
+            "missions": project_missions,
+        },
+    )
 
 
 # ── Project Board (Kanban) ───────────────────────────────────────
+
 
 @router.get("/projects/{project_id}/board", response_class=HTMLResponse)
 async def project_board_page(request: Request, project_id: str):
     """Kanban board view for a project."""
     from ...projects.manager import get_project_store
-    from ...projects import factory_tasks
     from ...agents.store import get_agent_store
     from ...missions.store import get_mission_store, get_mission_run_store
     from ...missions.product import get_product_backlog
@@ -299,11 +373,14 @@ async def project_board_page(request: Request, project_id: str):
     agents_by_id = {a.id: a for a in all_agents}
 
     avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
+
     def _avatar(agent_id):
         jpg = avatar_dir / f"{agent_id}.jpg"
         svg = avatar_dir / f"{agent_id}.svg"
-        if jpg.exists(): return f"/static/avatars/{agent_id}.jpg"
-        if svg.exists(): return f"/static/avatars/{agent_id}.svg"
+        if jpg.exists():
+            return f"/static/avatars/{agent_id}.jpg"
+        if svg.exists():
+            return f"/static/avatars/{agent_id}.svg"
         return ""
 
     # Build task list from missions + mission_run phases (live)
@@ -319,34 +396,57 @@ async def project_board_page(request: Request, project_id: str):
                 runs_by_mission[r.parent_mission_id] = r
             runs_by_mission[r.id] = r
 
-        status_col = {"planning": "backlog", "active": "active", "review": "review",
-                       "completed": "done", "deployed": "done"}
-        status_labels = {"planning": "Planifié", "active": "En cours", "review": "En revue",
-                          "completed": "Terminé", "deployed": "Déployé"}
+        status_col = {
+            "planning": "backlog",
+            "active": "active",
+            "review": "review",
+            "completed": "done",
+            "deployed": "done",
+        }
+        status_labels = {
+            "planning": "Planifié",
+            "active": "En cours",
+            "review": "En revue",
+            "completed": "Terminé",
+            "deployed": "Déployé",
+        }
         for m in missions:
             col = status_col.get(m.status, "backlog")
             agent = agents_by_id.get(m.lead_agent_id) if m.lead_agent_id else None
-            tasks.append({
-                "title": m.title,
-                "col": col,
-                "status_label": status_labels.get(m.status, m.status),
-                "avatar_url": _avatar(agent.id) if agent else "",
-                "agent_name": agent.name if agent else "",
-            })
+            tasks.append(
+                {
+                    "title": m.title,
+                    "col": col,
+                    "status_label": status_labels.get(m.status, m.status),
+                    "avatar_url": _avatar(agent.id) if agent else "",
+                    "agent_name": agent.name if agent else "",
+                }
+            )
             # Also add phases from mission_run as sub-tasks
             run = runs_by_mission.get(m.id)
             if run and run.phases:
-                phase_col_map = {"done": "done", "done_with_issues": "done",
-                                  "running": "active", "pending": "backlog", "failed": "review"}
+                phase_col_map = {
+                    "done": "done",
+                    "done_with_issues": "done",
+                    "running": "active",
+                    "pending": "backlog",
+                    "failed": "review",
+                }
                 for ph in run.phases:
-                    ph_status = ph.status.value if hasattr(ph.status, "value") else str(ph.status)
-                    tasks.append({
-                        "title": ph.phase_name or ph.phase_id,
-                        "col": phase_col_map.get(ph_status, "backlog"),
-                        "status_label": ph_status.replace("_", " ").title(),
-                        "avatar_url": "",
-                        "agent_name": "",
-                    })
+                    ph_status = (
+                        ph.status.value
+                        if hasattr(ph.status, "value")
+                        else str(ph.status)
+                    )
+                    tasks.append(
+                        {
+                            "title": ph.phase_name or ph.phase_id,
+                            "col": phase_col_map.get(ph_status, "backlog"),
+                            "status_label": ph_status.replace("_", " ").title(),
+                            "avatar_url": "",
+                            "agent_name": "",
+                        }
+                    )
     except Exception:
         pass
 
@@ -357,10 +457,14 @@ async def project_board_page(request: Request, project_id: str):
     positions = [(60, 100), (160, 50), (160, 150), (280, 100), (380, 50), (380, 150)]
     for i, ag in enumerate(team_agents[:6]):
         x, y = positions[i] if i < len(positions) else (60 + i * 80, 100)
-        flow_nodes.append({"x": x, "y": y, "label": ag.name.split()[-1] if ag.name else "Agent"})
+        flow_nodes.append(
+            {"x": x, "y": y, "label": ag.name.split()[-1] if ag.name else "Agent"}
+        )
     for i in range(len(flow_nodes) - 1):
         n1, n2 = flow_nodes[i], flow_nodes[i + 1]
-        flow_edges.append({"x1": n1["x"] + 25, "y1": n1["y"], "x2": n2["x"] - 25, "y2": n2["y"]})
+        flow_edges.append(
+            {"x1": n1["x"] + 25, "y1": n1["y"], "x2": n2["x"] - 25, "y2": n2["y"]}
+        )
 
     # Backlog items (live from DB)
     backlog = get_product_backlog()
@@ -378,7 +482,11 @@ async def project_board_page(request: Request, project_id: str):
     except Exception:
         pass
     backlog_items = [
-        {"title": "Stories non estimées", "count": unestimated, "color": "var(--yellow)"},
+        {
+            "title": "Stories non estimées",
+            "count": unestimated,
+            "color": "var(--yellow)",
+        },
         {"title": "Features", "count": feature_count, "color": "var(--blue)"},
         {"title": "User stories", "count": story_count, "color": "var(--green)"},
     ]
@@ -388,9 +496,13 @@ async def project_board_page(request: Request, project_id: str):
     try:
         if project.path and project.has_git:
             import subprocess
+
             result = subprocess.run(
                 ["git", "--no-pager", "log", "--oneline", "-5"],
-                cwd=project.path, capture_output=True, text=True, timeout=5,
+                cwd=project.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             for line in (result.stdout or "").strip().split("\n"):
                 if line.strip():
@@ -407,25 +519,36 @@ async def project_board_page(request: Request, project_id: str):
             if m.type == "program" and "tma" in (m.workflow_id or ""):
                 incidents = cfg.get("recurring_incidents", {})
                 ops_missions["tma"] = {
-                    "id": m.id, "name": m.name, "status": m.status,
+                    "id": m.id,
+                    "name": m.name,
+                    "status": m.status,
                     "incident_count": sum(incidents.values()),
                     "recurring": sum(1 for v in incidents.values() if v >= 3),
                 }
             elif m.type == "security":
                 ops_missions["security"] = {
-                    "id": m.id, "name": m.name, "status": m.status,
+                    "id": m.id,
+                    "name": m.name,
+                    "status": m.status,
                     "schedule": cfg.get("schedule", "weekly"),
                 }
             elif m.type == "debt":
                 ops_missions["debt"] = {
-                    "id": m.id, "name": m.name, "status": m.status,
+                    "id": m.id,
+                    "name": m.name,
+                    "status": m.status,
                     "schedule": cfg.get("schedule", "monthly"),
                 }
         else:
-            epics_list.append({
-                "id": m.id, "name": m.name, "status": m.status,
-                "type": m.type, "wsjf": m.wsjf_score,
-            })
+            epics_list.append(
+                {
+                    "id": m.id,
+                    "name": m.name,
+                    "status": m.status,
+                    "type": m.type,
+                    "wsjf": m.wsjf_score,
+                }
+            )
 
     # CI/CD pipeline status
     cicd_file = None
@@ -446,7 +569,9 @@ async def project_board_page(request: Request, project_id: str):
                 total_sp_planned += sp
                 if s.status in ("done", "accepted"):
                     total_sp_done += sp
-    velocity_pct = round(total_sp_done * 100 / total_sp_planned) if total_sp_planned else 0
+    velocity_pct = (
+        round(total_sp_done * 100 / total_sp_planned) if total_sp_planned else 0
+    )
 
     # PI cadence — phases from active mission runs
     pi_phases = []
@@ -454,49 +579,73 @@ async def project_board_page(request: Request, project_id: str):
         run = runs_by_mission.get(m.id)
         if run and run.phases:
             for ph in run.phases:
-                ph_status = ph.status.value if hasattr(ph.status, "value") else str(ph.status)
-                pi_phases.append({
-                    "name": ph.phase_name or ph.phase_id,
-                    "status": ph_status,
-                    "mission": m.name[:25],
-                })
+                ph_status = (
+                    ph.status.value if hasattr(ph.status, "value") else str(ph.status)
+                )
+                pi_phases.append(
+                    {
+                        "name": ph.phase_name or ph.phase_id,
+                        "status": ph_status,
+                        "mission": m.name[:25],
+                    }
+                )
 
-    return _templates(request).TemplateResponse("project_board.html", {
-        "request": request,
-        "page_title": f"Board — {project.name}",
-        "project": project,
-        "tasks": tasks,
-        "flow_nodes": flow_nodes,
-        "flow_edges": flow_edges,
-        "backlog_items": backlog_items,
-        "pull_requests": pull_requests,
-        "ops_missions": ops_missions,
-        "epics_list": epics_list,
-        "has_cicd": cicd_file is not None,
-        "velocity": {"planned": total_sp_planned, "done": total_sp_done, "pct": velocity_pct},
-        "pi_phases": pi_phases,
-    })
+    return _templates(request).TemplateResponse(
+        "project_board.html",
+        {
+            "request": request,
+            "page_title": f"Board — {project.name}",
+            "project": project,
+            "tasks": tasks,
+            "flow_nodes": flow_nodes,
+            "flow_edges": flow_edges,
+            "backlog_items": backlog_items,
+            "pull_requests": pull_requests,
+            "ops_missions": ops_missions,
+            "epics_list": epics_list,
+            "has_cicd": cicd_file is not None,
+            "velocity": {
+                "planned": total_sp_planned,
+                "done": total_sp_done,
+                "pct": velocity_pct,
+            },
+            "pi_phases": pi_phases,
+        },
+    )
 
 
 # ── API: Projects ────────────────────────────────────────────────
+
 
 @router.get("/api/projects", responses={200: {"model": list[ProjectOut]}})
 async def api_projects():
     """List all projects (JSON)."""
     from ...projects.manager import get_project_store
+
     store = get_project_store()
-    return JSONResponse([{
-        "id": p.id, "name": p.name, "path": p.path,
-        "factory_type": p.factory_type, "domains": p.domains,
-        "lead_agent_id": p.lead_agent_id, "status": p.status,
-        "has_vision": bool(p.vision), "values": p.values,
-    } for p in store.list_all()])
+    return JSONResponse(
+        [
+            {
+                "id": p.id,
+                "name": p.name,
+                "path": p.path,
+                "factory_type": p.factory_type,
+                "domains": p.domains,
+                "lead_agent_id": p.lead_agent_id,
+                "status": p.status,
+                "has_vision": bool(p.vision),
+                "values": p.values,
+            }
+            for p in store.list_all()
+        ]
+    )
 
 
 @router.post("/api/projects", responses={200: {"model": OkResponse}})
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project
+
     form = await _parse_body(request)
     store = get_project_store()
     p = Project(
@@ -506,7 +655,11 @@ async def create_project(request: Request):
         description=str(form.get("description", "")),
         factory_type=str(form.get("factory_type", "standalone")),
         lead_agent_id=str(form.get("lead_agent_id", "brain")),
-        values=[v.strip() for v in str(form.get("values", "quality,feedback")).split(",") if v.strip()],
+        values=[
+            v.strip()
+            for v in str(form.get("values", "quality,feedback")).split(",")
+            if v.strip()
+        ],
     )
     # Auto-detect domains from path
     if p.path and not p.domains:
@@ -526,6 +679,7 @@ async def create_project(request: Request):
     if p.path:
         try:
             from ...projects.manager import ProjectStore
+
             ProjectStore.generate_cicd(p.path, p.domains or [])
         except Exception as e:
             logger.warning("generate_cicd failed for %s: %s", p.id, e)
@@ -543,6 +697,7 @@ async def create_project(request: Request):
 async def update_vision(request: Request, project_id: str):
     """Update project vision."""
     from ...projects.manager import get_project_store
+
     data = await _parse_body(request)
     store = get_project_store()
     store.update_vision(project_id, str(data.get("vision", "")))
@@ -555,7 +710,6 @@ async def project_chat(request: Request, project_id: str):
     from ...sessions.store import get_session_store, SessionDef, MessageDef
     from ...sessions.runner import handle_user_message
     from ...projects.manager import get_project_store
-    from ...agents.store import get_agent_store
 
     data = await _parse_body(request)
     content = str(data.get("content", "")).strip()
@@ -568,32 +722,42 @@ async def project_chat(request: Request, project_id: str):
 
     store = get_session_store()
     # Find or create active session for this project
-    sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+    sessions = [
+        s
+        for s in store.list_all()
+        if s.project_id == project_id and s.status == "active"
+    ]
     sessions.sort(key=lambda s: s.created_at or "", reverse=True)
     if sessions:
         session = sessions[0]
     else:
-        session = store.create(SessionDef(
-            name=f"{proj.name} — Chat",
-            goal="Project conversation",
-            project_id=project_id,
-            status="active",
-            config={"lead_agent": proj.lead_agent_id or "brain"},
-        ))
-        store.add_message(MessageDef(
-            session_id=session.id,
-            from_agent="system",
-            message_type="system",
-            content=f"Session started for project {proj.name}",
-        ))
+        session = store.create(
+            SessionDef(
+                name=f"{proj.name} — Chat",
+                goal="Project conversation",
+                project_id=project_id,
+                status="active",
+                config={"lead_agent": proj.lead_agent_id or "brain"},
+            )
+        )
+        store.add_message(
+            MessageDef(
+                session_id=session.id,
+                from_agent="system",
+                message_type="system",
+                content=f"Session started for project {proj.name}",
+            )
+        )
 
     # Store user message
-    store.add_message(MessageDef(
-        session_id=session.id,
-        from_agent="user",
-        message_type="text",
-        content=content,
-    ))
+    store.add_message(
+        MessageDef(
+            session_id=session.id,
+            from_agent="user",
+            message_type="text",
+            content=content,
+        )
+    )
 
     # Get agent response
     agent_msg = await handle_user_message(session.id, content, proj.lead_agent_id or "")
@@ -601,40 +765,55 @@ async def project_chat(request: Request, project_id: str):
     # For HTMX: return both the user message and agent response as chat bubbles
     import html as html_mod
     import markdown as md_lib
+
     user_html = (
         f'<div class="chat-msg chat-msg-user">'
         f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(content)}</div></div>'
         f'<div class="chat-msg-avatar user">S</div>'
-        f'</div>'
+        f"</div>"
     )
     if agent_msg:
-        agent_content = agent_msg.get("content", "") if isinstance(agent_msg, dict) else getattr(agent_msg, "content", str(agent_msg))
+        agent_content = (
+            agent_msg.get("content", "")
+            if isinstance(agent_msg, dict)
+            else getattr(agent_msg, "content", str(agent_msg))
+        )
         # Render tool calls if present
         tools_html = ""
         tool_calls = None
         if isinstance(agent_msg, dict):
-            tool_calls = agent_msg.get("metadata", {}).get("tool_calls") if agent_msg.get("metadata") else None
+            tool_calls = (
+                agent_msg.get("metadata", {}).get("tool_calls")
+                if agent_msg.get("metadata")
+                else None
+            )
         elif hasattr(agent_msg, "metadata") and agent_msg.metadata:
             tool_calls = agent_msg.metadata.get("tool_calls")
         if tool_calls:
-            pills = "".join(f'<span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>' for tc in tool_calls)
+            pills = "".join(
+                f'<span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> {html_mod.escape(str(tc.get("name", tc) if isinstance(tc, dict) else tc))}</span>'
+                for tc in tool_calls
+            )
             tools_html = f'<div class="chat-msg-tools">{pills}</div>'
         # Render markdown to HTML
-        rendered = md_lib.markdown(str(agent_content), extensions=["fenced_code", "tables", "nl2br"])
+        rendered = md_lib.markdown(
+            str(agent_content), extensions=["fenced_code", "tables", "nl2br"]
+        )
         agent_html = (
             f'<div class="chat-msg chat-msg-agent">'
             f'<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>'
             f'<div class="chat-msg-body">'
             f'<div class="chat-msg-sender">{html_mod.escape(proj.name)}</div>'
             f'<div class="chat-msg-text md-rendered">{rendered}</div>'
-            f'{tools_html}'
-            f'</div></div>'
+            f"{tools_html}"
+            f"</div></div>"
         )
         return HTMLResponse(user_html + agent_html)
     return HTMLResponse(user_html)
 
 
 # ── Conversation Management ──────────────────────────────────────
+
 
 @router.post("/api/projects/{project_id}/conversations")
 async def create_conversation(request: Request, project_id: str):
@@ -648,23 +827,30 @@ async def create_conversation(request: Request, project_id: str):
 
     store = get_session_store()
     # Archive any existing active CHAT sessions (not workflow sessions)
-    active = [s for s in store.list_all()
-              if s.project_id == project_id and s.status == "active"
-              and not (s.config or {}).get("workflow_id")]
+    active = [
+        s
+        for s in store.list_all()
+        if s.project_id == project_id
+        and s.status == "active"
+        and not (s.config or {}).get("workflow_id")
+    ]
     for s in active:
         store.update_status(s.id, "completed")
 
-    session = store.create(SessionDef(
-        name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
-        goal="Project conversation",
-        project_id=project_id,
-        status="active",
-        config={"lead_agent": proj.lead_agent_id or "brain"},
-    ))
+    session = store.create(
+        SessionDef(
+            name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+            goal="Project conversation",
+            project_id=project_id,
+            status="active",
+            config={"lead_agent": proj.lead_agent_id or "brain"},
+        )
+    )
     return JSONResponse({"session_id": session.id})
 
 
 # ── Streaming Chat (SSE) ────────────────────────────────────────
+
 
 @router.post("/api/projects/{project_id}/chat/stream")
 async def project_chat_stream(request: Request, project_id: str):
@@ -673,7 +859,7 @@ async def project_chat_stream(request: Request, project_id: str):
     from ...sessions.runner import _build_context
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
-    from ...agents.executor import get_executor, ExecutionContext
+    from ...agents.executor import get_executor
 
     data = await _parse_body(request)
     content = str(data.get("content", "")).strip()
@@ -690,24 +876,34 @@ async def project_chat_stream(request: Request, project_id: str):
     if session_id:
         session = store.get(session_id)
     if not session:
-        sessions = [s for s in store.list_all() if s.project_id == project_id and s.status == "active"]
+        sessions = [
+            s
+            for s in store.list_all()
+            if s.project_id == project_id and s.status == "active"
+        ]
         sessions.sort(key=lambda s: s.created_at or "", reverse=True)
         if sessions:
             session = sessions[0]
     if not session:
-        session = store.create(SessionDef(
-            name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
-            goal="Project conversation",
-            project_id=project_id,
-            status="active",
-            config={"lead_agent": proj.lead_agent_id or "brain"},
-        ))
+        session = store.create(
+            SessionDef(
+                name=f"{proj.name} — {datetime.utcnow().strftime('%b %d, %H:%M')}",
+                goal="Project conversation",
+                project_id=project_id,
+                status="active",
+                config={"lead_agent": proj.lead_agent_id or "brain"},
+            )
+        )
 
     # Store user message
-    store.add_message(MessageDef(
-        session_id=session.id, from_agent="user",
-        message_type="text", content=content,
-    ))
+    store.add_message(
+        MessageDef(
+            session_id=session.id,
+            from_agent="user",
+            message_type="text",
+            content=content,
+        )
+    )
 
     # Find agent
     agent_store = get_agent_store()
@@ -718,7 +914,6 @@ async def project_chat_stream(request: Request, project_id: str):
         agent = all_agents[0] if all_agents else None
 
     async def event_generator():
-        import html as html_mod
         import markdown as md_lib
 
         def sse(event: str, data: dict) -> str:
@@ -739,7 +934,11 @@ async def project_chat_stream(request: Request, project_id: str):
 
             async def on_tool_call(name: str, args: dict, result: str):
                 # RLM sub-events: args contains {"status": "label"}
-                if name == "deep_search" and isinstance(args, dict) and "status" in args:
+                if (
+                    name == "deep_search"
+                    and isinstance(args, dict)
+                    and "status" in args
+                ):
                     label = args["status"]
                     await progress_queue.put(("status", name, label))
                     return
@@ -774,26 +973,27 @@ async def project_chat_stream(request: Request, project_id: str):
                 return
 
             # Store agent message
-            store.add_message(MessageDef(
-                session_id=session.id,
-                from_agent=agent.id,
-                to_agent="user",
-                message_type="text",
-                content=result.content,
-                metadata={
-                    "model": result.model,
-                    "provider": result.provider,
-                    "tokens_in": result.tokens_in,
-                    "tokens_out": result.tokens_out,
-                    "duration_ms": result.duration_ms,
-                    "tool_calls": result.tool_calls if result.tool_calls else None,
-                },
-            ))
+            store.add_message(
+                MessageDef(
+                    session_id=session.id,
+                    from_agent=agent.id,
+                    to_agent="user",
+                    message_type="text",
+                    content=result.content,
+                    metadata={
+                        "model": result.model,
+                        "provider": result.provider,
+                        "tokens_in": result.tokens_in,
+                        "tokens_out": result.tokens_out,
+                        "duration_ms": result.duration_ms,
+                        "tool_calls": result.tool_calls if result.tool_calls else None,
+                    },
+                )
+            )
 
             # Build final HTML
             rendered = md_lib.markdown(
-                str(result.content),
-                extensions=["fenced_code", "tables", "nl2br"]
+                str(result.content), extensions=["fenced_code", "tables", "nl2br"]
             )
             yield sse("done", {"html": rendered})
 
@@ -806,6 +1006,7 @@ async def project_chat_stream(request: Request, project_id: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
 
 @router.get("/api/sessions/{session_id}/stream")
 async def session_sse_stream(request: Request, session_id: str):
@@ -822,7 +1023,9 @@ async def session_sse_stream(request: Request, session_id: str):
                     break
                 try:
                     event = await asyncio.wait_for(queue.get(), timeout=30.0)
-                    payload = json.dumps(event) if isinstance(event, dict) else str(event)
+                    payload = (
+                        json.dumps(event) if isinstance(event, dict) else str(event)
+                    )
                     yield f"data: {payload}\n\n"
                 except asyncio.TimeoutError:
                     yield ": keepalive\n\n"
@@ -832,10 +1035,400 @@ async def session_sse_stream(request: Request, session_id: str):
             remove_sse_listener(session_id, queue)
 
     from fastapi.responses import StreamingResponse
+
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
+# ── Project Workspace ──────────────────────────────────────────────────────────
+
+
+@router.get("/projects/{project_id}/workspace", response_class=HTMLResponse)
+async def project_workspace(request: Request, project_id: str):
+    """Replit-style workspace view for a project."""
+    from ...projects.manager import get_project_store
+
+    proj_store = get_project_store()
+    project = proj_store.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    # Detect preview URL from docker-compose / package.json / .env
+    preview_url = _detect_preview_url(project.path)
+
+    templates = _templates(request)
+    return templates.TemplateResponse(
+        "project_workspace.html",
+        {
+            "request": request,
+            "project": project,
+            "preview_url": preview_url,
+        },
+    )
+
+
+def _detect_preview_url(root_path: str) -> str:
+    """Detect the app preview URL from project config files."""
+    import re as _re
+
+    p = Path(root_path)
+    # docker-compose ports: "HOST:CONTAINER"
+    for compose_name in ("docker-compose.yml", "docker-compose.yaml", "compose.yml"):
+        cf = p / compose_name
+        if cf.exists():
+            try:
+                text = cf.read_text(errors="ignore")
+                m = _re.search(r'["\']?(\d{4,5}):(\d{2,5})["\']?', text)
+                if m:
+                    return f"http://localhost:{m.group(1)}"
+            except Exception:
+                pass
+    # .env PORT=XXXX
+    env_file = p / ".env"
+    if env_file.exists():
+        try:
+            for line in env_file.read_text(errors="ignore").splitlines():
+                m = _re.match(r"PORT\s*=\s*(\d+)", line.strip())
+                if m:
+                    return f"http://localhost:{m.group(1)}"
+        except Exception:
+            pass
+    # package.json scripts.start contains port
+    pkg = p / "package.json"
+    if pkg.exists():
+        try:
+            import json as _json
+
+            data = _json.loads(pkg.read_text())
+            start = (data.get("scripts") or {}).get("start", "")
+            m = _re.search(r"PORT=(\d+)|--port[= ](\d+)", start)
+            if m:
+                port = m.group(1) or m.group(2)
+                return f"http://localhost:{port}"
+        except Exception:
+            pass
+    return ""
+
+
+@router.get("/api/projects/{project_id}/workspace/tool-calls")
+async def ws_tool_calls(project_id: str):
+    """Return last 50 tool calls for sessions linked to this project."""
+    from ...db.connection import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            """
+            SELECT tc.tool_name, tc.parameters_json, tc.result_json, tc.success, tc.duration_ms, tc.timestamp
+            FROM tool_calls tc
+            LEFT JOIN sessions s ON tc.session_id = s.id
+            WHERE s.project_id = ?
+            ORDER BY tc.timestamp DESC LIMIT 50
+        """,
+            (project_id,),
+        ).fetchall()
+    except Exception:
+        rows = []
+    items = []
+    for r in rows:
+        result = r[2] or ""
+        try:
+            import json as _json
+
+            rd = _json.loads(result)
+            output = rd.get("output") or rd.get("stdout") or str(rd)[:200]
+        except Exception:
+            output = result[:200]
+        items.append(
+            {
+                "tool_name": r[0],
+                "parameters_json": r[1],
+                "success": bool(r[3]),
+                "duration_ms": r[4],
+                "timestamp": str(r[5] or ""),
+                "output": output,
+            }
+        )
+    return JSONResponse({"items": items})
+
+
+@router.get("/api/projects/{project_id}/workspace/run")
+async def ws_run_command(project_id: str, cmd: str, request: Request):
+    """SSE endpoint — runs a shell command in project root and streams output."""
+    import asyncio
+    import shlex
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    cwd = proj.path if proj else "."
+
+    async def stream():
+        try:
+            args = shlex.split(cmd)
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+                cwd=cwd,
+            )
+            async for line in proc.stdout:
+                text = line.decode("utf-8", errors="replace").rstrip()
+                yield f"data: {text}\n\n"
+            await proc.wait()
+        except Exception as exc:
+            yield f"data: ERROR: {exc}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/api/projects/{project_id}/workspace/files")
+async def ws_list_files(project_id: str, path: str = "."):
+    """List directory contents for the project."""
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"items": []})
+    root = Path(proj.path)
+    target = (root / path).resolve()
+    # Security: stay within root
+    try:
+        target.relative_to(root)
+    except ValueError:
+        target = root
+    items = []
+    SKIP = {".git", "__pycache__", "node_modules", ".next", "dist", ".venv", "venv"}
+    if target.is_dir():
+        try:
+            for entry in sorted(
+                target.iterdir(), key=lambda e: (e.is_file(), e.name.lower())
+            ):
+                if entry.name in SKIP or entry.name.startswith("."):
+                    continue
+                rel = str(entry.relative_to(root))
+                items.append(
+                    {
+                        "name": entry.name,
+                        "path": rel,
+                        "type": "dir" if entry.is_dir() else "file",
+                        "size": entry.stat().st_size if entry.is_file() else 0,
+                    }
+                )
+        except PermissionError:
+            pass
+    return JSONResponse({"items": items, "cwd": str(target.relative_to(root))})
+
+
+@router.get("/api/projects/{project_id}/workspace/file")
+async def ws_read_file(project_id: str, path: str):
+    """Return file content (max 100KB)."""
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "project not found"})
+    root = Path(proj.path)
+    target = (root / path).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return JSONResponse({"error": "access denied"})
+    if not target.is_file():
+        return JSONResponse({"error": "not a file"})
+    if target.stat().st_size > 200_000:
+        return JSONResponse({"error": "file too large (>200KB)"})
+    try:
+        content = target.read_text(errors="replace")
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+    return JSONResponse({"content": content, "path": path})
+
+
+@router.get("/api/projects/{project_id}/workspace/docker")
+async def ws_docker_status(project_id: str):
+    """Return docker container status for this project."""
+    import subprocess
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"containers": []})
+    project_name = (proj.name or project_id).lower().replace(" ", "-").replace("_", "-")
+    containers = []
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "-a",
+                "--format",
+                "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=8,
+        )
+        for line in result.stdout.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) < 3:
+                continue
+            name, image, status = parts[0], parts[1], parts[2]
+            ports = parts[3] if len(parts) > 3 else ""
+            # Filter: container name contains project name or project path fragment
+            if project_name not in name.lower() and project_id[:8] not in name.lower():
+                continue
+            # Get last 30 log lines
+            logs = ""
+            try:
+                lr = subprocess.run(
+                    ["docker", "logs", "--tail", "30", name],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                logs = (lr.stdout + lr.stderr).strip()[-2000:]
+            except Exception:
+                pass
+            containers.append(
+                {
+                    "name": name,
+                    "image": image,
+                    "status": status,
+                    "ports": ports,
+                    "logs": logs,
+                }
+            )
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return JSONResponse({"containers": containers})
+
+
+@router.post("/api/projects/{project_id}/workspace/docker/{action}")
+async def ws_docker_action(project_id: str, action: str, request: Request):
+    """Perform docker action: start / stop / rebuild."""
+    import subprocess
+
+    body = await _parse_body(request)
+    container = body.get("container", "")
+    if action not in ("start", "stop", "rebuild") or not container:
+        return JSONResponse({"error": "invalid"}, status_code=400)
+    try:
+        if action == "start":
+            subprocess.run(["docker", "start", container], timeout=15)
+        elif action == "stop":
+            subprocess.run(["docker", "stop", container], timeout=15)
+        elif action == "rebuild":
+            from ...projects.manager import get_project_store
+
+            proj = get_project_store().get(project_id)
+            cwd = proj.path if proj else None
+            if cwd and (Path(cwd) / "docker-compose.yml").exists():
+                subprocess.run(
+                    ["docker", "compose", "up", "--build", "-d"], cwd=cwd, timeout=120
+                )
+            else:
+                subprocess.run(["docker", "restart", container], timeout=15)
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+    return JSONResponse({"ok": True})
+
+
+@router.get("/api/projects/{project_id}/workspace/agents")
+async def ws_agents(project_id: str):
+    """Return active agents/sessions for this project."""
+    from ...sessions.store import get_session_store
+    from ...agents.store import get_agent_store
+
+    sess_store = get_session_store()
+    agent_store = get_agent_store()
+    sessions = [
+        s
+        for s in sess_store.list_all()
+        if s.project_id == project_id and s.status in ("active", "running", "pending")
+    ]
+    items = []
+    for s in sessions[:20]:
+        agent = agent_store.get(s.agent_id or "") if s.agent_id else None
+        avatar = ""
+        if agent:
+            from pathlib import Path as _P
+
+            av = _P(__file__).parent.parent / "static" / "avatars" / f"{agent.id}.jpg"
+            if av.exists():
+                avatar = f"/static/avatars/{agent.id}.jpg"
+        items.append(
+            {
+                "session_id": s.id,
+                "agent_id": s.agent_id or "",
+                "agent_name": agent.name if agent else (s.agent_id or "Agent"),
+                "mission_title": s.title or s.id,
+                "status": s.status,
+                "phase": getattr(s, "current_phase", "") or "",
+                "progress": getattr(s, "progress_pct", 0) or 0,
+                "avatar": avatar,
+            }
+        )
+    return JSONResponse({"items": items})
+
+
+@router.get("/api/projects/{project_id}/workspace/git")
+async def ws_git(project_id: str):
+    """Return git log, changes and branch for this project."""
+    from ...projects.manager import get_project_store
+    from ...projects import git_service
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.has_git:
+        return JSONResponse({"commits": [], "changes": [], "branch": ""})
+    commits = [
+        c.__dict__ if hasattr(c, "__dict__") else dict(c)
+        for c in git_service.get_log(proj.path, 20)
+    ]
+    changes = [
+        c.__dict__ if hasattr(c, "__dict__") else dict(c)
+        for c in git_service.get_changes(proj.path)
+    ]
+    git_status = git_service.get_status(proj.path)
+    branch = git_status.branch if git_status else ""
+    return JSONResponse({"commits": commits, "changes": changes, "branch": branch})
+
+
+@router.post("/api/projects/{project_id}/workspace/git/commit")
+async def ws_git_commit(project_id: str, request: Request):
+    """Run git commit (and optionally push) in project directory."""
+    import subprocess
+
+    body = await _parse_body(request)
+    message = body.get("message", "").strip()
+    do_push = bool(body.get("push"))
+    if not message:
+        return JSONResponse({"error": "message required"}, status_code=400)
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "project not found"}, status_code=404)
+    try:
+        subprocess.run(["git", "add", "-A"], cwd=proj.path, timeout=10, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", message], cwd=proj.path, timeout=15, check=True
+        )
+        if do_push:
+            subprocess.run(["git", "push"], cwd=proj.path, timeout=30, check=True)
+    except subprocess.CalledProcessError as e:
+        return JSONResponse({"error": str(e)})
+    return JSONResponse({"ok": True})
