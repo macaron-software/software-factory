@@ -69,8 +69,48 @@ class Project:
     active_pattern_id: str = ""  # Currently active pattern
     status: str = "active"  # active | paused | archived
     git_url: str = ""  # GitHub/GitLab remote URL for PR creation
+    current_phase: str = ""  # ex: "discovery", "mvp", "v1", "run", "maintenance"
+    phases: list[dict] = field(
+        default_factory=list
+    )  # [{id, name, icon, mission_types_active[]}]
     created_at: str = ""
     updated_at: str = ""
+
+    # Default phase templates (used when no phases defined)
+    DEFAULT_PHASES: list[dict] = field(
+        default_factory=lambda: [
+            {
+                "id": "discovery",
+                "name": "Discovery",
+                "icon": "🔍",
+                "mission_types_active": [],
+            },
+            {
+                "id": "mvp",
+                "name": "MVP",
+                "icon": "🚀",
+                "mission_types_active": ["feature"],
+            },
+            {
+                "id": "v1",
+                "name": "V1 Prod",
+                "icon": "✅",
+                "mission_types_active": ["program", "security", "debt", "feature"],
+            },
+            {
+                "id": "run",
+                "name": "Run",
+                "icon": "⚙️",
+                "mission_types_active": ["program", "security", "debt", "hacking"],
+            },
+            {
+                "id": "maintenance",
+                "name": "Maintenance",
+                "icon": "🔧",
+                "mission_types_active": ["program", "security", "debt"],
+            },
+        ]
+    )
 
     @property
     def exists(self) -> bool:
@@ -308,14 +348,23 @@ class ProjectStore:
                 active_pattern_id TEXT DEFAULT '',
                 status TEXT DEFAULT 'active',
                 git_url TEXT DEFAULT '',
+                current_phase TEXT DEFAULT '',
+                phases_json TEXT DEFAULT '[]',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Migration: add git_url if missing
+        # Migrations: add missing columns
         cols = [r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()]
-        if "git_url" not in cols:
-            conn.execute("ALTER TABLE projects ADD COLUMN git_url TEXT DEFAULT ''")
+        for col, default in [
+            ("git_url", "''"),
+            ("current_phase", "''"),
+            ("phases_json", "'[]'"),
+        ]:
+            if col not in cols:
+                conn.execute(
+                    f"ALTER TABLE projects ADD COLUMN {col} TEXT DEFAULT {default}"
+                )
         conn.commit()
         conn.close()
 
@@ -417,8 +466,9 @@ class ProjectStore:
             """
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
-             vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
+             current_phase, phases_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -434,6 +484,8 @@ class ProjectStore:
                 p.active_pattern_id,
                 p.status,
                 p.git_url or "",
+                p.current_phase or "",
+                json.dumps(p.phases),
             ),
         )
         conn.commit()
@@ -450,6 +502,29 @@ class ProjectStore:
         except Exception as e:
             logger.warning("heal_missions failed for %s: %s", p.id, e)
         return p
+
+    def set_phase(self, project_id: str, phase_id: str) -> "Project | None":
+        """Set the current phase of a project and update mission statuses."""
+        from ..cache import invalidate
+
+        conn = get_db()
+        conn.execute(
+            "UPDATE projects SET current_phase = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (phase_id, project_id),
+        )
+        conn.commit()
+        conn.close()
+        invalidate("projects:all")
+        proj = self.get(project_id)
+        if proj:
+            # Recompute mission statuses for new phase
+            try:
+                self.heal_missions(proj)
+            except Exception as e:
+                logger.warning(
+                    "heal_missions after set_phase failed for %s: %s", project_id, e
+                )
+        return proj
 
     def auto_provision(self, project_id: str, project_name: str):
         """Auto-create TMA, Security, and Tech Debt missions for a new project."""
@@ -518,93 +593,131 @@ class ProjectStore:
         return created
 
     def heal_missions(self, proj: "Project") -> list[str]:
-        """Ensure every project has TMA + Security + Debt missions.
+        """Ensure every project has TMA + Security + Debt missions (phase-aware).
         MVP/ideation projects also get a MVP Réalisation mission.
-        Returns list of mission names created."""
+        System mission statuses are adjusted based on current_phase.
+        Returns list of mission names created or updated."""
         from ..missions.store import MissionDef, get_mission_store
 
         ms = get_mission_store()
         existing = ms.list_missions(limit=2000)
         proj_m = [m for m in existing if m.project_id == proj.id]
-        proj_types = {m.type for m in proj_m}
-        proj_names = {m.name for m in proj_m}
+        proj_types = {m.type: m for m in proj_m}  # type → mission
+
         created = []
 
-        is_mvp = (
+        phase = proj.current_phase or ""
+        is_early_phase = phase in ("", "discovery")
+        is_mvp_phase = phase in ("mvp",)
+        is_prod_phase = phase in ("v1", "run", "maintenance", "scale")
+
+        is_mvp_project = (
             proj.factory_type in ("mvp", "ideation")
             or "mvp" in proj.name.lower()
             or proj.status in ("ideation", "mvp", "discovery")
+            or is_mvp_phase
         )
+
+        # Compute status for system missions based on phase:
+        # - no phase / discovery → TMA + Dette = planning (system dormant), Sécu = planning
+        # - mvp → Sécu = active, TMA + Dette = planning
+        # - v1+ → all system = active
+        tma_status = "planning" if (is_early_phase or is_mvp_phase) else "active"
+        secu_status = "planning" if is_early_phase else "active"
+        debt_status = "planning" if (is_early_phase or is_mvp_phase) else "active"
 
         needed = [
             MissionDef(
                 name=f"TMA — {proj.name}",
                 description=f"Maintenance applicative permanente pour {proj.name}. Triage incidents → diagnostic → fix TDD → validation.",
                 goal="Assurer la stabilité et la disponibilité en continu.",
-                status="active",
+                status=tma_status,
                 type="program",
                 project_id=proj.id,
                 workflow_id="tma-maintenance",
                 wsjf_score=8,
                 created_by="responsable_tma",
+                category="system",
+                active_phases=["v1", "run", "maintenance", "scale"],
                 config={"auto_provisioned": True, "permanent": True},
             ),
             MissionDef(
                 name=f"Sécurité — {proj.name}",
                 description=f"Audit sécurité pour {proj.name}. Scan OWASP, CVE watch, revue code sécurité.",
                 goal="Score sécurité ≥ 80%, zéro CVE critique non corrigée.",
-                status="active",
+                status=secu_status,
                 type="security",
                 project_id=proj.id,
                 workflow_id="review-cycle",
                 wsjf_score=12,
                 created_by="devsecops",
+                category="system",
+                active_phases=["mvp", "v1", "run", "maintenance", "scale"],
                 config={"auto_provisioned": True, "schedule": "weekly"},
             ),
             MissionDef(
                 name=f"Dette Technique — {proj.name}",
                 description=f"Réduction de la dette technique pour {proj.name}. Audit → priorisation WSJF → sprint correctif.",
                 goal="Réduire la dette technique de 20% par PI. Complexité < 15, couverture > 80%.",
-                status="planning",
+                status=debt_status,
                 type="debt",
                 project_id=proj.id,
                 workflow_id="tech-debt-reduction",
                 wsjf_score=5,
                 created_by="enterprise_architect",
+                category="system",
+                active_phases=["v1", "run", "maintenance", "scale"],
                 config={"auto_provisioned": True, "schedule": "monthly"},
             ),
         ]
-        if is_mvp:
+        if is_mvp_project:
+            mvp_status = "completed" if is_prod_phase else "active"
             needed.append(
                 MissionDef(
                     name=f"MVP — {proj.name}",
                     description=f"Réalisation du MVP pour {proj.name}. Discovery → design → dev → validation utilisateurs → go/no-go.",
                     goal="Livrer un MVP validé par au moins 5 utilisateurs cibles en moins de 6 sprints.",
-                    status="active",
+                    status=mvp_status,
                     type="feature",
                     project_id=proj.id,
                     workflow_id="full-project",
                     wsjf_score=20,
                     created_by="product_owner",
+                    category="functional",
+                    active_phases=["discovery", "mvp"],
                     config={"auto_provisioned": True, "is_mvp": True},
                 )
             )
 
         for m in needed:
-            already = (
-                any(mt == m.type for mt in proj_types)
-                if m.type not in ("feature", "epic")
-                else any(n == m.name for n in proj_names)
+            existing_m = (
+                proj_types.get(m.type) if m.type not in ("feature", "epic") else None
             )
-            if not already:
+            if m.type in ("feature", "epic"):
+                existing_m = next((pm for pm in proj_m if pm.name == m.name), None)
+
+            if not existing_m:
+                # Create missing mission
                 try:
                     ms.create_mission(m)
-                    created.append(m.name)
+                    created.append(f"+{m.name}")
                     logger.info("heal_missions: created '%s' for %s", m.name, proj.id)
                 except Exception as e:
                     logger.warning(
                         "heal_missions: failed '%s' for %s: %s", m.name, proj.id, e
                     )
+            else:
+                # Update status if phase changed and mission is system-managed
+                if (
+                    existing_m.category == "system"
+                    and existing_m.status != m.status
+                    and existing_m.config.get("auto_provisioned")
+                ):
+                    try:
+                        ms.update_mission_status(existing_m.id, m.status)
+                        created.append(f"~{m.name}→{m.status}")
+                    except Exception:
+                        pass
 
         return created
 
@@ -959,6 +1072,9 @@ class ProjectStore:
             active_pattern_id=row["active_pattern_id"] or "",
             status=row["status"] or "active",
             git_url=row["git_url"] if "git_url" in keys else "",
+            current_phase=row["current_phase"] if "current_phase" in keys else "",
+            phases=json.loads(row["phases_json"] if "phases_json" in keys else "[]")
+            or [],
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
         )

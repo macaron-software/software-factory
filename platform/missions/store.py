@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Optional
 
 from ..db.migrations import get_db
+from ..models import MissionRun, MissionStatus, PhaseRun
 
 
 # ── Dataclasses ──────────────────────────────────────────────────────
@@ -38,6 +39,10 @@ class MissionDef:
     job_duration: float = 1
     kanban_status: str = "funnel"  # SAFe: funnel|analyzing|backlog|implementing|done
     created_by: str = ""  # agent who created it (strat-cpo, etc.)
+    category: str = "functional"  # system | functional | custom
+    active_phases: list[str] = field(
+        default_factory=list
+    )  # [] = all phases; ["v1","run"] = only those phases
     config: dict = field(default_factory=dict)
     created_at: str = ""
     completed_at: Optional[str] = None
@@ -100,6 +105,11 @@ def _row_to_mission(row) -> MissionDef:
         time_criticality=row["time_criticality"] if "time_criticality" in keys else 0,
         risk_reduction=row["risk_reduction"] if "risk_reduction" in keys else 0,
         job_duration=row["job_duration"] if "job_duration" in keys else 1,
+        category=row["category"] if "category" in keys else "functional",
+        active_phases=json.loads(
+            row["active_phases_json"] if "active_phases_json" in keys else "[]"
+        )
+        or [],
         config=json.loads(row["config_json"] or "{}"),
         created_at=row["created_at"] or "",
         completed_at=row["completed_at"],
@@ -184,6 +194,33 @@ class MissionStore:
         m.created_at = datetime.utcnow().isoformat()
         db = get_db()
         try:
+            db.execute(
+                """INSERT INTO missions (id, project_id, name, description, goal, status, type,
+                   workflow_id, parent_mission_id, wsjf_score, created_by, config_json,
+                   category, active_phases_json, created_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    m.id,
+                    m.project_id,
+                    m.name,
+                    m.description,
+                    m.goal,
+                    m.status,
+                    m.type,
+                    m.workflow_id,
+                    m.parent_mission_id,
+                    m.wsjf_score,
+                    m.created_by,
+                    json.dumps(m.config),
+                    m.category,
+                    json.dumps(m.active_phases),
+                    m.created_at,
+                    m.completed_at,
+                ),
+            )
+            db.commit()
+        except Exception:
+            # Fallback: insert without new columns (old DB schema)
             db.execute(
                 """INSERT INTO missions (id, project_id, name, description, goal, status, type,
                    workflow_id, parent_mission_id, wsjf_score, created_by, config_json,
@@ -724,8 +761,6 @@ def get_mission_store() -> MissionStore:
 # ============================================================================
 # MISSION RUNS (lifecycle orchestration)
 # ============================================================================
-
-from ..models import MissionRun, MissionStatus, PhaseRun
 
 
 def _row_to_mission_run(row) -> MissionRun:

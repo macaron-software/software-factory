@@ -1008,6 +1008,21 @@ def _ensure_darwin_tables(conn) -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Migrations: category + active_phases on missions
+    try:
+        m_cols3 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
+        if m_cols3 and "category" not in m_cols3:
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN category TEXT DEFAULT 'functional'"
+            )
+        if m_cols3 and "active_phases_json" not in m_cols3:
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN active_phases_json TEXT DEFAULT '[]'"
+            )
+    except Exception:
+        pass
+
     conn.commit()
 
 

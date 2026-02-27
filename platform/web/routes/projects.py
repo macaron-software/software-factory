@@ -136,6 +136,92 @@ async def projects_heal():
     return result
 
 
+@router.post("/api/projects/{project_id}/phase")
+async def project_set_phase(project_id: str, request: Request):
+    """Set the current phase of a project (triggers mission status update)."""
+    from ...projects.manager import get_project_store
+
+    body = await _parse_body(request)
+    phase_id = body.get("phase", "")
+    ps = get_project_store()
+    proj = ps.set_phase(project_id, phase_id)
+    if not proj:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "project not found")
+    return {"ok": True, "project_id": project_id, "current_phase": phase_id}
+
+
+@router.get("/api/projects/{project_id}/health")
+async def project_health(project_id: str):
+    """Return project health score + missions by category."""
+    from ...projects.manager import get_project_store
+    from ...missions.store import get_mission_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "project not found")
+
+    ms = get_mission_store()
+    all_m = ms.list_missions(limit=500)
+    proj_m = [m for m in all_m if m.project_id == project_id]
+
+    system_m = [m for m in proj_m if m.category == "system"]
+    functional_m = [m for m in proj_m if m.category == "functional"]
+    custom_m = [m for m in proj_m if m.category == "custom"]
+
+    active_count = sum(1 for m in proj_m if m.status == "active")
+    completed_count = sum(1 for m in proj_m if m.status == "completed")
+    blocked_count = sum(1 for m in proj_m if m.status == "blocked")
+    total = len(proj_m) or 1
+
+    # Simple health score: penalize blocked, reward completed
+    health = max(
+        0,
+        min(
+            100,
+            int(
+                (active_count / total) * 40
+                + (completed_count / total) * 50
+                - (blocked_count / total) * 30
+                + (20 if proj.exists else 0)
+                + (10 if proj.has_git else 0)
+            ),
+        ),
+    )
+
+    def _m_dict(m):
+        return {
+            "id": m.id,
+            "name": m.name,
+            "type": m.type,
+            "status": m.status,
+            "wsjf_score": m.wsjf_score,
+        }
+
+    return {
+        "project_id": project_id,
+        "current_phase": proj.current_phase,
+        "phases": proj.phases or proj.DEFAULT_PHASES,
+        "health": health,
+        "missions": {
+            "system": [_m_dict(m) for m in system_m],
+            "functional": [_m_dict(m) for m in functional_m],
+            "custom": [_m_dict(m) for m in custom_m],
+        },
+        "stats": {
+            "total": len(proj_m),
+            "active": active_count,
+            "completed": completed_count,
+            "blocked": blocked_count,
+            "has_workspace": proj.exists,
+            "has_git": proj.has_git,
+        },
+    }
+
+
 @router.post("/api/projects/{project_id}/scaffold")
 async def project_scaffold(project_id: str):
     """Scaffold a single project (idempotent)."""
@@ -200,6 +286,83 @@ async def project_git_status(project_id: str):
             f'<span class="commit-date">{date}</span></div>'
         )
     return HTMLResponse("\n".join(parts))
+
+
+@router.get("/projects/{project_id}/hub", response_class=HTMLResponse)
+async def project_hub(request: Request, project_id: str):
+    """Project Hub — unified lifecycle view with phases, missions by category, active agents."""
+    from ...projects.manager import get_project_store
+    from ...missions.store import get_mission_store
+    from ...sessions.store import get_session_store
+
+    ps = get_project_store()
+    project = ps.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    ms = get_mission_store()
+    all_m = ms.list_missions(limit=500)
+    proj_m = [m for m in all_m if m.project_id == project_id]
+
+    system_m = sorted(
+        [m for m in proj_m if m.category == "system"],
+        key=lambda m: m.wsjf_score,
+        reverse=True,
+    )
+    functional_m = sorted(
+        [m for m in proj_m if m.category != "system"],
+        key=lambda m: m.wsjf_score,
+        reverse=True,
+    )
+
+    # Active sessions/agents for this project
+    sess_store = get_session_store()
+    recent_sessions = (
+        sess_store.list_sessions(project_id=project_id, limit=5)
+        if hasattr(sess_store, "list_sessions")
+        else []
+    )
+
+    phases = project.phases or project.DEFAULT_PHASES
+
+    # Health score
+    active_count = sum(1 for m in proj_m if m.status == "active")
+    completed_count = sum(1 for m in proj_m if m.status == "completed")
+    blocked_count = sum(1 for m in proj_m if m.status == "blocked")
+    total = len(proj_m) or 1
+    health = max(
+        0,
+        min(
+            100,
+            int(
+                (active_count / total) * 40
+                + (completed_count / total) * 50
+                - (blocked_count / total) * 30
+                + (20 if project.exists else 0)
+                + (10 if project.has_git else 0)
+            ),
+        ),
+    )
+
+    return _templates(request).TemplateResponse(
+        "project_hub.html",
+        {
+            "request": request,
+            "page_title": f"{project.name} — Hub",
+            "project": project,
+            "phases": phases,
+            "system_missions": system_m,
+            "functional_missions": functional_m,
+            "health": health,
+            "recent_sessions": recent_sessions,
+            "stats": {
+                "total": len(proj_m),
+                "active": active_count,
+                "completed": completed_count,
+                "blocked": blocked_count,
+            },
+        },
+    )
 
 
 @router.get("/projects/{project_id}/overview", response_class=HTMLResponse)

@@ -1,0 +1,317 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* ── Project Hub ── */
+.hub{max-width:1280px;margin:0 auto;padding:1.5rem 1rem}
+
+/* Header */
+.hub-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.hub-title{font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0}
+.hub-type{font-size:.7rem;padding:.15rem .55rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);font-weight:600;text-transform:uppercase}
+.hub-health{display:flex;align-items:center;gap:.5rem;margin-left:auto}
+.hub-health-label{font-size:.75rem;color:var(--text-secondary)}
+.hub-health-bar{width:80px;height:8px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden}
+.hub-health-fill{height:100%;border-radius:4px;background:var(--green);transition:width .4s}
+.hub-health-fill.med{background:var(--yellow)}
+.hub-health-fill.low{background:var(--red)}
+.hub-health-score{font-size:.8rem;font-weight:700;color:var(--text-primary);min-width:2.5rem}
+
+/* Nav tabs */
+.hub-tabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.hub-tab{padding:.5rem 1rem;font-size:.8rem;font-weight:500;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;border-radius:var(--radius-sm) var(--radius-sm) 0 0;transition:color .15s,border-color .15s}
+.hub-tab:hover{color:var(--text-primary)}
+.hub-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+
+/* Lifecycle bar */
+.lifecycle{display:flex;align-items:center;gap:0;margin-bottom:1.5rem;overflow-x:auto;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.lc-phase{display:flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border-radius:99px;font-size:.78rem;font-weight:500;cursor:pointer;white-space:nowrap;color:var(--text-secondary);transition:background .15s,color .15s;border:2px solid transparent}
+.lc-phase:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.lc-phase.current{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.lc-phase.passed{background:var(--bg-tertiary);color:var(--text-secondary);border-color:var(--border)}
+.lc-arrow{color:var(--border);font-size:.9rem;flex-shrink:0;margin:0 .1rem}
+.lc-icon{font-size:1rem}
+.lc-add{font-size:.75rem;color:var(--text-tertiary);padding:.35rem .75rem;cursor:pointer;border:1px dashed var(--border);border-radius:99px;margin-left:.5rem;white-space:nowrap}
+.lc-add:hover{border-color:var(--accent);color:var(--accent)}
+
+/* 3-column grid */
+.hub-grid{display:grid;grid-template-columns:1fr 1fr 280px;gap:1rem;align-items:start}
+@media(max-width:1100px){.hub-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.hub-grid{grid-template-columns:1fr}}
+
+/* Columns */
+.hub-col-title{font-size:.75rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+.hub-col-title svg{width:14px;height:14px}
+
+/* Mission cards */
+.hub-mission{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .85rem;margin-bottom:.5rem;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.hub-mission:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.hub-mission-name{font-size:.82rem;font-weight:600;color:var(--text-primary);margin-bottom:.25rem}
+.hub-mission-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.hub-m-status{font-size:.68rem;padding:.15rem .45rem;border-radius:99px;font-weight:600}
+.hub-m-status.active{background:#1a4a1a;color:var(--green)}
+.hub-m-status.planning{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.hub-m-status.completed{background:#1a3a4a;color:#7dd3fc}
+.hub-m-status.blocked{background:#4a1a1a;color:var(--red)}
+.hub-m-status.paused{background:var(--bg-tertiary);color:var(--yellow)}
+.hub-m-type{font-size:.65rem;color:var(--text-tertiary);background:var(--bg-tertiary);padding:.1rem .35rem;border-radius:3px}
+.hub-m-wsjf{font-size:.65rem;color:var(--text-tertiary);margin-left:auto}
+
+/* Right column: agents + chat */
+.hub-agents-list{display:flex;flex-direction:column;gap:.4rem;margin-bottom:1rem}
+.hub-agent-row{display:flex;align-items:center;gap:.6rem;padding:.4rem .6rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm)}
+.hub-agent-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0}
+.hub-agent-name{font-size:.78rem;color:var(--text-primary);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hub-agent-phase{font-size:.68rem;color:var(--text-tertiary)}
+
+/* Chat section */
+.hub-chat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.hub-chat-header{padding:.55rem .75rem;border-bottom:1px solid var(--border);font-size:.78rem;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem}
+.hub-chat-msgs{height:180px;overflow-y:auto;padding:.6rem .75rem;display:flex;flex-direction:column;gap:.5rem}
+.hub-chat-msg{font-size:.76rem;line-height:1.5;color:var(--text-primary);background:var(--bg-tertiary);padding:.4rem .6rem;border-radius:var(--radius-sm)}
+.hub-chat-msg.pm{background:var(--accent-dim);border-left:2px solid var(--accent)}
+.hub-chat-input-row{display:flex;gap:.4rem;padding:.5rem .6rem;border-top:1px solid var(--border)}
+.hub-chat-input{flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.35rem .6rem;font-size:.78rem;color:var(--text-primary);outline:none}
+.hub-chat-input:focus{border-color:var(--accent)}
+.hub-chat-send{padding:.35rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:.78rem;cursor:pointer;font-weight:600}
+.hub-chat-send:hover{opacity:.9}
+
+/* Action buttons from PM */
+.hub-actions{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.4rem}
+.hub-action-btn{font-size:.72rem;padding:.3rem .7rem;border-radius:var(--radius-sm);background:var(--bg-tertiary);border:1px solid var(--accent);color:var(--accent);cursor:pointer;font-weight:500}
+.hub-action-btn:hover{background:var(--accent);color:#fff}
+
+/* Stats row */
+.hub-stats{display:flex;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.hub-stat{display:flex;flex-direction:column;align-items:center;padding:.5rem .9rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);min-width:70px}
+.hub-stat-val{font-size:1.3rem;font-weight:700;color:var(--text-primary);line-height:1.1}
+.hub-stat-lbl{font-size:.65rem;color:var(--text-tertiary);text-transform:uppercase;margin-top:.1rem}
+
+/* Empty state */
+.hub-empty{text-align:center;padding:1.5rem;color:var(--text-tertiary);font-size:.8rem;border:1px dashed var(--border);border-radius:var(--radius);margin-bottom:.5rem}
+</style>
+
+<div class="hub">
+  <!-- Header -->
+  <div class="hub-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <h1 class="hub-title">{{ project.name }}</h1>
+        <span class="hub-type">{{ project.factory_type }}</span>
+        {% if project.current_phase %}
+        <span class="hub-type" style="color:var(--accent);border-color:var(--accent)">{{ project.current_phase }}</span>
+        {% endif %}
+      </div>
+      {% if project.description %}
+      <p style="margin:.25rem 0 0;font-size:.8rem;color:var(--text-secondary)">{{ project.description[:120] }}{% if project.description|length > 120 %}…{% endif %}</p>
+      {% endif %}
+    </div>
+    <div class="hub-health">
+      <span class="hub-health-label">Santé</span>
+      <div class="hub-health-bar">
+        <div class="hub-health-fill {% if health >= 70 %}{% elif health >= 40 %}med{% else %}low{% endif %}" style="width:{{ health }}%"></div>
+      </div>
+      <span class="hub-health-score">{{ health }}%</span>
+      <a href="/projects/{{ project.id }}" style="font-size:.72rem;color:var(--text-tertiary);margin-left:.75rem">← Détail</a>
+      <a href="/projects/{{ project.id }}/workspace" style="font-size:.72rem;color:var(--text-tertiary);margin-left:.5rem">IDE</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="hub-stats">
+    <div class="hub-stat"><span class="hub-stat-val">{{ stats.total }}</span><span class="hub-stat-lbl">missions</span></div>
+    <div class="hub-stat"><span class="hub-stat-val" style="color:var(--green)">{{ stats.active }}</span><span class="hub-stat-lbl">actives</span></div>
+    <div class="hub-stat"><span class="hub-stat-val" style="color:#7dd3fc">{{ stats.completed }}</span><span class="hub-stat-lbl">terminées</span></div>
+    {% if stats.blocked > 0 %}<div class="hub-stat"><span class="hub-stat-val" style="color:var(--red)">{{ stats.blocked }}</span><span class="hub-stat-lbl">bloquées</span></div>{% endif %}
+    <div class="hub-stat"><span class="hub-stat-val" style="color:{% if project.exists %}var(--green){% else %}var(--red){% endif %}">{% if project.exists %}✓{% else %}✗{% endif %}</span><span class="hub-stat-lbl">workspace</span></div>
+    <div class="hub-stat"><span class="hub-stat-val" style="color:{% if project.has_git %}var(--green){% else %}var(--text-tertiary){% endif %}">{% if project.has_git %}git{% else %}—{% endif %}</span><span class="hub-stat-lbl">vcs</span></div>
+  </div>
+
+  <!-- Lifecycle bar -->
+  <div class="lifecycle" id="hubLifecycle">
+    {% set eff_phases = phases if phases else [] %}
+    {% for ph in eff_phases %}
+      {% if not loop.first %}<span class="lc-arrow">›</span>{% endif %}
+      <div class="lc-phase {% if project.current_phase == ph.id %}current{% elif loop.revindex > (eff_phases|length - loop.index0) %}passed{% endif %}"
+           onclick="hubSetPhase('{{ ph.id }}')" title="Passer en phase {{ ph.name }}">
+        <span class="lc-icon">{{ ph.icon }}</span>
+        {{ ph.name }}
+      </div>
+    {% else %}
+      <span style="font-size:.78rem;color:var(--text-tertiary)">Aucune phase définie — définissez-les via le chat PM</span>
+    {% endfor %}
+    <span class="lc-add" onclick="hubAddPhase()">+ Phase</span>
+  </div>
+
+  <!-- 3-column grid -->
+  <div class="hub-grid">
+
+    <!-- Col 1: System missions -->
+    <div>
+      <div class="hub-col-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Missions Système
+        <span style="font-size:.65rem;font-weight:400;color:var(--text-tertiary)">(TMA / Sécu / Dette)</span>
+      </div>
+      {% for m in system_missions %}
+      <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
+        <div class="hub-mission-name">{{ m.name }}</div>
+        <div class="hub-mission-meta">
+          <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
+          <span class="hub-m-type">{{ m.type }}</span>
+          {% if m.active_phases %}
+          <span style="font-size:.63rem;color:var(--text-tertiary)">{{ m.active_phases | join(' · ') }}</span>
+          {% endif %}
+          <span class="hub-m-wsjf">WSJF {{ m.wsjf_score }}</span>
+        </div>
+      </div>
+      {% else %}
+      <div class="hub-empty">Aucune mission système — <a href="#" onclick="hubHealMissions();return false">Générer</a></div>
+      {% endfor %}
+      <button onclick="hubHealMissions()" style="width:100%;margin-top:.25rem;padding:.4rem;font-size:.72rem;background:none;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-tertiary);cursor:pointer">↻ Synchroniser</button>
+    </div>
+
+    <!-- Col 2: Functional missions -->
+    <div>
+      <div class="hub-col-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Missions Fonctionnelles
+        <button onclick="hubNewMission()" style="margin-left:auto;font-size:.68rem;padding:.2rem .5rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">+ Mission</button>
+      </div>
+      {% for m in functional_missions %}
+      <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
+        <div class="hub-mission-name">{{ m.name }}</div>
+        <div class="hub-mission-meta">
+          <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
+          <span class="hub-m-type">{{ m.type }}</span>
+          <span class="hub-m-wsjf">WSJF {{ m.wsjf_score }}</span>
+        </div>
+      </div>
+      {% else %}
+      <div class="hub-empty">Aucune mission fonctionnelle — demandez à l'agent PM d'en créer</div>
+      {% endfor %}
+    </div>
+
+    <!-- Col 3: Agents + Chat PM -->
+    <div>
+      <div class="hub-col-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg>
+        Agent PM
+      </div>
+
+      {% if recent_sessions %}
+      <div class="hub-agents-list">
+        {% for s in recent_sessions[:3] %}
+        <div class="hub-agent-row">
+          <div class="hub-agent-dot"></div>
+          <span class="hub-agent-name">{{ s.name or s.id[:8] }}</span>
+          <span class="hub-agent-phase">{{ s.status or 'actif' }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Chat with PM Agent -->
+      <div class="hub-chat">
+        <div class="hub-chat-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Chat Agent PM — {{ project.name[:20] }}
+        </div>
+        <div class="hub-chat-msgs" id="hubChatMsgs">
+          <div class="hub-chat-msg pm">Bonjour ! Je pilote le projet <strong>{{ project.name }}</strong>. Phase actuelle : <strong>{{ project.current_phase or 'non définie' }}</strong>. Que voulez-vous faire ?</div>
+        </div>
+        <div id="hubChatActions" class="hub-actions" style="padding:.4rem .6rem;border-top:1px solid var(--border)">
+          <button class="hub-action-btn" onclick="hubSuggest('Quelle est la prochaine étape recommandée ?')">Prochaine étape ?</button>
+          <button class="hub-action-btn" onclick="hubSuggest('Analyse l\\'état du projet et propose des actions')">Analyser</button>
+        </div>
+        <div class="hub-chat-input-row">
+          <input type="text" class="hub-chat-input" id="hubChatInput" placeholder="Message à l'agent PM…" onkeydown="if(event.key==='Enter')hubSend()">
+          <button class="hub-chat-send" onclick="hubSend()">→</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+var _hubProjectId = {{ project.id | tojson }};
+var _hubProjectName = {{ project.name | tojson }};
+
+function hubSetPhase(phaseId) {
+  if (!confirm('Passer en phase "' + phaseId + '" ? Les statuts des missions système seront mis à jour.')) return;
+  fetch('/api/projects/' + encodeURIComponent(_hubProjectId) + '/phase', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({phase: phaseId})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) location.reload();
+    else alert('Erreur: ' + (d.detail || 'inconnue'));
+  });
+}
+
+function hubAddPhase() {
+  var name = prompt('Nom de la nouvelle phase ?');
+  if (!name) return;
+  hubSuggest('Ajoute la phase "' + name + '" au cycle de vie du projet');
+}
+
+function hubHealMissions() {
+  fetch('/api/projects/' + encodeURIComponent(_hubProjectId) + '/scaffold', {method: 'POST'})
+    .then(function(){ return fetch('/api/projects/' + encodeURIComponent(_hubProjectId) + '/health'); })
+    .then(function(r){ return r.json(); })
+    .then(function(){ location.reload(); });
+}
+
+function hubNewMission() {
+  var name = prompt('Nom de la nouvelle mission ?');
+  if (!name) return;
+  hubSuggest('Crée une mission fonctionnelle "' + name + '" pour ce projet avec description et objectif');
+}
+
+function hubSuggest(msg) {
+  document.getElementById('hubChatInput').value = msg;
+  hubSend();
+}
+
+function hubSend() {
+  var input = document.getElementById('hubChatInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  var msgs = document.getElementById('hubChatMsgs');
+  msgs.insertAdjacentHTML('beforeend', '<div class="hub-chat-msg" style="text-align:right;background:var(--bg-secondary)">' + _hubEsc(msg) + '</div>');
+  msgs.scrollTop = msgs.scrollHeight;
+
+  // Streaming chat to PM agent
+  var thinking = document.createElement('div');
+  thinking.className = 'hub-chat-msg pm';
+  thinking.textContent = '…';
+  msgs.appendChild(thinking);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  var context = 'Projet: ' + _hubProjectName + '. Phase: {{ project.current_phase or "non définie" }}. Missions: {{ stats.total }}. Santé: {{ health }}%.';
+  fetch('/api/projects/' + encodeURIComponent(_hubProjectId) + '/chat/stream', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: msg, context: context})
+  }).then(function(r){
+    if (!r.ok) { thinking.textContent = 'Erreur de connexion à l\'agent PM.'; return; }
+    var reader = r.body.getReader(); var dec = new TextDecoder(); var text = '';
+    function read(){ reader.read().then(function(v){
+      if (v.done){ return; }
+      var chunk = dec.decode(v.value, {stream:true});
+      chunk.split('\n').forEach(function(line){
+        if (line.startsWith('data: ')){
+          var d = line.slice(6);
+          if (d === '[DONE]') return;
+          try { var j = JSON.parse(d); text += j.text || j.delta || ''; thinking.textContent = text; msgs.scrollTop = msgs.scrollHeight; } catch(e){}
+        }
+      });
+      read();
+    }); }
+    read();
+  }).catch(function(e){ thinking.textContent = 'Agent PM non disponible: ' + e.message; });
+}
+
+function _hubEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+{% endblock %}
