@@ -78,7 +78,7 @@ for dir in "${DIRS_TO_SYNC[@]}"; do
         "$GITHUB_REPO/$dir/" "$LAPOSTE_REPO/$dir/"
 done
 
-# Fichiers racine
+# Fichiers racine (LICENSE exclu — GitHub only, pas GitLab La Poste)
 ROOT_FILES=(Makefile Dockerfile docker-compose.yml .gitignore .env.example pyproject.toml setup_env.sh nginx.conf .gitlab-ci.yml)
 for f in "${ROOT_FILES[@]}"; do
     [ -f "$GITHUB_REPO/$f" ] || continue
