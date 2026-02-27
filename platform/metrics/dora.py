@@ -188,10 +188,10 @@ class DORAMetrics:
         try:
             cutoff = (datetime.utcnow() - timedelta(days=period_days)).isoformat()
             rows = db.execute(
-                """SELECT (julianday(resolved_at) - julianday(created_at)) * 24 as hours
+                """SELECT resolved_at, created_at
                    FROM platform_incidents
                    WHERE status='resolved' AND resolved_at IS NOT NULL AND created_at >= ?
-                   ORDER BY hours""",
+                   ORDER BY resolved_at""",
                 (cutoff,),
             ).fetchall()
             if not rows:
@@ -201,9 +201,24 @@ class DORAMetrics:
                     "level": "high",
                     "note": "no resolved incidents",
                 }
-            hours = [
-                r["hours"] for r in rows if r["hours"] is not None and r["hours"] >= 0
-            ]
+            hours = []
+            for r in rows:
+                try:
+                    ca = (
+                        r["created_at"]
+                        if isinstance(r["created_at"], datetime)
+                        else datetime.fromisoformat(str(r["created_at"]))
+                    )
+                    ra = (
+                        r["resolved_at"]
+                        if isinstance(r["resolved_at"], datetime)
+                        else datetime.fromisoformat(str(r["resolved_at"]))
+                    )
+                    h = (ra - ca).total_seconds() / 3600
+                    if h >= 0:
+                        hours.append(h)
+                except Exception:
+                    pass
             if not hours:
                 return {"median_hours": 0, "count": 0, "level": "high"}
             median = hours[len(hours) // 2]
