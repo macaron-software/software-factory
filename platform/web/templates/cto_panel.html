@@ -265,6 +265,17 @@
   var _attachment = null; // {name, text, chars, truncated}
   var _lastMsg = null;    // {content, display} — for retry
 
+  /* Restore _lastMsg from retry bar data attribute (interrupted conversation) */
+  function _restoreLastMsgFromRetryBar(container){
+    var bar = (container || document).querySelector('.cto-retry-bar[data-msg]');
+    if(bar && !_lastMsg){
+      var raw = bar.getAttribute('data-msg') || '';
+      _lastMsg = {content: raw, display: raw};
+    }
+  }
+  // Check on initial page load
+  document.addEventListener('DOMContentLoaded', function(){ _restoreLastMsgFromRetryBar(null); });
+
   /* ── Attachment ── */
   function ctoHandleFileInput(input){
     var file = input.files && input.files[0];
@@ -663,7 +674,9 @@
     fetch('/api/cto/sessions/' + sessionId + '/messages')
     .then(function(r){ return r.text(); })
     .then(function(html){
+      _lastMsg = null;  // reset before loading new session
       msgs.innerHTML = html || '';
+      _restoreLastMsgFromRetryBar(msgs);
       msgs.scrollTop = msgs.scrollHeight;
     });
   }

@@ -85,11 +85,13 @@ def _build_history_html(session_id: str) -> str:
 
     store = get_session_store()
     agent_store = get_agent_store()
-    messages = store.get_messages(session_id, limit=50)
+    messages = [
+        m
+        for m in store.get_messages(session_id, limit=200)
+        if m.message_type != "system"
+    ]
     history_html = ""
     for msg in messages:
-        if msg.message_type == "system":
-            continue
         if msg.from_agent == "user":
             history_html += (
                 f'<div class="chat-msg chat-msg-user">'
@@ -148,6 +150,23 @@ def _build_history_html(session_id: str) -> str:
                     f"{tools_html}"
                     f"</div></div>"
                 )
+
+    # Detect interrupted: last message is from user → show retry bar
+    if messages and messages[-1].from_agent == "user":
+        last_content = messages[-1].content or ""
+        short = last_content[:60] + "…" if len(last_content) > 60 else last_content
+        safe_content = html_mod.escape(last_content).replace('"', "&#34;")
+        safe_short = html_mod.escape(short)
+        history_html += (
+            f'<div class="cto-retry-bar" data-msg="{safe_content}">'
+            f'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+            f'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+            f'<span class="retry-msg" title="Conversation interrompue">Conversation interrompue — «{safe_short}»</span>'
+            f'<button class="cto-retry-btn edit" onclick="ctoRetryEdit()">Modifier</button>'
+            f'<button class="cto-retry-btn" onclick="ctoRetryResend()">Relancer</button>'
+            f"</div>"
+        )
+
     return history_html
 
 
