@@ -423,6 +423,27 @@ def _resolve_mentions(content: str) -> str:
         return content
 
 
+def _badge_mentions(text: str) -> str:
+    """Convert @Project and #Agent mentions to colored badge HTML for display."""
+    import re
+    parts = []
+    last = 0
+    # Match @ProjectName or #AgentName — greedy up to logical stop
+    pattern = re.compile(
+        r'([@#])([\w\-][^@#\n]*?)(?=\s{2,}|\s+(?:ou|en|et|pour|qu|qui|dit|de|du|la|le|les)\s|[?!,;]|\s*$)',
+        re.IGNORECASE,
+    )
+    for m in pattern.finditer(text):
+        trigger = m.group(1)
+        name = m.group(2).strip()
+        cls = "mention-badge-project" if trigger == "@" else "mention-badge-agent"
+        parts.append(html_mod.escape(text[last:m.start()]))
+        parts.append(f'<span class="{cls}">{trigger}{html_mod.escape(name)}</span>')
+        last = m.start() + len(trigger) + len(m.group(2))
+    parts.append(html_mod.escape(text[last:]))
+    return "".join(parts)
+
+
 @router.post("/api/cto/message")
 async def cto_message(request: Request):
     """Send a message to the CTO agent, return SSE stream."""
@@ -457,7 +478,7 @@ async def cto_message(request: Request):
 
     user_html = (
         f'<div class="chat-msg chat-msg-user">'
-        f'<div class="chat-msg-body"><div class="chat-msg-text">{html_mod.escape(display)}</div></div>'
+        f'<div class="chat-msg-body"><div class="chat-msg-text">{_badge_mentions(display)}</div></div>'
         f'<div class="chat-msg-avatar user">S</div>'
         f"</div>"
     )
