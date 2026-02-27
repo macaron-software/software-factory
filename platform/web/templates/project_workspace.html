@@ -2,7 +2,7 @@
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs/loader.js"></script>
 <script>require.config({paths:{vs:'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.0/min/vs'}});</script>
-<link rel="stylesheet" href="/static/css/project_workspace.css?v=8">
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=9">
 <style>
 html,body{height:100%;overflow:hidden}
 .layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
@@ -62,6 +62,9 @@ html,body{height:100%;overflow:hidden}
     </button>
     <button class="ws-activity-btn" data-view="db" onclick="wsSetView('db')" title="Database">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="secrets" onclick="wsSetView('secrets')" title="Secrets / .env">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
     </button>
   </div>
 
@@ -182,8 +185,26 @@ html,body{height:100%;overflow:hidden}
               </div>
             </div>
           </div>
-          <div class="ws-tab-content" id="ws-docker-portainer" style="flex:1;min-height:0">
-            <iframe src="/portainer/" id="wsPortainerFrame" style="flex:1;width:100%;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+          <div class="ws-tab-content" id="ws-docker-portainer">
+            <div class="ws-tool-launcher">
+              <div class="ws-tool-logo">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </div>
+              <div class="ws-tool-info">
+                <h3>Portainer CE</h3>
+                <p>Gestion complète des containers Docker — images, volumes, réseaux, logs.</p>
+                <div class="ws-tool-stats" id="wsPortainerStats">
+                  <span class="ws-badge">Chargement…</span>
+                </div>
+              </div>
+              <div class="ws-tool-actions">
+                <a href="https://sf.macaron-software.com/portainer/" target="_blank" class="ws-btn-launch">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Ouvrir Portainer
+                </a>
+                <span class="ws-tool-hint">S'ouvre dans un nouvel onglet</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -292,9 +313,70 @@ html,body{height:100%;overflow:hidden}
                 </div>
               </div>
             </div>
-            <div class="ws-tab-content" id="ws-db-dbgate" style="flex:1;min-height:0">
-              <iframe src="/dbgate/" id="wsDbGateFrame" style="flex:1;width:100%;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+            <div class="ws-tab-content" id="ws-db-dbgate" style="flex-direction:column">
+              <div class="ws-dbgate-header">
+                <div style="flex:1">
+                  <strong style="font-size:.8rem">DbGate</strong>
+                  <span style="font-size:.72rem;color:var(--text-secondary);margin-left:.4rem">multi-DB (Postgres, MySQL, SQLite, MongoDB…)</span>
+                </div>
+                <a href="https://sf.macaron-software.com/dbgate/" target="_blank" class="ws-preview-btn" style="text-decoration:none">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Ouvrir en plein écran
+                </a>
+              </div>
+              <div class="ws-dbgate-connections" id="wsDbGateConnections">
+                <div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-secondary)">Scan des connexions…</div>
+              </div>
+              <iframe src="/dbgate/" id="wsDbGateFrame" style="flex:1;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Secrets / Vault ──────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-secrets">
+        <div class="ws-secrets-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Fichiers .env</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-filetree-body" id="wsSecretsFiles">
+              <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>
+            </div>
+          </div>
+          <div style="padding:.5rem;border-top:1px solid var(--border)">
+            <button class="ws-term-run" style="width:100%;justify-content:center;padding:.3rem;font-size:.72rem" onclick="wsSecretsNewFile()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Créer .env
+            </button>
+          </div>
+        </div>
+        <div class="ws-secrets-main">
+          <div class="ws-pane-tabs" id="wsSecretsToolbar">
+            <span style="font-size:.76rem;font-weight:600;color:var(--text-primary)" id="wsSecretsFileName">—</span>
+            <span style="flex:1"></span>
+            <button class="ws-preview-btn" onclick="wsSecretsToggleAll()" id="wsSecretsShowAllBtn" style="font-size:.7rem;padding:.2rem .4rem;margin-right:.3rem">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Afficher
+            </button>
+            <button class="ws-preview-btn" onclick="wsSecretsSave()" id="wsSecretsSaveBtn" style="font-size:.7rem;padding:.2rem .4rem" disabled>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Sauvegarder
+            </button>
+          </div>
+          <div class="ws-pane-content" style="overflow-y:auto">
+            <div id="wsSecretsList" style="padding:.5rem">
+              <div class="ws-empty-state" id="wsSecretsEmpty">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span>Sélectionnez un fichier .env</span>
+                <span class="ws-empty-hint">Gérez vos variables d'environnement et secrets</span>
+              </div>
+            </div>
+          </div>
+          <div style="padding:.5rem;border-top:1px solid var(--border);display:flex;gap:.4rem" id="wsSecretsAddRow" style="display:none">
+            <input type="text" id="wsSecretsNewKey" placeholder="NOM_VARIABLE" style="flex:1;min-width:0;padding:.3rem .5rem;font-size:.75rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.25rem;color:var(--text-primary)">
+            <input type="text" id="wsSecretsNewVal" placeholder="valeur" style="flex:2;min-width:0;padding:.3rem .5rem;font-size:.75rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.25rem;color:var(--text-primary)">
+            <button class="ws-term-run" style="padding:.3rem .55rem;font-size:.72rem;white-space:nowrap" onclick="wsSecretsAdd()">Ajouter</button>
           </div>
         </div>
       </div>
@@ -385,10 +467,11 @@ function wsSetView(name) {
   localStorage.setItem('ws_view_' + _wsProjectId, name);
   if (name === 'code') { wsLoadToolcalls(); }
   if (name === 'git') { wsLoadGit(); }
-  if (name === 'docker') { wsLoadDocker(); }
+  if (name === 'docker') { wsLoadDocker(); wsLoadPortainerStats(); }
   if (name === 'agents') { wsLoadAgents(); wsLoadAgentsToolcalls(); }
   if (name === 'backlog') { wsLoadBacklog(); }
   if (name === 'db') { wsLoadDatabase(); }
+  if (name === 'secrets') { wsLoadSecrets(); }
 }
 
 function wsBottomTab(btn, name) {
@@ -421,6 +504,7 @@ function wsDbMainTab(btn, name) {
   btn.classList.add('active');
   var el = document.getElementById('ws-db-' + name);
   if (el) el.classList.add('active');
+  if (name === 'dbgate') wsLoadDbGateConnections();
 }
 
 function wsGitMainTab(btn, name) {
@@ -541,7 +625,8 @@ function wsLoadFilesTree(path) {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
+      var parent = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.';
+      var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'' + wsEsc(parent) + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> ..</div>' : '';
       if (!items.length) { tree.innerHTML = backBtn + '<div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>'; return; }
       var html = backBtn;
       items.filter(function(i){ return i.type==='dir'; }).forEach(function(i) {
@@ -803,7 +888,10 @@ function wsLoadDatabase() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       _wsDbFiles = data.files || [];
-      if (!_wsDbFiles.length) { panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Aucune base SQLite détectée dans ce projet</div>'; return; }
+      if (!_wsDbFiles.length) {
+        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;line-height:1.6">Aucune base SQLite détectée<br><span style="font-size:.68rem">Pour Postgres/MySQL/MongoDB,<br>utilisez l\'onglet <strong>DbGate</strong> →</span></div>';
+        return;
+      }
       var html = '';
       _wsDbFiles.forEach(function(f) {
         html += '<div class="ws-db-file-label" style="padding:.4rem .75rem .2rem;font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.05em">' + wsEsc(f.name) + '</div>';
@@ -849,7 +937,183 @@ function wsDbRun() {
 }
 document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if(e.ctrlKey&&e.key==='Enter') wsDbRun(); });
 
-// ── Helpers ─────────────────────────────────────────────────────
+// ── Portainer Stats ─────────────────────────────────────────────
+function wsLoadPortainerStats() {
+  var el = document.getElementById('wsPortainerStats');
+  if (!el) return;
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var c = d.containers || [];
+      var up = c.filter(function(x){ return x.running; }).length;
+      el.innerHTML = '<span class="ws-badge ws-badge-ok">' + up + ' running</span> <span class="ws-badge">' + c.length + ' total</span>';
+    }).catch(function(){ el.innerHTML = '<span class="ws-badge">—</span>'; });
+}
+
+function wsLoadDbGateConnections() {
+  var el = document.getElementById('wsDbGateConnections');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Configuration des connexions…</div>';
+  // First auto-configure connections from .env
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/dbgate/configure', {method:'POST'})
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.configured > 0) {
+        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">' +
+          '<span class="ws-badge ws-badge-ok">✓ ' + d.configured + ' connexion(s) configurée(s)</span> ' +
+          '<span style="margin-left:.3rem">Rechargez DbGate pour les voir</span> ' +
+          '<button class="ws-secret-btn" onclick="document.getElementById(\'wsDbGateFrame\').src=\'/dbgate/\'" title="Recharger">↺</button></div>';
+      } else {
+        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Aucune connexion DB détectée — ajoutez-les manuellement dans DbGate</div>';
+      }
+    }).catch(function(){
+      el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate</div>';
+    });
+}
+
+// ── Secrets / Vault ─────────────────────────────────────────────
+var _wsSecretsCurrentFile = null;
+var _wsSecretsData = {};
+var _wsSecretsShowAll = false;
+
+function wsLoadSecrets() {
+  var panel = document.getElementById('wsSecretsFiles');
+  panel.innerHTML = '<div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/secrets')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      _wsSecretsData = {};
+      var files = data.files || [];
+      (data.env_info || []).forEach(function(ei) { /* extra info */ });
+      if (!files.length) {
+        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Aucun fichier .env</div>';
+        return;
+      }
+      var html = '';
+      files.forEach(function(f) {
+        _wsSecretsData[f.path] = f.vars || [];
+        var badge = f.vars.length + ' var' + (f.vars.length > 1 ? 's' : '');
+        html += '<div class="ws-tree-item" onclick="wsSecretsSelect(\'' + wsEsc(f.path) + '\')">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+          wsEsc(f.name) + '<span class="ws-tree-size">' + badge + '</span></div>';
+      });
+      panel.innerHTML = html;
+      if (files.length) wsSecretsSelect(files[0].path);
+    }).catch(function(){ panel.innerHTML = '<div style="padding:.75rem;color:#f85149;font-size:.72rem">Erreur</div>'; });
+}
+
+function wsSecretsSelect(path) {
+  _wsSecretsCurrentFile = path;
+  document.getElementById('wsSecretsFileName').textContent = path;
+  document.getElementById('wsSecretsSaveBtn').disabled = false;
+  document.getElementById('wsSecretsAddRow').style.display = 'flex';
+  wsSecretsRender();
+  // Highlight active file
+  document.querySelectorAll('#wsSecretsFiles .ws-tree-item').forEach(function(el) {
+    el.classList.toggle('active', el.textContent.trim().startsWith(path.replace(/^\./,'')));
+  });
+}
+
+function wsSecretsRender() {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile] || [];
+  var list = document.getElementById('wsSecretsList');
+  if (!vars.length) {
+    list.innerHTML = '<div style="padding:.5rem;color:var(--text-secondary);font-size:.75rem;text-align:center">Aucune variable — ajoutez-en ci-dessous</div>';
+    return;
+  }
+  var html = '';
+  vars.forEach(function(v, i) {
+    var masked = _wsSecretsShowAll ? wsEsc(v.value) : (v.value ? '•'.repeat(Math.min(v.value.length, 12)) : '—');
+    html += '<div class="ws-secret-row" data-idx="' + i + '">' +
+      '<span class="ws-secret-key">' + wsEsc(v.key) + '</span>' +
+      '<span class="ws-secret-val" data-idx="' + i + '">' + masked + '</span>' +
+      '<input class="ws-secret-input" type="text" value="' + wsEsc(v.value) + '" data-idx="' + i + '" onchange="wsSecretsEdit(' + i + ',this.value)" style="display:none">' +
+      '<button class="ws-secret-btn" onclick="wsSecretsToggleEdit(' + i + ')" title="Modifier">✎</button>' +
+      '<button class="ws-secret-btn ws-secret-del" onclick="wsSecretsDelete(' + i + ')" title="Supprimer">✕</button>' +
+      '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function wsSecretsToggleEdit(idx) {
+  var span = document.querySelector('.ws-secret-val[data-idx="' + idx + '"]');
+  var inp = document.querySelector('.ws-secret-input[data-idx="' + idx + '"]');
+  if (span && inp) {
+    var editing = inp.style.display !== 'none';
+    span.style.display = editing ? '' : 'none';
+    inp.style.display = editing ? 'none' : '';
+    if (!editing) inp.focus();
+  }
+}
+
+function wsSecretsEdit(idx, val) {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile];
+  if (vars && vars[idx]) vars[idx].value = val;
+  wsSecretsRender();
+}
+
+function wsSecretsDelete(idx) {
+  if (!_wsSecretsCurrentFile) return;
+  _wsSecretsData[_wsSecretsCurrentFile].splice(idx, 1);
+  wsSecretsRender();
+}
+
+function wsSecretsAdd() {
+  var key = document.getElementById('wsSecretsNewKey').value.trim().toUpperCase().replace(/[^A-Z0-9_]/g,'_');
+  var val = document.getElementById('wsSecretsNewVal').value;
+  if (!key || !_wsSecretsCurrentFile) return;
+  if (!_wsSecretsData[_wsSecretsCurrentFile]) _wsSecretsData[_wsSecretsCurrentFile] = [];
+  // Update if exists
+  var existing = _wsSecretsData[_wsSecretsCurrentFile].find(function(v){ return v.key === key; });
+  if (existing) { existing.value = val; } else { _wsSecretsData[_wsSecretsCurrentFile].push({key:key, value:val}); }
+  document.getElementById('wsSecretsNewKey').value = '';
+  document.getElementById('wsSecretsNewVal').value = '';
+  wsSecretsRender();
+}
+
+function wsSecretsToggleAll() {
+  _wsSecretsShowAll = !_wsSecretsShowAll;
+  var btn = document.getElementById('wsSecretsShowAllBtn');
+  if (btn) btn.style.color = _wsSecretsShowAll ? 'var(--purple)' : '';
+  wsSecretsRender();
+}
+
+function wsSecretsSave() {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile] || [];
+  var btn = document.getElementById('wsSecretsSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/secrets/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: _wsSecretsCurrentFile, vars: vars})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Sauvegarder'; }
+      wsSetStatus(d.ok ? 'Secrets sauvegardés ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2500);
+    }).catch(function(){ if(btn){ btn.disabled=false; } wsSetStatus('Erreur save','running'); });
+}
+
+function wsSecretsNewFile() {
+  var name = prompt('Nom du fichier (.env, .env.local, .env.production…)', '.env');
+  if (!name || !name.startsWith('.env')) return;
+  _wsSecretsData[name] = [];
+  _wsSecretsCurrentFile = name;
+  // Add to UI
+  var panel = document.getElementById('wsSecretsFiles');
+  var existing = panel.querySelector('[data-file="' + name + '"]');
+  if (!existing) {
+    panel.insertAdjacentHTML('beforeend', '<div class="ws-tree-item" onclick="wsSecretsSelect(\'' + wsEsc(name) + '\')">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' + wsEsc(name) + '<span class="ws-tree-size">0 var</span></div>');
+  }
+  wsSecretsSelect(name);
+  // Auto-save to create the file
+  wsSecretsSave();
+}
+
+
 function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el)return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
 function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 

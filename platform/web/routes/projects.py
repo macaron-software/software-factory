@@ -1432,7 +1432,10 @@ async def ws_list_files(project_id: str, path: str = "."):
             for entry in sorted(
                 target.iterdir(), key=lambda e: (e.is_file(), e.name.lower())
             ):
-                if entry.name in SKIP or entry.name.startswith("."):
+                if entry.name in SKIP:
+                    continue
+                # Skip hidden dirs (like .git, .next) but show hidden files (like .env)
+                if entry.is_dir() and entry.name.startswith("."):
                     continue
                 rel = str(entry.relative_to(root))
                 items.append(
@@ -1911,3 +1914,215 @@ async def ws_backlog(project_id: str):
         pass
 
     return JSONResponse({"missions": missions_out})
+
+
+@router.get("/api/projects/{project_id}/workspace/secrets")
+async def ws_get_secrets(project_id: str):
+    """List .env files and their KEY=VALUE pairs."""
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"files": []})
+
+    root = Path(proj.path)
+    env_names = [
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.production",
+        ".env.test",
+        ".env.example",
+        ".env.staging",
+    ]
+    files = []
+    for fname in env_names:
+        fpath = root / fname
+        if not fpath.is_file():
+            continue
+        vars_list = []
+        try:
+            content = fpath.read_text(errors="replace")
+            for line in content.splitlines():
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#"):
+                    continue
+                if "=" in stripped:
+                    key, _, val = stripped.partition("=")
+                    vars_list.append({"key": key.strip(), "value": val.strip()})
+        except Exception:
+            pass
+        files.append({"name": fname, "path": fname, "vars": vars_list})
+
+    return JSONResponse({"files": files})
+
+
+@router.post("/api/projects/{project_id}/workspace/secrets/save")
+async def ws_save_secrets(project_id: str, request: Request):
+    """Save .env file with updated KEY=VALUE pairs."""
+    from ...projects.manager import get_project_store
+    from ...web.routes.helpers import _parse_body
+
+    body = await _parse_body(request)
+    path = body.get("path", ".env")
+    vars_list = body.get("vars", [])
+
+    if not path or not str(path).startswith(".env"):
+        return JSONResponse({"error": "only .env* files allowed"})
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "project not found"}, status_code=404)
+
+    root = Path(proj.path).resolve()
+    target = (root / path).resolve()
+    try:
+        target.relative_to(root)
+    except ValueError:
+        return JSONResponse({"error": "access denied"})
+
+    lines = []
+    for v in vars_list:
+        key = str(v.get("key", "")).strip()
+        val = str(v.get("value", "")).strip()
+        if key:
+            # Quote value if it contains spaces and isn't already quoted
+            if " " in val and not (val.startswith('"') or val.startswith("'")):
+                val = f'"{val}"'
+            lines.append(f"{key}={val}")
+
+    try:
+        target.write_text("\n".join(lines) + "\n" if lines else "", encoding="utf-8")
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+    return JSONResponse({"ok": True})
+
+
+@router.post("/api/projects/{project_id}/workspace/dbgate/configure")
+async def ws_dbgate_configure(project_id: str):
+    """Auto-configure DbGate connections from project .env files."""
+    import httpx
+    import os
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "project not found"}, status_code=404)
+
+    root = Path(proj.path)
+    env_names = [".env", ".env.local", ".env.development", ".env.production"]
+    all_vars: dict = {}
+    for fname in env_names:
+        fpath = root / fname
+        if not fpath.is_file():
+            continue
+        try:
+            for line in fpath.read_text(errors="replace").splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#") and "=" in stripped:
+                    k, _, v = stripped.partition("=")
+                    all_vars[k.strip()] = v.strip().strip('"').strip("'")
+        except Exception:
+            pass
+
+    # Collect connections to create
+    conns = []
+    _id_counter = 0
+
+    def _next_id():
+        nonlocal _id_counter
+        _id_counter += 1
+        return f"{project_id[:12]}_conn{_id_counter}"
+
+    # SQLite files
+    for root2, dirs, fnames in os.walk(proj.path):
+        dirs[:] = [
+            d
+            for d in dirs
+            if not d.startswith(".")
+            and d not in ("node_modules", "__pycache__", "venv", ".git")
+        ]
+        for fname in fnames:
+            if fname.endswith((".db", ".sqlite", ".sqlite3")):
+                fpath2 = os.path.join(root2, fname)
+                conns.append(
+                    {
+                        "_id": _next_id(),
+                        "engine": "sqlite@dbgate-plugin-sqlite",
+                        "databaseFile": fpath2,
+                        "label": f"SQLite: {fname}",
+                    }
+                )
+
+    # Postgres from env
+    pg_url = (
+        all_vars.get("DATABASE_URL")
+        or all_vars.get("POSTGRES_URL")
+        or all_vars.get("PG_URL")
+        or all_vars.get("DB_URL")
+    )
+    if pg_url and (pg_url.startswith("postgres")):
+        conns.append(
+            {
+                "_id": _next_id(),
+                "engine": "postgres@dbgate-plugin-postgres",
+                "url": pg_url,
+                "label": "PostgreSQL",
+            }
+        )
+    elif all_vars.get("POSTGRES_HOST") or all_vars.get("PG_HOST"):
+        host = all_vars.get("POSTGRES_HOST") or all_vars.get("PG_HOST")
+        conns.append(
+            {
+                "_id": _next_id(),
+                "engine": "postgres@dbgate-plugin-postgres",
+                "server": host,
+                "port": all_vars.get("POSTGRES_PORT", "5432"),
+                "user": all_vars.get("POSTGRES_USER") or all_vars.get("PG_USER", ""),
+                "password": all_vars.get("POSTGRES_PASSWORD")
+                or all_vars.get("PG_PASSWORD", ""),
+                "database": all_vars.get("POSTGRES_DB")
+                or all_vars.get("PG_DATABASE", ""),
+                "label": "PostgreSQL",
+            }
+        )
+
+    # MySQL from env
+    mysql_url = all_vars.get("MYSQL_URL") or all_vars.get("DATABASE_URL")
+    if mysql_url and mysql_url.startswith("mysql"):
+        conns.append(
+            {
+                "_id": _next_id(),
+                "engine": "mysql@dbgate-plugin-mysql",
+                "url": mysql_url,
+                "label": "MySQL",
+            }
+        )
+
+    if not conns:
+        return JSONResponse({"configured": 0, "message": "No databases detected"})
+
+    # Login to DbGate and create connections
+    dbgate_url = "http://localhost:3002"
+    dbgate_password = "dbgate2024"
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            login = await client.post(
+                f"{dbgate_url}/auth/login",
+                json={"login": "admin", "password": dbgate_password},
+            )
+            if login.status_code != 200:
+                return JSONResponse({"configured": 0, "error": "DbGate auth failed"})
+            token = login.json().get("accessToken")
+            headers = {"Authorization": f"Bearer {token}"}
+            saved = 0
+            for conn in conns:
+                r = await client.post(
+                    f"{dbgate_url}/connections/save", json=conn, headers=headers
+                )
+                if r.status_code == 200:
+                    saved += 1
+        return JSONResponse({"configured": saved, "total": len(conns)})
+    except Exception as e:
+        return JSONResponse({"configured": 0, "error": str(e)})

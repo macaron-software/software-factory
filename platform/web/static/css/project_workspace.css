@@ -804,3 +804,67 @@
   text-decoration: none;
 }
 .ws-port-badge:hover { background: rgba(63,185,80,.25); }
+
+/* ── Tool Launcher (Portainer, DbGate) ────────────────────────── */
+.ws-tool-launcher {
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: 2rem 2.5rem; flex: 1;
+}
+.ws-tool-logo svg { color: var(--blue); opacity: .7; }
+.ws-tool-info { flex: 1; }
+.ws-tool-info h3 { font-size: 1rem; font-weight: 700; margin: 0 0 .3rem; }
+.ws-tool-info p { font-size: .8rem; color: var(--text-secondary); margin: 0 0 .6rem; }
+.ws-tool-stats { display: flex; gap: .4rem; flex-wrap: wrap; }
+.ws-tool-actions { display: flex; flex-direction: column; gap: .5rem; align-items: flex-end; }
+.ws-btn-launch {
+  display: inline-flex; align-items: center; gap: .4rem;
+  padding: .5rem 1rem; font-size: .82rem; font-weight: 600;
+  background: var(--blue); color: #fff; border-radius: .35rem;
+  text-decoration: none; transition: opacity .15s;
+}
+.ws-btn-launch:hover { opacity: .85; }
+.ws-tool-hint { font-size: .72rem; color: var(--text-secondary); }
+
+/* ── DbGate header ────────────────────────────────────────────── */
+.ws-dbgate-header {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .35rem .75rem; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.ws-dbgate-connections { flex-shrink: 0; border-bottom: 1px solid var(--border); }
+
+/* ── Secrets view ─────────────────────────────────────────────── */
+#ws-view-secrets { flex-direction: row; }
+.ws-secrets-left {
+  width: 180px; min-width: 140px; flex-shrink: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--bg-secondary); border-right: 1px solid var(--border);
+}
+.ws-secrets-main {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+}
+.ws-secret-row {
+  display: flex; align-items: center; gap: .35rem;
+  padding: .3rem .5rem; border-bottom: 1px solid var(--border-faint, rgba(255,255,255,.04));
+  font-size: .78rem;
+}
+.ws-secret-row:hover { background: var(--bg-secondary); }
+.ws-secret-key {
+  font-family: 'SF Mono','Fira Code',monospace; font-weight: 600;
+  color: var(--blue); min-width: 120px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ws-secret-val {
+  flex: 1; font-family: monospace; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  letter-spacing: .05em;
+}
+.ws-secret-input {
+  flex: 1; padding: .15rem .35rem; font-size: .76rem; font-family: monospace;
+  background: var(--bg); border: 1px solid var(--border); border-radius: .2rem; color: var(--text-primary);
+}
+.ws-secret-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-secondary);
+  padding: .15rem .3rem; border-radius: .2rem; font-size: .78rem; flex-shrink: 0;
+}
+.ws-secret-btn:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.ws-secret-del:hover { color: var(--red); }
