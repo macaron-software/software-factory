@@ -35,7 +35,9 @@ services:
 
   portainer:
     image: portainer/portainer-ce:latest
-    command: --http-disabled=false --base-url=/portainer
+    command: --no-http-disabled --base-url=/portainer
+    ports:
+      - "9000:9000"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - portainer-data:/data
@@ -43,6 +45,8 @@ services:
 
   dbgate:
     image: dbgate/dbgate:latest
+    ports:
+      - "3002:3000"
     environment:
       - ROOT_PATH=/dbgate
     volumes:
