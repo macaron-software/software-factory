@@ -16,7 +16,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.AZURE_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo -e "Host *\n  StrictHostKeyChecking no\n  ConnectTimeout 15" >> ~/.ssh/config
 
       - name: Rsync to Azure VM
         run: |
