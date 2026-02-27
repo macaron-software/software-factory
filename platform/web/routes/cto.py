@@ -380,43 +380,32 @@ def _resolve_mentions(content: str) -> str:
                     break
             if not match:
                 continue
-            # Gather missions for this project
-            missions = ms.list(project_id=match.id, limit=10)
-            m_lines = (
-                "\n".join(
-                    f"  - [{m.status}] {m.name} (workflow: {m.workflow_id or '?'})"
-                    for m in missions
-                )
-                or "  - Aucune mission SF enregistrée"
-            )
             workspace = match.path or ""
-            has_content = bool(match.description or match.vision or missions)
+            # Get SF missions only if they exist (optional enrichment)
+            missions = ms.list(project_id=match.id, limit=5)
+            m_lines = "\n".join(
+                f"  - [{m.status}] {m.name}" for m in missions
+            ) if missions else ""
+
             ctx_block = (
                 f"\n\n--- Contexte projet SF @{mention} ---\n"
                 f"Nom: {match.name}\n"
                 f"ID: {match.id}\n"
                 f"Description: {match.description or '(non renseignée)'}\n"
-                f"Type: {match.factory_type or '?'} | Statut: {match.status or '?'}\n"
-                f"Domaines: {', '.join(match.domains) if match.domains else '?'}\n"
+                f"Type: {match.factory_type or 'STANDALONE'} | Statut: {match.status or '?'}\n"
+                f"Domaines / Stack: {', '.join(match.domains) if match.domains else '?'}\n"
                 f"Git URL: {match.git_url or '(non configuré)'}\n"
-                f"Workspace (cwd pour outils git/code): {workspace or '(non configuré)'}\n"
-                f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
-                f"Missions SF (aperçu):\n{m_lines}\n"
-                f"\n"
-                f"INSTRUCTIONS OBLIGATOIRES :\n"
-                + (
-                    f'1. APPELLE platform_missions(project_id="{match.id}") pour détailler les missions\n'
-                    f'2. APPELLE platform_metrics(project_id="{match.id}") pour les métriques\n'
-                    f"3. Synthétise en français\n"
-                    if missions else
-                    f"Ce projet est enregistré dans la SF mais n'a pas encore de missions SF actives.\n"
-                    f"RÉPONDS en utilisant les informations ci-dessus (nom, description, vision, type, domaines).\n"
-                    f"Ne dis PAS que tu n'as pas d'informations — tu en as dans ce bloc.\n"
-                    f"Si l'utilisateur demande l'état du projet, explique que c'est un projet {match.factory_type or 'STANDALONE'} "
-                    f"et propose de créer des missions SF pour le piloter.\n"
-                )
-                + f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials. Ne génère PAS de SQL.\n"
-                + f"---\n"
+                f"Vision: {match.vision[:400] + '...' if match.vision and len(match.vision) > 400 else (match.vision or '(non définie)')}\n"
+                + (f"Missions SF actives:\n{m_lines}\n" if m_lines else "")
+                + f"\n"
+                f"INSTRUCTION : Réponds à la question de l'utilisateur en utilisant "
+                f"UNIQUEMENT les informations ci-dessus sur le projet. "
+                f"Ce bloc contient tout ce que tu sais sur ce projet. "
+                f"Ne dis PAS que tu manques d'informations. "
+                f"Ne demande PAS de contexte supplémentaire. "
+                f"Si l'utilisateur demande l'état/avancement, synthétise à partir de la description, vision et type.\n"
+                f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials.\n"
+                f"---\n"
             )
             injected.append(ctx_block)
         return content + "".join(injected)
