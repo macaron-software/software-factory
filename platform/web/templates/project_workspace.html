@@ -276,9 +276,32 @@ html,body{height:100%;overflow:hidden}
         <div class="ws-agents-left">
           <div class="ws-pane-tabs">
             <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agents actifs</span>
+            <button class="ws-term-run" style="margin-left:auto;padding:.2rem .55rem;font-size:.7rem;display:flex;align-items:center;gap:.3rem" onclick="wsShowLaunchMission()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Mission
+            </button>
           </div>
-          <div class="ws-pane-content">
-            <div class="ws-agents" id="wsAgentsBody">
+          <div class="ws-pane-content" style="flex-direction:column">
+            <!-- Launch mission panel (hidden by default) -->
+            <div id="wsLaunchMissionPanel" style="display:none;flex-direction:column;gap:.5rem;padding:.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)">
+              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)">⚡ Lancer une mission</div>
+              <select id="wsLaunchWorkflow" style="width:100%;padding:.3rem .5rem;font-size:.75rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px">
+                <option value="">Choisir un workflow…</option>
+                <option value="feature-sprint">Feature Sprint (TDD)</option>
+                <option value="feature-request">Feature Request</option>
+                <option value="ideation-to-prod">Ideation → Prod</option>
+                <option value="cicd-pipeline">CI/CD Pipeline</option>
+                <option value="documentation-pipeline">Documentation</option>
+                <option value="quality-improvement">Amélioration Qualité</option>
+                <option value="tech-debt-reduction">Réduction Dette Technique</option>
+              </select>
+              <textarea id="wsLaunchBrief" rows="2" placeholder="Décrivez la tâche à réaliser…" style="width:100%;padding:.3rem .5rem;font-size:.75rem;font-family:inherit;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;box-sizing:border-box"></textarea>
+              <div style="display:flex;gap:.4rem">
+                <button class="ws-term-run" style="flex:1;font-size:.73rem;padding:.3rem" onclick="wsLaunchMission()">⚡ Lancer</button>
+                <button class="ws-secret-btn" style="font-size:.73rem;padding:.3rem .55rem" onclick="document.getElementById('wsLaunchMissionPanel').style.display='none'">✕</button>
+              </div>
+              <div id="wsLaunchMissionStatus" style="font-size:.72rem;color:var(--text-secondary)"></div>
+            </div>
+            <div class="ws-agents" id="wsAgentsBody" style="flex:1;overflow-y:auto">
               <div class="ws-empty-state"><span>Chargement…</span></div>
             </div>
           </div>
@@ -855,6 +878,48 @@ function wsDockPreview(ports) {
 }
 
 // ── Agents ──────────────────────────────────────────────────────
+function wsShowLaunchMission() {
+  var panel = document.getElementById('wsLaunchMissionPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') {
+    // Load available workflows
+    fetch('/api/workflows').then(function(r){ return r.json(); }).then(function(d) {
+      var sel = document.getElementById('wsLaunchWorkflow');
+      if (!sel) return;
+      var wfs = (d.workflows || d.items || d || []).filter(function(w){ return w.id && w.name; });
+      if (!wfs.length) return;
+      sel.innerHTML = '<option value="">Choisir un workflow…</option>';
+      wfs.forEach(function(w) {
+        sel.innerHTML += '<option value="' + wsEsc(w.id) + '">' + wsEsc(w.name || w.id) + '</option>';
+      });
+    }).catch(function(){});
+  }
+}
+
+function wsLaunchMission() {
+  var wfId = document.getElementById('wsLaunchWorkflow')?.value;
+  var brief = document.getElementById('wsLaunchBrief')?.value?.trim();
+  var status = document.getElementById('wsLaunchMissionStatus');
+  if (!wfId || !brief) { if (status) status.textContent = '⚠ Workflow et brief requis'; return; }
+  if (status) status.textContent = '⏳ Lancement…';
+  fetch('/api/missions/start', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ workflow_id: wfId, brief: brief, project_id: _wsProjectId })
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.error) { if (status) status.textContent = '✗ ' + d.error; return; }
+      if (status) status.textContent = '✅ Mission ' + (d.mission_id||'') + ' lancée !';
+      document.getElementById('wsLaunchBrief').value = '';
+      setTimeout(function(){
+        var p = document.getElementById('wsLaunchMissionPanel');
+        if (p) p.style.display = 'none';
+        if (status) status.textContent = '';
+        wsLoadAgents();
+      }, 3000);
+    }).catch(function(e){ if (status) status.textContent = '✗ Erreur: ' + e.message; });
+}
+
 function wsLoadAgents() {
   var body = document.getElementById('wsAgentsBody');
   wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/agents')
