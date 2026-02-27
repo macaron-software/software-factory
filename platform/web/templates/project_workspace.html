@@ -1,32 +1,28 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/css/project_workspace.css?v=7">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=8">
 <style>
-/* ── IDE 3-panel layout ── */
 html,body{height:100%;overflow:hidden}
 .layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
 .content{display:flex!important;flex-direction:column!important;height:100%!important;overflow:hidden!important;min-height:0!important}
 .main-area{padding:0!important;overflow:hidden!important;flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
 .ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;background:var(--bg)}
-.ws-filetree{width:200px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
 .ws-center{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0}
 .ws-infobar{flex-shrink:0!important}
-/* Panels row = main pane + side pane */
-.ws-panels-row{flex:1 1 0%!important;display:flex!important;flex-direction:row!important;overflow:hidden!important;min-height:0}
-.ws-main-pane{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0}
-.ws-side-pane{width:280px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-left:1px solid var(--border);transition:width .15s ease}
-.ws-side-pane.ws-collapsed{width:0!important}
-/* Bottom terminal */
+/* File tree: only visible in code view */
+.ws-filetree{display:none!important}
+.ws-layout[data-view="code"] .ws-filetree{display:flex!important;width:200px!important;min-width:160px!important;flex-shrink:0!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
+/* View panels */
+.ws-view-container{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
+.ws-view-panel{display:none!important}
+.ws-view-panel.active{display:flex!important;flex:1 1 0%!important;overflow:hidden!important;min-height:0}
+/* Bottom */
 .ws-bottom-panel{height:200px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-top:1px solid var(--border);transition:height .15s ease}
 .ws-bottom-panel.ws-collapsed{height:28px!important}
-/* Pane tabs */
-.ws-pane-tabs{display:flex!important;align-items:center;flex-shrink:0!important;border-bottom:1px solid var(--border);background:var(--bg-secondary);min-height:28px;overflow-x:auto;overflow-y:hidden}
-.ws-pane-collapse{margin-left:auto;flex-shrink:0;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0 6px;line-height:28px;display:flex;align-items:center}
-.ws-pane-collapse:hover{color:var(--text-primary)}
+.ws-bottom-panel.ws-collapsed .ws-pane-content{display:none!important}
+/* Pane helpers */
 .ws-pane-content{flex:1 1 0%!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;min-height:0}
-/* Tab contents */
 .ws-tab-content{display:none!important}
 .ws-tab-content.active{display:flex!important;flex:1 1 0%!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
 </style>
@@ -41,9 +37,34 @@ html,body{height:100%;overflow:hidden}
 {% endblock %}
 
 {% block content %}
-<div class="ws-layout">
+<div class="ws-layout" id="wsLayout" data-view="code">
 
-  <!-- ── Left: file tree ─────────────────────────────────── -->
+  <!-- ── Activity Bar ─────────────────────────────────────────── -->
+  <div class="ws-activity-bar">
+    <button class="ws-activity-btn active" data-view="code" onclick="wsSetView('code')" title="Code">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="git" onclick="wsSetView('git')" title="Git">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="docker" onclick="wsSetView('docker')" title="Docker">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="preview" onclick="wsSetView('preview')" title="Preview">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="agents" onclick="wsSetView('agents')" title="Agents">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="backlog" onclick="wsSetView('backlog')" title="Backlog">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2m-3 7h3m-3 4h3m-7-4h.01M9 16h.01"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="db" onclick="wsSetView('db')" title="Database">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    </button>
+  </div>
+
+  <!-- ── File Tree (only in code view via CSS) ────────────────── -->
   <div class="ws-filetree" id="wsFiletree">
     <div class="ws-filetree-header">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
@@ -54,7 +75,7 @@ html,body{height:100%;overflow:hidden}
     </div>
   </div>
 
-  <!-- ── Center column ────────────────────────────────────── -->
+  <!-- ── Center column ────────────────────────────────────────── -->
   <div class="ws-center">
 
     <!-- Info bar -->
@@ -77,135 +98,234 @@ html,body{height:100%;overflow:hidden}
       </div>
     </div>
 
-    <!-- ── Panels row: main pane + side pane ─────────────── -->
-    <div class="ws-panels-row">
+    <!-- ── View Container ─────────────────────────────────────── -->
+    <div class="ws-view-container">
 
-      <!-- Main pane: Code/Files · ToolCalls · Docker · Preview -->
-      <div class="ws-main-pane">
-        <div class="ws-pane-tabs" id="wsMainTabs">
-          <button class="ws-tab active" onclick="wsMainTab(this,'files')" data-tab="files">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-            Code
-          </button>
-          <button class="ws-tab" onclick="wsMainTab(this,'toolcalls')" data-tab="toolcalls">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-            Tool Calls
-          </button>
-          <button class="ws-tab" onclick="wsMainTab(this,'docker')" data-tab="docker">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-            Docker
-          </button>
-          <button class="ws-tab" onclick="wsMainTab(this,'preview')" data-tab="preview">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-            Preview
-          </button>
+      <!-- ── VIEW: Code ───────────────────────────────────────── -->
+      <div class="ws-view-panel active" id="ws-view-code">
+        <div class="ws-code-editor" id="wsFilesViewer">
+          <div class="ws-file-empty">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <span>Sélectionnez un fichier dans l'arbre</span>
+          </div>
         </div>
-        <div class="ws-pane-content">
-          <!-- Code/Files — just the viewer; left tree is the navigator -->
-          <div class="ws-tab-content active" id="ws-files">
-            <div class="ws-files-viewer" id="wsFilesViewer">
-              <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier dans l&apos;arbre</span></div>
-            </div>
+        <div class="ws-code-side" id="wsCodeSide">
+          <div class="ws-pane-tabs" id="wsCodeSideTabs">
+            <button class="ws-tab active" onclick="wsCodeSideTab(this,'toolcalls')" data-tab="toolcalls">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              Tool Calls
+            </button>
+            <button class="ws-pane-collapse" onclick="wsToggleCodeSide()" title="Réduire">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
           </div>
-          <!-- Tool Calls -->
-          <div class="ws-tab-content" id="ws-toolcalls">
-            <div class="ws-toolcalls" id="wsToolcallsBody">
-              <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span>Chargement…</span></div>
-            </div>
-          </div>
-          <!-- Docker -->
-          <div class="ws-tab-content" id="ws-docker">
-            <div class="ws-docker" id="wsDockerBody">
-              <div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Chargement…</span></div>
-            </div>
-          </div>
-          <!-- Preview -->
-          <div class="ws-tab-content" id="ws-preview">
-            <div class="ws-preview" id="wsPreviewPanel">
-              <div class="ws-preview-bar">
-                <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:3000">
-                <button class="ws-preview-btn" onclick="wsPreviewLoad()">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  Charger
-                </button>
-                <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                </button>
-                <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                </button>
+          <div class="ws-pane-content">
+            <div class="ws-tab-content active" id="ws-code-toolcalls">
+              <div class="ws-toolcalls" id="wsToolcallsBody">
+                <div class="ws-empty-state"><span>Chargement…</span></div>
               </div>
-              <div class="ws-preview-empty" id="wsPreviewEmpty">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
-                <span>Aucun port détecté automatiquement</span>
-                <span class="ws-empty-hint">Saisissez une URL ci-dessus et cliquez sur Charger</span>
-              </div>
-              <iframe class="ws-preview-frame" id="wsPreviewFrame"
-                {% if preview_url %}src="{{ preview_url }}"{% endif %}
-                style="{{ '' if preview_url else 'display:none' }}"
-                sandbox="allow-scripts allow-forms allow-popups"></iframe>
             </div>
           </div>
         </div>
-      </div><!-- end ws-main-pane -->
+      </div>
 
-      <!-- Side pane: Git · Agents -->
-      <div class="ws-side-pane" id="wsSidePane">
-        <div class="ws-pane-tabs" id="wsSideTabs">
-          <button class="ws-tab active" onclick="wsSideTab(this,'git')" data-tab="git">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
-            Git
-          </button>
-          <button class="ws-tab" onclick="wsSideTab(this,'agents')" data-tab="agents">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Agents
-          </button>
-          <button class="ws-pane-collapse" onclick="wsToggleSidePane()" title="Réduire panneau">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-          </button>
-        </div>
-        <div class="ws-pane-content">
-          <!-- Git -->
-          <div class="ws-tab-content active" id="ws-git">
-            <div class="ws-git" id="wsGitBody">
-              <div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Chargement…</span></div>
+      <!-- ── VIEW: Git ─────────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-git">
+        <div class="ws-git-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Modifications</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-git" id="wsGitBody" style="overflow-y:auto">
+              <div class="ws-empty-state"><span>Chargement…</span></div>
             </div>
           </div>
-          <!-- Agents -->
-          <div class="ws-tab-content" id="ws-agents">
+        </div>
+        <div class="ws-git-main">
+          <div class="ws-pane-tabs" id="wsGitMainTabs">
+            <button class="ws-tab active" onclick="wsGitMainTab(this,'log')" data-tab="log">
+              Historique
+            </button>
+            <button class="ws-tab" onclick="wsGitMainTab(this,'diff')" data-tab="diff">
+              Diff
+            </button>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-tab-content active" id="ws-git-log">
+              <div class="ws-git-log-area" id="wsGitLogArea">
+                <div class="ws-empty-state"><span>Chargement…</span></div>
+              </div>
+            </div>
+            <div class="ws-tab-content" id="ws-git-diff">
+              <div class="ws-git-diff-area" id="wsGitDiffArea">Sélectionnez un fichier modifié pour voir le diff</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Docker ──────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-docker">
+        <div class="ws-docker" id="wsDockerBody">
+          <div class="ws-empty-state">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            <span>Chargement…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Preview ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-preview">
+        <div class="ws-preview" id="wsPreviewPanel">
+          <div class="ws-preview-bar">
+            <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:3000">
+            <button class="ws-preview-btn" onclick="wsPreviewLoad()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Charger
+            </button>
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </button>
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+          </div>
+          <div class="ws-preview-empty" id="wsPreviewEmpty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>Aucun port détecté</span>
+            <span class="ws-empty-hint">Saisissez une URL ou lancez un serveur dans Output</span>
+          </div>
+          <iframe class="ws-preview-frame" id="wsPreviewFrame"
+            {% if preview_url %}src="{{ preview_url }}"{% endif %}
+            style="{{ '' if preview_url else 'display:none' }}"
+            sandbox="allow-scripts allow-forms allow-popups allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Agents ──────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-agents">
+        <div class="ws-agents-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agents actifs</span>
+          </div>
+          <div class="ws-pane-content">
             <div class="ws-agents" id="wsAgentsBody">
-              <div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Chargement…</span></div>
+              <div class="ws-empty-state"><span>Chargement…</span></div>
             </div>
           </div>
         </div>
-      </div><!-- end ws-side-pane -->
+        <div class="ws-agents-main">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Tool Calls récents</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-toolcalls" id="wsAgentsToolcalls">
+              <div class="ws-empty-state"><span>Chargement…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-    </div><!-- end ws-panels-row -->
+      <!-- ── VIEW: Backlog ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-backlog">
+        <div class="ws-backlog" id="wsBacklogBody">
+          <div class="ws-empty-state">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>
+            <span>Chargement…</span>
+          </div>
+        </div>
+      </div>
 
-    <!-- ── Bottom panel: Terminal (always visible) ─────────── -->
+      <!-- ── VIEW: Database ────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-db">
+        <div class="ws-db-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Base de données</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-filetree-body" id="wsDbFiles">
+              <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>
+            </div>
+          </div>
+        </div>
+        <div class="ws-db-main">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-primary);font-size:.76rem;font-weight:600" id="wsDbTableLabel">SQL</span>
+            <span style="flex:1"></span>
+            <span style="font-size:.68rem;color:var(--text-secondary);padding:0 .5rem" id="wsDbStatus"></span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-db-editor">
+              <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
+              <div style="display:flex;gap:.4rem;margin-top:.4rem;align-items:center">
+                <button class="ws-term-run" style="padding:.25rem .55rem;font-size:.72rem" onclick="wsDbRun()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Run
+                </button>
+                <span style="font-size:.7rem;color:var(--text-secondary)">Ctrl+Enter</span>
+              </div>
+            </div>
+            <div class="ws-db-results" id="wsDbResults">
+              <div class="ws-empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                <span>Sélectionnez une table ou écrivez une requête</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end ws-view-container -->
+
+    <!-- ── Bottom Panel: Shell + Output ──────────────────────── -->
     <div class="ws-bottom-panel" id="wsBottomPanel">
       <div class="ws-pane-tabs">
-        <button class="ws-tab active" style="cursor:default">
+        <button class="ws-tab active" onclick="wsBottomTab(this,'shell')" data-btab="shell">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          Terminal
+          Shell
         </button>
-        <button class="ws-tab" onclick="wsMainTab(document.querySelector('[data-tab=toolcalls]'),'toolcalls')" style="font-size:.68rem">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-          Tool Calls
+        <button class="ws-tab" onclick="wsBottomTab(this,'output')" data-btab="output">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Output
         </button>
-        <button class="ws-pane-collapse" onclick="wsToggleBottomPanel()" title="Réduire terminal" id="wsBottomCollapseBtn">
+        <span id="wsPortBadge" style="display:none;margin-left:.3rem"></span>
+        <button class="ws-pane-collapse" onclick="wsToggleBottomPanel()" id="wsBottomCollapseBtn">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="wsBottomCollapseIcon"><polyline points="18 15 12 9 6 15"/></svg>
         </button>
       </div>
-      <div class="ws-terminal" id="wsTerminalWrap">
-        <div class="ws-term-history" id="wsTermHistory"></div>
-        <div class="ws-term-input-row">
-          <span class="ws-term-prompt">$</span>
-          <input class="ws-term-input" id="wsTermInput" type="text" placeholder="ls -la  /  git status  /  npm run dev …" autocomplete="off" spellcheck="false">
-          <button class="ws-term-run" id="wsTermRun" onclick="wsRunCmd()">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-            Run
-          </button>
+      <div class="ws-pane-content" id="wsBottomContent">
+        <!-- Shell tab -->
+        <div class="ws-tab-content active" id="ws-bottom-shell">
+          <div class="ws-terminal">
+            <div class="ws-term-history" id="wsTermHistory"></div>
+            <div class="ws-term-input-row">
+              <span class="ws-term-prompt">$</span>
+              <input class="ws-term-input" id="wsTermInput" type="text" placeholder="ls -la  /  git status  /  npm run dev …" autocomplete="off" spellcheck="false">
+              <button class="ws-term-run" id="wsTermRun" onclick="wsRunCmd()">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Run
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Output tab -->
+        <div class="ws-tab-content" id="ws-bottom-output">
+          <div class="ws-terminal" style="overflow:hidden">
+            <div class="ws-output-panel" id="wsOutputPanel">
+              <div class="ws-term-hint">Lancez un serveur ou une commande avec les boutons ci-dessous</div>
+            </div>
+            <div class="ws-term-input-row" style="gap:.4rem;flex-wrap:wrap">
+              <span style="color:#484f58;font-size:.72rem;font-weight:600">Quick:</span>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('npm run dev')">npm dev</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('npm install')">npm install</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('python main.py 2>&1 || python app.py 2>&1')">python run</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('docker compose up')">docker up</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('docker compose down')">docker down</button>
+              <button class="ws-output-quickbtn" id="wsOutputStop" onclick="wsStopOutput()" style="display:none;border-color:#f85149;color:#f85149">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                Stop
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div><!-- end ws-bottom-panel -->
@@ -213,50 +333,67 @@ html,body{height:100%;overflow:hidden}
   </div><!-- end ws-center -->
 </div><!-- end ws-layout -->
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
 <script>
 var _wsProjectId = {{ project.id | tojson }};
 var _wsPreviewMobile = false;
+var _wsOutputEs = null;
+var _wsDetectedPort = null;
+var _wsDbFiles = [];
+var _wsDbCurrentFile = null;
 
-// All API calls use same-origin credentials so session cookies are sent
 function wsFetch(url, opts) {
   opts = opts || {};
   opts.credentials = 'same-origin';
   return fetch(url, opts);
 }
 
-function wsMainTab(btn, name) {
-  document.querySelectorAll('#wsMainTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('.ws-main-pane .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
-  var el = document.getElementById('ws-' + name);
+// ── View switching ──────────────────────────────────────────────
+function wsSetView(name) {
+  document.getElementById('wsLayout').setAttribute('data-view', name);
+  document.querySelectorAll('.ws-activity-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-view') === name);
+  });
+  document.querySelectorAll('.ws-view-panel').forEach(function(p) { p.classList.remove('active'); });
+  var panel = document.getElementById('ws-view-' + name);
+  if (panel) panel.classList.add('active');
+  localStorage.setItem('ws_view_' + _wsProjectId, name);
+  if (name === 'code') { wsLoadToolcalls(); }
+  if (name === 'git') { wsLoadGit(); }
+  if (name === 'docker') { wsLoadDocker(); }
+  if (name === 'agents') { wsLoadAgents(); wsLoadAgentsToolcalls(); }
+  if (name === 'backlog') { wsLoadBacklog(); }
+  if (name === 'db') { wsLoadDatabase(); }
+}
+
+function wsBottomTab(btn, name) {
+  document.querySelectorAll('.ws-pane-tabs [data-btab]').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('#wsBottomContent .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-bottom-' + name);
   if (el) el.classList.add('active');
-  localStorage.setItem('ws_main_tab_' + _wsProjectId, name);
-  if (name === 'toolcalls') wsLoadToolcalls();
-  if (name === 'docker') wsLoadDocker();
-  if (name === 'preview') wsLoadPreview();
 }
 
-function wsSideTab(btn, name) {
-  document.querySelectorAll('#wsSideTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('.ws-side-pane .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
-  if (btn) btn.classList.add('active');
-  var el = document.getElementById('ws-' + name);
+function wsCodeSideTab(btn, name) {
+  document.querySelectorAll('#wsCodeSideTabs .ws-tab[data-tab]').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-code .ws-code-side .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-code-' + name);
   if (el) el.classList.add('active');
-  localStorage.setItem('ws_side_tab_' + _wsProjectId, name);
-  if (name === 'git') wsLoadGit();
-  if (name === 'agents') wsLoadAgents();
 }
 
-// Keep wsTab as alias for backward compat (left tree onclicks)
-function wsTab(btn, name) {
-  if (name === 'git' || name === 'agents') wsSideTab(btn, name);
-  else wsMainTab(btn, name);
+function wsGitMainTab(btn, name) {
+  document.querySelectorAll('#wsGitMainTabs .ws-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.ws-git-main .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-git-' + name);
+  if (el) el.classList.add('active');
 }
 
-function wsToggleSidePane() {
-  var pane = document.getElementById('wsSidePane');
-  var collapsed = pane.classList.toggle('ws-collapsed');
-  localStorage.setItem('ws_side_collapsed', collapsed ? '1' : '');
+function wsToggleCodeSide() {
+  var side = document.getElementById('wsCodeSide');
+  if (!side) return;
+  side.style.display = side.style.display === 'none' ? '' : 'none';
 }
 
 function wsToggleBottomPanel() {
@@ -267,44 +404,15 @@ function wsToggleBottomPanel() {
   localStorage.setItem('ws_bottom_collapsed', collapsed ? '1' : '');
 }
 
-function wsLoadTermHistory() {
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
-    
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      var h = document.getElementById('wsTermHistory');
-      h.innerHTML = '<div class="ws-term-header-line"><span style="color:#3fb950">✓</span> <span style="color:#58a6ff">{{ project.name }}</span> <span style="color:#484f58"> — prêt</span></div>';
-      var entries = data.items || [];
-      if (!entries.length) {
-        h.innerHTML += '<div class="ws-term-hint">Aucun tool call pour ce projet. Lancez une mission ou tapez une commande ci-dessous.</div>';
-        return;
-      }
-      entries.forEach(function(tc) {
-        var ok = tc.success;
-        var entry = document.createElement('div');
-        entry.className = 'ws-term-entry';
-        var params = '';
-        try { var p = JSON.parse(tc.parameters_json||'{}'); params = Object.values(p).slice(0,2).join(' '); } catch(e){}
-        entry.innerHTML =
-          '<div class="ws-term-cmd"><span class="ws-term-tool">' + wsEsc(tc.tool_name) + '</span> <span class="ws-term-args">' + wsEsc((params||'').substring(0,80)) + '</span><span class="ws-term-ts">' + wsEsc((tc.timestamp||'').substring(0,16)) + '</span></div>' +
-          (tc.output ? '<div class="ws-term-output' + (ok?'':' error') + '">' + wsEsc(tc.output.substring(0,300)) + '</div>' : '') +
-          '<hr class="ws-term-divider">';
-        h.appendChild(entry);
-      });
-      h.scrollTop = h.scrollHeight;
-    }).catch(function(){});
-}
-
+// ── Terminal Shell ──────────────────────────────────────────────
 function wsRunCmd() {
   var inp = document.getElementById('wsTermInput');
   var cmd = inp.value.trim();
   if (!cmd) return;
   inp.value = '';
   var h = document.getElementById('wsTermHistory');
-  var entry = document.createElement('div');
-  entry.className = 'ws-term-entry';
-  var outDiv = document.createElement('div');
-  outDiv.className = 'ws-term-output';
+  var entry = document.createElement('div'); entry.className = 'ws-term-entry';
+  var outDiv = document.createElement('div'); outDiv.className = 'ws-term-output';
   entry.innerHTML = '<div class="ws-term-cmd"><span style="color:#3fb950">$</span> <span class="ws-term-args">' + wsEsc(cmd) + '</span></div>';
   entry.appendChild(outDiv);
   var hr = document.createElement('hr'); hr.className = 'ws-term-divider';
@@ -313,55 +421,88 @@ function wsRunCmd() {
   h.scrollTop = h.scrollHeight;
   document.getElementById('wsTermRun').disabled = true;
   wsSetStatus('En cours…', 'running');
-  var es = new EventSource('/api/projects/' + _wsProjectId + '/workspace/run?cmd=' + encodeURIComponent(cmd));
-  var output = '';
+  var es = new EventSource('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/run?cmd=' + encodeURIComponent(cmd));
+  var out = '';
   es.onmessage = function(e) {
     if (e.data === '[DONE]') { es.close(); document.getElementById('wsTermRun').disabled = false; wsSetStatus('Prêt', 'idle'); return; }
-    output += e.data + '\n';
-    outDiv.textContent = output;
-    h.scrollTop = h.scrollHeight;
+    out += e.data + '\n'; outDiv.textContent = out; h.scrollTop = h.scrollHeight;
   };
   es.onerror = function() { es.close(); document.getElementById('wsTermRun').disabled = false; wsSetStatus('Prêt', 'idle'); outDiv.classList.add('error'); };
 }
-
 document.getElementById('wsTermInput').addEventListener('keydown', function(e) { if (e.key==='Enter') wsRunCmd(); });
 
-function wsLoadToolcalls() {
-  var body = document.getElementById('wsToolcallsBody');
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/tool-calls')
-    
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      var items = data.items || [];
-      if (!items.length) {
-        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg><span>Aucun tool call enregistré pour ce projet</span><span class="ws-empty-hint">Les tool calls apparaissent quand des agents exécutent des missions</span></div>';
-        return;
-      }
-      var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Paramètres</th><th>Statut</th><th>Durée</th><th>Date</th></tr></thead><tbody>';
-      items.forEach(function(tc) {
-        var params = '';
-        try { var p = JSON.parse(tc.parameters_json||'{}'); params = JSON.stringify(p).substring(0,100); } catch(e){}
-        html += '<tr class="ws-table-row"><td><span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span></td><td class="ws-tc-params" title="' + wsEsc(params) + '">' + wsEsc(params) + '</td><td><span class="' + (tc.success?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (tc.success?'OK':'Err') + '</span></td><td class="ws-tc-dur">' + (tc.duration_ms||0) + 'ms</td><td class="ws-tc-ts">' + wsEsc((tc.timestamp||'').substring(0,16)) + '</td></tr>';
-      });
-      html += '</tbody></table>';
-      body.innerHTML = html;
-    });
+// ── Output Streaming ────────────────────────────────────────────
+function wsRunOutput(cmd) {
+  wsStopOutput();
+  _wsDetectedPort = null;
+  document.getElementById('wsPortBadge').style.display = 'none';
+  var panel = document.getElementById('wsOutputPanel');
+  panel.innerHTML = '';
+  var cmdLine = document.createElement('div');
+  cmdLine.style.cssText = 'color:#484f58;font-size:.72rem;margin-bottom:.3rem';
+  cmdLine.textContent = '$ ' + cmd;
+  panel.appendChild(cmdLine);
+  var outDiv = document.createElement('div');
+  outDiv.style.whiteSpace = 'pre-wrap';
+  outDiv.style.wordBreak = 'break-all';
+  panel.appendChild(outDiv);
+  document.getElementById('wsOutputStop').style.display = '';
+  wsSetStatus('En cours…', 'running');
+  // Switch to output tab
+  var btn = document.querySelector('[data-btab="output"]');
+  if (btn) wsBottomTab(btn, 'output');
+  // Open bottom if collapsed
+  var bp = document.getElementById('wsBottomPanel');
+  if (bp.classList.contains('ws-collapsed')) wsToggleBottomPanel();
+  _wsOutputEs = new EventSource('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/run?cmd=' + encodeURIComponent(cmd));
+  var out = '';
+  _wsOutputEs.onmessage = function(e) {
+    if (e.data === '[DONE]') { wsStopOutput(); wsSetStatus('Prêt', 'idle'); return; }
+    out += e.data + '\n';
+    outDiv.textContent = out;
+    panel.scrollTop = panel.scrollHeight;
+    // Port detection
+    if (!_wsDetectedPort) {
+      var m = e.data.match(/localhost:(\d{4,5})/i) || e.data.match(/port\s+(\d{4,5})/i) || e.data.match(/:\s*(\d{4,5})\b/) || e.data.match(/on\s+http[^ ]*:(\d{4,5})/i);
+      if (m) { _wsDetectedPort = m[1]; wsShowPortBadge(m[1]); }
+    }
+  };
+  _wsOutputEs.onerror = function() { wsStopOutput(); wsSetStatus('Prêt', 'idle'); };
 }
 
+function wsStopOutput() {
+  if (_wsOutputEs) { _wsOutputEs.close(); _wsOutputEs = null; }
+  var btn = document.getElementById('wsOutputStop');
+  if (btn) btn.style.display = 'none';
+}
+
+function wsShowPortBadge(port) {
+  var badge = document.getElementById('wsPortBadge');
+  if (!badge) return;
+  badge.innerHTML = '<a href="#" class="ws-port-badge" onclick="wsOpenPreviewPort(' + port + ');return false">' +
+    '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>' +
+    ':' + port + '</a>';
+  badge.style.display = '';
+}
+
+function wsOpenPreviewPort(port) {
+  var url = 'http://localhost:' + port;
+  document.getElementById('wsPreviewUrl').value = url;
+  wsSetView('preview');
+  setTimeout(function() { wsPreviewLoad(url); }, 200);
+}
+
+// ── File Tree ───────────────────────────────────────────────────
 function wsLoadFilesTree(path) {
   var tree = document.getElementById('wsTreeBody');
   if (!tree) return;
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/files?path=' + encodeURIComponent(path))
-    
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/files?path=' + encodeURIComponent(path))
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      if (!items.length) {
-        var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
-        tree.innerHTML = backBtn + '<div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>';
-        return;
-      }
-      var html = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
+      var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
+      if (!items.length) { tree.innerHTML = backBtn + '<div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>'; return; }
+      var html = backBtn;
       items.filter(function(i){ return i.type==='dir'; }).forEach(function(i) {
         html += '<div class="ws-tree-item ws-tree-dir" onclick="wsLoadFilesTree(\'' + wsEsc(i.path) + '\')">' +
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' + wsEsc(i.name) + '/</div>';
@@ -374,213 +515,284 @@ function wsLoadFilesTree(path) {
       tree.innerHTML = html;
     });
 }
+function wsLoadLeftTree() { wsLoadFilesTree('.'); }
 
 function wsOpenFile(path) {
-  // Switch to Code tab
-  wsMainTab(document.querySelector('#wsMainTabs [data-tab="files"]'), 'files');
+  wsSetView('code');
   var viewer = document.getElementById('wsFilesViewer');
   if (!viewer) return;
-  viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
+  viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ws-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
   wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/file?path=' + encodeURIComponent(path))
-    
     .then(function(r){ return r.json(); })
     .then(function(data) {
       if (data.error) { viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">' + wsEsc(data.error) + '</span></div>'; return; }
       var ext = path.split('.').pop().toLowerCase();
-      var lm = {js:'javascript',ts:'typescript',py:'python',html:'html',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'bash',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java'};
+      var lm = {js:'javascript',ts:'typescript',tsx:'typescript',jsx:'javascript',py:'python',html:'xml',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'bash',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java',php:'php',rb:'ruby',cpp:'cpp',c:'c',h:'c'};
       var lang = lm[ext] || 'plaintext';
-      viewer.innerHTML = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
+      var barHtml = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
+      viewer.innerHTML = barHtml;
       var pre = document.createElement('pre'); pre.className = 'ws-file-pre';
       var code = document.createElement('code'); code.className = 'language-' + lang;
       code.textContent = data.content || '(empty)';
       pre.appendChild(code); viewer.appendChild(pre);
-      if (window.hljs) hljs.highlightElement(code);
+      try { if (window.hljs) { hljs.highlightElement(code); } } catch(e){}
     })
-    .catch(function(e) {
-      if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>';
-    });
+    .catch(function(e) { if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>'; });
 }
 
-function wsLoadDocker() {
-  var body = document.getElementById('wsDockerBody');
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker')
-    
+// ── Tool Calls ──────────────────────────────────────────────────
+function wsLoadToolcalls() {
+  var body = document.getElementById('wsToolcallsBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/tool-calls')
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      var containers = data.containers || [];
-      var dockerFiles = data.docker_files || [];
-      var html = '';
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez une mission pour voir les tool calls</span></div>'; return; }
+      var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Paramètres</th><th>Statut</th><th>Durée</th></tr></thead><tbody>';
+      items.forEach(function(tc) {
+        var params = ''; try { var p=JSON.parse(tc.parameters_json||'{}'); params=JSON.stringify(p).substring(0,80); } catch(e){}
+        html += '<tr class="ws-table-row"><td><span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span></td><td class="ws-tc-params" title="' + wsEsc(params) + '">' + wsEsc(params) + '</td><td><span class="' + (tc.success?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (tc.success?'OK':'Err') + '</span></td><td class="ws-tc-dur">' + (tc.duration_ms||0) + 'ms</td></tr>';
+      });
+      html += '</tbody></table>'; body.innerHTML = html;
+    }).catch(function(){});
+}
 
+function wsLoadAgentsToolcalls() {
+  var body = document.getElementById('wsAgentsToolcalls');
+  if (!body) return;
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/tool-calls')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span></div>'; return; }
+      var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Statut</th><th>Date</th></tr></thead><tbody>';
+      items.slice(0,30).forEach(function(tc) {
+        html += '<tr class="ws-table-row"><td><span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span></td><td><span class="' + (tc.success?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (tc.success?'OK':'Err') + '</span></td><td class="ws-tc-ts">' + wsEsc((tc.timestamp||'').substring(0,16)) + '</td></tr>';
+      });
+      html += '</tbody></table>'; body.innerHTML = html;
+    }).catch(function(){});
+}
+
+// ── Docker ──────────────────────────────────────────────────────
+function wsLoadDocker() {
+  var body = document.getElementById('wsDockerBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var containers = data.containers || [], dockerFiles = data.docker_files || [];
+      var html = '';
       if (containers.length) {
         html += containers.map(function(c) {
           var up = c.status && c.status.toLowerCase().startsWith('up');
-          return '<div class="ws-docker-container">' +
-            '<div class="ws-docker-header"><div class="ws-docker-status ' + (up?'up':'down') + '"></div>' +
-            '<span class="ws-docker-name">' + wsEsc(c.name) + '</span>' +
-            '<span class="ws-docker-image">' + wsEsc(c.image||'') + '</span>' +
-            '<span style="margin-left:auto;font-size:.7rem;color:var(--text-secondary);">' + wsEsc(c.status||'') + '</span>' +
-            (c.ports ? '<span class="ws-docker-port" onclick="wsDockPreview(\'' + wsEsc(c.ports) + '\')">' + wsEsc(c.ports) + '</span>' : '') + '</div>' +
-            '<div class="ws-docker-actions">' +
-            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'start\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button>' +
-            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'stop\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button>' +
-            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'rebuild\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Rebuild</button>' +
-            '</div><pre class="ws-docker-logs">' + wsEsc(c.logs||'— Aucun log —') + '</pre></div>';
+          return '<div class="ws-docker-container"><div class="ws-docker-header"><div class="ws-docker-status ' + (up?'up':'down') + '"></div><span class="ws-docker-name">' + wsEsc(c.name) + '</span><span class="ws-docker-image">' + wsEsc(c.image||'') + '</span><span style="margin-left:auto;font-size:.7rem;color:var(--text-secondary)">' + wsEsc(c.status||'') + '</span>' + (c.ports?'<span class="ws-docker-port" onclick="wsDockPreview(\''+wsEsc(c.ports)+'\')">'+wsEsc(c.ports)+'</span>':'') + '</div><div class="ws-docker-actions"><button class="ws-docker-btn" onclick="wsDockAction(\''+wsEsc(c.name)+'\',\'start\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button><button class="ws-docker-btn" onclick="wsDockAction(\''+wsEsc(c.name)+'\',\'stop\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button></div><pre class="ws-docker-logs">' + wsEsc(c.logs||'— Aucun log —') + '</pre></div>';
         }).join('');
       } else {
-        html += '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>' +
-          '<span>Aucun container en cours</span>' +
-          (dockerFiles.length
-            ? '<span class="ws-empty-hint">Fichiers Docker détectés: ' + dockerFiles.map(function(f){ return f.name; }).join(', ') + '</span>' +
-              '<button class="ws-docker-compose-up-btn" onclick="wsDockComposeUp(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up</button>'
-            : '<span class="ws-empty-hint">Aucun Dockerfile ou docker-compose.yml trouvé dans ce projet</span>') +
-          '</div>';
+        html += '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Aucun container en cours</span>' + (dockerFiles.length ? '<span class="ws-empty-hint">Fichiers Docker: ' + dockerFiles.map(function(f){return f.name;}).join(', ') + '</span><button class="ws-docker-compose-up-btn" onclick="wsDockComposeUp(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up</button>' : '<span class="ws-empty-hint">Aucun Dockerfile trouvé</span>') + '</div>';
       }
-
-      // Show detected Docker config files (collapsed)
       if (dockerFiles.length) {
         html += '<div style="margin-top:.75rem;">' + dockerFiles.map(function(f) {
-          var id = 'dkf_' + f.name.replace(/[^a-z0-9]/gi,'_');
-          return '<details style="margin-bottom:.5rem;">' +
-            '<summary style="cursor:pointer;font-size:.72rem;font-weight:600;color:var(--text-secondary);padding:.35rem .5rem;background:var(--surface-2);border-radius:4px;">' +
-            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>' + wsEsc(f.name) + '</summary>' +
-            '<pre style="background:var(--surface-2);padding:.5rem;font-size:.68rem;overflow:auto;max-height:200px;border-radius:0 0 4px 4px;margin:0">' + wsEsc(f.content) + '</pre></details>';
+          return '<details style="margin-bottom:.5rem;"><summary style="cursor:pointer;font-size:.72rem;font-weight:600;color:var(--text-secondary);padding:.35rem .5rem;background:var(--bg-secondary);border-radius:4px;">' + wsEsc(f.name) + '</summary><pre style="background:var(--bg-secondary);padding:.5rem;font-size:.68rem;overflow:auto;max-height:200px;border-radius:0 0 4px 4px;margin:0">' + wsEsc(f.content) + '</pre></details>';
         }).join('') + '</div>';
       }
-
       body.innerHTML = html;
     });
 }
 
 function wsDockAction(name, action) {
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
     .then(function(){ setTimeout(wsLoadDocker, 1500); });
 }
 
 function wsDockComposeUp(btn) {
-  btn.disabled = true;
-  btn.textContent = '⏳ Démarrage…';
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker/compose_up', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
+  btn.disabled = true; btn.textContent = '⏳ Démarrage…';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker/compose_up', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
     .then(function(r){ return r.json(); })
-    .then(function(d){
-      if (d.ok) { setTimeout(wsLoadDocker, 2000); }
-      else {
-        btn.disabled = false;
-        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up';
-        var msg = d.error || 'Erreur inconnue';
-        var body = document.getElementById('wsDockerBody');
-        if (body) body.insertAdjacentHTML('afterbegin', '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:.6rem .9rem;margin-bottom:.75rem;color:var(--text-secondary);font-size:.76rem;">⚠️ ' + wsEsc(msg) + '</div>');
-      }
-    });
+    .then(function(d){ if(d.ok){setTimeout(wsLoadDocker,2000);}else{btn.disabled=false;btn.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up';} });
 }
 
 function wsDockPreview(ports) {
-  var m = ports.match(/(\d{4,5})->/); if (!m) m = ports.match(/0\.0\.0\.0:(\d+)/);
-  if (m) { var url='http://localhost:'+m[1]; document.getElementById('wsPreviewUrl').value=url; wsTab(document.querySelector('[data-tab="preview"]'),'preview'); setTimeout(function(){wsPreviewLoad(url);},100); }
+  var m = ports.match(/(\d{4,5})->/)||ports.match(/0\.0\.0\.0:(\d+)/);
+  if (m) { var url='http://localhost:'+m[1]; document.getElementById('wsPreviewUrl').value=url; wsSetView('preview'); setTimeout(function(){wsPreviewLoad(url);},100); }
 }
 
+// ── Agents ──────────────────────────────────────────────────────
 function wsLoadAgents() {
   var body = document.getElementById('wsAgentsBody');
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/agents')
-    
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/agents')
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Aucun agent actif sur ce projet</span><span class="ws-empty-hint">Les agents apparaissent ici quand une mission est en cours</span></div>'; return; }
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Aucun agent actif</span></div>'; return; }
       body.innerHTML = items.map(function(a) {
         var pct = a.progress || 0;
-        return '<div class="ws-agent-row">' +
-          (a.avatar ? '<img class="ws-agent-avatar" src="' + wsEsc(a.avatar) + '" alt="">' : '<div class="ws-agent-avatar ws-agent-avatar-placeholder">' + wsEsc((a.agent_name||'?')[0]||'?') + '</div>') +
-          '<div class="ws-agent-info"><div class="ws-agent-name">' + wsEsc(a.agent_name||a.agent_id) + '</div><div class="ws-agent-mission">' + wsEsc(a.mission_title||a.session_id) + '</div>' +
-          (a.phase ? '<div class="ws-agent-phase">' + wsEsc(a.phase) + '</div>' : '') +
-          '<div class="ws-progress-bar"><div class="ws-progress-fill" style="width:' + pct + '%"></div></div></div>' +
-          '<span class="ws-badge ' + (a.status==='active'?'ws-badge-ok':'ws-badge-idle') + '">' + wsEsc(a.status||'') + '</span></div>';
+        return '<div class="ws-agent-row">' + (a.avatar?'<img class="ws-agent-avatar" src="'+wsEsc(a.avatar)+'" alt="">':'<div class="ws-agent-avatar ws-agent-avatar-placeholder">' + wsEsc((a.agent_name||'?')[0]) + '</div>') + '<div class="ws-agent-info"><div class="ws-agent-name">' + wsEsc(a.agent_name||a.agent_id) + '</div><div class="ws-agent-mission">' + wsEsc(a.mission_title||a.session_id) + '</div>' + (a.phase?'<div class="ws-agent-phase">'+wsEsc(a.phase)+'</div>':'') + '<div class="ws-progress-bar"><div class="ws-progress-fill" style="width:'+pct+'%"></div></div></div><span class="ws-badge '+(a.status==='active'?'ws-badge-ok':'ws-badge-idle')+'">'+wsEsc(a.status||'')+'</span></div>';
       }).join('');
     });
 }
 
+// ── Git ─────────────────────────────────────────────────────────
 function wsLoadGit() {
-  var body = document.getElementById('wsGitBody');
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/git')
-    
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git')
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      var commits = data.commits || [], changes = data.changes || [], branch = data.branch || '';
+      var commits = data.commits||[], changes = data.changes||[], branch = data.branch||'';
       if (branch) { var el=document.getElementById('wsGitBranchName'); if(el){el.textContent=branch; document.getElementById('wsGitBranch').style.display='';} }
-      var html = '';
+      // Left panel: changes + commit form
+      var leftHtml = '';
       if (changes.length) {
-        html += '<div class="ws-git-section-title">Modifications (' + changes.length + ')</div><div class="ws-git-changes">';
-        changes.forEach(function(f){ var color=f.status==='M'?'#f0883e':f.status==='A'?'#3fb950':'#f85149'; html+='<div class="ws-git-change-row"><span style="color:'+color+';font-family:monospace;font-weight:700;width:16px;flex-shrink:0">'+wsEsc(f.status||'M')+'</span><span class="ws-git-change-path">'+wsEsc(f.path||f.file||'')+'</span></div>'; });
-        html += '</div>';
+        leftHtml += '<div class="ws-git-section-title">Modifications ('+changes.length+')</div><div class="ws-git-changes">';
+        changes.forEach(function(f){ var color=f.status==='M'?'#f0883e':f.status==='A'?'#3fb950':'#f85149'; leftHtml+='<div class="ws-git-change-row" onclick="wsGitDiff(\''+wsEsc(f.path||f.file||'')+'\')"><span style="color:'+color+';font-family:monospace;font-weight:700;width:16px;flex-shrink:0">'+wsEsc(f.status||'M')+'</span><span class="ws-git-change-path">'+wsEsc(f.path||f.file||'')+'</span></div>'; });
+        leftHtml += '</div>';
       }
-      html += '<div class="ws-git-form"><div class="ws-git-form-title">Commit rapide</div><textarea id="wsGitMsg" placeholder="feat: …" rows="2"></textarea><div class="ws-git-form-row"><label style="font-size:.72rem;display:flex;align-items:center;gap:.35rem;"><input type="checkbox" id="wsGitPush"> Push après commit</label><button class="btn btn-sm btn-primary" onclick="wsGitCommit()" style="margin-left:auto">Commit</button></div></div>';
+      leftHtml += '<div class="ws-git-form"><div class="ws-git-form-title">Commit rapide</div><textarea id="wsGitMsg" placeholder="feat: …" rows="2"></textarea><div class="ws-git-form-row"><label style="font-size:.72rem;display:flex;align-items:center;gap:.35rem;"><input type="checkbox" id="wsGitPush"> Push</label><button class="btn btn-sm btn-primary" onclick="wsGitCommit()" style="margin-left:auto">Commit</button></div></div>';
+      document.getElementById('wsGitBody').innerHTML = leftHtml;
+      // Right panel: log
+      var logHtml = '';
       if (commits.length) {
-        html += '<div class="ws-git-section-title">Historique</div><div class="ws-git-log">';
-        commits.forEach(function(c){ html+='<div class="ws-git-commit"><span class="ws-git-sha">'+wsEsc((c.hash||'').substring(0,7))+'</span><span class="ws-git-msg">'+wsEsc(c.message||'')+'</span><span class="ws-git-meta">'+wsEsc(c.author||'')+' · '+wsEsc((c.date||'').substring(0,10))+'</span></div>'; });
-        html += '</div>';
+        logHtml += '<div class="ws-git-section-title" style="margin-bottom:.5rem">Historique ('+commits.length+')</div><div class="ws-git-log">';
+        commits.forEach(function(c){ logHtml+='<div class="ws-git-commit"><span class="ws-git-sha">'+wsEsc((c.hash||'').substring(0,7))+'</span><span class="ws-git-msg">'+wsEsc(c.message||'')+'</span><span class="ws-git-meta">'+wsEsc(c.author||'')+' · '+wsEsc((c.date||'').substring(0,10))+'</span></div>'; });
+        logHtml += '</div>';
+      } else {
+        logHtml = '<div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Pas de dépôt Git ou vide</span></div>';
       }
-      body.innerHTML = html || '<div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Pas de dépôt Git ou dépôt vide</span></div>';
+      document.getElementById('wsGitLogArea').innerHTML = logHtml;
     });
 }
 
-function wsGitCommit() {
-  var msg = document.getElementById('wsGitMsg').value.trim(); if (!msg) { alert('Message requis'); return; }
-  var push = document.getElementById('wsGitPush').checked;
-  wsSetStatus('Commit…', 'running');
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/git/commit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,push:push})})
-    
+function wsGitDiff(path) {
+  wsGitMainTab(document.querySelector('[data-tab="diff"]'), 'diff');
+  var area = document.getElementById('wsGitDiffArea');
+  area.textContent = 'Chargement diff ' + path + '…';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git/diff?file=' + encodeURIComponent(path))
     .then(function(r){ return r.json(); })
-    .then(function(d){ wsSetStatus('Prêt','idle'); if(d.ok){wsLoadGit();}else{alert(d.error||'Erreur');} });
+    .then(function(d){ area.textContent = d.diff || '(aucun diff)'; })
+    .catch(function(){ area.textContent = '(erreur)'; });
 }
 
+function wsGitCommit() {
+  var msg = document.getElementById('wsGitMsg').value.trim(); if(!msg){alert('Message requis');return;}
+  var push = document.getElementById('wsGitPush').checked;
+  wsSetStatus('Commit…','running');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git/commit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,push:push})})
+    .then(function(r){return r.json();})
+    .then(function(d){wsSetStatus('Prêt','idle');if(d.ok){wsLoadGit();}else{alert(d.error||'Erreur');}});
+}
+
+// ── Preview ─────────────────────────────────────────────────────
 function wsLoadPreview() { var url=document.getElementById('wsPreviewUrl').value.trim(); if(url) wsPreviewLoad(url); }
-
 function wsPreviewLoad(url) {
-  if (!url) url = document.getElementById('wsPreviewUrl').value.trim(); if (!url) return;
-  document.getElementById('wsPreviewEmpty').style.display = 'none';
-  var f = document.getElementById('wsPreviewFrame'); f.style.display = ''; f.src = url;
+  if(!url) url=document.getElementById('wsPreviewUrl').value.trim(); if(!url) return;
+  document.getElementById('wsPreviewEmpty').style.display='none';
+  var f=document.getElementById('wsPreviewFrame'); f.style.display=''; f.src=url;
 }
-
 function wsPreviewToggleMobile() {
-  _wsPreviewMobile = !_wsPreviewMobile;
+  _wsPreviewMobile=!_wsPreviewMobile;
   var f=document.getElementById('wsPreviewFrame'); var btn=document.getElementById('wsPreviewMobileBtn');
   if(f) f.classList.toggle('mobile',_wsPreviewMobile);
   if(btn) btn.style.color=_wsPreviewMobile?'var(--purple)':'';
 }
 
-function wsLoadLeftTree() { wsLoadFilesTree('.'); }
+// ── Backlog ─────────────────────────────────────────────────────
+function wsLoadBacklog() {
+  var body = document.getElementById('wsBacklogBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/backlog')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var missions = data.missions || [];
+      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucune mission pour ce projet</span><span class="ws-empty-hint">Créez une mission depuis la page projet</span></div>'; return; }
+      var html = '';
+      missions.forEach(function(m) {
+        var sc = m.status==='active'?'ws-badge-ok':m.status==='pending'?'ws-badge-idle':'ws-badge-err';
+        html += '<div class="ws-docker-container"><div class="ws-docker-header"><div class="ws-docker-status '+(m.status==='active'?'up':'down')+'"></div><span class="ws-docker-name">'+wsEsc(m.title||m.id)+'</span><span class="ws-badge '+sc+'" style="margin-left:auto">'+wsEsc(m.status||'')+'</span></div>';
+        if (m.tasks && m.tasks.length) {
+          html += '<table class="ws-table"><thead><tr><th>Tâche</th><th>Type</th><th>Statut</th><th>Assigné</th></tr></thead><tbody>';
+          m.tasks.forEach(function(t){ html+='<tr class="ws-table-row"><td>'+wsEsc(t.title||t.id)+'</td><td style="color:var(--text-secondary);font-size:.7rem">'+wsEsc(t.type||'')+'</td><td><span class="ws-badge '+(t.status==='done'?'ws-badge-ok':t.status==='active'||t.status==='in_progress'?'ws-badge-running':'ws-badge-idle')+'">'+wsEsc(t.status||'')+'</span></td><td style="font-size:.72rem;color:var(--text-secondary)">'+wsEsc(t.agent||'')+'</td></tr>'; });
+          html += '</tbody></table>';
+        }
+        html += '</div>';
+      });
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>'; });
+}
 
-function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el) return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
+// ── Database ────────────────────────────────────────────────────
+function wsLoadDatabase() {
+  var panel = document.getElementById('wsDbFiles');
+  panel.innerHTML = '<div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/db')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      _wsDbFiles = data.files || [];
+      if (!_wsDbFiles.length) { panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Aucune base SQLite détectée dans ce projet</div>'; return; }
+      var html = '';
+      _wsDbFiles.forEach(function(f) {
+        html += '<div class="ws-db-file-label" style="padding:.4rem .75rem .2rem;font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.05em">' + wsEsc(f.name) + '</div>';
+        (f.tables || []).forEach(function(t) {
+          html += '<div class="ws-db-table-item" onclick="wsDbSelectTable(' + JSON.stringify(f.file) + ',' + JSON.stringify(t.name) + ')">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>' +
+            wsEsc(t.name) + '<span style="margin-left:auto;font-size:.65rem;color:var(--text-secondary)">' + (t.row_count||0) + '</span></div>';
+        });
+      });
+      panel.innerHTML = html;
+      if (_wsDbFiles.length && _wsDbFiles[0].tables && _wsDbFiles[0].tables.length) {
+        _wsDbCurrentFile = _wsDbFiles[0].file;
+      }
+    }).catch(function(){ panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem">Erreur</div>'; });
+}
 
+function wsDbSelectTable(file, table) {
+  _wsDbCurrentFile = file;
+  document.getElementById('wsDbTableLabel').textContent = table;
+  document.getElementById('wsDbQuery').value = 'SELECT * FROM "' + table + '" LIMIT 100;';
+  wsDbRun();
+}
+
+function wsDbRun() {
+  var sql = document.getElementById('wsDbQuery').value.trim();
+  if (!sql) return;
+  if (!_wsDbCurrentFile) { document.getElementById('wsDbStatus').textContent = 'Sélectionnez un fichier'; return; }
+  document.getElementById('wsDbStatus').textContent = '…';
+  document.getElementById('wsDbResults').innerHTML = '<div class="ws-empty-state"><span>Exécution…</span></div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/db/query', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:_wsDbCurrentFile,sql:sql})})
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.error) { document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem;font-family:monospace">'+wsEsc(data.error)+'</div>'; return; }
+      var cols=data.columns||[], rows=data.rows||[];
+      document.getElementById('wsDbStatus').textContent = rows.length + ' ligne(s)';
+      if (!cols.length) { document.getElementById('wsDbResults').innerHTML='<div class="ws-empty-state"><span>Aucun résultat</span></div>'; return; }
+      var html='<table class="ws-db-table"><thead><tr>'+cols.map(function(c){return '<th>'+wsEsc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
+      rows.forEach(function(row){ html+='<tr>'+row.map(function(v){return '<td title="'+wsEsc(String(v===null?'NULL':v))+'">'+wsEsc(String(v===null?'NULL':v))+'</td>';}).join('')+'</tr>'; });
+      html+='</tbody></table>';
+      document.getElementById('wsDbResults').innerHTML=html;
+    })
+    .catch(function(e){ document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem">'+wsEsc(String(e))+'</div>'; });
+}
+document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if(e.ctrlKey&&e.key==='Enter') wsDbRun(); });
+
+// ── Helpers ─────────────────────────────────────────────────────
+function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el)return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
 function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// ── Init ────────────────────────────────────────────────────────
 (function() {
-  // Restore main pane tab
-  var mainTab = localStorage.getItem('ws_main_tab_' + _wsProjectId) || 'files';
-  var mainBtn = document.querySelector('#wsMainTabs [data-tab="' + mainTab + '"]');
-  if (mainBtn) wsMainTab(mainBtn, mainTab);
-
-  // Restore side pane tab
-  var sideTab = localStorage.getItem('ws_side_tab_' + _wsProjectId) || 'git';
-  var sideBtn = document.querySelector('#wsSideTabs [data-tab="' + sideTab + '"]');
-  if (sideBtn) wsSideTab(sideBtn, sideTab);
-
-  // Restore collapse states
-  if (localStorage.getItem('ws_side_collapsed')) document.getElementById('wsSidePane').classList.add('ws-collapsed');
+  var view = localStorage.getItem('ws_view_' + _wsProjectId) || 'code';
+  wsSetView(view);
+  wsLoadLeftTree();
+  wsLoadGit();
+  // Restore bottom collapse
   if (localStorage.getItem('ws_bottom_collapsed')) {
     document.getElementById('wsBottomPanel').classList.add('ws-collapsed');
     var icon = document.getElementById('wsBottomCollapseIcon');
     if (icon) icon.setAttribute('points', '6 9 12 15 18 9');
   }
-
-  // Auto-load visible panels
-  wsLoadTermHistory();
-  wsLoadLeftTree();
-  wsLoadGit();
-
+  // Auto-refresh agents every 10s when in agents view
   setInterval(function() {
-    var agentsEl = document.getElementById('ws-agents');
-    if (agentsEl && agentsEl.classList.contains('active')) wsLoadAgents();
+    if (document.getElementById('ws-view-agents').classList.contains('active')) { wsLoadAgents(); wsLoadAgentsToolcalls(); }
   }, 10000);
+  // Auto-refresh tool calls every 5s when in code view
+  setInterval(function() {
+    if (document.getElementById('ws-view-code').classList.contains('active')) wsLoadToolcalls();
+  }, 15000);
 })();
 </script>
 {% endblock %}

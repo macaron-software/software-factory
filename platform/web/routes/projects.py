@@ -1539,3 +1539,183 @@ async def ws_git_commit(project_id: str, request: Request):
     except subprocess.CalledProcessError as e:
         return JSONResponse({"error": str(e)})
     return JSONResponse({"ok": True})
+
+
+@router.get("/api/projects/{project_id}/workspace/git/diff")
+async def ws_git_diff(project_id: str, file: str = ""):
+    """Return git diff for a specific file or full diff."""
+    import subprocess
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"diff": ""})
+    try:
+        args = ["git", "diff", "HEAD", "--", file] if file else ["git", "diff", "HEAD"]
+        result = subprocess.run(
+            args, capture_output=True, text=True, cwd=proj.path, timeout=10
+        )
+        diff = result.stdout[:50000]
+        if not diff:
+            result2 = subprocess.run(
+                ["git", "diff", "--cached", "--", file]
+                if file
+                else ["git", "diff", "--cached"],
+                capture_output=True,
+                text=True,
+                cwd=proj.path,
+                timeout=10,
+            )
+            diff = result2.stdout[:50000]
+    except Exception as e:
+        return JSONResponse({"diff": str(e)})
+    return JSONResponse({"diff": diff or "(no diff)"})
+
+
+@router.get("/api/projects/{project_id}/workspace/db")
+async def ws_db_list(project_id: str):
+    """Detect SQLite database files in project and list their tables."""
+    import sqlite3
+    import os
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"files": []})
+
+    files = []
+    try:
+        for root, dirs, fnames in os.walk(proj.path):
+            # Skip hidden dirs and common non-project dirs
+            dirs[:] = [
+                d
+                for d in dirs
+                if not d.startswith(".")
+                and d not in ("node_modules", "__pycache__", "venv", ".git")
+            ]
+            for fname in fnames:
+                if fname.endswith((".db", ".sqlite", ".sqlite3")):
+                    fpath = os.path.join(root, fname)
+                    rel = os.path.relpath(fpath, proj.path)
+                    tables = []
+                    try:
+                        conn = sqlite3.connect(fpath)
+                        cur = conn.cursor()
+                        cur.execute(
+                            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+                        )
+                        for (tname,) in cur.fetchall():
+                            try:
+                                cur.execute(f'SELECT COUNT(*) FROM "{tname}"')
+                                count = cur.fetchone()[0]
+                            except Exception:
+                                count = 0
+                            tables.append({"name": tname, "row_count": count})
+                        conn.close()
+                    except Exception:
+                        pass
+                    files.append({"name": fname, "file": rel, "tables": tables})
+    except Exception:
+        pass
+
+    return JSONResponse({"files": files})
+
+
+@router.post("/api/projects/{project_id}/workspace/db/query")
+async def ws_db_query(project_id: str, request: Request):
+    """Execute a SELECT query on a SQLite database file."""
+    import sqlite3
+    import os
+    from ...projects.manager import get_project_store
+
+    body = await _parse_body(request)
+    file_rel = body.get("file", "")
+    sql = body.get("sql", "").strip()
+
+    if not sql:
+        return JSONResponse({"error": "No SQL provided"})
+
+    # Security: only allow SELECT / PRAGMA
+    sql_upper = sql.upper().lstrip()
+    if not (
+        sql_upper.startswith("SELECT")
+        or sql_upper.startswith("PRAGMA")
+        or sql_upper.startswith("WITH")
+    ):
+        return JSONResponse(
+            {"error": "Only SELECT, WITH, and PRAGMA queries are allowed"}
+        )
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Project not found"})
+
+    fpath = os.path.normpath(os.path.join(proj.path, file_rel))
+    if not fpath.startswith(proj.path):
+        return JSONResponse({"error": "Access denied"})
+    if not os.path.isfile(fpath):
+        return JSONResponse({"error": f"File not found: {file_rel}"})
+
+    try:
+        conn = sqlite3.connect(f"file:{fpath}?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows_raw = cur.fetchmany(500)
+        if rows_raw:
+            columns = [d[0] for d in cur.description]
+            rows = [list(row) for row in rows_raw]
+        else:
+            columns = [d[0] for d in cur.description] if cur.description else []
+            rows = []
+        conn.close()
+    except Exception as e:
+        return JSONResponse({"error": str(e)})
+
+    return JSONResponse({"columns": columns, "rows": rows})
+
+
+@router.get("/api/projects/{project_id}/workspace/backlog")
+async def ws_backlog(project_id: str):
+    """Return missions and tasks for the project backlog view."""
+    from ...projects.manager import get_project_store
+    from ...missions.manager import get_mission_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"missions": []})
+
+    missions_out = []
+    try:
+        store = get_mission_store()
+        all_missions = store.list(project_id=project_id)
+        for m in all_missions[:20]:
+            tasks = []
+            try:
+                task_list = getattr(m, "tasks", []) or []
+                for t in task_list[:30]:
+                    tasks.append(
+                        {
+                            "id": getattr(t, "id", ""),
+                            "title": getattr(
+                                t, "title", getattr(t, "description", "")[:60]
+                            ),
+                            "type": getattr(t, "type", ""),
+                            "status": getattr(t, "status", ""),
+                            "agent": getattr(t, "agent_id", ""),
+                        }
+                    )
+            except Exception:
+                pass
+            missions_out.append(
+                {
+                    "id": m.id,
+                    "title": getattr(m, "title", m.id),
+                    "status": getattr(m, "status", ""),
+                    "tasks": tasks,
+                }
+            )
+    except Exception:
+        pass
+
+    return JSONResponse({"missions": missions_out})
