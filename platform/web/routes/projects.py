@@ -98,7 +98,11 @@ async def projects_page(request: Request):
 
     store = get_project_store()
     projects, total = store.search(
-        q=q, factory_type=factory_type, has_workspace=has_workspace, limit=per_page, offset=offset
+        q=q,
+        factory_type=factory_type,
+        has_workspace=has_workspace,
+        limit=per_page,
+        offset=offset,
     )
     total_pages = max(1, (total + per_page - 1) // per_page)
 
@@ -107,7 +111,10 @@ async def projects_page(request: Request):
         {
             "request": request,
             "page_title": "Projects",
-            "projects": [{"info": p, "git": None, "tasks": None, "has_workspace": p.exists} for p in projects],
+            "projects": [
+                {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
+                for p in projects
+            ],
             "q": q,
             "factory_type": factory_type,
             "has_workspace": has_workspace,
@@ -116,6 +123,33 @@ async def projects_page(request: Request):
             "total_pages": total_pages,
         },
     )
+
+
+@router.post("/api/projects/heal")
+async def projects_heal():
+    """Scaffold all projects: ensure workspace + git + docker + docs + code exist."""
+    import asyncio
+    from ...projects.manager import heal_all_projects
+
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, heal_all_projects)
+    return result
+
+
+@router.post("/api/projects/{project_id}/scaffold")
+async def project_scaffold(project_id: str):
+    """Scaffold a single project (idempotent)."""
+    import asyncio
+    import functools
+    from ...projects.manager import get_project_store, scaffold_project
+
+    p = get_project_store().get(project_id)
+    if not p:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "project not found")
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, functools.partial(scaffold_project, p))
 
 
 @router.get("/api/projects/{project_id}/git-status")

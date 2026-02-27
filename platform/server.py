@@ -168,6 +168,12 @@ async def lifespan(app: FastAPI):
             "Auto-provisioned TMA/Security/Debt for %d projects", _prov_count
         )
 
+    # Scaffold all projects: ensure workspace + git + docker + docs + code exist
+    from .projects.manager import heal_all_projects as _heal
+    import asyncio as _asyncio
+
+    _asyncio.get_event_loop().run_in_executor(None, _heal)
+
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
 
@@ -676,7 +682,14 @@ def create_app() -> FastAPI:
             skip_setup = (
                 path.startswith("/static")
                 or path.startswith("/api/auth")
-                or path in ("/setup", "/health", "/favicon.ico", "/manifest.json", "/api/health")
+                or path
+                in (
+                    "/setup",
+                    "/health",
+                    "/favicon.ico",
+                    "/manifest.json",
+                    "/api/health",
+                )
             )
             if not skip_setup:
                 try:
@@ -724,7 +737,15 @@ def create_app() -> FastAPI:
         skip = (
             path.startswith("/static")
             or path.startswith("/api/")
-            or path in ("/login", "/setup", "/onboarding", "/health", "/favicon.ico", "/manifest.json")
+            or path
+            in (
+                "/login",
+                "/setup",
+                "/onboarding",
+                "/health",
+                "/favicon.ico",
+                "/manifest.json",
+            )
         )
         if not skip and not request.cookies.get("onboarding_done"):
             from starlette.responses import RedirectResponse
@@ -1007,14 +1028,29 @@ def create_app() -> FastAPI:
     # Version + git commit for header display
     import subprocess as _sp
     from pathlib import Path as _Path
+
     _ver_file = _Path(__file__).parent / "VERSION"
     if _ver_file.exists():
         _parts = _ver_file.read_text().strip().split(":")
-        _tag, _sha = (_parts[0], _parts[1]) if len(_parts) == 2 else (_parts[0], _parts[0])
+        _tag, _sha = (
+            (_parts[0], _parts[1]) if len(_parts) == 2 else (_parts[0], _parts[0])
+        )
     else:
         try:
-            _sha = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL).decode().strip()
-            _tag = _sp.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL).decode().strip()
+            _sha = (
+                _sp.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
+            _tag = (
+                _sp.check_output(
+                    ["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
         except Exception:
             _sha, _tag = "unknown", ""
     templates.env.globals["app_commit"] = _sha
