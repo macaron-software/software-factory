@@ -2,6 +2,14 @@
 
 {% block topbar_actions %}
 <div style="display:flex;align-items:center;gap:10px;">
+    <!-- Project filter -->
+    <select id="world-project-select" onchange="location.href='/world'+(this.value?'?project='+encodeURIComponent(this.value):'')"
+        style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:0.75rem;cursor:pointer;max-width:180px">
+        <option value="" {% if not selected_project %}selected{% endif %}>🌍 Tous les projets ({{ total_missions }})</option>
+        {% for p in projects %}
+        <option value="{{ p.id }}" {% if selected_project == p.id %}selected{% endif %}>📁 {{ p.name }}</option>
+        {% endfor %}
+    </select>
     <span class="badge badge-purple" id="world-agent-count">{{ agents|length }} agents</span>
     <span class="badge badge-green" id="world-active-count">0 actifs</span>
     <span class="badge badge-blue" id="world-mission-count">0 missions</span>
