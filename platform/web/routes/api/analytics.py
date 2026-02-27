@@ -26,8 +26,14 @@ async def metrics_tab_dora(request: Request):
     period = int(request.query_params.get("period", "30"))
 
     dora = get_dora_metrics()
-    summary = dora.summary(project_id, period)
-    trend = dora.trend(project_id, weeks=12)
+    try:
+        summary = dora.summary(project_id, period)
+    except Exception:
+        summary = {}
+    try:
+        trend = dora.trend(project_id, weeks=12)
+    except Exception:
+        trend = {"deploy": [], "lead_time": [], "failure": [], "mttr": []}
 
     return _templates(request).TemplateResponse(
         "_partial_dora.html",
@@ -536,29 +542,47 @@ async def llm_costs():
             ORDER BY date
         """).fetchall()
 
-        return JSONResponse({
-            "total_cost_usd": round(total, 6),
-            "by_provider": [
-                {"provider": r["provider"], "model": r["model"],
-                 "calls": r["calls"], "tokens": r["tokens"] or 0,
-                 "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_provider
-            ],
-            "by_mission": [
-                {"mission_id": r["mission_id"], "calls": r["calls"],
-                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_mission
-            ],
-            "by_agent": [
-                {"agent_id": r["agent_id"], "calls": r["calls"],
-                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_agent
-            ],
-            "daily": [
-                {"date": r["date"], "calls": r["calls"], "cost_usd": round(r["cost_usd"], 6)}
-                for r in daily
-            ],
-        })
+        return JSONResponse(
+            {
+                "total_cost_usd": round(total, 6),
+                "by_provider": [
+                    {
+                        "provider": r["provider"],
+                        "model": r["model"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_provider
+                ],
+                "by_mission": [
+                    {
+                        "mission_id": r["mission_id"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_mission
+                ],
+                "by_agent": [
+                    {
+                        "agent_id": r["agent_id"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_agent
+                ],
+                "daily": [
+                    {
+                        "date": r["date"],
+                        "calls": r["calls"],
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in daily
+                ],
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:

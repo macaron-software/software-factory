@@ -332,19 +332,38 @@ class DORAMetrics:
 
                 # Lead time: average mission_run duration (hours) for runs completed this week
                 lt_rows = db.execute(
-                    "SELECT (julianday(updated_at) - julianday(created_at)) * 24 as hours FROM mission_runs "
+                    "SELECT updated_at, created_at FROM mission_runs "
                     "WHERE status='completed' AND updated_at >= ? AND updated_at < ?"
                     + proj_filter,
                     proj_params,
                 ).fetchall()
+                lt_hours = []
+                for r in lt_rows:
+                    try:
+                        ca = r["created_at"]
+                        ua = r["updated_at"]
+                        if ca and ua:
+                            _ca = (
+                                ca
+                                if isinstance(ca, datetime)
+                                else datetime.fromisoformat(
+                                    str(ca).replace("Z", "").replace("+00:00", "")
+                                )
+                            )
+                            _ua = (
+                                ua
+                                if isinstance(ua, datetime)
+                                else datetime.fromisoformat(
+                                    str(ua).replace("Z", "").replace("+00:00", "")
+                                )
+                            )
+                            h = (_ua - _ca).total_seconds() / 3600
+                            if h >= 0:
+                                lt_hours.append(h)
+                    except Exception:
+                        pass
                 avg_lt = (
-                    round(
-                        sum(r["hours"] for r in lt_rows if r["hours"])
-                        / max(len(lt_rows), 1),
-                        1,
-                    )
-                    if lt_rows
-                    else 0
+                    round(sum(lt_hours) / max(len(lt_hours), 1), 1) if lt_hours else 0
                 )
                 data["lead_time"].append(avg_lt)
 
@@ -357,17 +376,38 @@ class DORAMetrics:
 
                 # MTTR: average resolution time (hours) for incidents resolved this week
                 mttr_rows = db.execute(
-                    "SELECT (julianday(resolved_at) - julianday(created_at)) * 24 as hours "
+                    "SELECT resolved_at, created_at "
                     "FROM platform_incidents WHERE status='resolved' AND resolved_at >= ? AND resolved_at < ?",
                     (start_iso, end_iso),
                 ).fetchall()
+                mttr_hours = []
+                for r in mttr_rows:
+                    try:
+                        ca = r["created_at"]
+                        ra = r["resolved_at"]
+                        if ca and ra:
+                            _ca = (
+                                ca
+                                if isinstance(ca, datetime)
+                                else datetime.fromisoformat(
+                                    str(ca).replace("Z", "").replace("+00:00", "")
+                                )
+                            )
+                            _ra = (
+                                ra
+                                if isinstance(ra, datetime)
+                                else datetime.fromisoformat(
+                                    str(ra).replace("Z", "").replace("+00:00", "")
+                                )
+                            )
+                            h = (_ra - _ca).total_seconds() / 3600
+                            if h >= 0:
+                                mttr_hours.append(h)
+                    except Exception:
+                        pass
                 avg_mttr = (
-                    round(
-                        sum(r["hours"] for r in mttr_rows if r["hours"])
-                        / max(len(mttr_rows), 1),
-                        1,
-                    )
-                    if mttr_rows
+                    round(sum(mttr_hours) / max(len(mttr_hours), 1), 1)
+                    if mttr_hours
                     else 0
                 )
                 data["mttr"].append(avg_mttr)
