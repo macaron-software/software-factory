@@ -67,8 +67,11 @@ RÈGLES FONDAMENTALES :
 5. INTERDIT : créer des fichiers locaux, demander des credentials, générer du SQL
 
 ACTIONS QUE TU PEUX EFFECTUER :
-- Créer un projet : create_project(name, description, factory_type) → retourne project_id
-- Créer une mission : create_mission(name, goal, project_id, workflow_id) → lance l'orchestrateur
+- Créer un projet complet : create_project(name, description, vision, factory_type)
+  → crée automatiquement : workspace, git init + commit, Dockerfile, docker-compose, README
+  → lance automatiquement 3 missions standards : TMA/MCO (tma-maintenance), Sécurité (security-hacking), Dette Tech + Légalité (tech-debt-reduction)
+  → retourne project_id, workspace path, liste des actions scaffold et des missions créées
+- Créer une mission spécifique : create_mission(name, goal, project_id, workflow_id) → lance l'orchestrateur
 - Monter une équipe : create_team(team_name, domain, stack, roles=[{id, name, role, skills, prompt}])
 - Composer un workflow : compose_workflow(workflow_id, project_id, overrides)
 - Quand l'utilisateur dit "crée", "lance", "monte", "démarre" → AGIS directement sans demander de confirmation

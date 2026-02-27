@@ -627,12 +627,34 @@ async def cto_message(request: Request):
                     if tc_name == "create_project":
                         pid = tc_res.get("project_id", "")
                         pname = html_mod.escape(tc_res.get("name", ""))
+                        scaffold = tc_res.get("scaffold", [])
+                        missions = tc_res.get("missions", [])
+                        scaffold_text = (
+                            ", ".join(scaffold) if scaffold else "workspace prêt"
+                        )
+                        missions_html = ""
+                        for m in missions:
+                            if m.get("error"):
+                                continue
+                            m_id = html_mod.escape(m.get("mission_id", ""))
+                            m_name = html_mod.escape(m.get("name", ""))
+                            wf = m.get("workflow", "")
+                            icon = (
+                                "🔧"
+                                if "tma" in wf
+                                else ("🛡️" if "security" in wf else "🧹")
+                            )
+                            missions_html += (
+                                f'<a class="cto-mission-chip" href="/missions/{m_id}" target="_blank">'
+                                f"{icon} {m_name}</a>"
+                            )
                         creation_cards_html += (
-                            f'<div class="cto-creation-card">'
+                            f'<div class="cto-creation-card cto-creation-project">'
                             f'<span class="cto-creation-icon">📁</span>'
                             f'<div class="cto-creation-info">'
                             f'<div class="cto-creation-title">{pname}</div>'
-                            f'<div class="cto-creation-sub">Projet créé · ID {html_mod.escape(pid)}</div>'
+                            f'<div class="cto-creation-sub">{html_mod.escape(scaffold_text)}</div>'
+                            f"{f'<div class=cto-creation-missions>{missions_html}</div>' if missions_html else ''}"
                             f"</div>"
                             f'<a class="cto-creation-link" href="/projects/{html_mod.escape(pid)}" target="_blank">Ouvrir →</a>'
                             f"</div>"

@@ -324,14 +324,17 @@ class PlatformCreateStoryTool(BaseTool):
 class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
-        "Create a new project on the platform. "
-        "Params: name (required), description, stack (tech stack string), factory_type ('software'|'data'|'security'). "
-        "Returns the created project id and name."
+        "Create a new project on the platform with full setup: workspace dir, git init, Dockerfile, docker-compose, "
+        "README, and standard missions (TMA/MCO, Security, Tech Debt + Legal). "
+        "Params: name (required), description, vision, stack (tech stack string), "
+        "factory_type ('software'|'data'|'security'|'standalone'), "
+        "skip_missions (bool, default false). "
+        "Returns the created project id, name, workspace path, scaffold actions, and mission ids."
     )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..projects.manager import get_project_store, Project
+        from ..projects.manager import get_project_store, Project, scaffold_project
 
         name = params.get("name", "").strip()
         if not name:
@@ -345,11 +348,102 @@ class PlatformCreateProjectTool(BaseTool):
             name=name,
             path="",
             description=params.get("description", ""),
+            vision=params.get("vision", params.get("description", "")),
             factory_type=params.get("factory_type", "software"),
             created_at=datetime.datetime.utcnow().isoformat(),
         )
         proj = store.create(proj)
-        return json.dumps({"ok": True, "project_id": proj.id, "name": proj.name})
+
+        # Scaffold workspace: git init + Dockerfile + docker-compose + README + src/
+        scaffold_result = {}
+        try:
+            scaffold_result = scaffold_project(proj)
+        except Exception as _e:
+            scaffold_result = {"error": str(_e)}
+
+        # Create standard missions unless explicitly skipped
+        missions_created = []
+        if not params.get("skip_missions", False):
+            try:
+                missions_created = await _bootstrap_standard_missions(
+                    proj.id, proj.name
+                )
+            except Exception as _e:
+                missions_created = [{"error": str(_e)}]
+
+        return json.dumps(
+            {
+                "ok": True,
+                "project_id": proj.id,
+                "name": proj.name,
+                "workspace": proj.path,
+                "scaffold": scaffold_result.get("actions", []),
+                "missions": missions_created,
+            }
+        )
+
+
+async def _bootstrap_standard_missions(project_id: str, project_name: str) -> list:
+    """Create the 3 standard missions for every new project: TMA, Security, Tech Debt + Legal."""
+    from ..missions.store import get_mission_store, MissionDef, get_mission_run_store
+    from ..models import MissionRun, MissionStatus
+    import uuid
+
+    m_store = get_mission_store()
+    run_store = get_mission_run_store()
+    created = []
+
+    standard = [
+        {
+            "name": f"TMA/MCO — {project_name}",
+            "description": "Tierce Maintenance Applicative — monitoring, incidents, corrections, SLA.",
+            "goal": "Maintenir le projet en conditions opérationnelles. Triage incidents, diagnostic root-cause, correctifs TDD, déploiements hotfix.",
+            "workflow_id": "tma-maintenance",
+        },
+        {
+            "name": f"Sécurité — {project_name}",
+            "description": "Audit sécurité offensif + défensif : pentest, CVE, SAST, remédiation.",
+            "goal": "Identifier et corriger toutes les vulnérabilités. Score OWASP Top 10, aucune CVE critique.",
+            "workflow_id": "security-hacking",
+        },
+        {
+            "name": f"Dette Tech & Légalité — {project_name}",
+            "description": "Réduction de la dette technique + conformité légale : RGPD, licences open-source, accessibilité a11y.",
+            "goal": "Dette technique < seuil, 100% conformité licences (license-compliance), RGPD validé, a11y WCAG AA.",
+            "workflow_id": "tech-debt-reduction",
+        },
+    ]
+
+    for m_def in standard:
+        try:
+            mission = MissionDef(
+                name=m_def["name"],
+                description=m_def["description"],
+                goal=m_def["goal"],
+                project_id=project_id,
+                workflow_id=m_def["workflow_id"],
+                status="active",
+            )
+            mission = m_store.create_mission(mission)
+            run = MissionRun(
+                id=str(uuid.uuid4())[:8],
+                mission_id=mission.id,
+                status=MissionStatus.PAUSED,
+                project_id=project_id,
+            )
+            run = run_store.create(run)
+            created.append(
+                {
+                    "mission_id": mission.id,
+                    "name": mission.name,
+                    "workflow": m_def["workflow_id"],
+                    "run_id": run.id,
+                }
+            )
+        except Exception as _e:
+            created.append({"name": m_def["name"], "error": str(_e)})
+
+    return created
 
 
 class PlatformCreateMissionTool(BaseTool):
