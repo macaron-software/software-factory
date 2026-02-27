@@ -104,7 +104,7 @@
     </div>
     {% endif %}
     <div class="mu__footer">
-      <span class="mu__time">{{ ts[11:16] if ts|length > 16 else ts }}</span>
+      <span class="mu__time">{{ ts | string | truncate(16, True, '') | replace('T', ' ') }}</span>
       {% if meta.get('model') %}<span class="mu__model">{{ meta['model'] }}</span>{% endif %}
       {% if is_user %}
       <svg class="mu__checks" width="16" height="10" viewBox="0 0 16 10"><path d="M1 5l3 3L9 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/><path d="M5 5l3 3L13 2" stroke="#7c8aff" stroke-width="1.5" fill="none"/></svg>
