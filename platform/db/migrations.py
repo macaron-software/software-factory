@@ -948,6 +948,16 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
+    # Backfill: mark auto-provisioned system missions as category='system'
+    try:
+        conn.execute(
+            "UPDATE missions SET category='system' WHERE type IN ('program','security','debt') AND config_json LIKE '%auto_provisioned%' AND category='functional'"
+        )
+        conn.execute(
+            "UPDATE missions SET category='system' WHERE name LIKE 'Self-Healing %' AND config_json LIKE '%auto_heal%' AND category='functional'"
+        )
+    except Exception:
+        pass
     conn.commit()
 
 
