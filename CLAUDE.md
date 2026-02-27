@@ -319,6 +319,21 @@ cli/sf.py, cli/_api.py, cli/_db.py, cli/_output.py, cli/_stream.py
 - HTMX: readyState check (not DOMContentLoaded). Enum: `_s(val)` helper.
 - Process cleanup: start_new_session=True + os.killpg() on timeout
 
+## EXTERNAL TOOLS WATCHLIST
+
+Outils tiers à suivre pour intégration future dans la SF :
+
+| Outil | Repo | Pourquoi | Statut |
+|-------|------|----------|--------|
+| **rtk** (Rust Token Killer) | [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | CLI proxy Rust, réduit 60-90% tokens LLM sur git/test/grep — intégrer dans `tool_runner.py` + wrappers agents | 🔭 watch |
+
+### rtk — notes d'intégration SF
+- **Approche hook** : `~/.claude/settings.json` `PreToolUse` → transparent pour Claude Code. Pas applicable server-side.
+- **Approche SF** : wrapper dans `platform/tools/git_tools.py`, `test_tools.py`, `build_tools.py` — détecter si `rtk` est dans PATH, préfixer les commandes.
+- **Patterns à récupérer** : logique de compression `cargo_cmd.rs`, `diff_cmd.rs`, `grep_cmd.rs` → portage Python dans `platform/tools/`.
+- **Install local** : `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh`
+- **Version analysée** : v0.22.2 (fév 2026) — 1572 ⭐, 115 forks
+
 ## AUDIT COVERAGE (46/46 = 100%)
 
 ```
