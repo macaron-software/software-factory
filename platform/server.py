@@ -870,6 +870,16 @@ def create_app() -> FastAPI:
             )
         return {"error": "manifest not found"}
 
+    # Serve favicon.ico
+    @app.get("/favicon.ico")
+    async def favicon():
+        from fastapi.responses import FileResponse
+
+        favicon_path = STATIC_DIR / "favicon.ico"
+        if favicon_path.exists():
+            return FileResponse(str(favicon_path), media_type="image/x-icon")
+        return FileResponse(str(favicon_path))  # 404 handled by FastAPI
+
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
     # Add markdown filter for chat rendering (with LLM artifact stripping)

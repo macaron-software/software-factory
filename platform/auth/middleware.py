@@ -202,6 +202,7 @@ PUBLIC_PATHS = {
     "/setup",
     "/static",
     "/favicon.ico",
+    "/manifest.json",
     "/health",
     "/docs",
     "/openapi.json",
