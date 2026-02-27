@@ -26,6 +26,8 @@ services:
       - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
       - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
       - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - DBGATE_URL=http://dbgate:3000
+      - DBGATE_PASSWORD=dbgate2024
     volumes:
       - platform-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock

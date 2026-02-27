@@ -2120,8 +2120,10 @@ async def ws_dbgate_configure(project_id: str):
         return JSONResponse({"configured": 0, "message": "No databases detected"})
 
     # Login to DbGate and create connections
-    dbgate_url = "http://localhost:3002"
-    dbgate_password = "dbgate2024"
+    import os
+
+    dbgate_url = os.environ.get("DBGATE_URL", "http://dbgate:3000")
+    dbgate_password = os.environ.get("DBGATE_PASSWORD", "dbgate2024")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             login = await client.post(
@@ -2148,12 +2150,15 @@ async def ws_dbgate_configure(project_id: str):
 async def dbgate_get_token():
     """Return a fresh DbGate access token for iframe auto-login."""
     import httpx
+    import os
 
+    dbgate_url = os.environ.get("DBGATE_URL", "http://dbgate:3000")
+    dbgate_password = os.environ.get("DBGATE_PASSWORD", "dbgate2024")
     try:
         async with httpx.AsyncClient(timeout=5) as client:
             r = await client.post(
-                "http://localhost:3002/auth/login",
-                json={"login": "admin", "password": "dbgate2024"},
+                f"{dbgate_url}/auth/login",
+                json={"login": "admin", "password": dbgate_password},
             )
             if r.status_code == 200:
                 token = r.json().get("accessToken", "")
