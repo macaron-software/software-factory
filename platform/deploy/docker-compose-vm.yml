@@ -35,6 +35,7 @@ services:
       - MF_ROOT=/app/mf_projects
       - ANDROID_BUILDER_CONTAINER=android-builder
       - AZURE_DEPLOY=1
+      - PLATFORM_AUTO_RESUME_ENABLED=${PLATFORM_AUTO_RESUME_ENABLED:-0}
       - SANDBOX_ENABLED=true
       - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
       - SANDBOX_NETWORK=bridge

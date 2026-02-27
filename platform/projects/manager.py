@@ -543,7 +543,7 @@ class ProjectStore:
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Migrations: add missing columns
+        # Migrations: add missing columns (IF NOT EXISTS handles both SQLite and PostgreSQL)
         cols = [r[1] for r in conn.execute("PRAGMA table_info(projects)").fetchall()]
         for col, default in [
             ("git_url", "''"),
@@ -551,9 +551,12 @@ class ProjectStore:
             ("phases_json", "'[]'"),
         ]:
             if col not in cols:
-                conn.execute(
-                    f"ALTER TABLE projects ADD COLUMN {col} TEXT DEFAULT {default}"
-                )
+                try:
+                    conn.execute(
+                        f"ALTER TABLE projects ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT {default}"
+                    )
+                except Exception:
+                    pass  # Column already exists (SQLite doesn't support IF NOT EXISTS)
         conn.commit()
         conn.close()
 
