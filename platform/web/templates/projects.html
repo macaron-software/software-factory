@@ -9,16 +9,39 @@
 
 {% block content %}
 {% set persp = request.state.perspective|default('admin') %}
+<style>
+.pj-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+.pj-search{display:flex;align-items:center;gap:.25rem;flex:1;min-width:180px;max-width:360px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0 .5rem}
+.pj-search input{border:0;background:transparent;outline:none;padding:.4rem .25rem;font-size:.875rem;color:var(--text-primary);width:100%}
+.pj-search svg{color:var(--text-secondary);flex-shrink:0}
+.pj-btn{padding:.3rem .75rem;font-size:.8rem;border:1px solid var(--border);border-radius:5px;background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer}
+.pj-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pj-count{font-size:.8rem;color:var(--text-secondary);margin-left:auto}
+.ppager{display:flex;gap:.25rem;align-items:center;margin-top:1rem;justify-content:center}
+.ppager a,.ppager span{padding:.3rem .6rem;border:1px solid var(--border);border-radius:5px;font-size:.8rem;color:var(--text-secondary);text-decoration:none;background:var(--bg-secondary)}
+.ppager a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ppager span.current{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ppager span.ellipsis{border:none;background:none}
+</style>
 
-{% if persp == 'developer' %}
-<div style="display:flex;align-items:center;gap:0.75rem;padding:0.5rem 1rem;margin-bottom:1rem;font-size:0.82rem">
-    <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-folder"/></svg>
-    <span style="font-weight:600">My Projects</span>
-    <label style="margin-left:auto;display:flex;align-items:center;gap:0.4rem;cursor:pointer;color:var(--text-secondary);font-size:0.78rem">
-        <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--purple)"> Show only assigned
-    </label>
+<form method="get" action="/projects" id="pjf">
+<div class="pj-toolbar">
+  <div class="pj-search">
+    <svg class="icon icon-sm"><use href="#icon-search"/></svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher projets…" autocomplete="off">
+  </div>
+  <button type="submit" class="pj-btn {% if not factory_type %}active{% endif %}" name="type" value="">Tous</button>
+  <button type="submit" class="pj-btn {% if factory_type=='sf' %}active{% endif %}" name="type" value="sf">SF</button>
+  <button type="submit" class="pj-btn {% if factory_type=='mf' %}active{% endif %}" name="type" value="mf">MF</button>
+  <button type="submit" class="pj-btn {% if factory_type=='standalone' %}active{% endif %}" name="type" value="standalone">Standalone</button>
+  {% if persp == 'developer' %}
+  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:var(--text-secondary)">
+    <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--accent)"> Mes projets
+  </label>
+  {% endif %}
+  <span class="pj-count">{{ total }} projet{{ 's' if total != 1 }}</span>
 </div>
-{% endif %}
+</form>
 
 <div class="item-grid" data-view-grid data-view="card">
     {% for proj in projects %}
@@ -57,19 +80,41 @@
     {% endfor %}
     {% if not projects %}
     <div class="empty-state">
+        {% if q or factory_type %}
+        <p>Aucun résultat{% if q %} pour « {{ q }} »{% endif %}</p>
+        <a href="/projects" class="btn btn-primary">Effacer</a>
+        {% else %}
         <p>{{ _("no_projects_found") }}</p>
+        {% endif %}
     </div>
     {% endif %}
 </div>
-{% if persp == 'developer' %}
+
+{% if total_pages > 1 %}
+<div class="ppager">
+  {% set base = "/projects?q=" ~ q ~ "&type=" ~ factory_type ~ "&page=" %}
+  {% if page > 1 %}<a href="{{ base }}{{ page-1 }}">‹</a>{% endif %}
+  {% for p in range(1, total_pages+1) %}
+    {% if p == page %}<span class="current">{{ p }}</span>
+    {% elif p == 1 or p == total_pages or (p >= page-2 and p <= page+2) %}<a href="{{ base }}{{ p }}">{{ p }}</a>
+    {% elif p == page-3 or p == page+3 %}<span class="ellipsis">…</span>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}<a href="{{ base }}{{ page+1 }}">›</a>{% endif %}
+</div>
+{% endif %}
+
 <script>
+const pjInp = document.querySelector('.pj-search input');
+let _pjt; pjInp.addEventListener('input', () => { clearTimeout(_pjt); _pjt = setTimeout(() => document.getElementById('pjf').submit(), 400); });
+{% if persp == 'developer' %}
 function filterProjects() {
     const show = document.getElementById('filterMyProjects').checked;
     document.querySelectorAll('.item-card').forEach(card => {
-        const lead = card.dataset.lead || '';
-        card.style.display = (show && !lead) ? 'none' : '';
+        card.style.display = (show && !card.dataset.lead) ? 'none' : '';
     });
 }
-</script>
 {% endif %}
+</script>
 {% endblock %}
+

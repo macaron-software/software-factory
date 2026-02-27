@@ -184,6 +184,35 @@ class ProjectStore:
         cache_put("projects:all", projects, ttl=60)
         return projects
 
+    def search(self, q: str = "", factory_type: str = "", limit: int = 24, offset: int = 0) -> tuple[list[Project], int]:
+        """Search projects by name/description/vision/domains. Returns (projects, total)."""
+        conn = get_db()
+        try:
+            conditions = []
+            params: list = []
+            if q:
+                like = f"%{q}%"
+                conditions.append("(p.name LIKE ? OR p.description LIKE ? OR p.vision LIKE ? OR p.domains_json LIKE ?)")
+                params += [like, like, like, like]
+            if factory_type:
+                conditions.append("p.factory_type = ?")
+                params.append(factory_type)
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            total = conn.execute(f"SELECT COUNT(*) FROM projects p {where}", params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT p.* FROM projects p {where} ORDER BY p.name LIMIT ? OFFSET ?",
+                params + [limit, offset]
+            ).fetchall()
+            projects = [self._row_to_project(r) for r in rows]
+            if os.environ.get("AZURE_DEPLOY", ""):
+                from .registry import _PERSONAL_IDS
+                projects = [p for p in projects if p.id not in _PERSONAL_IDS]
+                # Re-count without personal projects (approximate)
+                total = max(0, total - sum(1 for p in projects if p.id in _PERSONAL_IDS))
+            return projects, total
+        finally:
+            conn.close()
+
     def get(self, project_id: str) -> Optional[Project]:
         conn = get_db()
         row = conn.execute(
