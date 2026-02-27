@@ -65,11 +65,13 @@ DIRS_TO_SYNC=(
     "mcp_lrm"
     "deploy"
     "tests"
+    "docs/screenshots"
 )
 
 for dir in "${DIRS_TO_SYNC[@]}"; do
     [ -d "$GITHUB_REPO/$dir" ] || continue
     echo "  → $dir/"
+    $DRY_RUN || mkdir -p "$LAPOSTE_REPO/$dir"
     rsync $RSYNC_OPTS "${EXCLUDES[@]}" \
         --exclude="skills/definitions/*.yaml" \
         --exclude="workflows/definitions/*.yaml" \
