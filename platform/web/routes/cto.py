@@ -183,6 +183,63 @@ async def cto_load_session(session_id: str, request: Request):
     return HTMLResponse(history_html or "")
 
 
+def _resolve_mentions(content: str) -> str:
+    """Replace @ProjectName mentions with rich project context for the LLM."""
+    import re
+
+    mentions = re.findall(r"@([\w\-]+)", content)
+    if not mentions:
+        return content
+    try:
+        from ...projects.manager import get_project_store
+        from ...missions.store import get_mission_store
+
+        ps = get_project_store()
+        ms = get_mission_store()
+        all_projects = ps.list_all()
+        injected = []
+        for mention in mentions:
+            mention_lower = mention.lower().replace("-", " ").replace("_", " ")
+            # Find project by name (fuzzy: starts with or contains)
+            match = None
+            for p in all_projects:
+                pname = p.name.lower().replace("-", " ").replace("_", " ")
+                if (
+                    pname == mention_lower
+                    or pname.startswith(mention_lower)
+                    or mention_lower in pname
+                ):
+                    match = p
+                    break
+            if not match:
+                continue
+            # Gather missions for this project
+            missions = ms.list(project_id=match.id, limit=10)
+            m_lines = (
+                "\n".join(
+                    f"  - [{m.status}] {m.name} (workflow: {m.workflow_id or '?'})"
+                    for m in missions
+                )
+                or "  - Aucune mission"
+            )
+            ctx_block = (
+                f"\n\n--- Contexte projet @{mention} ---\n"
+                f"Nom: {match.name}\n"
+                f"Description: {match.description or '(non renseignée)'}\n"
+                f"Type: {match.factory_type or '?'} | Statut: {match.status or '?'}\n"
+                f"Domaines: {', '.join(match.domains) if match.domains else '?'}\n"
+                f"Git: {match.git_url or '(non configuré)'}\n"
+                f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
+                f"Missions:\n{m_lines}\n"
+                f"---\n"
+            )
+            injected.append(ctx_block)
+        return content + "".join(injected)
+    except Exception as e:
+        logger.warning("_resolve_mentions failed: %s", e)
+        return content
+
+
 @router.post("/api/cto/message")
 async def cto_message(request: Request):
     """Send a message to the CTO agent, return SSE stream."""
@@ -195,6 +252,9 @@ async def cto_message(request: Request):
     session_id = str(data.get("session_id", "")).strip()
     if not content:
         return HTMLResponse("")
+
+    # Resolve @Project mentions → inject project context for the LLM
+    content_with_ctx = _resolve_mentions(content)
 
     # Resolve session
     store = get_session_store()
@@ -227,6 +287,7 @@ async def cto_message(request: Request):
 
         try:
             from ...agents.store import get_agent_store
+
             agent_store = get_agent_store()
             agent = agent_store.get(_CTO_AGENT_ID)
             if not agent:
@@ -234,12 +295,15 @@ async def cto_message(request: Request):
                 return
 
             from ...sessions.runner import _build_context
+
             ctx = await _build_context(agent, session)
 
             executor = get_executor()
             result = None
 
-            async for event_type_s, data_s in executor.run_streaming(ctx, content):
+            async for event_type_s, data_s in executor.run_streaming(
+                ctx, content_with_ctx
+            ):
                 if event_type_s == "delta":
                     yield sse("chunk", {"text": data_s})
                 elif event_type_s == "result":
@@ -291,7 +355,14 @@ async def cto_message(request: Request):
                 f"</div></div>"
             )
             title_hint = html_mod.escape(display[:55])
-            yield sse("done", {"html": agent_html, "session_id": session.id, "title_hint": title_hint})
+            yield sse(
+                "done",
+                {
+                    "html": agent_html,
+                    "session_id": session.id,
+                    "title_hint": title_hint,
+                },
+            )
 
         except Exception as exc:
             logger.exception("CTO streaming error")
@@ -307,10 +378,34 @@ async def cto_message(request: Request):
 # ── File upload ──────────────────────────────────────────────────────────────
 
 _TEXT_EXTS = {
-    ".txt", ".md", ".rst", ".csv", ".json", ".yaml", ".yml",
-    ".py", ".js", ".ts", ".jsx", ".tsx", ".html", ".css", ".scss",
-    ".java", ".kt", ".go", ".rs", ".rb", ".php", ".sh", ".xml",
-    ".sql", ".toml", ".ini", ".cfg", ".env",
+    ".txt",
+    ".md",
+    ".rst",
+    ".csv",
+    ".json",
+    ".yaml",
+    ".yml",
+    ".py",
+    ".js",
+    ".ts",
+    ".jsx",
+    ".tsx",
+    ".html",
+    ".css",
+    ".scss",
+    ".java",
+    ".kt",
+    ".go",
+    ".rs",
+    ".rb",
+    ".php",
+    ".sh",
+    ".xml",
+    ".sql",
+    ".toml",
+    ".ini",
+    ".cfg",
+    ".env",
 }
 _MAX_CHARS = 40_000  # clip to avoid exploding the context window
 
@@ -367,12 +462,14 @@ async def cto_upload(file: UploadFile = File(...)):
     truncated = len(text) > _MAX_CHARS
     text = text[:_MAX_CHARS]
 
-    return JSONResponse({
-        "ok": True,
-        "name": name,
-        "ext": ext,
-        "size": len(data),
-        "chars": len(text),
-        "truncated": truncated,
-        "text": text,
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "name": name,
+            "ext": ext,
+            "size": len(data),
+            "chars": len(text),
+            "truncated": truncated,
+            "text": text,
+        }
+    )
