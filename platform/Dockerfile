@@ -12,6 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
     npx playwright install --with-deps chromium && \
     chmod -R 755 $PLAYWRIGHT_BROWSERS_PATH && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
 
 # Python deps + SAST tools
@@ -30,8 +33,9 @@ COPY projects/ /app/projects/
 # Data + workspace dirs
 RUN mkdir -p /app/data /app/workspace
 
-# Create non-root user
+# Create non-root user with docker group access
 RUN groupadd -r macaron && useradd -r -g macaron -d /app macaron \
+    && usermod -aG docker macaron 2>/dev/null || true \
     && chown -R macaron:macaron /app \
     && chown -R macaron:macaron $PLAYWRIGHT_BROWSERS_PATH
 USER macaron
