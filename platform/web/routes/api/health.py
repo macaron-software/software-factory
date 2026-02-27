@@ -338,6 +338,8 @@ async def monitoring_live(request: Request, hours: int = 24):
         freelist = db.execute("PRAGMA freelist_count").fetchone()[0]
         journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0]
         db.close()
+        from ....db.migrations import get_schema_version
+
         db_stats = {
             "size_mb": db_size_mb,
             "tables": len(tables),
@@ -347,6 +349,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             "page_count": page_count,
             "freelist_pages": freelist,
             "journal_mode": journal_mode,
+            "schema_version": get_schema_version(),
         }
     except Exception as e:
         db_stats = {"error": str(e)}

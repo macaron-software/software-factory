@@ -15,6 +15,35 @@ SCHEMA_PG_PATH = Path(__file__).parent / "schema_pg.sql"
 
 _USE_PG = is_postgresql()
 
+# Increment this when adding new migration blocks (SQLite or PG).
+_SCHEMA_VERSION = 2
+
+
+def get_schema_version() -> int:
+    """Return the schema version recorded in the DB (0 if not yet tracked)."""
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        return row[0] if row else 0
+    except Exception:
+        return 0
+
+
+def _bump_schema_version(conn, version: int) -> None:
+    """Record the applied schema version (idempotent)."""
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT DEFAULT (datetime('now')))"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (version,)
+        )
+    except Exception:
+        pass
+
 
 def _pg_column_exists(conn, table: str, column: str) -> bool:
     """Check if a column exists in a PostgreSQL table."""
@@ -35,8 +64,13 @@ def _pg_table_exists(conn, table: str) -> bool:
 
 def init_db(db_path: Path = DB_PATH):
     """Initialize database with schema. Safe to call multiple times."""
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
     if _USE_PG:
-        return _init_pg()
+        conn = _init_pg()
+        _log.info("DB (PostgreSQL) schema v%s ready", _SCHEMA_VERSION)
+        return conn
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
@@ -49,6 +83,7 @@ def init_db(db_path: Path = DB_PATH):
     conn.execute("PRAGMA foreign_keys=ON")
     _migrate(conn)
     conn.commit()
+    _log.info("DB (SQLite) schema v%s ready", _SCHEMA_VERSION)
     return conn
 
 
@@ -818,6 +853,7 @@ def _migrate(conn):
         )
     """)
     _ensure_sqlite_tables(conn)
+    _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
 
@@ -958,6 +994,7 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
+    _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
 

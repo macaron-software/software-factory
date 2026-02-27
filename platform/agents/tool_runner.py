@@ -1545,6 +1545,156 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
     return result[:8000] if result else "No response from MCP"
 
 
+async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """PM lifecycle tools: phase management, health, mission suggestions."""
+    from ..projects.manager import get_project_store
+    from ..db.migrations import get_db
+
+    project_id = args.get("project_id") or ctx.project_id or ""
+    if not project_id and name not in ("activate_mission", "pause_mission"):
+        return "Error: project_id required"
+
+    if name == "get_project_health":
+        try:
+            store = get_project_store()
+            project = store.get(project_id)
+            if not project:
+                return f"Error: project '{project_id}' not found"
+            db = get_db()
+            try:
+                missions = db.execute(
+                    "SELECT id, name, type, status, category FROM missions WHERE project_id=? ORDER BY status",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            active = [m for m in missions if m["status"] == "active"]
+            blocked = [m for m in missions if m["status"] in ("failed", "interrupted")]
+            lines = [
+                f"Project: {project.name}",
+                f"Phase: {getattr(project, 'current_phase', '') or 'not set'}",
+                f"Missions: {len(missions)} total / {len(active)} active / {len(blocked)} blocked",
+            ]
+            if blocked:
+                lines.append("Blockers: " + ", ".join(m["name"] for m in blocked[:5]))
+            if active:
+                lines.append("Active: " + ", ".join(m["name"] for m in active[:5]))
+            return "\n".join(lines)
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "set_project_phase":
+        new_phase = args.get("phase", "")
+        if not new_phase:
+            return "Error: phase required"
+        try:
+            store = get_project_store()
+            project = store.get(project_id)
+            if not project:
+                return f"Error: project '{project_id}' not found"
+            db = get_db()
+            try:
+                db.execute(
+                    "UPDATE projects SET current_phase=? WHERE id=?",
+                    (new_phase, project_id),
+                )
+                db.commit()
+            finally:
+                db.close()
+            # Trigger heal_missions to re-evaluate system mission statuses
+            try:
+                from ..ops.auto_heal import heal_missions
+
+                await asyncio.get_event_loop().run_in_executor(
+                    None, heal_missions, project_id
+                )
+            except Exception:
+                pass
+            return f"Phase set to '{new_phase}' for project {project_id}. System missions rebalanced."
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "suggest_next_missions":
+        try:
+            db = get_db()
+            try:
+                existing = db.execute(
+                    "SELECT name, type, status FROM missions WHERE project_id=? ORDER BY status",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            store = get_project_store()
+            project = store.get(project_id)
+            phase = getattr(project, "current_phase", "") or "unknown"
+            active_names = {m["name"] for m in existing if m["status"] == "active"}
+            suggestions = []
+            if phase in ("discovery", "mvp") and not any(
+                "MVP" in n or "Feature" in n for n in active_names
+            ):
+                suggestions.append("Launch a Feature mission for MVP scope definition")
+            if phase in ("v1", "run") and not any(
+                "Security" in n for n in active_names
+            ):
+                suggestions.append(
+                    "Activate Security audit mission (required for production)"
+                )
+            if phase in ("v1", "run", "maintenance") and not any(
+                "TMA" in n or "maintenance" in n.lower() for n in active_names
+            ):
+                suggestions.append("Activate TMA (maintenance) mission")
+            if not suggestions:
+                suggestions.append("Current missions appear well-suited to the phase.")
+            return f"Phase: {phase}\nSuggestions:\n" + "\n".join(
+                f"- {s}" for s in suggestions
+            )
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name in ("activate_mission", "pause_mission"):
+        mission_id = args.get("mission_id", "")
+        if not mission_id:
+            return "Error: mission_id required"
+        new_status = "active" if name == "activate_mission" else "paused"
+        try:
+            db = get_db()
+            try:
+                cur = db.execute(
+                    "UPDATE missions SET status=? WHERE id=?",
+                    (new_status, mission_id),
+                )
+                db.commit()
+            finally:
+                db.close()
+            if cur.rowcount == 0:
+                return f"Error: mission '{mission_id}' not found"
+            return f"Mission {mission_id} → {new_status}"
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "check_phase_gate":
+        target_phase = args.get("target_phase", "")
+        # Simple gate check: all active missions must not be 'failed'
+        try:
+            db = get_db()
+            try:
+                failed = db.execute(
+                    "SELECT name FROM missions WHERE project_id=? AND status='failed'",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            if failed:
+                return f"Gate BLOCKED — {len(failed)} failed mission(s): " + ", ".join(
+                    m["name"] for m in failed[:5]
+                )
+            return f"Gate OK — no blockers for transition to '{target_phase}'"
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    return f"Error: unknown PM tool '{name}'"
+
+
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 
@@ -1703,6 +1853,17 @@ async def _execute_tool(
     # ── Local CI pipeline ──
     if name == "local_ci":
         return await _tool_local_ci(args, ctx)
+
+    # ── PM lifecycle tools ──
+    if name in (
+        "set_project_phase",
+        "get_project_health",
+        "suggest_next_missions",
+        "activate_mission",
+        "pause_mission",
+        "check_phase_gate",
+    ):
+        return await _tool_pm_lifecycle(name, args, ctx)
 
     if name == "get_si_blueprint":
         return await _tool_si_blueprint(args, ctx)
