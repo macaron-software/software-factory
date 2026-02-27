@@ -897,8 +897,16 @@ function wsLoadBacklog() {
       if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucune mission pour ce projet</span><span class="ws-empty-hint">Créez une mission depuis la page projet</span></div>'; return; }
       var html = '';
       missions.forEach(function(m) {
-        var sc = m.status==='active'?'ws-badge-ok':m.status==='pending'?'ws-badge-idle':'ws-badge-err';
-        html += '<div class="ws-docker-container"><div class="ws-docker-header"><div class="ws-docker-status '+(m.status==='active'?'up':'down')+'"></div><span class="ws-docker-name">'+wsEsc(m.title||m.id)+'</span><span class="ws-badge '+sc+'" style="margin-left:auto">'+wsEsc(m.status||'')+'</span></div>';
+        var sc = m.status==='active'?'ws-badge-ok':m.status==='planning'?'ws-badge-idle':'ws-badge-err';
+        var typeIcon = {'architecture':'🏗','feature':'⚡','security':'🔒','tma':'🔧','debt':'⚙','maintenance':'🔩'}[m.type] || '📋';
+        html += '<div class="ws-docker-container">';
+        html += '<div class="ws-docker-header">';
+        html += '<div class="ws-docker-status '+(m.status==='active'?'up':'down')+'"></div>';
+        html += '<span class="ws-docker-name">'+typeIcon+' '+wsEsc(m.title||m.id)+'</span>';
+        if (m.type) html += '<span class="ws-badge ws-badge-idle" style="margin-left:.4rem;font-size:.65rem">'+wsEsc(m.type)+'</span>';
+        html += '<span class="ws-badge '+sc+'" style="margin-left:auto">'+wsEsc(m.status||'')+'</span>';
+        html += '</div>';
+        if (m.goal) html += '<div style="padding:.25rem .75rem .4rem;font-size:.72rem;color:var(--text-secondary);font-style:italic">'+wsEsc(m.goal.substring(0,120))+'</div>';
         if (m.tasks && m.tasks.length) {
           html += '<table class="ws-table"><thead><tr><th>Tâche</th><th>Type</th><th>Statut</th><th>Assigné</th></tr></thead><tbody>';
           m.tasks.forEach(function(t){ html+='<tr class="ws-table-row"><td>'+wsEsc(t.title||t.id)+'</td><td style="color:var(--text-secondary);font-size:.7rem">'+wsEsc(t.type||'')+'</td><td><span class="ws-badge '+(t.status==='done'?'ws-badge-ok':t.status==='active'||t.status==='in_progress'?'ws-badge-running':'ws-badge-idle')+'">'+wsEsc(t.status||'')+'</span></td><td style="font-size:.72rem;color:var(--text-secondary)">'+wsEsc(t.agent||'')+'</td></tr>'; });

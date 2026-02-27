@@ -1899,18 +1899,20 @@ async def ws_backlog(project_id: str):
     missions_out = []
     try:
         store = get_mission_store()
-        all_missions = store.list(project_id=project_id)
+        all_missions = store.list_missions(project_id=project_id)
         for m in all_missions[:20]:
             tasks = []
             try:
-                task_list = getattr(m, "tasks", []) or []
+                task_list = store.list_tasks(mission_id=m.id)
                 for t in task_list[:30]:
                     tasks.append(
                         {
                             "id": getattr(t, "id", ""),
                             "title": getattr(
-                                t, "title", getattr(t, "description", "")[:60]
-                            ),
+                                t,
+                                "name",
+                                getattr(t, "description", getattr(t, "title", "")),
+                            )[:60],
                             "type": getattr(t, "type", ""),
                             "status": getattr(t, "status", ""),
                             "agent": getattr(t, "agent_id", ""),
@@ -1921,8 +1923,12 @@ async def ws_backlog(project_id: str):
             missions_out.append(
                 {
                     "id": m.id,
-                    "title": getattr(m, "title", m.id),
+                    "title": getattr(m, "name", None)
+                    or getattr(m, "title", None)
+                    or getattr(m, "description", m.id)[:60],
+                    "type": getattr(m, "type", ""),
                     "status": getattr(m, "status", ""),
+                    "goal": getattr(m, "goal", ""),
                     "tasks": tasks,
                 }
             )
