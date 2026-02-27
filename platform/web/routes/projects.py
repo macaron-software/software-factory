@@ -1395,7 +1395,13 @@ async def ws_docker_status(project_id: str):
 @router.post("/api/projects/{project_id}/workspace/docker/{action}")
 async def ws_docker_action(project_id: str, action: str, request: Request):
     """Perform docker action: start / stop / rebuild / compose_up."""
+    import shutil
     import subprocess
+
+    if not shutil.which("docker"):
+        return JSONResponse(
+            {"error": "Docker n'est pas disponible sur ce serveur"}, status_code=503
+        )
 
     body = await _parse_body(request)
     container = body.get("container", "")
@@ -1403,20 +1409,33 @@ async def ws_docker_action(project_id: str, action: str, request: Request):
         return JSONResponse({"error": "invalid"}, status_code=400)
     try:
         from ...projects.manager import get_project_store
+
         proj = get_project_store().get(project_id)
         cwd = proj.path if proj else None
 
         if action == "compose_up":
             if not cwd:
-                return JSONResponse({"error": "workspace path not configured"}, status_code=400)
+                return JSONResponse(
+                    {"error": "workspace path not configured"}, status_code=400
+                )
             compose_file = Path(cwd) / "docker-compose.yml"
             if not compose_file.exists():
-                return JSONResponse({"error": "docker-compose.yml not found"}, status_code=400)
+                return JSONResponse(
+                    {"error": "docker-compose.yml not found"}, status_code=400
+                )
             result = subprocess.run(
                 ["docker", "compose", "up", "--build", "-d"],
-                cwd=cwd, timeout=180, capture_output=True, text=True
+                cwd=cwd,
+                timeout=180,
+                capture_output=True,
+                text=True,
             )
-            return JSONResponse({"ok": result.returncode == 0, "output": (result.stdout + result.stderr)[-2000:]})
+            return JSONResponse(
+                {
+                    "ok": result.returncode == 0,
+                    "output": (result.stdout + result.stderr)[-2000:],
+                }
+            )
         elif not container:
             return JSONResponse({"error": "container required"}, status_code=400)
         elif action == "start":

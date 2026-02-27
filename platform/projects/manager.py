@@ -147,7 +147,7 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "{port}:8000"
     environment:
       - ENV=development
 """
@@ -218,10 +218,13 @@ def scaffold_project(p: "Project") -> dict:
         (root / "Dockerfile").write_text(_DOCKERFILE_TEMPLATE, encoding="utf-8")
         actions.append("created Dockerfile")
 
-    # 5. docker-compose.yml
+    # 5. docker-compose.yml — unique host port per project (10000-19999 range)
     if not (root / "docker-compose.yml").exists():
+        import hashlib
+
+        _port = 10000 + (int(hashlib.md5(p.id.encode()).hexdigest(), 16) % 10000)
         (root / "docker-compose.yml").write_text(
-            _DOCKER_COMPOSE_TEMPLATE, encoding="utf-8"
+            _DOCKER_COMPOSE_TEMPLATE.format(port=_port), encoding="utf-8"
         )
         actions.append("created docker-compose.yml")
 

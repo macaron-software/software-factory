@@ -466,7 +466,9 @@ function wsDockComposeUp(btn) {
       else {
         btn.disabled = false;
         btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up';
-        alert('Erreur: ' + (d.error || 'inconnue'));
+        var msg = d.error || 'Erreur inconnue';
+        var body = document.getElementById('wsDockerBody');
+        if (body) body.insertAdjacentHTML('afterbegin', '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:.6rem .9rem;margin-bottom:.75rem;color:var(--text-secondary);font-size:.76rem;">⚠️ ' + wsEsc(msg) + '</div>');
       }
     });
 }
