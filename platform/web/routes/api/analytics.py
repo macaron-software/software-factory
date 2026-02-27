@@ -612,7 +612,10 @@ async def releases_data(project_id: str):
         import json as _json
 
         for run in runs:
-            phases = _json.loads(run["phases_json"] or "[]")
+            try:
+                phases = _json.loads(run["phases_json"] or "[]")
+            except Exception:
+                phases = []
             done_phases = [p["name"] for p in phases if p.get("status") == "completed"]
             releases.append(
                 {
@@ -628,42 +631,50 @@ async def releases_data(project_id: str):
                 }
             )
 
-        # 2. Active epics with partial completion (backlog view)
-        active = db.execute(
-            f"SELECT id, name, status FROM missions WHERE type='epic' "
-            f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
-            params,
-        ).fetchall()
-        for epic in active:
-            features = db.execute(
-                "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
-                (epic["id"],),
+        # 2. Active epics with partial completion (backlog view) — skip if tables missing
+        try:
+            active = db.execute(
+                f"SELECT id, name, status FROM missions WHERE type='epic' "
+                f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
+                params,
             ).fetchall()
-            done = [f for f in features if f["status"] == "done"]
-            total = len(features)
-            if total == 0:
-                continue
-            releases.append(
-                {
-                    "epic_id": epic["id"],
-                    "epic_name": epic["name"] + " (in progress)",
-                    "completed_at": None,
-                    "feature_count": total,
-                    "done_count": len(done),
-                    "progress_pct": round(len(done) / total * 100) if total else 0,
-                    "total_sp": sum(f["story_points"] or 0 for f in features),
-                    "features": [
-                        {
-                            "name": f["name"],
-                            "sp": f["story_points"],
-                            "status": f["status"],
-                            "date": f["completed_at"],
-                        }
-                        for f in features
-                    ],
-                }
-            )
+            for epic in active:
+                try:
+                    features = db.execute(
+                        "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
+                        (epic["id"],),
+                    ).fetchall()
+                except Exception:
+                    features = []
+                done = [f for f in features if f["status"] == "done"]
+                total = len(features)
+                if total == 0:
+                    continue
+                releases.append(
+                    {
+                        "epic_id": epic["id"],
+                        "epic_name": epic["name"] + " (in progress)",
+                        "completed_at": None,
+                        "feature_count": total,
+                        "done_count": len(done),
+                        "progress_pct": round(len(done) / total * 100) if total else 0,
+                        "total_sp": sum(f["story_points"] or 0 for f in features),
+                        "features": [
+                            {
+                                "name": f["name"],
+                                "sp": f["story_points"],
+                                "status": f["status"],
+                                "date": f["completed_at"],
+                            }
+                            for f in features
+                        ],
+                    }
+                )
+        except Exception:
+            pass  # missions/features tables may not exist yet
 
         return JSONResponse({"project_id": project_id, "releases": releases})
+    except Exception as exc:
+        return JSONResponse({"project_id": project_id, "releases": [], "error": str(exc)})
     finally:
         db.close()
