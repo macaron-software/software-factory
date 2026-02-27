@@ -262,6 +262,80 @@ def _find_agent_mentions(content: str):
     return found
 
 
+# Keywords → auto-invited role when a project is @mentioned
+_PROJECT_KEYWORDS_TO_ROLE = {
+    "Program Manager":    ("pilotage", "avancement", "en est", "statut", "status",
+                           "planning", "délai", "retard", "sprint", "livraison"),
+    "Architect":          ("architecture", "technique", "stack", "dette technique",
+                           "migration", "conception", "design", "scalab"),
+    "Lean Portfolio Manager": ("budget", "coût", "invest", "portfolio", "capacit",
+                                "priorisation", "roadmap"),
+    "Test Manager":       ("qualité", "quality", "test", "bug", "régression",
+                           "recette", "e2e", "couverture"),
+}
+
+
+def _auto_invite_for_project_mention(content: str, explicit_agent_ids: set) -> list:
+    """Auto-invite relevant colleague(s) when a project is @mentioned.
+    Returns list of agents not already explicitly @mentioned.
+    """
+    import re
+    from ...projects.manager import get_project_store
+
+    # Check if any @mention resolves to a PROJECT (not an agent)
+    mentions = re.findall(r"@([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$))", content)
+    if not mentions:
+        mentions = re.findall(r"@([\w\-]+)", content)
+    if not mentions:
+        return []
+
+    try:
+        ps = get_project_store()
+        all_projects = ps.list_all()
+    except Exception:
+        return []
+
+    has_project_mention = False
+    for mention in mentions:
+        m_lower = mention.lower().replace("-", " ").replace("_", " ")
+        for p in all_projects:
+            pname = p.name.lower().replace("-", " ").replace("_", " ")
+            if pname == m_lower or pname.startswith(m_lower) or m_lower in pname:
+                has_project_mention = True
+                break
+        if has_project_mention:
+            break
+
+    if not has_project_mention:
+        return []
+
+    # Determine which role to invite based on content keywords
+    content_lower = content.lower()
+    target_role = "Program Manager"  # default
+    for role, kws in _PROJECT_KEYWORDS_TO_ROLE.items():
+        if any(kw in content_lower for kw in kws):
+            target_role = role
+            break
+
+    # Find the agent matching that role
+    all_agents = _get_invitable_agents()
+    for a in all_agents:
+        if a.id in explicit_agent_ids:
+            continue
+        if (a.role == target_role
+                or target_role.lower() in (a.role or "").lower()
+                or target_role.lower() in a.id.lower()):
+            return [a]
+
+    # Fallback: invite chef_de_programme (Alexandre Moreau)
+    for a in all_agents:
+        if a.id in explicit_agent_ids:
+            continue
+        if a.id == "chef_de_programme" or "programme" in a.id:
+            return [a]
+    return []
+
+
 def _resolve_mentions(content: str) -> str:
     """Replace @ProjectName mentions with rich project context for the LLM."""
     import re
@@ -461,7 +535,11 @@ async def cto_message(request: Request):
 
             # ── Invited agents (@mention → another agent responds) ────────
             invited = _find_agent_mentions(content)
-            for _mention_text, inv_agent in invited:
+            explicit_ids = {a.id for _, a in invited}
+            # Auto-invite relevant colleague when a project is @mentioned
+            auto = _auto_invite_for_project_mention(content, explicit_ids)
+            all_invited = invited + [(None, a) for a in auto]
+            for _mention_text, inv_agent in all_invited:
                 try:
                     inv_ctx = await _build_context(inv_agent, session)
                     # Build a contextual prompt for the invited agent
