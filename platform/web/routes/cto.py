@@ -81,8 +81,10 @@ def _session_title(session) -> str:
 def _build_history_html(session_id: str) -> str:
     """Build chat messages HTML for a session."""
     from ...sessions.store import get_session_store
+    from ...agents.store import get_agent_store
 
     store = get_session_store()
+    agent_store = get_agent_store()
     messages = store.get_messages(session_id, limit=50)
     history_html = ""
     for msg in messages:
@@ -112,15 +114,40 @@ def _build_history_html(session_id: str) -> str:
                     for tc in tool_calls
                 )
                 tools_html = f'<div class="chat-msg-tools">{pills}</div>'
-            history_html += (
-                f'<div class="chat-msg chat-msg-agent">'
-                f'<div class="chat-msg-avatar cto-avatar"></div>'
-                f'<div class="chat-msg-body">'
-                f'<div class="chat-msg-sender">Karim Benali — CTO</div>'
-                f'<div class="chat-msg-text md-rendered">{rendered}</div>'
-                f"{tools_html}"
-                f"</div></div>"
-            )
+
+            if msg.from_agent == _CTO_AGENT_ID:
+                history_html += (
+                    f'<div class="chat-msg chat-msg-agent">'
+                    f'<div class="chat-msg-avatar cto-avatar"></div>'
+                    f'<div class="chat-msg-body">'
+                    f'<div class="chat-msg-sender">Karim Benali — CTO</div>'
+                    f'<div class="chat-msg-text md-rendered">{rendered}</div>'
+                    f"{tools_html}"
+                    f"</div></div>"
+                )
+            else:
+                # Invited agent — look up their name/avatar
+                inv = agent_store.get(msg.from_agent)
+                inv_name = inv.name if inv else (msg.from_agent or "Agent")
+                inv_role = (inv.role or "") if inv else ""
+                av_url = _avatar_url(msg.from_agent)
+                initials = "".join(w[0].upper() for w in inv_name.split()[:2])
+                av_html = (
+                    f'<img class="invited-avatar-img" src="{html_mod.escape(av_url)}" alt="{html_mod.escape(inv_name)}">'
+                    if av_url
+                    else f'<div class="invited-avatar invited-avatar-initials">{initials}</div>'
+                )
+                history_html += (
+                    f'<div class="chat-msg chat-msg-invited">'
+                    f"{av_html}"
+                    f'<div class="chat-msg-body">'
+                    f'<div class="chat-msg-sender">{html_mod.escape(inv_name)}'
+                    + (f" — {html_mod.escape(inv_role)}" if inv_role else "")
+                    + f"</div>"
+                    f'<div class="chat-msg-text md-rendered">{rendered}</div>'
+                    f"{tools_html}"
+                    f"</div></div>"
+                )
     return history_html
 
 
