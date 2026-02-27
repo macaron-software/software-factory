@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Request
@@ -13,12 +15,34 @@ from .helpers import _templates
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+_GITLAB_ENABLED = bool(os.getenv("GITLAB_LAPOSTE_TOKEN"))
+
 
 def _wiki_db():
     from ...db.migrations import get_db
 
     return get_db()
 
+
+def _gitlab_sync_page(slug: str, title: str, content: str) -> None:
+    """Fire-and-forget: push a single page to GitLab wiki."""
+    if not _GITLAB_ENABLED:
+        return
+
+    def _push():
+        try:
+            from ...gitlab.wiki_sync import upsert_page
+            upsert_page(slug, title, content)
+            logger.debug("gitlab wiki synced: %s", slug)
+        except Exception as e:
+            logger.warning("gitlab wiki sync failed for %s: %s", slug, e)
+
+    try:
+        loop = asyncio.get_event_loop()
+        loop.run_in_executor(None, _push)
+    except RuntimeError:
+        import threading
+        threading.Thread(target=_push, daemon=True).start()
 
 @router.get("/wiki", response_class=HTMLResponse)
 async def wiki_partial(request: Request):
@@ -87,11 +111,14 @@ async def api_wiki_update(request: Request, slug: str):
     body = await request.json()
     db = _wiki_db()
     now = datetime.now(timezone.utc).isoformat()
+    title = body.get("title", slug)
+    content = body.get("content", "")
     db.execute(
         "UPDATE wiki_pages SET content = ?, title = ?, updated_at = ? WHERE slug = ?",
-        (body.get("content", ""), body.get("title", slug), now, slug),
+        (content, title, now, slug),
     )
     db.commit()
+    _gitlab_sync_page(slug, title, content)
     return {"success": True}
 
 
@@ -123,6 +150,7 @@ async def api_wiki_create(request: Request):
         db.commit()
     except Exception as exc:
         return JSONResponse({"success": False, "error": str(exc)}, 409)
+    _gitlab_sync_page(slug, body.get("title", slug), body.get("content", ""))
     return {"success": True, "slug": slug}
 
 

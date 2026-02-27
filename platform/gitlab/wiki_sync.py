@@ -43,12 +43,10 @@ def list_pages() -> list[dict]:
 
 
 def upsert_page(slug: str, title: str, content: str) -> dict:
-    """Create or update a GitLab wiki page."""
-    existing = {p["slug"]: p for p in list_pages()}
+    """Create or update a GitLab wiki page (tries PUT first, falls back to POST)."""
     payload = {"title": title, "content": content, "format": "markdown"}
-    if slug in existing:
-        r = httpx.put(_api(f"/{slug}"), headers=_headers(), json=payload, timeout=15, verify=False)
-    else:
+    r = httpx.put(_api(f"/{slug}"), headers=_headers(), json=payload, timeout=15, verify=False)
+    if r.status_code == 404:
         r = httpx.post(_api(""), headers=_headers(), json=payload, timeout=15, verify=False)
     r.raise_for_status()
     return r.json()
@@ -99,60 +97,43 @@ def sync(dry_run: bool = False, force: bool = False) -> dict:
     if not pages:
         return {"status": "error", "message": "No wiki pages found in DB"}
 
-    # Fetch existing GitLab pages (for upsert logic)
-    try:
-        existing = {p["slug"]: p for p in list_pages()}
-    except Exception as e:
-        return {"status": "error", "message": f"GitLab API error: {e}"}
+    # When not --force, fetch existing slugs to skip already-synced pages
+    existing_slugs: set[str] = set()
+    if not force:
+        try:
+            existing_slugs = {p["slug"] for p in list_pages()}
+        except Exception as e:
+            return {"status": "error", "message": f"GitLab API error: {e}"}
 
-    results = {"created": [], "updated": [], "skipped": [], "errors": []}
+    results: dict = {"synced": [], "skipped": [], "errors": []}
 
-    # Push individual pages
     for row in pages:
-        slug = row["slug"]
-        title = row["title"]
-        content = row["content"] or ""
+        slug, title, content = row["slug"], row["title"], row["content"] or ""
 
-        if not force and slug in existing:
+        if not force and slug in existing_slugs:
             results["skipped"].append(slug)
-            log.debug("skip %s (exists, use --force to overwrite)", slug)
             continue
 
-        action = "update" if slug in existing else "create"
-        log.info("%s %s — %s", action, slug, title)
-
+        log.info("sync %s — %s", slug, title)
         if dry_run:
-            results["created" if action == "create" else "updated"].append(slug)
+            results["synced"].append(slug)
             continue
 
         try:
-            payload = {"title": title, "content": content, "format": "markdown"}
-            if action == "update":
-                r = httpx.put(_api(f"/{slug}"), headers=_headers(), json=payload, timeout=15, verify=False)
-            else:
-                r = httpx.post(_api(""), headers=_headers(), json=payload, timeout=15, verify=False)
-            r.raise_for_status()
-            results["created" if action == "create" else "updated"].append(slug)
+            upsert_page(slug, title, content)
+            results["synced"].append(slug)
         except Exception as e:
             log.error("error pushing %s: %s", slug, e)
             results["errors"].append({"slug": slug, "error": str(e)})
 
     # Build and push home page
-    page_dicts = [dict(p) for p in pages]
-    home_content = build_home_page(page_dicts)
-    home_slug = "home"
-
     if not dry_run:
         try:
-            payload = {"title": "Home", "content": home_content, "format": "markdown"}
-            if home_slug in existing:
-                r = httpx.put(_api(f"/{home_slug}"), headers=_headers(), json=payload, timeout=15, verify=False)
-            else:
-                r = httpx.post(_api(""), headers=_headers(), json=payload, timeout=15, verify=False)
-            r.raise_for_status()
-            results["created" if home_slug not in existing else "updated"].append(home_slug)
+            home_content = build_home_page([dict(p) for p in pages])
+            upsert_page("home", "Home", home_content)
+            results["synced"].append("home")
         except Exception as e:
-            results["errors"].append({"slug": home_slug, "error": str(e)})
+            results["errors"].append({"slug": "home", "error": str(e)})
 
     results["status"] = "ok" if not results["errors"] else "partial"
     return results
@@ -170,10 +151,8 @@ if __name__ == "__main__":
     print(f"Syncing SF wiki → {GITLAB_URL}/{GITLAB_PROJECT} wiki {'(DRY RUN)' if dry else ''}")
     result = sync(dry_run=dry, force=force)
     print(f"\nResult: {result['status']}")
-    if result.get("created"):
-        print(f"  Created: {result['created']}")
-    if result.get("updated"):
-        print(f"  Updated: {result['updated']}")
+    if result.get("synced"):
+        print(f"  Synced: {result['synced']}")
     if result.get("skipped"):
         print(f"  Skipped (use --force): {len(result['skipped'])} pages")
     if result.get("errors"):
