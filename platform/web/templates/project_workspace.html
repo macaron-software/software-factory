@@ -1046,19 +1046,10 @@ function wsDbGateAutoLogin(callback) {
         return;
       }
       _wsDbGateToken = d.token;
-      // Load dbgate, inject token once loaded, then reload once more
-      frame.onload = function() {
-        try {
-          frame.contentWindow.localStorage.setItem('accessToken', _wsDbGateToken);
-          frame.onload = function() { _wsDbGateReady = true; frame.onload = null; if (callback) callback(); };
-          frame.contentWindow.location.reload();
-        } catch(e) {
-          _wsDbGateReady = true;
-          frame.onload = null;
-          if (callback) callback();
-        }
-      };
-      frame.src = '/dbgate/';
+      // Use URL-based token (avoids cross-origin localStorage restrictions)
+      var url = '/dbgate/?accessToken=' + encodeURIComponent(_wsDbGateToken);
+      frame.onload = function() { _wsDbGateReady = true; frame.onload = null; if (callback) callback(); };
+      frame.src = url;
     }).catch(function(){
       if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
       if (callback) callback();
