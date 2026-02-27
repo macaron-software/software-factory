@@ -38,21 +38,21 @@ _CONTINUOUS_KEYWORDS = (
 # Watchdog loop interval (seconds)
 _WATCHDOG_INTERVAL = 300
 # Stagger between each resume — defaults, overridden by config at runtime
-_STAGGER_STARTUP = 30.0
-_STAGGER_WATCHDOG = 10.0
-_MAX_STARTUP_BATCH = 3
+_STAGGER_STARTUP = 60.0   # 60s between each launch on first pass
+_STAGGER_WATCHDOG = 15.0
+_MAX_STARTUP_BATCH = 1    # only 1 mission at startup (safe default)
 # Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
 _CLEANUP_EVERY_N_CYCLES = 12
 
 # Auto-launch new runs
-_LAUNCH_PER_CYCLE = 5  # max new launches per watchdog cycle (avoid thundering herd)
-_LAUNCH_STAGGER = 2.0  # seconds between each new launch
+_LAUNCH_PER_CYCLE = 2   # max new launches per watchdog cycle
+_LAUNCH_STAGGER = 5.0   # seconds between each new launch
 
 # CPU/RAM backpressure thresholds
 _CPU_GREEN = 40.0  # below → launch freely
-_CPU_YELLOW = 70.0  # 40-70 → slow down (2× stagger)
-_CPU_RED = 85.0  # above → skip launch this cycle
-_RAM_RED = 85.0  # RAM % above → skip launch
+_CPU_YELLOW = 65.0  # 40-65 → slow down (2× stagger)
+_CPU_RED = 80.0    # above → skip launch this cycle
+_RAM_RED = 75.0    # RAM % above → skip launch (was 85 — too permissive)
 
 
 def _get_system_load() -> tuple[float, float]:
@@ -113,6 +113,12 @@ async def auto_resume_missions() -> None:
     await asyncio.sleep(_startup_delay)
 
     # Semaphore is set to 2 in helpers.py — no hot-patch needed
+
+    # Cleanup stale workspace containers before launching missions
+    try:
+        await _cleanup_workspace_containers()
+    except Exception as e:
+        logger.warning("auto_resume: workspace container cleanup error: %s", e)
 
     # First: repair all failed runs (reset to paused + create TMA incidents)
     try:
@@ -833,3 +839,35 @@ async def _cleanup_disk() -> None:
         logger.warning(
             "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
         )
+
+
+async def _cleanup_workspace_containers() -> None:
+    """Kill stale proj-* and macaron-app-* containers that accumulate from past missions."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
+            capture_output=True, text=True, timeout=10
+        )
+    except Exception:
+        return
+
+    killed = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        name, status = parts
+        # Kill stopped/exited workspace containers (proj-* and macaron-app-*)
+        if (name.startswith("proj-") or name.startswith("macaron-app-")) and (
+            "Exited" in status or "Created" in status
+        ):
+            try:
+                subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=10)
+                killed.append(name)
+            except Exception:
+                pass
+
+    if killed:
+        logger.warning("auto_resume: cleaned up %d stale workspace containers: %s", len(killed), killed[:5])

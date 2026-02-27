@@ -1,21 +1,24 @@
 stages:
   - deploy
 
-# Architecture:
-#   GitLab CI → triggers GitHub Actions (network-agnostic)
-#   GitHub Actions → SSH to Azure VM (unrestricted outbound)
+# This repo is a read-only skeleton synced from macaron-software/software-factory.
+# Deploy to Azure Prod is triggered only when commits come from the Macaron sync
+# (commit author = sylvain@macaron-software.com).
+# La Poste employee commits → no deploy (La Poste has its own infra).
 #
-# Required GitLab CI/CD variables:
-#   GH_DISPATCH_TOKEN  — GitHub PAT (repo + workflow scope)
+# Required GitLab CI/CD variable:
+#   GH_DISPATCH_TOKEN — GitHub PAT with repo+workflow scope
 
 deploy-azure:
   stage: deploy
   image: alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_AUTHOR =~ /macaron-software/'
   before_script:
     - apk add --no-cache curl
   script:
     - |
-      echo "Triggering GitHub Actions deploy-azure workflow..."
+      echo "Macaron sync detected — triggering GitHub Actions Azure deploy..."
       HTTP=$(curl -s -o /tmp/gh_resp.txt -w "%{http_code}" \
         -X POST \
         -H "Authorization: Bearer $GH_DISPATCH_TOKEN" \
@@ -23,11 +26,12 @@ deploy-azure:
         "https://api.github.com/repos/macaron-software/software-factory/actions/workflows/deploy-azure.yml/dispatches" \
         -d '{"ref":"main"}')
       cat /tmp/gh_resp.txt
-      if [ "$HTTP" = "204" ]; then
-        echo "✓ GitHub Actions deploy triggered (HTTP 204)"
-      else
-        echo "✗ Dispatch failed (HTTP $HTTP)"
-        exit 1
-      fi
-  only:
-    - main
+      [ "$HTTP" = "204" ] && echo "✓ Azure deploy triggered" || (echo "✗ HTTP $HTTP" && exit 1)
+
+# La Poste internal deploy (future — configure LAPOSTE_* vars when infra is ready)
+# deploy-laposte:
+#   stage: deploy
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "main"'
+#   script:
+#     - echo "Deploy to La Poste infra (TODO)"
