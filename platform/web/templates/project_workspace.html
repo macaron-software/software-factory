@@ -429,7 +429,10 @@ function wsLoadDocker() {
       } else {
         html += '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>' +
           '<span>Aucun container en cours</span>' +
-          (dockerFiles.length ? '<span class="ws-empty-hint">Fichiers Docker détectés: ' + dockerFiles.map(function(f){ return f.name; }).join(', ') + '</span>' : '<span class="ws-empty-hint">Aucun Dockerfile ou docker-compose.yml trouvé dans ce projet</span>') +
+          (dockerFiles.length
+            ? '<span class="ws-empty-hint">Fichiers Docker détectés: ' + dockerFiles.map(function(f){ return f.name; }).join(', ') + '</span>' +
+              '<button class="ws-docker-compose-up-btn" onclick="wsDockComposeUp(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up</button>'
+            : '<span class="ws-empty-hint">Aucun Dockerfile ou docker-compose.yml trouvé dans ce projet</span>') +
           '</div>';
       }
 
@@ -451,6 +454,21 @@ function wsLoadDocker() {
 function wsDockAction(name, action) {
   wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
     .then(function(){ setTimeout(wsLoadDocker, 1500); });
+}
+
+function wsDockComposeUp(btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳ Démarrage…';
+  wsFetch('/api/projects/' + _wsProjectId + '/workspace/docker/compose_up', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) { setTimeout(wsLoadDocker, 2000); }
+      else {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up';
+        alert('Erreur: ' + (d.error || 'inconnue'));
+      }
+    });
 }
 
 function wsDockPreview(ports) {

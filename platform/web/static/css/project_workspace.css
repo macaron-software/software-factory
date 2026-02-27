@@ -389,6 +389,23 @@
   transition: border-color .1s, color .1s;
 }
 .ws-docker-btn:hover { border-color: var(--purple); color: var(--purple); }
+.ws-docker-compose-up-btn {
+  margin-top: .6rem;
+  padding: .35rem .8rem;
+  border-radius: 6px;
+  border: 1px solid #3fb950;
+  background: rgba(63,185,80,.1);
+  color: #3fb950;
+  font-size: .78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  transition: background .12s;
+}
+.ws-docker-compose-up-btn:hover { background: rgba(63,185,80,.2); }
+.ws-docker-compose-up-btn:disabled { opacity: .5; cursor: not-allowed; }
 .ws-docker-logs {
   padding: .6rem .9rem;
   font-family: monospace;
