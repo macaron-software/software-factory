@@ -55,6 +55,8 @@ jobs:
             CONTAINER=$(docker ps --format "{{.Names}}" | grep -i platform | head -1)
             docker cp /opt/software-factory/platform/. $CONTAINER:/app/platform/
             docker exec $CONTAINER find /app/platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+            # Install any new requirements (PYTHONPATH cleared to avoid platform/ module conflict)
+            docker exec -e PYTHONPATH= -w /tmp $CONTAINER pip install -r /app/platform/requirements.txt -q 2>/dev/null || true
             docker stop $CONTAINER && sleep 2 && docker start $CONTAINER
             sleep 10
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/ 2>/dev/null || echo 000)
