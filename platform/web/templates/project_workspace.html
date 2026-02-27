@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/css/project_workspace.css?v=6">
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=7">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js" defer></script>
 <style>
@@ -103,7 +103,7 @@ html,body{height:100%;overflow:hidden}
         <div class="ws-pane-content">
           <!-- Code/Files — just the viewer; left tree is the navigator -->
           <div class="ws-tab-content active" id="ws-files">
-            <div class="ws-files-viewer" id="wsFilesViewer" style="flex:1;overflow:auto;display:flex;flex-direction:column">
+            <div class="ws-files-viewer" id="wsFilesViewer">
               <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier dans l&apos;arbre</span></div>
             </div>
           </div>
@@ -356,7 +356,11 @@ function wsLoadFilesTree(path) {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      if (!items.length) { tree.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>'; return; }
+      if (!items.length) {
+        var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
+        tree.innerHTML = backBtn + '<div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>';
+        return;
+      }
       var html = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'.\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>..</div>' : '';
       items.filter(function(i){ return i.type==='dir'; }).forEach(function(i) {
         html += '<div class="ws-tree-item ws-tree-dir" onclick="wsLoadFilesTree(\'' + wsEsc(i.path) + '\')">' +
@@ -375,8 +379,9 @@ function wsOpenFile(path) {
   // Switch to Code tab
   wsMainTab(document.querySelector('#wsMainTabs [data-tab="files"]'), 'files');
   var viewer = document.getElementById('wsFilesViewer');
+  if (!viewer) return;
   viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/file?path=' + encodeURIComponent(path))
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/file?path=' + encodeURIComponent(path))
     
     .then(function(r){ return r.json(); })
     .then(function(data) {
@@ -387,9 +392,12 @@ function wsOpenFile(path) {
       viewer.innerHTML = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
       var pre = document.createElement('pre'); pre.className = 'ws-file-pre';
       var code = document.createElement('code'); code.className = 'language-' + lang;
-      code.textContent = data.content || '';
+      code.textContent = data.content || '(empty)';
       pre.appendChild(code); viewer.appendChild(pre);
       if (window.hljs) hljs.highlightElement(code);
+    })
+    .catch(function(e) {
+      if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>';
     });
 }
 
