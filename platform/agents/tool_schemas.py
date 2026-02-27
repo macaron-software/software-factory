@@ -2003,6 +2003,46 @@ def _get_tool_schemas() -> list[dict]:
 
 # Tools available to each agent role category
 ROLE_TOOL_MAP: dict[str, list[str]] = {
+    "cto": [
+        # SF Platform — primary tools for project/mission queries
+        "platform_missions",
+        "platform_metrics",
+        "platform_agents",
+        "platform_memory_search",
+        "platform_sessions",
+        "platform_workflows",
+        # Memory
+        "memory_search",
+        "memory_store",
+        # Read-only code/git inspection
+        "code_read",
+        "code_search",
+        "list_files",
+        "git_status",
+        "git_log",
+        "git_diff",
+        # Git write ops (explicit user requests only)
+        "git_init",
+        "git_commit",
+        "git_push",
+        "git_create_pr",
+        # GitHub
+        "github_issues",
+        "github_prs",
+        "github_code_search",
+        # Orchestration (delegate / create)
+        "create_project",
+        "create_team",
+        "create_mission",
+        "create_sub_mission",
+        "compose_workflow",
+        "get_project_context",
+        "run_e2e_tests",
+        "screenshot",
+        # Web / fetch
+        "mcp_fetch_fetch",
+        "deep_search",
+    ],
     "product": [
         "code_read",
         "code_search",

@@ -52,19 +52,21 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
         role_cat = _classify_agent_role(agent)
         if role_cat == "cto":
             parts.append("""
-## Software Factory — Outils plateforme (IMPORTANT)
-Tu es le CTO de la Software Factory. Tu as accès aux outils internes de la plateforme.
-Pour TOUTE question sur les projets, missions, agents ou métriques de la SF, utilise ces outils DIRECTEMENT — ne demande pas de credentials, ne génère pas de SQL manuel :
+## Software Factory — Outils plateforme (PRIORITÉ ABSOLUE)
+Tu es le CTO de la Software Factory. Pour TOUTE question sur l'état, les missions ou les métriques d'un projet SF, utilise ces outils — jamais code_write ou du SQL manuel :
 
-- platform_missions(project_id="<id>") — liste les missions/epics d'un projet SF
-- platform_metrics(project_id="<id>") — métriques d'un projet (runs, agents, sessions, messages)
-- platform_agents() — liste tous les agents disponibles
-- platform_memory_search(query="...") — recherche dans la mémoire de la plateforme
-- memory_search(query="...") — recherche dans la mémoire de session
+QUERY : platform_missions(project_id="<id>") → missions/epics du projet
+QUERY : platform_metrics(project_id="<id>") → runs, agents, sessions, messages
+QUERY : platform_agents() → liste tous les agents
+QUERY : platform_memory_search(query="...") → mémoire plateforme
+QUERY : memory_search(query="...") → mémoire de session
 
-Quand le message mentionne un projet SF (via @NomProjet ou directement), appelle IMMÉDIATEMENT platform_missions et platform_metrics avec le project_id fourni dans le contexte — NE DEMANDE PAS de confirmation, NE fournis PAS de SQL à l'utilisateur.
-
-Pour les opérations git sur un projet, utilise cwd=workspace_path du projet (fourni dans le contexte @mention).""")
+RÈGLES STRICTES :
+- Question sur l'état/statut d'un projet → appelle platform_missions + platform_metrics, puis synthétise
+- NE CRÉE PAS de fichiers (pas de code_write, README, src/) pour répondre à une question de statut
+- NE demande PAS de credentials DB, NE génère PAS de SQL
+- Le project_id est toujours fourni dans le contexte --- Contexte projet SF --- du message
+- Pour opérations git/code sur un projet : utilise cwd=workspace fourni dans le contexte""")
         elif role_cat == "qa":
             parts.append("""
 ## QA Testing (MANDATORY — read carefully)

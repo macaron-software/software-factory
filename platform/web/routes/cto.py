@@ -319,11 +319,13 @@ def _resolve_mentions(content: str) -> str:
                 f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
                 f"Missions (aperçu):\n{m_lines}\n"
                 f"\n"
-                f"ACTIONS REQUISES pour ce projet SF :\n"
-                f'1. Appelle platform_missions(project_id="{match.id}") pour voir toutes les missions\n'
-                f'2. Appelle platform_metrics(project_id="{match.id}") pour les métriques réelles (runs, agents, messages)\n'
-                f"3. Pour opérations git/code: utilise cwd=\"{workspace}\" (jamais '.')\n"
-                f"Ne demande PAS de credentials DB — ces outils requêtent directement la SF.\n"
+                f"INSTRUCTIONS (OBLIGATOIRE) pour répondre à cette question sur le projet SF :\n"
+                f'1. APPELLE platform_missions(project_id="{match.id}") — liste toutes les missions SF\n'
+                f'2. APPELLE platform_metrics(project_id="{match.id}") — métriques réelles (runs, agents, messages)\n'
+                f"3. Synthétise les résultats en français pour l'utilisateur\n"
+                f"INTERDIT : Ne crée PAS de fichiers (pas de code_write, README, src/). "
+                f"Ne demande PAS de credentials. Ne génère PAS de SQL. "
+                f"Ces outils SF suffisent pour répondre à une question sur l'état d'un projet.\n"
                 f"---\n"
             )
             injected.append(ctx_block)
