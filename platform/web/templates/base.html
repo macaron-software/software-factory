@@ -114,6 +114,9 @@
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
+                    <li><a href="/world" data-tooltip="World 3D" class="{% if page_title in ('Agent World', 'World') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-globe"/></svg>
+                    </a></li>
                     {% if p in _full + ('developer', 'architect') %}
                     <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System', 'Wiki') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
