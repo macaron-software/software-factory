@@ -1,38 +1,15 @@
 stages:
-  - backup
   - deploy
 
+# Required GitLab CI/CD variables:
+#   AZURE_SSH_KEY  — private key (PEM, not base64)
+#   AZURE_VM_IP    — e.g. 4.233.64.30
+#   AZURE_USER     — e.g. azureadmin
+
 variables:
-  AZURE_USER: ${AZURE_USER}
-  AZURE_VM_IP: ${AZURE_VM_IP}
-  APP_PATH: /home/macaron
-  CONTAINER: platform-platform-1
+  STAGING_DIR: /home/${AZURE_USER}/macaron_update
 
-backup:
-  stage: backup
-  image: alpine
-  before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh
-    - echo "$AZURE_SSH_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
-  script:
-    - |
-      ssh ${AZURE_USER}@${AZURE_VM_IP} "
-        docker exec ${CONTAINER} sh -c '
-          tar czf /tmp/backup-\$(date +%Y%m%d-%H%M%S).tar.gz \
-            /app/data/*.db \
-            /app/platform/workflows/definitions/*.yaml \
-            /app/platform/agents/skills/ 2>/dev/null || true
-        '
-        docker cp ${CONTAINER}:/tmp/ /home/${AZURE_USER}/ci-backups/ 2>/dev/null || true
-        echo BACKUP_DONE
-      "
-  only:
-    - main
-
-deploy:
+deploy-azure:
   stage: deploy
   image: alpine
   before_script:
@@ -48,16 +25,20 @@ deploy:
         --exclude '__pycache__' \
         --exclude '*.pyc' \
         --exclude 'data/' \
-        --exclude 'workspace/' \
-        platform/ cli/ skills/ dashboard/ mcp_lrm/ \
-        ${AZURE_USER}@${AZURE_VM_IP}:${APP_PATH}/
+        --exclude 'workspaces/' \
+        platform cli skills dashboard mcp_lrm \
+        ${AZURE_USER}@${AZURE_VM_IP}:${STAGING_DIR}/
     - |
       ssh ${AZURE_USER}@${AZURE_VM_IP} "
-        docker cp ${APP_PATH}/platform/web/routes/. ${CONTAINER}:/app/platform/web/routes/ 2>/dev/null || true
-        docker cp ${APP_PATH}/platform/. ${CONTAINER}:/app/platform/ 2>/dev/null || true
-        docker cp ${APP_PATH}/skills/. ${CONTAINER}:/app/skills/ 2>/dev/null || true
-        docker restart ${CONTAINER} && echo DEPLOYED
+        CONTAINER=\$(docker ps --format '{{.Names}}' | grep -E 'platform-platform' | head -1)
+        if [ -z \"\$CONTAINER\" ]; then echo 'ERROR: no platform container running'; exit 1; fi
+        echo \"Deploying to \$CONTAINER\"
+        docker cp ${STAGING_DIR}/platform/. \$CONTAINER:/app/macaron_platform/
+        docker exec \$CONTAINER find /app/macaron_platform -name '__pycache__' -type d -exec rm -rf {} + 2>/dev/null || true
+        docker stop \$CONTAINER && sleep 3 && docker start \$CONTAINER
+        echo 'Waiting for health...'
+        sleep 8
+        docker exec \$CONTAINER curl -sf http://localhost:8099/api/health > /dev/null && echo 'OK' || echo 'WARN: health check failed'
       "
   only:
     - main
-  needs: [backup]
