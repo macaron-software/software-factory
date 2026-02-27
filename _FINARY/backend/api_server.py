@@ -1200,6 +1200,74 @@ def get_sca():
     return sca
 
 
+@app.get("/api/v1/dvf/grabels")
+def get_dvf_grabels():
+    """DVF transactions immobilières à Grabels (34116) — données data.gouv.fr DGFiP."""
+    import csv, os
+    dvf_file = os.path.join(os.path.dirname(__file__), "..", "scrapers", "data", "dvf", "grabels_transactions.json")
+    dvf_file = os.path.abspath(dvf_file)
+    if not os.path.exists(dvf_file):
+        return {"error": "DVF data not found", "transactions": [], "stats": {}}
+
+    with open(dvf_file) as f:
+        data = json.load(f)
+
+    # Filter valid transactions
+    maisons = [r for r in data if r["type"] == "Maison"]
+    apparts = [r for r in data if r["type"] == "Appartement"]
+
+    def stats(subset, label):
+        if not subset:
+            return {"count": 0, "label": label}
+        prices = [r["prix_m2"] for r in subset if 500 < r["prix_m2"] < 10000]
+        return {
+            "count": len(subset),
+            "label": label,
+            "prix_m2_min": min(prices) if prices else 0,
+            "prix_m2_max": max(prices) if prices else 0,
+            "prix_m2_median": sorted(prices)[len(prices) // 2] if prices else 0,
+            "prix_m2_avg": round(sum(prices) / len(prices)) if prices else 0,
+        }
+
+    # Comparable to SCA: maisons 80-160m²
+    comparables = [r for r in maisons if 80 <= r["surface"] <= 160]
+    comp_clean = [r for r in comparables if 500 < r["prix_m2"] < 10000]
+    comp_prices = [r["prix_m2"] for r in comp_clean]
+    sca_surface = 118  # m²
+
+    # Rue des Cinsaults only
+    cinsaults = [r for r in data if "CINSAULTS" in r.get("voie", "").upper()]
+
+    # Prix/m² evolution by quarter
+    by_quarter = {}
+    for r in data:
+        if r["type"] != "Maison" or not (500 < r["prix_m2"] < 10000):
+            continue
+        q = r["date"][:4] + "-Q" + str((int(r["date"][5:7]) - 1) // 3 + 1)
+        by_quarter.setdefault(q, []).append(r["prix_m2"])
+    chart = [{"quarter": q, "prix_m2": round(sum(v) / len(v)), "count": len(v)}
+             for q, v in sorted(by_quarter.items())]
+
+    return {
+        "source": "data.gouv.fr — DGFiP Demandes de Valeurs Foncières (DVF)",
+        "commune": "Grabels (34116)",
+        "periode": "2023-2025 S1",
+        "total": len(data),
+        "stats": {
+            "maisons": stats(maisons, "Maisons"),
+            "appartements": stats(apparts, "Appartements"),
+            "comparables_sca": {
+                **stats(comparables, f"Maisons 80-160m² (comparable SCA {sca_surface}m²)"),
+                "estimation_sca_median": round(sorted(comp_prices)[len(comp_prices) // 2] * sca_surface) if comp_prices else 0,
+                "estimation_sca_avg": round(sum(comp_prices) / len(comp_prices) * sca_surface) if comp_prices else 0,
+            },
+        },
+        "rue_des_cinsaults": cinsaults,
+        "chart_prix_m2": chart,
+        "transactions": data[:50],  # 50 most recent
+    }
+
+
 def _build_scenario_rachat(sca_data: dict) -> dict:
     """Scénario: vente forcée art. 19 statuts SCA — défaillance associé."""
     prop = sca_data["property"]

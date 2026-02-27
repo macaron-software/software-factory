@@ -206,6 +206,185 @@ build/
 *.log
 """
 
+_DOC_TEMPLATES = {
+    "spec.md": """\
+# Spec — {name}
+
+> **Status:** 🚧 À compléter (phase Discovery)
+
+## Vision & Objectif
+
+*Décrivez le problème résolu et la valeur métier.*
+
+## Périmètre fonctionnel
+
+- [ ] Fonctionnalité 1
+- [ ] Fonctionnalité 2
+
+## Personas & Use Cases
+
+| Persona | Besoin | Use Case |
+|---------|--------|----------|
+| — | — | — |
+
+## Contraintes & Hypothèses
+
+- *Contraintes techniques, réglementaires, budget*
+
+---
+*Généré par Software Factory — à compléter par l'agent architecte*
+""",
+    "schema.md": """\
+# Schéma de Données — {name}
+
+> **Status:** 🚧 À compléter (phase Discovery)
+
+## Entités principales
+
+```
+Entity: NomEntite
+  - id: UUID (PK)
+  - created_at: timestamp
+  - ...
+```
+
+## Relations
+
+```
+NomEntite 1---* AutreEntite
+```
+
+## Flux de données
+
+1. *Source* → *Transformation* → *Destination*
+
+---
+*Généré par Software Factory — à compléter par l'agent architecte*
+""",
+    "workflows.md": """\
+# Workflows — {name}
+
+> **Status:** 🚧 À compléter (phase Discovery)
+
+## Workflow principal
+
+```
+[Début] → [Étape 1] → [Étape 2] → [Fin]
+                ↓
+           [Cas d'erreur]
+```
+
+## Règles métier
+
+- RG01 : *Description de la règle*
+
+## États & Transitions
+
+| État | Déclencheur | État suivant |
+|------|-------------|--------------|
+| draft | submit | pending |
+
+---
+*Généré par Software Factory — à compléter par l'agent architecte*
+""",
+    "conventions.md": """\
+# Conventions Techniques — {name}
+
+> **Status:** 🚧 À compléter (phase Discovery)
+
+## Stack technique
+
+- **Backend:** *À définir*
+- **Frontend:** *À définir*
+- **Base de données:** *À définir*
+- **Infra:** *À définir*
+
+## Structure de code
+
+```
+src/
+  api/        # Routes API
+  models/     # Modèles de données
+  services/   # Logique métier
+  utils/      # Utilitaires
+```
+
+## Conventions de nommage
+
+- Variables : `snake_case`
+- Classes : `PascalCase`
+- Constantes : `UPPER_SNAKE`
+- Fichiers : `kebab-case.ext`
+
+## Standards qualité
+
+- Couverture tests : ≥ 80%
+- Complexité cyclomatique : ≤ 15
+- Lint : ruff / eslint
+
+---
+*Généré par Software Factory — à compléter par l'agent architecte*
+""",
+    "security.md": """\
+# Sécurité — {name}
+
+> **Status:** 🚧 À compléter (phase Discovery — audit obligatoire avant MVP)
+
+## ⚠️ Audit de sécurité requis
+
+Ce fichier DOIT être complété AVANT de passer en phase MVP.
+
+## Surfaces d'attaque
+
+| Surface | Risque | Vecteur possible | Protection |
+|---------|--------|-----------------|------------|
+| API | — | — | Auth JWT / API Key |
+| DB | — | Injection SQL | ORM + validation |
+| Auth | — | Brute force | Rate limit + MFA |
+| Données | — | Data leak | Chiffrement at rest |
+
+## Vecteurs d'attaque identifiés
+
+- [ ] Injection (SQL, LDAP, XSS)
+- [ ] Authentification cassée
+- [ ] Exposition de données sensibles
+- [ ] Mauvaise configuration sécurité
+- [ ] Composants vulnérables (CVE watch)
+
+## Règles obligatoires
+
+### Auth
+- [ ] Tous les endpoints authentifiés sauf liste blanche explicite
+- [ ] Tokens expirables (JWT max 1h, refresh 7j)
+- [ ] Pas de secrets dans le code (env vars uniquement)
+
+### Validation des inputs
+- [ ] Validation côté serveur pour TOUS les inputs
+- [ ] Sanitisation avant persistance
+- [ ] Taille maximale définie pour chaque champ
+
+### Accès aux données
+- [ ] Principe du moindre privilège
+- [ ] Isolation par tenant/utilisateur
+- [ ] Audit log pour les accès sensibles
+
+### Protection backend
+- [ ] Rate limiting sur les endpoints publics
+- [ ] CORS strict (liste blanche)
+- [ ] Headers sécurité (CSP, HSTS, X-Frame-Options)
+- [ ] Pas d'erreurs techniques exposées en prod
+
+## Score sécurité initial
+
+- [ ] Audit OWASP Top 10 réalisé
+- [ ] Pas de CVE critique sur les dépendances
+- [ ] Revue de code sécurité faite
+
+---
+*Généré par Software Factory — OBLIGATOIRE avant passage MVP*
+""",
+}
+
 
 def scaffold_project(p: "Project") -> dict:
     """Ensure every project has workspace + git + docker + docs + minimal code.
@@ -279,6 +458,16 @@ def scaffold_project(p: "Project") -> dict:
         src.mkdir(exist_ok=True)
         (src / "__init__.py").write_text(f'"""{p.name} package."""\n', encoding="utf-8")
         actions.append("created src/__init__.py")
+
+    # 8. docs/ — architecture-first templates (idempotent, never overwrite)
+    docs = root / "docs"
+    if not docs.exists():
+        docs.mkdir(exist_ok=True)
+    for fname, tmpl in _DOC_TEMPLATES.items():
+        doc_file = docs / fname
+        if not doc_file.exists():
+            doc_file.write_text(tmpl.format(name=p.name), encoding="utf-8")
+            actions.append(f"created docs/{fname}")
 
     # 8. Initial git commit if repo is empty
     if actions:
@@ -503,9 +692,53 @@ class ProjectStore:
             logger.warning("heal_missions failed for %s: %s", p.id, e)
         return p
 
-    def set_phase(self, project_id: str, phase_id: str) -> "Project | None":
-        """Set the current phase of a project and update mission statuses."""
+    def get_phase_gate(self, project_id: str, target_phase: str) -> dict:
+        """Check if project can transition to target_phase.
+        Returns {allowed: bool, blockers: list[str]}."""
+        from ..missions.store import get_mission_store
+
+        # Gates: to enter mvp, Architecture + Audit Sécurité must be done/completed
+        PHASE_GATES: dict[str, list[str]] = {
+            "mvp": ["architecture", "audit"],
+            "v1": ["security"],
+        }
+        required_types = PHASE_GATES.get(target_phase, [])
+        if not required_types:
+            return {"allowed": True, "blockers": [], "target_phase": target_phase}
+
+        ms = get_mission_store()
+        missions = ms.list_missions(limit=500)
+        proj_missions = [m for m in missions if m.project_id == project_id]
+        proj_types = {m.type: m for m in proj_missions}
+
+        blockers = []
+        for mtype in required_types:
+            m = proj_types.get(mtype)
+            if not m:
+                blockers.append(f"Mission '{mtype}' manquante")
+            elif m.status not in ("completed", "done"):
+                blockers.append(f"'{m.name}' non terminée (statut: {m.status})")
+
+        return {
+            "allowed": len(blockers) == 0,
+            "blockers": blockers,
+            "target_phase": target_phase,
+        }
+
+    def set_phase(
+        self, project_id: str, phase_id: str, force: bool = False
+    ) -> "Project | None":
+        """Set the current phase of a project and update mission statuses.
+        Raises ValueError if phase gate is not satisfied (unless force=True)."""
         from ..cache import invalidate
+
+        if not force:
+            gate = self.get_phase_gate(project_id, phase_id)
+            if not gate["allowed"]:
+                raise ValueError(
+                    f"Phase gate bloquée pour '{phase_id}': "
+                    + "; ".join(gate["blockers"])
+                )
 
         conn = get_db()
         conn.execute(
@@ -627,6 +860,52 @@ class ProjectStore:
         debt_status = "planning" if (is_early_phase or is_mvp_phase) else "active"
 
         needed = [
+            # ── Architecture First: mandatory for discovery phase ──
+            MissionDef(
+                name=f"Architecture — {proj.name}",
+                description=(
+                    f"Définir l'architecture de {proj.name} : spec.md, schema.md, "
+                    "workflows.md, conventions.md. Obligatoire avant passage en MVP."
+                ),
+                goal="Produire les 4 docs d'architecture dans docs/. Validé = tous complétés + revus.",
+                status="active" if is_early_phase else "completed",
+                type="architecture",
+                project_id=proj.id,
+                workflow_id="review-cycle",
+                wsjf_score=25,
+                created_by="enterprise_architect",
+                category="system",
+                active_phases=["discovery"],
+                config={
+                    "auto_provisioned": True,
+                    "blocks_phase": "mvp",
+                    "docs": ["spec.md", "schema.md", "workflows.md", "conventions.md"],
+                },
+            ),
+            MissionDef(
+                name=f"Audit Sécurité — {proj.name}",
+                description=(
+                    f"Audit sécurité de l'architecture de {proj.name} : vecteurs d'attaque, "
+                    "protections, compléter docs/security.md. Obligatoire avant MVP."
+                ),
+                goal="security.md complété : OWASP Top 10 couvert, vecteurs documentés, règles définies.",
+                status="active"
+                if is_early_phase
+                else ("active" if is_mvp_phase else "completed"),
+                type="audit",
+                project_id=proj.id,
+                workflow_id="review-cycle",
+                wsjf_score=22,
+                created_by="devsecops",
+                category="system",
+                active_phases=["discovery", "mvp"],
+                config={
+                    "auto_provisioned": True,
+                    "blocks_phase": "mvp",
+                    "docs": ["security.md"],
+                },
+            ),
+            # ── TMA / Sécu / Dette : opérationnel (v1+) ──
             MissionDef(
                 name=f"TMA — {proj.name}",
                 description=f"Maintenance applicative permanente pour {proj.name}. Triage incidents → diagnostic → fix TDD → validation.",
@@ -690,11 +969,13 @@ class ProjectStore:
             )
 
         for m in needed:
-            existing_m = (
-                proj_types.get(m.type) if m.type not in ("feature", "epic") else None
-            )
+            # architecture + audit: match by type (unique per project)
+            # program/security/debt: match by type
+            # feature/epic: match by name
             if m.type in ("feature", "epic"):
                 existing_m = next((pm for pm in proj_m if pm.name == m.name), None)
+            else:
+                existing_m = proj_types.get(m.type)
 
             if not existing_m:
                 # Create missing mission

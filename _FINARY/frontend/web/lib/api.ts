@@ -99,6 +99,8 @@ export const api = {
     fetchApi<import("./types/api").SCA>("/api/v1/sca"),
   getSCALegal: () =>
     fetchApi<Record<string, unknown>>("/api/v1/sca/legal"),
+  getDVFGrabels: () =>
+    fetchApi<Record<string, unknown>>("/api/v1/dvf/grabels"),
 
   // ─── Costs ───
   getCosts: () =>

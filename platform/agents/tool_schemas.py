@@ -1356,6 +1356,142 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {"type": "object", "properties": {}},
             },
         },
+        # ── Project lifecycle tools (Architecture First) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "get_project_health",
+                "description": "Get a project's health: missions by category, current phase, docs status (spec/schema/workflows/conventions/security).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Project ID"},
+                    },
+                    "required": ["project_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_phase_gate",
+                "description": "Check if a project can transition to a target phase. Returns allowed=true/false and blockers. Always call before set_project_phase.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "target_phase": {
+                            "type": "string",
+                            "enum": [
+                                "discovery",
+                                "mvp",
+                                "v1",
+                                "run",
+                                "maintenance",
+                                "scale",
+                            ],
+                        },
+                    },
+                    "required": ["project_id", "target_phase"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "set_project_phase",
+                "description": "Transition a project to a new lifecycle phase. Blocked if gate not satisfied. Call get_phase_gate first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "phase": {
+                            "type": "string",
+                            "enum": [
+                                "discovery",
+                                "mvp",
+                                "v1",
+                                "run",
+                                "maintenance",
+                                "scale",
+                            ],
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "description": "Bypass gate check — only if user explicitly authorized",
+                            "default": False,
+                        },
+                    },
+                    "required": ["project_id", "phase"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "suggest_next_missions",
+                "description": "Suggest next missions to create or activate based on project phase and health.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                    },
+                    "required": ["project_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "read_project_doc",
+                "description": "Read an architecture doc from project's docs/ folder (spec.md, schema.md, workflows.md, conventions.md, security.md).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "filename": {
+                            "type": "string",
+                            "enum": [
+                                "spec.md",
+                                "schema.md",
+                                "workflows.md",
+                                "conventions.md",
+                                "security.md",
+                            ],
+                        },
+                    },
+                    "required": ["project_id", "filename"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_project_doc",
+                "description": "Write or update an architecture doc in project's docs/ folder. Use to fill spec, schema, workflows, conventions or security docs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "filename": {
+                            "type": "string",
+                            "enum": [
+                                "spec.md",
+                                "schema.md",
+                                "workflows.md",
+                                "conventions.md",
+                                "security.md",
+                            ],
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Full markdown content to write",
+                        },
+                    },
+                    "required": ["project_id", "filename", "content"],
+                },
+            },
+        },
         # ── Platform creation tools (CTO Jarvis: create projects + missions) ──
         {
             "type": "function",
@@ -2305,7 +2441,21 @@ for _role_key in ROLE_TOOL_MAP:
     ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
 
 
-def _classify_agent_role(agent: AgentDef) -> str:
+# Project lifecycle tools — available to CDP (PM) and architecture roles
+_PROJECT_TOOLS = [
+    "get_project_health",
+    "get_phase_gate",
+    "set_project_phase",
+    "suggest_next_missions",
+    "read_project_doc",
+    "update_project_doc",
+]
+for _prole in ("cdp", "architecture"):
+    if _prole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_prole].extend(_PROJECT_TOOLS)
+
+
+def _classify_agent_role(agent) -> str:
     """Classify an agent into a tool-mapping role category."""
     role = (agent.role or "").lower()
     name = (agent.name or "").lower()

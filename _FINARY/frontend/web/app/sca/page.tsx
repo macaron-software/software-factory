@@ -1,6 +1,6 @@
 "use client";
 
-import { useSCA, useSCALegal } from "@/lib/hooks/useApi";
+import { useSCA, useSCALegal, useDVFGrabels } from "@/lib/hooks/useApi";
 import { formatEUR, formatEURCompact, CHART_COLORS } from "@/lib/utils";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -49,6 +49,7 @@ const STATUS_MAP: Record<string, { label: string; variant: BadgeVariant }> = {
 export default function SCAPage() {
   const { data: sca, isLoading: loadingSCA } = useSCA();
   const { data: legal, isLoading: loadingLegal, error } = useSCALegal();
+  const { data: dvf } = useDVFGrabels();
 
   if (loadingSCA || loadingLegal) return <Loading />;
   if (error) return <ErrorState />;
@@ -409,6 +410,77 @@ export default function SCAPage() {
               </div>
             </div>
           </div>
+        </Section>
+      )}
+
+      {/* ─── DVF Transactions Grabels ─── */}
+      {dvf && !dvf.error && (
+        <Section title={<span className="flex items-center gap-2"><Home className="w-4 h-4 text-accent" />Transactions immobilières Grabels (DVF)</span>}>
+          <p className="text-t-4 text-xs mb-3">Source : {(dvf as any).source} — {(dvf as any).periode} — {(dvf as any).total} transactions</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <div className="bg-bg-1 rounded-lg p-3 text-center">
+              <p className="text-t-4 text-xs">Maisons médian</p>
+              <p className="text-t-1 text-lg font-bold">{(dvf as any).stats?.maisons?.prix_m2_median?.toLocaleString()}€/m²</p>
+              <p className="text-t-4 text-xs">{(dvf as any).stats?.maisons?.count} ventes</p>
+            </div>
+            <div className="bg-bg-1 rounded-lg p-3 text-center">
+              <p className="text-t-4 text-xs">Apparts médian</p>
+              <p className="text-t-1 text-lg font-bold">{(dvf as any).stats?.appartements?.prix_m2_median?.toLocaleString()}€/m²</p>
+              <p className="text-t-4 text-xs">{(dvf as any).stats?.appartements?.count} ventes</p>
+            </div>
+            <div className="bg-bg-1 rounded-lg p-3 text-center border border-accent/30">
+              <p className="text-t-4 text-xs">Comparable SCA (118m²)</p>
+              <p className="text-accent text-lg font-bold">{(dvf as any).stats?.comparables_sca?.prix_m2_median?.toLocaleString()}€/m²</p>
+              <p className="text-t-4 text-xs">{(dvf as any).stats?.comparables_sca?.count} ventes</p>
+            </div>
+            <div className="bg-bg-1 rounded-lg p-3 text-center border border-accent/30">
+              <p className="text-t-4 text-xs">Estimation SCA DVF</p>
+              <p className="text-accent text-lg font-bold">{formatEURCompact((dvf as any).stats?.comparables_sca?.estimation_sca_median)}</p>
+              <p className="text-t-4 text-xs">médiane × 118m²</p>
+            </div>
+          </div>
+
+          {/* Prix/m² chart by quarter */}
+          {(dvf as any).chart_prix_m2?.length > 0 && (
+            <div className="h-48 mb-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={(dvf as any).chart_prix_m2}>
+                  <XAxis dataKey="quarter" tick={{ fill: "var(--text-4)", fontSize: 10 }} />
+                  <YAxis tick={{ fill: "var(--text-4)", fontSize: 10 }} domain={[2000, "auto"]} />
+                  <Tooltip contentStyle={{ background: "var(--bg-2)", border: "1px solid var(--border-1)", borderRadius: 8, fontSize: 12 }}
+                    formatter={(v: number | undefined) => [`${(v ?? 0).toLocaleString()}€/m²`, "Prix médian"]} />
+                  <Bar dataKey="prix_m2" fill="var(--accent)" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Rue des Cinsaults */}
+          {(dvf as any).rue_des_cinsaults?.length > 0 && (
+            <div>
+              <p className="text-t-2 text-xs font-semibold mb-2">📍 Rue des Cinsaults (même rue que SCA)</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead><tr className="text-t-4 border-b border-bd-1">
+                    <th className="text-left py-1 pr-3">Date</th><th className="text-left pr-3">Type</th>
+                    <th className="text-right pr-3">Prix</th><th className="text-right pr-3">Surface</th>
+                    <th className="text-right">€/m²</th>
+                  </tr></thead>
+                  <tbody>
+                    {(dvf as any).rue_des_cinsaults.map((t: any, i: number) => (
+                      <tr key={i} className="border-b border-bd-1/50">
+                        <td className="py-1 pr-3 text-t-3">{fmtDate(t.date)}</td>
+                        <td className="pr-3 text-t-2">{t.type}</td>
+                        <td className="text-right pr-3 text-t-1 font-medium">{formatEUR(t.prix)}</td>
+                        <td className="text-right pr-3 text-t-3">{t.surface}m²</td>
+                        <td className="text-right text-accent font-medium">{t.prix_m2.toLocaleString()}€</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </Section>
       )}
 

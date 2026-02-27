@@ -107,6 +107,13 @@ def _get_tool_registry():
         register_quality_tools(reg)
     except Exception:
         pass
+    # Project lifecycle tools (phase gate, docs, health, set_phase)
+    try:
+        from ..tools.project_tools import register_project_tools
+
+        register_project_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

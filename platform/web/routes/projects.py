@@ -138,18 +138,34 @@ async def projects_heal():
 
 @router.post("/api/projects/{project_id}/phase")
 async def project_set_phase(project_id: str, request: Request):
-    """Set the current phase of a project (triggers mission status update)."""
+    """Set the current phase of a project (triggers mission status update).
+    Accepts ?force=true to bypass gate check."""
     from ...projects.manager import get_project_store
 
     body = await _parse_body(request)
     phase_id = body.get("phase", "")
+    force = str(body.get("force", "false")).lower() == "true"
     ps = get_project_store()
-    proj = ps.set_phase(project_id, phase_id)
+    try:
+        proj = ps.set_phase(project_id, phase_id, force=force)
+    except ValueError as e:
+        return JSONResponse(
+            {"ok": False, "error": str(e), "blocked": True}, status_code=409
+        )
     if not proj:
         from fastapi import HTTPException
 
         raise HTTPException(404, "project not found")
     return {"ok": True, "project_id": project_id, "current_phase": phase_id}
+
+
+@router.get("/api/projects/{project_id}/gate")
+async def project_gate(project_id: str, target_phase: str = "mvp"):
+    """Check if project can transition to target_phase."""
+    from ...projects.manager import get_project_store
+
+    ps = get_project_store()
+    return ps.get_phase_gate(project_id, target_phase)
 
 
 @router.get("/api/projects/{project_id}/health")

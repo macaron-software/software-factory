@@ -163,6 +163,13 @@ export function useSCALegal() {
   });
 }
 
+export function useDVFGrabels() {
+  return useQuery({
+    queryKey: ["dvf-grabels"],
+    queryFn: api.getDVFGrabels,
+  });
+}
+
 // ─── Costs ───
 
 export function useCosts() {
