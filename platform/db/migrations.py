@@ -817,6 +817,49 @@ def _migrate(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    _ensure_sqlite_tables(conn)
+    conn.commit()
+
+
+def _ensure_sqlite_tables(conn) -> None:
+    """Create SQLite-only tables that may be missing on older DBs."""
+    # MCP server registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mcps (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            command TEXT NOT NULL DEFAULT '',
+            args_json TEXT DEFAULT '[]',
+            env_json TEXT DEFAULT '{}',
+            tools_json TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'stopped',
+            is_builtin INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Marketing ideation tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'running',
+            result_json TEXT DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            role TEXT DEFAULT 'assistant',
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     conn.commit()
 
 
