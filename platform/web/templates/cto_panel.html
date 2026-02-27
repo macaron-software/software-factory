@@ -378,7 +378,7 @@
     _loadMentionItems(type, function(items){
       var filtered = items.filter(function(p){
         return p.name.toLowerCase().includes(query) || (p.sub||'').toLowerCase().includes(query);
-      }).slice(0, 50);
+      });
       _renderMention(filtered, trigger);
     });
   }
