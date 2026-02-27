@@ -29,6 +29,8 @@ services:
     volumes:
       - platform-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "989"
     depends_on:
       postgres:
         condition: service_healthy
