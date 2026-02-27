@@ -183,6 +183,85 @@ async def cto_load_session(session_id: str, request: Request):
     return HTMLResponse(history_html or "")
 
 
+# ── Key agents invitable in CTO chat ────────────────────────────────────────
+_INVITABLE_ROLES = {
+    "Program Manager", "Project Manager", "Lean Portfolio Manager",
+    "Chief Technology Officer", "Solution Architect", "Architect",
+    "Product Manager", "Mobile Architect", "Release Manager",
+    "Test Manager", "Change Manager", "Solution Manager",
+}
+_INVITABLE_PREFIXES = ("strat-", "chef_de_programme", "chef_projet", "architecte",
+                        "lean_portfolio", "product-manager-art", "test_manager",
+                        "change_manager", "solution_manager")
+
+
+def _get_invitable_agents():
+    """Return agents that can be invited into the CTO chat."""
+    from ...agents.store import get_agent_store
+    store = get_agent_store()
+    agents = store.list_all()
+    result = []
+    for a in agents:
+        if a.id == _CTO_AGENT_ID:
+            continue
+        role = a.role or ""
+        is_key = (
+            role in _INVITABLE_ROLES
+            or any(a.id.startswith(p) for p in _INVITABLE_PREFIXES)
+            or role in ("chef_de_programme", "chef_projet", "lean_portfolio_manager",
+                        "architecte", "product-manager-art", "test_manager",
+                        "change_manager", "solution_manager")
+        )
+        if is_key:
+            result.append(a)
+    return result[:30]
+
+
+@router.get("/api/cto/mention-list", response_class=JSONResponse)
+async def cto_mention_list():
+    """Return combined list of projects + key agents for @ autocomplete."""
+    from ...projects.manager import get_project_store
+    items = []
+    try:
+        ps = get_project_store()
+        for p in ps.list_all()[:50]:
+            items.append({"type": "project", "id": p.id, "name": p.name,
+                           "sub": p.factory_type or ""})
+    except Exception:
+        pass
+    try:
+        for a in _get_invitable_agents():
+            items.append({"type": "agent", "id": a.id, "name": a.name,
+                           "sub": a.role or ""})
+    except Exception:
+        pass
+    return JSONResponse(items)
+
+
+def _find_agent_mentions(content: str):
+    """Return list of (mention_text, agent) for @mentions that resolve to an agent."""
+    import re
+    from ...agents.store import get_agent_store
+    mentions = re.findall(r"@([\w\-][\w\-\s]*?)(?=\s*(?:—|--|,|:|\?|$|\set\s|\spour\s))", content)
+    if not mentions:
+        mentions = re.findall(r"@([\w\-]+)", content)
+    if not mentions:
+        return []
+    store = get_agent_store()
+    all_agents = _get_invitable_agents()
+    found = []
+    for mention in mentions:
+        m_lower = mention.lower().strip()
+        for a in all_agents:
+            aname = a.name.lower()
+            aid = a.id.lower()
+            if (m_lower == aname or m_lower in aname or aname.startswith(m_lower)
+                    or m_lower in aid):
+                found.append((mention, a))
+                break
+    return found
+
+
 def _resolve_mentions(content: str) -> str:
     """Replace @ProjectName mentions with rich project context for the LLM."""
     import re
@@ -377,6 +456,66 @@ async def cto_message(request: Request):
                     "title_hint": title_hint,
                 },
             )
+
+            # ── Invited agents (@mention → another agent responds) ────────
+            invited = _find_agent_mentions(content)
+            for _mention_text, inv_agent in invited:
+                try:
+                    inv_ctx = await _build_context(inv_agent, session)
+                    # Build a contextual prompt for the invited agent
+                    inv_prompt = (
+                        f"Tu es invité dans une conversation par le CTO Karim Benali.\n"
+                        f"Question de l'utilisateur : {content}\n\n"
+                        f"Réponse du CTO :\n{result.content[:1000]}\n\n"
+                        f"En tant que {inv_agent.name} ({inv_agent.role}), "
+                        f"donne ta perspective, complète ou nuance si nécessaire. "
+                        f"Sois direct et concis."
+                    )
+                    yield sse("agent_thinking", {
+                        "agent_id": inv_agent.id,
+                        "agent_name": inv_agent.name,
+                        "agent_role": inv_agent.role or "",
+                    })
+                    inv_result = None
+                    async for ev_t, ev_d in executor.run_streaming(inv_ctx, inv_prompt):
+                        if ev_t == "delta":
+                            yield sse("agent_chunk", {
+                                "text": ev_d,
+                                "agent_id": inv_agent.id,
+                                "agent_name": inv_agent.name,
+                            })
+                        elif ev_t == "result":
+                            inv_result = ev_d
+                    if inv_result:
+                        store.add_message(MessageDef(
+                            session_id=session.id,
+                            from_agent=inv_agent.id,
+                            to_agent="user",
+                            message_type="text",
+                            content=inv_result.content,
+                        ))
+                        inv_rendered = md_lib.markdown(
+                            str(inv_result.content),
+                            extensions=["fenced_code", "tables", "nl2br"],
+                        )
+                        initials = "".join(w[0].upper() for w in inv_agent.name.split()[:2])
+                        inv_html = (
+                            f'<div class="chat-msg chat-msg-agent chat-msg-invited">'
+                            f'<div class="chat-msg-avatar invited-avatar" '
+                            f'title="{html_mod.escape(inv_agent.name)}">{initials}</div>'
+                            f'<div class="chat-msg-body">'
+                            f'<div class="chat-msg-sender">{html_mod.escape(inv_agent.name)} — '
+                            f'{html_mod.escape(inv_agent.role or "")}</div>'
+                            f'<div class="chat-msg-text md-rendered">{inv_rendered}</div>'
+                            f"</div></div>"
+                        )
+                        yield sse("agent_done", {
+                            "html": inv_html,
+                            "agent_id": inv_agent.id,
+                            "agent_name": inv_agent.name,
+                        })
+                except Exception as inv_exc:
+                    logger.warning("Invited agent %s error: %s", inv_agent.id, inv_exc)
 
         except Exception as exc:
             logger.exception("CTO streaming error")

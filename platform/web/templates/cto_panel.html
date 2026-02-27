@@ -92,6 +92,10 @@
 .cto-mention-item svg{flex-shrink:0;opacity:.55}
 .cto-mention-item .mi-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
 .cto-mention-item .mi-stack{font-size:.66rem;color:var(--text-muted);white-space:nowrap}
+.mi-badge-agent{font-size:.58rem;background:rgba(99,102,241,.15);color:var(--accent,#6366f1);border-radius:3px;padding:1px 5px;margin-right:.3rem;flex-shrink:0}
+/* Invited agent bubble */
+.chat-msg-invited .chat-msg-body{border-left:2px solid var(--accent,#6366f1);padding-left:.6rem}
+.invited-avatar{background:linear-gradient(135deg,#6366f1,#8b5cf6)!important;color:#fff!important;font-size:.6rem!important;font-weight:700}
 
 @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}
 @keyframes fadeUp{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
@@ -208,7 +212,7 @@
         <textarea
           id="cto-input"
           class="cto-input"
-          placeholder="Posez une question, glissez un fichier, tapez @ pour mentionner un projet…"
+          placeholder="Posez une question, glissez un fichier, tapez @ pour mentionner un projet ou inviter un agent…"
           rows="1"
           onkeydown="ctoInputKeydown(event)"
           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,110)+'px';ctoInputChange(this)"
@@ -313,16 +317,17 @@
   });
 
   /* ── @ Mention ── */
-  var _projects = null;
+  var _mentionList = null;
   var _mentionActive = false;
   var _mentionIdx = 0;
+  var _invitedStreams = {};  // agent_id → {bubble, text}
 
-  function _loadProjects(cb){
-    if(_projects){ cb(_projects); return; }
-    fetch('/api/projects').then(function(r){ return r.json(); }).then(function(d){
-      _projects = Array.isArray(d) ? d : (d.projects || d.items || []);
-      cb(_projects);
-    }).catch(function(){ _projects = []; cb([]); });
+  function _loadMentionList(cb){
+    if(_mentionList){ cb(_mentionList); return; }
+    fetch('/api/cto/mention-list').then(function(r){ return r.json(); }).then(function(d){
+      _mentionList = Array.isArray(d) ? d : [];
+      cb(_mentionList);
+    }).catch(function(){ _mentionList = []; cb([]); });
   }
 
   function ctoInputChange(inp){
@@ -330,23 +335,25 @@
     var atIdx = val.lastIndexOf('@', cur - 1);
     if(atIdx === -1 || (atIdx > 0 && !/\s/.test(val[atIdx-1]))){ _closeMention(); return; }
     var query = val.slice(atIdx + 1, cur).toLowerCase();
-    if(/\s/.test(query)){ _closeMention(); return; }
-    _loadProjects(function(projects){
-      var filtered = projects.filter(function(p){ return p.name.toLowerCase().includes(query); }).slice(0,10);
+    _loadMentionList(function(items){
+      var filtered = items.filter(function(p){ return p.name.toLowerCase().includes(query); }).slice(0,12);
       _renderMention(filtered);
     });
   }
 
-  function _renderMention(projects){
+  function _renderMention(items){
     var popup = document.getElementById('cto-mention-popup');
     if(!popup) return;
-    if(!projects.length){ _closeMention(); return; }
+    if(!items.length){ _closeMention(); return; }
     _mentionActive = true; _mentionIdx = 0;
-    popup.innerHTML = projects.map(function(p, i){
-      var stack = p.stack || p.technology || '';
-      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention(\''+_mesc(p.name)+'\')">' +
-        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>' +
-        '<span class="mi-name">'+_mesc(p.name)+'</span>'+(stack?'<span class="mi-stack">'+_mesc(stack)+'</span>':'')+
+    popup.innerHTML = items.map(function(p, i){
+      var isAgent = p.type === 'agent';
+      var icon = isAgent
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
+      var badge = isAgent ? '<span class="mi-badge-agent">agent</span>' : '';
+      return '<div class="cto-mention-item'+(i===0?' active':'')+'" onclick="ctoPickMention(\''+_mesc(p.name)+'\',\''+p.type+'\')">' +
+        icon + '<span class="mi-name">'+_mesc(p.name)+'</span>'+badge+'<span class="mi-stack">'+_mesc(p.sub||'')+'</span>'+
         '</div>';
     }).join('');
     popup.classList.add('open');
@@ -358,7 +365,7 @@
     if(popup){ popup.classList.remove('open'); popup.innerHTML = ''; }
   }
 
-  function ctoPickMention(name){
+  function ctoPickMention(name, type){
     var inp = document.getElementById('cto-input');
     var val = inp.value, cur = inp.selectionStart;
     var atIdx = val.lastIndexOf('@', cur - 1);
@@ -479,6 +486,37 @@
             btn.classList.remove('loading');
             if(d.session_id) _sessionId = d.session_id;
             if(d.title_hint) _updateConvTitle(_sessionId, d.title_hint);
+            msgs.scrollTop = msgs.scrollHeight;
+          } else if(eventName === 'agent_thinking'){
+            // Show thinking indicator for invited agent
+            var aid = d.agent_id;
+            if(!_invitedStreams[aid]){
+              var initials = d.agent_name.split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
+              msgs.insertAdjacentHTML('beforeend',
+                '<div class="chat-msg chat-msg-agent chat-msg-invited" id="inv-bubble-'+aid+'">' +
+                '<div class="chat-msg-avatar invited-avatar" title="'+_mesc(d.agent_name)+'">'+_mesc(initials)+'</div>' +
+                '<div class="chat-msg-body">' +
+                '<div class="chat-msg-sender">'+_mesc(d.agent_name)+' — '+_mesc(d.agent_role||'')+'</div>' +
+                '<div class="chat-msg-text" id="inv-text-'+aid+'"><span class="thinking-dots"><span></span><span></span><span></span></span></div>' +
+                '</div></div>'
+              );
+              _invitedStreams[aid] = {text: ''};
+              msgs.scrollTop = msgs.scrollHeight;
+            }
+          } else if(eventName === 'agent_chunk'){
+            var aid = d.agent_id;
+            if(_invitedStreams[aid] !== undefined){
+              _invitedStreams[aid].text += d.text;
+              var el = document.getElementById('inv-text-'+aid);
+              if(el) el.textContent = _invitedStreams[aid].text;
+              msgs.scrollTop = msgs.scrollHeight;
+            }
+          } else if(eventName === 'agent_done'){
+            var aid = d.agent_id;
+            var old = document.getElementById('inv-bubble-'+aid);
+            if(old) old.remove();
+            delete _invitedStreams[aid];
+            msgs.insertAdjacentHTML('beforeend', d.html);
             msgs.scrollTop = msgs.scrollHeight;
           } else if(eventName === 'error'){
             thinking.style.display = 'none';
