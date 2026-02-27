@@ -589,6 +589,7 @@ def create_app() -> FastAPI:
                 "font-src 'self' data: https://fonts.gstatic.com; "
                 "img-src 'self' data: blob: https:; "
                 "connect-src 'self' https://cdn.jsdelivr.net; "
+                "worker-src blob: 'self'; "
                 "frame-src 'self' http://localhost:* http://127.0.0.1:* https:; "
                 "frame-ancestors 'none'"
             )

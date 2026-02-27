@@ -665,26 +665,57 @@ function wsOpenFile(path) {
       monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden';
       viewer.appendChild(monacoDiv);
       if (window._wsMonacoEditor) { try { window._wsMonacoEditor.dispose(); } catch(e){} window._wsMonacoEditor = null; }
-      require(['vs/editor/editor.main'], function() {
-        window._wsMonacoEditor = monaco.editor.create(monacoDiv, {
-          value: data.content || '',
-          language: lang,
-          theme: 'vs-dark',
-          automaticLayout: true,
-          minimap: {enabled: true},
-          scrollBeyondLastLine: false,
-          fontSize: 13,
-          fontFamily: "'SF Mono','Fira Code','Monaco','Courier New',monospace",
-          lineNumbers: 'on',
-          wordWrap: 'off',
-          tabSize: 2,
-          readOnly: isBin,
-          renderWhitespace: 'boundary'
-        });
+      // Fallback: show textarea if Monaco doesn't load within 2s
+      var monacoLoaded = false;
+      var fallbackTimer = setTimeout(function() {
+        if (monacoLoaded) return;
+        monacoDiv.innerHTML = '';
+        var ta = document.createElement('textarea');
+        ta.value = data.content || '';
+        ta.style.cssText = 'width:100%;height:100%;background:#1e1e1e;color:#d4d4d4;border:none;padding:.75rem;font-family:"SF Mono","Fira Code","Monaco","Courier New",monospace;font-size:13px;resize:none;outline:none;box-sizing:border-box;tab-size:2';
+        ta.spellcheck = false;
+        monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
+        monacoDiv.appendChild(ta);
         if (!isBin) {
-          window._wsMonacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, wsMonacoSave);
+          ta.addEventListener('input', function() { window._wsTextareaContent = ta.value; });
+          window._wsMonacoEditor = { getValue: function(){ return ta.value; }, dispose: function(){} };
         }
-      });
+      }, 2000);
+      if (window.require && typeof window.require === 'function') {
+        require(['vs/editor/editor.main'], function() {
+          monacoLoaded = true;
+          clearTimeout(fallbackTimer);
+          window._wsMonacoEditor = monaco.editor.create(monacoDiv, {
+            value: data.content || '',
+            language: lang,
+            theme: 'vs-dark',
+            automaticLayout: true,
+            minimap: {enabled: true},
+            scrollBeyondLastLine: false,
+            fontSize: 13,
+            fontFamily: "'SF Mono','Fira Code','Monaco','Courier New',monospace",
+            lineNumbers: 'on',
+            wordWrap: 'off',
+            tabSize: 2,
+            readOnly: isBin,
+            renderWhitespace: 'boundary'
+          });
+          if (!isBin) {
+            window._wsMonacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, wsMonacoSave);
+          }
+        });
+      } else {
+        // require not available — use textarea immediately
+        clearTimeout(fallbackTimer);
+        monacoLoaded = false; // trigger fallback inline
+        var ta2 = document.createElement('textarea');
+        ta2.value = data.content || '';
+        ta2.style.cssText = 'width:100%;height:100%;background:#1e1e1e;color:#d4d4d4;border:none;padding:.75rem;font-family:"SF Mono","Fira Code","Monaco","Courier New",monospace;font-size:13px;resize:none;outline:none;box-sizing:border-box;tab-size:2';
+        ta2.spellcheck = false;
+        monacoDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
+        monacoDiv.appendChild(ta2);
+        window._wsMonacoEditor = { getValue: function(){ return ta2.value; }, dispose: function(){} };
+      }
     })
     .catch(function(e) { if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>'; });
 }
