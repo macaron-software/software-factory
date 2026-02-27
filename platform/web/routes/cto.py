@@ -15,7 +15,7 @@ from fastapi import APIRouter, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.requests import Request
 
-from .helpers import _parse_body, _templates
+from .helpers import _parse_body, _templates, _avatar_url
 
 logger = logging.getLogger(__name__)
 
@@ -592,6 +592,7 @@ async def cto_message(request: Request):
                         "agent_id": inv_agent.id,
                         "agent_name": inv_agent.name,
                         "agent_role": inv_agent.role or "",
+                        "avatar_url": _avatar_url(inv_agent.id),
                     })
                     inv_result = None
                     async for ev_t, ev_d in executor.run_streaming(inv_ctx, inv_prompt):
@@ -616,11 +617,17 @@ async def cto_message(request: Request):
                             extensions=["fenced_code", "tables", "nl2br"],
                         )
                         initials = "".join(w[0].upper() for w in inv_agent.name.split()[:2])
+                        av_url = _avatar_url(inv_agent.id)
+                        av_html = (
+                            f'<img class="invited-avatar-img" src="{html_mod.escape(av_url)}" '
+                            f'alt="{html_mod.escape(inv_agent.name)}">'
+                            if av_url else
+                            f'<div class="invited-avatar invited-avatar-initials">{initials}</div>'
+                        )
                         inv_html = (
                             f'<div class="invited-divider">{html_mod.escape(inv_agent.name)} a rejoint</div>'
                             f'<div class="chat-msg chat-msg-invited">'
-                            f'<div class="chat-msg-avatar invited-avatar" '
-                            f'title="{html_mod.escape(inv_agent.name)}">{initials}</div>'
+                            f'{av_html}'
                             f'<div class="chat-msg-body">'
                             f'<div class="chat-msg-sender">{html_mod.escape(inv_agent.name)} — '
                             f'{html_mod.escape(inv_agent.role or "")}</div>'

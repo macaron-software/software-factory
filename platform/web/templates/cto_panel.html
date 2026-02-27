@@ -107,7 +107,8 @@
   padding:.55rem .8rem;
 }
 .chat-msg-invited .chat-msg-sender{color:#10b981!important;font-size:.65rem;font-weight:700;margin-bottom:.25rem}
-.invited-avatar{background:linear-gradient(135deg,#10b981,#059669)!important;color:#fff!important;font-size:.6rem!important;font-weight:700}
+.invited-avatar-img{width:30px;height:30px;border-radius:50%;object-fit:cover;border:1.5px solid rgba(16,185,129,.4);flex-shrink:0}
+.invited-avatar,.invited-avatar-initials{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#10b981,#059669)!important;color:#fff!important;font-size:.6rem!important;font-weight:700;flex-shrink:0}
 .invited-divider{display:flex;align-items:center;gap:.5rem;margin:.4rem 0 .3rem;font-size:.65rem;color:var(--text-muted);opacity:.6}
 .invited-divider::before,.invited-divider::after{content:'';flex:1;height:1px;background:rgba(16,185,129,.25)}
 
@@ -517,10 +518,13 @@
             var aid = d.agent_id;
             if(!_invitedStreams[aid]){
               var initials = d.agent_name.split(' ').slice(0,2).map(function(w){return w[0]||'';}).join('').toUpperCase();
+              var avHtml = d.avatar_url
+                ? '<img class="invited-avatar-img" src="'+_mesc(d.avatar_url)+'" alt="'+_mesc(d.agent_name)+'">'
+                : '<div class="invited-avatar invited-avatar-initials">'+_mesc(initials)+'</div>';
               msgs.insertAdjacentHTML('beforeend',
                 '<div class="invited-divider">'+_mesc(d.agent_name)+' a rejoint</div>' +
                 '<div class="chat-msg chat-msg-invited" id="inv-bubble-'+aid+'">' +
-                '<div class="chat-msg-avatar invited-avatar" title="'+_mesc(d.agent_name)+'">'+_mesc(initials)+'</div>' +
+                avHtml +
                 '<div class="chat-msg-body">' +
                 '<div class="chat-msg-sender">'+_mesc(d.agent_name)+' — '+_mesc(d.agent_role||'')+'</div>' +
                 '<div class="chat-msg-text" id="inv-text-'+aid+'"><span class="thinking-dots"><span></span><span></span><span></span></span></div>' +
