@@ -65,7 +65,7 @@ DIRS_TO_SYNC=(
     "mcp_lrm"
     "deploy"
     "tests"
-    "docs/screenshots"
+    "docs/screenshots/fr"
 )
 
 for dir in "${DIRS_TO_SYNC[@]}"; do
