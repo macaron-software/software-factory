@@ -878,3 +878,70 @@ async def agent_world_page(request: Request):
             "total_missions": len(all_active),
         },
     )
+
+
+@router.get("/api/world/live")
+async def world_live_data(project: str = ""):
+    """Live world data for periodic refresh — returns missions + agent sessions."""
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from ...agents.store import AgentStore
+    from ...missions.store import MissionRunStore
+    from ...sessions.store import SessionStore
+
+    mission_store = MissionRunStore()
+    session_store = SessionStore()
+
+    def _s(v):
+        return v.value if hasattr(v, "value") else str(v) if v else "pending"
+
+    all_runs = mission_store.list_runs(limit=100)
+    all_active = []
+    project_ids_seen: dict = {}
+    for mr in all_runs:
+        st = _s(mr.status)
+        if st in ("running", "pending", "paused"):
+            pid = mr.project_id or ""
+            if pid and pid not in project_ids_seen:
+                project_ids_seen[pid] = pid.replace("-", " ").title()
+            phases_done = sum(1 for p in (mr.phases or []) if _s(p.status) in ("completed", "done"))
+            all_active.append({
+                "id": mr.id,
+                "name": mr.workflow_name or mr.workflow_id,
+                "brief": (mr.brief or "")[:100],
+                "status": st,
+                "session_id": mr.session_id,
+                "project_id": pid,
+                "phases_done": phases_done,
+                "phases_total": len(mr.phases or []),
+                "phases": [{"name": p.phase_name or f"Phase {i+1}", "status": _s(p.status)} for i, p in enumerate(mr.phases or [])],
+            })
+
+    if project:
+        active_missions = [m for m in all_active if m["project_id"] == project]
+    else:
+        active_missions = all_active[:10]
+
+    active_session_ids = {m["session_id"] for m in active_missions if m["session_id"]}
+    recent_messages = []
+    agent_sessions: dict = {}
+    for sid in list(active_session_ids)[:10]:
+        try:
+            msgs = session_store.get_messages(sid, limit=10)
+            for m in msgs:
+                if m.from_agent and m.from_agent not in ("user", "system"):
+                    agent_sessions[m.from_agent] = sid
+                    content = (m.content or "")[:120]
+                    if content and m.message_type not in ("system",):
+                        recent_messages.append({"from": m.from_agent, "to": m.to_agent or "", "content": content, "session_id": sid, "ts": m.timestamp or ""})
+        except Exception:
+            pass
+    recent_messages.sort(key=lambda x: x["ts"], reverse=True)
+
+    return JSONResponse({
+        "missions": active_missions,
+        "messages": recent_messages[:20],
+        "agent_sessions": agent_sessions,
+        "projects": [{"id": k, "name": v} for k, v in sorted(project_ids_seen.items())],
+        "total_missions": len(all_active),
+    })

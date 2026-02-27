@@ -1679,14 +1679,77 @@ function seedLiveData() {
 
     updateCounters();
 
-    // Periodic re-fetch of messages (poll every 30s for new activity)
+    // Periodic re-fetch of live data (every 15s)
     setInterval(async () => {
         try {
-            const resp = await fetch('/api/sessions');
+            const project = new URLSearchParams(location.search).get('project') || '';
+            const resp = await fetch('/api/world/live' + (project ? '?project=' + encodeURIComponent(project) : ''));
             if (!resp.ok) return;
+            const data = await resp.json();
+            worldLiveRefresh(data);
         } catch(e) { /* ignore */ }
-    }, 30000);
+    }, 15000);
 }
+
+// ═══════════════════════════════════════════════════════
+// LIVE REFRESH — update 3D world from fresh data
+// ═══════════════════════════════════════════════════════
+function worldLiveRefresh(data) {
+    const missions = data.missions || [];
+    const messages = data.messages || [];
+    const agentSessions = data.agent_sessions || {};
+
+    // Update mission progress in zone labels
+    for (const m of missions) {
+        const mz = MISSION_ZONES.find(z => z.mission.id === m.id);
+        if (mz) {
+            mz.mission.phases_done = m.phases_done;
+            mz.mission.phases_total = m.phases_total;
+            mz.mission.status = m.status;
+            // Update phases status
+            if (m.phases && mz.mission.phases) {
+                for (let i = 0; i < Math.min(m.phases.length, mz.mission.phases.length); i++) {
+                    mz.mission.phases[i].status = m.phases[i].status;
+                }
+                // Update station colors
+                updateMissionZoneColors(mz);
+            }
+        }
+    }
+
+    // Update counters
+    document.getElementById('world-mission-count').textContent = MISSION_ZONES.length + ' missions';
+    updateCounters();
+
+    // Update zone labels sidebar
+    const container = document.getElementById('world-zones');
+    if (container) {
+        container.querySelectorAll('.wz-label').forEach((el, i) => {
+            const mz = MISSION_ZONES[i];
+            if (mz) {
+                const m = mz.mission;
+                el.textContent = `${(mz.name || '').slice(0, 20)} (${m.phases_done}/${m.phases_total})`;
+            }
+        });
+    }
+
+    // Feed new messages
+    const lastMsg = _worldLastMsgTs;
+    for (const msg of messages) {
+        if (msg.ts > lastMsg) {
+            const agName = agents[msg.from]?.data?.name || msg.from;
+            addFeedItem(agName, 'acting', msg.content);
+            if (agents[msg.from]) showSpeechBubble(msg.from, msg.content);
+            if (msg.to && agents[msg.from] && agents[msg.to]) triggerDelegation(msg.from, msg.to);
+        }
+    }
+    if (messages.length) _worldLastMsgTs = messages[0].ts || _worldLastMsgTs;
+}
+
+var _worldLastMsgTs = '';
+
+// Stub — full color rebuild requires scene traversal; counters/labels update above is sufficient
+function updateMissionZoneColors(mz) { /* phase color update on next repaint cycle via pulseObjects */ }
 
 // ═══════════════════════════════════════════════════════
 // DAY/NIGHT TOGGLE
