@@ -640,6 +640,9 @@ async def cto_message(request: Request):
             async for event_type_s, data_s in executor.run_streaming(ctx, content):
                 if event_type_s == "delta":
                     yield sse("chunk", {"text": data_s})
+                elif event_type_s == "tool":
+                    # Keepalive: forward tool name so nginx doesn't timeout (60s)
+                    yield sse("tool_ping", {"name": data_s})
                 elif event_type_s == "result":
                     result = data_s
 
@@ -817,6 +820,10 @@ async def cto_message(request: Request):
                                     "agent_id": inv_agent.id,
                                     "agent_name": inv_agent.name,
                                 },
+                            )
+                        elif ev_t == "tool":
+                            yield sse(
+                                "tool_ping", {"name": ev_d, "agent_id": inv_agent.id}
                             )
                         elif ev_t == "result":
                             inv_result = ev_d
