@@ -387,10 +387,10 @@ def _resolve_mentions(content: str) -> str:
                     f"  - [{m.status}] {m.name} (workflow: {m.workflow_id or '?'})"
                     for m in missions
                 )
-                or "  - Aucune mission"
+                or "  - Aucune mission SF enregistrée"
             )
             workspace = match.path or ""
-            is_empty = not missions and not match.description and not match.vision
+            has_content = bool(match.description or match.vision or missions)
             ctx_block = (
                 f"\n\n--- Contexte projet SF @{mention} ---\n"
                 f"Nom: {match.name}\n"
@@ -401,19 +401,21 @@ def _resolve_mentions(content: str) -> str:
                 f"Git URL: {match.git_url or '(non configuré)'}\n"
                 f"Workspace (cwd pour outils git/code): {workspace or '(non configuré)'}\n"
                 f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
-                f"Missions (aperçu):\n{m_lines}\n"
+                f"Missions SF (aperçu):\n{m_lines}\n"
                 f"\n"
+                f"INSTRUCTIONS OBLIGATOIRES :\n"
                 + (
-                    f"⚠ PROJET VIDE : Ce projet existe dans la SF (ID={match.id}) mais n'a pas encore de description, de vision ni de missions. "
-                    f"RÉPONDS clairement que le projet est enregistré dans SF mais n'a pas encore de contenu. "
-                    f"Ne dis PAS que le projet n'existe pas. Propose de créer une mission pour initialiser ce projet.\n\n"
-                    if is_empty else
-                    f"INSTRUCTIONS (OBLIGATOIRE) pour répondre à cette question sur le projet SF :\n"
-                    f'1. APPELLE platform_missions(project_id="{match.id}") — liste toutes les missions SF\n'
-                    f'2. APPELLE platform_metrics(project_id="{match.id}") — métriques réelles (runs, agents, messages)\n'
-                    f"3. Synthétise les résultats en français pour l'utilisateur\n"
-                    f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials. Ne génère PAS de SQL.\n\n"
+                    f'1. APPELLE platform_missions(project_id="{match.id}") pour détailler les missions\n'
+                    f'2. APPELLE platform_metrics(project_id="{match.id}") pour les métriques\n'
+                    f"3. Synthétise en français\n"
+                    if missions else
+                    f"Ce projet est enregistré dans la SF mais n'a pas encore de missions SF actives.\n"
+                    f"RÉPONDS en utilisant les informations ci-dessus (nom, description, vision, type, domaines).\n"
+                    f"Ne dis PAS que tu n'as pas d'informations — tu en as dans ce bloc.\n"
+                    f"Si l'utilisateur demande l'état du projet, explique que c'est un projet {match.factory_type or 'STANDALONE'} "
+                    f"et propose de créer des missions SF pour le piloter.\n"
                 )
+                + f"INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials. Ne génère PAS de SQL.\n"
                 + f"---\n"
             )
             injected.append(ctx_block)
