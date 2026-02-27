@@ -419,8 +419,13 @@ def _auto_invite_for_project_mention(content: str, explicit_agent_ids: set) -> l
     return []
 
 
-def _resolve_mentions(content: str) -> str:
-    """Replace @ProjectName mentions with rich project context for the LLM."""
+def _resolve_mentions(content: str) -> tuple[str, str]:
+    """Resolve @ProjectName mentions.
+
+    Returns (clean_content, project_context_block) where:
+    - clean_content = original content unchanged (@ mention stays as-is)
+    - project_context_block = rich project info to inject into ExecutionContext.project_context
+    """
     import re
 
     # Capture full project name including em-dash/en-dash until a verb/sentence-break
@@ -434,16 +439,13 @@ def _resolve_mentions(content: str) -> str:
         re.IGNORECASE,
     )
     if not mentions:
-        # fallback: capture up to 80 chars after @, stopping at punctuation/newline
         mentions = re.findall(r"@([\w][\w\-\s—–]{0,79}?)(?=\s*[\?:!\n]|$)", content)
     if not mentions:
         mentions = re.findall(r"@([\w\-]+)", content)
-    if not mentions:
-        return content
     # Strip trailing spaces/dashes from each mention
     mentions = [m.strip(" \t—–-") for m in mentions if m.strip()]
     if not mentions:
-        return content
+        return content, ""
     try:
         from ...projects.manager import get_project_store
         from ...missions.store import get_mission_store
@@ -451,7 +453,7 @@ def _resolve_mentions(content: str) -> str:
         ps = get_project_store()
         ms = get_mission_store()
         all_projects = ps.list_all()
-        injected = []
+        blocks = []
         for mention in mentions:
             m_key = (
                 mention.lower()
@@ -461,7 +463,7 @@ def _resolve_mentions(content: str) -> str:
                 .replace("–", " ")
                 .strip()
             )
-            # Score each project: exact=3, starts_with=2, contains=1; bonus +1 if SF type
+            # Score each project: exact=3, starts_with/prefix=2, contains=1; +1 if SF type
             best, best_score = None, 0
             for p in all_projects:
                 pname = (
@@ -486,39 +488,37 @@ def _resolve_mentions(content: str) -> str:
             match = best
             if not match:
                 continue
-            # Get SF missions only if they exist (optional enrichment)
-            missions = ms.list(project_id=match.id, limit=5)
+            missions = ms.list_missions(project_id=match.id, limit=5)
             m_lines = (
                 "\n".join(f"  - [{m.status}] {m.name}" for m in missions)
                 if missions
-                else ""
+                else "  (aucune mission active)"
             )
-
-            ctx_block = (
-                f"\n\n--- Contexte projet SF @{mention} ---\n"
-                f"Nom: {match.name}\n"
+            blocks.append(
+                f"## Projet mentionné : {match.name}\n"
                 f"ID: {match.id}\n"
+                f"Type: {match.factory_type or 'STANDALONE'} | Statut: {match.status or 'actif'}\n"
+                f"Stack: {', '.join(match.domains) if match.domains else '?'}\n"
                 f"Description: {match.description or '(non renseignée)'}\n"
-                f"Type: {match.factory_type or 'STANDALONE'} | Statut: {match.status or '?'}\n"
-                f"Domaines / Stack: {', '.join(match.domains) if match.domains else '?'}\n"
-                f"Git URL: {match.git_url or '(non configuré)'}\n"
-                f"Vision: {match.vision[:400] + '...' if match.vision and len(match.vision) > 400 else (match.vision or '(non définie)')}\n"
-                + (f"Missions SF actives:\n{m_lines}\n" if m_lines else "")
-                + "\n"
-                "INSTRUCTION : Réponds à la question de l'utilisateur en utilisant "
-                "UNIQUEMENT les informations ci-dessus sur le projet. "
-                "Ce bloc contient tout ce que tu sais sur ce projet. "
-                "Ne dis PAS que tu manques d'informations. "
-                "Ne demande PAS de contexte supplémentaire. "
-                "Si l'utilisateur demande l'état/avancement, synthétise à partir de la description, vision et type.\n"
-                "INTERDIT : Ne crée PAS de fichiers. Ne demande PAS de credentials.\n"
-                "---\n"
+                f"Vision: {match.vision[:500] + '...' if match.vision and len(match.vision) > 500 else (match.vision or '(non définie)')}\n"
+                f"Git: {match.git_url or '(non configuré)'}\n"
+                f"Missions:\n{m_lines}\n"
             )
-            injected.append(ctx_block)
-        return content + "".join(injected)
+        ctx_block = (
+            (
+                "# CONTEXTE PROJET RÉSOLU (injecté automatiquement)\n"
+                "Tu as accès aux informations complètes de ce projet. "
+                "Utilise-les pour répondre directement et précisément. "
+                "N'appelle PAS d'outils pour chercher ce projet — tout est déjà ici.\n\n"
+                + "\n".join(blocks)
+            )
+            if blocks
+            else ""
+        )
+        return content, ctx_block
     except Exception as e:
         logger.warning("_resolve_mentions failed: %s", e)
-        return content
+        return content, ""
 
 
 def _badge_mentions(text: str) -> str:
@@ -557,7 +557,7 @@ async def cto_message(request: Request):
         return HTMLResponse("")
 
     # Resolve @Project mentions → inject project context for the LLM
-    content_with_ctx = _resolve_mentions(content)
+    content, mention_ctx = _resolve_mentions(content)
 
     # Resolve session
     store = get_session_store()
@@ -601,12 +601,16 @@ async def cto_message(request: Request):
 
             ctx = await _build_context(agent, session)
 
+            # Inject resolved @mention project context into system prompt (not user msg)
+            if mention_ctx:
+                ctx.project_context = mention_ctx + (
+                    ("\n\n" + ctx.project_context) if ctx.project_context else ""
+                )
+
             executor = get_executor()
             result = None
 
-            async for event_type_s, data_s in executor.run_streaming(
-                ctx, content_with_ctx
-            ):
+            async for event_type_s, data_s in executor.run_streaming(ctx, content):
                 if event_type_s == "delta":
                     yield sse("chunk", {"text": data_s})
                 elif event_type_s == "result":
