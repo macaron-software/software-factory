@@ -154,6 +154,11 @@ async def auto_resume_missions() -> None:
                     await _cleanup_disk()
                 except Exception as e_clean:
                     logger.error("auto_resume: disk cleanup error: %s", e_clean)
+            # Every cycle: enforce container TTL + project slots
+            try:
+                await _enforce_container_ttl_and_slots()
+            except Exception as e_ttl:
+                logger.warning("auto_resume: container TTL error: %s", e_ttl)
             first_pass = False
         except Exception as e:
             logger.error("auto_resume watchdog error: %s", e)
@@ -871,3 +876,81 @@ async def _cleanup_workspace_containers() -> None:
 
     if killed:
         logger.warning("auto_resume: cleaned up %d stale workspace containers: %s", len(killed), killed[:5])
+
+
+async def _enforce_container_ttl_and_slots() -> None:
+    """Stop deployed app containers (macaron-app-*) that are too old or exceed the active-project slot limit.
+
+    Reads config.orchestrator.max_active_projects and deployed_container_ttl_hours.
+    Called every watchdog cycle.
+    """
+    import subprocess
+    import re
+    from datetime import datetime, timezone
+
+    try:
+        from ..config import get_config
+        oc = get_config().orchestrator
+        max_slots = oc.max_active_projects       # 0 = unlimited
+        ttl_hours = oc.deployed_container_ttl_hours  # 0 = no TTL
+    except Exception:
+        max_slots = 3
+        ttl_hours = 4.0
+
+    if max_slots == 0 and ttl_hours == 0:
+        return
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.CreatedAt}}"],
+            capture_output=True, text=True, timeout=10
+        )
+    except Exception:
+        return
+
+    now = datetime.now(timezone.utc)
+    app_containers: list[tuple[str, datetime]] = []
+
+    for line in result.stdout.splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        name, created_str = parts
+        if not (name.startswith("macaron-app-") or name.startswith("proj-")):
+            continue
+        try:
+            # Docker format: "2026-01-15 10:23:45 +0000 UTC" or "2026-01-15T10:23:45Z"
+            created_str = re.sub(r'\s+UTC$', '', created_str.strip())
+            dt = datetime.fromisoformat(created_str.replace(' ', 'T').replace(' +0000', '+00:00'))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            app_containers.append((name, dt))
+        except Exception:
+            app_containers.append((name, now))  # unknown age → treat as fresh
+
+    if not app_containers:
+        return
+
+    # Sort oldest first
+    app_containers.sort(key=lambda x: x[1])
+
+    to_stop = []
+    for name, created in app_containers:
+        age_hours = (now - created).total_seconds() / 3600
+        if ttl_hours > 0 and age_hours > ttl_hours:
+            to_stop.append((name, f"age={age_hours:.1f}h > ttl={ttl_hours}h"))
+
+    # Enforce slot limit: stop oldest beyond max_slots
+    if max_slots > 0 and len(app_containers) > max_slots:
+        over = app_containers[:len(app_containers) - max_slots]
+        for name, created in over:
+            if name not in [n for n, _ in to_stop]:
+                to_stop.append((name, f"slots={len(app_containers)} > max={max_slots}"))
+
+    for name, reason in to_stop:
+        try:
+            subprocess.run(["docker", "stop", name], capture_output=True, timeout=15)
+            subprocess.run(["docker", "rm", name], capture_output=True, timeout=10)
+            logger.warning("auto_resume: stopped deployed container %s (%s)", name, reason)
+        except Exception as e:
+            logger.warning("auto_resume: failed to stop %s: %s", name, e)

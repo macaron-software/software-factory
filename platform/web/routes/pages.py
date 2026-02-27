@@ -906,6 +906,10 @@ async def save_orchestrator_settings(request: Request):
         oc.cpu_red = max(oc.cpu_yellow + 5, min(95.0, float(body["cpu_red"])))
     if "ram_red" in body:
         oc.ram_red = max(50.0, min(95.0, float(body["ram_red"])))
+    if "max_active_projects" in body:
+        oc.max_active_projects = max(0, min(20, int(body["max_active_projects"])))
+    if "deployed_container_ttl_hours" in body:
+        oc.deployed_container_ttl_hours = max(0.0, min(168.0, float(body["deployed_container_ttl_hours"])))
     if "worker_nodes" in body:
         raw = body["worker_nodes"]
         if isinstance(raw, list):
@@ -927,6 +931,8 @@ async def save_orchestrator_settings(request: Request):
         "cpu_yellow": oc.cpu_yellow,
         "cpu_red": oc.cpu_red,
         "ram_red": oc.ram_red,
+        "max_active_projects": oc.max_active_projects,
+        "deployed_container_ttl_hours": oc.deployed_container_ttl_hours,
         "worker_nodes": oc.worker_nodes,
     }
 

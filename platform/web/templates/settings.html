@@ -144,6 +144,29 @@
 
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
+              <!-- Project Slots -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Deployed App Containers</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
+                Deployed apps run as Docker containers (<code>macaron-app-*</code>). Limit active slots to avoid RAM saturation.
+                The watchdog stops the oldest containers beyond the slot limit, and stops any container older than the TTL.
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.8rem">
+                <div class="form-group">
+                  <label>Max active project slots</label>
+                  <input type="number" name="max_active_projects"
+                    value="{{ config.orchestrator.max_active_projects }}" min="0" max="20" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">0 = unlimited</span>
+                </div>
+                <div class="form-group">
+                  <label>Container TTL (hours)</label>
+                  <input type="number" name="deployed_container_ttl_hours"
+                    value="{{ config.orchestrator.deployed_container_ttl_hours }}" min="0" max="168" step="0.5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">0 = no auto-stop</span>
+                </div>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
               <!-- Backpressure -->
               <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">CPU / RAM Backpressure</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
