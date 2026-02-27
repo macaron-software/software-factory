@@ -428,7 +428,7 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
             run = MissionRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PAUSED,
+                status=MissionStatus.PENDING,
                 project_id=project_id,
             )
             run = run_store.create(run)
@@ -484,7 +484,7 @@ class PlatformCreateMissionTool(BaseTool):
             run = MissionRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PAUSED,
+                status=MissionStatus.PENDING,
                 project_id=mission.project_id or "",
             )
             run = run_store.create(run)
