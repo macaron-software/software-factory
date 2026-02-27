@@ -969,7 +969,7 @@ async def get_agent_scores() -> dict[str, Any]:
             FROM llm_traces t
             LEFT JOIN agents a ON a.id = t.agent_id
             WHERE t.agent_id != ''
-            GROUP BY t.agent_id, t.model
+            GROUP BY t.agent_id, COALESCE(a.name, t.agent_id), t.provider, t.model
             ORDER BY iterations DESC
         """).fetchall()
 
