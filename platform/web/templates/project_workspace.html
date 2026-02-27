@@ -101,13 +101,10 @@ html,body{height:100%;overflow:hidden}
           </button>
         </div>
         <div class="ws-pane-content">
-          <!-- Code/Files -->
+          <!-- Code/Files — just the viewer; left tree is the navigator -->
           <div class="ws-tab-content active" id="ws-files">
-            <div class="ws-files-layout">
-              <div class="ws-files-tree" id="wsFilesTree"><div class="ws-empty-state" style="font-size:.7rem;padding:.75rem">Chargement…</div></div>
-              <div class="ws-files-viewer" id="wsFilesViewer">
-                <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier</span></div>
-              </div>
+            <div class="ws-files-viewer" id="wsFilesViewer" style="flex:1;overflow:auto;display:flex;flex-direction:column">
+              <div class="ws-file-empty"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg><span>Sélectionnez un fichier dans l&apos;arbre</span></div>
             </div>
           </div>
           <!-- Tool Calls -->
@@ -235,7 +232,6 @@ function wsMainTab(btn, name) {
   if (el) el.classList.add('active');
   localStorage.setItem('ws_main_tab_' + _wsProjectId, name);
   if (name === 'toolcalls') wsLoadToolcalls();
-  if (name === 'files') wsLoadFilesTree('.');
   if (name === 'docker') wsLoadDocker();
   if (name === 'preview') wsLoadPreview();
 }
@@ -353,7 +349,8 @@ function wsLoadToolcalls() {
 }
 
 function wsLoadFilesTree(path) {
-  var tree = document.getElementById('wsFilesTree');
+  var tree = document.getElementById('wsTreeBody');
+  if (!tree) return;
   wsFetch('/api/projects/' + _wsProjectId + '/workspace/files?path=' + encodeURIComponent(path))
     
     .then(function(r){ return r.json(); })
@@ -375,6 +372,8 @@ function wsLoadFilesTree(path) {
 }
 
 function wsOpenFile(path) {
+  // Switch to Code tab
+  wsMainTab(document.querySelector('#wsMainTabs [data-tab="files"]'), 'files');
   var viewer = document.getElementById('wsFilesViewer');
   viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
   wsFetch('/api/projects/' + _wsProjectId + '/workspace/file?path=' + encodeURIComponent(path))
@@ -401,21 +400,43 @@ function wsLoadDocker() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var containers = data.containers || [];
-      if (!containers.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Aucun container Docker pour ce projet</span><span class="ws-empty-hint">Les containers dont le nom contient l\'ID du projet apparaissent ici</span></div>'; return; }
-      body.innerHTML = containers.map(function(c) {
-        var up = c.status && c.status.toLowerCase().startsWith('up');
-        return '<div class="ws-docker-container">' +
-          '<div class="ws-docker-header"><div class="ws-docker-status ' + (up?'up':'down') + '"></div>' +
-          '<span class="ws-docker-name">' + wsEsc(c.name) + '</span>' +
-          '<span class="ws-docker-image">' + wsEsc(c.image||'') + '</span>' +
-          '<span style="margin-left:auto;font-size:.7rem;color:var(--text-secondary);">' + wsEsc(c.status||'') + '</span>' +
-          (c.ports ? '<span class="ws-docker-port" onclick="wsDockPreview(\'' + wsEsc(c.ports) + '\')">' + wsEsc(c.ports) + '</span>' : '') + '</div>' +
-          '<div class="ws-docker-actions">' +
-          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'start\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button>' +
-          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'stop\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button>' +
-          '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'rebuild\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Rebuild</button>' +
-          '</div><pre class="ws-docker-logs">' + wsEsc(c.logs||'— Aucun log —') + '</pre></div>';
-      }).join('');
+      var dockerFiles = data.docker_files || [];
+      var html = '';
+
+      if (containers.length) {
+        html += containers.map(function(c) {
+          var up = c.status && c.status.toLowerCase().startsWith('up');
+          return '<div class="ws-docker-container">' +
+            '<div class="ws-docker-header"><div class="ws-docker-status ' + (up?'up':'down') + '"></div>' +
+            '<span class="ws-docker-name">' + wsEsc(c.name) + '</span>' +
+            '<span class="ws-docker-image">' + wsEsc(c.image||'') + '</span>' +
+            '<span style="margin-left:auto;font-size:.7rem;color:var(--text-secondary);">' + wsEsc(c.status||'') + '</span>' +
+            (c.ports ? '<span class="ws-docker-port" onclick="wsDockPreview(\'' + wsEsc(c.ports) + '\')">' + wsEsc(c.ports) + '</span>' : '') + '</div>' +
+            '<div class="ws-docker-actions">' +
+            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'start\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button>' +
+            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'stop\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button>' +
+            '<button class="ws-docker-btn" onclick="wsDockAction(\'' + wsEsc(c.name) + '\',\'rebuild\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Rebuild</button>' +
+            '</div><pre class="ws-docker-logs">' + wsEsc(c.logs||'— Aucun log —') + '</pre></div>';
+        }).join('');
+      } else {
+        html += '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>' +
+          '<span>Aucun container en cours</span>' +
+          (dockerFiles.length ? '<span class="ws-empty-hint">Fichiers Docker détectés: ' + dockerFiles.map(function(f){ return f.name; }).join(', ') + '</span>' : '<span class="ws-empty-hint">Aucun Dockerfile ou docker-compose.yml trouvé dans ce projet</span>') +
+          '</div>';
+      }
+
+      // Show detected Docker config files (collapsed)
+      if (dockerFiles.length) {
+        html += '<div style="margin-top:.75rem;">' + dockerFiles.map(function(f) {
+          var id = 'dkf_' + f.name.replace(/[^a-z0-9]/gi,'_');
+          return '<details style="margin-bottom:.5rem;">' +
+            '<summary style="cursor:pointer;font-size:.72rem;font-weight:600;color:var(--text-secondary);padding:.35rem .5rem;background:var(--surface-2);border-radius:4px;">' +
+            '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:.3rem"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>' + wsEsc(f.name) + '</summary>' +
+            '<pre style="background:var(--surface-2);padding:.5rem;font-size:.68rem;overflow:auto;max-height:200px;border-radius:0 0 4px 4px;margin:0">' + wsEsc(f.content) + '</pre></details>';
+        }).join('') + '</div>';
+      }
+
+      body.innerHTML = html;
     });
 }
 
@@ -498,25 +519,7 @@ function wsPreviewToggleMobile() {
   if(btn) btn.style.color=_wsPreviewMobile?'var(--purple)':'';
 }
 
-function wsLoadLeftTree() {
-  wsFetch('/api/projects/' + _wsProjectId + '/workspace/files?path=.')
-    
-    .then(function(r){ return r.json(); })
-    .then(function(data) {
-      var body = document.getElementById('wsTreeBody');
-      var items = data.items || [];
-      if (!items.length) { body.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Chemin non accessible</div>'; return; }
-      var html = '';
-      items.slice(0,40).forEach(function(i) {
-        var isDir = i.type==='dir';
-        html += '<div class="ws-tree-item' + (isDir?' ws-tree-dir':'') + '" onclick="wsTab(document.querySelector(\'[data-tab=files]\'),\'files\');setTimeout(function(){' + (isDir?'wsLoadFilesTree':'wsOpenFile') + '(\'' + wsEsc(i.path) + '\')},50)">' +
-          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
-          (isDir?'<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>':'<path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/>')+
-          '</svg>' + wsEsc(i.name) + '</div>';
-      });
-      body.innerHTML = html;
-    }).catch(function(){ document.getElementById('wsTreeBody').innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;">Chemin non accessible</div>'; });
-}
+function wsLoadLeftTree() { wsLoadFilesTree('.'); }
 
 function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el) return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
 

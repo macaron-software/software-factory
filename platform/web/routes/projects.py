@@ -96,7 +96,9 @@ async def projects_page(request: Request):
     offset = (page - 1) * per_page
 
     store = get_project_store()
-    projects, total = store.search(q=q, factory_type=factory_type, limit=per_page, offset=offset)
+    projects, total = store.search(
+        q=q, factory_type=factory_type, limit=per_page, offset=offset
+    )
     total_pages = max(1, (total + per_page - 1) // per_page)
 
     return _templates(request).TemplateResponse(
@@ -1330,7 +1332,28 @@ async def ws_docker_status(project_id: str):
         pass
     except Exception:
         pass
-    return JSONResponse({"containers": containers})
+
+    # Detect Docker config files in project path regardless of running containers
+    docker_files = []
+    if proj.path:
+        import os
+
+        for fname in [
+            "docker-compose.yml",
+            "docker-compose.yaml",
+            "Dockerfile",
+            "Dockerfile.dev",
+        ]:
+            fpath = os.path.join(proj.path, fname)
+            if os.path.isfile(fpath):
+                try:
+                    with open(fpath, "r", encoding="utf-8", errors="replace") as f:
+                        content = f.read(8000)
+                    docker_files.append({"name": fname, "content": content})
+                except Exception:
+                    docker_files.append({"name": fname, "content": ""})
+
+    return JSONResponse({"containers": containers, "docker_files": docker_files})
 
 
 @router.post("/api/projects/{project_id}/workspace/docker/{action}")
