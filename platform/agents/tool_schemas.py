@@ -2014,10 +2014,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         # Memory
         "memory_search",
         "memory_store",
-        # Read-only code/git inspection
-        "code_read",
-        "code_search",
-        "list_files",
+        # Project context (read-only, no filesystem browsing)
+        "get_project_context",
+        # Git read (on explicit user request with workspace context)
         "git_status",
         "git_log",
         "git_diff",
@@ -2036,7 +2035,6 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_mission",
         "create_sub_mission",
         "compose_workflow",
-        "get_project_context",
         "run_e2e_tests",
         "screenshot",
         # Web / fetch
