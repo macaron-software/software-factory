@@ -25,6 +25,11 @@ jobs:
 
       - name: Rsync to OVH
         run: |
+          # Write VERSION file so the container knows git tag + commit (no .git inside Docker)
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          SHA=$(git rev-parse --short HEAD)
+          echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
+
           # Sync each directory as a proper subdirectory (no trailing slash = preserve dir name)
           rsync -az --delete \
             --exclude '__pycache__' \

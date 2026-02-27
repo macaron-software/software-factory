@@ -1006,11 +1006,17 @@ def create_app() -> FastAPI:
 
     # Version + git commit for header display
     import subprocess as _sp
-    try:
-        _sha = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL).decode().strip()
-        _tag = _sp.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL).decode().strip()
-    except Exception:
-        _sha, _tag = "unknown", ""
+    from pathlib import Path as _Path
+    _ver_file = _Path(__file__).parent / "VERSION"
+    if _ver_file.exists():
+        _parts = _ver_file.read_text().strip().split(":")
+        _tag, _sha = (_parts[0], _parts[1]) if len(_parts) == 2 else (_parts[0], _parts[0])
+    else:
+        try:
+            _sha = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL).decode().strip()
+            _tag = _sp.check_output(["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL).decode().strip()
+        except Exception:
+            _sha, _tag = "unknown", ""
     templates.env.globals["app_commit"] = _sha
     templates.env.globals["app_version"] = _tag or _sha
 
