@@ -909,7 +909,9 @@ async def save_orchestrator_settings(request: Request):
     if "max_active_projects" in body:
         oc.max_active_projects = max(0, min(20, int(body["max_active_projects"])))
     if "deployed_container_ttl_hours" in body:
-        oc.deployed_container_ttl_hours = max(0.0, min(168.0, float(body["deployed_container_ttl_hours"])))
+        oc.deployed_container_ttl_hours = max(
+            0.0, min(168.0, float(body["deployed_container_ttl_hours"]))
+        )
     if "worker_nodes" in body:
         raw = body["worker_nodes"]
         if isinstance(raw, list):
@@ -920,6 +922,18 @@ async def save_orchestrator_settings(request: Request):
     save_config(cfg)
     # Apply semaphore change live
     get_mission_semaphore()
+
+    # Append live system metrics to response
+    try:
+        import psutil
+
+        _cpu_now = psutil.cpu_percent(interval=0.5)
+        _ram = psutil.virtual_memory()
+        _ram_now = _ram.percent
+        _ram_total_gb = round(_ram.total / 1024**3, 1)
+        _ram_used_gb = round(_ram.used / 1024**3, 1)
+    except Exception:
+        _cpu_now = _ram_now = _ram_total_gb = _ram_used_gb = 0
 
     return {
         "ok": True,
@@ -934,6 +948,10 @@ async def save_orchestrator_settings(request: Request):
         "max_active_projects": oc.max_active_projects,
         "deployed_container_ttl_hours": oc.deployed_container_ttl_hours,
         "worker_nodes": oc.worker_nodes,
+        "cpu_now": _cpu_now,
+        "ram_now": _ram_now,
+        "ram_total_gb": _ram_total_gb,
+        "ram_used_gb": _ram_used_gb,
     }
 
 
