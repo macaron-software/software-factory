@@ -1120,7 +1120,7 @@ def _detect_preview_url(root_path: str) -> str:
 @router.get("/api/projects/{project_id}/workspace/tool-calls")
 async def ws_tool_calls(project_id: str):
     """Return last 50 tool calls for sessions linked to this project."""
-    from ...db.connection import get_db
+    from ...db.migrations import get_db
 
     db = get_db()
     try:
