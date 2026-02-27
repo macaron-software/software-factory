@@ -95,10 +95,11 @@ class PlatformMissionsTool(BaseTool):
                     "phases": phases,
                 }
             )
-        # List missions (not runs) with optional status filter
+        # List missions (not runs) with optional status/project filter
         mstore = get_mission_store()
         status_filter = params.get("status")
-        missions = mstore.list_missions(limit=int(params.get("limit", 30)))
+        project_filter = params.get("project_id")
+        missions = mstore.list_missions(limit=int(params.get("limit", 100)))
         items = []
         for m in missions:
             s = (
@@ -108,12 +109,16 @@ class PlatformMissionsTool(BaseTool):
             )
             if status_filter and s != status_filter:
                 continue
+            if project_filter and getattr(m, "project_id", None) != project_filter:
+                continue
             items.append(
                 {
                     "id": m.id,
                     "name": m.name,
                     "status": s,
-                    "description": (m.description or "")[:100],
+                    "workflow_id": getattr(m, "workflow_id", ""),
+                    "description": (m.description or "")[:150],
+                    "project_id": getattr(m, "project_id", ""),
                 }
             )
         return json.dumps({"total": len(items), "missions": items})
@@ -143,21 +148,57 @@ class PlatformMemoryTool(BaseTool):
 
 class PlatformMetricsTool(BaseTool):
     name = "platform_metrics"
-    description = "Get platform statistics: agent count, missions, sessions, messages, memory entries."
+    description = (
+        "Get platform statistics. Pass project_id to filter by project: "
+        "mission_runs count, sessions, messages, agents involved."
+    )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         from ..db.migrations import get_db
 
         db = get_db()
+        project_id = params.get("project_id")
         counts = {}
-        for table in ("agents", "mission_runs", "sessions", "messages"):
+
+        if project_id:
+            # Project-specific metrics
+            for table, col in (
+                ("mission_runs", "project_id"),
+                ("sessions", "project_id"),
+            ):
+                try:
+                    counts[table] = db.execute(
+                        f"SELECT COUNT(*) FROM {table} WHERE {col}=?", (project_id,)
+                    ).fetchone()[0]
+                except Exception:
+                    counts[table] = 0
+            # Messages via sessions of the project
             try:
-                counts[table] = db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[
-                    0
-                ]
+                counts["messages"] = db.execute(
+                    "SELECT COUNT(*) FROM messages WHERE session_id IN "
+                    "(SELECT id FROM sessions WHERE project_id=?)",
+                    (project_id,),
+                ).fetchone()[0]
             except Exception:
-                counts[table] = 0
+                counts["messages"] = 0
+            # Agents involved via mission_runs
+            try:
+                counts["agents_involved"] = db.execute(
+                    "SELECT COUNT(DISTINCT cdp_agent_id) FROM mission_runs WHERE project_id=?",
+                    (project_id,),
+                ).fetchone()[0]
+            except Exception:
+                counts["agents_involved"] = 0
+            counts["project_id"] = project_id
+        else:
+            for table in ("agents", "missions", "mission_runs", "sessions", "messages"):
+                try:
+                    counts[table] = db.execute(
+                        f"SELECT COUNT(*) FROM {table}"
+                    ).fetchone()[0]
+                except Exception:
+                    counts[table] = 0
         return json.dumps(counts)
 
 

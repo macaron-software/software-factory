@@ -187,7 +187,12 @@ def _resolve_mentions(content: str) -> str:
     """Replace @ProjectName mentions with rich project context for the LLM."""
     import re
 
-    mentions = re.findall(r"@([\w\-]+)", content)
+    mentions = re.findall(
+        r"@([\w\-][\w\-\s]*?)(?=\s*(?:—|--|et |pour |dit |:|\?|$))", content
+    )
+    if not mentions:
+        # fallback: single-word mentions
+        mentions = re.findall(r"@([\w\-]+)", content)
     if not mentions:
         return content
     try:
@@ -224,17 +229,22 @@ def _resolve_mentions(content: str) -> str:
             )
             workspace = match.path or ""
             ctx_block = (
-                f"\n\n--- Contexte projet @{mention} ---\n"
+                f"\n\n--- Contexte projet SF @{mention} ---\n"
                 f"Nom: {match.name}\n"
                 f"ID: {match.id}\n"
                 f"Description: {match.description or '(non renseignée)'}\n"
                 f"Type: {match.factory_type or '?'} | Statut: {match.status or '?'}\n"
                 f"Domaines: {', '.join(match.domains) if match.domains else '?'}\n"
                 f"Git URL: {match.git_url or '(non configuré)'}\n"
-                f"Workspace (cwd pour outils git/code): {workspace or '(non configuré — utilise create_project pour en créer un)'}\n"
+                f"Workspace (cwd pour outils git/code): {workspace or '(non configuré)'}\n"
                 f"Vision: {match.vision[:300] + '...' if match.vision and len(match.vision) > 300 else (match.vision or '(non définie)')}\n"
-                f"Missions:\n{m_lines}\n"
-                f"IMPORTANT: Pour toute opération git/code sur ce projet, utilise cwd='{workspace}' (pas '.')\n"
+                f"Missions (aperçu):\n{m_lines}\n"
+                f"\n"
+                f"ACTIONS REQUISES pour ce projet SF :\n"
+                f'1. Appelle platform_missions(project_id="{match.id}") pour voir toutes les missions\n'
+                f'2. Appelle platform_metrics(project_id="{match.id}") pour les métriques réelles (runs, agents, messages)\n'
+                f"3. Pour opérations git/code: utilise cwd=\"{workspace}\" (jamais '.')\n"
+                f"Ne demande PAS de credentials DB — ces outils requêtent directement la SF.\n"
                 f"---\n"
             )
             injected.append(ctx_block)

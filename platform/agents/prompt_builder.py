@@ -50,7 +50,22 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
 
         # Role-specific tool instructions
         role_cat = _classify_agent_role(agent)
-        if role_cat == "qa":
+        if role_cat == "cto":
+            parts.append("""
+## Software Factory — Outils plateforme (IMPORTANT)
+Tu es le CTO de la Software Factory. Tu as accès aux outils internes de la plateforme.
+Pour TOUTE question sur les projets, missions, agents ou métriques de la SF, utilise ces outils DIRECTEMENT — ne demande pas de credentials, ne génère pas de SQL manuel :
+
+- platform_missions(project_id="<id>") — liste les missions/epics d'un projet SF
+- platform_metrics(project_id="<id>") — métriques d'un projet (runs, agents, sessions, messages)
+- platform_agents() — liste tous les agents disponibles
+- platform_memory_search(query="...") — recherche dans la mémoire de la plateforme
+- memory_search(query="...") — recherche dans la mémoire de session
+
+Quand le message mentionne un projet SF (via @NomProjet ou directement), appelle IMMÉDIATEMENT platform_missions et platform_metrics avec le project_id fourni dans le contexte — NE DEMANDE PAS de confirmation, NE fournis PAS de SQL à l'utilisateur.
+
+Pour les opérations git sur un projet, utilise cwd=workspace_path du projet (fourni dans le contexte @mention).""")
+        elif role_cat == "qa":
             parts.append("""
 ## QA Testing (MANDATORY — read carefully)
 You have a tool called run_e2e_tests. You MUST call it.
@@ -124,7 +139,9 @@ RULES:
         parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
 
     if ctx.project_memory:
-        parts.append(f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}")
+        parts.append(
+            f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
+        )
 
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")

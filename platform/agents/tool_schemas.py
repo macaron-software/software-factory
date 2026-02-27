@@ -2285,6 +2285,11 @@ def _classify_agent_role(agent: AgentDef) -> str:
         )
     ):
         return "product"
+    if any(
+        k in combined
+        for k in ("chief technology", "cto", "directeur technique", "tech lead")
+    ):
+        return "cto"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"
     if any(
