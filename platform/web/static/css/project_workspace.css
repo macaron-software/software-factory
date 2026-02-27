@@ -1,5 +1,8 @@
 /* ── Project Workspace — Replit-style layout ─────────────────────────────── */
 
+/* Safety reset: SVGs inside workspace must never expand to fill containers */
+.ws-layout svg { flex-shrink: 0; overflow: visible; }
+
 .ws-layout {
   display: flex;
   height: calc(100vh - 56px);
