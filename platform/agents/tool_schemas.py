@@ -6,17 +6,18 @@ role-based access control mappings. Extracted from executor.py.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..agents.store import AgentDef
+
 # Tool JSON schemas for OpenAI function-calling API
 _TOOL_SCHEMAS: list[dict] | None = None
 
 
-def _get_tool_schemas() -> list[dict]:
-    """Build OpenAI-compatible tool definitions from the registry."""
-    global _TOOL_SCHEMAS
-    if _TOOL_SCHEMAS is not None:
-        return _TOOL_SCHEMAS
-
-    schemas = [
+def _core_schemas() -> list[dict]:
+    """Core file/code/git/shell/communication tool schemas."""
+    return [
         {
             "type": "function",
             "function": {
@@ -380,6 +381,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _phase_schemas() -> list[dict]:
+    """Phase orchestration tool schemas."""
+    return [
         # ── Phase orchestration tools (CDP Mission Control) ──
         {
             "type": "function",
@@ -462,6 +469,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _web_schemas() -> list[dict]:
+    """Web/Playwright/screenshot tool schemas."""
+    return [
         # ── Playwright test/screenshot tools ──
         {
             "type": "function",
@@ -525,6 +538,70 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "browse",
+                "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "URL to open (e.g. http://localhost:3000)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "take_screenshot",
+                "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Screenshot name (e.g. homepage, login-page)",
+                        },
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "inspect_page",
+                "description": "Get the accessibility tree of the current browser page for assertions.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_e2e_tests",
+                "description": "Run full E2E test suite automatically: installs dependencies, starts dev server, takes browser screenshots, runs unit tests, returns full report. Call this for complete QA validation.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "port": {
+                            "type": "integer",
+                            "description": "Port for dev server (default 3000)",
+                        },
+                    },
+                },
+            },
+        },
+    ]
+
+
+def _mcp_schemas() -> list[dict]:
+    """MCP tool schemas (LRM, Figma, Solaris, GitHub, JIRA)."""
+    return [
         # ── MCP: LRM tools (project knowledge) ──
         {
             "type": "function",
@@ -976,6 +1053,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _build_schemas() -> list[dict]:
+    """Build, test, and CI tool schemas."""
+    return [
         # ── Build & Test tools ──
         {
             "type": "function",
@@ -1266,6 +1349,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _platform_schemas() -> list[dict]:
+    """Platform introspection and lifecycle tool schemas."""
+    return [
         # ── Platform introspection tools (self-aware) ──
         {
             "type": "function",
@@ -2070,71 +2159,22 @@ def _get_tool_schemas() -> list[dict]:
             },
         },
     ]
-    # ── Simple Playwright aliases (LLM-friendly short names) ──
-    schemas.extend(
-        [
-            {
-                "type": "function",
-                "function": {
-                    "name": "browse",
-                    "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "url": {
-                                "type": "string",
-                                "description": "URL to open (e.g. http://localhost:3000)",
-                            },
-                        },
-                        "required": ["url"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "take_screenshot",
-                    "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Screenshot name (e.g. homepage, login-page)",
-                            },
-                        },
-                        "required": ["name"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "inspect_page",
-                    "description": "Get the accessibility tree of the current browser page for assertions.",
-                    "parameters": {"type": "object", "properties": {}},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_e2e_tests",
-                    "description": "Run full E2E test suite automatically: installs dependencies, starts dev server, takes browser screenshots, runs unit tests, returns full report. Call this for complete QA validation.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Port for dev server (default 3000)",
-                            },
-                        },
-                    },
-                },
-            },
-        ]
+
+
+def _get_tool_schemas() -> list[dict]:
+    """Build OpenAI-compatible tool definitions from the registry."""
+    global _TOOL_SCHEMAS
+    if _TOOL_SCHEMAS is not None:
+        return _TOOL_SCHEMAS
+    _TOOL_SCHEMAS = (
+        _core_schemas()
+        + _phase_schemas()
+        + _web_schemas()
+        + _mcp_schemas()
+        + _build_schemas()
+        + _platform_schemas()
     )
-    _TOOL_SCHEMAS = schemas
-    return schemas
+    return _TOOL_SCHEMAS
 
 
 # Tools available to each agent role category
