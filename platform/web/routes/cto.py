@@ -584,7 +584,9 @@ async def cto_message(request: Request):
                         f"Réponse du CTO :\n{result.content[:1000]}\n\n"
                         f"En tant que {inv_agent.name} ({inv_agent.role}), "
                         f"donne ta perspective, complète ou nuance si nécessaire. "
-                        f"Sois direct et concis."
+                        f"Sois direct et concis.\n"
+                        f"IMPORTANT : Ne commence PAS ta réponse par ton nom ni ton rôle "
+                        f"(ex: '{inv_agent.name} —'), l'en-tête est déjà affiché dans l'interface."
                     )
                     yield sse("agent_thinking", {
                         "agent_id": inv_agent.id,
@@ -615,7 +617,8 @@ async def cto_message(request: Request):
                         )
                         initials = "".join(w[0].upper() for w in inv_agent.name.split()[:2])
                         inv_html = (
-                            f'<div class="chat-msg chat-msg-agent chat-msg-invited">'
+                            f'<div class="invited-divider">{html_mod.escape(inv_agent.name)} a rejoint</div>'
+                            f'<div class="chat-msg chat-msg-invited">'
                             f'<div class="chat-msg-avatar invited-avatar" '
                             f'title="{html_mod.escape(inv_agent.name)}">{initials}</div>'
                             f'<div class="chat-msg-body">'
