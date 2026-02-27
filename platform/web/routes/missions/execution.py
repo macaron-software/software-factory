@@ -349,6 +349,23 @@ async def api_mission_start(request: Request):
         logger.error("Failed to start CDP agent: %s", e)
 
     # Auto-trigger orchestrator pipeline (no second API call needed)
+    # Check if we should dispatch to a remote worker node
+    dispatched = None
+    try:
+        from .dispatch import maybe_dispatch
+        dispatched = await maybe_dispatch(mission_id, brief, project_id, workflow_id)
+    except Exception as _de:
+        logger.debug("Dispatch check failed (running locally): %s", _de)
+
+    if dispatched:
+        # Worker node took over — return coordinator response with remote info
+        return JSONResponse({
+            "mission_id": mission_id,
+            "session_id": session_id,
+            "redirect": f"/missions/{mission_id}/control",
+            "_dispatched_to": dispatched.get("_dispatched_to", ""),
+        })
+
     try:
         await _launch_orchestrator(mission_id)
         logger.warning("ORCH auto-launched for mission=%s", mission_id)
