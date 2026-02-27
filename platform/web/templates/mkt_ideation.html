@@ -26,7 +26,7 @@
           <div class="mkt-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
           <div class="mkt-sidebar-item-meta">
             <span class="mkt-sidebar-badge {{ s.status }}">{{ s.status }}</span>
-            <span style="font-size:0.65rem;color:var(--text-muted)">{{ s.created_at[:10] if s.created_at else '' }}</span>
+            <span style="font-size:0.65rem;color:var(--text-muted)">{{ (s.created_at | string)[:10] if s.created_at else '' }}</span>
           </div>
         </div>
         {% endfor %}
