@@ -647,6 +647,11 @@ def create_app() -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+            "accelerometer=(), gyroscope=()"
+        )
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
 
         path = request.url.path
         # Workspace pages need iframes (preview, dbgate, portainer)
@@ -672,10 +677,10 @@ def create_app() -> FastAPI:
                 "connect-src 'self' wss: ws:; "
                 "frame-ancestors 'none'"
             )
-        if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+        # HSTS: also set on HTTP to pre-empt before HTTPS upgrade
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
         return response
 
     # ── Rate limiting (API endpoints, 120 req/min per IP) ───────────────
@@ -868,8 +873,8 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
-        if path.startswith("/api/analytics") or path.startswith("/api/health"):
-            return await call_next(request)
+        # NOTE: auth bypass removed — is_public_path() handles /api/health
+        # /api/analytics/* requires auth (contains cost/agent data)
 
         # Skip auth in test mode
         if os.environ.get("PLATFORM_ENV") == "test":

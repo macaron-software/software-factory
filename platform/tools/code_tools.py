@@ -12,6 +12,25 @@ from pathlib import Path
 from ..models import AgentInstance
 from .registry import BaseTool
 
+# Allowed base directories for code_write / code_edit operations.
+# Paths MUST resolve to one of these prefixes or they are rejected.
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent  # repo root
+_ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
+    _BASE_DIR / "data" / "workspaces",   # agent mission workspaces
+    _BASE_DIR / "workspaces",             # project workspaces (supabase-lite etc.)
+    _BASE_DIR / "tests",                  # test files
+    Path("/tmp"),                          # scratch
+)
+
+
+def _is_path_allowed(resolved_path: str) -> bool:
+    """Return True if resolved_path is under one of the allowed write roots."""
+    p = Path(resolved_path)
+    return any(
+        p == root or str(p).startswith(str(root) + os.sep)
+        for root in _ALLOWED_WRITE_ROOTS
+    )
+
 
 class CodeReadTool(BaseTool):
     name = "code_read"
@@ -63,6 +82,12 @@ class CodeWriteTool(BaseTool):
             return f"Error: content too short ({len(stripped)} chars) — write real code"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # Workspace restriction: reject writes outside allowed directories
+        if not _is_path_allowed(path):
+            import logging as _log_cw
+            _log_cw.getLogger(__name__).warning(
+                "code_write BLOCKED: agent=%s path=%s", getattr(agent, 'id', '?'), path)
+            return f"Error: path '{path}' is outside allowed workspace directories"
         try:
             p = Path(path)
             if p.exists():
@@ -87,6 +112,12 @@ class CodeEditTool(BaseTool):
             return "Error: path and old_str required"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # Workspace restriction
+        if not _is_path_allowed(path):
+            import logging as _log_ce
+            _log_ce.getLogger(__name__).warning(
+                "code_edit BLOCKED: agent=%s path=%s", getattr(agent, 'id', '?'), path)
+            return f"Error: path '{path}' is outside allowed workspace directories"
         try:
             content = Path(path).read_text()
             if old not in content:

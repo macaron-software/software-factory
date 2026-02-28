@@ -63,11 +63,39 @@ class WebFetchTool(BaseTool):
     description = "Fetch a URL and return its text content (HTML stripped)."
     category = "research"
 
+    # Private/internal IP ranges blocked to prevent SSRF
+    _BLOCKED_PREFIXES = (
+        "http://127.", "https://127.",
+        "http://0.", "https://0.",
+        "http://10.", "https://10.",
+        "http://172.16.", "http://172.17.", "http://172.18.", "http://172.19.",
+        "http://172.20.", "http://172.21.", "http://172.22.", "http://172.23.",
+        "http://172.24.", "http://172.25.", "http://172.26.", "http://172.27.",
+        "http://172.28.", "http://172.29.", "http://172.30.", "http://172.31.",
+        "https://172.1", "https://172.2", "https://172.3",
+        "http://192.168.", "https://192.168.",
+        "http://169.254.", "https://169.254.",   # Cloud IMDS (AWS/Azure/GCP)
+        "http://metadata.", "https://metadata.",
+        "http://localhost", "https://localhost",
+        "http://[", "https://[",  # IPv6 loopback
+    )
+
+    def _is_ssrf_blocked(self, url: str) -> bool:
+        """Return True if URL targets a private/internal address."""
+        url_lower = url.lower()
+        return any(url_lower.startswith(p) for p in self._BLOCKED_PREFIXES)
+
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         url = params.get("url", "")
         max_chars = params.get("max_chars", 8000)
         if not url:
             return "Error: url required"
+        # SSRF protection: block private/internal IPs
+        if self._is_ssrf_blocked(url):
+            logger.warning("SSRF blocked: agent=%s url=%s", getattr(agent, 'id', '?'), url)
+            return f"Error: URL blocked — private/internal addresses not allowed"
+        if not url.startswith(("http://", "https://")):
+            return "Error: URL must start with http:// or https://"
         try:
             import aiohttp
             async with aiohttp.ClientSession() as session:
