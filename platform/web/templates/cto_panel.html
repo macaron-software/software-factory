@@ -9,6 +9,11 @@
 .cto-new-btn{width:100%;display:flex;align-items:center;gap:.5rem;background:var(--accent,#6366f1);color:#fff;border:none;border-radius:7px;padding:.5rem .75rem;font-size:.78rem;font-weight:600;cursor:pointer;transition:opacity .15s}
 .cto-new-btn:hover{opacity:.85}
 .cto-new-btn svg{flex-shrink:0}
+.cto-search-wrap{padding:.45rem .65rem .3rem;position:relative}
+.cto-search-input{width:100%;box-sizing:border-box;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:.32rem .55rem .32rem 1.6rem;font-size:.72rem;color:var(--text);outline:none;transition:border-color .15s}
+.cto-search-input:focus{border-color:var(--accent,#6366f1)}
+.cto-search-input::placeholder{color:var(--text-muted)}
+.cto-search-icon{position:absolute;left:1rem;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;opacity:.65}
 .cto-sidebar-label{font-size:.62rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;padding:.6rem .75rem .3rem}
 .cto-conv-list{flex:1;overflow-y:auto;padding:.2rem .4rem .5rem}
 .cto-conv-item{display:flex;align-items:center;gap:.4rem;padding:.45rem .55rem;border-radius:6px;cursor:pointer;border:1px solid transparent;transition:background .12s;position:relative;group:true}
@@ -20,6 +25,7 @@
 .cto-conv-title{font-size:.75rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3}
 .cto-conv-item.active .cto-conv-title{color:var(--accent,#6366f1);font-weight:600}
 .cto-conv-date{font-size:.62rem;color:var(--text-muted);margin-top:1px}
+.cto-conv-snippet{font-size:.62rem;color:var(--text-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-style:italic}
 .cto-sidebar-footer{padding:.6rem .65rem;border-top:1px solid var(--border);display:flex;align-items:center;gap:.5rem}
 .cto-agent-mini-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border);flex-shrink:0}
 .cto-agent-mini-name{font-size:.72rem;font-weight:600;color:var(--text)}
@@ -62,6 +68,18 @@
 .cto-messages .chat-msg-text.md-rendered br{display:none}
 .cto-drop-overlay{display:none;position:absolute;inset:0;z-index:20;background:rgba(99,102,241,.08);border:2px dashed var(--accent,#6366f1);border-radius:10px;align-items:center;justify-content:center;flex-direction:column;gap:.5rem;font-size:.85rem;color:var(--accent,#6366f1);font-weight:600;pointer-events:none}
 .cto-drop-overlay.active{display:flex!important}
+/* guardrail confirmation modal */
+.cto-confirm-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);align-items:center;justify-content:center}
+.cto-confirm-overlay.active{display:flex}
+.cto-confirm-box{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:1.4rem 1.6rem;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.cto-confirm-title{font-size:.92rem;font-weight:700;color:var(--text);margin-bottom:.5rem}
+.cto-confirm-sub{font-size:.78rem;color:var(--text-muted);margin-bottom:1.1rem;line-height:1.5}
+.cto-confirm-preview{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:.55rem .7rem;font-size:.72rem;color:var(--text-muted);margin-bottom:1rem;max-height:80px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap;word-break:break-word}
+.cto-confirm-actions{display:flex;gap:.5rem;justify-content:flex-end}
+.cto-confirm-btn-cancel{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:7px;padding:.4rem 1rem;font-size:.78rem;cursor:pointer;color:var(--text-muted)}
+.cto-confirm-btn-ok{background:var(--accent,#6366f1);border:none;border-radius:7px;padding:.4rem 1rem;font-size:.78rem;cursor:pointer;color:#fff;font-weight:600}
+.cto-confirm-btn-cancel:hover{background:var(--bg-primary)}
+.cto-confirm-btn-ok:hover{opacity:.85}
 .cto-messages .chat-msg-text.md-rendered code{background:var(--bg-primary);padding:.1em .3em;border-radius:3px;font-size:.78em}
 .cto-messages .chat-msg-text.md-rendered pre{background:var(--bg-primary);border-radius:6px;padding:.7rem;overflow-x:auto;font-size:.76rem;margin:.35rem 0}
 .cto-messages .chat-msg-tools{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.35rem}
@@ -161,7 +179,12 @@
       </button>
     </div>
 
-    <div class="cto-sidebar-label">Historique</div>
+    <div class="cto-search-wrap">
+      <svg class="cto-search-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="cto-search-input" id="cto-search-input" type="text" placeholder="Rechercher…" autocomplete="off" oninput="ctoSearchConvs(this.value)">
+    </div>
+
+    <div class="cto-sidebar-label" id="cto-hist-label">Historique</div>
 
     <div class="cto-conv-list" id="cto-conv-list">
       {% for item in sidebar_items %}
@@ -199,7 +222,8 @@
       </div>
     </div>
 
-    <div class="cto-chips">
+    <div class="cto-chips" id="cto-chips">
+      {# Static chips always visible #}
       <button class="cto-chip" data-prompt="Donne-moi les métriques du portfolio : missions, projets, agents, coûts LLM" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stats portfolio</button>
       <button class="cto-chip" data-prompt="Liste les missions en cours et leur état" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Missions en cours</button>
       <button class="cto-chip" data-prompt="Monte-moi une équipe optimale pour un projet de sécurité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Monter une équipe</button>
@@ -211,6 +235,7 @@
       <button class="cto-chip cto-chip-project" data-prompt="Lance les tests E2E Playwright sur le projet actif, prends des screenshots des pages principales et génère un rapport de qualité" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>E2E + Screenshots</button>
       <button class="cto-chip cto-chip-debt" data-prompt="Synchronise le Jira du projet actif : crée les tickets pour les missions en cours et mets à jour le statut des stories existantes" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Sync Jira</button>
       <button class="cto-chip cto-chip-project" data-prompt="Mets à jour le wiki GitHub du projet actif avec un résumé de l&#x27;architecture, les décisions techniques récentes et le statut des missions en cours" onclick="ctoChipClick(this)"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>Mise à jour Wiki</button>
+      {# Dynamic contextual chips injected by JS on load #}
     </div>
 
     <div class="cto-messages" id="cto-msgs" style="position:relative">
@@ -255,6 +280,19 @@
           Envoyer
         </button>
       </div>
+    </div>
+  </div>
+</div>
+
+{# Guardrail confirmation modal #}
+<div class="cto-confirm-overlay" id="cto-confirm-overlay" onclick="if(event.target===this)_ctoConfirmCancel()">
+  <div class="cto-confirm-box">
+    <div class="cto-confirm-title">⚠️ Action à fort impact</div>
+    <div class="cto-confirm-sub" id="cto-confirm-sub">Cette action va créer ou modifier des données de façon permanente. Confirmer ?</div>
+    <div class="cto-confirm-preview" id="cto-confirm-preview"></div>
+    <div class="cto-confirm-actions">
+      <button class="cto-confirm-btn-cancel" onclick="_ctoConfirmCancel()">Annuler</button>
+      <button class="cto-confirm-btn-ok" onclick="_ctoConfirmOk()">Confirmer</button>
     </div>
   </div>
 </div>
@@ -462,15 +500,49 @@
     inp.value = '';
     inp.style.height = 'auto';
     ctoClearAttach();
-    _ctoDispatch(fullMsg, msg || ('📎 ' + (_attachment ? _attachment.name : '')));
+    _ctoGuardrailCheck(fullMsg, msg || ('📎 ' + (_attachment ? _attachment.name : '')));
   }
 
-  function ctoSendChip(text){ _ctoDispatch(text, text); }
+  /* ── Guardrail: confirm high-impact actions ── */
+  var _pendingDispatch = null;
+  var _HIGH_IMPACT = /\b(crée?\s+(le\s+)?projet|cr[eé]ation\s+de\s+projet|déploie?|deploy|git\s+commit\s+sur\s+main|supprime?|delete|drop\s+table|lance\s+la\s+mission|crée?\s+(une?\s+)?mission)\b/i;
+
+  function _ctoGuardrailCheck(msg, displayMsg){
+    if(_HIGH_IMPACT.test(msg)){
+      _pendingDispatch = {msg: msg, displayMsg: displayMsg};
+      var sub = document.getElementById('cto-confirm-sub');
+      var preview = document.getElementById('cto-confirm-preview');
+      var action = msg.match(_HIGH_IMPACT);
+      if(sub) sub.textContent = 'Jarvis va exécuter une action à fort impact : "' + (action ? action[0] : 'action critique') + '". Impossible d\'annuler après exécution.';
+      if(preview) preview.textContent = msg.slice(0, 200) + (msg.length > 200 ? '…' : '');
+      var overlay = document.getElementById('cto-confirm-overlay');
+      if(overlay) overlay.classList.add('active');
+    } else {
+      _ctoDispatch(msg, displayMsg);
+    }
+  }
+
+  function _ctoConfirmOk(){
+    var overlay = document.getElementById('cto-confirm-overlay');
+    if(overlay) overlay.classList.remove('active');
+    if(_pendingDispatch){
+      _ctoDispatch(_pendingDispatch.msg, _pendingDispatch.displayMsg);
+      _pendingDispatch = null;
+    }
+  }
+
+  function _ctoConfirmCancel(){
+    var overlay = document.getElementById('cto-confirm-overlay');
+    if(overlay) overlay.classList.remove('active');
+    _pendingDispatch = null;
+  }
+
+  function ctoSendChip(text){ _ctoGuardrailCheck(text, text); }
 
   function ctoChipClick(btn){
     var prompt = btn.getAttribute('data-prompt') || btn.textContent.trim();
     var label = btn.textContent.trim();
-    _ctoDispatch(prompt, label);
+    _ctoGuardrailCheck(prompt, label);
   }
 
   function _ctoDispatch(msg, displayMsg){
@@ -651,6 +723,9 @@
 
   /* ── New conversation ── */
   function ctoNewConversation(){
+    // Clear search on new conversation
+    var si = document.getElementById('cto-search-input');
+    if(si){ si.value = ''; ctoSearchConvs(''); }
     fetch('/api/cto/sessions/new', {method:'POST'})
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -674,6 +749,74 @@
       // Focus input
       document.getElementById('cto-input').focus();
     });
+  }
+
+  /* ── Search conversations ── */
+  var _searchTimer = null;
+  var _allConvItems = null; // cache of original sidebar items HTML
+
+  function ctoSearchConvs(q){
+    q = (q || '').trim();
+    var label = document.getElementById('cto-hist-label');
+    if(!q){
+      // Restore original list
+      if(_allConvItems !== null){
+        var list = document.getElementById('cto-conv-list');
+        list.innerHTML = _allConvItems;
+        _allConvItems = null;
+      }
+      if(label) label.textContent = 'Historique';
+      return;
+    }
+    // Save original items once
+    if(_allConvItems === null){
+      _allConvItems = document.getElementById('cto-conv-list').innerHTML;
+    }
+    if(label) label.textContent = 'Résultats';
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(function(){
+      var qLow = q.toLowerCase();
+      // Fast client-side filter first (titles only)
+      var list = document.getElementById('cto-conv-list');
+      var tmp = document.createElement('div');
+      tmp.innerHTML = _allConvItems;
+      var items = tmp.querySelectorAll('.cto-conv-item');
+      var anyVisible = false;
+      items.forEach(function(el){
+        var title = (el.querySelector('.cto-conv-title') || {}).textContent || '';
+        if(title.toLowerCase().includes(qLow)){
+          el.style.display = '';
+          anyVisible = true;
+        } else {
+          el.style.display = 'none';
+        }
+      });
+      list.innerHTML = tmp.innerHTML;
+      // Then do server-side content search (async)
+      fetch('/api/cto/search?q=' + encodeURIComponent(q))
+      .then(function(r){ return r.json(); })
+      .then(function(results){
+        if(!results.length && !anyVisible){
+          list.innerHTML = '<div style="padding:.6rem .75rem;font-size:.72rem;color:var(--text-muted)">Aucun résultat</div>';
+          return;
+        }
+        // Rebuild list with search results (content matches)
+        var html = '';
+        var seen = new Set();
+        results.forEach(function(item){
+          seen.add(item.id);
+          var snippet = item.snippet ? '<div class="cto-conv-snippet">' + item.snippet.replace(/</g,'&lt;') + '</div>' : '';
+          html += '<div class="cto-conv-item" id="conv-' + item.id + '" onclick="ctoLoadConv(\'' + item.id + '\',this)" title="' + item.title.replace(/"/g,'&quot;') + '">'
+            + '<svg class="cto-conv-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>'
+            + '<div class="cto-conv-text"><div class="cto-conv-title">' + item.title.replace(/</g,'&lt;') + '</div>'
+            + '<div class="cto-conv-date">' + item.ts + '</div>'
+            + snippet
+            + '</div></div>';
+        });
+        list.innerHTML = html || '<div style="padding:.6rem .75rem;font-size:.72rem;color:var(--text-muted)">Aucun résultat</div>';
+      })
+      .catch(function(){});
+    }, 280);
   }
 
   /* ── Load existing conversation ── */
@@ -724,12 +867,29 @@
   window.ctoInputKeydown = ctoInputKeydown;
   window.ctoRetryEdit = ctoRetryEdit;
   window.ctoRetryResend = ctoRetryResend;
+  window.ctoSearchConvs = ctoSearchConvs;
+  window._ctoConfirmOk = _ctoConfirmOk;
+  window._ctoConfirmCancel = _ctoConfirmCancel;
 
   // Scroll to bottom on load
   var msgs = document.getElementById('cto-msgs');
   if(msgs) msgs.scrollTop = msgs.scrollHeight;
   // Focus input
   setTimeout(function(){ var inp=document.getElementById('cto-input'); if(inp) inp.focus(); }, 100);
+  // Load dynamic contextual chips
+  fetch('/api/cto/chips').then(function(r){ return r.json(); }).then(function(chips){
+    if(!chips || !chips.length) return;
+    var container = document.getElementById('cto-chips');
+    if(!container) return;
+    chips.forEach(function(c){
+      var btn = document.createElement('button');
+      btn.className = 'cto-chip' + (c.cls ? ' ' + c.cls : '');
+      btn.setAttribute('data-prompt', c.prompt);
+      btn.setAttribute('onclick', 'ctoChipClick(this)');
+      btn.textContent = c.label;
+      container.appendChild(btn);
+    });
+  }).catch(function(){});
 })();
 </script>
 

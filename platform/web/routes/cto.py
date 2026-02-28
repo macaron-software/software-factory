@@ -325,6 +325,114 @@ async def cto_mention_list(type: str = "all"):
     return JSONResponse(items)
 
 
+@router.get("/api/cto/search", response_class=JSONResponse)
+async def cto_search(q: str = ""):
+    """Search CTO conversations by title and message content. Returns matching sessions."""
+    if not q or len(q.strip()) < 2:
+        return JSONResponse([])
+    from ...sessions.store import get_session_store
+
+    store = get_session_store()
+    q_lower = q.strip().lower()
+    results = []
+    try:
+        sessions = _list_cto_sessions(limit=200)
+        for s in sessions:
+            title = _session_title(s).lower()
+            score = 0
+            snippet = ""
+            if q_lower in title:
+                score += 10
+            # Search message content
+            try:
+                msgs = store.get_messages(s.id, limit=100)
+                for msg in msgs:
+                    content = (msg.content or "").lower()
+                    if q_lower in content:
+                        score += 5
+                        # Extract a snippet around the match
+                        idx = content.find(q_lower)
+                        start = max(0, idx - 40)
+                        end = min(len(msg.content), idx + len(q_lower) + 60)
+                        raw = msg.content[start:end].replace("\n", " ").strip()
+                        if start > 0:
+                            raw = "…" + raw
+                        if end < len(msg.content):
+                            raw += "…"
+                        snippet = raw
+                        break
+            except Exception:
+                pass
+            if score > 0:
+                results.append(
+                    {
+                        "id": s.id,
+                        "title": _session_title(s),
+                        "ts": str(s.created_at or "")[:10],
+                        "snippet": snippet,
+                        "score": score,
+                    }
+                )
+    except Exception as e:
+        logger.warning("cto_search failed: %s", e)
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return JSONResponse(results[:20])
+
+
+@router.get("/api/cto/chips", response_class=JSONResponse)
+async def cto_chips():
+    """Return dynamic contextual chips based on active missions and platform state."""
+    from ...missions.store import get_mission_store
+    from ...projects.manager import get_project_store
+
+    chips = []
+    try:
+        ms = get_mission_store()
+        ps = get_project_store()
+        # Active missions → chips to dive in
+        running = ms.list_missions(status="running", limit=5)
+        for m in running:
+            project = None
+            try:
+                project = ps.get(m.project_id) if m.project_id else None
+            except Exception:
+                pass
+            chips.append(
+                {
+                    "label": f"⚡ {m.name[:28]}",
+                    "prompt": f"Donne-moi le statut détaillé de la mission « {m.name} »{' du projet ' + project.name if project else ''} : avancement, blocages, prochaine étape.",
+                    "cls": "cto-chip-project",
+                    "type": "mission",
+                }
+            )
+        # Recent failed missions → investigate
+        failed = ms.list_missions(status="failed", limit=3)
+        for m in failed:
+            chips.append(
+                {
+                    "label": f"🔴 {m.name[:28]}",
+                    "prompt": f"La mission « {m.name} » a échoué. Analyse les causes et propose un plan de reprise.",
+                    "cls": "cto-chip-debt",
+                    "type": "alert",
+                }
+            )
+        # Projects without workspace → suggest setup
+        all_projects = ps.list_all(limit=5)
+        no_ws = [p for p in all_projects if not (p.workspace_path or p.git_url)][:2]
+        for p in no_ws:
+            chips.append(
+                {
+                    "label": f"🔧 Setup {p.name[:20]}",
+                    "prompt": f"Configure le workspace, le git local et le docker pour le projet @{p.name}.",
+                    "cls": "cto-chip-project",
+                    "type": "setup",
+                }
+            )
+    except Exception as e:
+        logger.warning("cto_chips failed: %s", e)
+    return JSONResponse(chips[:6])
+
+
 def _find_agent_mentions(content: str):
     """Return list of (mention_text, agent) for #AgentName mentions."""
     import re
@@ -501,37 +609,54 @@ def _resolve_mentions(content: str) -> tuple[str, str]:
         all_projects = ps.list_all()
         blocks = []
         for mention in mentions:
-            m_key = (
-                mention.lower()
-                .replace("-", " ")
-                .replace("_", " ")
-                .replace("—", " ")
-                .replace("–", " ")
-                .strip()
-            )
-            # Score each project: exact=3, starts_with/prefix=2, contains=1; +1 if SF type
-            best, best_score = None, 0
-            for p in all_projects:
-                pname = (
-                    p.name.lower()
+
+            def _norm(s: str) -> str:
+                """Normalize project name for fuzzy matching."""
+                import unicodedata
+
+                s = unicodedata.normalize("NFD", s)
+                s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+                return (
+                    s.lower()
                     .replace("-", " ")
                     .replace("_", " ")
                     .replace("—", " ")
                     .replace("–", " ")
                     .strip()
                 )
-                score = 0
-                if pname == m_key:
-                    score = 3
-                elif pname.startswith(m_key) or m_key.startswith(pname):
-                    score = 2
-                elif m_key in pname or pname.split()[0] == m_key.split()[0]:
-                    score = 1
+
+            from difflib import SequenceMatcher
+
+            m_norm = _norm(mention)
+            # Score each project: exact=10, startswith=7, fuzzy similarity≥0.6→score*5
+            # Also check first word match and words-in-common
+            best, best_score = None, 0.0
+            for p in all_projects:
+                p_norm = _norm(p.name)
+                # Exact match
+                if p_norm == m_norm:
+                    score = 10.0
+                # Mention is fully contained in project name or vice versa
+                elif m_norm in p_norm or p_norm.startswith(m_norm):
+                    score = 7.0
+                else:
+                    # Fuzzy ratio on full name
+                    ratio = SequenceMatcher(None, m_norm, p_norm).ratio()
+                    # Also try first word of project vs mention (handles "Maison Léa" → "maison lea")
+                    first_words = " ".join(p_norm.split()[:2])
+                    ratio2 = SequenceMatcher(None, m_norm, first_words).ratio()
+                    score = max(ratio, ratio2) * 5.0
+                    # Bonus: significant word overlap
+                    m_words = set(m_norm.split())
+                    p_words = set(p_norm.split())
+                    overlap = len(m_words & p_words) / max(len(m_words), 1)
+                    score += overlap * 3.0
                 if score > 0 and (p.factory_type or "STANDALONE") != "STANDALONE":
-                    score += 1
+                    score += 0.5
                 if score > best_score:
                     best, best_score = p, score
-            match = best
+            # Require minimum confidence to avoid false positives
+            match = best if best_score >= 2.5 else None
             if not match:
                 continue
             missions = ms.list_missions(project_id=match.id, limit=5)
