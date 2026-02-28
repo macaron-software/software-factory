@@ -858,6 +858,21 @@ def _get_live_activity(since_ts: str | None = None) -> dict:
             "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
         ).fetchall()
 
+        # RTK proxy stats
+        rtk_row = conn.execute(
+            "SELECT cmds_total, cmds_proxied, bytes_saved_est FROM rtk_stats WHERE id=1",
+        ).fetchone()
+        rtk = (
+            dict(rtk_row)
+            if rtk_row
+            else {"cmds_total": 0, "cmds_proxied": 0, "bytes_saved_est": 0}
+        )
+        rtk["proxied_pct"] = (
+            round(100 * rtk["cmds_proxied"] / rtk["cmds_total"], 1)
+            if rtk["cmds_total"]
+            else 0
+        )
+
         conn.close()
         return {
             "tool_calls": [dict(r) for r in tool_calls],
@@ -865,6 +880,7 @@ def _get_live_activity(since_ts: str | None = None) -> dict:
             "commits": [dict(r) for r in commits],
             "active_agents": [r["agent_id"] for r in active],
             "llm_cost_last_hour": round(cost, 4),
+            "rtk": rtk,
         }
     except Exception as e:
         return {"error": str(e), "tool_calls": [], "messages": [], "active_agents": []}

@@ -104,6 +104,26 @@ def _rtk_wrap(command: str) -> str:
     return command
 
 
+def _track_rtk_stats(proxied: bool, output_bytes: int) -> None:
+    """Persist RTK proxy counters to platform.db (best-effort, non-blocking)."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        db.execute(
+            """UPDATE rtk_stats SET
+                cmds_total = cmds_total + 1,
+                cmds_proxied = cmds_proxied + ?,
+                bytes_saved_est = bytes_saved_est + ?,
+                updated_at = datetime('now')
+               WHERE id = 1""",
+            (1 if proxied else 0, output_bytes // 2 if proxied else 0),
+        )
+        db.commit()
+    except Exception:
+        pass  # never block agent execution for stats
+
+
 # Image selection by detected language/tool
 _IMAGE_MAP = {
     "python": "python:3.12-slim",
@@ -295,6 +315,7 @@ class SandboxExecutor:
         # Apply RTK proxy — rewrites known commands (git, grep, pytest, etc.)
         # to compress stdout before it reaches the LLM agent context
         proxied = _rtk_wrap(command)
+        was_proxied = proxied != command
 
         try:
             r = subprocess.run(
@@ -307,12 +328,13 @@ class SandboxExecutor:
                 env=run_env,
                 preexec_fn=lambda: os.nice(10),  # low CPU priority
             )
+            _track_rtk_stats(was_proxied, len(r.stdout.encode()))
             return SandboxResult(
                 stdout=r.stdout[-5000:],
                 stderr=r.stderr[-3000:],
                 returncode=r.returncode,
                 sandboxed=False,
-                rtk_proxied=(proxied != command),
+                rtk_proxied=was_proxied,
             )
         except subprocess.TimeoutExpired:
             return SandboxResult(
