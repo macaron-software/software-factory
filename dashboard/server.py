@@ -322,6 +322,24 @@ def get_all_projects() -> List[Dict]:
         # Get domains from config
         domains = list(config.get("domains", {}).keys())
 
+        # Load arch_domain badge
+        arch_domain_id = project_config.get("domain", "")
+        arch_domain_label = ""
+        arch_domain_color = "#6B7280"
+        if arch_domain_id:
+            try:
+                import sys, os
+                _sf_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if _sf_root not in sys.path:
+                    sys.path.insert(0, _sf_root)
+                from platform.projects.domains import load_domain
+                d = load_domain(arch_domain_id)
+                if d:
+                    arch_domain_label = d.name
+                    arch_domain_color = d.color
+            except Exception:
+                arch_domain_label = arch_domain_id
+
         projects.append(
             {
                 "id": project_id,
@@ -333,6 +351,9 @@ def get_all_projects() -> List[Dict]:
                 "domains": domains,
                 "running": daemon_status.get("cycle", {}).get("running", False),
                 "workers": get_worker_count(project_id),
+                "arch_domain": arch_domain_id,
+                "arch_domain_label": arch_domain_label,
+                "arch_domain_color": arch_domain_color,
             }
         )
 

@@ -240,6 +240,8 @@ RULES:
 
     if ctx.capability_grade == "organizer":
         # Organizers: full project context (constitution, vision, memory files)
+        if ctx.domain_context:
+            parts.append(f"\n{ctx.domain_context}")
         if ctx.vision:
             parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
         if ctx.project_context:
@@ -249,8 +251,9 @@ RULES:
                 f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
             )
     else:
-        # Executors: task-scoped context only — no vision, condensed memory
-        # Avoids injecting the full project constitution into every dev/qa call
+        # Executors: task-scoped context only
+        if ctx.domain_context:
+            parts.append(f"\n{ctx.domain_context}")
         if ctx.project_context:
             parts.append(
                 f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"

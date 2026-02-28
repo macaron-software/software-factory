@@ -263,6 +263,20 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         except Exception as exc:
             logger.debug("Failed to load project memory files: %s", exc)
 
+    # Load domain context (projects/domains/<arch_domain>.yaml)
+    domain_context_str = ""
+    try:
+        from ..projects.manager import get_project_store
+        from ..projects.domains import load_domain
+        proj = get_project_store().get(session.project_id or "")
+        if proj and proj.arch_domain:
+            domain = load_domain(proj.arch_domain)
+            if domain:
+                domain_context_str = domain.to_context_string()
+                logger.info("[Domain] Injecting domain '%s' into agent %s", proj.arch_domain, agent.id)
+    except Exception as exc:
+        logger.debug("Failed to load domain context: %s", exc)
+
     # Apply role-based tool restrictions
     from ..agents.tool_schemas import _classify_agent_role, ROLE_TOOL_MAP
     _role_cat = _classify_agent_role(agent)
@@ -276,6 +290,7 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         history=history_dicts,
         project_context=project_context,
         project_memory=project_memory_str,
+        domain_context=domain_context_str,
         skills_prompt=skills_prompt,
         vision=vision,
         allowed_tools=_allowed_tools,

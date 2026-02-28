@@ -112,11 +112,19 @@
                         {{ project.display_name }}
                     </a>
                 </div>
-                {% if project.running %}
-                <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
-                    {{ project.workers }} worker{% if project.workers != 1 %}s{% endif %}
-                </span>
-                {% endif %}
+                <div class="flex items-center space-x-1">
+                    {% if project.arch_domain_label %}
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+                          style="background-color: {{ project.arch_domain_color }};">
+                        {{ project.arch_domain_label }}
+                    </span>
+                    {% endif %}
+                    {% if project.running %}
+                    <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                        {{ project.workers }} worker{% if project.workers != 1 %}s{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
 
             <!-- Stats -->

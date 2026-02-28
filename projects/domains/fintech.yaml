@@ -1,0 +1,34 @@
+# Domaine Fintech — OVH Demo
+name: "Fintech"
+env: demo
+color: "#10B981"
+
+description: >
+  Applications financières et de paiement (démo OVH).
+  Stack orientée performance, sécurité des transactions, conformité PCI-DSS.
+
+stack:
+  backend: "Node.js 20 + TypeScript + NestJS (ou Fastify)"
+  frontend: "React 18 + TypeScript + Tailwind CSS"
+  database: "PostgreSQL 16"
+  database_forbidden: ["SQLite", "MongoDB"]
+  cache: "Redis 7"
+  infra: "Docker + docker-compose / Railway / Fly.io"
+  ci: "GitHub Actions"
+  auth: "JWT + OAuth2 (Keycloak ou Auth0)"
+  extra:
+    - "Paiements : Stripe API"
+    - "Queues : BullMQ (Redis)"
+    - "OpenAPI 3.1 obligatoire"
+    - "Tests : Jest + Supertest, couverture ≥ 80%"
+
+compliance:
+  - "RGPD"
+  - "PCI-DSS (si paiements en prod)"
+  - "OWASP Top 10"
+
+conventions: |
+  - Transactions DB explicites pour toutes les opérations financières
+  - Logs structurés (pino) — jamais de données sensibles en clair
+  - Rate limiting sur tous les endpoints publics
+  - Idempotency keys sur les endpoints de paiement

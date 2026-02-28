@@ -6,7 +6,7 @@ project:
   name: bscc-api
   display_name: "BSCC API Backend"
   root_path: /app/workspace/bscc-api
-  vision_doc: CLAUDE.md
+  vision_doc: SPECS.md
   domain: bscc
   description: >
     API REST backend des services BSCC.

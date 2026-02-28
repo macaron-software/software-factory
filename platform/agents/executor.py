@@ -59,6 +59,8 @@ class ExecutionContext:
     project_context: str = ""
     # Project memory files (CLAUDE.md, copilot-instructions.md, etc.)
     project_memory: str = ""
+    # Domain context (injected from projects/domains/<id>.yaml)
+    domain_context: str = ""
     # Skills content (injected into system prompt)
     skills_prompt: str = ""
     # Vision document (if project has one)

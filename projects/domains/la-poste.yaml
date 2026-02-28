@@ -1,0 +1,60 @@
+# Domaine La Poste — référentiel technique groupe
+# =================================================
+# Standards DSI La Poste applicables à tous les projets du groupe.
+# Specs Solaris : MCP mcp-solaris
+# Specs archi/infra : Confluence La Poste (espace IAN)
+
+name: "La Poste"
+env: prod
+color: "#FFD700"   # jaune La Poste
+
+description: >
+  Socle technique commun La Poste Groupe.
+  Tous les projets La Poste doivent respecter ces choix technologiques
+  validés par la DSI. Le Design System Solaris est obligatoire pour toutes
+  les interfaces utilisateur.
+
+stack:
+  backend: "Java 17 + Spring Boot 3.x (ou Quarkus pour les microservices)"
+  frontend: "Angular 17+ (TypeScript strict)"
+  database: "PostgreSQL 15+ (RDS Aurora en prod)"
+  database_forbidden:
+    - SQLite
+    - MongoDB
+    - MySQL
+  cache: "Redis 7"
+  infra: "Docker + Helm + Azure AKS (francecentral)"
+  ci: "GitLab CI/CD (gitlab.azure.innovation-laposte.io)"
+  auth: "SAML2 / SSO La Poste (Keycloak)"
+  extra:
+    - "API : OpenAPI 3.1 obligatoire"
+    - "Logs : ELK Stack (Elasticsearch + Logstash + Kibana)"
+    - "Monitoring : Prometheus + Grafana"
+    - "Tests : JUnit 5 + Testcontainers, couverture ≥ 80%"
+
+design_system: >
+  Solaris Design System (La Poste) — obligatoire pour toutes les IHM.
+  Utiliser le MCP mcp-solaris pour accéder aux specs Figma, tokens de design,
+  patterns WCAG, et variantes de composants.
+  Aucun composant custom sans validation DS.
+
+compliance:
+  - "RGPD (traitement données personnelles)"
+  - "RGAA 4.1 (accessibilité numérique — niveau AA minimum)"
+  - "ANSSI NP SN (sécurité numérique)"
+  - "DNUM standards La Poste"
+  - "OWASP Top 10"
+
+mcp_tools:
+  - mcp-solaris
+
+confluence_space: "IAN"
+
+conventions: |
+  - Nommage : camelCase Java, kebab-case HTML/CSS, PascalCase composants Angular
+  - Branches Git : feature/*, fix/*, release/* (GitLab Flow)
+  - Merge Requests obligatoires — pas de push direct sur main
+  - Review de code obligatoire (≥ 1 approbateur)
+  - Pas de secrets dans le code — utiliser Azure Key Vault
+  - Internationalisation : fr-FR par défaut, support i18n prévu
+  - Logs structurés JSON (pas de System.out.println)

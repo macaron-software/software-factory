@@ -6,7 +6,7 @@ project:
   name: bscc-portail
   display_name: "BSCC Portail Services Citoyens"
   root_path: /app/workspace/bscc-portail
-  vision_doc: CLAUDE.md
+  vision_doc: SPECS.md
   domain: bscc                          # ← agents load domain:bscc guidelines
   description: >
     Portail web de services aux citoyens BSCC.

@@ -6,7 +6,8 @@ project:
   name: solaris
   display_name: "Solaris Design System"
   root_path: /app/workspace/solaris
-  vision_doc: CLAUDE.md
+  vision_doc: SPECS.md
+  domain: solaris
   description: >
     Design System officiel La Poste (Solaris). 41 composants Figma,
     WCAG 2.1 AA, tokens de design, validation automatique.
