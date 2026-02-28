@@ -912,6 +912,55 @@ async def cto_message(request: Request):
                             f"</div>"
                             f"</div>"
                         )
+                    elif tc_name == "create_domain":
+                        did = tc_res.get("domain_id", "")
+                        dname = html_mod.escape(tc_res.get("name", ""))
+                        missions = tc_res.get("missions", [])
+                        sub_projects = tc_res.get("sub_projects", [])
+                        missions_html = "".join(
+                            f'<a class="cto-mission-chip" href="/missions/{html_mod.escape(m.get("mission_id", ""))}" target="_blank">'
+                            f"🔧 {html_mod.escape(m.get('name', ''))}</a>"
+                            for m in missions
+                            if not m.get("error")
+                        )
+                        sub_html = ""
+                        if sub_projects:
+                            sub_html = (
+                                '<div class="cto-creation-sub">'
+                                + ", ".join(
+                                    html_mod.escape(s.get("name", ""))
+                                    for s in sub_projects
+                                )
+                                + "</div>"
+                            )
+                        creation_cards_html += (
+                            f'<div class="cto-creation-card cto-creation-project">'
+                            f'<span class="cto-creation-icon">🏛️</span>'
+                            f'<div class="cto-creation-info">'
+                            f'<div class="cto-creation-title">Domaine {dname}</div>'
+                            f"{sub_html}"
+                            f"{f'<div class=cto-creation-missions>{missions_html}</div>' if missions_html else ''}"
+                            f"</div>"
+                            f'<a class="cto-creation-link" href="/projects/{html_mod.escape(did)}" target="_blank">Ouvrir →</a>'
+                            f"</div>"
+                        )
+                    elif tc_name == "platform_tma":
+                        summary = tc_res.get("summary", {})
+                        n_inc = summary.get("open_incidents", 0)
+                        n_tkt = summary.get("open_tickets", 0)
+                        n_tma = summary.get("tma_missions", 0)
+                        status_icon = "🔴" if (n_inc + n_tkt) > 0 else "✅"
+                        creation_cards_html += (
+                            f'<div class="cto-creation-card">'
+                            f'<span class="cto-creation-icon">{status_icon}</span>'
+                            f'<div class="cto-creation-info">'
+                            f'<div class="cto-creation-title">TMA / Incidents</div>'
+                            f'<div class="cto-creation-sub">'
+                            f"{n_inc} incident(s) · {n_tkt} ticket(s) · {n_tma} mission(s) TMA"
+                            f"</div></div>"
+                            f'<a class="cto-creation-link" href="/tma" target="_blank">Voir TMA →</a>'
+                            f"</div>"
+                        )
 
             rendered = md_lib.markdown(
                 str(result.content),

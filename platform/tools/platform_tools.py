@@ -621,7 +621,8 @@ class LaunchIdeationTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        import uuid, asyncio
+        import uuid
+        import asyncio
         from ..sessions.store import get_session_store, SessionDef, MessageDef
         from ..patterns.engine import run_pattern
         from ..patterns.store import PatternDef
@@ -632,21 +633,26 @@ class LaunchIdeationTool(BaseTool):
 
         session_id = str(uuid.uuid4())[:8]
         store = get_session_store()
-        session = store.create(SessionDef(
-            id=session_id,
-            name=f"Idéation: {prompt[:60]}",
-            goal=prompt,
-            status="active",
-            config={"type": "ideation", "pattern": "network"},
-        ))
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="user",
-            message_type="user",
-            content=prompt,
-        ))
+        session = store.create(
+            SessionDef(
+                id=session_id,
+                name=f"Idéation: {prompt[:60]}",
+                goal=prompt,
+                status="active",
+                config={"type": "ideation", "pattern": "network"},
+            )
+        )
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="user",
+                message_type="user",
+                content=prompt,
+            )
+        )
 
         from ..web.routes.ideation import _IDEATION_AGENTS
+
         pattern = PatternDef(
             id="ideation-network",
             name="Ideation Network",
@@ -661,12 +667,14 @@ class LaunchIdeationTool(BaseTool):
                 logger.warning("launch_ideation background error: %s", _e)
 
         asyncio.ensure_future(_run())
-        return json.dumps({
-            "ok": True,
-            "session_id": session_id,
-            "url": f"/ideation?session_id={session_id}",
-            "message": f"Idéation lancée avec 5 agents. Résultats sur /ideation?session_id={session_id}",
-        })
+        return json.dumps(
+            {
+                "ok": True,
+                "session_id": session_id,
+                "url": f"/ideation?session_id={session_id}",
+                "message": f"Idéation lancée avec 5 agents. Résultats sur /ideation?session_id={session_id}",
+            }
+        )
 
 
 class LaunchMktIdeationTool(BaseTool):
@@ -679,7 +687,8 @@ class LaunchMktIdeationTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        import uuid, asyncio
+        import uuid
+        import asyncio
         from ..sessions.store import get_session_store, SessionDef, MessageDef
         from ..patterns.engine import run_pattern
         from ..patterns.store import PatternDef
@@ -690,21 +699,26 @@ class LaunchMktIdeationTool(BaseTool):
 
         session_id = str(uuid.uuid4())[:8]
         store = get_session_store()
-        session = store.create(SessionDef(
-            id=session_id,
-            name=f"Mkt Idéation: {prompt[:60]}",
-            goal=prompt,
-            status="active",
-            config={"type": "mkt_ideation", "pattern": "network"},
-        ))
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="user",
-            message_type="user",
-            content=prompt,
-        ))
+        session = store.create(
+            SessionDef(
+                id=session_id,
+                name=f"Mkt Idéation: {prompt[:60]}",
+                goal=prompt,
+                status="active",
+                config={"type": "mkt_ideation", "pattern": "network"},
+            )
+        )
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="user",
+                message_type="user",
+                content=prompt,
+            )
+        )
 
         from ..web.routes.mkt_ideation import _MKT_AGENTS
+
         pattern = PatternDef(
             id="mkt-ideation-network",
             name="Marketing Ideation Network",
@@ -719,12 +733,14 @@ class LaunchMktIdeationTool(BaseTool):
                 logger.warning("launch_mkt_ideation background error: %s", _e)
 
         asyncio.ensure_future(_run())
-        return json.dumps({
-            "ok": True,
-            "session_id": session_id,
-            "url": f"/mkt-ideation?session_id={session_id}",
-            "message": f"Idéation marketing lancée. Résultats sur /mkt-ideation?session_id={session_id}",
-        })
+        return json.dumps(
+            {
+                "ok": True,
+                "session_id": session_id,
+                "url": f"/mkt-ideation?session_id={session_id}",
+                "message": f"Idéation marketing lancée. Résultats sur /mkt-ideation?session_id={session_id}",
+            }
+        )
 
 
 class LaunchGroupIdeationTool(BaseTool):
@@ -738,7 +754,8 @@ class LaunchGroupIdeationTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        import uuid, asyncio
+        import uuid
+        import asyncio
         from ..sessions.store import get_session_store, SessionDef, MessageDef
         from ..patterns.engine import run_pattern
         from ..patterns.store import PatternDef
@@ -748,34 +765,42 @@ class LaunchGroupIdeationTool(BaseTool):
         prompt = (params.get("prompt") or params.get("question") or "").strip()
 
         if not group_id:
-            return json.dumps({
-                "error": "group_id is required",
-                "available_groups": list(GROUP_CONFIGS.keys()),
-            })
+            return json.dumps(
+                {
+                    "error": "group_id is required",
+                    "available_groups": list(GROUP_CONFIGS.keys()),
+                }
+            )
         if group_id not in GROUP_CONFIGS:
-            return json.dumps({
-                "error": f"Unknown group '{group_id}'",
-                "available_groups": list(GROUP_CONFIGS.keys()),
-            })
+            return json.dumps(
+                {
+                    "error": f"Unknown group '{group_id}'",
+                    "available_groups": list(GROUP_CONFIGS.keys()),
+                }
+            )
         if not prompt:
             return json.dumps({"error": "prompt is required"})
 
         group = GROUP_CONFIGS[group_id]
         session_id = str(uuid.uuid4())[:8]
         store = get_session_store()
-        session = store.create(SessionDef(
-            id=session_id,
-            name=f"{group['name']}: {prompt[:60]}",
-            goal=prompt,
-            status="active",
-            config={"type": f"group_{group_id}", "pattern": "network"},
-        ))
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="user",
-            message_type="user",
-            content=prompt,
-        ))
+        session = store.create(
+            SessionDef(
+                id=session_id,
+                name=f"{group['name']}: {prompt[:60]}",
+                goal=prompt,
+                status="active",
+                config={"type": f"group_{group_id}", "pattern": "network"},
+            )
+        )
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="user",
+                message_type="user",
+                content=prompt,
+            )
+        )
 
         pattern = PatternDef(
             id=f"group-{group_id}-network",
@@ -791,14 +816,223 @@ class LaunchGroupIdeationTool(BaseTool):
                 logger.warning("launch_group_ideation background error: %s", _e)
 
         asyncio.ensure_future(_run())
-        return json.dumps({
-            "ok": True,
-            "session_id": session_id,
-            "group": group_id,
-            "group_name": group["name"],
-            "url": f"/group/{group_id}?session_id={session_id}",
-            "message": f"Communauté '{group['name']}' lancée. Résultats sur /group/{group_id}?session_id={session_id}",
-        })
+        return json.dumps(
+            {
+                "ok": True,
+                "session_id": session_id,
+                "group": group_id,
+                "group_name": group["name"],
+                "url": f"/group/{group_id}?session_id={session_id}",
+                "message": f"Communauté '{group['name']}' lancée. Résultats sur /group/{group_id}?session_id={session_id}",
+            }
+        )
+
+
+class PlatformCreateDomainTool(BaseTool):
+    name = "create_domain"
+    description = (
+        "Create a new technical domain (a grouping project) with its own workspace, "
+        "standard missions (TMA/MCO, Security, Tech Debt), and optional sub-projects. "
+        "Params: name (required), description, vision, sub_projects (list of {name, description} dicts). "
+        "A domain is a top-level structural grouping — use it for 'Frontend', 'Backend', 'Data Platform', etc. "
+        "Returns domain_id, name, workspace, missions, and created sub-project ids."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import uuid
+        import datetime
+        from ..projects.manager import get_project_store, Project, scaffold_project
+
+        name = params.get("name", "").strip()
+        if not name:
+            return json.dumps({"error": "name is required"})
+
+        store = get_project_store()
+        domain = Project(
+            id=str(uuid.uuid4())[:8],
+            name=name,
+            path="",
+            description=params.get("description", f"Domain: {name}"),
+            vision=params.get("vision", params.get("description", "")),
+            factory_type="domain",
+            domains=[name.lower()],
+            created_at=datetime.datetime.utcnow().isoformat(),
+        )
+        domain = store.create(domain)
+
+        scaffold_result = {}
+        try:
+            scaffold_result = scaffold_project(domain)
+        except Exception as _e:
+            scaffold_result = {"error": str(_e)}
+
+        missions_created = []
+        try:
+            from ..missions.store import get_mission_store
+
+            m_store = get_mission_store()
+            missions_created = [
+                {
+                    "mission_id": m.id,
+                    "name": m.name,
+                    "workflow": m.workflow_id,
+                    "status": m.status,
+                }
+                for m in m_store.list_missions(project_id=domain.id, limit=20)
+            ]
+        except Exception:
+            pass
+
+        # Optionally create sub-projects
+        sub_projects_created = []
+        for sp in params.get("sub_projects", []):
+            sp_name = (sp.get("name") or "").strip()
+            if not sp_name:
+                continue
+            try:
+                sub = Project(
+                    id=str(uuid.uuid4())[:8],
+                    name=sp_name,
+                    path="",
+                    description=sp.get("description", ""),
+                    vision=sp.get("description", ""),
+                    factory_type="software",
+                    created_at=datetime.datetime.utcnow().isoformat(),
+                )
+                sub = store.create(sub)
+                sub_projects_created.append({"project_id": sub.id, "name": sub.name})
+            except Exception as _e:
+                sub_projects_created.append({"name": sp_name, "error": str(_e)})
+
+        return json.dumps(
+            {
+                "ok": True,
+                "domain_id": domain.id,
+                "name": domain.name,
+                "workspace": domain.path,
+                "scaffold": scaffold_result.get("actions", []),
+                "missions": missions_created,
+                "sub_projects": sub_projects_created,
+            }
+        )
+
+
+class PlatformTmaTool(BaseTool):
+    name = "platform_tma"
+    description = (
+        "Query TMA (Tierce Maintenance Applicative) status: open incidents, support tickets, "
+        "and TMA mission health across projects. "
+        "Params: project_id (optional, filter by project), severity (optional: P1/P2/P3/P4), "
+        "status (optional: open/resolved/in_progress, default=open), limit (default=20). "
+        "Returns incidents, tickets, and TMA mission summaries with counts."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        project_id = params.get("project_id")
+        severity = params.get("severity")
+        status_filter = params.get("status", "open")
+        limit = int(params.get("limit", 20))
+
+        # Query platform_incidents
+        inc_where = ["1=1"]
+        inc_args = []
+        if status_filter:
+            inc_where.append("status = ?")
+            inc_args.append(status_filter)
+        if severity:
+            inc_where.append("severity = ?")
+            inc_args.append(severity)
+        if project_id:
+            inc_where.append(
+                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+            )
+            inc_args.append(project_id)
+
+        try:
+            incidents = db.execute(
+                f"SELECT id, title, severity, status, source, error_type, error_detail, created_at "
+                f"FROM platform_incidents WHERE {' AND '.join(inc_where)} "
+                f"ORDER BY created_at DESC LIMIT ?",
+                inc_args + [limit],
+            ).fetchall()
+        except Exception:
+            incidents = []
+
+        # Query support_tickets
+        tkt_where = ["1=1"]
+        tkt_args = []
+        if status_filter:
+            tkt_where.append("status = ?")
+            tkt_args.append(status_filter)
+        if severity:
+            tkt_where.append("severity = ?")
+            tkt_args.append(severity)
+        if project_id:
+            tkt_where.append(
+                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+            )
+            tkt_args.append(project_id)
+
+        try:
+            tickets = db.execute(
+                f"SELECT id, title, severity, status, category, reporter, assignee, created_at "
+                f"FROM support_tickets WHERE {' AND '.join(tkt_where)} "
+                f"ORDER BY created_at DESC LIMIT ?",
+                tkt_args + [limit],
+            ).fetchall()
+        except Exception:
+            tickets = []
+
+        # TMA missions summary
+        tma_missions = []
+        try:
+            from ..missions.store import get_mission_store
+
+            m_store = get_mission_store()
+            all_missions = m_store.list_missions(limit=200)
+            for m in all_missions:
+                wf = getattr(m, "workflow_id", "") or ""
+                if "tma" not in wf.lower() and "tma" not in (m.name or "").lower():
+                    continue
+                if project_id and getattr(m, "project_id", None) != project_id:
+                    continue
+                s = (
+                    m.status
+                    if isinstance(m.status, str)
+                    else getattr(m.status, "value", str(m.status))
+                )
+                tma_missions.append(
+                    {
+                        "mission_id": m.id,
+                        "name": m.name,
+                        "project_id": getattr(m, "project_id", ""),
+                        "status": s,
+                        "workflow_id": wf,
+                    }
+                )
+        except Exception:
+            pass
+
+        def _row(r):
+            return dict(r) if hasattr(r, "keys") else dict(zip(r.keys(), r))
+
+        return json.dumps(
+            {
+                "incidents": [_row(r) for r in incidents],
+                "tickets": [_row(r) for r in tickets],
+                "tma_missions": tma_missions,
+                "summary": {
+                    "open_incidents": len(incidents),
+                    "open_tickets": len(tickets),
+                    "tma_missions": len(tma_missions),
+                },
+            }
+        )
 
 
 def register_platform_tools(registry):
@@ -812,7 +1046,9 @@ def register_platform_tools(registry):
     registry.register(PlatformCreateFeatureTool())
     registry.register(PlatformCreateStoryTool())
     registry.register(PlatformCreateProjectTool())
+    registry.register(PlatformCreateDomainTool())
     registry.register(PlatformCreateMissionTool())
+    registry.register(PlatformTmaTool())
     registry.register(LaunchIdeationTool())
     registry.register(LaunchMktIdeationTool())
     registry.register(LaunchGroupIdeationTool())
