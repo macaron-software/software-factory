@@ -80,6 +80,28 @@ def rtk_run(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess:
         except Exception:
             pass
 
+        # Persist to DB for historical stats
+        try:
+            tokens_orig = max(1, bytes_raw // 4)
+            tokens_comp = max(1, bytes_compressed // 4)
+            pct = (
+                round(100 * (1 - bytes_compressed / bytes_raw), 1)
+                if bytes_raw > 0
+                else 0
+            )
+            cmd_prefix = " ".join(str(c) for c in cmd[:2])
+            from ..db.migrations import get_db
+
+            conn = get_db()
+            conn.execute(
+                "INSERT INTO rtk_compression_stats (original_tokens, compressed_tokens, savings_pct, provider, cmd_prefix)"
+                " VALUES (%s, %s, %s, %s, %s)",
+                (tokens_orig, tokens_comp, pct, "sf-agent", cmd_prefix),
+            )
+            conn.commit()
+        except Exception:
+            pass
+
         return rtk
     except Exception:
         return raw

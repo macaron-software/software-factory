@@ -274,7 +274,7 @@ async def api_metrics_modules():
                 conn.execute(
                     "SELECT COUNT(*) as calls, COALESCE(AVG(savings_pct),0) as avg_pct, "
                     "COALESCE(SUM(original_tokens - compressed_tokens),0) as tokens_saved "
-                    "FROM rtk_compression_stats WHERE ts > datetime('now', '-24 hours')"
+                    "FROM rtk_compression_stats WHERE ts > NOW() - INTERVAL '24 hours'"
                 ).fetchone()
                 or rtk_24h_empty
             )
@@ -296,7 +296,7 @@ async def api_metrics_modules():
             rtk_daily = conn.execute(
                 "SELECT DATE(ts) as day, COUNT(*) as calls, "
                 "COALESCE(SUM(original_tokens - compressed_tokens),0) as tokens_saved "
-                "FROM rtk_compression_stats WHERE ts > datetime('now', '-7 days') "
+                "FROM rtk_compression_stats WHERE ts > NOW() - INTERVAL '7 days' "
                 "GROUP BY DATE(ts) ORDER BY day"
             ).fetchall()
         except Exception:
@@ -309,7 +309,7 @@ async def api_metrics_modules():
         modules_list = []
         if registry_path.exists():
             with open(registry_path) as f:
-                all_modules = yaml.safe_load(f) or []
+                all_modules = (yaml.safe_load(f) or {}).get("modules", [])
             enabled_ids = set()
             try:
                 rows = conn.execute(

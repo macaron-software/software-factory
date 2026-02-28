@@ -332,6 +332,19 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
     )
+    # RTK compression stats — tracks token savings from rtk-wrapped commands (added 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rtk_compression_stats (
+            id SERIAL PRIMARY KEY,
+            ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            original_tokens INTEGER NOT NULL DEFAULT 0,
+            compressed_tokens INTEGER NOT NULL DEFAULT 0,
+            savings_pct REAL NOT NULL DEFAULT 0,
+            provider TEXT DEFAULT 'git',
+            cmd_prefix TEXT DEFAULT ''
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
     _bump_schema_version(conn, _SCHEMA_VERSION)
     # memory_project / memory_global: access tracking columns (added 2026-03)
     for col, defn in [
