@@ -1464,6 +1464,20 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id)"
     )
+    # Group ideation sessions table (added 2026-06)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
+    )
     # MCP server registry (added 2026-02)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS mcps (

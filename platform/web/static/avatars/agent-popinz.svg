@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <radialGradient id="bgr" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#8b949e;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#8b949e;stop-opacity:0.08"/>
+    </radialGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="100" height="100" fill="#f8f9fa"/>
+  <rect width="100" height="100" fill="url(#bgr)"/>
+  
+  <!-- Shoulders / clothing -->
+  <path d="M16 98 Q22 72 50 66 Q78 72 84 98 Z" fill="#8b949e" opacity="0.85"/>
+  <path d="M22 98 Q28 76 50 70 Q72 76 78 98 Z" fill="#8b949e"/>
+  
+  <!-- Collar / shirt -->
+  <path d="M42 68 L50 78 L58 68 Q54 66 50 67 Q46 66 42 68 Z" fill="white" opacity="0.6"/>
+  
+  <!-- Neck -->
+  <path d="M43 57 Q43 67 50 69 Q57 67 57 57 Z" fill="#C68642"/>
+  
+  <!-- Head -->
+  <ellipse cx="50" cy="42" rx="19" ry="20" fill="#C68642"/>
+  
+  <!-- Hair -->
+  
+  <ellipse cx="50" cy="26" rx="20" ry="10" fill="#5C3317"/>
+  <path d="M30 32 Q29 36 31 38 Q33 35 34 38 Z" fill="#5C3317"/>
+  <path d="M70 32 Q71 36 69 38 Q67 35 66 38 Z" fill="#5C3317"/>
+  
+  <!-- Ears -->
+  <ellipse cx="31" cy="43" rx="3.2" ry="4.5" fill="#A0522D"/>
+  <ellipse cx="69" cy="43" rx="3.2" ry="4.5" fill="#A0522D"/>
+  
+  <!-- Jaw shadow -->
+  <ellipse cx="50" cy="58" rx="15" ry="4" fill="#8B5230" opacity="0.2"/>
+  
+  <!-- Eyes white -->
+  <ellipse cx="43" cy="42" rx="4.2" ry="3.2" fill="white"/>
+  <ellipse cx="57" cy="42" rx="4.2" ry="3.2" fill="white"/>
+  
+  <!-- Iris -->
+  <circle cx="43.3" cy="42.2" r="2.6" fill="#1A3A5C"/>
+  <circle cx="57.3" cy="42.2" r="2.6" fill="#1A3A5C"/>
+  
+  <!-- Pupil -->
+  <circle cx="43.3" cy="42.2" r="1.4" fill="#0A0A0A"/>
+  <circle cx="57.3" cy="42.2" r="1.4" fill="#0A0A0A"/>
+  
+  <!-- Eye shine -->
+  <circle cx="44.1" cy="41.5" r="0.8" fill="white"/>
+  <circle cx="58.1" cy="41.5" r="0.8" fill="white"/>
+  
+  <!-- Eyebrows - thicker for male -->
+  <path d="M38.5 38.5 Q43 37 47.5 38.5" stroke="#5C3317" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M52.5 38.5 Q57 37 61.5 38.5" stroke="#5C3317" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Nose - stronger for male -->
+  <path d="M48.5 47 Q46 51 47 54 Q49 55.5 50 55.5 Q51 55.5 53 54 Q54 51 51.5 47" stroke="#8B5230" stroke-width="1.2" fill="none" opacity="0.6"/>
+  <path d="M47 54 Q50 56 53 54" stroke="#8B5230" stroke-width="1" fill="none" opacity="0.4"/>
+  
+  <!-- Mouth -->
+  <path d="M44 58 Q50 62 56 58" stroke="#8B5230" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  <path d="M42 58 Q50 64 58 58 Q56 62 50 64 Q44 62 42 58 Z" fill="#5C3317" opacity="0.35"/>
+  
+  <!-- Badge -->
+  <circle cx="80" cy="80" r="13" fill="#8b949e"/>
+  <text x="80" y="85" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" font-weight="700" fill="white">HP</text>
+</svg>
