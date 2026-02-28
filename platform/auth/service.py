@@ -37,23 +37,23 @@ def _ensure_jwt_secret() -> str:
     if JWT_SECRET:
         return JWT_SECRET
     # Generate and persist in DB for consistency across restarts
-    db = get_db()
-    row = db.execute(
-        "SELECT value FROM session_state WHERE key='jwt_secret'"
-    ).fetchone()
-    if row:
-        JWT_SECRET = row[0] if isinstance(row, tuple) else row["value"]
-        return JWT_SECRET
-    # First time — generate
-    db.execute(
-        "CREATE TABLE IF NOT EXISTS session_state (key TEXT PRIMARY KEY, value TEXT)"
-    )
-    secret = uuid.uuid4().hex + uuid.uuid4().hex
-    db.execute(
-        "INSERT OR REPLACE INTO session_state (key, value) VALUES ('jwt_secret', ?)",
-        (secret,),
-    )
-    db.commit()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT value FROM session_state WHERE key='jwt_secret'"
+        ).fetchone()
+        if row:
+            JWT_SECRET = row[0] if isinstance(row, tuple) else row["value"]
+            return JWT_SECRET
+        # First time — generate
+        db.execute(
+            "CREATE TABLE IF NOT EXISTS session_state (key TEXT PRIMARY KEY, value TEXT)"
+        )
+        secret = uuid.uuid4().hex + uuid.uuid4().hex
+        db.execute(
+            "INSERT OR REPLACE INTO session_state (key, value) VALUES ('jwt_secret', ?)",
+            (secret,),
+        )
+        db.commit()
     JWT_SECRET = secret
     return JWT_SECRET
 
@@ -143,9 +143,9 @@ def _row_to_user(row) -> User:
 
 def user_count() -> int:
     """Return total number of users (for setup wizard check)."""
-    db = get_db()
     try:
-        row = db.execute("SELECT COUNT(*) FROM users").fetchone()
+        with get_db() as db:
+            row = db.execute("SELECT COUNT(*) FROM users").fetchone()
         return row[0] if isinstance(row, tuple) else row[0]
     except Exception:
         return 0
@@ -164,21 +164,20 @@ def register(
     if len(password) < 8:
         raise AuthError("Password must be at least 8 characters", "weak_password")
 
-    db = get_db()
-    existing = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
-    if existing:
-        raise AuthError("Email already registered", "email_taken")
-
     user_id = uuid.uuid4().hex[:12]
     password_hash = _hash_password(password)
     now = datetime.now(timezone.utc).isoformat()
 
-    db.execute(
-        "INSERT INTO users (id, email, password_hash, display_name, role, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, email, password_hash, display_name.strip(), role, now),
-    )
-    db.commit()
+    with get_db() as db:
+        existing = db.execute("SELECT id FROM users WHERE email=?", (email,)).fetchone()
+        if existing:
+            raise AuthError("Email already registered", "email_taken")
+        db.execute(
+            "INSERT INTO users (id, email, password_hash, display_name, role, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, email, password_hash, display_name.strip(), role, now),
+        )
+        db.commit()
 
     return User(
         id=user_id,
@@ -199,58 +198,58 @@ def oauth_login_or_create(
 ) -> dict:
     """Login or create user from OAuth provider. Returns tokens dict."""
     email = email.strip().lower()
-    db = get_db()
-    row = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
+    with get_db() as db:
+        row = db.execute("SELECT * FROM users WHERE email=?", (email,)).fetchone()
 
-    if row:
-        user = _row_to_user(row)
-        # Update provider info if needed
-        if user.auth_provider != auth_provider:
+        if row:
+            user = _row_to_user(row)
+            # Update provider info if needed
+            if user.auth_provider != auth_provider:
+                db.execute(
+                    "UPDATE users SET auth_provider=? WHERE id=?",
+                    (auth_provider, user.id),
+                )
+                db.commit()
+        else:
+            # Create new user from OAuth
+            user_id = uuid.uuid4().hex[:12]
+            now = datetime.now(timezone.utc).isoformat()
+            # First user = admin, rest = developer
+            count = db.execute("SELECT COUNT(*) FROM users").fetchone()
+            role = (
+                "admin"
+                if (count[0] if isinstance(count, tuple) else count["COUNT(*)"]) == 0
+                else "developer"
+            )
             db.execute(
-                "UPDATE users SET auth_provider=? WHERE id=?",
-                (auth_provider, user.id),
+                "INSERT INTO users (id, email, password_hash, display_name, role, avatar, auth_provider, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    user_id,
+                    email,
+                    "",
+                    display_name.strip(),
+                    role,
+                    avatar,
+                    auth_provider,
+                    now,
+                ),
             )
             db.commit()
-    else:
-        # Create new user from OAuth
-        user_id = uuid.uuid4().hex[:12]
-        now = datetime.now(timezone.utc).isoformat()
-        # First user = admin, rest = developer
-        count = db.execute("SELECT COUNT(*) FROM users").fetchone()
-        role = (
-            "admin"
-            if (count[0] if isinstance(count, tuple) else count["COUNT(*)"]) == 0
-            else "developer"
-        )
-        db.execute(
-            "INSERT INTO users (id, email, password_hash, display_name, role, avatar, auth_provider, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (
-                user_id,
-                email,
-                "",
-                display_name.strip(),
-                role,
-                avatar,
-                auth_provider,
-                now,
-            ),
-        )
-        db.commit()
-        user = User(
-            id=user_id,
-            email=email,
-            display_name=display_name.strip(),
-            role=role,
-            avatar=avatar,
-            auth_provider=auth_provider,
-            created_at=now,
-        )
+            user = User(
+                id=user_id,
+                email=email,
+                display_name=display_name.strip(),
+                role=role,
+                avatar=avatar,
+                auth_provider=auth_provider,
+                created_at=now,
+            )
 
-    # Generate tokens
-    now_ts = datetime.now(timezone.utc).isoformat()
-    db.execute("UPDATE users SET last_login=? WHERE id=?", (now_ts, user.id))
-    db.commit()
+        # Update last login
+        now_ts = datetime.now(timezone.utc).isoformat()
+        db.execute("UPDATE users SET last_login=? WHERE id=?", (now_ts, user.id))
+        db.commit()
     access = _create_access_token(user)
     refresh = _create_refresh_token(user, ip=ip, ua=ua)
     return {
@@ -268,24 +267,24 @@ def oauth_login_or_create(
 
 def get_user_by_id(user_id: str) -> Optional[User]:
     """Get user by ID."""
-    db = get_db()
-    row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
+    with get_db() as db:
+        row = db.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
     return _row_to_user(row) if row else None
 
 
 def get_user_by_email(email: str) -> Optional[User]:
     """Get user by email."""
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM users WHERE email=?", (email.strip().lower(),)
-    ).fetchone()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM users WHERE email=?", (email.strip().lower(),)
+        ).fetchone()
     return _row_to_user(row) if row else None
 
 
 def list_users() -> list[User]:
     """List all users."""
-    db = get_db()
-    rows = db.execute("SELECT * FROM users ORDER BY created_at").fetchall()
+    with get_db() as db:
+        rows = db.execute("SELECT * FROM users ORDER BY created_at").fetchall()
     return [_row_to_user(r) for r in rows]
 
 
@@ -296,21 +295,21 @@ def update_user(user_id: str, **kwargs) -> Optional[User]:
     if not updates:
         return get_user_by_id(user_id)
 
-    db = get_db()
     sets = ", ".join(f"{k}=?" for k in updates)
     vals = list(updates.values()) + [user_id]
-    db.execute(f"UPDATE users SET {sets} WHERE id=?", vals)
-    db.commit()
+    with get_db() as db:
+        db.execute(f"UPDATE users SET {sets} WHERE id=?", vals)
+        db.commit()
     return get_user_by_id(user_id)
 
 
 def delete_user(user_id: str) -> bool:
     """Delete user and related data."""
-    db = get_db()
-    db.execute("DELETE FROM user_sessions WHERE user_id=?", (user_id,))
-    db.execute("DELETE FROM user_project_roles WHERE user_id=?", (user_id,))
-    db.execute("DELETE FROM users WHERE id=?", (user_id,))
-    db.commit()
+    with get_db() as db:
+        db.execute("DELETE FROM user_sessions WHERE user_id=?", (user_id,))
+        db.execute("DELETE FROM user_project_roles WHERE user_id=?", (user_id,))
+        db.execute("DELETE FROM users WHERE id=?", (user_id,))
+        db.commit()
     return True
 
 
@@ -321,22 +320,22 @@ def delete_user(user_id: str) -> bool:
 
 def set_project_role(user_id: str, project_id: str, role: str, granted_by: str = ""):
     """Set user role for a specific project."""
-    db = get_db()
-    db.execute(
-        "INSERT OR REPLACE INTO user_project_roles (user_id, project_id, role, granted_by) "
-        "VALUES (?, ?, ?, ?)",
-        (user_id, project_id, role, granted_by),
-    )
-    db.commit()
+    with get_db() as db:
+        db.execute(
+            "INSERT OR REPLACE INTO user_project_roles (user_id, project_id, role, granted_by) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, project_id, role, granted_by),
+        )
+        db.commit()
 
 
 def get_project_role(user_id: str, project_id: str) -> str:
     """Get user role for a project. Falls back to global role."""
-    db = get_db()
-    row = db.execute(
-        "SELECT role FROM user_project_roles WHERE user_id=? AND project_id=?",
-        (user_id, project_id),
-    ).fetchone()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT role FROM user_project_roles WHERE user_id=? AND project_id=?",
+            (user_id, project_id),
+        ).fetchone()
     if row:
         return row[0] if isinstance(row, tuple) else row["role"]
     # Fallback: global role
@@ -346,11 +345,11 @@ def get_project_role(user_id: str, project_id: str) -> str:
 
 def get_user_projects(user_id: str) -> list[dict]:
     """Get all project roles for a user."""
-    db = get_db()
-    rows = db.execute(
-        "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
-        (user_id,),
-    ).fetchall()
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
+            (user_id,),
+        ).fetchall()
     return [
         {
             "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
@@ -362,12 +361,12 @@ def get_user_projects(user_id: str) -> list[dict]:
 
 def remove_project_role(user_id: str, project_id: str):
     """Remove user role for a project (falls back to global role)."""
-    db = get_db()
-    db.execute(
-        "DELETE FROM user_project_roles WHERE user_id=? AND project_id=?",
-        (user_id, project_id),
-    )
-    db.commit()
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM user_project_roles WHERE user_id=? AND project_id=?",
+            (user_id, project_id),
+        )
+        db.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -411,22 +410,22 @@ def _create_refresh_token(user: User, ip: str = "", ua: str = "") -> str:
     token = pyjwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
     token_hash = hashlib.sha256(token.encode()).hexdigest()
 
-    db = get_db()
-    db.execute(
-        "INSERT INTO user_sessions (id, user_id, refresh_token_hash, user_agent, ip_address, expires_at) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (session_id, user.id, token_hash, ua[:200], ip[:45], expires.isoformat()),
-    )
-    db.commit()
+    with get_db() as db:
+        db.execute(
+            "INSERT INTO user_sessions (id, user_id, refresh_token_hash, user_agent, ip_address, expires_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (session_id, user.id, token_hash, ua[:200], ip[:45], expires.isoformat()),
+        )
+        db.commit()
     return token
 
 
 def login(email: str, password: str, ip: str = "", ua: str = "") -> dict:
     """Authenticate user, return access + refresh tokens."""
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM users WHERE email=? AND is_active=1", (email.strip().lower(),)
-    ).fetchone()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM users WHERE email=? AND is_active=1", (email.strip().lower(),)
+        ).fetchone()
     if not row:
         raise AuthError("Invalid credentials", "invalid_credentials")
 
@@ -438,8 +437,9 @@ def login(email: str, password: str, ip: str = "", ua: str = "") -> dict:
 
     # Update last_login
     now = datetime.now(timezone.utc).isoformat()
-    db.execute("UPDATE users SET last_login=? WHERE id=?", (now, user.id))
-    db.commit()
+    with get_db() as db:
+        db.execute("UPDATE users SET last_login=? WHERE id=?", (now, user.id))
+        db.commit()
 
     access = _create_access_token(user)
     refresh = _create_refresh_token(user, ip=ip, ua=ua)
@@ -488,11 +488,11 @@ def refresh_tokens(refresh_token: str, ip: str = "", ua: str = "") -> dict:
     session_id = payload.get("sid")
     token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
 
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM user_sessions WHERE id=? AND refresh_token_hash=?",
-        (session_id, token_hash),
-    ).fetchone()
+    with get_db() as db:
+        row = db.execute(
+            "SELECT * FROM user_sessions WHERE id=? AND refresh_token_hash=?",
+            (session_id, token_hash),
+        ).fetchone()
     if not row:
         raise AuthError("Session not found or token already rotated", "invalid_session")
 
@@ -501,8 +501,9 @@ def refresh_tokens(refresh_token: str, ip: str = "", ua: str = "") -> dict:
         raise AuthError("User not found or inactive", "user_inactive")
 
     # Rotate: delete old session, create new
-    db.execute("DELETE FROM user_sessions WHERE id=?", (session_id,))
-    db.commit()
+    with get_db() as db:
+        db.execute("DELETE FROM user_sessions WHERE id=?", (session_id,))
+        db.commit()
 
     access = _create_access_token(user)
     refresh = _create_refresh_token(user, ip=ip, ua=ua)
@@ -522,23 +523,23 @@ def refresh_tokens(refresh_token: str, ip: str = "", ua: str = "") -> dict:
 
 def logout(user_id: str, session_id: str = ""):
     """Logout: invalidate refresh token session(s)."""
-    db = get_db()
-    if session_id:
-        db.execute(
-            "DELETE FROM user_sessions WHERE id=? AND user_id=?",
-            (session_id, user_id),
-        )
-    else:
-        # Logout all sessions
-        db.execute("DELETE FROM user_sessions WHERE user_id=?", (user_id,))
-    db.commit()
+    with get_db() as db:
+        if session_id:
+            db.execute(
+                "DELETE FROM user_sessions WHERE id=? AND user_id=?",
+                (session_id, user_id),
+            )
+        else:
+            # Logout all sessions
+            db.execute("DELETE FROM user_sessions WHERE user_id=?", (user_id,))
+        db.commit()
 
 
 def cleanup_expired_sessions():
     """Remove expired refresh token sessions."""
-    db = get_db()
-    db.execute(
-        "DELETE FROM user_sessions WHERE expires_at < ?",
-        (datetime.now(timezone.utc).isoformat(),),
-    )
-    db.commit()
+    with get_db() as db:
+        db.execute(
+            "DELETE FROM user_sessions WHERE expires_at < ?",
+            (datetime.now(timezone.utc).isoformat(),),
+        )
+        db.commit()
