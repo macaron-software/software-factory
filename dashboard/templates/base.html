@@ -133,5 +133,22 @@
     </script>
 
     {% block scripts %}{% endblock %}
+
+    <!-- Umami Analytics -->
+    <script async src="https://analytics.macaron-software.com/script.js"
+      data-website-id="dcfa04c0-1c8f-4500-83ea-fcadbd427f3a"></script>
+    <script>
+    window.sfTrack = function(name, props) {
+      if (typeof umami !== 'undefined' && umami.track) umami.track(name, props || {});
+    };
+    document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener('click', function(e) {
+        var tab = e.target.closest('[data-tab]');
+        if (tab) sfTrack('tab_click', { tab: tab.dataset.tab, page: 'dashboard' });
+        var nav = e.target.closest('nav a, .nav a, [href]');
+        if (nav && nav.tagName === 'A') sfTrack('nav_click', { label: nav.textContent.trim().slice(0, 40) });
+      });
+    });
+    </script>
 </body>
 </html>

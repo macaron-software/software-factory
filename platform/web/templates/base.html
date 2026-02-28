@@ -555,5 +555,88 @@ window.sfRequestPush = async function() {
   return true;
 };
 </script>
+
+<!-- Umami Analytics -->
+<script async src="https://analytics.macaron-software.com/script.js"
+  data-website-id="fddc91d3-a7fe-4544-85df-46b16597e143"></script>
+
+<script>
+/* ── SF Analytics helper ──────────────────────────────────────────
+   Wraps umami.track() — safe to call even before Umami loads.
+   Usage: sfTrack('event_name', { prop: value })
+──────────────────────────────────────────────────────────────────*/
+window.sfTrack = function(name, props) {
+  if (typeof umami !== 'undefined' && umami.track) {
+    umami.track(name, props || {});
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+
+  /* ── 1. Sidebar navigation ────────────────────────────────────*/
+  document.querySelectorAll('.nav-links a[data-tooltip], .nav-links a[href]').forEach(function(a) {
+    a.addEventListener('click', function() {
+      sfTrack('nav_click', { label: a.dataset.tooltip || a.getAttribute('href') });
+    });
+  });
+
+  /* ── 2. Tab clicks (event delegation on document) ─────────────
+     Catches: .session-tab[data-tab], .metrics-tab[data-tab],
+              .ws-activity-btn[data-view], .ws-tab[data-btab],
+              [data-tab] (mission-control, ceremonies, backlog…)  */
+  document.addEventListener('click', function(e) {
+    var el = e.target.closest('[data-tab],[data-btab],[data-view]');
+    if (!el) return;
+    var isTab = el.classList.contains('session-tab') ||
+                el.classList.contains('metrics-tab') ||
+                el.classList.contains('ws-activity-btn') ||
+                el.classList.contains('ws-tab') ||
+                el.hasAttribute('data-tab');
+    if (!isTab) return;
+    var label = el.dataset.tab || el.dataset.btab || el.dataset.view || el.textContent.trim().slice(0, 40);
+    sfTrack('tab_click', { tab: label, page: document.title.split('—')[0].trim() });
+  });
+
+  /* ── 3. Chat sends ────────────────────────────────────────────*/
+
+  /* 3a. Session live: #btnSend */
+  var btnSend = document.getElementById('btnSend');
+  if (btnSend) {
+    btnSend.addEventListener('click', function() {
+      sfTrack('chat_send', { context: 'session' });
+    });
+  }
+
+  /* 3b. CTO Panel: #cto-send-btn */
+  var ctoBtn = document.getElementById('cto-send-btn');
+  if (ctoBtn) {
+    ctoBtn.addEventListener('click', function() {
+      sfTrack('chat_send', { context: 'cto_panel' });
+    });
+  }
+
+  /* 3c. Workspace AI: patch wsAiSend after it's defined */
+  function _patchWsAiSend() {
+    if (typeof window.wsAiSend === 'function' && !window.wsAiSend._sfPatched) {
+      var _orig = window.wsAiSend;
+      window.wsAiSend = function() {
+        sfTrack('chat_send', { context: 'workspace_ai' });
+        return _orig.apply(this, arguments);
+      };
+      window.wsAiSend._sfPatched = true;
+    }
+  }
+  setTimeout(_patchWsAiSend, 500);
+
+  /* ── 4. Ideation / quick-start prompts ───────────────────────*/
+  document.addEventListener('click', function(e) {
+    var chip = e.target.closest('.cto-chip, .ideation-chip, [data-prompt]');
+    if (chip) {
+      sfTrack('prompt_chip', { label: (chip.textContent||'').trim().slice(0, 60) });
+    }
+  });
+
+});
+</script>
 </body>
 </html>
