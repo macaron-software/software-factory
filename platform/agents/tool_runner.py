@@ -1312,19 +1312,6 @@ RULES:
         summary_parts.append(f"\n**Summary:** {llm_resp.content[:500]}")
 
     return "\n".join(summary_parts)
-    """Push a mission control SSE event via the A2A bus SSE listeners."""
-    from ..a2a.bus import get_bus
-
-    data["session_id"] = session_id
-    bus = get_bus()
-    dead = []
-    for q in bus._sse_listeners:
-        try:
-            q.put_nowait(data)
-        except asyncio.QueueFull:
-            dead.append(q)
-    for q in dead:
-        bus._sse_listeners.remove(q)
 
 
 # ── MCP Tool Handlers ─────────────────────────────────────────
@@ -1824,6 +1811,21 @@ async def _execute_tool(
             return denied
     except Exception as e:
         logger.debug("Permission check skipped: %s", e)
+
+    # ── Guardrails: critical action interception ──
+    try:
+        from .guardrails import check_guardrails
+
+        blocked = check_guardrails(
+            tool_name=name,
+            args=args,
+            agent_id=getattr(ctx.agent, "id", "") if ctx.agent else "",
+            session_id=ctx.session_id or "",
+        )
+        if blocked:
+            return blocked
+    except Exception as e:
+        logger.debug("Guardrails check skipped: %s", e)
 
     # Handle built-in tools that don't go through registry
     if name == "list_files":
