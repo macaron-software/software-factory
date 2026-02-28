@@ -377,7 +377,9 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
             return (
                 "Error: no project context — cannot store memory without project scope"
             )
-        agent_role = getattr(ctx.agent, "role", "") or ""
+        # Use classified role (same as retrieval in prompt_builder) to ensure consistency
+        from .tool_schemas import _classify_agent_role
+        agent_role = _classify_agent_role(ctx.agent)
         mem.project_store(
             ctx.project_id, key, value, category=category, source=ctx.agent.id,
             agent_role=agent_role,

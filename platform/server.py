@@ -264,6 +264,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to start evolution scheduler: %s", e)
 
+    # Start memory compactor (nightly at 03:00 UTC)
+    try:
+        from .memory.compactor import memory_compactor_loop as _mem_compact
+
+        _asyncio.create_task(_mem_compact())
+        logger.info("Memory compactor scheduled (nightly 03:00 UTC)")
+    except Exception as e:
+        logger.warning("Failed to start memory compactor: %s", e)
+
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init
