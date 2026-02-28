@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .cto import router as cto_router
 from .agents import router as agents_router
+from .group_ideation import router as group_ideation_router
 from .marketplace import router as marketplace_router
 from .analytics import router as analytics_router
 from .api import router as api_router
@@ -32,6 +33,7 @@ router = APIRouter()
 router.include_router(cto_router)
 router.include_router(pages_router)
 router.include_router(marketplace_router)
+router.include_router(group_ideation_router)
 router.include_router(projects_router)
 router.include_router(missions_router)
 router.include_router(agents_router)
