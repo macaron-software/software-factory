@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/static/css/project_workspace.css?v=10">
 <style>
 html,body{height:100%;overflow:hidden}
-.layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
+.layout{display:grid!important;grid-template-columns:56px 1fr;grid-template-rows:100vh;height:100vh!important;overflow:hidden!important}
 .content{display:flex!important;flex-direction:column!important;height:100%!important;overflow:hidden!important;min-height:0!important}
 .main-area{padding:0!important;overflow:hidden!important;flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
 .ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;background:var(--bg)}
@@ -130,6 +130,7 @@ html,body{height:100%;overflow:hidden}
     <button class="ws-activity-btn" onclick="document.getElementById('importGitModal').style.display='flex'" title="Importer un dépôt GitHub">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
     </button>
+  </div><!-- end ws-activity-bar -->
 
   <!-- ── File Tree (only in code view via CSS) ────────────────── -->
   <div class="ws-filetree" id="wsFiletree">
@@ -434,9 +435,13 @@ html,body{height:100%;overflow:hidden}
 
       <!-- ── VIEW: Database ────────────────────────────────────── -->
       <div class="ws-view-panel" id="ws-view-db">
+        <!-- Left: DB file list + table list -->
         <div class="ws-db-left">
           <div class="ws-pane-tabs">
-            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Base de données</span>
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Tables</span>
+            <button class="ws-btn ws-btn-sm" style="margin-left:auto" onclick="wsLoadDatabase()" title="Rafraîchir">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            </button>
           </div>
           <div class="ws-pane-content">
             <div class="ws-filetree-body" id="wsDbFiles">
@@ -444,51 +449,54 @@ html,body{height:100%;overflow:hidden}
             </div>
           </div>
         </div>
+        <!-- Right: data grid + SQL editor -->
         <div class="ws-db-main">
-          <div class="ws-pane-tabs" id="wsDbMainTabs">
-            <button class="ws-tab" onclick="wsDbMainTab(this,'sql')">SQLite / SQL</button>
-            <button class="ws-tab active" onclick="wsDbMainTab(this,'dbgate')">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-              DbGate
+          <!-- Top bar: breadcrumb / filter / actions -->
+          <div class="ws-db-topbar">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+            <span id="wsDbBreadcrumb" style="font-size:.75rem;font-weight:600;color:var(--text-primary);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>
+            <span id="wsDbRowCount" style="font-size:.68rem;color:var(--text-muted);white-space:nowrap"></span>
+            <input id="wsDbFilterInput" placeholder="Filtrer…" oninput="wsDbFilterRows(this.value)"
+              style="background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);border-radius:4px;padding:.18rem .45rem;font-size:.72rem;width:130px;outline:none">
+            <button class="ws-btn ws-btn-sm" onclick="wsDbToggleSchema()" id="wsDbSchemaBtn" title="Schéma des colonnes">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="4" rx="1"/><rect x="3" y="10" width="18" height="4" rx="1"/><rect x="3" y="17" width="18" height="4" rx="1"/></svg>
             </button>
-            <span style="flex:1"></span>
-            <span style="font-size:.68rem;color:var(--text-secondary);padding:0 .5rem" id="wsDbStatus"></span>
+            <button class="ws-btn ws-btn-sm" onclick="wsDbExportCsv()" title="Exporter CSV">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            </button>
           </div>
-          <div class="ws-pane-content">
-            <div class="ws-tab-content" id="ws-db-sql">
-              <span style="font-size:.76rem;font-weight:600;color:var(--text-primary);padding:.3rem .5rem;display:block" id="wsDbTableLabel">SQL</span>
-              <div class="ws-db-editor">
-                <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
-                <div style="display:flex;gap:.4rem;margin-top:.4rem;align-items:center">
-                  <button class="ws-term-run" style="padding:.25rem .55rem;font-size:.72rem" onclick="wsDbRun()">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                    Run
-                  </button>
-                  <span style="font-size:.7rem;color:var(--text-secondary)">Ctrl+Enter</span>
-                </div>
-              </div>
-              <div class="ws-db-results" id="wsDbResults">
-                <div class="ws-empty-state">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                  <span>Sélectionnez une table ou écrivez une requête</span>
-                </div>
-              </div>
+          <!-- Schema panel (hidden by default) -->
+          <div id="wsDbSchemaPanel" style="display:none;overflow-x:auto;background:var(--bg-secondary);border-bottom:1px solid var(--border);padding:.4rem .6rem;flex-shrink:0;max-height:120px;overflow-y:auto">
+            <table class="ws-db-table" id="wsDbSchemaTable" style="font-size:.7rem"></table>
+          </div>
+          <!-- Data grid -->
+          <div class="ws-db-results" id="wsDbResults" style="flex:1;overflow:auto">
+            <div class="ws-empty-state">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:.3"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              <span>Sélectionnez une table</span>
             </div>
-            <div class="ws-tab-content active" id="ws-db-dbgate" style="flex-direction:column">
-              <div class="ws-dbgate-header">
-                <div style="flex:1">
-                  <strong style="font-size:.8rem">DbGate</strong>
-                  <span style="font-size:.72rem;color:var(--text-secondary);margin-left:.4rem">multi-DB (Postgres, MySQL, SQLite, MongoDB…)</span>
-                </div>
-                <a href="https://sf.macaron-software.com/dbgate/" target="_blank" class="ws-preview-btn" style="text-decoration:none">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  Ouvrir en plein écran
-                </a>
+          </div>
+          <!-- SQL editor bar (collapsible, anchored at bottom) -->
+          <div class="ws-db-sql-bar" id="wsDbSqlBar">
+            <div class="ws-db-sql-toggle" onclick="wsDbToggleSql()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              <span style="font-size:.72rem;font-weight:700;letter-spacing:.04em;color:var(--text-secondary)">SQL</span>
+              <span style="flex:1"></span>
+              <span id="wsDbStatus" style="font-size:.68rem;color:var(--text-muted)"></span>
+              <svg id="wsDbSqlChevron" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <div id="wsDbSqlPanel" style="display:none;padding:.5rem .6rem .6rem;border-top:1px solid var(--border)">
+              <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;&#10;-- Ctrl+Enter pour exécuter"></textarea>
+              <div style="display:flex;gap:.4rem;margin-top:.35rem;align-items:center">
+                <button class="ws-term-run" style="padding:.22rem .5rem;font-size:.71rem" onclick="wsDbRun()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  Exécuter
+                </button>
+                <span style="font-size:.68rem;color:var(--text-muted)">Ctrl+Enter</span>
+                <button class="ws-btn ws-btn-sm" style="margin-left:auto" onclick="wsDbFormatSql()" title="Formater SQL">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="7" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="7" y2="18"/></svg>
+                </button>
               </div>
-              <div class="ws-dbgate-connections" id="wsDbGateConnections">
-                <div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-secondary)">Scan des connexions…</div>
-              </div>
-              <iframe src="about:blank" id="wsDbGateFrame" style="flex:1;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
             </div>
           </div>
         </div>
@@ -768,7 +776,7 @@ function wsSetView(name) {
   if (name === 'docker') { wsLoadDocker(); wsLoadPortainerStats(); }
   if (name === 'agents') { wsLoadAgents(); wsLoadAgentsToolcalls(); }
   if (name === 'backlog') { wsLoadBacklog(); }
-  if (name === 'db') { wsLoadDatabase(); wsDbGateAutoLogin(); }
+  if (name === 'db') { wsLoadDatabase(); }
   if (name === 'secrets') { wsLoadSecrets(); }
   if (name === 'timeline') { wsLoadTimeline(); }
   if (name === 'search') { setTimeout(function(){ var q=document.getElementById('wsSearchQuery'); if(q)q.focus(); },50); }
@@ -824,14 +832,7 @@ function wsDockerTab(btn, name) {
   if (el) el.classList.add('active');
 }
 
-function wsDbMainTab(btn, name) {
-  document.querySelectorAll('#wsDbMainTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#ws-view-db .ws-db-main .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
-  btn.classList.add('active');
-  var el = document.getElementById('ws-db-' + name);
-  if (el) el.classList.add('active');
-  if (name === 'dbgate') wsLoadDbGateConnections();
-}
+function wsDbMainTab(btn, name) { /* kept for compat — no longer used */ }
 
 function wsGitMainTab(btn, name) {
   document.querySelectorAll('#wsGitMainTabs .ws-tab').forEach(function(b) { b.classList.remove('active'); });
@@ -1345,53 +1346,142 @@ function wsLoadDatabase() {
     .then(function(data) {
       _wsDbFiles = data.files || [];
       if (!_wsDbFiles.length) {
-        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;line-height:1.6">Aucune base SQLite détectée<br><span style="font-size:.68rem">Pour Postgres/MySQL/MongoDB,<br>utilisez l\'onglet <strong>DbGate</strong> →</span></div>';
+        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;line-height:1.6">Aucune base SQLite<br><span style="font-size:.68rem;opacity:.6">Placez un fichier .db ou .sqlite dans le projet</span></div>';
         return;
       }
       var html = '';
       _wsDbFiles.forEach(function(f) {
-        html += '<div class="ws-db-file-label" style="padding:.4rem .75rem .2rem;font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.05em">' + wsEsc(f.name) + '</div>';
+        html += '<div style="padding:.3rem .75rem .1rem;font-size:.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);letter-spacing:.06em;display:flex;align-items:center;gap:.3rem">' +
+          '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>' +
+          wsEsc(f.name) + '</div>';
         (f.tables || []).forEach(function(t) {
-          html += '<div class="ws-db-table-item" onclick="wsDbSelectTable(' + JSON.stringify(f.file) + ',' + JSON.stringify(t.name) + ')">' +
-            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>' +
-            wsEsc(t.name) + '<span style="margin-left:auto;font-size:.65rem;color:var(--text-secondary)">' + (t.row_count||0) + '</span></div>';
+          html += '<div class="ws-db-table-item" id="wsDbItem-'+wsEsc(f.file)+'-'+wsEsc(t.name)+'" onclick="wsDbSelectTable(' + JSON.stringify(f.file) + ',' + JSON.stringify(t.name) + ',' + JSON.stringify(f.name) + ',' + JSON.stringify(t.columns||[]) + ')">' +
+            '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="1"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>' +
+            wsEsc(t.name) + '<span style="margin-left:auto;font-size:.64rem;color:var(--text-muted)">' + (t.row_count||0) + '</span></div>';
         });
       });
       panel.innerHTML = html;
+      // Auto-select first table
       if (_wsDbFiles.length && _wsDbFiles[0].tables && _wsDbFiles[0].tables.length) {
-        _wsDbCurrentFile = _wsDbFiles[0].file;
+        var f0 = _wsDbFiles[0], t0 = f0.tables[0];
+        wsDbSelectTable(f0.file, t0.name, f0.name, t0.columns||[]);
       }
     }).catch(function(){ panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem">Erreur</div>'; });
 }
 
-function wsDbSelectTable(file, table) {
+var _wsDbCurrentColumns = [];
+var _wsDbLastRows = [];
+var _wsDbLastCols = [];
+
+function wsDbSelectTable(file, table, dbName, columns) {
   _wsDbCurrentFile = file;
-  document.getElementById('wsDbTableLabel').textContent = table;
-  document.getElementById('wsDbQuery').value = 'SELECT * FROM "' + table + '" LIMIT 100;';
+  _wsDbCurrentColumns = columns || [];
+  // Update active state
+  document.querySelectorAll('.ws-db-table-item').forEach(function(el){ el.classList.remove('active'); });
+  var item = document.getElementById('wsDbItem-'+file+'-'+table);
+  if (item) item.classList.add('active');
+  // Update breadcrumb
+  document.getElementById('wsDbBreadcrumb').textContent = (dbName||file) + ' › ' + table;
+  document.getElementById('wsDbFilterInput').value = '';
+  // Update schema panel if visible
+  wsDbRenderSchema(columns);
+  // Run SELECT
+  document.getElementById('wsDbQuery').value = 'SELECT * FROM "' + table + '" LIMIT 200;';
   wsDbRun();
+}
+
+function wsDbRenderSchema(columns) {
+  var el = document.getElementById('wsDbSchemaTable');
+  if (!el) return;
+  if (!columns || !columns.length) { el.innerHTML = '<tr><td style="padding:.3rem;color:var(--text-muted);font-size:.7rem">Pas de schéma disponible</td></tr>'; return; }
+  var html = '<thead><tr><th>Colonne</th><th>Type</th><th>Nullable</th><th>PK</th></tr></thead><tbody>';
+  columns.forEach(function(c) {
+    html += '<tr><td>' + wsEsc(c.name||c) + '</td><td style="color:#79c0ff">' + wsEsc(c.type||'') + '</td>' +
+      '<td>' + (c.notnull ? 'NOT NULL' : 'NULL') + '</td><td>' + (c.pk ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>' : '') + '</td></tr>';
+  });
+  el.innerHTML = html + '</tbody>';
+}
+
+function wsDbToggleSchema() {
+  var panel = document.getElementById('wsDbSchemaPanel');
+  var btn = document.getElementById('wsDbSchemaBtn');
+  var visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  btn.style.color = visible ? '' : 'var(--purple)';
+  if (!visible) wsDbRenderSchema(_wsDbCurrentColumns);
+}
+
+function wsDbToggleSql() {
+  var panel = document.getElementById('wsDbSqlPanel');
+  var chev = document.getElementById('wsDbSqlChevron');
+  var visible = panel.style.display !== 'none';
+  panel.style.display = visible ? 'none' : 'block';
+  if (chev) chev.style.transform = visible ? 'rotate(180deg)' : '';
+  if (!visible) document.getElementById('wsDbQuery').focus();
 }
 
 function wsDbRun() {
   var sql = document.getElementById('wsDbQuery').value.trim();
   if (!sql) return;
-  if (!_wsDbCurrentFile) { document.getElementById('wsDbStatus').textContent = 'Sélectionnez un fichier'; return; }
+  if (!_wsDbCurrentFile) { document.getElementById('wsDbStatus').textContent = 'Sélectionnez une table'; return; }
   document.getElementById('wsDbStatus').textContent = '…';
-  document.getElementById('wsDbResults').innerHTML = '<div class="ws-empty-state"><span>Exécution…</span></div>';
+  document.getElementById('wsDbResults').innerHTML = '<div class="ws-empty-state"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ws-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
   wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/db/query', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:_wsDbCurrentFile,sql:sql})})
     .then(function(r){ return r.json(); })
     .then(function(data) {
-      if (data.error) { document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem;font-family:monospace">'+wsEsc(data.error)+'</div>'; return; }
-      var cols=data.columns||[], rows=data.rows||[];
-      document.getElementById('wsDbStatus').textContent = rows.length + ' ligne(s)';
-      if (!cols.length) { document.getElementById('wsDbResults').innerHTML='<div class="ws-empty-state"><span>Aucun résultat</span></div>'; return; }
-      var html='<table class="ws-db-table"><thead><tr>'+cols.map(function(c){return '<th>'+wsEsc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
-      rows.forEach(function(row){ html+='<tr>'+row.map(function(v){return '<td title="'+wsEsc(String(v===null?'NULL':v))+'">'+wsEsc(String(v===null?'NULL':v))+'</td>';}).join('')+'</tr>'; });
-      html+='</tbody></table>';
-      document.getElementById('wsDbResults').innerHTML=html;
+      if (data.error) {
+        document.getElementById('wsDbStatus').textContent = 'Erreur';
+        document.getElementById('wsDbResults').innerHTML = '<div style="padding:.75rem;color:#f85149;font-size:.76rem;font-family:monospace;white-space:pre-wrap">'+wsEsc(data.error)+'</div>';
+        return;
+      }
+      var cols = data.columns||[], rows = data.rows||[];
+      _wsDbLastCols = cols; _wsDbLastRows = rows;
+      document.getElementById('wsDbRowCount').textContent = rows.length + ' lignes';
+      document.getElementById('wsDbStatus').textContent = rows.length + ' lignes · ' + cols.length + ' col';
+      wsDbRenderGrid(cols, rows);
     })
-    .catch(function(e){ document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem">'+wsEsc(String(e))+'</div>'; });
+    .catch(function(e){ document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.76rem">'+wsEsc(String(e))+'</div>'; });
 }
-document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if(e.ctrlKey&&e.key==='Enter') wsDbRun(); });
+
+function wsDbRenderGrid(cols, rows) {
+  if (!cols.length) { document.getElementById('wsDbResults').innerHTML='<div class="ws-empty-state"><span>Aucun résultat</span></div>'; return; }
+  var html = '<table class="ws-db-table"><thead><tr>' + cols.map(function(c){ return '<th>' + wsEsc(c) + '</th>'; }).join('') + '</tr></thead><tbody>';
+  rows.forEach(function(row){
+    html += '<tr>' + row.map(function(v){
+      if (v === null) return '<td class="ws-db-null">NULL</td>';
+      var s = String(v);
+      var isNum = !isNaN(v) && s !== '';
+      var cls = isNum ? ' class="ws-db-num"' : '';
+      return '<td' + cls + ' title="' + wsEsc(s) + '">' + wsEsc(s.length > 80 ? s.slice(0,80)+'…' : s) + '</td>';
+    }).join('') + '</tr>';
+  });
+  document.getElementById('wsDbResults').innerHTML = html + '</tbody></table>';
+}
+
+function wsDbFilterRows(q) {
+  if (!_wsDbLastCols.length) return;
+  if (!q) { wsDbRenderGrid(_wsDbLastCols, _wsDbLastRows); document.getElementById('wsDbRowCount').textContent = _wsDbLastRows.length + ' lignes'; return; }
+  var lq = q.toLowerCase();
+  var filtered = _wsDbLastRows.filter(function(row){ return row.some(function(v){ return v !== null && String(v).toLowerCase().includes(lq); }); });
+  document.getElementById('wsDbRowCount').textContent = filtered.length + '/' + _wsDbLastRows.length + ' lignes';
+  wsDbRenderGrid(_wsDbLastCols, filtered);
+}
+
+function wsDbExportCsv() {
+  if (!_wsDbLastCols.length) return;
+  var lines = [_wsDbLastCols.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(',')];
+  _wsDbLastRows.forEach(function(row){ lines.push(row.map(function(v){ var s=v===null?'':String(v); return '"'+s.replace(/"/g,'""')+'"'; }).join(',')); });
+  var blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = (_wsDbBreadcrumbTable||'export')+'.csv'; a.click();
+}
+
+function wsDbFormatSql() {
+  var ta = document.getElementById('wsDbQuery');
+  var sql = ta.value.replace(/\s+/g,' ').replace(/ ?(SELECT|FROM|WHERE|JOIN|LEFT|RIGHT|INNER|OUTER|ON|GROUP BY|ORDER BY|HAVING|LIMIT|OFFSET|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER) ?/gi, function(m){ return '\n'+m.trim()+' '; }).trim();
+  ta.value = sql;
+}
+var _wsDbBreadcrumbTable = '';
+document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if(e.ctrlKey&&e.key==='Enter'){ e.preventDefault(); wsDbRun(); } });
 
 // ── Portainer Stats ─────────────────────────────────────────────
 function wsLoadPortainerStats() {
@@ -1402,55 +1492,6 @@ function wsLoadPortainerStats() {
     .then(function(d) {
       el.innerHTML = '<span class="ws-badge ws-badge-ok">' + (d.running||0) + ' running</span> <span class="ws-badge">' + (d.total||0) + ' total</span>';
     }).catch(function(){ el.innerHTML = '<span class="ws-badge">—</span>'; });
-}
-
-var _wsDbGateToken = null;
-var _wsDbGateReady = false;
-
-function wsDbGateAutoLogin(callback) {
-  if (_wsDbGateReady) { if (callback) callback(); return; }
-  var frame = document.getElementById('wsDbGateFrame');
-  wsFetch('/api/dbgate/token')
-    .then(function(r){ return r.json(); })
-    .then(function(d) {
-      if (!d.token || !frame) {
-        if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
-        _wsDbGateReady = true;
-        if (callback) callback();
-        return;
-      }
-      _wsDbGateToken = d.token;
-      // Use URL-based token (avoids cross-origin localStorage restrictions)
-      var url = '/dbgate/?accessToken=' + encodeURIComponent(_wsDbGateToken);
-      frame.onload = function() { _wsDbGateReady = true; frame.onload = null; if (callback) callback(); };
-      frame.src = url;
-    }).catch(function(){
-      if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
-      if (callback) callback();
-    });
-}
-
-function wsLoadDbGateConnections() {
-  var el = document.getElementById('wsDbGateConnections');
-  if (!el) return;
-  el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Connexion à DbGate…</div>';
-  // Auto-login first
-  wsDbGateAutoLogin(function() {
-    // Then configure connections
-    wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/dbgate/configure', {method:'POST'})
-      .then(function(r){ return r.json(); })
-      .then(function(d) {
-        if (d.configured > 0) {
-          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">' +
-            '<span class="ws-badge ws-badge-ok">✓ ' + d.configured + ' connexion(s) auto-configurée(s)</span> ' +
-            '<button class="ws-secret-btn" onclick="var f=document.getElementById(\'wsDbGateFrame\');f.src=f.src" title="Recharger">↺ Recharger</button></div>';
-        } else {
-          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate ci-dessous</div>';
-        }
-      }).catch(function(){
-        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate</div>';
-      });
-  });
 }
 
 // ── Secrets / Vault ─────────────────────────────────────────────
