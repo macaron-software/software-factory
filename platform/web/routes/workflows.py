@@ -375,6 +375,7 @@ async def _run_workflow_background(
     """Background workflow execution."""
     from ...workflows.store import run_workflow
     from ...sessions.store import get_session_store, MessageDef
+    from .helpers import _active_mission_tasks
 
     try:
         result = await run_workflow(
@@ -454,6 +455,20 @@ async def _run_workflow_background(
             get_session_store().update_status(session_id, "failed")
         except Exception:
             pass
+    finally:
+        # Update linked mission_run status so it doesn't stay 'running' on restart
+        try:
+            from ...db.migrations import get_db as _gdb
+
+            _db = _gdb()
+            _db.execute(
+                "UPDATE mission_runs SET status=? WHERE session_id=? AND status='running'",
+                ("completed", session_id),
+            )
+            _db.commit()
+        except Exception:
+            pass
+        _active_mission_tasks.pop(session_id, None)
 
 
 # ── Workflow Resume ───────────────────────────────────────────────
