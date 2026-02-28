@@ -1612,6 +1612,13 @@ class MissionOrchestrator:
         except Exception as retro_err:
             logger.warning(f"Auto-retrospective failed: {retro_err}")
 
+        # Promote recurring project decisions to global memory
+        if mission.status == MissionStatus.COMPLETED:
+            try:
+                _promote_mission_to_global(mission)
+            except Exception as promo_err:
+                logger.warning(f"Global memory promotion failed: {promo_err}")
+
     def _build_edges(self, pattern_type: str, aids: list, leader: str) -> list:
         """Build edges for the pattern graph."""
         edges = []
@@ -1688,3 +1695,37 @@ class MissionOrchestrator:
                 edges.append({"from": w, "to": dispatcher, "type": "report"})
 
         return edges
+
+
+def _promote_mission_to_global(mission) -> None:
+    """Promote high-confidence project decisions to global memory after a successful mission.
+
+    Selects entries with category in (architecture, stack, convention, decision)
+    and confidence >= 0.7, then upserts them in memory_global so they benefit
+    future projects on the same platform.
+    """
+    from ..memory.manager import get_memory_manager
+
+    project_id = getattr(mission, "project_id", "") or mission.id
+    mem = get_memory_manager()
+    # Pull high-confidence facts from this project
+    entries = mem.project_get(project_id, limit=100)
+    promotable_categories = {"architecture", "stack", "convention", "decision", "pattern"}
+    promoted = 0
+    for entry in entries:
+        cat = (entry.get("category") or "").lower()
+        conf = float(entry.get("confidence") or 0)
+        if cat in promotable_categories and conf >= 0.7:
+            key = entry.get("key", "")
+            value = entry.get("value", "")
+            if key and value:
+                mem.global_store(
+                    key=key,
+                    value=value[:500],
+                    category=cat,
+                    project_id=project_id,
+                    confidence=conf,
+                )
+                promoted += 1
+    if promoted:
+        logger.info("Promoted %d entries to global memory from project %s", promoted, project_id)

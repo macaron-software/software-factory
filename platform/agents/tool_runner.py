@@ -326,6 +326,14 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
             # If FTS yields nothing, fallback to recent entries from project
             if not results:
                 results = mem.project_get(ctx.project_id, limit=8)
+            # Always include relevant global memory (cross-project learnings)
+            global_results = mem.global_search(query, limit=3) or []
+            for r in global_results:
+                results.append({
+                    "key": r.get("key", ""),
+                    "value": r.get("value", ""),
+                    "category": f"global:{r.get('category', '')}",
+                })
         else:
             results = mem.global_search(query, limit=5)
         # Also search session pattern memory (what other agents decided in THIS session)
@@ -369,10 +377,12 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
             return (
                 "Error: no project context — cannot store memory without project scope"
             )
+        agent_role = getattr(ctx.agent, "role", "") or ""
         mem.project_store(
-            ctx.project_id, key, value, category=category, source=ctx.agent.id
+            ctx.project_id, key, value, category=category, source=ctx.agent.id,
+            agent_role=agent_role,
         )
-        return f"Stored in project memory: [{key}] (by {ctx.agent.id})"
+        return f"Stored in project memory: [{key}] (by {ctx.agent.id}, role={agent_role or 'generic'})"
     except Exception as e:
         return f"Memory store error: {e}"
 
