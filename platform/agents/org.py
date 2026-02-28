@@ -702,6 +702,289 @@ class OrgStore:
             ),
         ]
         all_new = all_new + knowledge_teams
+
+        # ── ART Data & Intelligence ───────────────────────────────────
+        if "art-data" not in existing_arts:
+            self.create_art(
+                ART(
+                    id="art-data",
+                    name="ART Data & Intelligence",
+                    portfolio_id="portfolio-dsi",
+                    description="Data pipelines, ML, LLM Ops, Analytics & BI — intelligence at scale.",
+                    lead_agent_id="ai-product-manager",
+                    pi_cadence_weeks=10,
+                )
+            )
+
+        data_teams = [
+            Team(
+                id="team-data-pipeline",
+                name="Team Data Pipeline",
+                art_id="art-data",
+                description="ETL, data warehouse, migrations, database administration",
+                scrum_master_id="data_engineer",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "data_engineer", "role": "lead"},
+                    {"agent_id": "dba", "role": "dba"},
+                    {"agent_id": "data_migration_engineer", "role": "migration"},
+                    {"agent_id": "cloud_architect", "role": "infra"},
+                ],
+            ),
+            Team(
+                id="team-ml-llmops",
+                name="Team ML & LLM Ops",
+                art_id="art-data",
+                description="Machine learning models, LLM management, prompt engineering, cost optimization",
+                scrum_master_id="llm-ops-engineer",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "llm-ops-engineer", "role": "lead"},
+                    {"agent_id": "ml_engineer", "role": "ml"},
+                    {"agent_id": "prompt-engineer", "role": "prompts"},
+                    {"agent_id": "finops-engineer", "role": "cost"},
+                ],
+            ),
+            Team(
+                id="team-analytics",
+                name="Team Analytics & BI",
+                art_id="art-data",
+                description="Business intelligence, data analysis, AI product management",
+                scrum_master_id="ai-product-manager",
+                capacity=3,
+                wip_limit=2,
+                members=[
+                    {"agent_id": "ai-product-manager", "role": "lead"},
+                    {"agent_id": "data_analyst", "role": "analyst"},
+                    {"agent_id": "test_data_engineer", "role": "data"},
+                ],
+            ),
+        ]
+        all_new = all_new + data_teams
+
+        # ── ART Mobile ───────────────────────────────────────────────
+        if "art-mobile" not in existing_arts:
+            self.create_art(
+                ART(
+                    id="art-mobile",
+                    name="ART Mobile",
+                    portfolio_id="portfolio-dsi",
+                    description="iOS and Android native development — Popinz, Veligo, YoloNow mobile apps.",
+                    lead_agent_id="tech_lead_mobile",
+                    pi_cadence_weeks=10,
+                )
+            )
+
+        mobile_teams = [
+            Team(
+                id="team-ios",
+                name="Team iOS",
+                art_id="art-mobile",
+                description="Native iOS development — Swift, SwiftUI, networking, UI",
+                scrum_master_id="lead_ios",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "lead_ios", "role": "lead"},
+                    {"agent_id": "dev_ios_ui", "role": "ui"},
+                    {"agent_id": "dev_ios_networking", "role": "networking"},
+                    {"agent_id": "qa_ios", "role": "qa"},
+                ],
+            ),
+            Team(
+                id="team-android",
+                name="Team Android",
+                art_id="art-mobile",
+                description="Native Android development — Kotlin, Jetpack Compose, networking, UI",
+                scrum_master_id="lead_android",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "lead_android", "role": "lead"},
+                    {"agent_id": "dev_android_ui", "role": "ui"},
+                    {"agent_id": "dev_android_networking", "role": "networking"},
+                    {"agent_id": "qa_android", "role": "qa"},
+                ],
+            ),
+            Team(
+                id="team-mobile-ux",
+                name="Team Mobile UX & QA",
+                art_id="art-mobile",
+                description="Mobile UX design, cross-platform QA strategy, performance benchmarks",
+                scrum_master_id="tech_lead_mobile",
+                capacity=3,
+                wip_limit=2,
+                members=[
+                    {"agent_id": "tech_lead_mobile", "role": "lead"},
+                    {"agent_id": "ux_mobile", "role": "ux"},
+                    {"agent_id": "qa-mobile-lead", "role": "qa"},
+                ],
+            ),
+        ]
+        all_new = all_new + mobile_teams
+
+        # ── ART Infrastructure & Cloud ───────────────────────────────
+        if "art-infra" not in existing_arts:
+            self.create_art(
+                ART(
+                    id="art-infra",
+                    name="ART Infrastructure & Cloud",
+                    portfolio_id="portfolio-dsi",
+                    description="Cloud infrastructure, SRE, observability, incident response, FinOps — operational excellence.",
+                    lead_agent_id="sre",
+                    pi_cadence_weeks=10,
+                )
+            )
+
+        infra_teams = [
+            Team(
+                id="team-sre",
+                name="Team SRE",
+                art_id="art-infra",
+                description="Site reliability, incident management, SLOs, post-mortems",
+                scrum_master_id="sre",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "sre", "role": "lead"},
+                    {"agent_id": "observability_engineer", "role": "observability"},
+                    {"agent_id": "incident-commander", "role": "incidents"},
+                    {"agent_id": "performance_engineer", "role": "perf"},
+                ],
+            ),
+            Team(
+                id="team-cloud-iac",
+                name="Team Cloud & IaC",
+                art_id="art-infra",
+                description="Cloud architecture, infrastructure as code, deployment automation, backup & recovery",
+                scrum_master_id="cloud_architect",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "cloud_architect", "role": "lead"},
+                    {"agent_id": "iac_engineer", "role": "iac"},
+                    {"agent_id": "canary_specialist", "role": "deployment"},
+                    {"agent_id": "backup_engineer", "role": "backup"},
+                ],
+            ),
+            Team(
+                id="team-devops-platform",
+                name="Team DevOps Platform",
+                art_id="art-infra",
+                description="CI/CD pipelines, developer experience, release automation",
+                scrum_master_id="devops",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "devops", "role": "lead"},
+                    {"agent_id": "devsecops", "role": "security"},
+                    {"agent_id": "pipeline_engineer", "role": "pipeline"},
+                    {"agent_id": "release_manager", "role": "release"},
+                ],
+            ),
+        ]
+        all_new = all_new + infra_teams
+
+        # ── ART Go-to-Market ─────────────────────────────────────────
+        if "art-gtm" not in existing_arts:
+            self.create_art(
+                ART(
+                    id="art-gtm",
+                    name="ART Go-to-Market",
+                    portfolio_id="portfolio-dsi",
+                    description="Growth, marketing, community, customer success — product market fit and adoption.",
+                    lead_agent_id="cmo",
+                    pi_cadence_weeks=12,
+                )
+            )
+
+        gtm_teams = [
+            Team(
+                id="team-growth",
+                name="Team Growth & Marketing",
+                art_id="art-gtm",
+                description="Growth hacking, brand strategy, competitive intelligence, market trends",
+                scrum_master_id="cmo",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "cmo", "role": "lead"},
+                    {"agent_id": "growth_hacker", "role": "growth"},
+                    {"agent_id": "brand_strategist", "role": "brand"},
+                    {"agent_id": "competitive_intel", "role": "intel"},
+                ],
+            ),
+            Team(
+                id="team-product-market-fit",
+                name="Team Product Market Fit",
+                art_id="art-gtm",
+                description="Customer success, user insights, community management, adoption",
+                scrum_master_id="customer-success",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "customer-success", "role": "lead"},
+                    {"agent_id": "community-manager", "role": "community"},
+                    {"agent_id": "customer_insights", "role": "insights"},
+                    {"agent_id": "market_analyst", "role": "research"},
+                ],
+            ),
+        ]
+        all_new = all_new + gtm_teams
+
+        # ── Missing product teams in ART Produits ────────────────────
+        product_missing = [
+            Team(
+                id="team-yolonow",
+                name="Team YoloNow",
+                art_id="art-products",
+                description="YoloNow — livraison instantanée, marketplace gig economy",
+                scrum_master_id="scrum_master",
+                capacity=5,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_backend", "role": "backend"},
+                    {"agent_id": "dev_mobile", "role": "mobile"},
+                    {"agent_id": "qa_lead", "role": "qa"},
+                    {"agent_id": "ux_designer", "role": "ux"},
+                ],
+            ),
+            Team(
+                id="team-finary",
+                name="Team Finary",
+                art_id="art-products",
+                description="Finary — gestion patrimoine, finance personnelle, reporting",
+                scrum_master_id="scrum_master",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_fullstack", "role": "fullstack"},
+                    {"agent_id": "data_analyst", "role": "data"},
+                    {"agent_id": "qa_lead", "role": "qa"},
+                ],
+            ),
+            Team(
+                id="team-psy",
+                name="Team PSY",
+                art_id="art-products",
+                description="PSY — plateforme santé mentale, suivi psychologique, téléconsultation",
+                scrum_master_id="scrum_master",
+                capacity=4,
+                wip_limit=2,
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_backend", "role": "backend"},
+                    {"agent_id": "dev_frontend", "role": "frontend"},
+                    {"agent_id": "qa_lead", "role": "qa"},
+                ],
+            ),
+        ]
+        all_new = all_new + product_missing
+
         count = 0
         for t in all_new:
             if t.id not in existing:
@@ -710,7 +993,7 @@ class OrgStore:
 
         if count:
             logger.info(
-                "[Org] Seeded %d additional teams (Security + Platform + RSE + Knowledge)",
+                "[Org] Seeded %d additional teams (Security + Platform + RSE + Knowledge + Data + Mobile + Infra + GTM + Products)",
                 count,
             )
 
