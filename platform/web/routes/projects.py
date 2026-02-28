@@ -1734,6 +1734,20 @@ async def ws_live_stream(project_id: str, since: str = "", request: Request = No
                     except Exception:
                         pass
 
+                # 6. System stats every 10 iterations (~20s)
+                if _loop_n % 10 == 0:
+                    try:
+                        import psutil as _psutil
+
+                        _cpu = _psutil.cpu_percent(interval=0.1)
+                        _mem = _psutil.virtual_memory()
+                        _disk = _psutil.disk_usage("/")
+                        yield (
+                            f"event: system_stats\ndata: {json.dumps({'type': 'system_stats', 'cpu': _cpu, 'ram': _mem.percent, 'ram_used_mb': round(_mem.used / 1024 / 1024), 'ram_total_mb': round(_mem.total / 1024 / 1024), 'disk': _disk.percent})}\n\n"
+                        )
+                    except Exception:
+                        pass
+
                 # Advance cursor to latest ts seen
                 if batch:
                     latest = max(
@@ -3380,3 +3394,274 @@ async def ws_terminal(websocket: WebSocket, project_id: str):
             await websocket.close()
         except Exception:
             pass
+
+
+# ── Workspace: Branch switcher ────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/branches")
+async def ws_get_branches(project_id: str, request: Request):
+    """List git branches + current for the project."""
+    import subprocess
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"branches": [], "current": "main"})
+    try:
+        r1 = subprocess.run(
+            ["git", "branch", "-a", "--format=%(refname:short)"],
+            cwd=proj.path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        branches = [b.strip() for b in r1.stdout.splitlines() if b.strip()]
+        r2 = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=proj.path,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        current = r2.stdout.strip() or "main"
+        return JSONResponse({"branches": branches, "current": current})
+    except Exception as exc:
+        return JSONResponse({"branches": [], "current": "main", "error": str(exc)})
+
+
+@router.post("/api/projects/{project_id}/workspace/checkout")
+async def ws_checkout_branch(project_id: str, request: Request):
+    """Checkout a branch in the project."""
+    import subprocess
+    from ...projects.manager import get_project_store
+
+    body = await _parse_body(request)
+    branch = body.get("branch", "").strip()
+    if not branch or any(c in branch for c in [" ", "..", ";"]):
+        return JSONResponse({"error": "Invalid branch name"}, status_code=400)
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    try:
+        result = subprocess.run(
+            ["git", "checkout", branch],
+            cwd=proj.path,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if result.returncode != 0:
+            return JSONResponse({"error": result.stderr[:500]}, status_code=400)
+        return JSONResponse({"ok": True, "branch": branch})
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+# ── Workspace: GitHub import ──────────────────────────────────────────────────
+
+
+@router.post("/api/projects/{project_id}/workspace/import-git")
+async def ws_import_git(project_id: str, request: Request):
+    """Clone a GitHub/GitLab repo into the project workspace (SSE stream)."""
+    import subprocess
+    import re
+    from ...projects.manager import get_project_store
+
+    body = await _parse_body(request)
+    url = body.get("url", "").strip()
+    if not re.match(
+        r"^https://(github\.com|gitlab\.com)/[\w\-\.]+/[\w\-\.]+(?:\.git)?$", url
+    ):
+
+        async def _err():
+            yield f"data: {json.dumps({'type': 'error', 'msg': 'URL invalide. Format: https://github.com/user/repo'})}\n\n"
+
+        return StreamingResponse(_err(), media_type="text/event-stream")
+    proj = get_project_store().get(project_id)
+    if not proj:
+
+        async def _err2():
+            yield f"data: {json.dumps({'type': 'error', 'msg': 'Projet non trouvé'})}\n\n"
+
+        return StreamingResponse(_err2(), media_type="text/event-stream")
+    repo_name = url.rstrip("/").replace(".git", "").split("/")[-1]
+    target = Path(proj.path) / repo_name
+
+    async def _stream():
+        if target.exists():
+            yield f"data: {json.dumps({'type': 'error', 'msg': f'Le dossier {repo_name}/ existe déjà'})}\n\n"
+            return
+        yield f"data: {json.dumps({'type': 'log', 'msg': f'Clonage de {url}…'})}\n\n"
+        proc = subprocess.Popen(
+            ["git", "clone", "--depth=1", "--progress", url, str(target)],
+            cwd=str(proj.path),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+        for line in proc.stdout:
+            yield f"data: {json.dumps({'type': 'log', 'msg': line.rstrip()})}\n\n"
+        proc.wait()
+        if proc.returncode == 0:
+            yield f"data: {json.dumps({'type': 'done', 'msg': f'✅ Cloné dans {repo_name}/', 'dir': repo_name})}\n\n"
+        else:
+            yield f"data: {json.dumps({'type': 'error', 'msg': '❌ Erreur lors du clone'})}\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── Workspace: AI Chat ────────────────────────────────────────────────────────
+
+
+@router.post("/api/projects/{project_id}/workspace/chat")
+async def ws_workspace_chat(project_id: str, request: Request):
+    """AI chat for the workspace — streaming SSE."""
+    from ...projects.manager import get_project_store
+    from ...llm.client import get_llm_client, LLMMessage
+
+    body = await _parse_body(request)
+    message = body.get("message", "").strip()
+    context = body.get("context", "")
+    if not message:
+        return JSONResponse({"error": "message required"}, status_code=400)
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    system = (
+        f'Tu es un assistant de développement intégré au workspace du projet "{proj.name}". '
+        f"Tu aides avec le code, les erreurs et les questions techniques. Sois concis et précis."
+    )
+    if context:
+        system += f"\n\nContexte:\n{context[:2000]}"
+
+    async def _stream():
+        yield f"data: {json.dumps({'type': 'start'})}\n\n"
+        try:
+            llm = get_llm_client()
+            msgs = [LLMMessage(role="user", content=message)]
+            async for chunk in llm.stream(
+                messages=msgs, system_prompt=system, max_tokens=1500
+            ):
+                if chunk.delta:
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': chunk.delta})}\n\n"
+                if chunk.done:
+                    break
+        except Exception as exc:
+            yield f"data: {json.dumps({'type': 'error', 'text': str(exc)})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── Workspace: PR viewer ──────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/prs")
+async def ws_get_prs(project_id: str):
+    """Fetch open PRs from GitHub for this project."""
+    import subprocess
+    import re
+    import urllib.request
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"prs": [], "error": "Not found"})
+    try:
+        r = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=proj.path,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        remote_url = r.stdout.strip()
+        m = re.search(r"github\.com[:/]([\w\-\.]+)/([\w\-\.]+?)(?:\.git)?$", remote_url)
+        if not m:
+            return JSONResponse(
+                {"prs": [], "error": "Not a GitHub repo", "remote": remote_url}
+            )
+        owner, repo = m.group(1), m.group(2)
+        gh_url = (
+            f"https://api.github.com/repos/{owner}/{repo}/pulls?state=open&per_page=10"
+        )
+        req = urllib.request.Request(
+            gh_url,
+            headers={
+                "User-Agent": "SoftwareFactory/1.0",
+                "Accept": "application/vnd.github.v3+json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            prs_data = json.loads(resp.read())
+        prs = [
+            {
+                "number": pr["number"],
+                "title": pr["title"],
+                "author": pr["user"]["login"],
+                "branch": pr["head"]["ref"],
+                "base": pr["base"]["ref"],
+                "url": pr["html_url"],
+                "created_at": pr["created_at"][:10],
+                "draft": pr.get("draft", False),
+            }
+            for pr in prs_data
+        ]
+        return JSONResponse({"prs": prs, "repo": f"{owner}/{repo}"})
+    except Exception as exc:
+        return JSONResponse({"prs": [], "error": str(exc)})
+
+
+# ── Workspace: Deploy logs ────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/deploy-logs")
+async def ws_deploy_logs(project_id: str, request: Request):
+    """Stream docker/container logs for the project (SSE)."""
+    import subprocess
+    import select as _sel
+    import time as _time
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+
+        async def _err():
+            yield f"data: {json.dumps({'line': 'Projet non trouvé', 'src': 'error'})}\n\n"
+
+        return StreamingResponse(_err(), media_type="text/event-stream")
+    container = getattr(proj, "docker_container", None) or proj.name.lower().replace(
+        " ", "-"
+    )
+
+    async def _stream():
+        yield f"data: {json.dumps({'line': f'▶ Logs du container: {container}', 'src': 'system'})}\n\n"
+        try:
+            proc = subprocess.Popen(
+                ["docker", "logs", "--tail=200", "--follow", container],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            deadline = _time.monotonic() + 120
+            while _time.monotonic() < deadline:
+                if await request.is_disconnected():
+                    break
+                ready = _sel.select([proc.stdout], [], [], 0.5)[0]
+                if ready:
+                    line = proc.stdout.readline()
+                    if not line:
+                        break
+                    yield f"data: {json.dumps({'line': line.rstrip(), 'src': 'docker'})}\n\n"
+                else:
+                    await asyncio.sleep(0.1)
+            proc.terminate()
+        except FileNotFoundError:
+            yield f"data: {json.dumps({'line': 'Docker non disponible sur ce serveur', 'src': 'system'})}\n\n"
+        except Exception as exc:
+            yield f"data: {json.dumps({'line': f'Erreur: {exc}', 'src': 'error'})}\n\n"
+        yield f"data: {json.dumps({'line': '[FIN DU STREAM]', 'src': 'system'})}\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")

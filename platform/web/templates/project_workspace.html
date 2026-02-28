@@ -118,7 +118,18 @@ html,body{height:100%;overflow:hidden}
         <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
       </svg>
     </button>
-  </div>
+    <button class="ws-activity-btn" data-view="aichat" onclick="wsSetView('aichat')" title="Assistant IA">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="prs" onclick="wsSetView('prs');wsPrLoad()" title="Pull Requests">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12M13 6h3a2 2 0 0 1 2 2v7"/><circle cx="6" cy="18" r="3"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="deploylogs" onclick="wsSetView('deploylogs');wsDeployLogsStart()" title="Deploy Logs">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </button>
+    <button class="ws-activity-btn" onclick="document.getElementById('importGitModal').style.display='flex'" title="Importer un dépôt GitHub">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+    </button>
 
   <!-- ── File Tree (only in code view via CSS) ────────────────── -->
   <div class="ws-filetree" id="wsFiletree">
@@ -144,10 +155,12 @@ html,body{height:100%;overflow:hidden}
           {{ project.path }}
         </span>
         {% endif %}
-        <span class="ws-badge ws-badge-git" id="wsGitBranch" style="display:none">
+        <span class="ws-badge ws-badge-git" id="wsGitBranch" style="display:none;cursor:pointer;position:relative" onclick="wsBranchOpen()" title="Changer de branche">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
           <span id="wsGitBranchName"></span>
+          <span style="opacity:.5;font-size:.6rem">▾</span>
         </span>
+        <div id="wsBranchDropdown" style="display:none;position:absolute;z-index:100;background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:6px;min-width:160px;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);top:28px;left:0"></div>
       </div>
       <div class="ws-infobar-right">
         <span class="ws-badge ws-badge-status ws-badge-idle" id="wsStatus">Prêt</span>
@@ -175,6 +188,12 @@ html,body{height:100%;overflow:hidden}
       <span class="ws-metric-item" id="wsMetricWallet" title="Project budget">💰 <span id="wsWalletBalance">—</span></span>
       <span class="ws-metric-sep">·</span>
       <span class="ws-metric-item" id="wsLiveCost" title="Tokens cumulés (1h)">💰 –</span>
+      <span class="ws-metric-sep" id="wsMetricSysSep" style="display:none">·</span>
+      <span class="ws-metric-item" id="wsMetricCpu" title="CPU" style="display:none;cursor:default">🖥️ –%</span>
+      <span class="ws-metric-sep" id="wsMetricRamSep" style="display:none">·</span>
+      <span class="ws-metric-item" id="wsMetricRam" title="RAM" style="display:none;cursor:default">🧠 –%</span>
+      <span class="ws-metric-sep">·</span>
+      <button onclick="openCmdPalette()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:1px 7px;font-size:.68rem;cursor:pointer;line-height:1.6" title="Palette de commandes (⌘K)">⌘K</button>
     </div>
 
     <!-- ── View Container ─────────────────────────────────────── -->
@@ -235,6 +254,9 @@ html,body{height:100%;overflow:hidden}
             <button class="ws-tab" onclick="wsGitMainTab(this,'diff')" data-tab="diff">
               Diff
             </button>
+            <button class="ws-tab" onclick="wsGitMainTab(this,'commit')" data-tab="commit">
+              ✅ Commit
+            </button>
             <button class="ws-btn ws-btn-sm" onclick="wsShowDiff()" style="margin-left:auto">⊕ Diff</button>
           </div>
           <div class="ws-pane-content">
@@ -245,6 +267,16 @@ html,body{height:100%;overflow:hidden}
             </div>
             <div class="ws-tab-content" id="ws-git-diff">
               <div class="ws-git-diff-area" id="wsGitDiffArea">Sélectionnez un fichier modifié pour voir le diff</div>
+            </div>
+            <div class="ws-tab-content" id="ws-git-commit" style="flex-direction:column;padding:.75rem;gap:.5rem;overflow-y:auto">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Fichiers modifiés</div>
+              <div id="wsCommitFileList" style="font-size:.72rem;background:var(--bg-secondary);border-radius:4px;padding:.4rem;min-height:60px;max-height:180px;overflow-y:auto"></div>
+              <textarea id="wsCommitMsg" placeholder="Message de commit…" style="background:var(--bg-input,#1a1a1a);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.4rem .5rem;font-size:.72rem;resize:vertical;height:56px;font-family:inherit;width:100%;box-sizing:border-box"></textarea>
+              <div style="display:flex;gap:.4rem">
+                <button onclick="wsGitRefreshStatus()" class="ws-btn ws-btn-sm">↻ Actualiser</button>
+                <button onclick="wsGitDoCommit()" class="ws-btn ws-btn-sm" style="flex:1;background:var(--green-dim,#1a3a1a);color:var(--green,#4ade80);border-color:var(--green-dim,#1a3a1a)">✅ Commit</button>
+              </div>
+              <div id="wsCommitResult" style="font-size:.72rem;display:none"></div>
             </div>
           </div>
           <div id="wsDiffPanel" style="display:none;padding:8px;overflow:auto">
@@ -598,9 +630,50 @@ html,body{height:100%;overflow:hidden}
         </div>
       </div>
 
-    </div><!-- end ws-view-container -->
+      <!-- ── VIEW: AI Chat ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-aichat" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700">🤖 Assistant IA</span>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <span style="font-size:.68rem;color:var(--text-muted)">Contexte:</span>
+            <select id="aiCtxSelect" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--text-primary);border-radius:3px;font-size:.68rem;padding:1px 4px">
+              <option value="">Aucun</option>
+              <option value="file">Fichier ouvert</option>
+              <option value="git">Git status</option>
+            </select>
+            <button onclick="wsAiClear()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem">Vider</button>
+          </div>
+        </div>
+        <div id="aiChatMsgs" style="flex:1;overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:.5rem"></div>
+        <div style="padding:.5rem;border-top:1px solid var(--border);display:flex;gap:.4rem;flex-shrink:0">
+          <textarea id="aiChatInput" placeholder="Pose une question… (Ctrl+Enter pour envoyer)"
+            style="flex:1;background:var(--bg-input,#1a1a1a);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.4rem .5rem;font-size:.72rem;resize:none;height:52px;font-family:inherit"
+            onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')wsAiSend()"></textarea>
+          <button onclick="wsAiSend()" class="ws-btn ws-btn-sm" style="align-self:flex-end;padding:.3rem .6rem">↑</button>
+        </div>
+      </div>
 
-    <!-- ── Bottom Panel: Shell + Output ──────────────────────── -->
+      <!-- ── VIEW: Pull Requests ───────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-prs" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700">🔃 Pull Requests</span>
+          <span id="prRepoLabel" style="font-size:.7rem;color:var(--text-muted);flex:1"></span>
+          <button onclick="wsPrLoad()" class="ws-btn ws-btn-sm">↻</button>
+        </div>
+        <div id="prList" style="flex:1;overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:.4rem"></div>
+      </div>
+
+      <!-- ── VIEW: Deploy Logs ─────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-deploylogs" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700">📋 Deploy Logs</span>
+          <button onclick="wsDeployLogsStart()" class="ws-btn ws-btn-sm">▶ Stream</button>
+          <button onclick="document.getElementById('deployLogList').innerHTML=''" class="ws-btn ws-btn-sm">Vider</button>
+        </div>
+        <div id="deployLogList" style="flex:1;overflow-y:auto;padding:.4rem .75rem;font-family:monospace;font-size:.7rem;line-height:1.5;background:#0a0a0a;color:#aaa"></div>
+      </div>
+
+    </div><!-- end ws-view-container -->
     <div class="ws-bottom-panel" id="wsBottomPanel">
       <div class="ws-pane-tabs">
         <button class="ws-tab active" onclick="wsBottomTab(this,'shell')" data-btab="shell">
@@ -1780,6 +1853,7 @@ function wsStartLiveStream() {
   if (_wsLiveEs) { try { _wsLiveEs.close(); } catch(e){} }
   var url = '/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/live';
   _wsLiveEs = new EventSource(url);
+  _attachSysStats(_wsLiveEs);
 
   function handleEv(type) {
     return function(e) {
@@ -2006,6 +2080,307 @@ function _wsPkgRunInstall(pkg) {
     }
     read();
   }).catch(function(e) { out.textContent += '[error: ' + e + ']\n'; });
+}
+</script>
+
+<!-- ── Command Palette ────────────────────────────────────────────────────── -->
+<div id="cmdPalette" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:flex-start;justify-content:center;padding-top:12vh">
+  <div style="background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:8px;width:560px;max-width:92vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;padding:.7rem 1rem;gap:.6rem;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-muted);font-size:.9rem">⌘</span>
+      <input id="cmdInput" type="text" placeholder="Rechercher fichiers, actions…" autocomplete="off"
+        oninput="cmdFilter()" onkeydown="cmdKey(event)"
+        style="flex:1;background:none;border:none;color:var(--text-primary);font-size:.85rem;outline:none">
+      <kbd style="font-size:.68rem;color:var(--text-muted);background:var(--bg-secondary);padding:1px 6px;border-radius:3px">Esc</kbd>
+    </div>
+    <div id="cmdResults" style="max-height:360px;overflow-y:auto;padding:.25rem 0"></div>
+  </div>
+</div>
+
+<!-- ── GitHub Import Modal ────────────────────────────────────────────────── -->
+<div id="importGitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:center;justify-content:center">
+  <div style="background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:480px;max-width:92vw">
+    <h3 style="margin:0 0 1rem;font-size:.9rem">🔗 Importer un dépôt GitHub / GitLab</h3>
+    <input id="importGitUrl" type="text" placeholder="https://github.com/user/repo" autocomplete="off"
+      style="width:100%;box-sizing:border-box;background:var(--bg-input,#111);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.45rem .6rem;font-size:.78rem;margin-bottom:.75rem">
+    <div style="display:flex;gap:.4rem;justify-content:flex-end">
+      <button onclick="document.getElementById('importGitModal').style.display='none'" class="ws-btn ws-btn-sm">Annuler</button>
+      <button onclick="wsImportGit()" class="ws-btn ws-btn-sm" style="background:var(--green-dim,#1a3a1a);color:var(--green,#4ade80)">🚀 Cloner</button>
+    </div>
+    <div id="importGitLog" style="display:none;margin-top:.75rem;background:#0a0a0a;border-radius:4px;padding:.5rem;max-height:160px;overflow-y:auto;font-size:.7rem;font-family:monospace;color:#aaa"></div>
+  </div>
+</div>
+
+<script>
+// ── Command Palette ──────────────────────────────────────────────────────────
+var _cmdItems = [];
+var _cmdSel = 0;
+var CMD_ACTIONS = [
+  {icon:'📁', label:'Explorateur de fichiers', sub:'Vue', fn:function(){wsSetView('code');}},
+  {icon:'🔀', label:'Git — Historique', sub:'Vue', fn:function(){wsSetView('git');}},
+  {icon:'✅', label:'Git — Commit', sub:'Vue', fn:function(){wsSetView('git');wsGitMainTab(document.querySelector('[data-tab="commit"]'),'commit');wsGitRefreshStatus();}},
+  {icon:'🤖', label:'Assistant IA', sub:'Vue', fn:function(){wsSetView('aichat');}},
+  {icon:'🔃', label:'Pull Requests', sub:'Vue', fn:function(){wsSetView('prs');wsPrLoad();}},
+  {icon:'📋', label:'Deploy Logs', sub:'Vue', fn:function(){wsSetView('deploylogs');wsDeployLogsStart();}},
+  {icon:'📦', label:'Package Manager', sub:'Vue', fn:function(){wsSetView('packages');if(typeof wsPkgLoad==='function')wsPkgLoad();}},
+  {icon:'🔗', label:'Importer un dépôt GitHub', sub:'Action', fn:function(){document.getElementById('importGitModal').style.display='flex';}},
+  {icon:'🔀', label:'Changer de branche', sub:'Action', fn:function(){wsBranchOpen();}},
+  {icon:'📊', label:'Analytics & Coûts', sub:'Navigation', fn:function(){window.open('/analytics','_blank');}},
+];
+function openCmdPalette() {
+  document.getElementById('cmdPalette').style.display = 'flex';
+  setTimeout(function(){document.getElementById('cmdInput').focus();}, 40);
+  cmdFilter();
+}
+function closeCmdPalette() {
+  document.getElementById('cmdPalette').style.display = 'none';
+  document.getElementById('cmdInput').value = '';
+}
+function cmdFilter() {
+  var q = document.getElementById('cmdInput').value.toLowerCase();
+  _cmdSel = 0;
+  _cmdItems = CMD_ACTIONS.filter(function(a){ return !q || a.label.toLowerCase().includes(q) || a.sub.toLowerCase().includes(q); }).slice(0,12);
+  document.getElementById('cmdResults').innerHTML = _cmdItems.map(function(item, i) {
+    return '<div class="cmd-item" data-idx="'+i+'" onclick="cmdRun('+i+')"'+
+      ' style="padding:.5rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.6rem;'+(i===0?'background:var(--bg-hover,#2a3a4a)':'')+'">'+
+      '<span style="font-size:1rem;width:20px">'+item.icon+'</span>'+
+      '<span style="flex:1"><span style="font-size:.8rem;color:var(--text-primary)">'+item.label+'</span>'+
+      '<span style="font-size:.68rem;color:var(--text-muted);display:block">'+item.sub+'</span></span></div>';
+  }).join('');
+}
+function cmdRun(i) { closeCmdPalette(); if(_cmdItems[i]) _cmdItems[i].fn(); }
+function cmdKey(e) {
+  var items = document.querySelectorAll('.cmd-item');
+  if (e.key==='Escape') { closeCmdPalette(); return; }
+  if (e.key==='ArrowDown') { _cmdSel = Math.min(_cmdSel+1, items.length-1); }
+  if (e.key==='ArrowUp') { _cmdSel = Math.max(_cmdSel-1, 0); }
+  if (e.key==='Enter') { cmdRun(_cmdSel); return; }
+  items.forEach(function(el,i){ el.style.background = i===_cmdSel ? 'var(--bg-hover,#2a3a4a)' : ''; });
+}
+document.getElementById('cmdPalette').addEventListener('click', function(e){
+  if (e.target === document.getElementById('cmdPalette')) closeCmdPalette();
+});
+document.addEventListener('keydown', function(e){
+  if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); openCmdPalette(); }
+  if (e.key==='Escape' && document.getElementById('cmdPalette').style.display!=='none') closeCmdPalette();
+});
+
+// ── Branch switcher ──────────────────────────────────────────────────────────
+function wsBranchOpen() {
+  var dd = document.getElementById('wsBranchDropdown');
+  if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
+  dd.innerHTML = '<div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-muted)">Chargement…</div>';
+  dd.style.display = 'block';
+  fetch('/api/projects/{{ project.id }}/workspace/branches').then(function(r){return r.json();}).then(function(data){
+    dd.innerHTML = (data.branches||[]).map(function(b){
+      return '<div onclick="wsBranchCheckout(\''+b+'\')" style="padding:.4rem .75rem;cursor:pointer;font-size:.72rem;'+(b===data.current?'color:#60a5fa;font-weight:700':'')+'" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'\'">'+
+        (b===data.current?'✓ ':'')+b+'</div>';
+    }).join('') || '<div style="padding:.5rem;color:var(--text-muted);font-size:.72rem">Aucune branche</div>';
+  }).catch(function(){dd.innerHTML='<div style="padding:.5rem;color:#f87171;font-size:.72rem">Erreur</div>';});
+}
+function wsBranchCheckout(branch) {
+  document.getElementById('wsBranchDropdown').style.display = 'none';
+  fetch('/api/projects/{{ project.id }}/workspace/checkout', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({branch:branch})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (d.ok) {
+      document.getElementById('wsGitBranchName').textContent = branch;
+      if (typeof wsShowNotif==='function') wsShowNotif('✅ Checkout '+branch);
+    } else {
+      alert('Erreur: '+(d.error||'inconnue'));
+    }
+  });
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#wsGitBranch') && !e.target.closest('#wsBranchDropdown'))
+    document.getElementById('wsBranchDropdown').style.display = 'none';
+});
+
+// ── GitHub import ────────────────────────────────────────────────────────────
+async function wsImportGit() {
+  var url = document.getElementById('importGitUrl').value.trim();
+  var log = document.getElementById('importGitLog');
+  log.style.display = 'block';
+  log.innerHTML = '';
+  var resp = await fetch('/api/projects/{{ project.id }}/workspace/import-git', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url:url})
+  });
+  var reader = resp.body.getReader();
+  var decoder = new TextDecoder();
+  var buf = '';
+  while(true) {
+    var res = await reader.read();
+    if(res.done) break;
+    buf += decoder.decode(res.value);
+    var parts = buf.split('\n\n');
+    buf = parts.pop();
+    parts.forEach(function(part){
+      if(!part.startsWith('data: ')) return;
+      try {
+        var e = JSON.parse(part.slice(6));
+        var div = document.createElement('div');
+        div.textContent = e.msg;
+        if(e.type==='error') div.style.color='#f87171';
+        if(e.type==='done') { div.style.color='#4ade80'; if(typeof wsLoadTree==='function') setTimeout(wsLoadTree,500); }
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      } catch(ex){}
+    });
+  }
+}
+
+// ── AI Chat ──────────────────────────────────────────────────────────────────
+var _currentAiFile = '';
+function wsAiClear() { document.getElementById('aiChatMsgs').innerHTML = ''; }
+async function wsAiSend() {
+  var input = document.getElementById('aiChatInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  var ctx = '';
+  var ctxSel = document.getElementById('aiCtxSelect').value;
+  if (ctxSel==='file') ctx = (_currentAiFile ? 'Fichier: '+_currentAiFile+'\n' : '') + (document.getElementById('wsCodeEditor') ? '' : '');
+  var msgs = document.getElementById('aiChatMsgs');
+  var userDiv = document.createElement('div');
+  userDiv.innerHTML = '<div style="background:var(--bg-secondary);border-radius:6px;padding:.4rem .6rem;font-size:.72rem;color:var(--text-primary);align-self:flex-end;max-width:90%">'+msg.replace(/</g,'&lt;')+'</div>';
+  msgs.appendChild(userDiv);
+  var botId = 'ai-'+Date.now();
+  var botWrap = document.createElement('div');
+  botWrap.innerHTML = '<div id="'+botId+'" style="font-size:.72rem;color:var(--text-secondary);white-space:pre-wrap;padding:.2rem 0;line-height:1.5"></div>';
+  msgs.appendChild(botWrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  try {
+    var resp = await fetch('/api/projects/{{ project.id }}/workspace/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:msg, context:ctx})
+    });
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = '', fullText = '';
+    var botEl = document.getElementById(botId);
+    while(true) {
+      var res = await reader.read();
+      if(res.done) break;
+      buf += decoder.decode(res.value);
+      var parts = buf.split('\n\n');
+      buf = parts.pop();
+      parts.forEach(function(part){
+        if(!part.startsWith('data: ')) return;
+        try {
+          var e = JSON.parse(part.slice(6));
+          if(e.type==='chunk') { fullText += e.text; botEl.textContent = fullText; msgs.scrollTop = msgs.scrollHeight; }
+          if(e.type==='error') { botEl.style.color='#f87171'; botEl.textContent = '❌ '+e.text; }
+        } catch(ex){}
+      });
+    }
+  } catch(ex) {
+    document.getElementById(botId).textContent = '❌ Erreur: '+ex.message;
+  }
+}
+
+// ── PR viewer ────────────────────────────────────────────────────────────────
+function wsPrLoad() {
+  var list = document.getElementById('prList');
+  var repo = document.getElementById('prRepoLabel');
+  list.innerHTML = '<div style="color:var(--text-muted);font-size:.72rem;padding:.5rem">Chargement…</div>';
+  fetch('/api/projects/{{ project.id }}/workspace/prs').then(function(r){return r.json();}).then(function(d){
+    if(d.repo) repo.textContent = d.repo;
+    if(d.prs && d.prs.length===0) { list.innerHTML='<div style="color:var(--text-muted);font-size:.72rem;padding:.5rem">'+(d.error||'Aucune PR ouverte')+'</div>'; return; }
+    list.innerHTML = (d.prs||[]).map(function(pr){
+      return '<a href="'+pr.url+'" target="_blank" style="text-decoration:none;display:block;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+        '<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">'+
+        '<span style="color:#60a5fa;font-weight:700;font-size:.72rem">#'+pr.number+'</span>'+
+        (pr.draft?'<span style="background:#333;color:#aaa;font-size:.62rem;padding:0 4px;border-radius:8px">Draft</span>':'')+
+        '<span style="color:var(--text-primary);font-size:.72rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+pr.title.replace(/</g,'&lt;')+'</span></div>'+
+        '<div style="color:var(--text-muted);font-size:.65rem">'+pr.branch+' → '+pr.base+' · '+pr.author+' · '+pr.created_at+'</div></a>';
+    }).join('');
+  }).catch(function(e){ list.innerHTML='<div style="color:#f87171;font-size:.72rem;padding:.5rem">Erreur: '+e+'</div>'; });
+}
+
+// ── Deploy Logs ──────────────────────────────────────────────────────────────
+var _deployLogsReader = null;
+async function wsDeployLogsStart() {
+  if(_deployLogsReader) { try { _deployLogsReader.cancel(); } catch(e){} }
+  var list = document.getElementById('deployLogList');
+  var _addLine = function(text, color) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    if(color) div.style.color = color;
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+  };
+  _addLine('▶ Connexion…', '#60a5fa');
+  try {
+    var resp = await fetch('/api/projects/{{ project.id }}/workspace/deploy-logs');
+    _deployLogsReader = resp.body.getReader();
+    var decoder = new TextDecoder(), buf = '';
+    while(true) {
+      var res = await _deployLogsReader.read();
+      if(res.done) break;
+      buf += decoder.decode(res.value);
+      var parts = buf.split('\n\n');
+      buf = parts.pop();
+      parts.forEach(function(part){
+        if(!part.startsWith('data: ')) return;
+        try {
+          var e = JSON.parse(part.slice(6));
+          _addLine(e.line, e.src==='error'?'#f87171':e.src==='system'?'#60a5fa':null);
+        } catch(ex){}
+      });
+    }
+  } catch(ex) { _addLine('❌ '+ex.message, '#f87171'); }
+}
+
+// ── Git Commit UI ────────────────────────────────────────────────────────────
+function wsGitRefreshStatus() {
+  var list = document.getElementById('wsCommitFileList');
+  list.innerHTML = '<span style="color:var(--text-muted);font-size:.7rem">Chargement…</span>';
+  fetch('/api/projects/{{ project.id }}/workspace/git').then(function(r){return r.json();}).then(function(d){
+    if(!d.changes || d.changes.length===0) { list.innerHTML='<span style="color:var(--text-muted);font-size:.7rem">Aucune modification</span>'; return; }
+    list.innerHTML = d.changes.map(function(f){
+      var fp = f.path||f.name||JSON.stringify(f);
+      var st = f.status||'M';
+      var color = st==='?'?'#aaa':st.startsWith('M')?'#60a5fa':'#4ade80';
+      return '<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0"><input type="checkbox" class="ws-commit-cb" value="'+fp+'" checked>'+
+        '<span style="color:'+color+';font-size:.68rem;width:1.5rem">'+st+'</span>'+
+        '<span style="font-size:.68rem;word-break:break-all">'+fp+'</span></div>';
+    }).join('');
+  }).catch(function(){ list.innerHTML='<span style="color:#f87171;font-size:.7rem">Erreur</span>'; });
+}
+async function wsGitDoCommit() {
+  var msg = document.getElementById('wsCommitMsg').value.trim();
+  var res = document.getElementById('wsCommitResult');
+  res.style.display = 'block';
+  if(!msg) { res.style.color='#f87171'; res.textContent='⚠️ Message de commit requis'; return; }
+  res.style.color = 'var(--text-muted)';
+  res.textContent = 'Commit en cours…';
+  var r = await fetch('/api/projects/{{ project.id }}/workspace/git/commit', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})
+  });
+  var d = await r.json();
+  if(d.ok) { res.style.color='#4ade80'; res.textContent='✅ Commit effectué'; document.getElementById('wsCommitMsg').value=''; wsGitRefreshStatus(); }
+  else { res.style.color='#f87171'; res.textContent='❌ '+(d.error||'Erreur'); }
+}
+
+// ── System stats SSE handler ─────────────────────────────────────────────────
+// This is added after wsStartLiveStream is defined — attach it at init
+var _sysStatsAttached = false;
+function _attachSysStats(es) {
+  if(_sysStatsAttached) return;
+  _sysStatsAttached = true;
+  es.addEventListener('system_stats', function(e){
+    try {
+      var d = JSON.parse(e.data);
+      var cpu = document.getElementById('wsMetricCpu');
+      var ram = document.getElementById('wsMetricRam');
+      if(!cpu) return;
+      cpu.textContent = '🖥️ '+d.cpu+'%';
+      ram.textContent = '🧠 '+d.ram+'%';
+      cpu.style.display = 'inline';
+      ram.style.display = 'inline';
+      document.getElementById('wsMetricSysSep').style.display = 'inline';
+      document.getElementById('wsMetricRamSep').style.display = 'inline';
+    } catch(ex){}
+  });
 }
 </script>
 {% endblock %}
