@@ -1487,10 +1487,10 @@ _BLOCKED_CMDS = (
 async def ws_run_command(project_id: str, cmd: str, request: Request):
     """SSE endpoint — runs a shell command in project root and streams output."""
     import shlex
-    from ..auth_middleware import require_auth
+    from ...auth.middleware import get_current_user
     from ...projects.manager import get_project_store
 
-    user = await require_auth(request)
+    user = await get_current_user(request)
     if not user:
 
         async def _deny():
@@ -2732,12 +2732,16 @@ async def dbgate_get_token():
 @router.get("/api/projects/{project_id}/workspace/timeline")
 async def ws_timeline(project_id: str, filter: str = "all"):
     """Return unified timeline events: git commits + missions + deployments."""
-    from ...projects.manager import get_project_store
-    from ...projects import git_service
+    try:
+        from ...projects.manager import get_project_store
+        from ...projects import git_service
 
-    proj = get_project_store().get(project_id)
-    if not proj:
-        return JSONResponse({"events": []})
+        proj = get_project_store().get(project_id)
+        if not proj:
+            return JSONResponse({"events": []})
+    except Exception as exc:
+        logger.warning("ws_timeline init error: %s", exc)
+        return JSONResponse({"events": [], "error": str(exc)})
 
     events: list[dict] = []
 
@@ -3179,9 +3183,9 @@ def _parse_generic_list(raw: str, pkg_type: str) -> list[dict]:
 @router.get("/api/projects/{project_id}/workspace/packages")
 async def ws_packages(project_id: str, request: Request):
     """List installed packages for the project."""
-    from ..auth_middleware import require_auth
+    from ...auth.middleware import get_current_user
 
-    user = await require_auth(request)
+    user = await get_current_user(request)
     if not user:
         return JSONResponse({"detail": "Authentication required"}, status_code=401)
 
@@ -3228,9 +3232,9 @@ async def ws_packages(project_id: str, request: Request):
 @router.post("/api/projects/{project_id}/workspace/packages/install")
 async def ws_packages_install(project_id: str, request: Request):
     """Install a package or run the full install command. Returns SSE stream."""
-    from ..auth_middleware import require_auth
+    from ...auth.middleware import get_current_user
 
-    user = await require_auth(request)
+    user = await get_current_user(request)
     if not user:
         return JSONResponse({"detail": "Authentication required"}, status_code=401)
 
