@@ -50,3 +50,6 @@ conventions: |
   - Chaque composant : story Storybook + test axe-core + snapshot visuel
   - Aucun composant fusionné sans validation design QA
   - Versioning semver strict (patch = fix, minor = nouveau composant, major = breaking)
+
+compliance_agents:
+  - solaris-compliance-critic

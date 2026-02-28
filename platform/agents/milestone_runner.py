@@ -64,6 +64,7 @@ async def run_milestone_pipeline(
     mission_name: str,
     project_path: str = "",
     on_progress=None,  # async callable(milestone_result) for SSE
+    compliance_agents: list[str] | None = None,  # domain-specific critic agent ids
 ) -> list[MilestoneResult]:
     """Run a list of milestones sequentially, with retries and PROGRESS.md updates.
 
@@ -87,6 +88,10 @@ async def run_milestone_pipeline(
         Workspace directory path (written to PROGRESS.md + used by tools)
     on_progress:
         Optional async callback called after each milestone with its MilestoneResult
+    compliance_agents:
+        Optional list of domain-specific critic agent IDs to run after each successful
+        milestone. If provided, each agent is spawned as a compliance check on the
+        workspace. Violations are logged to PROGRESS.md (non-blocking).
     """
     results: list[MilestoneResult] = []
     consecutive_failures = 0
@@ -208,6 +213,19 @@ async def run_milestone_pipeline(
                 await on_progress(m_result)
             except Exception:
                 pass
+
+        # Run domain compliance critics after each successful milestone
+        if m_result.success and compliance_agents:
+            await _run_compliance_checks(
+                compliance_agents=compliance_agents,
+                executor=executor,
+                ctx=ctx,
+                session_id=session_id,
+                milestone_id=m_id,
+                goal=goal,
+                project_path=project_path,
+                mission_name=mission_name,
+            )
 
         # Stop on 3 consecutive failures
         if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
@@ -370,3 +388,111 @@ async def _push_sse_safe(session_id: str, event: dict) -> None:
         await _push_sse(session_id, event)
     except Exception:
         pass
+
+
+async def _run_compliance_checks(
+    *,
+    compliance_agents: list[str],
+    executor: "AgentExecutor",
+    ctx: "ExecutionContext",
+    session_id: str,
+    milestone_id: str,
+    goal: str,
+    project_path: str,
+    mission_name: str,
+) -> None:
+    """Run domain-specific compliance critic agents after a successful milestone.
+
+    Each compliance agent gets a focused prompt listing the milestone that just
+    completed, then reviews the workspace for domain constraint violations.
+    Results are appended to PROGRESS.md and pushed as SSE events (non-blocking).
+    """
+    from ..agents.store import get_agent_store
+    from dataclasses import replace
+
+    store = get_agent_store()
+    for agent_id in compliance_agents:
+        agent_def = store.get(agent_id)
+        if not agent_def:
+            logger.warning("ComplianceCheck: agent '%s' not found, skipping", agent_id)
+            continue
+
+        logger.info(
+            "ComplianceCheck: running %s after milestone %s session=%s",
+            agent_id,
+            milestone_id,
+            session_id,
+        )
+        await _push_sse_safe(
+            session_id,
+            {
+                "type": "compliance_start",
+                "agent_id": agent_id,
+                "milestone_id": milestone_id,
+            },
+        )
+
+        compliance_prompt = (
+            f"## Compliance Review — Milestone « {goal} »\n\n"
+            f"The milestone `{milestone_id}` just completed successfully as part of "
+            f"mission « {mission_name} ».\n\n"
+            f"Review the code produced in this milestone for domain compliance violations.\n"
+            f"Focus on changes introduced in this milestone — check files in the workspace.\n\n"
+            f"List all violations with file + line. Provide a PASS/FAIL verdict."
+        )
+
+        compliance_ctx = replace(ctx, agent=agent_def)
+        try:
+            result = await executor.run(compliance_ctx, compliance_prompt)
+            verdict = "PASS" if not result.error else "ERROR"
+            if result.content and "FAIL" in result.content.upper():
+                verdict = "FAIL"
+
+            logger.info(
+                "ComplianceCheck: %s verdict=%s milestone=%s",
+                agent_id,
+                verdict,
+                milestone_id,
+            )
+            await _push_sse_safe(
+                session_id,
+                {
+                    "type": "compliance_done",
+                    "agent_id": agent_id,
+                    "milestone_id": milestone_id,
+                    "verdict": verdict,
+                    "preview": (result.content or "")[:300],
+                },
+            )
+
+            # Append compliance report to PROGRESS.md
+            if project_path:
+                _append_compliance_to_progress(
+                    project_path, agent_id, milestone_id, verdict, result.content or ""
+                )
+        except Exception as exc:
+            logger.warning(
+                "ComplianceCheck: %s failed with %s — milestone=%s",
+                agent_id,
+                exc,
+                milestone_id,
+            )
+
+
+def _append_compliance_to_progress(
+    project_path: str, agent_id: str, milestone_id: str, verdict: str, content: str
+) -> None:
+    """Append a compliance check result to PROGRESS.md."""
+    path = os.path.join(project_path, "PROGRESS.md")
+    if not os.path.exists(path):
+        return
+    icon = "✅" if verdict == "PASS" else ("❌" if verdict == "FAIL" else "⚠️")
+    now = datetime.utcnow().strftime("%H:%M UTC")
+    section = (
+        f"\n### {icon} Compliance: {agent_id} — {milestone_id} ({now}) — {verdict}\n\n"
+        f"<details><summary>Rapport</summary>\n\n"
+        f"{content[:1500]}\n"
+        f"</details>\n"
+    )
+    with open(path, "a") as f:
+        f.write(section)

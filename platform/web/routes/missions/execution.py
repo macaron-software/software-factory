@@ -948,6 +948,8 @@ async def _run_milestone_pipeline_background(
     from ....agents.milestone_runner import run_milestone_pipeline
     from ....agents.executor import AgentExecutor, ExecutionContext
     from ....agents.store import get_agent_store
+    from ....projects.registry import get_project_registry
+    from ....projects.domains import load_domain
 
     try:
         agent_def = get_agent_store().get(lead_agent_id)
@@ -958,6 +960,25 @@ async def _run_milestone_pipeline_background(
                 "MilestonePipeline: no agent found, skipping. session=%s", session_id
             )
             return
+
+        # Resolve domain compliance agents
+        compliance_agents: list[str] = []
+        try:
+            proj = get_project_registry().get(project_id)
+            if proj and proj.arch_domain:
+                domain = load_domain(proj.arch_domain)
+                if domain and domain.compliance_agents:
+                    compliance_agents = domain.compliance_agents
+                    logger.info(
+                        "MilestonePipeline: domain '%s' compliance_agents=%s session=%s",
+                        proj.arch_domain,
+                        compliance_agents,
+                        session_id,
+                    )
+        except Exception as _e:
+            logger.debug(
+                "MilestonePipeline: could not load domain compliance agents: %s", _e
+            )
 
         executor = AgentExecutor()
         ctx = ExecutionContext(
@@ -974,6 +995,7 @@ async def _run_milestone_pipeline_background(
             session_id=session_id,
             mission_name=mission_name,
             project_path=project_path,
+            compliance_agents=compliance_agents or None,
         )
         done = sum(1 for r in results if r.success)
         logger.info(

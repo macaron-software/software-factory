@@ -50,6 +50,9 @@ class Domain:
     compliance: list[str] = field(default_factory=list)  # e.g. ["RGPD", "RGAA 4.1"]
     mcp_tools: list[str] = field(default_factory=list)  # e.g. ["mcp-solaris"]
     confluence_space: str = ""  # e.g. "IAN" — for live spec lookup via LRM
+    compliance_agents: list[str] = field(
+        default_factory=list
+    )  # domain-specific critic agents
     conventions: str = ""  # free-text injected verbatim into agent system prompt
     color: str = "#6B7280"  # UI badge color (hex)
     extends: str = ""  # parent domain id to inherit from
@@ -247,6 +250,9 @@ def load_domain(domain_id: str) -> Optional[Domain]:
         conventions=raw.get("conventions", base.conventions if base else ""),
         color=raw.get("color", base.color if base else "#6B7280"),
         extends=raw.get("extends", ""),
+        compliance_agents=raw.get(
+            "compliance_agents", base.compliance_agents if base else []
+        ),
     )
 
     _cache[domain_id] = domain

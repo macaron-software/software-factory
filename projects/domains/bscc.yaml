@@ -45,3 +45,7 @@ conventions: |
   - Pas d'exposition directe de la BDD — DTO obligatoire
   - Validation des entrées : Bean Validation (Jakarta) côté backend
   - Frontend : composants Solaris uniquement, RGAA AA validé par agent a11y
+
+compliance_agents:
+  - bscc-compliance-critic
+  - solaris-compliance-critic
