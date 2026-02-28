@@ -360,10 +360,15 @@ class MissionOrchestrator:
                 except Exception:
                     pass
                 _rl_rec = _rl.recommend(
-                    wf_id=mission.workflow_id or "",
-                    phase_index=i,
-                    rejection_rate=_rej_rate,
-                    quality_score=_qual,
+                    mission_id=mission.id,
+                    phase_id=phase.phase_id,
+                    state_dict={
+                        "workflow_id": mission.workflow_id or "",
+                        "phase_idx": i,
+                        "phase_count": len(workflow.phases),
+                        "rejection_pct": _rej_rate,
+                        "quality_score": _qual,
+                    },
                 )
                 if _rl_rec and _rl_rec.get("fired") and _rl_rec.get("action") != "keep":
                     _new_pattern = {
@@ -986,6 +991,24 @@ class MissionOrchestrator:
                     phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                 phases_done += 1
 
+                # RL: record experience (phase succeeded → positive reward)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(workflow.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=1.0,
+                    )
+                except Exception:
+                    pass
+
                 summary_text = f"[{wf_phase.name}] terminée"
                 if mission.workspace_path:
                     try:
@@ -1020,6 +1043,23 @@ class MissionOrchestrator:
             else:
                 phase.summary = f"Phase échouée — {phase_error[:200]}"
                 phases_failed += 1
+                # RL: record negative experience (phase failed)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(workflow.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=-1.0,
+                    )
+                except Exception:
+                    pass
             run_store.update(mission)
 
             # Extract features from phase output into PO backlog
