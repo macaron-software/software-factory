@@ -1023,6 +1023,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     tool_calls=cumulative_tool_calls,
                     pattern_type=run.pattern.type,
                     enable_l1=not skip_l1,
+                    project_id=run.project_id or "",
                 )
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)

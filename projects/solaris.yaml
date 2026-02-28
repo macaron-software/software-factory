@@ -67,14 +67,21 @@ design_system:
 
 # Adversarial gate — strict pour le DS
 adversarial:
-  threshold: 3
+  threshold: 5
   custom_patterns:
-    - pattern: 'hardcoded.*#[0-9a-fA-F]{6}'
-      score: 5
-      message: "Hardcoded color — use Solaris token ($color-*)"
-    - pattern: 'px(?!-)'
-      score: 2
-      message: "Hardcoded px value — use Solaris spacing token"
-    - pattern: 'font-size:\s*\d+px'
+    # Couleur CSS hardcodée directe (pas dans var(--..., fallback) )
+    - pattern: '(?:background|color|border|fill|stroke)\s*:\s*#[0-9a-fA-F]{3,6}\b(?!\s*\))'
       score: 4
-      message: "Hardcoded font-size — use Solaris typography token"
+      message: "Hardcoded CSS color — must use var(--color-*) Solaris token"
+    # Couleur hex sans propriété CSS (ex: dans un objet JS/TS)
+    - pattern: ':\s*[''"]#[0-9a-fA-F]{6}[''"]'
+      score: 4
+      message: "Hardcoded hex string — must use Solaris token"
+    # borderRadius hardcodé (doit venir du MCP Figma)
+    - pattern: 'border-?[Rr]adius\s*:\s*\d+px(?!\s*\))'
+      score: 3
+      message: "Hardcoded borderRadius — use var(--border-radius-*) token from Figma MCP"
+    # font-size hardcodé
+    - pattern: 'font-size\s*:\s*\d+(?:px|rem)(?!\s*\))'
+      score: 3
+      message: "Hardcoded font-size — use var(--font-size-*) Solaris token"

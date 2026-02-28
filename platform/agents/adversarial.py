@@ -572,14 +572,73 @@ async def run_guard(
     tool_calls: list = None,
     pattern_type: str = "",
     enable_l1: bool = True,
+    project_id: str = "",
 ) -> GuardResult:
     """Run the full adversarial guard pipeline: L0 then L1.
 
     L0 always runs (deterministic, 0ms).
     L1 runs only for execution patterns (not discussions) and if L0 passes.
+    project_id: when set, loads custom_patterns from projects/<id>.yaml.
     """
+    # Load project-specific custom patterns if project_id provided
+    project_patterns: list[tuple[str, int, str]] = []
+    project_threshold: int | None = None
+    if project_id:
+        try:
+            import os as _os
+            import yaml as _yaml  # optional dep
+
+            _yaml_path = _os.path.join(
+                _os.path.dirname(__file__), "..", "..", "projects", f"{project_id}.yaml"
+            )
+            _yaml_path = _os.path.normpath(_yaml_path)
+            if _os.path.exists(_yaml_path):
+                with open(_yaml_path) as _f:
+                    _cfg = _yaml.safe_load(_f) or {}
+                _adv = _cfg.get("adversarial", {})
+                if isinstance(_adv.get("threshold"), int):
+                    project_threshold = _adv["threshold"]
+                for _pat in _adv.get("custom_patterns", []):
+                    _p = _pat.get("pattern", "")
+                    _s = int(_pat.get("score", 3))
+                    _m = _pat.get("message", f"Project pattern: {_p}")
+                    if _p:
+                        project_patterns.append((_p, _s, _m))
+        except Exception as _pe:
+            logger.debug(
+                "run_guard: failed to load project patterns for %s: %s", project_id, _pe
+            )
+
     # L0: Fast deterministic
     l0 = check_l0(content, agent_role, tool_calls, task)
+
+    # Apply project-specific L0 patterns on top of global ones
+    if project_patterns:
+        import re as _re2
+
+        extra_score = 0
+        extra_issues: list[str] = []
+        for _pattern, _score, _msg in project_patterns:
+            try:
+                if _re2.search(_pattern, content, _re2.IGNORECASE | _re2.MULTILINE):
+                    extra_score += _score
+                    extra_issues.append(_msg)
+            except re.error:
+                pass
+        if extra_issues:
+            l0.score += extra_score
+            l0.issues.extend(extra_issues)
+            _eff_threshold = project_threshold if project_threshold is not None else 5
+            l0.passed = l0.score < _eff_threshold
+            if not l0.passed:
+                logger.info(
+                    "GUARD L0 PROJECT-REJECT [%s] project=%s score=%d: %s",
+                    agent_name,
+                    project_id,
+                    l0.score,
+                    "; ".join(extra_issues[:3]),
+                )
+                return l0
 
     if not l0.passed:
         logger.info(f"GUARD L0 REJECT [{agent_name}]: {l0.summary}")
