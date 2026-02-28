@@ -10,6 +10,7 @@ A domain defines the technical environment a project lives in:
 
 Domain files live in: projects/domains/<id>.yaml
 """
+
 from __future__ import annotations
 
 import logging
@@ -42,16 +43,16 @@ class DomainStack:
 class Domain:
     id: str
     name: str
-    env: str = "any"           # "demo" | "prod" | "any"
+    env: str = "any"  # "demo" | "prod" | "any"
     description: str = ""
     stack: DomainStack = field(default_factory=DomainStack)
-    design_system: str = ""    # e.g. "Solaris (La Poste)"
+    design_system: str = ""  # e.g. "Solaris (La Poste)"
     compliance: list[str] = field(default_factory=list)  # e.g. ["RGPD", "RGAA 4.1"]
-    mcp_tools: list[str] = field(default_factory=list)   # e.g. ["mcp-solaris"]
-    confluence_space: str = "" # e.g. "IAN" — for live spec lookup via LRM
-    conventions: str = ""      # free-text injected verbatim into agent system prompt
-    color: str = "#6B7280"     # UI badge color (hex)
-    extends: str = ""          # parent domain id to inherit from
+    mcp_tools: list[str] = field(default_factory=list)  # e.g. ["mcp-solaris"]
+    confluence_space: str = ""  # e.g. "IAN" — for live spec lookup via LRM
+    conventions: str = ""  # free-text injected verbatim into agent system prompt
+    color: str = "#6B7280"  # UI badge color (hex)
+    extends: str = ""  # parent domain id to inherit from
 
     def to_context_string(self) -> str:
         """Build the domain context string injected into agent system prompts."""
@@ -70,7 +71,9 @@ class Domain:
             if s.database:
                 lines.append(f"- **Base de données :** {s.database}")
             if s.database_forbidden:
-                lines.append(f"- **BDD interdites :** {', '.join(s.database_forbidden)}")
+                lines.append(
+                    f"- **BDD interdites :** {', '.join(s.database_forbidden)}"
+                )
             if s.cache:
                 lines.append(f"- **Cache :** {s.cache}")
             if s.infra:
@@ -97,6 +100,92 @@ class Domain:
             lines.append(f"### Conventions\n{self.conventions}\n")
 
         return "\n".join(lines)
+
+    async def fetch_confluence_context(
+        self, query: str = "", max_chars: int = 3000
+    ) -> str:
+        """Fetch live Confluence pages from LRM and return injected context string.
+
+        Called at session start if domain.confluence_space is set.
+        Falls back silently if LRM is not available.
+        Tries specific query first, then fallback queries if no results.
+        """
+        if not self.confluence_space:
+            return ""
+        try:
+            import aiohttp
+
+            # Try LRM on 9500 (/call) then 9501 (/tool)
+            lrm_endpoints = [
+                ("http://localhost:9500/call", "confluence_search"),
+                ("http://localhost:9501/tool", "confluence_search"),
+            ]
+            # Queries: specific → domain name → "architecture"
+            queries = [
+                q
+                for q in [
+                    query,
+                    f"{self.name} architecture",
+                    "architecture stack",
+                ]
+                if q.strip()
+            ]
+
+            results = []
+            for q in queries:
+                if results:
+                    break
+                for lrm_url, tool_name in lrm_endpoints:
+                    try:
+                        async with aiohttp.ClientSession() as http:
+                            async with http.post(
+                                lrm_url,
+                                json={
+                                    "name": tool_name,
+                                    "arguments": {
+                                        "query": q,
+                                        "space": self.confluence_space,
+                                        "limit": 5,
+                                    },
+                                },
+                                timeout=aiohttp.ClientTimeout(total=8),
+                            ) as resp:
+                                if resp.status == 200:
+                                    data = await resp.json()
+                                    results = data.get("result", {}).get("results", [])
+                                    if results:
+                                        break
+                    except aiohttp.ClientConnectorError:
+                        continue
+
+            if not results:
+                return ""
+
+            # Build compact context block
+            pages = []
+            for p in results[:4]:
+                excerpt = (
+                    p.get("excerpt", "").replace("<b>", "**").replace("</b>", "**")
+                )
+                excerpt = excerpt[:400].strip()
+                if excerpt:
+                    pages.append(f"**{p.get('title', '?')}**\n{excerpt}")
+
+            if not pages:
+                return ""
+
+            return (
+                f"\n### Specs Confluence ({self.confluence_space})\n"
+                + "\n\n".join(pages)
+                + "\n"
+            )[:max_chars]
+        except Exception as exc:
+            logger.debug(
+                "[Domain] Confluence fetch failed for %s: %s",
+                self.confluence_space,
+                exc,
+            )
+            return ""
 
 
 # ── Cache ────────────────────────────────────────────────────────────────────
@@ -133,7 +222,9 @@ def load_domain(domain_id: str) -> Optional[Domain]:
         backend=stack_raw.get("backend", base.stack.backend if base else ""),
         frontend=stack_raw.get("frontend", base.stack.frontend if base else ""),
         database=stack_raw.get("database", base.stack.database if base else ""),
-        database_forbidden=stack_raw.get("database_forbidden", base.stack.database_forbidden if base else []),
+        database_forbidden=stack_raw.get(
+            "database_forbidden", base.stack.database_forbidden if base else []
+        ),
         cache=stack_raw.get("cache", base.stack.cache if base else ""),
         infra=stack_raw.get("infra", base.stack.infra if base else ""),
         ci=stack_raw.get("ci", base.stack.ci if base else ""),
@@ -150,7 +241,9 @@ def load_domain(domain_id: str) -> Optional[Domain]:
         design_system=raw.get("design_system", base.design_system if base else ""),
         compliance=raw.get("compliance", base.compliance if base else []),
         mcp_tools=raw.get("mcp_tools", base.mcp_tools if base else []),
-        confluence_space=raw.get("confluence_space", base.confluence_space if base else ""),
+        confluence_space=raw.get(
+            "confluence_space", base.confluence_space if base else ""
+        ),
         conventions=raw.get("conventions", base.conventions if base else ""),
         color=raw.get("color", base.color if base else "#6B7280"),
         extends=raw.get("extends", ""),

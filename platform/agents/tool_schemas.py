@@ -867,6 +867,78 @@ def _mcp_schemas() -> list[dict]:
                 },
             },
         },
+        # ── LRM: Confluence & Jira ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_confluence_search",
+                "description": "Search Confluence wiki pages (full-text). Use to find architecture docs, ADRs, conventions, or project specs in the company knowledge base.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search keywords"},
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key (default: IAN)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default: 10)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_confluence_read",
+                "description": "Read a Confluence page content by title or page ID. Use to get full architecture specs, conventions, or design decisions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title to find",
+                        },
+                        "page_id": {
+                            "type": "string",
+                            "description": "Confluence page ID (alternative to title)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Space key (default: IAN)",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_jira_search",
+                "description": "Search Jira issues via JQL or keywords. Use to find tickets, bugs, epics or user stories linked to the current project.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "JQL query or plain text keywords",
+                        },
+                        "project": {
+                            "type": "string",
+                            "description": "Jira project key (optional filter)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default: 20)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
         # ── MCP: Figma (design system) ──
         {
             "type": "function",
@@ -2470,6 +2542,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_conventions",
         "lrm_build",
         "lrm_examples",
+        "lrm_confluence_search",
+        "lrm_confluence_read",
+        "lrm_jira_search",
         "github_prs",
         "github_code_search",
         "android_build",

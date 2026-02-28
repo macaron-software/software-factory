@@ -329,11 +329,13 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
             # Always include relevant global memory (cross-project learnings)
             global_results = mem.global_search(query, limit=3) or []
             for r in global_results:
-                results.append({
-                    "key": r.get("key", ""),
-                    "value": r.get("value", ""),
-                    "category": f"global:{r.get('category', '')}",
-                })
+                results.append(
+                    {
+                        "key": r.get("key", ""),
+                        "value": r.get("value", ""),
+                        "category": f"global:{r.get('category', '')}",
+                    }
+                )
         else:
             results = mem.global_search(query, limit=5)
         # Also search session pattern memory (what other agents decided in THIS session)
@@ -379,9 +381,14 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
             )
         # Use classified role (same as retrieval in prompt_builder) to ensure consistency
         from .tool_schemas import _classify_agent_role
+
         agent_role = _classify_agent_role(ctx.agent)
         mem.project_store(
-            ctx.project_id, key, value, category=category, source=ctx.agent.id,
+            ctx.project_id,
+            key,
+            value,
+            category=category,
+            source=ctx.agent.id,
             agent_role=agent_role,
         )
         return f"Stored in project memory: [{key}] (by {ctx.agent.id}, role={agent_role or 'generic'})"
@@ -1324,27 +1331,39 @@ RULES:
 
 
 async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
-    """Proxy to unified MCP SF server (localhost:9501, merged LRM+Platform)."""
+    """Proxy to LRM MCP server (localhost:9500/call or unified 9501/tool)."""
     import aiohttp
 
     tool_name = name.replace("lrm_", "")
     if ctx.project_id:
         args.setdefault("project", ctx.project_id)
-    try:
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                "http://localhost:9501/tool",
-                json={"name": tool_name, "arguments": args},
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp,
-        ):
-            if resp.status == 200:
-                data = await resp.json()
-                return str(data.get("result", data))[:8000]
-            return f"LRM error {resp.status}"
-    except Exception as e:
-        return f"LRM server unavailable: {e}"
+
+    # Try primary port 9500 (/call endpoint) first, fallback to 9501 (/tool)
+    endpoints = [
+        ("http://localhost:9500/call", {"name": tool_name, "arguments": args}),
+        ("http://localhost:9501/tool", {"name": tool_name, "arguments": args}),
+    ]
+    for url, payload in endpoints:
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    url,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp,
+            ):
+                if resp.status == 200:
+                    data = await resp.json()
+                    return str(data.get("result", data))[:8000]
+                if resp.status == 404:
+                    continue  # Try next endpoint
+                return f"LRM error {resp.status}"
+        except aiohttp.ClientConnectorError:
+            continue  # Try next endpoint
+        except Exception as e:
+            return f"LRM server unavailable: {e}"
+    return f"LRM tool '{tool_name}' unavailable (tried ports 9500, 9501)"
 
 
 async def _tool_mcp_figma(name: str, args: dict, ctx: ExecutionContext) -> str:

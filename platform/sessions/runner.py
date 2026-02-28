@@ -304,6 +304,21 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
             domain = load_domain(proj.arch_domain)
             if domain:
                 domain_context_str = domain.to_context_string()
+                # Live Confluence fetch if domain has a confluence_space
+                if domain.confluence_space:
+                    try:
+                        conf_ctx = await domain.fetch_confluence_context(
+                            query=f"{proj.name} architecture stack {domain.stack.backend or ''}"
+                        )
+                        if conf_ctx:
+                            domain_context_str += conf_ctx
+                            logger.info(
+                                "[Domain] Confluence context fetched (%d chars) for domain '%s'",
+                                len(conf_ctx),
+                                proj.arch_domain,
+                            )
+                    except Exception as _ce:
+                        logger.debug("[Domain] Confluence fetch skipped: %s", _ce)
                 logger.info(
                     "[Domain] Injecting domain '%s' into agent %s",
                     proj.arch_domain,
