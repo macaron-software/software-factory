@@ -1709,3 +1709,819 @@ async def ws_preview_proxy(request: Request, project_id: str, path: str):
         headers=resp_headers,
         media_type=content_type or None,
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Missing workspace endpoints — infobar + panels
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def _get_proj(project_id: str):
+    from ...projects.manager import get_project_store
+
+    return get_project_store().get(project_id)
+
+
+async def _require_user(request: Request):
+    from ...auth.middleware import get_current_user
+
+    return await get_current_user(request)
+
+
+# ── Metrics (infobar) ─────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/metrics")
+async def ws_metrics(project_id: str, request: Request):
+    import subprocess
+    from ...db.migrations import get_db
+
+    proj = _get_proj(project_id)
+    if not proj:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    db = get_db()
+    try:
+        active_agents = (
+            db.execute(
+                "SELECT COUNT(DISTINCT agent_id) FROM mission_runs WHERE project_id=? AND status='running'",
+                (project_id,),
+            ).fetchone()[0]
+            or 0
+        )
+    except Exception:
+        active_agents = 0
+    try:
+        calls_h = (
+            db.execute(
+                "SELECT COUNT(*) FROM tool_calls tc LEFT JOIN sessions s ON tc.session_id=s.id "
+                "WHERE s.project_id=? AND tc.timestamp > datetime('now','-1 hour')",
+                (project_id,),
+            ).fetchone()[0]
+            or 0
+        )
+    except Exception:
+        calls_h = 0
+    try:
+        files_w = (
+            db.execute(
+                "SELECT COUNT(*) FROM tool_calls tc LEFT JOIN sessions s ON tc.session_id=s.id "
+                "WHERE s.project_id=? AND tc.tool_name IN ('write_file','create_file','save_file','edit_file') "
+                "AND tc.timestamp > datetime('now','-24 hours')",
+                (project_id,),
+            ).fetchone()[0]
+            or 0
+        )
+    except Exception:
+        files_w = 0
+    try:
+        active_missions = (
+            db.execute(
+                "SELECT COUNT(*) FROM mission_runs WHERE project_id=? AND status='running'",
+                (project_id,),
+            ).fetchone()[0]
+            or 0
+        )
+    except Exception:
+        active_missions = 0
+    db.close()
+    last_hash = last_msg = ""
+    if proj.path and Path(proj.path).exists():
+        try:
+            r = subprocess.run(
+                ["git", "log", "-1", "--format=%h|%s"],
+                cwd=proj.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if r.returncode == 0 and "|" in r.stdout:
+                last_hash, last_msg = r.stdout.strip().split("|", 1)
+        except Exception:
+            pass
+    return JSONResponse(
+        {
+            "active_agents": active_agents,
+            "tool_calls_last_hour": calls_h,
+            "files_written": files_w,
+            "mission_runs_active": active_missions,
+            "last_commit_hash": last_hash,
+            "last_commit_msg": last_msg,
+        }
+    )
+
+
+# ── Git panel ─────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/git")
+async def ws_git(project_id: str, request: Request):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"commits": [], "changes": [], "branch": ""})
+    p = proj.path
+    if not Path(p).exists():
+        return JSONResponse({"commits": [], "changes": [], "branch": ""})
+
+    def run(cmd):
+        r = subprocess.run(cmd, cwd=p, capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() if r.returncode == 0 else ""
+
+    branch = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+    # Changed files
+    changes = []
+    status_out = run(["git", "status", "--porcelain"])
+    for line in status_out.splitlines():
+        if len(line) >= 3:
+            status = line[:2].strip() or "M"
+            path = line[3:].strip()
+            changes.append({"status": status, "path": path})
+    # Recent commits
+    commits = []
+    log_out = run(["git", "log", "--oneline", "-20", "--format=%H|%s|%an|%ai"])
+    for line in log_out.splitlines():
+        parts = line.split("|", 3)
+        if len(parts) == 4:
+            commits.append(
+                {
+                    "hash": parts[0],
+                    "message": parts[1],
+                    "author": parts[2],
+                    "date": parts[3],
+                }
+            )
+    return JSONResponse({"branch": branch, "commits": commits, "changes": changes})
+
+
+@router.get("/api/projects/{project_id}/workspace/git/diff")
+async def ws_git_diff(project_id: str, request: Request, file: str = ""):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"diff": ""})
+    cmd = ["git", "diff", "HEAD", "--", file] if file else ["git", "diff", "HEAD"]
+    r = subprocess.run(cmd, cwd=proj.path, capture_output=True, text=True, timeout=15)
+    return JSONResponse({"diff": r.stdout or r.stderr or "(aucun diff)"})
+
+
+@router.get("/api/projects/{project_id}/workspace/diff")
+async def ws_diff_ref(project_id: str, request: Request, ref: str = "HEAD~1"):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"diff": ""})
+    r = subprocess.run(
+        ["git", "diff", ref], cwd=proj.path, capture_output=True, text=True, timeout=15
+    )
+    return JSONResponse({"diff": r.stdout or "(aucun diff)"})
+
+
+# ── Tool calls ────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/tool-calls")
+async def ws_tool_calls(project_id: str, request: Request):
+    from ...db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT tc.tool_name, tc.parameters_json, tc.result_json, tc.success, "
+            "tc.duration_ms, tc.timestamp FROM tool_calls tc "
+            "LEFT JOIN sessions s ON tc.session_id=s.id "
+            "WHERE s.project_id=? ORDER BY tc.timestamp DESC LIMIT 50",
+            (project_id,),
+        ).fetchall()
+    except Exception:
+        rows = []
+    db.close()
+    items = [
+        {
+            "tool_name": r[0],
+            "parameters": r[1],
+            "result": r[2],
+            "success": bool(r[3]),
+            "duration_ms": r[4],
+            "ts": r[5],
+        }
+        for r in rows
+    ]
+    return JSONResponse({"items": items})
+
+
+# ── Agents ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/agents")
+async def ws_agents(project_id: str, request: Request):
+    from ...db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT mr.agent_id, mr.status, mr.phase, mr.progress, m.title, s.id "
+            "FROM mission_runs mr LEFT JOIN missions m ON mr.mission_id=m.id "
+            "LEFT JOIN sessions s ON s.project_id=mr.project_id "
+            "WHERE mr.project_id=? AND mr.status IN ('running','active') "
+            "ORDER BY mr.started_at DESC LIMIT 20",
+            (project_id,),
+        ).fetchall()
+    except Exception:
+        rows = []
+    db.close()
+    items = []
+    for r in rows:
+        agent_id = r[0] or ""
+        items.append(
+            {
+                "agent_id": agent_id,
+                "agent_name": agent_id.replace("-", " ").title(),
+                "status": r[1] or "idle",
+                "phase": r[2] or "",
+                "progress": int(r[3] or 0),
+                "mission_title": r[4] or "",
+                "session_id": r[5] or "",
+                "avatar": f"/static/avatars/{agent_id}.jpg" if agent_id else "",
+            }
+        )
+    return JSONResponse({"items": items})
+
+
+# ── Backlog ───────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/backlog")
+async def ws_backlog(project_id: str, request: Request):
+    from ...db.migrations import get_db
+
+    db = get_db()
+    missions = []
+    try:
+        rows = db.execute(
+            "SELECT id, title, status, type, goal FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 30",
+            (project_id,),
+        ).fetchall()
+        for row in rows:
+            m = {
+                "id": row[0],
+                "title": row[1],
+                "status": row[2],
+                "type": row[3],
+                "goal": row[4],
+                "tasks": [],
+            }
+            try:
+                tasks = db.execute(
+                    "SELECT id, title, type, status, agent_id FROM tasks WHERE mission_id=? ORDER BY created_at",
+                    (row[0],),
+                ).fetchall()
+                m["tasks"] = [
+                    {
+                        "id": t[0],
+                        "title": t[1],
+                        "type": t[2],
+                        "status": t[3],
+                        "agent": t[4] or "",
+                    }
+                    for t in tasks
+                ]
+            except Exception:
+                pass
+            missions.append(m)
+    except Exception:
+        pass
+    db.close()
+    return JSONResponse({"missions": missions})
+
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/docker")
+async def ws_docker(project_id: str, request: Request):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj:
+        return JSONResponse({"containers": [], "docker_files": []})
+    p = Path(proj.path) if proj.path else Path(".")
+    # Docker files in project
+    docker_files = []
+    for fname in (
+        "Dockerfile",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+    ):
+        f = p / fname
+        if f.exists():
+            try:
+                docker_files.append(
+                    {"name": fname, "content": f.read_text(errors="ignore")[:2000]}
+                )
+            except Exception:
+                pass
+    # Running containers — filter by project name hint
+    containers = []
+    try:
+        r = subprocess.run(
+            [
+                "docker",
+                "ps",
+                "--format",
+                "{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        for line in r.stdout.strip().splitlines():
+            parts = line.split("\t")
+            if len(parts) >= 3:
+                name, image = parts[0], parts[1]
+                status = parts[2] if len(parts) > 2 else ""
+                ports = parts[3] if len(parts) > 3 else ""
+                containers.append(
+                    {
+                        "name": name,
+                        "image": image,
+                        "status": status,
+                        "ports": ports,
+                        "logs": "",
+                    }
+                )
+    except Exception:
+        pass
+    # Get last 10 log lines for each container
+    for c in containers[:5]:
+        try:
+            lr = subprocess.run(
+                ["docker", "logs", c["name"], "--tail", "10"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            c["logs"] = (lr.stdout + lr.stderr).strip()[-800:] or "—"
+        except Exception:
+            pass
+    return JSONResponse({"containers": containers, "docker_files": docker_files})
+
+
+@router.post("/api/projects/{project_id}/workspace/docker/{action}")
+async def ws_docker_action(project_id: str, action: str, request: Request):
+    import subprocess
+
+    if action not in ("start", "stop", "restart"):
+        return JSONResponse({"error": "Invalid action"}, status_code=400)
+    body = await request.json()
+    container = body.get("container", "")
+    if not container:
+        return JSONResponse({"error": "container required"}, status_code=400)
+    try:
+        subprocess.run(["docker", action, container], capture_output=True, timeout=15)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    return JSONResponse({"ok": True})
+
+
+# ── Database browser ──────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/db")
+async def ws_db_list(project_id: str, request: Request):
+    import sqlite3 as _sq
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"databases": []})
+    p = Path(proj.path)
+    dbs = []
+    for db_file in sorted(p.rglob("*.db")):
+        if any(
+            skip in str(db_file) for skip in ("node_modules", ".git", "__pycache__")
+        ):
+            continue
+        tables = []
+        try:
+            conn = _sq.connect(str(db_file), timeout=5)
+            table_names = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                ).fetchall()
+            ]
+            for tname in table_names:
+                try:
+                    count = conn.execute(f"SELECT COUNT(*) FROM '{tname}'").fetchone()[
+                        0
+                    ]
+                    cols = [
+                        {
+                            "name": r[1],
+                            "type": r[2],
+                            "notnull": bool(r[3]),
+                            "pk": bool(r[5]),
+                        }
+                        for r in conn.execute(
+                            f"PRAGMA table_info('{tname}')"
+                        ).fetchall()
+                    ]
+                    tables.append({"name": tname, "rows": count, "columns": cols})
+                except Exception:
+                    pass
+            conn.close()
+        except Exception:
+            pass
+        dbs.append({"file": str(db_file.relative_to(p)), "tables": tables})
+    return JSONResponse({"databases": dbs})
+
+
+@router.post("/api/projects/{project_id}/workspace/db/query")
+async def ws_db_query(project_id: str, request: Request):
+    import sqlite3 as _sq
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    db_file = body.get("file", "")
+    sql = body.get("sql", "").strip()
+    if not sql:
+        return JSONResponse({"error": "SQL required"}, status_code=400)
+    target = (Path(proj.path) / db_file).resolve()
+    try:
+        target.relative_to(Path(proj.path))
+    except ValueError:
+        return JSONResponse({"error": "Access denied"}, status_code=403)
+    try:
+        conn = _sq.connect(str(target), timeout=10)
+        conn.row_factory = _sq.Row
+        cur = conn.execute(sql)
+        if cur.description:
+            cols = [d[0] for d in cur.description]
+            rows = [list(r) for r in cur.fetchmany(200)]
+            conn.close()
+            return JSONResponse({"columns": cols, "rows": rows})
+        conn.commit()
+        conn.close()
+        return JSONResponse({"ok": True, "rowcount": cur.rowcount})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+# ── Secrets / .env ────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/secrets")
+async def ws_secrets(project_id: str, request: Request):
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"content": "", "exists": False})
+    env_file = Path(proj.path) / ".env"
+    if not env_file.exists():
+        return JSONResponse({"content": "", "exists": False})
+    try:
+        return JSONResponse(
+            {"content": env_file.read_text(errors="ignore"), "exists": True}
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/projects/{project_id}/workspace/secrets/save")
+async def ws_secrets_save(project_id: str, request: Request):
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    content = body.get("content", "")
+    env_file = Path(proj.path) / ".env"
+    try:
+        env_file.write_text(content)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── Timeline ──────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/timeline")
+async def ws_timeline(project_id: str, request: Request, filter: str = "all"):
+    import subprocess
+    from ...db.migrations import get_db
+
+    events = []
+    # Git commits
+    proj = _get_proj(project_id)
+    if proj and proj.path and Path(proj.path).exists() and filter in ("all", "commit"):
+        try:
+            r = subprocess.run(
+                ["git", "log", "-20", "--format=%H|%s|%an|%ai"],
+                cwd=proj.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            for line in r.stdout.strip().splitlines():
+                parts = line.split("|", 3)
+                if len(parts) == 4:
+                    events.append(
+                        {
+                            "type": "commit",
+                            "title": parts[1],
+                            "author": parts[2],
+                            "ts": parts[3],
+                            "description": parts[0][:8],
+                        }
+                    )
+        except Exception:
+            pass
+    # Tool calls from DB
+    if filter in ("all", "tool_call"):
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT tc.tool_name, tc.success, tc.timestamp, s.agent_id "
+                "FROM tool_calls tc LEFT JOIN sessions s ON tc.session_id=s.id "
+                "WHERE s.project_id=? ORDER BY tc.timestamp DESC LIMIT 30",
+                (project_id,),
+            ).fetchall()
+            for r in rows:
+                events.append(
+                    {
+                        "type": "tool_call",
+                        "title": r[0],
+                        "description": "success" if r[1] else "failed",
+                        "author": r[3] or "",
+                        "ts": r[2] or "",
+                    }
+                )
+        except Exception:
+            pass
+        db.close()
+    # Missions
+    if filter in ("all", "mission"):
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT title, status, created_at FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
+                (project_id,),
+            ).fetchall()
+            for r in rows:
+                events.append(
+                    {
+                        "type": "mission",
+                        "title": r[0] or "",
+                        "description": r[1],
+                        "ts": r[2] or "",
+                    }
+                )
+        except Exception:
+            pass
+        db.close()
+    # Sort by ts desc
+    events.sort(key=lambda x: x.get("ts", ""), reverse=True)
+    return JSONResponse({"events": events[:50]})
+
+
+# ── Progress.md ───────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/progress")
+async def ws_progress(project_id: str, request: Request):
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"exists": False, "content": ""})
+    for fname in ("PROGRESS.md", "progress.md", "STATUS.md"):
+        f = Path(proj.path) / fname
+        if f.exists():
+            try:
+                stat = f.stat()
+                import datetime as _dt
+
+                return JSONResponse(
+                    {
+                        "exists": True,
+                        "content": f.read_text(errors="ignore"),
+                        "mtime": _dt.datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    }
+                )
+            except Exception:
+                pass
+    return JSONResponse({"exists": False, "content": ""})
+
+
+# ── Packages ──────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/packages")
+async def ws_packages(project_id: str, request: Request):
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"packages": [], "manager": ""})
+    p = Path(proj.path)
+    pkg_json = p / "package.json"
+    if pkg_json.exists():
+        try:
+            import json as _j
+
+            data = _j.loads(pkg_json.read_text())
+            pkgs = []
+            for section in ("dependencies", "devDependencies"):
+                for name, ver in (data.get(section) or {}).items():
+                    pkgs.append(
+                        {
+                            "name": name,
+                            "version": ver,
+                            "dev": section == "devDependencies",
+                        }
+                    )
+            return JSONResponse({"packages": pkgs, "manager": "npm"})
+        except Exception:
+            pass
+    req = p / "requirements.txt"
+    if req.exists():
+        pkgs = [
+            {"name": line.strip(), "version": "", "dev": False}
+            for line in req.read_text().splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+        return JSONResponse({"packages": pkgs, "manager": "pip"})
+    return JSONResponse({"packages": [], "manager": ""})
+
+
+@router.post("/api/projects/{project_id}/workspace/packages/install")
+async def ws_packages_install(project_id: str, request: Request):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    pkg = body.get("package", "").strip()
+    p = Path(proj.path)
+    manager = "npm" if (p / "package.json").exists() else "pip3"
+    cmd = (
+        [manager, "install", pkg]
+        if pkg
+        else (
+            [manager, "install"]
+            if manager == "npm"
+            else [manager, "install", "-r", "requirements.txt"]
+        )
+    )
+    try:
+        r = subprocess.run(cmd, cwd=str(p), capture_output=True, text=True, timeout=120)
+        return JSONResponse(
+            {"ok": r.returncode == 0, "output": (r.stdout + r.stderr)[-2000:]}
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── Search ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/search")
+async def ws_search(project_id: str, request: Request, q: str = ""):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path or not q:
+        return JSONResponse({"results": []})
+    try:
+        r = subprocess.run(
+            [
+                "grep",
+                "-r",
+                "-n",
+                "-I",
+                "--include=*.py",
+                "--include=*.ts",
+                "--include=*.tsx",
+                "--include=*.js",
+                "--include=*.jsx",
+                "--include=*.json",
+                "--include=*.md",
+                "--include=*.css",
+                "--include=*.html",
+                "-m",
+                "5",
+                "--",
+                q,
+                ".",
+            ],
+            cwd=proj.path,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        results = []
+        for line in r.stdout.splitlines()[:50]:
+            parts = line.split(":", 2)
+            if len(parts) >= 3:
+                results.append(
+                    {"file": parts[0], "line": parts[1], "content": parts[2]}
+                )
+        return JSONResponse({"results": results})
+    except Exception as e:
+        return JSONResponse({"results": [], "error": str(e)})
+
+
+# ── Terminal / Run ────────────────────────────────────────────────────────────
+
+
+@router.post("/api/projects/{project_id}/workspace/terminal")
+async def ws_terminal_run(project_id: str, request: Request):
+    import subprocess
+
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    cmd = body.get("cmd", "").strip()
+    if not cmd:
+        return JSONResponse({"error": "cmd required"}, status_code=400)
+    try:
+        r = subprocess.run(
+            cmd, shell=True, cwd=proj.path, capture_output=True, text=True, timeout=30
+        )
+        return JSONResponse(
+            {"output": (r.stdout + r.stderr)[-4000:], "exit_code": r.returncode}
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── File (alias for file-content) ─────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/workspace/file")
+async def ws_file_get(project_id: str, request: Request, path: str = ""):
+    """Alias endpoint for reading a file — delegates to ws_file_content logic."""
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    base = Path(proj.path)
+    target = (base / path).resolve() if path else base
+    try:
+        target.relative_to(base)
+    except ValueError:
+        return JSONResponse({"error": "Access denied"}, status_code=403)
+    if not target.is_file():
+        return JSONResponse({"error": "Not a file"}, status_code=404)
+    try:
+        content = target.read_text(errors="replace")
+        ext = target.suffix.lstrip(".")
+        return JSONResponse({"content": content, "language": ext, "path": path})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.post("/api/projects/{project_id}/workspace/file/save")
+async def ws_file_save(project_id: str, request: Request):
+    proj = _get_proj(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+    body = await request.json()
+    path = body.get("path", "").strip()
+    content = body.get("content", "")
+    if not path:
+        return JSONResponse({"error": "path required"}, status_code=400)
+    base = Path(proj.path)
+    target = (base / path).resolve()
+    try:
+        target.relative_to(base)
+    except ValueError:
+        return JSONResponse({"error": "Access denied"}, status_code=403)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── Wallet ────────────────────────────────────────────────────────────────────
+
+
+@router.get("/api/projects/{project_id}/wallet")
+async def ws_wallet(project_id: str, request: Request):
+    from ...db.migrations import get_db
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM tool_calls tc "
+            "LEFT JOIN sessions s ON tc.session_id=s.id WHERE s.project_id=?",
+            (project_id,),
+        ).fetchone()
+        cost = float(row[0] or 0)
+    except Exception:
+        cost = 0.0
+    db.close()
+    return JSONResponse({"balance": round(cost, 4)})
