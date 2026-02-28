@@ -2376,6 +2376,77 @@ def _platform_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Ideation & Community Launch tools (Jarvis / CTO delegation) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_ideation",
+                "description": (
+                    "Launch a multi-agent ideation session (Business Analyst, Solution Architect, "
+                    "UX Designer, Product Manager, Tech Lead). Returns session_id and URL. "
+                    "Use to explore product ideas, architecture questions, strategic directions."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The question or topic to explore with the ideation team",
+                        },
+                    },
+                    "required": ["prompt"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_mkt_ideation",
+                "description": (
+                    "Launch a marketing ideation session (CMO, Content Strategist, Growth Hacker, "
+                    "Brand Strategist, Community Manager). Returns session_id and URL. "
+                    "Use for campaigns, go-to-market, brand positioning, growth strategies."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The marketing topic or campaign to ideate on",
+                        },
+                    },
+                    "required": ["prompt"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_group_ideation",
+                "description": (
+                    "Launch a specialized community ideation with domain experts. "
+                    "Available groups: 'knowledge' (Knowledge & Recherche), "
+                    "'archi' (Architecture & Design), 'security' (Sécurité & Conformité), "
+                    "'data-ai' (Data & IA), 'pi-planning' (PI Planning & SAFe). "
+                    "Returns session_id and URL."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "group_id": {
+                            "type": "string",
+                            "enum": ["knowledge", "archi", "security", "data-ai", "pi-planning"],
+                            "description": "The expert community to engage",
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": "The question or topic for the expert community",
+                        },
+                    },
+                    "required": ["group_id", "prompt"],
+                },
+            },
+        },
     ]
 
 
@@ -2431,6 +2502,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "compose_workflow",
         "run_e2e_tests",
         "screenshot",
+        # Ideation & community delegation
+        "launch_ideation",
+        "launch_mkt_ideation",
+        "launch_group_ideation",
         # Web / fetch
         "mcp_fetch_fetch",
         "deep_search",

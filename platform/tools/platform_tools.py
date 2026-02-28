@@ -610,6 +610,197 @@ class PlatformCreateMissionTool(BaseTool):
         )
 
 
+class LaunchIdeationTool(BaseTool):
+    name = "launch_ideation"
+    description = (
+        "Launch a multi-agent business/project ideation session (5 specialist agents: "
+        "Business Analyst, Solution Architect, UX Designer, Product Manager, Tech Lead). "
+        "Runs asynchronously — returns session_id immediately. "
+        "Use to explore a product idea, architecture direction, or strategic question."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import uuid, asyncio
+        from ..sessions.store import get_session_store, SessionDef, MessageDef
+        from ..patterns.engine import run_pattern
+        from ..patterns.store import PatternDef
+
+        prompt = (params.get("prompt") or params.get("question") or "").strip()
+        if not prompt:
+            return json.dumps({"error": "prompt is required"})
+
+        session_id = str(uuid.uuid4())[:8]
+        store = get_session_store()
+        session = store.create(SessionDef(
+            id=session_id,
+            name=f"Idéation: {prompt[:60]}",
+            goal=prompt,
+            status="active",
+            config={"type": "ideation", "pattern": "network"},
+        ))
+        store.add_message(MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            message_type="user",
+            content=prompt,
+        ))
+
+        from ..web.routes.ideation import _IDEATION_AGENTS
+        pattern = PatternDef(
+            id="ideation-network",
+            name="Ideation Network",
+            pattern_type="network",
+            agents=[a["id"] for a in _IDEATION_AGENTS],
+        )
+
+        async def _run():
+            try:
+                await run_pattern(pattern, session.id, prompt, max_rounds=3)
+            except Exception as _e:
+                logger.warning("launch_ideation background error: %s", _e)
+
+        asyncio.ensure_future(_run())
+        return json.dumps({
+            "ok": True,
+            "session_id": session_id,
+            "url": f"/ideation?session_id={session_id}",
+            "message": f"Idéation lancée avec 5 agents. Résultats sur /ideation?session_id={session_id}",
+        })
+
+
+class LaunchMktIdeationTool(BaseTool):
+    name = "launch_mkt_ideation"
+    description = (
+        "Launch a marketing ideation session (CMO, Content Strategist, Growth Hacker, Brand Strategist, "
+        "Community Manager). Returns session_id immediately. "
+        "Use to brainstorm marketing campaigns, go-to-market strategies, brand positioning."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import uuid, asyncio
+        from ..sessions.store import get_session_store, SessionDef, MessageDef
+        from ..patterns.engine import run_pattern
+        from ..patterns.store import PatternDef
+
+        prompt = (params.get("prompt") or params.get("question") or "").strip()
+        if not prompt:
+            return json.dumps({"error": "prompt is required"})
+
+        session_id = str(uuid.uuid4())[:8]
+        store = get_session_store()
+        session = store.create(SessionDef(
+            id=session_id,
+            name=f"Mkt Idéation: {prompt[:60]}",
+            goal=prompt,
+            status="active",
+            config={"type": "mkt_ideation", "pattern": "network"},
+        ))
+        store.add_message(MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            message_type="user",
+            content=prompt,
+        ))
+
+        from ..web.routes.mkt_ideation import _MKT_AGENTS
+        pattern = PatternDef(
+            id="mkt-ideation-network",
+            name="Marketing Ideation Network",
+            pattern_type="network",
+            agents=[a["id"] for a in _MKT_AGENTS],
+        )
+
+        async def _run():
+            try:
+                await run_pattern(pattern, session.id, prompt, max_rounds=3)
+            except Exception as _e:
+                logger.warning("launch_mkt_ideation background error: %s", _e)
+
+        asyncio.ensure_future(_run())
+        return json.dumps({
+            "ok": True,
+            "session_id": session_id,
+            "url": f"/mkt-ideation?session_id={session_id}",
+            "message": f"Idéation marketing lancée. Résultats sur /mkt-ideation?session_id={session_id}",
+        })
+
+
+class LaunchGroupIdeationTool(BaseTool):
+    name = "launch_group_ideation"
+    description = (
+        "Launch a specialized community ideation with a predefined group of expert agents. "
+        "Available groups: 'knowledge' (Knowledge & Recherche), 'archi' (Architecture & Design), "
+        "'security' (Sécurité & Conformité), 'data-ai' (Data & IA), 'pi-planning' (PI Planning & SAFe). "
+        "Returns session_id immediately."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import uuid, asyncio
+        from ..sessions.store import get_session_store, SessionDef, MessageDef
+        from ..patterns.engine import run_pattern
+        from ..patterns.store import PatternDef
+        from ..web.routes.group_ideation import GROUP_CONFIGS
+
+        group_id = (params.get("group_id") or "").strip()
+        prompt = (params.get("prompt") or params.get("question") or "").strip()
+
+        if not group_id:
+            return json.dumps({
+                "error": "group_id is required",
+                "available_groups": list(GROUP_CONFIGS.keys()),
+            })
+        if group_id not in GROUP_CONFIGS:
+            return json.dumps({
+                "error": f"Unknown group '{group_id}'",
+                "available_groups": list(GROUP_CONFIGS.keys()),
+            })
+        if not prompt:
+            return json.dumps({"error": "prompt is required"})
+
+        group = GROUP_CONFIGS[group_id]
+        session_id = str(uuid.uuid4())[:8]
+        store = get_session_store()
+        session = store.create(SessionDef(
+            id=session_id,
+            name=f"{group['name']}: {prompt[:60]}",
+            goal=prompt,
+            status="active",
+            config={"type": f"group_{group_id}", "pattern": "network"},
+        ))
+        store.add_message(MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            message_type="user",
+            content=prompt,
+        ))
+
+        pattern = PatternDef(
+            id=f"group-{group_id}-network",
+            name=f"{group['name']} Network",
+            pattern_type="network",
+            agents=[a["id"] for a in group["agents"]],
+        )
+
+        async def _run():
+            try:
+                await run_pattern(pattern, session.id, prompt, max_rounds=3)
+            except Exception as _e:
+                logger.warning("launch_group_ideation background error: %s", _e)
+
+        asyncio.ensure_future(_run())
+        return json.dumps({
+            "ok": True,
+            "session_id": session_id,
+            "group": group_id,
+            "group_name": group["name"],
+            "url": f"/group/{group_id}?session_id={session_id}",
+            "message": f"Communauté '{group['name']}' lancée. Résultats sur /group/{group_id}?session_id={session_id}",
+        })
+
+
 def register_platform_tools(registry):
     """Register all platform introspection tools."""
     registry.register(PlatformAgentsTool())
@@ -622,3 +813,6 @@ def register_platform_tools(registry):
     registry.register(PlatformCreateStoryTool())
     registry.register(PlatformCreateProjectTool())
     registry.register(PlatformCreateMissionTool())
+    registry.register(LaunchIdeationTool())
+    registry.register(LaunchMktIdeationTool())
+    registry.register(LaunchGroupIdeationTool())
