@@ -44,12 +44,19 @@ services:
       - JIRA_BOARD_ID=${JIRA_BOARD_ID:-}
       - JIRA_TOKEN=${JIRA_TOKEN:-}
       - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
       - platform-data:/app/data
       - workspace-data:/app/workspace
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/macaron/repos:/opt/macaron/repos
+      # Live code volumes — overrides baked image code; docker restart = code reload
+      - /opt/macaron/platform:/app/macaron_platform
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /opt/macaron/mcp_lrm:/app/mcp_lrm
     depends_on:
       postgres:
         condition: service_healthy
