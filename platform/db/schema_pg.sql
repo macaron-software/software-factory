@@ -1022,3 +1022,34 @@ CREATE INDEX IF NOT EXISTS idx_retro_scope           ON retrospectives(scope_id)
 CREATE INDEX IF NOT EXISTS idx_rl_created            ON rl_experience(created_at DESC);
 
 -- features: epic_id (already has idx_features_epic — add project via epic join, no direct project_id col)
+
+-- phase_outcomes: real GA/RL execution data per phase
+CREATE TABLE IF NOT EXISTS phase_outcomes (
+    id SERIAL PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    phase_id TEXT NOT NULL,
+    agent_ids TEXT NOT NULL,
+    team_size INTEGER DEFAULT 1,
+    success INTEGER DEFAULT 0,
+    quality_score REAL DEFAULT 0.0,
+    duration_s REAL DEFAULT 0.0,
+    complexity_tier TEXT DEFAULT 'simple',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_po_workflow   ON phase_outcomes(workflow_id, pattern_id);
+CREATE INDEX IF NOT EXISTS idx_po_phase      ON phase_outcomes(phase_id, success);
+CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id);
+
+-- agent_pair_scores: chemistry between agent pairs
+CREATE TABLE IF NOT EXISTS agent_pair_scores (
+    id SERIAL PRIMARY KEY,
+    agent_a TEXT NOT NULL,
+    agent_b TEXT NOT NULL,
+    co_appearances INTEGER DEFAULT 0,
+    joint_successes INTEGER DEFAULT 0,
+    joint_quality_sum REAL DEFAULT 0.0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(agent_a, agent_b)
+);
+CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b);

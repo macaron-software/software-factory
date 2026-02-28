@@ -1037,6 +1037,52 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
+    # GA/RL empirical data tables (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id SERIAL PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            agent_ids TEXT NOT NULL,
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            duration_s REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+    try:
+        conn.execute(
+            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS complexity_tier TEXT DEFAULT 'simple'"
+        )
+    except Exception:
+        pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id SERIAL PRIMARY KEY,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
