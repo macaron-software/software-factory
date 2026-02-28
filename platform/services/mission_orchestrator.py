@@ -1024,9 +1024,18 @@ class MissionOrchestrator:
 
                     _duration = time.monotonic() - _phase_start_time
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
-                    _qual_val = _qual if "_qual" in dir() else 0.0
                     _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
                     _db = _get_db()
+                    # Quality = avg agent quality from agent_scores (global, not mission-scoped)
+                    _qual_val = 0.0
+                    if aids:
+                        _q_rows = _db.execute(
+                            "SELECT AVG(quality_score) as q FROM agent_scores WHERE agent_id IN ({}) AND iterations > 0".format(
+                                ",".join("?" * len(aids))
+                            ),
+                            tuple(aids),
+                        ).fetchone()
+                        _qual_val = float(_q_rows[0] or 0.0) if _q_rows else 0.0
                     _db.execute(
                         """INSERT INTO phase_outcomes
                            (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
@@ -1129,6 +1138,16 @@ class MissionOrchestrator:
                     _duration = time.monotonic() - _phase_start_time
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
                     _db = _get_db()
+                    # Quality from global agent_scores
+                    _qual_fail = 0.0
+                    if aids:
+                        _qf = _db.execute(
+                            "SELECT AVG(quality_score) as q FROM agent_scores WHERE agent_id IN ({}) AND iterations > 0".format(
+                                ",".join("?" * len(aids))
+                            ),
+                            tuple(aids),
+                        ).fetchone()
+                        _qual_fail = float(_qf[0] or 0.0) if _qf else 0.0
                     _db.execute(
                         """INSERT INTO phase_outcomes
                            (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
@@ -1142,7 +1161,7 @@ class MissionOrchestrator:
                             _json.dumps(aids),
                             len(aids),
                             0,
-                            _qual if "_qual" in dir() else 0.0,
+                            _qual_fail,
                             int(
                                 (_rej_rate if "_rej_rate" in dir() else 1.0)
                                 * max(1, len(aids))
