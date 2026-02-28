@@ -1500,6 +1500,362 @@ async def ws_run_command(project_id: str, cmd: str, request: Request):
     )
 
 
+@router.get("/api/projects/{project_id}/workspace/live")
+async def ws_live_stream(project_id: str, since: str = "", request: Request = None):
+    """SSE multi-channel live stream: tool_call, agent_status, file_write, git_commit, message, mission_phase."""
+    import time as _time
+    from ...db.migrations import get_db
+
+    # Determine cursor timestamp
+    cursor = since.strip() if since.strip() else None
+    if not cursor:
+        # Default: last 30s
+        from datetime import timedelta
+
+        cursor = (datetime.utcnow() - timedelta(seconds=30)).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+    async def event_stream():
+        nonlocal cursor
+        deadline = _time.monotonic() + 300  # 5 min max
+        last_keepalive = _time.monotonic()
+
+        while _time.monotonic() < deadline:
+            # Check client disconnect
+            if request and await request.is_disconnected():
+                break
+
+            try:
+                db = get_db()
+                batch = []
+
+                # 1. New tool calls for this project
+                try:
+                    rows = db.execute(
+                        """
+                        SELECT tc.agent_id, tc.tool_name, tc.success, tc.parameters_json, tc.timestamp
+                        FROM tool_calls tc
+                        LEFT JOIN sessions s ON tc.session_id = s.id
+                        WHERE s.project_id = ? AND tc.timestamp > ?
+                        ORDER BY tc.timestamp ASC LIMIT 20
+                        """,
+                        (project_id, cursor),
+                    ).fetchall()
+                    for r in rows:
+                        params = {}
+                        try:
+                            params = json.loads(r[3] or "{}")
+                        except Exception:
+                            pass
+                        file_path = params.get("path", "")
+                        preview = (
+                            str(params.get("content", ""))[:60]
+                            if params.get("content")
+                            else ""
+                        )
+                        batch.append(
+                            (
+                                "tool_call",
+                                {
+                                    "agent_id": r[0] or "",
+                                    "tool_name": r[1] or "",
+                                    "success": bool(r[2]),
+                                    "file": file_path,
+                                    "preview": preview,
+                                    "ts": str(r[4] or ""),
+                                },
+                            )
+                        )
+                        # File write secondary event
+                        if (
+                            r[1] in ("code_write", "code_edit", "code_create")
+                            and file_path
+                        ):
+                            batch.append(
+                                (
+                                    "file_write",
+                                    {
+                                        "path": file_path,
+                                        "agent_id": r[0] or "",
+                                        "ts": str(r[4] or ""),
+                                    },
+                                )
+                            )
+                except Exception:
+                    pass
+
+                # 2. Agent/session status changes
+                try:
+                    sess_rows = db.execute(
+                        """
+                        SELECT id, agent_id, status, title, updated_at
+                        FROM sessions
+                        WHERE project_id = ? AND updated_at > ?
+                        ORDER BY updated_at ASC LIMIT 10
+                        """,
+                        (project_id, cursor),
+                    ).fetchall()
+                    for r in sess_rows:
+                        batch.append(
+                            (
+                                "agent_status",
+                                {
+                                    "session_id": r[0] or "",
+                                    "agent_id": r[1] or "",
+                                    "status": r[2] or "",
+                                    "mission": r[3] or "",
+                                    "ts": str(r[4] or ""),
+                                },
+                            )
+                        )
+                except Exception:
+                    pass
+
+                # 3. Recent agent messages
+                try:
+                    msg_rows = db.execute(
+                        """
+                        SELECT m.from_agent, m.session_id, m.content, m.created_at
+                        FROM messages m
+                        LEFT JOIN sessions s ON m.session_id = s.id
+                        WHERE s.project_id = ? AND m.created_at > ?
+                        AND m.role != 'tool'
+                        ORDER BY m.created_at ASC LIMIT 10
+                        """,
+                        (project_id, cursor),
+                    ).fetchall()
+                    for r in msg_rows:
+                        content = str(r[2] or "")
+                        if content.startswith("[") or len(content) < 5:
+                            continue
+                        batch.append(
+                            (
+                                "message",
+                                {
+                                    "agent_id": r[0] or "",
+                                    "session_id": r[1] or "",
+                                    "preview": content[:120],
+                                    "ts": str(r[3] or ""),
+                                },
+                            )
+                        )
+                except Exception:
+                    pass
+
+                # 4. Mission run phase changes
+                try:
+                    run_rows = db.execute(
+                        """
+                        SELECT mr.id, mr.workflow_id, mr.status, mr.current_phase, mr.updated_at
+                        FROM mission_runs mr
+                        WHERE mr.project_id = ? AND mr.updated_at > ?
+                        ORDER BY mr.updated_at ASC LIMIT 5
+                        """,
+                        (project_id, cursor),
+                    ).fetchall()
+                    for r in run_rows:
+                        batch.append(
+                            (
+                                "mission_phase",
+                                {
+                                    "mission_id": r[0] or "",
+                                    "workflow": r[1] or "",
+                                    "status": r[2] or "",
+                                    "phase": r[3] or "",
+                                    "ts": str(r[4] or ""),
+                                },
+                            )
+                        )
+                except Exception:
+                    pass
+
+                # Advance cursor to latest ts seen
+                if batch:
+                    latest = max(
+                        (e[1].get("ts", "") for e in batch),
+                        default=cursor,
+                    )
+                    if latest and latest > cursor:
+                        cursor = latest
+
+                    # Emit events (max 20)
+                    for ev_type, ev_data in batch[:20]:
+                        yield f"event: {ev_type}\ndata: {json.dumps(ev_data)}\n\n"
+
+            except Exception:
+                pass
+
+            # Keepalive every 25s
+            now = _time.monotonic()
+            if now - last_keepalive >= 25:
+                yield ": ping\n\n"
+                last_keepalive = now
+
+            await asyncio.sleep(2)
+
+        yield "event: close\ndata: {}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@router.get("/api/projects/{project_id}/workspace/metrics")
+async def ws_metrics(project_id: str):
+    """Workspace metrics: active agents, tool calls/h, files written, commits today."""
+    from ...db.migrations import get_db
+    from ...projects.manager import get_project_store
+    from ...projects import git_service
+
+    db = get_db()
+    proj = get_project_store().get(project_id)
+    metrics: dict = {
+        "active_agents": 0,
+        "tool_calls_last_hour": 0,
+        "tool_calls_per_min": 0.0,
+        "files_written": 0,
+        "commits_today": 0,
+        "last_commit_hash": "",
+        "last_commit_msg": "",
+        "mission_runs_active": 0,
+    }
+    try:
+        # Active sessions
+        r = db.execute(
+            "SELECT COUNT(*) FROM sessions WHERE project_id=? AND status IN ('active','running')",
+            (project_id,),
+        ).fetchone()
+        metrics["active_agents"] = r[0] if r else 0
+
+        # Tool calls last hour
+        r = db.execute(
+            """
+            SELECT COUNT(*) FROM tool_calls tc
+            LEFT JOIN sessions s ON tc.session_id = s.id
+            WHERE s.project_id = ? AND tc.timestamp > datetime('now','-1 hour')
+            """,
+            (project_id,),
+        ).fetchone()
+        hourly = r[0] if r else 0
+        metrics["tool_calls_last_hour"] = hourly
+        metrics["tool_calls_per_min"] = round(hourly / 60.0, 1)
+
+        # Files written today
+        r = db.execute(
+            """
+            SELECT COUNT(*) FROM tool_calls tc
+            LEFT JOIN sessions s ON tc.session_id = s.id
+            WHERE s.project_id = ? AND tc.tool_name IN ('code_write','code_edit','code_create')
+            AND tc.timestamp > datetime('now','-24 hours')
+            """,
+            (project_id,),
+        ).fetchone()
+        metrics["files_written"] = r[0] if r else 0
+
+        # Active mission runs
+        r = db.execute(
+            "SELECT COUNT(*) FROM mission_runs WHERE project_id=? AND status IN ('running','active')",
+            (project_id,),
+        ).fetchone()
+        metrics["mission_runs_active"] = r[0] if r else 0
+    except Exception:
+        pass
+
+    # Git: commits today + last commit
+    if proj and proj.has_git:
+        try:
+            commits = git_service.get_log(proj.path, 10)
+            if commits:
+                c0 = (
+                    commits[0].__dict__
+                    if hasattr(commits[0], "__dict__")
+                    else dict(commits[0])
+                )
+                metrics["last_commit_hash"] = str(c0.get("hash") or "")[:8]
+                metrics["last_commit_msg"] = str(
+                    c0.get("message") or c0.get("subject") or ""
+                )[:60]
+            # Count today
+            import subprocess as _sp
+
+            result = _sp.run(
+                ["git", "log", "--oneline", "--since=midnight"],
+                cwd=proj.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            metrics["commits_today"] = sum(
+                1 for line in result.stdout.splitlines() if line.strip()
+            )
+        except Exception:
+            pass
+
+    return JSONResponse(metrics)
+
+
+@router.get("/api/projects/{project_id}/workspace/progress")
+async def ws_progress(project_id: str):
+    """Read PROGRESS.md from project workspace."""
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj or not proj.path:
+        return JSONResponse({"exists": False, "content": "", "mtime": ""})
+
+    progress_path = Path(proj.path) / "PROGRESS.md"
+    if not progress_path.exists():
+        return JSONResponse({"exists": False, "content": "", "mtime": ""})
+
+    try:
+        content = progress_path.read_text(errors="replace")
+        mtime = datetime.fromtimestamp(progress_path.stat().st_mtime).isoformat()
+        return JSONResponse({"exists": True, "content": content[:8000], "mtime": mtime})
+    except Exception as e:
+        return JSONResponse(
+            {"exists": False, "content": "", "mtime": "", "error": str(e)}
+        )
+
+
+@router.get("/api/projects/{project_id}/workspace/messages")
+async def ws_messages(project_id: str, limit: int = 30):
+    """Return recent agent messages for this project's live feed."""
+    from ...db.migrations import get_db
+
+    db = get_db()
+    items = []
+    try:
+        rows = db.execute(
+            """
+            SELECT m.from_agent, m.session_id, m.content, m.role, m.created_at
+            FROM messages m
+            LEFT JOIN sessions s ON m.session_id = s.id
+            WHERE s.project_id = ? AND m.role NOT IN ('tool','system')
+            ORDER BY m.created_at DESC LIMIT ?
+            """,
+            (project_id, min(limit, 50)),
+        ).fetchall()
+        for r in rows:
+            content = str(r[2] or "")
+            if len(content) < 3:
+                continue
+            items.append(
+                {
+                    "agent_id": r[0] or "",
+                    "session_id": r[1] or "",
+                    "preview": content[:200],
+                    "role": r[3] or "assistant",
+                    "ts": str(r[4] or ""),
+                }
+            )
+    except Exception:
+        pass
+    return JSONResponse({"items": items})
+
+
 @router.get("/api/projects/{project_id}/workspace/files")
 async def ws_list_files(project_id: str, path: str = "."):
     """List directory contents for the project."""

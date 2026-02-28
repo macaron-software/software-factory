@@ -878,3 +878,172 @@
 #wsMonacoContainer .cm-editor.cm-focused { outline: none; }
 #wsMonacoContainer .cm-scroller { overflow: auto; }
 #wsMonacoContainer { height: 100%; }
+
+/* ── Live metrics bar ─────────────────────────────────────────── */
+.ws-metrics-bar {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .3rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: .71rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.ws-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .7rem;
+  font-weight: 700;
+  padding: .15rem .45rem;
+  border-radius: 3px;
+  background: transparent;
+  border: 1px solid #484f58;
+  color: var(--text-secondary);
+  transition: all .3s;
+  flex-shrink: 0;
+}
+.ws-live-badge.connected {
+  border-color: #3fb950;
+  color: #3fb950;
+}
+.ws-live-badge .ws-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ws-live-badge.connected .ws-live-dot {
+  animation: ws-pulse 1.4s ease-in-out infinite;
+}
+@keyframes ws-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .3; }
+}
+.ws-metric-item {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+  font-size: .71rem;
+  color: var(--text-secondary);
+}
+.ws-metric-item strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.ws-metric-sep { color: var(--border); margin: 0 .1rem; }
+
+/* ── Notification badge on activity buttons ───────────────────── */
+.ws-activity-btn { position: relative; }
+.ws-notif-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 13px;
+  height: 13px;
+  padding: 0 3px;
+  border-radius: 6px;
+  background: #f85149;
+  color: #fff;
+  font-size: .58rem;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* ── Live feed view ───────────────────────────────────────────── */
+.ws-live-feed {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: .5rem;
+  gap: 0;
+}
+.ws-live-event {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  padding: .3rem .4rem;
+  border-radius: 4px;
+  font-size: .72rem;
+  border-bottom: 1px solid var(--border);
+  animation: ws-fadein .3s ease;
+}
+.ws-live-event:hover { background: var(--bg-secondary); }
+.ws-live-event-icon { font-size: .8rem; flex-shrink: 0; width: 1rem; text-align: center; }
+.ws-live-event-agent { color: var(--text-primary); font-weight: 600; min-width: 80px; flex-shrink: 0; }
+.ws-live-event-body { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.ws-live-event-file { color: #79c0ff; font-family: monospace; font-size: .7rem; }
+.ws-live-event-ts { color: #484f58; font-size: .67rem; flex-shrink: 0; font-family: monospace; }
+.ws-live-filters {
+  display: flex;
+  gap: .3rem;
+  padding: .4rem .5rem;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ws-live-filter-btn {
+  padding: .15rem .45rem;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: .69rem;
+  cursor: pointer;
+  transition: all .15s;
+}
+.ws-live-filter-btn.active, .ws-live-filter-btn:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+/* ── File tree highlight on write ────────────────────────────── */
+.ws-tree-item.ws-just-written {
+  background: rgba(210, 153, 20, 0.15) !important;
+  border-left: 2px solid #e3b341 !important;
+}
+
+/* ── Fade-in for new tool call rows ──────────────────────────── */
+@keyframes ws-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ws-table-row.ws-new-row {
+  animation: ws-fadein .3s ease;
+  background: rgba(56, 139, 253, 0.08);
+}
+
+/* ── Progress.md tab content ─────────────────────────────────── */
+#ws-code-progress {
+  padding: .75rem;
+  overflow-y: auto;
+  font-size: .75rem;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+#ws-code-progress pre {
+  background: var(--bg-secondary);
+  padding: .5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: .72rem;
+  white-space: pre-wrap;
+}
+#ws-code-progress h1, #ws-code-progress h2 {
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: .75rem 0 .25rem;
+}
+#ws-code-progress h3 { font-size: .78rem; font-weight: 600; margin: .5rem 0 .2rem; }
+#ws-code-progress ul, #ws-code-progress ol { padding-left: 1.2rem; }
+#ws-code-progress li { margin-bottom: .2rem; }
+#ws-code-progress strong { color: var(--text-primary); font-weight: 600; }
