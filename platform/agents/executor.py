@@ -142,11 +142,10 @@ def _get_rate_limit_setting(key: str, default: str) -> str:
         try:
             from ..db.migrations import get_db
 
-            db = get_db()
-            rows = db.execute(
-                "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
-            ).fetchall()
-            db.close()
+            with get_db() as db:
+                rows = db.execute(
+                    "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
+                ).fetchall()
             _settings_cache = {r[0]: r[1] for r in rows}
             _settings_cache_ts = now
         except Exception:
@@ -166,12 +165,11 @@ def _check_session_budget(session_id: str) -> None:
             return
         from ..db.migrations import get_db
 
-        db = get_db()
-        row = db.execute(
-            "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?",
-            (session_id,),
-        ).fetchone()
-        db.close()
+        with get_db() as db:
+            row = db.execute(
+                "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?",
+                (session_id,),
+            ).fetchone()
         spent = float(row[0]) if row else 0.0
         if spent >= cap:
             logger.warning(
@@ -204,23 +202,22 @@ def _write_llm_usage(
         from ..llm.observability import _estimate_cost
 
         cost = _estimate_cost(model, tokens_in, tokens_out)
-        db = get_db()
-        db.execute(
-            "INSERT INTO llm_usage (provider, model, tokens_in, tokens_out,"
-            " cost_estimate, project_id, agent_id, session_id) VALUES (?,?,?,?,?,?,?,?)",
-            (
-                provider,
-                model,
-                tokens_in,
-                tokens_out,
-                cost,
-                project_id or "",
-                agent_id,
-                session_id,
-            ),
-        )
-        db.commit()
-        db.close()
+        with get_db() as db:
+            db.execute(
+                "INSERT INTO llm_usage (provider, model, tokens_in, tokens_out,"
+                " cost_estimate, project_id, agent_id, session_id) VALUES (?,?,?,?,?,?,?,?)",
+                (
+                    provider,
+                    model,
+                    tokens_in,
+                    tokens_out,
+                    cost,
+                    project_id or "",
+                    agent_id,
+                    session_id,
+                ),
+            )
+            db.commit()
     except Exception:
         pass
 
@@ -233,28 +230,33 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
         import uuid as _uuid_w
         from ..db.migrations import get_db
 
-        db = get_db()
-        row = db.execute(
-            "SELECT balance FROM project_wallets WHERE project_id=?", (project_id,)
-        ).fetchone()
-        if not row:
+        with get_db() as db:
+            row = db.execute(
+                "SELECT balance FROM project_wallets WHERE project_id=?", (project_id,)
+            ).fetchone()
+            if not row:
+                db.execute(
+                    "INSERT INTO project_wallets (project_id, balance, total_earned, total_spent)"
+                    " VALUES (?,100.0,100.0,0)",
+                    (project_id,),
+                )
             db.execute(
-                "INSERT INTO project_wallets (project_id, balance, total_earned, total_spent)"
-                " VALUES (?,100.0,100.0,0)",
-                (project_id,),
+                "UPDATE project_wallets SET balance=balance-?, total_spent=total_spent+?,"
+                " updated_at=datetime('now') WHERE project_id=?",
+                (cost_usd, cost_usd, project_id),
             )
-        db.execute(
-            "UPDATE project_wallets SET balance=balance-?, total_spent=total_spent+?,"
-            " updated_at=datetime('now') WHERE project_id=?",
-            (cost_usd, cost_usd, project_id),
-        )
-        db.execute(
-            "INSERT INTO token_transactions (id, project_id, amount, reason, reference_id)"
-            " VALUES (?,?,?,?,?)",
-            (str(_uuid_w.uuid4()), project_id, -cost_usd, "llm_usage", reference_id),
-        )
-        db.commit()
-        db.close()
+            db.execute(
+                "INSERT INTO token_transactions (id, project_id, amount, reason, reference_id)"
+                " VALUES (?,?,?,?,?)",
+                (
+                    str(_uuid_w.uuid4()),
+                    project_id,
+                    -cost_usd,
+                    "llm_usage",
+                    reference_id,
+                ),
+            )
+            db.commit()
     except Exception:
         pass
 
@@ -264,24 +266,23 @@ def _update_mission_cost(session_id: str, mission_run_id: str | None) -> None:
     try:
         from ..db.migrations import get_db
 
-        db = get_db()
-        mid = mission_run_id
-        if not mid and session_id:
-            row = db.execute(
-                "SELECT id FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
-                (session_id,),
-            ).fetchone()
-            if row:
-                mid = row[0]
-        if mid:
-            db.execute(
-                "UPDATE mission_runs SET llm_cost_usd="
-                "(SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?)"
-                " WHERE id=?",
-                (session_id, mid),
-            )
-            db.commit()
-        db.close()
+        with get_db() as db:
+            mid = mission_run_id
+            if not mid and session_id:
+                row = db.execute(
+                    "SELECT id FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
+                    (session_id,),
+                ).fetchone()
+                if row:
+                    mid = row[0]
+            if mid:
+                db.execute(
+                    "UPDATE mission_runs SET llm_cost_usd="
+                    "(SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?)"
+                    " WHERE id=?",
+                    (session_id, mid),
+                )
+                db.commit()
     except Exception:
         pass
 
@@ -317,33 +318,32 @@ class AgentExecutor:
             import json as _json
             from ..db.migrations import get_db
 
-            db = get_db()
-            db.execute(
-                """CREATE TABLE IF NOT EXISTS agent_step_checkpoints (
-                    id TEXT PRIMARY KEY,
-                    session_id TEXT NOT NULL,
-                    agent_id TEXT NOT NULL,
-                    step_index INTEGER NOT NULL,
-                    tool_calls TEXT NOT NULL,
-                    partial_content TEXT,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )"""
-            )
-            db.execute(
-                """INSERT OR REPLACE INTO agent_step_checkpoints
-                   (id, session_id, agent_id, step_index, tool_calls, partial_content)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
-                (
-                    f"{session_id}:{agent_id}:{step_index}",
-                    session_id,
-                    agent_id,
-                    step_index,
-                    _json.dumps(tool_calls[-5:]),  # keep last 5 tool calls only
-                    partial_content[:500] if partial_content else "",
-                ),
-            )
-            db.commit()
-            db.close()
+            with get_db() as db:
+                db.execute(
+                    """CREATE TABLE IF NOT EXISTS agent_step_checkpoints (
+                        id TEXT PRIMARY KEY,
+                        session_id TEXT NOT NULL,
+                        agent_id TEXT NOT NULL,
+                        step_index INTEGER NOT NULL,
+                        tool_calls TEXT NOT NULL,
+                        partial_content TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )"""
+                )
+                db.execute(
+                    """INSERT OR REPLACE INTO agent_step_checkpoints
+                       (id, session_id, agent_id, step_index, tool_calls, partial_content)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        f"{session_id}:{agent_id}:{step_index}",
+                        session_id,
+                        agent_id,
+                        step_index,
+                        _json.dumps(tool_calls[-5:]),  # keep last 5 tool calls only
+                        partial_content[:500] if partial_content else "",
+                    ),
+                )
+                db.commit()
         except Exception:
             pass  # checkpointing is best-effort, never block execution
 
@@ -1016,24 +1016,24 @@ class AgentExecutor:
                     try:
                         from ..db.migrations import get_db
 
-                        db = get_db()
-                        db.execute(
-                            "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
-                            "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
-                            (
-                                agent.id,
-                                ctx.session_id,
-                                tc.function_name,
-                                str(tc.arguments)[:1000],
-                                result[:1000],
-                                1
-                                if not result.startswith(
-                                    ("Error", "LRM error", "MCP error")
-                                )
-                                else 0,
-                            ),
-                        )
-                        db.commit()
+                        with get_db() as db:
+                            db.execute(
+                                "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
+                                "VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+                                (
+                                    agent.id,
+                                    ctx.session_id,
+                                    tc.function_name,
+                                    str(tc.arguments)[:1000],
+                                    result[:1000],
+                                    1
+                                    if not result.startswith(
+                                        ("Error", "LRM error", "MCP error")
+                                    )
+                                    else 0,
+                                ),
+                            )
+                            db.commit()
                     except Exception:
                         pass
                     if tc.function_name == "deep_search":
