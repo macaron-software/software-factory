@@ -12,10 +12,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from ....i18n import t
 from ...schemas import ErrorResponse, OkResponse
-from ..helpers import _active_mission_tasks, _mission_semaphore, _parse_body, _templates
+from ..helpers import _active_mission_tasks, get_mission_semaphore, _parse_body
+from .execution_helpers import build_mission_context, get_role_instruction
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
 
 @router.post("/api/missions/{mission_id}/start", responses={200: {"model": OkResponse}})
 async def start_mission(mission_id: str):
@@ -24,8 +26,6 @@ async def start_mission(mission_id: str):
 
     get_mission_store().update_mission_status(mission_id, "active")
     return JSONResponse({"ok": True})
-
-
 
 
 @router.post(
@@ -80,31 +80,38 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     from pathlib import Path
 
     workspace_root = (
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "workspaces" / session.id
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "data"
+        / "workspaces"
+        / session.id
     )
     workspace_root.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "agents@macaron.ai"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
     subprocess.run(
         ["git", "config", "user.name", "Macaron Agents"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
     readme = workspace_root / "README.md"
     task_desc = mission.goal or mission.description or mission.name
     readme.write_text(f"# {wf.name}\n\n{task_desc}\n\nMission ID: {mission_id}\n")
     gitignore = workspace_root / ".gitignore"
-    gitignore.write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n")
+    gitignore.write_text(
+        "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
+    )
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit — mission workspace"],
-        cwd=str(workspace_root), capture_output=True,
+        cwd=str(workspace_root),
+        capture_output=True,
     )
 
     # Auto-start workflow execution — agents will dialogue via patterns
-    import asyncio
 
     from ..workflows import _run_workflow_background
 
@@ -144,13 +151,35 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     except Exception:
         pass
 
-    asyncio.create_task(
+    from ..helpers import _active_mission_tasks
+
+    _wf_task = asyncio.create_task(
         _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
     )
+    _active_mission_tasks[session.id] = _wf_task
+    _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
 
-    return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
+    # If mission config has milestones, also launch the milestone pipeline in parallel
+    milestones = (mission.config or {}).get("milestones")
+    if milestones and isinstance(milestones, list) and len(milestones) > 0:
+        asyncio.create_task(
+            _run_milestone_pipeline_background(
+                milestones=milestones,
+                session_id=session.id,
+                mission_name=mission.name,
+                project_path=str(workspace_root),
+                lead_agent_id=mission.created_by or "brain",
+                project_id=mission.project_id or "",
+            )
+        )
 
-
+    return JSONResponse(
+        {
+            "session_id": session.id,
+            "workflow_id": wf_id,
+            "milestones": len(milestones) if milestones else 0,
+        }
+    )
 
 
 @router.post("/api/missions/start")
@@ -186,6 +215,42 @@ async def api_mission_start(request: Request):
         return JSONResponse({"error": "Workflow not found"}, status_code=404)
     if not brief:
         return JSONResponse({"error": "Brief is required"}, status_code=400)
+
+    # Auto-inject domain default_pattern + default_agents into workflow phases when applicable
+    try:
+        from ....projects.registry import get_project_registry
+        from ....projects.domains import load_domain
+
+        _proj = get_project_registry().get(project_id) if project_id else None
+        if _proj and getattr(_proj, "arch_domain", ""):
+            _dom = load_domain(_proj.arch_domain)
+            if _dom and _dom.default_pattern:
+                # Override pattern_id on all phases that use a generic pattern
+                for wp in wf.phases:
+                    if not wp.pattern_id or wp.pattern_id in (
+                        "solo-chat",
+                        "sequential",
+                    ):
+                        wp.pattern_id = _dom.default_pattern
+                logger.info(
+                    "MissionCreate: domain '%s' default_pattern='%s' applied to workflow '%s'",
+                    _proj.arch_domain,
+                    _dom.default_pattern,
+                    workflow_id,
+                )
+            if _dom and _dom.default_agents:
+                # Inject domain default agents into phase agent_ids if not already set
+                for wp in wf.phases:
+                    if not getattr(wp, "agent_ids", None):
+                        wp.agent_ids = list(_dom.default_agents)
+                logger.info(
+                    "MissionCreate: domain '%s' default_agents=%s applied to workflow '%s'",
+                    _proj.arch_domain,
+                    _dom.default_agents,
+                    workflow_id,
+                )
+    except Exception as _de:
+        logger.debug("MissionCreate: could not apply domain defaults: %s", _de)
 
     # Build phase runs from workflow
     phases = []
@@ -345,6 +410,26 @@ async def api_mission_start(request: Request):
         logger.error("Failed to start CDP agent: %s", e)
 
     # Auto-trigger orchestrator pipeline (no second API call needed)
+    # Check if we should dispatch to a remote worker node
+    dispatched = None
+    try:
+        from .dispatch import maybe_dispatch
+
+        dispatched = await maybe_dispatch(mission_id, brief, project_id, workflow_id)
+    except Exception as _de:
+        logger.debug("Dispatch check failed (running locally): %s", _de)
+
+    if dispatched:
+        # Worker node took over — return coordinator response with remote info
+        return JSONResponse(
+            {
+                "mission_id": mission_id,
+                "session_id": session_id,
+                "redirect": f"/missions/{mission_id}/control",
+                "_dispatched_to": dispatched.get("_dispatched_to", ""),
+            }
+        )
+
     try:
         await _launch_orchestrator(mission_id)
         logger.warning("ORCH auto-launched for mission=%s", mission_id)
@@ -360,14 +445,11 @@ async def api_mission_start(request: Request):
     )
 
 
-
-
 @router.post("/api/missions/{mission_id}/chat/stream")
 async def mission_chat_stream(request: Request, mission_id: str):
     """Stream a conversation with the CDP agent in mission context."""
     from ....agents.executor import get_executor
     from ....agents.store import get_agent_store
-    from ....memory.manager import get_memory_manager
     from ....missions.store import get_mission_run_store
     from ....sessions.runner import _build_context
     from ....sessions.store import MessageDef, get_session_store
@@ -410,100 +492,9 @@ async def mission_chat_stream(request: Request, mission_id: str):
         )
     )
 
-    # Build mission-specific context summary
-    phase_summary = []
-    if mission.phases:
-        for p in mission.phases:
-            phase_summary.append(
-                f"- {p.phase_id}: {p.status.value if hasattr(p.status, 'value') else p.status}"
-            )
-    phases_str = "\n".join(phase_summary) if phase_summary else "No phases yet"
-
-    # Gather memory
-    mem_ctx = ""
-    try:
-        mem = get_memory_manager()
-        entries = mem.project_get(mission_id, limit=20)
-        if entries:
-            mem_ctx = "\n".join(
-                f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
-            )
-    except Exception:
-        pass
-
-    # Gather recent agent messages from this session
-    recent = sess_store.get_messages(session_id, limit=30)
-    agent_msgs = []
-    for m in recent:
-        if m.from_agent not in ("user", "system") and m.content:
-            agent_msgs.append(f"[{m.from_agent}] {m.content[:300]}")
-    agent_conv = (
-        "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
-    )
-
-    mission_context = f"""MISSION BRIEF: {mission.brief or "N/A"}
-MISSION STATUS: {mission.status.value if hasattr(mission.status, "value") else mission.status}
-WORKSPACE: {mission.workspace_path or "N/A"}
-
-PHASES STATUS:
-{phases_str}
-
-PROJECT MEMORY (knowledge from agents):
-{mem_ctx or "No memory entries yet"}
-
-RECENT AGENT CONVERSATIONS (last 10):
-{agent_conv}
-
-Answer the user's question about this mission with concrete data.
-If they ask about PRs, features, sprints, git — use the appropriate tools to search.
-Answer in the same language as the user. Be precise and data-driven."""
-
-    # Role-specific tool instructions per agent type
-    _role_instructions = {
-        "lead_dev": "\n\nTu es le Lead Dev. Tu peux LIRE et MODIFIER le code du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour les modifier, et git_commit pour committer tes changements. Quand l'utilisateur te demande de modifier quelque chose, fais-le directement avec les outils.",
-        "dev_backend": "\n\nTu es développeur backend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
-        "dev_frontend": "\n\nTu es développeur frontend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
-        "architecte": "\n\nTu es l'Architecte Solution. Tu peux LIRE et MODIFIER l'architecture du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour modifier Architecture.md ou d'autres docs d'architecture, et git_commit pour committer. Quand l'utilisateur te demande de mettre à jour l'architecture, fais-le directement.",
-        "qa_lead": "\n\nTu es le QA Lead. Tu peux LIRE et MODIFIER les tests du projet. Utilise code_read pour examiner les tests, code_write/code_edit pour créer ou modifier des fichiers de test, et git_commit pour committer.",
-        "test_manager": "\n\nTu es le Test Manager. Tu peux LIRE et MODIFIER les tests. Utilise code_read, code_write, code_edit, git_commit.",
-        "test_automation": "\n\nTu es l'ingénieur test automation. Tu peux LIRE et ÉCRIRE des tests automatisés. Utilise code_read, code_write, code_edit, git_commit.",
-        "tech_writer": "\n\nTu es le Technical Writer. Tu peux LIRE et MODIFIER la documentation du projet (README.md, docs/, wiki). Utilise code_read pour examiner les docs, code_write/code_edit pour les mettre à jour, memory_store pour sauvegarder des connaissances, et git_commit pour committer.",
-        "product_owner": "\n\nTu es le Product Owner. Tu peux consulter le code, les features et la mémoire projet. Utilise memory_store pour sauvegarder des décisions produit.",
-        "product_manager": "\n\nTu es le Product Manager. Tu peux consulter le backlog, les features et la mémoire. Utilise memory_store pour les décisions.",
-        "chef_de_programme": """
-
-Tu es le Chef de Programme (CDP). Tu ORCHESTRE activement le projet.
-
-RÈGLE FONDAMENTALE: Quand l'utilisateur te demande d'agir (lancer, relancer, fixer, itérer), tu DOIS utiliser tes outils. Ne te contente JAMAIS de décrire ce que tu ferais — FAIS-LE.
-
-Tes outils d'orchestration:
-- run_phase(phase_id, brief): Lance une phase du pipeline (idéation, dev-sprint, qa-campaign, etc.)
-- get_phase_status(phase_id): Vérifie le statut d'une phase
-- list_phases(): Liste toutes les phases et leur statut
-- request_validation(phase_id, decision): Demande GO/NOGO
-
-Tes outils d'investigation:
-- code_read(path): Lire un fichier du projet
-- code_search(query, path): Chercher dans le code
-- git_log(cwd): View git history
-- git_diff(cwd): View changes
-- memory_search(query): Chercher dans la mémoire projet
-- platform_missions(): État des missions
-- platform_agents(): Liste des agents
-
-WORKFLOW: Quand on te dit "go" ou "lance":
-1. D'abord list_phases() pour voir l'état
-2. Identifie la prochaine phase à lancer
-3. Appelle run_phase(phase_id="...", brief="...") pour la lancer
-4. Rapporte le résultat
-
-N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function calling.""",
-    }
-    role_instruction = _role_instructions.get(
-        agent_id,
-        "\n\nTu peux LIRE et MODIFIER les fichiers du projet avec code_read, code_write, code_edit, git_commit, et sauvegarder des connaissances avec memory_store.",
-    )
-    mission_context += role_instruction
+    # Build mission-specific context summary and role instruction
+    mission_context = build_mission_context(mission, session_id, sess_store)
+    mission_context += get_role_instruction(agent_id)
 
     async def event_generator():
         import markdown as md_lib
@@ -613,7 +604,10 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
                         "platform_sessions": "Cérémonies",
                         "platform_workflows": "Templates workflow",
                     }
-                    label = tool_labels.get(data_s, f'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-wrench"/></svg> {data_s}')
+                    label = tool_labels.get(
+                        data_s,
+                        f'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-wrench"/></svg> {data_s}',
+                    )
                     yield sse("tool", {"name": data_s, "label": label})
                 elif evt == "result":
                     if hasattr(data_s, "error") and data_s.error:
@@ -668,13 +662,17 @@ N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function 
     )
 
 
-
-
 @router.post("/api/missions/{mission_id}/exec")
 async def api_mission_exec(request: Request, mission_id: str):
     """Execute a command in the mission workspace. Returns JSON {stdout, stderr, returncode}."""
     import os as _os
     import subprocess as _sp
+
+    from ....auth.middleware import get_current_user as _get_current_user
+
+    user = await _get_current_user(request)
+    if not user:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
 
     from ....missions.store import get_mission_run_store
 
@@ -734,8 +732,6 @@ async def api_mission_exec(request: Request, mission_id: str):
         )
     except Exception as e:
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
-
-
 
 
 @router.post("/api/missions/{mission_id}/validate")
@@ -801,8 +797,6 @@ async def api_mission_validate(request: Request, mission_id: str):
         )
 
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
-
-
 
 
 @router.post("/api/missions/{mission_id}/reset")
@@ -872,11 +866,8 @@ async def api_mission_reset(request: Request, mission_id: str):
 # ── Confluence Sync ──────────────────────────────────────────
 
 
-
-
 async def _launch_orchestrator(mission_id: str):
     """Shared helper: launch the MissionOrchestrator as an asyncio task."""
-    import asyncio
 
     from ....agents.store import get_agent_store
     from ....missions.store import get_mission_run_store
@@ -921,12 +912,41 @@ async def _launch_orchestrator(mission_id: str):
 
     async def _safe_run():
         try:
-            async with _mission_semaphore:
+            async with get_mission_semaphore():
                 logger.warning(
                     "ORCH mission=%s acquired semaphore, starting", mission_id
                 )
                 await orchestrator.run_phases()
                 logger.warning("ORCH mission=%s completed normally", mission_id)
+                project_path = getattr(mission, "workspace_path", None)
+                if project_path:
+                    asyncio.create_task(
+                        _run_quality_scan_background(
+                            mission_id,
+                            getattr(mission, "project_id", "") or "",
+                            project_path,
+                            session_id,
+                        )
+                    )
+                # Push browser notification on completion
+                try:
+                    from ....services.push import send_push_to_project
+
+                    _pid = getattr(mission, "project_id", "") or ""
+                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _wname = getattr(wf, "name", "") or ""
+                    asyncio.create_task(
+                        send_push_to_project(
+                            _pid,
+                            f"✅ Mission completed: {_mname}",
+                            f"Workflow: {_wname}"
+                            if _wname
+                            else "Mission finished successfully",
+                            url=f"/projects/{_pid}/workspace" if _pid else "/",
+                        )
+                    )
+                except Exception:
+                    pass
         except Exception as exc:
             import traceback
 
@@ -951,6 +971,25 @@ async def _launch_orchestrator(mission_id: str):
                         "msg_type": "text",
                     },
                 )
+                # Push browser notification on failure
+                try:
+                    from ....services.push import send_push_to_project
+
+                    _pid = getattr(mission, "project_id", "") or ""
+                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _wname = getattr(wf, "name", "") or ""
+                    asyncio.create_task(
+                        send_push_to_project(
+                            _pid,
+                            f"❌ Mission failed: {_mname}",
+                            f"Workflow: {_wname}"
+                            if _wname
+                            else "Mission encountered an error",
+                            url=f"/projects/{_pid}/workspace" if _pid else "/",
+                        )
+                    )
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -960,8 +999,6 @@ async def _launch_orchestrator(mission_id: str):
     task = asyncio.create_task(_safe_run())
     _active_mission_tasks[mission_id] = task
     task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
-
-
 
 
 @router.post("/api/missions/{mission_id}/run")
@@ -988,4 +1025,404 @@ async def api_mission_run(request: Request, mission_id: str):
     return JSONResponse({"status": "running", "mission_id": mission_id})
 
 
+async def _run_milestone_pipeline_background(
+    *,
+    milestones: list[dict],
+    session_id: str,
+    mission_name: str,
+    project_path: str,
+    lead_agent_id: str,
+    project_id: str,
+) -> None:
+    """Launch the MilestoneRunner pipeline as a background task."""
+    from ....agents.milestone_runner import run_milestone_pipeline
+    from ....agents.executor import AgentExecutor, ExecutionContext
+    from ....agents.store import get_agent_store
+    from ....projects.registry import get_project_registry
+    from ....projects.domains import load_domain
 
+    try:
+        agent_def = get_agent_store().get(lead_agent_id)
+        if agent_def is None:
+            agent_def = get_agent_store().get("brain")
+        if agent_def is None:
+            logger.warning(
+                "MilestonePipeline: no agent found, skipping. session=%s", session_id
+            )
+            return
+
+        # Resolve domain compliance agents
+        compliance_agents: list[str] = []
+        compliance_blocking: bool = False
+        try:
+            proj = get_project_registry().get(project_id)
+            if proj and proj.arch_domain:
+                domain = load_domain(proj.arch_domain)
+                if domain and domain.compliance_agents:
+                    compliance_agents = domain.compliance_agents
+                    compliance_blocking = domain.compliance_blocking
+                    logger.info(
+                        "MilestonePipeline: domain '%s' compliance_agents=%s blocking=%s session=%s",
+                        proj.arch_domain,
+                        compliance_agents,
+                        compliance_blocking,
+                        session_id,
+                    )
+        except Exception as _e:
+            logger.debug(
+                "MilestonePipeline: could not load domain compliance agents: %s", _e
+            )
+
+        executor = AgentExecutor()
+        ctx = ExecutionContext(
+            agent=agent_def,
+            session_id=session_id,
+            project_id=project_id,
+            project_path=project_path,
+            tools_enabled=True,
+        )
+        results = await run_milestone_pipeline(
+            milestones,
+            executor=executor,
+            ctx=ctx,
+            session_id=session_id,
+            mission_name=mission_name,
+            project_path=project_path,
+            compliance_agents=compliance_agents or None,
+            compliance_blocking=compliance_blocking,
+        )
+        done = sum(1 for r in results if r.success)
+        logger.info(
+            "MilestonePipeline done: %d/%d milestones passed session=%s",
+            done,
+            len(milestones),
+            session_id,
+        )
+    except Exception as exc:
+        logger.exception("MilestonePipeline error session=%s: %s", session_id, exc)
+
+
+# ── Quality Scan ─────────────────────────────────────────────────
+
+
+async def _run_quality_scan_background(
+    mission_id: str,
+    project_id: str,
+    project_path: str,
+    session_id: str,
+) -> None:
+    """Run code-critic quality scan after mission completion (non-blocking)."""
+    import re
+    from ....agents.executor import AgentExecutor, ExecutionContext
+    from ....agents.store import get_agent_store
+    from ....db.migrations import get_db
+
+    try:
+        agent_store = get_agent_store()
+        critic = agent_store.get("code-critic") or agent_store.get("code_critic")
+        if critic is None:
+            logger.info(
+                "QualityScan: no code-critic agent found, skipping mission=%s",
+                mission_id,
+            )
+            return
+
+        executor = AgentExecutor()
+        ctx = ExecutionContext(
+            agent=critic,
+            session_id=session_id,
+            project_id=project_id,
+            project_path=project_path,
+            tools_enabled=True,
+        )
+        prompt = (
+            "Review the code produced in the recent mission. "
+            "Check for: SLOP, dead code, missing tests, security issues. "
+            "Provide a quality score 0-100 and list of findings."
+        )
+        result = await executor.run(ctx, prompt)
+
+        # Parse quality score from result
+        score: int | None = None
+        if result and result.content:
+            m = re.search(r"\b(\d{1,3})\s*/\s*100\b", result.content)
+            if not m:
+                m = re.search(r"[Ss]core[:\s]+(\d{1,3})", result.content)
+            if m:
+                score = int(m.group(1))
+
+        # Write to quality_reports table
+        try:
+            conn = get_db()
+            conn.execute(
+                """INSERT INTO quality_reports
+                   (project_id, mission_id, session_id, phase_name, dimension, score, details_json, tool_used, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                (
+                    project_id,
+                    mission_id,
+                    session_id,
+                    "mission_completion",
+                    "overall",
+                    score,
+                    json.dumps({"content": result.content if result else ""})
+                    if result
+                    else "{}",
+                    "code-critic",
+                ),
+            )
+            conn.commit()
+        except Exception as db_err:
+            logger.warning(
+                "QualityScan: DB write failed mission=%s: %s", mission_id, db_err
+            )
+
+        logger.info(
+            "QualityScan: mission=%s score=%s",
+            mission_id,
+            score if score is not None else "n/a",
+        )
+    except Exception as exc:
+        logger.warning("QualityScan: failed mission=%s: %s", mission_id, exc)
+
+
+# ── Mission Debug & Replay ────────────────────────────────────────
+
+
+@router.get("/api/missions/{run_id}/debug")
+async def mission_debug(run_id: str):
+    """Return debug info for a mission run: phases, llm_traces, cost breakdown."""
+    from ....db.migrations import get_db
+
+    conn = get_db()
+    try:
+        run = conn.execute(
+            "SELECT * FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+
+        phases = (
+            conn.execute(
+                "SELECT * FROM phase_runs WHERE run_id=? ORDER BY started_at ASC",
+                (run_id,),
+            ).fetchall()
+            if _table_exists(conn, "phase_runs")
+            else []
+        )
+
+        traces = (
+            conn.execute(
+                "SELECT * FROM llm_traces WHERE mission_id=? ORDER BY created_at ASC",
+                (run_id,),
+            ).fetchall()
+            if _table_exists(conn, "llm_traces")
+            else []
+        )
+
+        traces_list = [dict(t) for t in traces]
+        phases_list = [dict(p) for p in phases]
+
+        return JSONResponse(
+            {
+                "run": dict(run),
+                "phases": phases_list,
+                "traces": traces_list,
+                "total_traces": len(traces_list),
+                "total_cost": sum((t.get("cost_usd") or 0) for t in traces_list),
+                "total_tokens": sum((t.get("tokens_total") or 0) for t in traces_list),
+            }
+        )
+    finally:
+        conn.close()
+
+
+def _table_exists(conn, table: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    return bool(row)
+
+
+@router.post("/api/missions/{run_id}/replay")
+async def mission_replay(run_id: str, from_phase: int = 0):
+    """Create a new mission run as replay of an existing one."""
+    from ....db.migrations import get_db
+    from ....missions.store import get_mission_run_store
+    from ....models import MissionRun
+
+    conn = get_db()
+    try:
+        run = conn.execute(
+            "SELECT * FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+        run_dict = dict(run)
+    finally:
+        conn.close()
+
+    # Build a new MissionRun from the original
+    import json as _json
+    from ....models import PhaseRun
+
+    orig_phases_raw = _json.loads(run_dict.get("phases_json") or "[]")
+    new_phases = [
+        PhaseRun(
+            phase_id=p.get("phase_id", ""),
+            phase_name=p.get("phase_name", ""),
+            pattern_id=p.get("pattern_id", ""),
+        )
+        for p in orig_phases_raw
+    ]
+
+    new_run = MissionRun(
+        workflow_id=run_dict.get("workflow_id", ""),
+        workflow_name=run_dict.get("workflow_name", ""),
+        session_id=run_dict.get("session_id", ""),
+        cdp_agent_id=run_dict.get("cdp_agent_id", ""),
+        project_id=run_dict.get("project_id", ""),
+        workspace_path=run_dict.get("workspace_path", ""),
+        parent_mission_id=run_id,
+        brief=run_dict.get("brief", ""),
+        phases=new_phases,
+    )
+
+    mrs = get_mission_run_store()
+    mrs.create(new_run)
+
+    return JSONResponse(
+        {"ok": True, "new_run_id": new_run.id, "from_phase": from_phase}
+    )
+
+
+# ── Compliance Reports ────────────────────────────────────────────────
+
+
+@router.get("/api/missions/{run_id}/compliance-reports")
+async def get_compliance_reports(run_id: str):
+    """Get all compliance verdicts for a mission run."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Ensure table exists
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS compliance_verdicts (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                milestone_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                goal TEXT,
+                verdict TEXT NOT NULL,
+                is_blocking INTEGER DEFAULT 0,
+                content TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        # Get session_id for this run
+        run = db.execute(
+            "SELECT session_id FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+
+        verdicts = db.execute(
+            """SELECT * FROM compliance_verdicts WHERE session_id=?
+               ORDER BY created_at ASC""",
+            (run["session_id"],),
+        ).fetchall()
+
+        total = len(verdicts)
+        passed = sum(1 for v in verdicts if v["verdict"] == "PASS")
+        failed = sum(1 for v in verdicts if v["verdict"] == "FAIL")
+
+        return JSONResponse(
+            {
+                "run_id": run_id,
+                "summary": {"total": total, "passed": passed, "failed": failed},
+                "verdicts": [
+                    {
+                        "id": v["id"],
+                        "milestone_id": v["milestone_id"],
+                        "agent_id": v["agent_id"],
+                        "goal": v["goal"],
+                        "verdict": v["verdict"],
+                        "is_blocking": bool(v["is_blocking"]),
+                        "preview": (v["content"] or "")[:500],
+                        "created_at": v["created_at"],
+                    }
+                    for v in verdicts
+                ],
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.get("/api/compliance/project/{project_id}")
+async def get_project_compliance_summary(project_id: str):
+    """Get compliance history for a project across all missions."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS compliance_verdicts (
+                id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
+                milestone_id TEXT NOT NULL, agent_id TEXT NOT NULL,
+                goal TEXT, verdict TEXT NOT NULL, is_blocking INTEGER DEFAULT 0,
+                content TEXT, created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        rows = db.execute(
+            """SELECT cv.agent_id, cv.verdict, cv.milestone_id, cv.goal,
+                      cv.is_blocking, cv.created_at
+               FROM compliance_verdicts cv
+               JOIN mission_runs mr ON cv.session_id = mr.session_id
+               WHERE mr.project_id = ?
+               ORDER BY cv.created_at DESC
+               LIMIT 100""",
+            (project_id,),
+        ).fetchall()
+
+        by_agent: dict = {}
+        for r in rows:
+            aid = r["agent_id"]
+            if aid not in by_agent:
+                by_agent[aid] = {
+                    "agent_id": aid,
+                    "pass": 0,
+                    "fail": 0,
+                    "last_verdict": None,
+                }
+            if r["verdict"] == "PASS":
+                by_agent[aid]["pass"] += 1
+            elif r["verdict"] == "FAIL":
+                by_agent[aid]["fail"] += 1
+            if not by_agent[aid]["last_verdict"]:
+                by_agent[aid]["last_verdict"] = r["verdict"]
+
+        return JSONResponse(
+            {
+                "project_id": project_id,
+                "by_agent": list(by_agent.values()),
+                "recent": [
+                    {
+                        "agent_id": r["agent_id"],
+                        "verdict": r["verdict"],
+                        "milestone_id": r["milestone_id"],
+                        "goal": r["goal"],
+                        "is_blocking": bool(r["is_blocking"]),
+                        "created_at": r["created_at"],
+                    }
+                    for r in rows[:20]
+                ],
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()

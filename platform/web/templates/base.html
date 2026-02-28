@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
     <link rel="stylesheet" href="/static/css/projects.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/mkt_ideation.css?v=20260226">
+    <link rel="stylesheet" href="/static/css/ideation.css?v=20260221">
+    {% block extra_head %}{% endblock %}
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/sortable.min.js"></script>
     <script src="/static/js/sse.js" defer></script>
@@ -78,8 +81,11 @@
             {% set p = request.state.perspective|default('admin') %}
             <div class="sidebar-section">
                 <ul class="nav-links">
-                    <li><a href="/" data-tooltip="Dashboard" class="{% if page_title in ('Dashboard', 'Portfolio', 'Projects', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                    <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
+                    </a></li>
+                    <li><a href="/portfolio" data-tooltip="Dashboard" class="{% if page_title in ('Portfolio', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
                     </a></li>
                     {% set _full = ('admin', 'overview', 'dsi') %}
                     {% if p in _full + ('portfolio_manager', 'product_owner', 'architect', 'business_owner') %}
@@ -112,6 +118,12 @@
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
+                    <li><a href="/marketplace" data-tooltip="Marketplace" class="{% if page_title == 'Marketplace' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-grid"/></svg>
+                    </a></li>
+                    <li><a href="/world" data-tooltip="World 3D" class="{% if page_title in ('Agent World', 'World') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-globe"/></svg>
+                    </a></li>
                     {% if p in _full + ('developer', 'architect') %}
                     <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System', 'Wiki') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
@@ -122,6 +134,15 @@
                     {% endif %}
                     <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-chart"/></svg>
+                    </a></li>
+                    <li><a href="/analytics" data-tooltip="Cost Analytics" class="{% if page_title == 'Analytics' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-trending-up"/></svg>
+                    </a></li>
+                    <li><a href="/evals" data-tooltip="Evaluations" class="{% if page_title == 'Evaluations' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-check-circle"/></svg>
+                    </a></li>
+                    <li><a href="/tool-builder" data-tooltip="Tool Builder" class="{% if page_title == 'Tool Builder' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-wrench"/></svg>
                     </a></li>
                     <li><a href="/ops" data-tooltip="Ops" class="{% if page_title == 'Ops' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-activity"/></svg>
@@ -162,13 +183,18 @@
                 </ul>
             </div>
 
-            <div class="sidebar-footer"></div>
+            <div class="sidebar-footer">
+                <div class="workspace-badge" onclick="location.href='/workspaces'" title="Changer de workspace" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin:4px 6px;border-radius:8px;cursor:pointer;background:var(--bg-secondary);border:1px solid var(--border);font-size:0.72rem;color:var(--text-secondary);overflow:hidden">
+                    <span class="ws-dot" style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:{{ request.state.workspace_color | default('#6366f1') }}"></span>
+                    <span class="ws-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ request.state.workspace_name | default('Default') }}</span>
+                </div>
+            </div>
         </nav>
 
         <!-- Main content -->
         <main class="content">
             <header class="topbar">
-                <h2>{{ page_title }}</h2>
+                <h2>{{ page_title }} <span class="app-version" title="commit {{ app_commit }}">{{ app_version }}</span></h2>
                 <div class="topbar-right">
                     {% block topbar_actions %}{% endblock %}
                     <!-- SAFe Perspective Selector -->
@@ -199,7 +225,7 @@
                          hx-trigger="load, every 30s"
                          hx-swap="innerHTML">
                     </div>
-                    <div class="notif-wrapper" id="notifWrapper">
+                     <div class="notif-wrapper" id="notifWrapper">
                         <button class="topbar-bell" id="notifBell" aria-label="Notifications">
                             <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
                             <span id="notifBadge"
@@ -212,6 +238,10 @@
                              hx-trigger="notif-open"
                              hx-swap="innerHTML"></div>
                     </div>
+                    <button id="sfPushBtn" class="topbar-bell" aria-label="Enable push notifications"
+                            title="Enable push notifications"
+                            onclick="sfRequestPush().then(ok=>{ if(ok) this.style.display='none'; })"
+                            style="display:none">🔔</button>
                     <div class="user-menu-wrapper" style="position:relative">
                         <button class="topbar-avatar" id="userMenuBtn" onclick="document.getElementById('userDropdown').classList.toggle('show')" title="{{ request.state.user.display_name if request.state.user else 'User' }}">
                             {{ (request.state.user.display_name[:1] if request.state.user else 'U') | upper }}
@@ -466,6 +496,64 @@ async function setPerspective(p) {
     await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
     location.reload();
 }
+
+// ── Browser Web Push Registration ──────────────────────────────────
+(async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const sw = await navigator.serviceWorker.register('/sw.js', {scope: '/'});
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const keyData = await keyRes.json();
+    if (!keyData.enabled) return;
+    // Check existing subscription
+    const existing = await sw.pushManager.getSubscription();
+    if (existing) return; // already subscribed
+    // Show the "Enable notifications" button when permission not yet decided
+    if (Notification.permission === 'default') {
+      const btn = document.getElementById('sfPushBtn');
+      if (btn) btn.style.display = '';
+      window.__sfPushReady = async function() {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+        await _sfSubscribePush(sw, keyData.publicKey);
+      };
+      return; // Permission will be requested on first click via sfRequestPush()
+    }
+    if (Notification.permission === 'granted') {
+      await _sfSubscribePush(sw, keyData.publicKey);
+    }
+  } catch(e) { console.debug('Push init:', e); }
+})();
+
+async function _sfSubscribePush(sw, vapidKey) {
+  try {
+    const sub = await sw.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _urlB64ToUint8Array(vapidKey)
+    });
+    await fetch('/api/push/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(sub.toJSON())});
+    localStorage.setItem('sf_push_subscribed', '1');
+  } catch(e) { console.debug('Push subscribe:', e); }
+}
+
+function _urlB64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Call this from a user interaction (button click) to request push permission
+window.sfRequestPush = async function() {
+  if (!('serviceWorker' in navigator)) return false;
+  const sw = await navigator.serviceWorker.ready;
+  const keyRes = await fetch('/api/push/vapid-public-key');
+  const keyData = await keyRes.json();
+  if (!keyData.enabled) return false;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return false;
+  await _sfSubscribePush(sw, keyData.publicKey);
+  return true;
+};
 </script>
 </body>
 </html>

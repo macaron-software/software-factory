@@ -5,7 +5,7 @@ from __future__ import annotations
 import html as html_mod
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
@@ -33,16 +33,40 @@ async def vector_stats(scope_id: str = ""):
 
 
 @router.get("/api/memory/project/{project_id}")
-async def project_memory(project_id: str, q: str = "", category: str = ""):
-    """Get or search project memory."""
+async def project_memory(
+    project_id: str, q: str = "", category: str = "", role: str = ""
+):
+    """Get or search project memory, optionally filtered by agent role."""
     from ....memory.manager import get_memory_manager
 
     mem = get_memory_manager()
     if q:
         entries = mem.project_search(project_id, q)
     else:
-        entries = mem.project_get(project_id, category=category or None)
+        entries = mem.project_get(
+            project_id, category=category or None, agent_role=role
+        )
     return JSONResponse(entries)
+
+
+@router.delete("/api/memory/project/{project_id}")
+async def delete_project_memory(project_id: str, category: str = "", role: str = ""):
+    """Clear project memory, optionally filtered by category and/or agent role."""
+    from ....db.migrations import get_db
+
+    conn = get_db()
+    q = "DELETE FROM memory_project WHERE project_id=?"
+    params: list = [project_id]
+    if category:
+        q += " AND category=?"
+        params.append(category)
+    if role:
+        q += " AND agent_role=?"
+        params.append(role)
+    deleted = conn.execute(q, params).rowcount
+    conn.commit()
+    conn.close()
+    return JSONResponse({"ok": True, "deleted": deleted})
 
 
 @router.get("/api/memory/global")
@@ -55,18 +79,13 @@ async def global_memory(category: str = ""):
 
 
 @router.post("/api/memory/global")
-async def global_memory_store(request: Request):
+async def global_memory_store(body: "GlobalMemoryCreate"):
     """Store a global memory entry."""
     from ....memory.manager import get_memory_manager
+    from .input_models import GlobalMemoryCreate as _M  # noqa: F401
 
-    data = await request.json()
-    cat = data.get("category", "general")
-    key = data.get("key", "")
-    val = data.get("value", "")
-    if not key or not val:
-        return JSONResponse({"error": "key and value required"}, status_code=400)
     get_memory_manager().global_store(
-        key, val, category=cat, confidence=data.get("confidence", 0.8)
+        body.key, body.value, category=body.category, confidence=body.confidence
     )
     return JSONResponse({"ok": True})
 
@@ -104,3 +123,33 @@ async def memory_stats():
     from ....memory.manager import get_memory_manager
 
     return JSONResponse(get_memory_manager().stats())
+
+
+@router.get("/api/memory/health")
+async def memory_health():
+    """Full health snapshot of all memory layers (counts, quality, role breakdown)."""
+    from ....memory.compactor import get_memory_health
+
+    return JSONResponse(get_memory_health())
+
+
+@router.post("/api/memory/compact")
+async def memory_compact():
+    """Trigger on-demand memory compaction (dedup, prune, compress, re-score)."""
+    import asyncio
+    from ....memory.compactor import run_compaction
+
+    loop = asyncio.get_event_loop()
+    stats = await loop.run_in_executor(None, run_compaction)
+    return JSONResponse(
+        {
+            "ok": True,
+            "pattern_pruned": stats.pattern_pruned,
+            "project_pruned": stats.project_pruned,
+            "project_compressed": stats.project_compressed,
+            "global_deduped": stats.global_deduped,
+            "global_rescored": stats.global_rescored,
+            "errors": stats.errors,
+            "ran_at": stats.ran_at,
+        }
+    )

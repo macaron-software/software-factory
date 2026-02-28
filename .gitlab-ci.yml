@@ -1,63 +1,37 @@
 stages:
-  - backup
   - deploy
 
-variables:
-  AZURE_USER: ${AZURE_USER}
-  AZURE_VM_IP: ${AZURE_VM_IP}
-  APP_PATH: /home/macaron
-  CONTAINER: platform-platform-1
+# This repo is a read-only skeleton synced from macaron-software/software-factory.
+# Deploy to Azure Prod is triggered only when commits come from the Macaron sync
+# (commit author = sylvain@macaron-software.com).
+# La Poste employee commits → no deploy (La Poste has its own infra).
+#
+# Required GitLab CI/CD variable:
+#   GH_DISPATCH_TOKEN — GitHub PAT with repo+workflow scope
 
-backup:
-  stage: backup
-  image: alpine
-  before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh
-    - echo "$AZURE_SSH_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
-  script:
-    - |
-      ssh ${AZURE_USER}@${AZURE_VM_IP} "
-        docker exec ${CONTAINER} sh -c '
-          tar czf /tmp/backup-\$(date +%Y%m%d-%H%M%S).tar.gz \
-            /app/data/*.db \
-            /app/platform/workflows/definitions/*.yaml \
-            /app/platform/agents/skills/ 2>/dev/null || true
-        '
-        docker cp ${CONTAINER}:/tmp/ /home/${AZURE_USER}/ci-backups/ 2>/dev/null || true
-        echo BACKUP_DONE
-      "
-  only:
-    - main
-
-deploy:
+deploy-azure:
   stage: deploy
   image: alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_AUTHOR =~ /macaron-software/'
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh
-    - echo "$AZURE_SSH_KEY" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - ssh-keyscan -H "$AZURE_VM_IP" >> ~/.ssh/known_hosts
+    - apk add --no-cache curl
   script:
     - |
-      rsync -az --delete \
-        --exclude '.git' \
-        --exclude '__pycache__' \
-        --exclude '*.pyc' \
-        --exclude 'data/' \
-        --exclude 'workspace/' \
-        platform/ cli/ skills/ dashboard/ mcp_lrm/ \
-        ${AZURE_USER}@${AZURE_VM_IP}:${APP_PATH}/
-    - |
-      ssh ${AZURE_USER}@${AZURE_VM_IP} "
-        docker cp ${APP_PATH}/platform/web/routes/. ${CONTAINER}:/app/platform/web/routes/ 2>/dev/null || true
-        docker cp ${APP_PATH}/platform/. ${CONTAINER}:/app/platform/ 2>/dev/null || true
-        docker cp ${APP_PATH}/skills/. ${CONTAINER}:/app/skills/ 2>/dev/null || true
-        docker restart ${CONTAINER} && echo DEPLOYED
-      "
-  only:
-    - main
-  needs: [backup]
+      echo "Macaron sync detected — triggering GitHub Actions Azure deploy..."
+      HTTP=$(curl -s -o /tmp/gh_resp.txt -w "%{http_code}" \
+        -X POST \
+        -H "Authorization: Bearer $GH_DISPATCH_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        "https://api.github.com/repos/macaron-software/software-factory/actions/workflows/deploy-azure.yml/dispatches" \
+        -d '{"ref":"main"}')
+      cat /tmp/gh_resp.txt
+      [ "$HTTP" = "204" ] && echo "✓ Azure deploy triggered" || (echo "✗ HTTP $HTTP" && exit 1)
+
+# La Poste internal deploy (future — configure LAPOSTE_* vars when infra is ready)
+# deploy-laposte:
+#   stage: deploy
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "main"'
+#   script:
+#     - echo "Deploy to La Poste infra (TODO)"

@@ -6,10 +6,8 @@ import html as html_mod
 import logging
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse
 
-from ...schemas import FeatureOut
-from ..helpers import _templates
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -274,16 +272,37 @@ async def quality_dashboard_page(request: Request):
 
 @router.get("/api/dashboard/quality-badge")
 async def dashboard_quality_badge(request: Request, project_id: str = ""):
-    """Quality badge for project header — shows score as colored circle."""
+    """Quality badge for project header — shows score or infra badges (workspace/git/docker)."""
     if not project_id:
         return HTMLResponse("")
     from ....metrics.quality import QualityScanner
 
     snapshot = QualityScanner.get_latest_snapshot(project_id)
     if not snapshot or not snapshot.get("global_score"):
-        return HTMLResponse(
-            '<span style="color:var(--text-tertiary); font-size:0.8rem;">No scan</span>'
-        )
+        # No quality scan — show infra presence badges instead
+        try:
+            from ....projects.manager import get_project_store
+            from pathlib import Path as _P
+            proj = get_project_store().get(project_id)
+            if not proj:
+                return HTMLResponse("")
+            badges = []
+            _st = 'display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-secondary)'
+            # Workspace
+            if proj.exists:
+                badges.append(f'<span style="{_st}" title="{proj.path}">workspace</span>')
+            # Git
+            if proj.has_git:
+                badges.append(f'<span style="{_st};color:#f59e0b;border-color:#f59e0b22">git</span>')
+            # Docker
+            p = _P(proj.path)
+            if (p / "Dockerfile").exists() or (p / "docker-compose.yml").exists() or (p / "docker-compose.yaml").exists():
+                badges.append(f'<span style="{_st};color:#3b82f6;border-color:#3b82f622">docker</span>')
+            if badges:
+                return HTMLResponse(f'<span style="display:inline-flex;gap:4px;flex-wrap:wrap">{"".join(badges)}</span>')
+        except Exception:
+            pass
+        return HTMLResponse("")
 
     score = snapshot["global_score"]
     color = (
@@ -360,12 +379,14 @@ async def dashboard_activity_feed(request: Request):
 
     html = ""
     for s in recent:
-        ts = (s.created_at or "")[:16].replace("T", " ")[-5:]  # HH:MM
+        ts = (
+            str(s.created_at or "")[:16].replace("T", " ").replace(" ", "T")[-5:]
+        )  # HH:MM
         name = html_mod.escape((s.name or "Session")[:35])
         status = getattr(s, "status", "")
-        badge = "var(--purple)" if status == "active" else "var(--text-secondary)"
+        color = "var(--purple)" if status == "active" else "var(--text-secondary)"
         html += f"""<div class="dash-activity-item">
-            <span class="dash-activity-time">{ts}</span>
+            <span class="dash-activity-time" style="color:{color}">{ts}</span>
             <span class="dash-activity-text">{name}</span>
         </div>"""
     return HTMLResponse(html)
@@ -375,11 +396,13 @@ async def dashboard_activity_feed(request: Request):
 async def dashboard_ai_panel(request: Request):
     """Adaptive Intelligence sidebar panel: Thompson top agents, GA proposals, RL stats."""
     import html as html_mod
+
     lines: list[str] = []
 
     # Thompson top-3 agents
     try:
         from ....db.migrations import get_db
+
         db = get_db()
         rows = db.execute(
             "SELECT agent_id, accepted, rejected, iterations, quality_score "
@@ -387,60 +410,89 @@ async def dashboard_ai_panel(request: Request):
         ).fetchall()
         db.close()
         if rows:
-            lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin-bottom:.3rem">🏅 Top agents</div>')
+            lines.append(
+                '<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin-bottom:.3rem">🏅 Top agents</div>'
+            )
             for r in rows:
                 total = r["iterations"] or 1
                 rate = round(r["accepted"] / total * 100)
-                bar_color = "#22c55e" if rate >= 70 else "#f97316" if rate >= 50 else "#ef4444"
-                lines.append(f'''<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
+                bar_color = (
+                    "#22c55e" if rate >= 70 else "#f97316" if rate >= 50 else "#ef4444"
+                )
+                lines.append(f"""<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">
   <span style="font-size:.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{html_mod.escape(r["agent_id"])}</span>
   <div style="width:40px;height:5px;background:#e5e7eb;border-radius:3px">
     <div style="width:{rate}%;height:100%;background:{bar_color};border-radius:3px"></div>
   </div>
   <span style="font-size:.72rem;color:#666">{rate}%</span>
-</div>''')
+</div>""")
     except Exception:
         pass
 
     # Pending GA proposals
     try:
         from ....db.migrations import get_db
+
         db = get_db()
-        pending = db.execute("SELECT COUNT(*) FROM evolution_proposals WHERE status='pending'").fetchone()[0]
-        best = db.execute("SELECT MAX(fitness) FROM evolution_proposals WHERE status='approved'").fetchone()[0]
+        pending = db.execute(
+            "SELECT COUNT(*) FROM evolution_proposals WHERE status='pending'"
+        ).fetchone()[0]
+        best = db.execute(
+            "SELECT MAX(fitness) FROM evolution_proposals WHERE status='approved'"
+        ).fetchone()[0]
         db.close()
-        lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🧬 Évolution GA</div>')
-        lines.append(f'<div style="font-size:.8rem">Proposals: <strong>{pending}</strong> en attente</div>')
+        lines.append(
+            '<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🧬 Évolution GA</div>'
+        )
+        lines.append(
+            f'<div style="font-size:.8rem">Proposals: <strong>{pending}</strong> en attente</div>'
+        )
         if best:
-            lines.append(f'<div style="font-size:.8rem">Best fitness: <strong>{best:.3f}</strong></div>')
-        lines.append('<a href="/workflows#evolution" style="font-size:.75rem;color:var(--accent,#6c63ff)">→ Voir proposals</a>')
+            lines.append(
+                f'<div style="font-size:.8rem">Best fitness: <strong>{best:.3f}</strong></div>'
+            )
+        lines.append(
+            '<a href="/workflows#evolution" style="font-size:.75rem;color:var(--accent,#6c63ff)">→ Voir proposals</a>'
+        )
     except Exception:
         pass
 
     # RL stats
     try:
         from ....agents.rl_policy import get_rl_policy
+
         stats = get_rl_policy().stats()
         fired = stats.get("recommendations_fired", 0)
         total_rec = stats.get("recommendations_total", 0)
-        lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🤖 RL Policy</div>')
-        lines.append(f'<div style="font-size:.8rem">États: <strong>{stats.get("states",0)}</strong> · Décisions: <strong>{fired}/{total_rec}</strong></div>')
+        lines.append(
+            '<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">🤖 RL Policy</div>'
+        )
+        lines.append(
+            f'<div style="font-size:.8rem">États: <strong>{stats.get("states", 0)}</strong> · Décisions: <strong>{fired}/{total_rec}</strong></div>'
+        )
     except Exception:
         pass
 
     # LLM provider Thompson
     try:
         from ....llm.llm_thompson import llm_thompson_stats
+
         pstats = llm_thompson_stats()
         if pstats:
-            lines.append('<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">⚡ LLM Providers</div>')
+            lines.append(
+                '<div style="font-size:.75rem;font-weight:600;color:var(--text-muted,#888);margin:.6rem 0 .3rem">⚡ LLM Providers</div>'
+            )
             for ps in pstats[:3]:
                 rate = round(ps.get("success_rate", 0) * 100)
-                lines.append(f'<div style="font-size:.78rem">{html_mod.escape(ps["provider"])}: <strong>{rate}%</strong> ({ps["total_calls"]} calls)</div>')
+                lines.append(
+                    f'<div style="font-size:.78rem">{html_mod.escape(ps["provider"])}: <strong>{rate}%</strong> ({ps["total_calls"]} calls)</div>'
+                )
     except Exception:
         pass
 
     if not lines:
-        return HTMLResponse('<p class="text-muted" style="font-size:.82rem">En attente de données…</p>')
+        return HTMLResponse(
+            '<p class="text-muted" style="font-size:.82rem">En attente de données…</p>'
+        )
 
     return HTMLResponse("\n".join(lines))

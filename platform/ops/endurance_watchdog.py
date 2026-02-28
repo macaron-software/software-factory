@@ -29,7 +29,7 @@ CHECK_INTERVAL = int(os.environ.get("WATCHDOG_INTERVAL", "60"))  # seconds
 PHASE_STALL_THRESHOLD = int(os.environ.get("WATCHDOG_STALL_THRESHOLD", "900"))  # 15 min
 DISK_ALERT_PCT = int(os.environ.get("WATCHDOG_DISK_ALERT", "90"))
 ENABLED = os.environ.get("WATCHDOG_ENABLED", "1") == "1"
-HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8090/api/health")
+HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8099/api/health")
 DB_PATH = os.environ.get("WATCHDOG_DB_PATH", "")
 
 
@@ -40,8 +40,21 @@ def _db_path() -> str:
     return os.path.join(base, "data", "platform.db")
 
 
+def _get_db():
+    """Get a platform DB connection (SQLite or PostgreSQL depending on env)."""
+    try:
+        from ..db.migrations import get_db
+
+        return get_db()
+    except Exception:
+        # Fallback to direct SQLite (standalone mode)
+        conn = sqlite3.connect(_db_path())
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
 def _ensure_table():
-    db = sqlite3.connect(_db_path())
+    db = _get_db()
     db.execute("""CREATE TABLE IF NOT EXISTS endurance_metrics (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL,
@@ -50,12 +63,24 @@ def _ensure_table():
         detail TEXT DEFAULT ''
     )""")
     db.commit()
+    # Reset PG sequence if out of sync (can happen after restore/restart)
+    try:
+        from ..db.migrations import is_postgresql
+
+        if is_postgresql():
+            db.execute(
+                "SELECT setval(pg_get_serial_sequence('endurance_metrics', 'id'), "
+                "COALESCE((SELECT MAX(id) FROM endurance_metrics), 0) + 1, false)"
+            )
+            db.commit()
+    except Exception:
+        pass
     db.close()
 
 
 def _log_metric(metric: str, value: float, detail: str = ""):
     try:
-        db = sqlite3.connect(_db_path())
+        db = _get_db()
         ts = datetime.now(timezone.utc).isoformat()
         db.execute(
             "INSERT INTO endurance_metrics (ts, metric, value, detail) VALUES (?,?,?,?)",
@@ -68,8 +93,7 @@ def _log_metric(metric: str, value: float, detail: str = ""):
 
 
 def get_metrics(metric: Optional[str] = None, limit: int = 100) -> list[dict]:
-    db = sqlite3.connect(_db_path())
-    db.row_factory = sqlite3.Row
+    db = _get_db()
     if metric:
         rows = db.execute(
             "SELECT * FROM endurance_metrics WHERE metric=? ORDER BY ts DESC LIMIT ?",
@@ -107,8 +131,7 @@ async def _check_stalled_missions() -> list[dict]:
     """Find mission runs that are running but haven't progressed recently."""
     stalls = []
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
+        db = _get_db()
         rows = db.execute("""
             SELECT mr.id, mr.workflow_name as name, mr.status, mr.current_phase, mr.updated_at
             FROM mission_runs mr
@@ -123,9 +146,13 @@ async def _check_stalled_missions() -> list[dict]:
                 try:
                     from datetime import datetime as dt
 
-                    updated_ts = dt.fromisoformat(
-                        updated.replace("Z", "+00:00")
-                    ).timestamp()
+                    updated_ts = (
+                        updated.timestamp()
+                        if hasattr(updated, "timestamp")
+                        else dt.fromisoformat(
+                            updated.replace("Z", "+00:00")
+                        ).timestamp()
+                    )
                     age = now - updated_ts
                     if age > PHASE_STALL_THRESHOLD:
                         stalls.append(
@@ -248,12 +275,13 @@ MAX_CONCURRENT_RUNS = int(os.environ.get("WATCHDOG_MAX_CONCURRENT", "10"))
 
 
 async def _auto_resume_paused() -> int:
-    """Resume paused mission runs in controlled batches. Returns count resumed."""
+    """Resume paused mission runs in controlled batches with backoff. Returns count resumed."""
+    MAX_RESUME_ATTEMPTS = 5  # abandon after 5 failed resumes
+    BACKOFF_MINUTES = [0, 5, 15, 30, 60]  # wait between retries
+
     resumed = 0
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Check how many are already running (avoid overload)
         running = db.execute(
             "SELECT COUNT(*) as c FROM mission_runs WHERE status='running'"
@@ -270,77 +298,143 @@ async def _auto_resume_paused() -> int:
 
         slots = min(RESUME_BATCH_SIZE, MAX_CONCURRENT_RUNS - running)
 
-        # Find paused runs with interrupted/paused sessions
+        # Find paused runs eligible for auto-resume:
+        # - not requiring human input
+        # - not exceeded max attempts
+        # - backoff elapsed since last attempt
         paused = db.execute(
             """
-            SELECT mr.session_id, mr.id, s.config_json, mr.workflow_id
+            SELECT mr.session_id, mr.id, s.config_json, mr.workflow_id,
+                   COALESCE(mr.resume_attempts, 0) as attempts,
+                   mr.last_resume_at, mr.project_id, mr.brief
             FROM mission_runs mr
             JOIN sessions s ON mr.session_id = s.id
             WHERE mr.status = 'paused'
             AND s.status IN ('interrupted', 'paused')
+            AND COALESCE(mr.human_input_required, 0) = 0
+            AND COALESCE(mr.resume_attempts, 0) < ?
             ORDER BY mr.updated_at ASC
             LIMIT ?
         """,
-            (slots,),
+            (MAX_RESUME_ATTEMPTS, slots * 3),  # fetch more, filter by backoff below
         ).fetchall()
 
         if not paused:
             db.close()
             return 0
 
+        from datetime import datetime, timedelta
+
+        now = datetime.utcnow()
+        eligible = []
+        for row in paused:
+            attempts = row["attempts"]
+            last_at = row["last_resume_at"]
+            if last_at:
+                try:
+                    last_dt = datetime.fromisoformat(last_at.replace("Z", ""))
+                    wait_min = BACKOFF_MINUTES[min(attempts, len(BACKOFF_MINUTES) - 1)]
+                    if now - last_dt < timedelta(minutes=wait_min):
+                        continue  # still in backoff window
+                except Exception:
+                    pass
+            eligible.append(row)
+            if len(eligible) >= slots:
+                break
+
+        if not eligible:
+            db.close()
+            return 0
+
+        # Log root cause analysis for missions with multiple failures
+        stalled = [r for r in eligible if r["attempts"] >= 2]
+        if stalled:
+            logger.warning(
+                "WATCHDOG: %d missions with %d+ failed resumes (possible loop/block): %s",
+                len(stalled),
+                2,
+                [r["id"][:8] for r in stalled],
+            )
+
         logger.warning(
-            "WATCHDOG: auto-resuming %d paused runs (running=%d, slots=%d)",
+            "WATCHDOG: auto-resuming %d/%d paused runs (running=%d, slots=%d)",
+            len(eligible),
             len(paused),
             running,
             slots,
         )
 
-        for row in paused:
+        for row in eligible:
             try:
                 import json as _json
 
                 config = _json.loads(row["config_json"]) if row["config_json"] else {}
                 wf_id = config.get("workflow_id", row["workflow_id"] or "")
                 if not wf_id:
+                    # No workflow — mark as human_input_required to skip future attempts
+                    db.execute(
+                        "UPDATE mission_runs SET human_input_required=1 WHERE id=?",
+                        (row["id"],),
+                    )
+                    db.commit()
                     continue
 
                 sid = row["session_id"]
+                new_attempts = row["attempts"] + 1
 
-                # Update statuses
+                # Update statuses + increment resume counter
                 db.execute("UPDATE sessions SET status='active' WHERE id=?", (sid,))
                 db.execute(
-                    "UPDATE mission_runs SET status='running' WHERE id=?", (row["id"],)
+                    """UPDATE mission_runs SET status='running',
+                       resume_attempts=?, last_resume_at=?
+                       WHERE id=?""",
+                    (new_attempts, now.isoformat(), row["id"]),
                 )
                 db.commit()
 
-                # Trigger resume via resume-all API (batch approach)
-                base_url = HEALTH_URL.replace("/api/health", "")
-                proc = await asyncio.create_subprocess_exec(
-                    "curl",
-                    "-sf",
-                    "-X",
-                    "POST",
-                    "-m",
-                    "30",
-                    f"{base_url}/api/workflows/resume-all",
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                await proc.wait()
+                # Trigger one-shot batch resume (avoid calling the infinite loop)
+                try:
+                    from ..services.auto_resume import _resume_batch
 
-                if proc.returncode == 0:
-                    resumed = slots  # Assume all were resumed
-                    _log_metric("auto_resume", slots, "batch via resume-all")
-                    logger.warning(
-                        "WATCHDOG: resume-all triggered for %d candidates", slots
+                    resumed = await _resume_batch(stagger=5.0)
+                    _log_metric(
+                        "auto_resume",
+                        resumed,
+                        f"batch via _resume_batch (attempt {new_attempts})",
                     )
-                else:
-                    _log_metric("auto_resume_fail", 0, "resume-all failed")
+                    logger.warning(
+                        "WATCHDOG: auto-resumed %d runs (attempt %d)",
+                        resumed,
+                        new_attempts,
+                    )
+                except Exception as _re:
+                    _log_metric("auto_resume_fail", 0, str(_re))
+                    # Revert to paused on failure
+                    db.execute(
+                        "UPDATE mission_runs SET status='paused' WHERE id=?",
+                        (row["id"],),
+                    )
+                    db.commit()
 
                 # Don't loop per-session — resume-all handles the batch
                 break
             except Exception as e:
                 logger.warning("WATCHDOG: resume failed for %s: %s", row["id"][:8], e)
+
+        # Auto-abandon missions that have exhausted retries
+        abandoned = db.execute(
+            """UPDATE mission_runs SET status='abandoned', updated_at=datetime('now')
+               WHERE status='paused'
+               AND COALESCE(resume_attempts, 0) >= ?
+               AND COALESCE(human_input_required, 0) = 0""",
+            (MAX_RESUME_ATTEMPTS,),
+        ).rowcount
+        if abandoned:
+            db.commit()
+            logger.warning(
+                "WATCHDOG: abandoned %d missions that exhausted resume retries",
+                abandoned,
+            )
 
         db.close()
     except Exception as e:
@@ -360,9 +454,7 @@ async def _recover_stale_sessions() -> int:
     """Detect sessions active too long without progress and mark as interrupted."""
     recovered = 0
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Find "active" sessions with no recent messages (stale)
         rows = db.execute("""
             SELECT s.id, s.name,
@@ -379,7 +471,11 @@ async def _recover_stale_sessions() -> int:
             try:
                 from datetime import datetime as dt
 
-                msg_ts = dt.fromisoformat(last_msg.replace("Z", "+00:00")).timestamp()
+                msg_ts = (
+                    last_msg.timestamp()
+                    if hasattr(last_msg, "timestamp")
+                    else dt.fromisoformat(last_msg.replace("Z", "+00:00")).timestamp()
+                )
                 age = now - msg_ts
                 if age > SESSION_STALE_THRESHOLD:
                     # Mark as interrupted — will be picked up by auto-resume
@@ -421,7 +517,7 @@ async def _cleanup_failed_sessions() -> int:
     """Mark sessions for failed runs as 'failed' (avoid zombie active sessions)."""
     cleaned = 0
     try:
-        db = sqlite3.connect(_db_path())
+        db = _get_db()
         cleaned = db.execute("""
             UPDATE sessions SET status='failed'
             WHERE id IN (
@@ -439,15 +535,36 @@ async def _cleanup_failed_sessions() -> int:
     return cleaned
 
 
-# ── Daily Report ─────────────────────────────────────────────────────
+async def _cleanup_phantom_runs() -> int:
+    """Mark mission runs that have been running/paused > 48h without activity as 'abandoned'."""
+    abandoned = 0
+    try:
+        db = _get_db()
+        result = db.execute("""
+            UPDATE mission_runs SET status='abandoned'
+            WHERE status IN ('running', 'paused')
+            AND (
+                updated_at IS NULL
+                OR datetime(updated_at) < datetime('now', '-48 hours')
+            )
+        """)
+        abandoned = result.rowcount
+        if abandoned:
+            db.commit()
+            _log_metric("phantom_runs_abandoned", abandoned)
+            logger.info(
+                "WATCHDOG: abandoned %d phantom mission runs (stale > 48h)", abandoned
+            )
+        db.close()
+    except Exception as e:
+        logger.warning("WATCHDOG: phantom run cleanup error: %s", e)
+    return abandoned
 
 
 async def _daily_report():
     """Generate daily endurance report and store in metrics."""
     try:
-        db = sqlite3.connect(_db_path())
-        db.row_factory = sqlite3.Row
-
+        db = _get_db()
         # Count phases completed today
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         phases = db.execute(
@@ -458,7 +575,8 @@ async def _daily_report():
         # Count chaos events today
         chaos = (
             db.execute(
-                "SELECT COUNT(*) as c FROM chaos_runs WHERE ts LIKE ?", (f"{today}%",)
+                "SELECT COUNT(*) as c FROM chaos_runs WHERE ran_at LIKE ?",
+                (f"{today}%",),
             ).fetchone()
             if _table_exists(db, "chaos_runs")
             else None
@@ -484,10 +602,21 @@ async def _daily_report():
 
 
 def _table_exists(db, name: str) -> bool:
+    try:
+        from ..db.migrations import is_postgresql
+
+        if is_postgresql():
+            r = db.execute(
+                "SELECT COUNT(*) FROM information_schema.tables WHERE table_name=?",
+                (name,),
+            ).fetchone()
+            return bool(r and r[0] > 0)
+    except Exception:
+        pass
     r = db.execute(
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", (name,)
     ).fetchone()
-    return r[0] > 0
+    return bool(r and r[0] > 0)
 
 
 # ── Main Loop ────────────────────────────────────────────────────────
@@ -534,6 +663,10 @@ async def watchdog_loop():
             # Failed session cleanup (every 5 min)
             if check_count % 5 == 0:
                 await _cleanup_failed_sessions()
+
+            # Phantom run cleanup (every 30 min — stale runs > 48h → abandoned)
+            if check_count % 30 == 0:
+                await _cleanup_phantom_runs()
 
             # Auto-resume paused runs (every RESUME_INTERVAL)
             now = time.time()

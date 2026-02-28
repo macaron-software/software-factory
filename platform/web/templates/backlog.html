@@ -12,7 +12,6 @@
     <button class="tab active" id="tab-backlog" hx-get="/product" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("backlog") }}</button>
     {% endif %}
     <button class="tab" id="tab-kanban" hx-get="/api/portfolio/kanban" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("portfolio_kanban") }}</button>
-    <button class="tab" id="tab-discovery" hx-get="/ideation" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("ideation") }}</button>
 </div>
 <div id="tab-content"></div>
 <script>

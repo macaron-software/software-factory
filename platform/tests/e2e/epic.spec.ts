@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
 
 test.describe("Epic & Project Flow", () => {
   test("projects page loads with project list", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/portfolio");
     // Sidebar navigation visible
     await expect(page.locator("nav.sidebar")).toBeVisible();
     // At least one project link

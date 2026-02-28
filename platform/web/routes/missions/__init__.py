@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .backlog import router as backlog_router
 from .crud import router as crud_router
+from .dispatch import router as dispatch_router
 from .execution import router as execution_router
 from .integrations import router as integrations_router
 from .internal import (
@@ -27,6 +28,7 @@ router.include_router(execution_router)
 router.include_router(sprints_router)
 router.include_router(backlog_router)
 router.include_router(integrations_router)
+router.include_router(dispatch_router)
 
 __all__ = [
     "router",

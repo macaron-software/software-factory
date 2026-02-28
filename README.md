@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[Live Demo: sf.macaron-software.com](https://sf.macaron-software.com)** — click "Skip (Demo)" to explore
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Contributing](#contributing)
 
@@ -31,11 +41,21 @@
 
 Software Factory is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-Think of it as a **virtual software factory** where 161 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
+Think of it as a **virtual software factory** where 191 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
 ### Key Highlights
 
-- **161 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **191 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **36 built-in workflows** — SAFe ceremonies, quality gates, nightly maintenance, security, knowledge management
+- **8 home ideation groups** — CTO Jarvis, Business, Project, Knowledge, Architecture, Security, Data & AI, PI Planning
+- **Agent Marketplace** — discover and launch agents from `/marketplace`; filter by ART, role, or skills
+- **Mission Replay** — step-by-step timeline with tokens, cost, and duration per agent (`/missions/{id}/replay`)
+- **LLM Metrics Dashboard** — real-time cost/latency/provider monitoring at `/metrics`
+- **Agent Evaluation Framework** — LLM-as-judge golden dataset scoring at `/evals`
+- **Tool Builder** — no-code HTTP/SQL/shell tool creation at `/tool-builder`
+- **Multi-tenant Workspaces** — isolated namespaces per project/client at `/workspaces`
+- **Knowledge Management** — 4 dedicated agents, ART Knowledge team, nightly knowledge-maintenance workflow
+- **Memory Intelligence** — relevance scoring, access tracking, automatic pruning of stale entries
 - **10 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
@@ -88,6 +108,56 @@ Think of it as a **virtual software factory** where 161 AI agents collaborate th
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Home — 8 Ideation Groups (CTO Jarvis, Business, Project, Knowledge, Architecture, Security, Data & AI, PI Planning)</strong><br>
+<img src="docs/screenshots/en/home.png" alt="Home" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — Strategic AI Advisor</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Business Ideation — 6-Agent Marketing Team</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="Business Ideation" width="100%">
+</td>
+<td width="50%">
+<strong>Project Ideation — Multi-Agent Tech Team</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="Project Ideation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Agent Marketplace — Discover & Launch Agents (/marketplace)</strong><br>
+<img src="docs/screenshots/en/marketplace.png" alt="Marketplace" width="100%">
+</td>
+<td width="50%">
+<strong>LLM Metrics — Cost/Latency/Provider Dashboard (/metrics)</strong><br>
+<img src="docs/screenshots/en/metrics.png" alt="LLM Metrics" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Workspaces — Multi-Tenant Isolation (/workspaces)</strong><br>
+<img src="docs/screenshots/en/workspaces.png" alt="Workspaces" width="100%">
+</td>
+<td width="50%">
+<strong>Tool Builder — No-Code Tool Creation (/tool-builder)</strong><br>
+<img src="docs/screenshots/en/tool_builder.png" alt="Tool Builder" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Evaluations — LLM-as-Judge Scoring (/evals)</strong><br>
+<img src="docs/screenshots/en/evals.png" alt="Evaluations" width="100%">
+</td>
+<td width="50%">
+<strong>Mission Replay — Step-by-step Timeline (/missions/{id}/replay)</strong><br>
+<img src="docs/screenshots/en/mission_replay.png" alt="Mission Replay" width="100%">
+</td>
+</tr>
 </table>
 
 ## Quick Start
@@ -103,7 +173,7 @@ make setup   # copies .env.example → .env (edit it to add your LLM API key)
 make run     # builds & starts the platform
 ```
 
-Open http://localhost:8090 — click **"Skip (Demo)"** to explore without an API key.
+Open http://localhost:8090 — the platform opens on the **CTO Jarvis** tab.
 
 ### Option 2: Local Installation
 
@@ -119,8 +189,8 @@ make dev
 # or manually: PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
 ```
 
-Open http://localhost:8090 — on first launch you'll see the **onboarding wizard**.
-Choose your SAFe role or click **"Skip (Demo)"** to explore immediately.
+Open http://localhost:8090 — the platform opens on the **CTO Jarvis** tab.
+Choose your SAFe role or start typing directly in the Jarvis chat.
 
 ### Step 3: Configure an LLM Provider
 
@@ -134,12 +204,7 @@ To enable real AI agents, edit `.env` and add **one** API key:
 PLATFORM_LLM_PROVIDER=minimax
 MINIMAX_API_KEY=sk-your-key-here
 
-# Option B: Azure OpenAI
-PLATFORM_LLM_PROVIDER=azure-openai
-AZURE_OPENAI_API_KEY=your-key
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-
-# Option C: NVIDIA NIM
+# Option B: NVIDIA NIM
 PLATFORM_LLM_PROVIDER=nvidia
 NVIDIA_API_KEY=nvapi-your-key-here
 ```
@@ -149,8 +214,8 @@ Then restart: `make run` (Docker) or `make dev` (local)
 | Provider | Env Variable | Models |
 |----------|-------------|--------|
 | **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **OpenAI-compatible** | `OPENAI_API_KEY` | any OpenAI-compatible model |
 | **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
-| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
 | **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
 
 The platform auto-falls back to other configured providers if the primary fails.
@@ -160,19 +225,36 @@ You can also configure providers from the **Settings** page in the dashboard (`/
 
 After installation, here's how to go from idea to working project:
 
-### Path A: Start from an Idea (Ideation Workshop)
+### Path A: Ask CTO Jarvis (Fastest)
 
-1. **Open the Ideation page** — go to `/ideation` (or click "Ideation" in the sidebar)
-2. **Describe your idea** — e.g. *"Enterprise carpooling app with real-time matching"*
-3. **Watch agents discuss** — 5 specialized agents (Product Manager, Business Analyst, Architect, UX Designer, Security) analyze your idea in real-time via SSE streaming
-4. **Create a project from the result** — click **"Create an Epic from this idea"**. The platform will:
-   - Create a new **project** with generated `VISION.md` and CI/CD scaffolding
-   - Create an **epic** with features and user stories broken down by the PO agent
-   - Auto-provision **TMA** (maintenance), **Security**, and **Tech Debt** missions
+1. **Open the home page** (`/`) — the platform starts on the CTO Jarvis tab
+2. **Type your project idea or question** — e.g. *"Create a new project for an enterprise carpooling app with React and Python"*
+3. **Jarvis (Gabriel Mercier, Strategic Orchestrator)** analyses the request, creates the project, provisions the SAFe backlog, and starts the first mission — all in one conversation
 
-You now have a full SAFe backlog ready to execute.
+This is the **recommended entry point** for any new project.
 
-### Path B: Create a Project Manually
+### Path B: Ideation Workshops (8 Specialized Groups)
+
+The home page offers **8 ideation contexts**, each with a dedicated team of specialized agents:
+
+| Group | Agents | Focus |
+|-------|--------|-------|
+| **CTO Jarvis** | Gabriel Mercier (Strategic Orchestrator) | Technical strategy, architecture decisions, SAST audits, portfolio overview |
+| **Business Ideation** | CMO Sophie Laurent + 5 marketing agents | Go-to-market, SWOT, brand strategy, investor pitch |
+| **Project Ideation** | PM + Architect + Backend Dev + QA + SRE | Technical specification, epic/feature breakdown, tech stack selection |
+| **Knowledge & Research** | Knowledge Manager + Wiki Maintainer | Knowledge gap analysis, wiki building, research synthesis |
+| **Architecture Committee** | Solution Architect + Tech Lead | ADR reviews, technology choices, cross-team dependencies |
+| **Security Council** | Security Analyst + Penetration Tester | Threat modeling, penetration testing, RBAC design |
+| **Data & AI** | Data Engineer + ML Engineer | ML pipeline design, data architecture, LLM integration strategy |
+| **PI Planning** | RTE + Product Owner + Scrum Master | Program Increment planning, capacity allocation, dependency mapping |
+
+For each group: describe your need → agents stream their analysis → export as epic/project/ADR/plan.
+
+### Path C: Explore the Agent Marketplace
+
+Go to `/marketplace` to discover all 191 agents. Filter by ART, role, or skills. Click any agent to view their full profile — tools, skills, recent sessions — and launch a direct session.
+
+### Path D: Create a Project Manually
 
 1. Go to `/projects` and click **"New Project"**
 2. Fill in: name, description, tech stack, repository path
@@ -194,6 +276,7 @@ You now have a full SAFe backlog ready to execute.
 - Choose an **orchestration pattern** (hierarchical, network, parallel...)
 - Watch agents work in real-time from **Mission Control**
 - Agents use their tools (code_read, git, build, test, security scan) autonomously
+- Replay any past mission at `/missions/{id}/replay` — step-by-step with tokens, cost, duration per agent
 
 ### TMA & Security — Always On
 
@@ -210,7 +293,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## Features
 
-### 161 Specialized AI Agents
+### 191 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 
@@ -384,6 +467,83 @@ Automatic documentation generation throughout the lifecycle:
 - **Confluence sync** — bidirectional sync with Confluence wiki pages for enterprise documentation
 - **Swagger auto-docs** — 94 REST endpoints auto-documented at `/docs` with OpenAPI schema
 
+### Knowledge Management System
+
+A dedicated subsystem for organizational knowledge, introduced in v2.7.0:
+
+- **4 specialized agents** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART Knowledge team** — dedicated Agile Release Train team for knowledge operations
+- **Nightly `knowledge-maintenance` workflow** — automatic curation, deduplication, and freshness scoring
+- **Memory Health dashboard** — knowledge health metrics in the Metrics tab
+- **Knowledge Health badge** — visible in the Settings page
+- **Relevance scoring formula** — `confidence × recency × access_boost` for intelligent retrieval ranking
+- **Access tracking** — `access_count` and `last_read_at` fields on every memory entry
+- **Automatic pruning** — stale entries below threshold removed on each nightly run
+
+### Settings Integrations Hub
+
+Configurable tool integrations available to all agents:
+
+- **Supported tools** — Jira, Confluence, SonarQube, and more
+- **Domain-level BSCC guidelines** — architecture guidelines (Confluence/Solaris) enforced per project domain
+- **Project Export/Import** — ZIP archive containing `project.json` + missions + mission runs + memories
+- **Browser Push Notifications** — native browser push via Web Push API (VAPID)
+- **Input Validation** — Pydantic models on all POST/PATCH routes
+
+### Agent Marketplace
+
+Discover, filter, and launch any of the 191 agents from a single catalog at `/marketplace`:
+
+- **Filter by ART, role, or skills** — quickly find the right agent for any task
+- **Agent profiles** — full detail view: system prompt, tools, skills, recent sessions
+- **One-click session launch** — start a direct conversation with any agent instantly
+- **Group browsing** — view agents organized by their Agile Release Train
+
+### LLM Metrics Dashboard
+
+Real-time observability for all LLM usage at `/metrics`:
+
+- **Cost tracking** — per-agent, per-mission, per-provider spend
+- **Latency monitoring** — P50/P95/P99 latency per model and provider
+- **Provider comparison** — side-by-side cost/latency/quality across providers
+- **Token budget alerts** — configurable thresholds with dashboard warnings
+
+### Agent Evaluation Framework
+
+LLM-as-judge scoring system at `/evals`:
+
+- **Golden dataset** — curated test cases with expected outputs
+- **Automated scoring** — LLM judge evaluates agent responses against ground truth
+- **Per-agent benchmarks** — track quality scores over time and across versions
+- **Regression detection** — alert on quality drops after agent prompt changes
+
+### Tool Builder
+
+No-code tool creation at `/tool-builder`:
+
+- **HTTP tools** — configure REST API calls with headers, auth, and response mapping
+- **SQL tools** — write SQL queries that agents can execute against configured databases
+- **Shell tools** — wrap shell commands as agent-callable tools with parameter templating
+- **Instant activation** — new tools available to agents immediately after saving
+
+### Multi-Tenant Workspaces
+
+Isolated project namespaces at `/workspaces`:
+
+- **Namespace isolation** — separate data, agents, and memory per workspace
+- **Per-client deployment** — onboard multiple clients or projects without cross-contamination
+- **Workspace switching** — switch context without logout
+- **RBAC per workspace** — granular role assignments scoped to each workspace
+
+### Mission Replay
+
+Step-by-step mission execution replay at `/missions/{id}/replay`:
+
+- **Full execution history** — every agent turn, tool call, and LLM response
+- **Per-step cost and tokens** — see exactly what each agent spent
+- **Duration breakdown** — timeline view showing where time was spent
+- **Exportable** — download replay as JSON for analysis or debugging
+
 ## Four Interfaces
 
 ### 1. Web Dashboard (HTMX + SSE)
@@ -409,7 +569,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -474,8 +634,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -580,34 +740,9 @@ Mission Created
 ### Deployment
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (recommended) → http://localhost:8090
+Local (dev)          → http://localhost:8090
+Production           → your own infrastructure
 ```
 
 ## Project Configuration
@@ -948,6 +1083,95 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **Darwin LLM A/B section** — live view of ongoing model experiments from the Settings page
 - **Save & invalidate** — one-click save pushes config to DB and flushes the executor cache
 
+## What's New in v2.7.0 (2026)
+
+### Knowledge Management System
+- **4 new agents** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART Knowledge team** — dedicated Agile Release Train for knowledge operations
+- **Nightly `knowledge-maintenance` workflow** — automatic curation, deduplication, freshness scoring
+- **Memory Health dashboard** — knowledge health metrics panel in the Metrics tab
+- **Knowledge Health badge** — visible in the Settings page
+
+### Memory Intelligence
+- **Relevance scoring** — `confidence × recency × access_boost` formula for ranked retrieval
+- **Access tracking** — `access_count` and `last_read_at` fields on every memory entry
+- **Automatic pruning** — stale entries below threshold removed on each nightly run
+
+### LLM Cost Tracking
+- **Per-mission cost** — displayed in the mission timeline tab header
+- **Auto-summed** — aggregated from `llm_traces` table, no manual tracking needed
+
+### Mission Timeline
+- **Swimlane timeline tab** — in Mission Control, shows agent phases as horizontal swim lanes
+- **Phase durations** — visual representation of how long each phase took
+
+### Quality Scoring
+- **PhaseRun `quality_score` field** — populated by the adversarial guard after each phase
+
+### Project Export/Import
+- **ZIP archive** — contains `project.json` + all missions + mission runs + memories
+- **Portable projects** — export from one instance, import into another
+
+### Input Validation
+- **Pydantic models** — all POST/PATCH routes now validated with strict input schemas
+
+### BSCC Domain Guidelines
+- **Domain-level architecture guidelines** — Confluence/Solaris guidelines enforced per project domain
+- **Configurable per project** in Settings
+
+### Settings Integrations Hub
+- **Configurable tool integrations** — Jira, Confluence, SonarQube available to all agents from a single Settings panel
+
+### Browser Push Notifications
+- **Web Push API (VAPID)** — native browser push notifications for mission events and alerts
+
+## What's New in v3.0.0 (2026)
+
+### Agent Marketplace
+- **191 agents catalogued** — full-text search, filter by ART/role/skills at `/marketplace`
+- **Agent profiles** — detailed view with tools, skills, and recent session history
+- **One-click launch** — start a direct session with any agent from their profile page
+
+### Mission Replay UI
+- **Step-by-step replay** — every agent turn and tool call replayed at `/missions/{id}/replay`
+- **Per-step cost and tokens** — granular LLM spend breakdown per agent
+- **Exportable history** — download replay as JSON for debugging and auditing
+
+### LLM Metrics Dashboard
+- **Real-time cost/latency/provider monitoring** at `/metrics`
+- **Per-agent and per-mission spend** — identify expensive agents and optimize
+- **Provider comparison** — side-by-side P50/P95 latency and cost across providers
+
+### RBAC + Rate Limiting
+- **Workspace-scoped RBAC** — role assignments per workspace, not just per platform
+- **Per-user rate limiting** — configurable token/request quotas per role
+- **Audit trail** — all RBAC changes logged with actor, timestamp, and change detail
+
+### Agent Evaluation Framework
+- **LLM-as-judge scoring** — automated evaluation against golden datasets at `/evals`
+- **Per-agent benchmarks** — track quality over time and detect regressions
+- **Configurable judges** — use any configured LLM provider as the evaluation judge
+
+### Tool Builder
+- **No-code tool creation** at `/tool-builder` — HTTP, SQL, and shell tools
+- **Instant activation** — tools available to agents immediately after saving
+- **Parameter templates** — define input schemas with types and validation
+
+### Multi-Tenant Workspaces
+- **Isolated namespaces** at `/workspaces` — separate data, agents, and memory per workspace
+- **Per-client deployment** — onboard multiple clients without cross-contamination
+- **RBAC per workspace** — granular role assignments per namespace
+
+### YAML Agents Hot-Reload
+- **Live agent updates** — edit agent YAML files and reload without restarting the platform
+- **No downtime** — in-flight missions continue with the previous agent definition
+
+## Ecosystem & Related Tools
+
+| Tool | Description | Why it matters |
+|------|-------------|----------------|
+| [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | Rust Token Killer — CLI proxy that reduces LLM token consumption by 60-90% on common dev commands | Integrating into agent tool wrappers to reduce session costs |
+
 ## Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -958,6 +1182,6 @@ This project is licensed under the AGPL v3 License - see the [LICENSE](LICENSE) 
 
 ## Support
 
-- Live Demo: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Discussions: https://github.com/macaron-software/software-factory/discussions

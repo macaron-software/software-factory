@@ -1,0 +1,17 @@
+# LPD — La Poste Distribution
+# ==============================
+
+project:
+  id: lpd
+  name: lpd
+  display_name: "LPD - La Poste Distribution"
+  root_path: ""
+  domain: la-poste
+  description: >
+    Système de distribution La Poste.
+    Optimisation des tournées, suivi colis, gestion dépôts.
+
+domains:
+  rust:
+    paths: [src/]
+    extensions: [.rs]

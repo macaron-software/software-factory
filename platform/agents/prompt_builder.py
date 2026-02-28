@@ -17,6 +17,96 @@ from .tool_schemas import (
 if TYPE_CHECKING:
     from .executor import ExecutionContext
 
+# Roles that benefit from architecture guidelines injection
+_GUIDELINES_ROLES = {
+    "dev",
+    "architecture",
+    "security",
+    "reviewer",
+    "qa",
+    "backend",
+    "frontend",
+}
+
+# Simple LRU-style cache to avoid DB hit on every message (project_id → (summary, timestamp))
+_guidelines_cache: dict[str, tuple[str, float]] = {}
+_GUIDELINES_CACHE_TTL = 300  # 5 minutes
+
+
+def _get_project_domain(project_id: str) -> str:
+    """Read domain field from projects/{project_id}.yaml. Returns empty string if not set."""
+    try:
+        from pathlib import Path
+        import yaml as _yaml
+
+        p = Path(__file__).parent.parent.parent / "projects" / f"{project_id}.yaml"
+        if not p.exists():
+            return ""
+        data = _yaml.safe_load(p.read_text()) or {}
+        return data.get("project", {}).get("domain", "") or data.get("domain", "") or ""
+    except Exception:
+        return ""
+
+
+def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
+    """Load architecture guidelines from DB and return compact summary for system prompt injection.
+
+    Lookup order: project_id → domain:{project.domain}
+    Only injects for roles that need tech constraints (dev, architecture, security, ...).
+    Returns empty string if no guidelines configured for this project.
+    """
+    import time
+
+    if not ctx.project_id:
+        return ""
+
+    # Role filter — skip for product/marketing/ideation-only roles
+    role = _classify_agent_role(ctx.agent)
+    if role not in _GUIDELINES_ROLES:
+        return ""
+
+    # Determine which project keys to try (project-level first, then domain-level)
+    keys_to_try = [ctx.project_id]
+    domain = _get_project_domain(ctx.project_id)
+    if domain:
+        keys_to_try.append(f"domain:{domain}")
+
+    for proj_key in keys_to_try:
+        cached = _guidelines_cache.get(proj_key)
+        if cached:
+            summary, ts = cached
+            if time.time() - ts < _GUIDELINES_CACHE_TTL:
+                return summary
+
+    try:
+        from pathlib import Path
+
+        db_path = Path(__file__).parent.parent.parent / "data" / "guidelines.db"
+        if not db_path.exists():
+            return ""
+
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+
+        from mcp_lrm.guidelines_scraper import build_guidelines_summary
+
+        for proj_key in keys_to_try:
+            meta = conn.execute(
+                "SELECT page_count FROM guideline_meta WHERE project = ?", (proj_key,)
+            ).fetchone()
+            if meta and meta["page_count"] > 0:
+                conn.close()
+                summary = build_guidelines_summary(proj_key, role, max_chars=600)
+                _guidelines_cache[proj_key] = (summary, time.time())
+                return summary
+
+        conn.close()
+        return ""
+    except Exception:
+        return ""
+
 
 def _build_system_prompt(ctx: ExecutionContext) -> str:
     """Compose the full system prompt from agent config + skills + context."""
@@ -50,7 +140,33 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
 
         # Role-specific tool instructions
         role_cat = _classify_agent_role(agent)
-        if role_cat == "qa":
+        if role_cat == "cto":
+            parts.append("""
+## Software Factory — Rôle CTO (PRIORITÉ ABSOLUE)
+Tu es Karim Benali, CTO de la Software Factory. Tu es opérationnel : tu peux CONSULTER et CRÉER.
+
+RÈGLES FONDAMENTALES :
+1. Si le message contient un bloc "--- Contexte projet SF @NomProjet ---" :
+   → RÉPONDS DIRECTEMENT en utilisant les infos de ce bloc (nom, description, vision, type, domaines)
+   → NE PAS appeler list_files, code_search, code_read — les projets SF ne sont PAS dans le filesystem local
+   → NE PAS dire "je ne trouve pas ce projet" — il est dans le bloc de contexte
+   → Si le bloc indique des missions SF actives, tu peux appeler platform_missions(project_id="...")
+2. Pour lister les projets SF : appelle platform_agents() ou demande à l'utilisateur d'utiliser @NomProjet
+3. Pour les métriques globales : platform_metrics(), platform_sessions()
+4. INTERDIT : list_files, code_search (ces outils cherchent dans le filesystem local, pas dans la SF)
+5. INTERDIT : créer des fichiers locaux, demander des credentials, générer du SQL
+
+ACTIONS QUE TU PEUX EFFECTUER :
+- Créer un projet complet : create_project(name, description, vision, factory_type)
+  → crée automatiquement : workspace, git init + commit, Dockerfile, docker-compose, README
+  → lance automatiquement 3 missions standards : TMA/MCO (tma-maintenance), Sécurité (security-hacking), Dette Tech + Légalité (tech-debt-reduction)
+  → retourne project_id, workspace path, liste des actions scaffold et des missions créées
+- Créer une mission spécifique : create_mission(name, goal, project_id, workflow_id) → lance l'orchestrateur
+- Monter une équipe : create_team(team_name, domain, stack, roles=[{id, name, role, skills, prompt}])
+- Composer un workflow : compose_workflow(workflow_id, project_id, overrides)
+- Quand l'utilisateur dit "crée", "lance", "monte", "démarre" → AGIS directement sans demander de confirmation
+- Après create_project/create_mission, informe l'utilisateur avec l'ID et un lien vers la ressource créée""")
+        elif role_cat == "qa":
             parts.append("""
 ## QA Testing (MANDATORY — read carefully)
 You have a tool called run_e2e_tests. You MUST call it.
@@ -117,14 +233,49 @@ RULES:
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
 
-    if ctx.vision:
-        parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
+    # Inject architecture/tech guidelines if available for this project
+    guidelines = _load_guidelines_for_prompt(ctx)
+    if guidelines:
+        parts.append(f"\n## Architecture & Tech Guidelines (DSI)\n{guidelines}")
 
-    if ctx.project_context:
-        parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
+    if ctx.capability_grade == "organizer":
+        # Organizers: full project context (constitution, vision, memory files)
+        if ctx.domain_context:
+            parts.append(f"\n{ctx.domain_context}")
+        if ctx.vision:
+            parts.append(f"\n## Project Vision\n{ctx.vision[:3000]}")
+        if ctx.project_context:
+            parts.append(f"\n## Project Context\n{ctx.project_context[:2000]}")
+        if ctx.project_memory:
+            parts.append(
+                f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}"
+            )
+    else:
+        # Executors: task-scoped context only
+        if ctx.domain_context:
+            parts.append(f"\n{ctx.domain_context}")
+        if ctx.project_context:
+            parts.append(
+                f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"
+            )
+        # Inject role-scoped project memory (last 10 facts relevant to this role)
+        if ctx.project_id:
+            try:
+                from ..memory.manager import get_memory_manager
 
-    if ctx.project_memory:
-        parts.append(f"\n## Project Memory (auto-loaded instructions)\n{ctx.project_memory[:4000]}")
+                role = _classify_agent_role(ctx.agent)
+                mem = get_memory_manager()
+                entries = mem.project_get(ctx.project_id, agent_role=role, limit=10)
+                if entries:
+                    mem_lines = "\n".join(
+                        f"- [{e.get('category', 'ctx')}] {e['key']}: {str(e['value'])[:200]}"
+                        for e in entries
+                    )
+                    parts.append(
+                        f"\n## Learned Project Knowledge ({role})\n{mem_lines}"
+                    )
+            except Exception:
+                pass
 
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")

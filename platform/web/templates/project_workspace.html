@@ -1,0 +1,2386 @@
+{% extends "base.html" %}
+{% block extra_head %}
+<script src="/static/js/codemirror6.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<link rel="stylesheet" href="/static/css/project_workspace.css?v=10">
+<style>
+html,body{height:100%;overflow:hidden}
+.layout{display:grid!important;grid-template-columns:56px 1fr;height:100vh!important;overflow:hidden!important}
+.content{display:flex!important;flex-direction:column!important;height:100%!important;overflow:hidden!important;min-height:0!important}
+.main-area{padding:0!important;overflow:hidden!important;flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important}
+.ws-layout{display:flex!important;flex-direction:row!important;height:100%!important;overflow:hidden!important;background:var(--bg)}
+.ws-center{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-width:0}
+.ws-infobar{flex-shrink:0!important}
+/* File tree: only visible in code view */
+.ws-filetree{display:none!important}
+.ws-layout[data-view="code"] .ws-filetree{display:flex!important;width:200px!important;min-width:160px!important;flex-shrink:0!important;flex-direction:column!important;overflow:hidden!important;background:var(--bg-secondary);border-right:1px solid var(--border)}
+/* View panels */
+.ws-view-container{flex:1 1 0%!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
+.ws-view-panel{display:none!important}
+.ws-layout[data-view="terminal"] #ws-view-terminal{display:flex!important;flex-direction:column;height:100%}
+.ws-view-panel.active{display:flex!important;flex:1 1 0%!important;overflow:hidden!important;min-height:0}
+/* Bottom */
+.ws-bottom-panel{height:200px!important;flex-shrink:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;border-top:1px solid var(--border);transition:height .15s ease}
+.ws-bottom-panel.ws-collapsed{height:28px!important}
+.ws-bottom-panel.ws-collapsed .ws-pane-content{display:none!important}
+/* Pane helpers */
+.ws-pane-content{flex:1 1 0%!important;overflow:hidden!important;display:flex!important;flex-direction:column!important;min-height:0}
+.ws-tab-content{display:none!important}
+.ws-tab-content.active{display:flex!important;flex:1 1 0%!important;flex-direction:column!important;overflow:hidden!important;min-height:0}
+/* Timeline */
+.ws-tl-item{display:flex;gap:.8rem;padding:.5rem 0;border-left:2px solid var(--border);margin-left:.5rem;padding-left:1rem;position:relative}
+.ws-tl-item::before{content:'';position:absolute;left:-.45rem;top:.7rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--border);flex-shrink:0}
+.ws-tl-item.commit::before{background:#3b82f6}
+.ws-tl-item.mission::before{background:#7c3aed}
+.ws-tl-item.deploy::before{background:#22c55e}
+.ws-tl-item.error::before{background:#ef4444}
+.ws-tl-meta{min-width:0;flex:1}
+.ws-tl-title{font-size:.78rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ws-tl-desc{font-size:.72rem;color:var(--text-secondary);margin-top:.15rem;line-height:1.4}
+.ws-tl-time{font-size:.68rem;color:var(--text-secondary);white-space:nowrap;flex-shrink:0;margin-top:.1rem}
+.ws-tl-badge{display:inline-block;padding:.1rem .4rem;border-radius:.25rem;font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-right:.3rem}
+.ws-tl-badge.commit{background:rgba(59,130,246,.15);color:#3b82f6}
+.ws-tl-badge.mission{background:rgba(124,58,237,.15);color:#7c3aed}
+.ws-tl-badge.deploy{background:rgba(34,197,94,.15);color:#22c55e}
+.ws-tl-badge.error{background:rgba(239,68,68,.15);color:#ef4444}
+/* Search results */
+.ws-search-file{font-size:.73rem;font-weight:600;color:var(--text-primary);padding:.4rem .2rem .1rem;border-top:1px solid var(--border);margin-top:.3rem;display:flex;align-items:center;gap:.35rem;cursor:pointer}
+.ws-search-file:first-child{border-top:none;margin-top:0}
+.ws-search-match{font-size:.72rem;font-family:monospace;padding:.15rem .6rem;color:var(--text-secondary);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:2px}
+.ws-search-match:hover{background:var(--bg-hover);color:var(--text-primary)}
+.ws-search-match em{color:#fbbf24;font-style:normal;font-weight:700}
+.ws-search-lnum{color:var(--text-muted);min-width:3ch;display:inline-block;text-align:right;margin-right:.4rem}
+/* File icons colors */
+.ws-icon-js{color:#f7df1e}.ws-icon-ts{color:#3178c6}.ws-icon-py{color:#3572a5}
+.ws-icon-html{color:#e34c26}.ws-icon-css{color:#563d7c}.ws-icon-json{color:#cbcb41}
+.ws-icon-md{color:#083fa1}.ws-icon-sh{color:#22c55e}.ws-icon-sql{color:#e38c00}
+.ws-icon-rust{color:#dea584}.ws-icon-go{color:#00add8}.ws-icon-yaml{color:#cb171e}
+.ws-icon-default{color:var(--text-secondary)}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<a href="/projects/{{ project.id }}" class="btn btn-sm btn-ghost">
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+  {{ project.name }}
+</a>
+<span class="badge badge-purple" style="font-size:.68rem;">Workspace</span>
+{% endblock %}
+
+{% block content %}
+<div class="ws-layout" id="wsLayout" data-view="code">
+
+  <!-- ── Activity Bar ─────────────────────────────────────────── -->
+  <div class="ws-activity-bar">
+    <button class="ws-activity-btn active" data-view="code" onclick="wsSetView('code')" title="Code">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="git" onclick="wsSetView('git')" title="Git">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="docker" onclick="wsSetView('docker')" title="Docker">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="preview" onclick="wsSetView('preview')" title="Preview">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="agents" onclick="wsSetView('agents')" title="Agents">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="backlog" onclick="wsSetView('backlog')" title="Backlog">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2m-3 7h3m-3 4h3m-7-4h.01M9 16h.01"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="compliance" onclick="wsSetView('compliance')" title="Compliance">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="db" onclick="wsSetView('db')" title="Database">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="secrets" onclick="wsSetView('secrets')" title="Secrets / .env">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="timeline" onclick="wsSetView('timeline')" title="Timeline">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="search" onclick="wsSetView('search')" title="Recherche dans les fichiers">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="live" onclick="wsSetView('live')" title="Live Activity Feed" id="wsLiveBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="packages" onclick="wsSetView('packages')" title="Package Manager" id="wsPkgBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 7 8 2"/><line x1="12" y1="12" x2="12" y2="17"/><line x1="9.5" y1="14.5" x2="14.5" y2="14.5"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="terminal" onclick="wsSetView('terminal')" title="Terminal PTY">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/>
+      </svg>
+    </button>
+    <button class="ws-activity-btn" data-view="aichat" onclick="wsSetView('aichat')" title="Assistant IA">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="prs" onclick="wsSetView('prs');wsPrLoad()" title="Pull Requests">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 9v12M13 6h3a2 2 0 0 1 2 2v7"/><circle cx="6" cy="18" r="3"/></svg>
+    </button>
+    <button class="ws-activity-btn" data-view="deploylogs" onclick="wsSetView('deploylogs');wsDeployLogsStart()" title="Deploy Logs">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+    </button>
+    <button class="ws-activity-btn" onclick="document.getElementById('importGitModal').style.display='flex'" title="Importer un dépôt GitHub">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+    </button>
+
+  <!-- ── File Tree (only in code view via CSS) ────────────────── -->
+  <div class="ws-filetree" id="wsFiletree">
+    <div class="ws-filetree-header">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <span>{{ project.name }}</span>
+    </div>
+    <div class="ws-filetree-body" id="wsTreeBody">
+      <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Chargement…</div>
+    </div>
+  </div>
+
+  <!-- ── Center column ────────────────────────────────────────── -->
+  <div class="ws-center">
+
+    <!-- Info bar -->
+    <div class="ws-infobar">
+      <div class="ws-infobar-left">
+        <span class="ws-infobar-name">{{ project.name }}</span>
+        {% if project.path %}
+        <span class="ws-badge ws-badge-path">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          {{ project.path }}
+        </span>
+        {% endif %}
+        <span class="ws-badge ws-badge-git" id="wsGitBranch" style="display:none;cursor:pointer;position:relative" onclick="wsBranchOpen()" title="Changer de branche">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg>
+          <span id="wsGitBranchName"></span>
+          <span style="opacity:.5;font-size:.6rem">▾</span>
+        </span>
+        <div id="wsBranchDropdown" style="display:none;position:absolute;z-index:100;background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:6px;min-width:160px;max-height:260px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.4);top:28px;left:0"></div>
+      </div>
+      <div class="ws-infobar-right">
+        <span class="ws-badge ws-badge-status ws-badge-idle" id="wsStatus">Prêt</span>
+      </div>
+    </div>
+
+    <!-- ── Live metrics bar ─────────────────────────────────────── -->
+    <div class="ws-metrics-bar" id="wsMetricsBar">
+      <span class="ws-live-badge" id="wsLiveBadge">
+        <span class="ws-live-dot"></span> LIVE
+      </span>
+      <span class="ws-metric-sep">|</span>
+      <span class="ws-metric-item"><strong id="wsMetricAgents">–</strong> agents</span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item"><strong id="wsMetricCalls">–</strong> calls/h</span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item"><strong id="wsMetricFiles">–</strong> fichiers</span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item"><strong id="wsMetricMissions">–</strong> missions</span>
+      <span class="ws-metric-sep" id="wsMetricCommitSep" style="display:none">·</span>
+      <span class="ws-metric-item" id="wsMetricCommit" style="display:none">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg> <strong id="wsMetricCommitHash"></strong> <span id="wsMetricCommitMsg" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom"></span>
+      </span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item" id="wsMetricWallet" title="Project budget"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> <span id="wsWalletBalance">—</span></span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item" id="wsLiveCost" title="Tokens cumulés (1h)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> –</span>
+      <span class="ws-metric-sep" id="wsMetricSysSep" style="display:none">·</span>
+      <span class="ws-metric-item" id="wsMetricCpu" title="CPU" style="display:none;cursor:default"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> –%</span>
+      <span class="ws-metric-sep" id="wsMetricRamSep" style="display:none">·</span>
+      <span class="ws-metric-item" id="wsMetricRam" title="RAM" style="display:none;cursor:default"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg> –%</span>
+      <span class="ws-metric-sep">·</span>
+      <button onclick="openCmdPalette()" style="background:none;border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:1px 7px;font-size:.68rem;cursor:pointer;line-height:1.6" title="Palette de commandes (⌘K)">⌘K</button>
+    </div>
+
+    <!-- ── View Container ─────────────────────────────────────── -->
+    <div class="ws-view-container">
+
+      <!-- ── VIEW: Code ───────────────────────────────────────── -->
+      <div class="ws-view-panel active" id="ws-view-code">
+        <div class="ws-code-editor" id="wsFilesViewer">
+          <div class="ws-file-empty">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+            <span>Sélectionnez un fichier dans l'arbre</span>
+          </div>
+        </div>
+        <div class="ws-code-side" id="wsCodeSide">
+          <div class="ws-pane-tabs" id="wsCodeSideTabs">
+            <button class="ws-tab active" onclick="wsCodeSideTab(this,'toolcalls')" data-tab="toolcalls">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+              Tool Calls
+            </button>
+            <button class="ws-tab" onclick="wsCodeSideTab(this,'progress')" data-tab="progress">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>
+              Progress
+            </button>
+            <button class="ws-pane-collapse" onclick="wsToggleCodeSide()" title="Réduire">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-tab-content active" id="ws-code-toolcalls">
+              <div class="ws-toolcalls" id="wsToolcallsBody">
+                <div class="ws-empty-state"><span>Chargement…</span></div>
+              </div>
+            </div>
+            <div class="ws-tab-content" id="ws-code-progress">
+              <div class="ws-empty-state"><span>Chargement PROGRESS.md…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Git ─────────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-git">
+        <div class="ws-git-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Modifications</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-git" id="wsGitBody" style="overflow-y:auto">
+              <div class="ws-empty-state"><span>Chargement…</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ws-git-main">
+          <div class="ws-pane-tabs" id="wsGitMainTabs">
+            <button class="ws-tab active" onclick="wsGitMainTab(this,'log')" data-tab="log">
+              Historique
+            </button>
+            <button class="ws-tab" onclick="wsGitMainTab(this,'diff')" data-tab="diff">
+              Diff
+            </button>
+            <button class="ws-tab" onclick="wsGitMainTab(this,'commit')" data-tab="commit">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Commit
+            </button>
+            <button class="ws-btn ws-btn-sm" onclick="wsShowDiff()" style="margin-left:auto"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Diff</button>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-tab-content active" id="ws-git-log">
+              <div class="ws-git-log-area" id="wsGitLogArea">
+                <div class="ws-empty-state"><span>Chargement…</span></div>
+              </div>
+            </div>
+            <div class="ws-tab-content" id="ws-git-diff">
+              <div class="ws-git-diff-area" id="wsGitDiffArea">Sélectionnez un fichier modifié pour voir le diff</div>
+            </div>
+            <div class="ws-tab-content" id="ws-git-commit" style="flex-direction:column;padding:.75rem;gap:.5rem;overflow-y:auto">
+              <div style="font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Fichiers modifiés</div>
+              <div id="wsCommitFileList" style="font-size:.72rem;background:var(--bg-secondary);border-radius:4px;padding:.4rem;min-height:60px;max-height:180px;overflow-y:auto"></div>
+              <textarea id="wsCommitMsg" placeholder="Message de commit…" style="background:var(--bg-input,#1a1a1a);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.4rem .5rem;font-size:.72rem;resize:vertical;height:56px;font-family:inherit;width:100%;box-sizing:border-box"></textarea>
+              <div style="display:flex;gap:.4rem">
+                <button onclick="wsGitRefreshStatus()" class="ws-btn ws-btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Actualiser</button>
+                <button onclick="wsGitDoCommit()" class="ws-btn ws-btn-sm" style="flex:1;background:var(--green-dim,#1a3a1a);color:var(--green,#4ade80);border-color:var(--green-dim,#1a3a1a)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Commit</button>
+              </div>
+              <div id="wsCommitResult" style="font-size:.72rem;display:none"></div>
+            </div>
+          </div>
+          <div id="wsDiffPanel" style="display:none;padding:8px;overflow:auto">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <select id="wsDiffRef" onchange="wsShowDiff()">
+                <option value="HEAD~1">vs HEAD~1</option>
+                <option value="HEAD~3">vs HEAD~3</option>
+                <option value="HEAD~10">vs HEAD~10</option>
+              </select>
+              <button class="ws-btn ws-btn-sm" onclick="document.getElementById('wsDiffPanel').style.display='none'">✕</button>
+            </div>
+            <div id="wsDiffContent" style="font-family:monospace;font-size:12px;overflow:auto;max-height:500px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Docker ──────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-docker" style="flex-direction:column">
+        <div class="ws-pane-tabs" id="wsDockerTabs">
+          <button class="ws-tab active" onclick="wsDockerTab(this,'containers')">Containers</button>
+          <button class="ws-tab" onclick="wsDockerTab(this,'portainer')">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Portainer
+          </button>
+        </div>
+        <div class="ws-pane-content">
+          <div class="ws-tab-content active" id="ws-docker-containers">
+            <div class="ws-docker" id="wsDockerBody">
+              <div class="ws-empty-state">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+                <span>Chargement…</span>
+              </div>
+            </div>
+          </div>
+          <div class="ws-tab-content" id="ws-docker-portainer">
+            <div class="ws-tool-launcher">
+              <div class="ws-tool-logo">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              </div>
+              <div class="ws-tool-info">
+                <h3>Portainer CE</h3>
+                <p>Gestion complète des containers Docker — images, volumes, réseaux, logs.</p>
+                <div class="ws-tool-stats" id="wsPortainerStats">
+                  <span class="ws-badge">Chargement…</span>
+                </div>
+              </div>
+              <div class="ws-tool-actions">
+                <a href="https://sf.macaron-software.com/portainer/" target="_blank" class="ws-btn-launch">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Ouvrir Portainer
+                </a>
+                <span class="ws-tool-hint">S'ouvre dans un nouvel onglet</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Preview ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-preview">
+        <div class="ws-preview" id="wsPreviewPanel">
+          <div class="ws-preview-bar">
+            <input class="ws-preview-url" id="wsPreviewUrl" type="text" value="{{ preview_url or '' }}" placeholder="http://localhost:3000">
+            <button class="ws-preview-btn" onclick="wsPreviewLoad()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Charger
+            </button>
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+            </button>
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </button>
+          </div>
+          <div class="ws-preview-empty" id="wsPreviewEmpty">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <span>Aucun port détecté</span>
+            <span class="ws-empty-hint">Saisissez une URL ou lancez un serveur dans Output</span>
+          </div>
+          <iframe class="ws-preview-frame" id="wsPreviewFrame"
+            {% if preview_url %}src="{{ preview_url }}"{% endif %}
+            style="{{ '' if preview_url else 'display:none' }}"
+            sandbox="allow-scripts allow-forms allow-popups allow-same-origin"></iframe>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Agents ──────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-agents">
+        <div class="ws-agents-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Agents actifs</span>
+            <button class="ws-term-run" style="margin-left:auto;padding:.2rem .55rem;font-size:.7rem;display:flex;align-items:center;gap:.3rem" onclick="wsShowLaunchMission()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Mission
+            </button>
+          </div>
+          <div class="ws-pane-content" style="flex-direction:column">
+            <!-- Launch mission panel (hidden by default) -->
+            <div id="wsLaunchMissionPanel" style="display:none;flex-direction:column;gap:.5rem;padding:.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)">
+              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer une mission</div>
+              <select id="wsLaunchWorkflow" style="width:100%;padding:.3rem .5rem;font-size:.75rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px">
+                <option value="">Choisir un workflow…</option>
+                <option value="feature-sprint">Feature Sprint (TDD)</option>
+                <option value="feature-request">Feature Request</option>
+                <option value="ideation-to-prod">Ideation → Prod</option>
+                <option value="cicd-pipeline">CI/CD Pipeline</option>
+                <option value="documentation-pipeline">Documentation</option>
+                <option value="quality-improvement">Amélioration Qualité</option>
+                <option value="tech-debt-reduction">Réduction Dette Technique</option>
+              </select>
+              <textarea id="wsLaunchBrief" rows="2" placeholder="Décrivez la tâche à réaliser…" style="width:100%;padding:.3rem .5rem;font-size:.75rem;font-family:inherit;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;box-sizing:border-box"></textarea>
+              <div style="display:flex;gap:.4rem">
+                <button class="ws-term-run" style="flex:1;font-size:.73rem;padding:.3rem" onclick="wsLaunchMission()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer</button>
+                <button class="ws-secret-btn" style="font-size:.73rem;padding:.3rem .55rem" onclick="document.getElementById('wsLaunchMissionPanel').style.display='none'">✕</button>
+              </div>
+              <div id="wsLaunchMissionStatus" style="font-size:.72rem;color:var(--text-secondary)"></div>
+            </div>
+            <div class="ws-agents" id="wsAgentsBody" style="flex:1;overflow-y:auto">
+              <div class="ws-empty-state"><span>Chargement…</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="ws-agents-main">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Tool Calls récents</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-toolcalls" id="wsAgentsToolcalls">
+              <div class="ws-empty-state"><span>Chargement…</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Backlog ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-backlog">
+        <div class="ws-backlog" id="wsBacklogBody">
+          <div class="ws-empty-state">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>
+            <span>Chargement…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Compliance ──────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-compliance" style="flex-direction:column;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0">
+          <span style="font-size:.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.05em"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Compliance</span>
+          <button class="ws-term-run" style="padding:.2rem .5rem;font-size:.7rem" onclick="wsLoadCompliance()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> Refresh</button>
+        </div>
+        <div id="wsComplianceSummary" style="display:flex;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0;font-size:.72rem;color:var(--text-secondary)"></div>
+        <div id="wsComplianceBody" style="flex:1;overflow-y:auto;padding:.5rem .75rem">
+          <div class="ws-empty-state"><span>Chargement…</span></div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Database ────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-db">
+        <div class="ws-db-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Base de données</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-filetree-body" id="wsDbFiles">
+              <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>
+            </div>
+          </div>
+        </div>
+        <div class="ws-db-main">
+          <div class="ws-pane-tabs" id="wsDbMainTabs">
+            <button class="ws-tab" onclick="wsDbMainTab(this,'sql')">SQLite / SQL</button>
+            <button class="ws-tab active" onclick="wsDbMainTab(this,'dbgate')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+              DbGate
+            </button>
+            <span style="flex:1"></span>
+            <span style="font-size:.68rem;color:var(--text-secondary);padding:0 .5rem" id="wsDbStatus"></span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-tab-content" id="ws-db-sql">
+              <span style="font-size:.76rem;font-weight:600;color:var(--text-primary);padding:.3rem .5rem;display:block" id="wsDbTableLabel">SQL</span>
+              <div class="ws-db-editor">
+                <textarea class="ws-db-query" id="wsDbQuery" rows="3" placeholder="SELECT * FROM table LIMIT 100;"></textarea>
+                <div style="display:flex;gap:.4rem;margin-top:.4rem;align-items:center">
+                  <button class="ws-term-run" style="padding:.25rem .55rem;font-size:.72rem" onclick="wsDbRun()">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Run
+                  </button>
+                  <span style="font-size:.7rem;color:var(--text-secondary)">Ctrl+Enter</span>
+                </div>
+              </div>
+              <div class="ws-db-results" id="wsDbResults">
+                <div class="ws-empty-state">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                  <span>Sélectionnez une table ou écrivez une requête</span>
+                </div>
+              </div>
+            </div>
+            <div class="ws-tab-content active" id="ws-db-dbgate" style="flex-direction:column">
+              <div class="ws-dbgate-header">
+                <div style="flex:1">
+                  <strong style="font-size:.8rem">DbGate</strong>
+                  <span style="font-size:.72rem;color:var(--text-secondary);margin-left:.4rem">multi-DB (Postgres, MySQL, SQLite, MongoDB…)</span>
+                </div>
+                <a href="https://sf.macaron-software.com/dbgate/" target="_blank" class="ws-preview-btn" style="text-decoration:none">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  Ouvrir en plein écran
+                </a>
+              </div>
+              <div class="ws-dbgate-connections" id="wsDbGateConnections">
+                <div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-secondary)">Scan des connexions…</div>
+              </div>
+              <iframe src="about:blank" id="wsDbGateFrame" style="flex:1;border:none;min-height:0" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Secrets / Vault ──────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-secrets">
+        <div class="ws-secrets-left">
+          <div class="ws-pane-tabs">
+            <span class="ws-tab" style="cursor:default;color:var(--text-secondary);font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em">Fichiers .env</span>
+          </div>
+          <div class="ws-pane-content">
+            <div class="ws-filetree-body" id="wsSecretsFiles">
+              <div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>
+            </div>
+          </div>
+          <div style="padding:.5rem;border-top:1px solid var(--border)">
+            <button class="ws-term-run" style="width:100%;justify-content:center;padding:.3rem;font-size:.72rem" onclick="wsSecretsNewFile()">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Créer .env
+            </button>
+          </div>
+        </div>
+        <div class="ws-secrets-main">
+          <div class="ws-pane-tabs" id="wsSecretsToolbar">
+            <span style="font-size:.76rem;font-weight:600;color:var(--text-primary)" id="wsSecretsFileName">—</span>
+            <span style="flex:1"></span>
+            <button class="ws-preview-btn" onclick="wsSecretsToggleAll()" id="wsSecretsShowAllBtn" style="font-size:.7rem;padding:.2rem .4rem;margin-right:.3rem">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              Afficher
+            </button>
+            <button class="ws-preview-btn" onclick="wsSecretsSave()" id="wsSecretsSaveBtn" style="font-size:.7rem;padding:.2rem .4rem" disabled>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Sauvegarder
+            </button>
+          </div>
+          <div class="ws-pane-content" style="overflow-y:auto">
+            <div id="wsSecretsList" style="padding:.5rem">
+              <div class="ws-empty-state" id="wsSecretsEmpty">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span>Sélectionnez un fichier .env</span>
+                <span class="ws-empty-hint">Gérez vos variables d'environnement et secrets</span>
+              </div>
+            </div>
+          </div>
+          <div style="padding:.5rem;border-top:1px solid var(--border);display:flex;gap:.4rem" id="wsSecretsAddRow" style="display:none">
+            <input type="text" id="wsSecretsNewKey" placeholder="NOM_VARIABLE" style="flex:1;min-width:0;padding:.3rem .5rem;font-size:.75rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.25rem;color:var(--text-primary)">
+            <input type="text" id="wsSecretsNewVal" placeholder="valeur" style="flex:2;min-width:0;padding:.3rem .5rem;font-size:.75rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.25rem;color:var(--text-primary)">
+            <button class="ws-term-run" style="padding:.3rem .55rem;font-size:.72rem;white-space:nowrap" onclick="wsSecretsAdd()">Ajouter</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Timeline view ─────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-timeline" style="flex-direction:column;overflow-y:auto;padding:1rem 1.5rem;gap:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-shrink:0">
+          <div style="font-size:.82rem;font-weight:700;color:var(--text-primary)">⏱ Timeline</div>
+          <div style="display:flex;gap:.4rem">
+            <select id="wsTimelineFilter" onchange="wsLoadTimeline()" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.73rem">
+              <option value="all">Tout</option>
+              <option value="commit">Git commits</option>
+              <option value="mission">Missions</option>
+              <option value="deploy">Déploiements</option>
+            </select>
+            <button class="ws-term-run" style="padding:.2rem .6rem;font-size:.72rem" onclick="wsLoadTimeline()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+          </div>
+        </div>
+        <div id="wsTimelineBody" style="display:flex;flex-direction:column;gap:0;flex:1"></div>
+      </div>
+
+      <!-- ── Search view ────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-search" style="flex-direction:column;padding:1rem 1.2rem;gap:.6rem;overflow-y:auto">
+        <div style="font-size:.82rem;font-weight:700;color:var(--text-primary);flex-shrink:0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Recherche dans les fichiers</div>
+        <div style="display:flex;gap:.4rem;flex-shrink:0">
+          <input id="wsSearchQuery" type="text" placeholder="Texte à chercher…" style="flex:1;padding:.35rem .6rem;font-size:.78rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);min-width:0" onkeydown="if(event.key==='Enter')wsRunSearch()">
+          <input id="wsSearchGlob" type="text" placeholder="*.py" style="width:70px;padding:.35rem .5rem;font-size:.75rem;font-family:monospace;background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;color:var(--text-secondary)">
+          <button class="ws-term-run" style="padding:.3rem .65rem;font-size:.72rem" onclick="wsRunSearch()">↵</button>
+        </div>
+        <div style="display:flex;gap:.6rem;flex-shrink:0">
+          <label style="font-size:.72rem;color:var(--text-secondary);display:flex;align-items:center;gap:.3rem;cursor:pointer"><input type="checkbox" id="wsSearchCase"> Casse</label>
+          <label style="font-size:.72rem;color:var(--text-secondary);display:flex;align-items:center;gap:.3rem;cursor:pointer"><input type="checkbox" id="wsSearchRegex"> Regex</label>
+          <span id="wsSearchCount" style="font-size:.71rem;color:var(--text-secondary);margin-left:auto"></span>
+        </div>
+        <div id="wsSearchResults" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:0"></div>
+      </div>
+
+      <!-- ── VIEW: Live Activity Feed ─────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-live" style="flex-direction:column">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;border-bottom:1px solid var(--border);flex-shrink:0">
+          <div style="font-size:.78rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:.4rem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            Live Activity
+          </div>
+          <div class="ws-live-filters" style="padding:0;border:none">
+            <button class="ws-live-filter-btn active" data-lf="all" onclick="wsLiveFilter(this,'all')">All</button>
+            <button class="ws-live-filter-btn" data-lf="tool_call" onclick="wsLiveFilter(this,'tool_call')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Tools</button>
+            <button class="ws-live-filter-btn" data-lf="file_write" onclick="wsLiveFilter(this,'file_write')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Files</button>
+            <button class="ws-live-filter-btn" data-lf="message" onclick="wsLiveFilter(this,'message')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Msgs</button>
+            <button class="ws-live-filter-btn" data-lf="git_commit" onclick="wsLiveFilter(this,'git_commit')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg> Git</button>
+            <button class="ws-live-filter-btn" data-lf="agent_status" onclick="wsLiveFilter(this,'agent_status')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> Agents</button>
+          </div>
+          <button class="ws-term-run" style="padding:.15rem .5rem;font-size:.7rem" onclick="wsLiveClear()">Clear</button>
+        </div>
+        <div class="ws-live-feed" id="wsLiveFeed">
+          <div class="ws-empty-state"><span>En attente d'événements…</span><span class="ws-empty-hint">Les tool calls, fichiers, commits et messages apparaissent ici en temps réel</span></div>
+        </div>
+      </div>
+
+      <!-- ── Terminal View ─────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-terminal" style="display:none;height:100%;overflow:hidden;padding:0">
+        <div id="wsXtermContainer" style="height:100%;background:#1e1e1e;padding:4px"></div>
+      </div>
+
+      <!-- ── Package Manager View ─────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-packages" style="flex-direction:column">        <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .75rem;border-bottom:1px solid var(--border);flex-shrink:0">
+          <div style="font-size:.78rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:.4rem">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="16 2 12 7 8 2"/></svg>
+            Package Manager
+            <span id="wsPkgTypeLabel" style="font-size:.7rem;font-weight:400;opacity:.6;margin-left:.3rem"></span>
+          </div>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <input id="wsPkgSearch" type="text" placeholder="Ajouter un package…" autocomplete="off"
+              style="background:var(--bg-panel);border:1px solid var(--border);color:var(--text-primary);padding:.2rem .5rem;border-radius:4px;font-size:.72rem;width:180px"
+              onkeydown="if(event.key==='Enter')wsPkgInstall()">
+            <button class="ws-term-run" style="padding:.15rem .55rem;font-size:.7rem" onclick="wsPkgInstall()">Install</button>
+            <button class="ws-term-run" style="padding:.15rem .55rem;font-size:.7rem;background:var(--bg-input)" onclick="wsPkgReinstallAll()">Reinstall All</button>
+            <button class="ws-term-run" style="padding:.15rem .5rem;font-size:.7rem;background:var(--bg-panel)" onclick="wsPkgLoad()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+          </div>
+        </div>
+        <div id="wsPkgInstallOutput" style="display:none;background:#0f1117;font-family:monospace;font-size:.72rem;padding:.4rem .75rem;max-height:140px;overflow-y:auto;border-bottom:1px solid var(--border);color:#8bc34a;flex-shrink:0"></div>
+        <div style="padding:.4rem .75rem;flex-shrink:0;display:flex;align-items:center;gap:1rem">
+          <span id="wsPkgCount" style="font-size:.72rem;color:var(--text-muted)">–</span>
+          <input id="wsPkgFilter" type="text" placeholder="Filtrer…" autocomplete="off"
+            style="background:var(--bg-panel);border:1px solid var(--border);color:var(--text-primary);padding:.15rem .4rem;border-radius:4px;font-size:.72rem;width:140px"
+            oninput="wsPkgFilter_()">
+        </div>
+        <div id="wsPkgList" style="flex:1;overflow-y:auto;padding:0 .5rem .5rem">
+          <div class="ws-empty-state"><span>Chargement…</span></div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: AI Chat ─────────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-aichat" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Assistant IA</span>
+          <div style="display:flex;gap:.4rem;align-items:center">
+            <span style="font-size:.68rem;color:var(--text-muted)">Contexte:</span>
+            <select id="aiCtxSelect" style="background:var(--bg-panel);border:1px solid var(--border);color:var(--text-primary);border-radius:3px;font-size:.68rem;padding:1px 4px">
+              <option value="">Aucun</option>
+              <option value="file">Fichier ouvert</option>
+              <option value="git">Git status</option>
+            </select>
+            <button onclick="wsAiClear()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:.7rem">Vider</button>
+          </div>
+        </div>
+        <div id="aiChatMsgs" style="flex:1;overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:.5rem"></div>
+        <div style="padding:.5rem;border-top:1px solid var(--border);display:flex;gap:.4rem;flex-shrink:0">
+          <textarea id="aiChatInput" placeholder="Pose une question… (Ctrl+Enter pour envoyer)"
+            style="flex:1;background:var(--bg-input,#1a1a1a);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.4rem .5rem;font-size:.72rem;resize:none;height:52px;font-family:inherit"
+            onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')wsAiSend()"></textarea>
+          <button onclick="wsAiSend()" class="ws-btn ws-btn-sm" style="align-self:flex-end;padding:.3rem .6rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Pull Requests ───────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-prs" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><circle cx="6" cy="18" r="3"/></svg> Pull Requests</span>
+          <span id="prRepoLabel" style="font-size:.7rem;color:var(--text-muted);flex:1"></span>
+          <button onclick="wsPrLoad()" class="ws-btn ws-btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
+        </div>
+        <div id="prList" style="flex:1;overflow-y:auto;padding:.75rem;display:flex;flex-direction:column;gap:.4rem"></div>
+      </div>
+
+      <!-- ── VIEW: Deploy Logs ─────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-deploylogs" style="flex-direction:column">
+        <div style="padding:.5rem .75rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+          <span style="font-size:.78rem;font-weight:700"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Deploy Logs</span>
+          <button onclick="wsDeployLogsStart()" class="ws-btn ws-btn-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Stream</button>
+          <button onclick="document.getElementById('deployLogList').innerHTML=''" class="ws-btn ws-btn-sm">Vider</button>
+        </div>
+        <div id="deployLogList" style="flex:1;overflow-y:auto;padding:.4rem .75rem;font-family:monospace;font-size:.7rem;line-height:1.5;background:#0a0a0a;color:#aaa"></div>
+      </div>
+
+    </div><!-- end ws-view-container -->
+    <div class="ws-bottom-panel" id="wsBottomPanel">
+      <div class="ws-pane-tabs">
+        <button class="ws-tab active" onclick="wsBottomTab(this,'shell')" data-btab="shell">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          Shell
+        </button>
+        <button class="ws-tab" onclick="wsBottomTab(this,'output')" data-btab="output">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          Output
+        </button>
+        <span id="wsPortBadge" style="display:none;margin-left:.3rem"></span>
+        <button class="ws-pane-collapse" onclick="wsToggleBottomPanel()" id="wsBottomCollapseBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="wsBottomCollapseIcon"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
+      </div>
+      <div class="ws-pane-content" id="wsBottomContent">
+        <!-- Shell tab -->
+        <div class="ws-tab-content active" id="ws-bottom-shell">
+          <div class="ws-terminal">
+            <div class="ws-term-history" id="wsTermHistory"></div>
+            <div class="ws-term-input-row">
+              <span class="ws-term-prompt">$</span>
+              <input class="ws-term-input" id="wsTermInput" type="text" placeholder="ls -la  /  git status  /  npm run dev …" autocomplete="off" spellcheck="false">
+              <button class="ws-term-run" id="wsTermRun" onclick="wsRunCmd()">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                Run
+              </button>
+            </div>
+          </div>
+        </div>
+        <!-- Output tab -->
+        <div class="ws-tab-content" id="ws-bottom-output">
+          <div class="ws-terminal" style="overflow:hidden">
+            <div class="ws-output-panel" id="wsOutputPanel">
+              <div class="ws-term-hint">Lancez un serveur ou une commande avec les boutons ci-dessous</div>
+            </div>
+            <div class="ws-term-input-row" style="gap:.4rem;flex-wrap:wrap">
+              <span style="color:#484f58;font-size:.72rem;font-weight:600">Quick:</span>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('npm run dev')">npm dev</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('npm install')">npm install</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('python main.py 2>&1 || python app.py 2>&1')">python run</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('docker compose up')">docker up</button>
+              <button class="ws-output-quickbtn" onclick="wsRunOutput('docker compose down')">docker down</button>
+              <button class="ws-output-quickbtn" id="wsOutputStop" onclick="wsStopOutput()" style="display:none;border-color:#f85149;color:#f85149">
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                Stop
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div><!-- end ws-bottom-panel -->
+
+  </div><!-- end ws-center -->
+</div><!-- end ws-layout -->
+
+<script>
+var _wsProjectId = {{ project.id | tojson }};
+var _wsPreviewMobile = false;
+var _wsOutputEs = null;
+var _wsDetectedPort = null;
+var _wsDbFiles = [];
+var _wsDbCurrentFile = null;
+var _wsCurrentFilePath = null;
+var _wsLiveEs = null;
+var _wsLiveFilter = 'all';
+var _wsLiveBuf = [];
+var _wsNotifCounts = {};
+var _wsCurrentView = 'code';
+
+function wsFetch(url, opts) {
+  opts = opts || {};
+  opts.credentials = 'same-origin';
+  return fetch(url, opts);
+}
+
+// ── View switching ──────────────────────────────────────────────
+function wsSetView(name) {
+  _wsCurrentView = name;
+  document.getElementById('wsLayout').setAttribute('data-view', name);
+  document.querySelectorAll('.ws-activity-btn').forEach(function(b) {
+    b.classList.toggle('active', b.getAttribute('data-view') === name);
+  });
+  document.querySelectorAll('.ws-view-panel').forEach(function(p) { p.classList.remove('active'); });
+  var panel = document.getElementById('ws-view-' + name);
+  if (panel) panel.classList.add('active');
+  localStorage.setItem('ws_view_' + _wsProjectId, name);
+  // Clear notification badge for this view
+  wsNotifClear(name);
+  if (name === 'code') { wsLoadToolcalls(); }
+  if (name === 'git') { wsLoadGit(); }
+  if (name === 'docker') { wsLoadDocker(); wsLoadPortainerStats(); }
+  if (name === 'agents') { wsLoadAgents(); wsLoadAgentsToolcalls(); }
+  if (name === 'backlog') { wsLoadBacklog(); }
+  if (name === 'db') { wsLoadDatabase(); wsDbGateAutoLogin(); }
+  if (name === 'secrets') { wsLoadSecrets(); }
+  if (name === 'timeline') { wsLoadTimeline(); }
+  if (name === 'search') { setTimeout(function(){ var q=document.getElementById('wsSearchQuery'); if(q)q.focus(); },50); }
+  if (name === 'compliance') { wsLoadCompliance(); }
+  if (name === 'live') { wsLiveRenderAll(); }
+  if (name === 'packages') { wsPkgLoad(); }
+  if (name === 'terminal') { wsInitTerminal(); }
+}
+
+function wsNotifAdd(view) {
+  if (view === _wsCurrentView) return;
+  _wsNotifCounts[view] = (_wsNotifCounts[view] || 0) + 1;
+  var btn = document.querySelector('.ws-activity-btn[data-view="'+view+'"]');
+  if (!btn) return;
+  var badge = btn.querySelector('.ws-notif-badge');
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.className = 'ws-notif-badge';
+    btn.appendChild(badge);
+  }
+  var n = _wsNotifCounts[view];
+  badge.textContent = n > 9 ? '9+' : n;
+}
+
+function wsNotifClear(view) {
+  _wsNotifCounts[view] = 0;
+  var btn = document.querySelector('.ws-activity-btn[data-view="'+view+'"]');
+  if (btn) { var b = btn.querySelector('.ws-notif-badge'); if (b) b.remove(); }
+}
+
+function wsBottomTab(btn, name) {
+  document.querySelectorAll('.ws-pane-tabs [data-btab]').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('#wsBottomContent .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-bottom-' + name);
+  if (el) el.classList.add('active');
+}
+
+function wsCodeSideTab(btn, name) {
+  document.querySelectorAll('#wsCodeSideTabs .ws-tab[data-tab]').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-code .ws-code-side .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-code-' + name);
+  if (el) el.classList.add('active');
+  if (name === 'progress') wsLoadProgress();
+}
+
+function wsDockerTab(btn, name) {
+  document.querySelectorAll('#wsDockerTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-docker .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-docker-' + name);
+  if (el) el.classList.add('active');
+}
+
+function wsDbMainTab(btn, name) {
+  document.querySelectorAll('#wsDbMainTabs .ws-tab').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#ws-view-db .ws-db-main .ws-tab-content').forEach(function(c){ c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-db-' + name);
+  if (el) el.classList.add('active');
+  if (name === 'dbgate') wsLoadDbGateConnections();
+}
+
+function wsGitMainTab(btn, name) {
+  document.querySelectorAll('#wsGitMainTabs .ws-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.ws-git-main .ws-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  btn.classList.add('active');
+  var el = document.getElementById('ws-git-' + name);
+  if (el) el.classList.add('active');
+}
+
+function wsToggleCodeSide() {
+  var side = document.getElementById('wsCodeSide');
+  if (!side) return;
+  side.style.display = side.style.display === 'none' ? '' : 'none';
+}
+
+function wsToggleBottomPanel() {
+  var panel = document.getElementById('wsBottomPanel');
+  var icon = document.getElementById('wsBottomCollapseIcon');
+  var collapsed = panel.classList.toggle('ws-collapsed');
+  if (icon) icon.setAttribute('points', collapsed ? '6 9 12 15 18 9' : '18 15 12 9 6 15');
+  localStorage.setItem('ws_bottom_collapsed', collapsed ? '1' : '');
+}
+
+// ── Terminal Shell ──────────────────────────────────────────────
+// ── PTY Terminal (xterm.js over WebSocket) ──────────────────────
+var _wsTerm = null, _wsTermWs = null, _wsTermFit = null;
+
+function wsInitTerminal() {
+  if (_wsTerm) return;
+  var container = document.getElementById('wsXtermContainer');
+  if (!container || !window.Terminal) return;
+  _wsTerm = new Terminal({
+    fontFamily: '"SF Mono","Fira Code","Cascadia Code","Courier New",monospace',
+    fontSize: 13,
+    theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4' },
+    cursorBlink: true,
+    scrollback: 5000,
+  });
+  _wsTermFit = new FitAddon.FitAddon();
+  _wsTerm.loadAddon(_wsTermFit);
+  _wsTerm.open(container);
+  _wsTermFit.fit();
+  var wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  _wsTermWs = new WebSocket(wsProto + '//' + location.host + '/api/projects/' + _wsProjectId + '/workspace/terminal');
+  _wsTermWs.binaryType = 'arraybuffer';
+  _wsTermWs.onopen = function() {
+    _wsTerm.write('\r\n\x1b[32m● Terminal connected\x1b[0m\r\n');
+    _wsTermWs.send(JSON.stringify({type:'resize', cols:_wsTerm.cols, rows:_wsTerm.rows}));
+  };
+  _wsTermWs.onmessage = function(e) {
+    if (e.data instanceof ArrayBuffer) _wsTerm.write(new Uint8Array(e.data));
+    else _wsTerm.write(e.data);
+  };
+  _wsTermWs.onclose = function() { _wsTerm.write('\r\n\x1b[31m● Disconnected\x1b[0m\r\n'); };
+  _wsTerm.onData(function(data) { if (_wsTermWs && _wsTermWs.readyState===1) _wsTermWs.send(data); });
+  _wsTerm.onResize(function(s) {
+    if (_wsTermWs && _wsTermWs.readyState===1)
+      _wsTermWs.send(JSON.stringify({type:'resize', cols:s.cols, rows:s.rows}));
+  });
+  new ResizeObserver(function(){ if(_wsTermFit) _wsTermFit.fit(); }).observe(container);
+}
+
+function wsRunCmd() {
+  var inp = document.getElementById('wsTermInput');
+  var cmd = inp.value.trim();
+  if (!cmd) return;
+  inp.value = '';
+  var h = document.getElementById('wsTermHistory');
+  var entry = document.createElement('div'); entry.className = 'ws-term-entry';
+  var outDiv = document.createElement('div'); outDiv.className = 'ws-term-output';
+  entry.innerHTML = '<div class="ws-term-cmd"><span style="color:#3fb950">$</span> <span class="ws-term-args">' + wsEsc(cmd) + '</span></div>';
+  entry.appendChild(outDiv);
+  var hr = document.createElement('hr'); hr.className = 'ws-term-divider';
+  entry.appendChild(hr);
+  h.appendChild(entry);
+  h.scrollTop = h.scrollHeight;
+  document.getElementById('wsTermRun').disabled = true;
+  wsSetStatus('En cours…', 'running');
+  var es = new EventSource('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/run?cmd=' + encodeURIComponent(cmd));
+  var out = '';
+  es.onmessage = function(e) {
+    if (e.data === '[DONE]') { es.close(); document.getElementById('wsTermRun').disabled = false; wsSetStatus('Prêt', 'idle'); return; }
+    out += e.data + '\n'; outDiv.textContent = out; h.scrollTop = h.scrollHeight;
+  };
+  es.onerror = function() { es.close(); document.getElementById('wsTermRun').disabled = false; wsSetStatus('Prêt', 'idle'); outDiv.classList.add('error'); };
+}
+document.getElementById('wsTermInput').addEventListener('keydown', function(e) { if (e.key==='Enter') wsRunCmd(); });
+
+// ── Output Streaming ────────────────────────────────────────────
+function wsRunOutput(cmd) {
+  wsStopOutput();
+  _wsDetectedPort = null;
+  document.getElementById('wsPortBadge').style.display = 'none';
+  var panel = document.getElementById('wsOutputPanel');
+  panel.innerHTML = '';
+  var cmdLine = document.createElement('div');
+  cmdLine.style.cssText = 'color:#484f58;font-size:.72rem;margin-bottom:.3rem';
+  cmdLine.textContent = '$ ' + cmd;
+  panel.appendChild(cmdLine);
+  var outDiv = document.createElement('div');
+  outDiv.style.whiteSpace = 'pre-wrap';
+  outDiv.style.wordBreak = 'break-all';
+  panel.appendChild(outDiv);
+  document.getElementById('wsOutputStop').style.display = '';
+  wsSetStatus('En cours…', 'running');
+  // Switch to output tab
+  var btn = document.querySelector('[data-btab="output"]');
+  if (btn) wsBottomTab(btn, 'output');
+  // Open bottom if collapsed
+  var bp = document.getElementById('wsBottomPanel');
+  if (bp.classList.contains('ws-collapsed')) wsToggleBottomPanel();
+  _wsOutputEs = new EventSource('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/run?cmd=' + encodeURIComponent(cmd));
+  var out = '';
+  _wsOutputEs.onmessage = function(e) {
+    if (e.data === '[DONE]') { wsStopOutput(); wsSetStatus('Prêt', 'idle'); return; }
+    out += e.data + '\n';
+    outDiv.textContent = out;
+    panel.scrollTop = panel.scrollHeight;
+    // Port detection
+    if (!_wsDetectedPort) {
+      var m = e.data.match(/localhost:(\d{4,5})/i) || e.data.match(/port\s+(\d{4,5})/i) || e.data.match(/:\s*(\d{4,5})\b/) || e.data.match(/on\s+http[^ ]*:(\d{4,5})/i);
+      if (m) { _wsDetectedPort = m[1]; wsShowPortBadge(m[1]); }
+    }
+  };
+  _wsOutputEs.onerror = function() { wsStopOutput(); wsSetStatus('Prêt', 'idle'); };
+}
+
+function wsStopOutput() {
+  if (_wsOutputEs) { _wsOutputEs.close(); _wsOutputEs = null; }
+  var btn = document.getElementById('wsOutputStop');
+  if (btn) btn.style.display = 'none';
+}
+
+function wsShowPortBadge(port) {
+  var badge = document.getElementById('wsPortBadge');
+  if (!badge) return;
+  badge.innerHTML = '<a href="#" class="ws-port-badge" onclick="wsOpenPreviewPort(' + port + ');return false">' +
+    '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>' +
+    ':' + port + '</a>';
+  badge.style.display = '';
+}
+
+function wsOpenPreviewPort(port) {
+  var url = window.location.protocol + '//' + window.location.hostname + ':' + port;
+  document.getElementById('wsPreviewUrl').value = url;
+  wsSetView('preview');
+  setTimeout(function() { wsPreviewLoad(url); }, 200);
+}
+
+// ── File Tree ───────────────────────────────────────────────────
+function wsLoadFilesTree(path) {
+  var tree = document.getElementById('wsTreeBody');
+  if (!tree) return;
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/files?path=' + encodeURIComponent(path))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      var parent = path.includes('/') ? path.substring(0, path.lastIndexOf('/')) : '.';
+      var backBtn = path !== '.' ? '<div class="ws-tree-item" onclick="wsLoadFilesTree(\'' + wsEsc(parent) + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg> ..</div>' : '';
+      if (!items.length) { tree.innerHTML = backBtn + '<div style="padding:.5rem .75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Dossier vide</div>'; return; }
+      var html = backBtn;
+      items.filter(function(i){ return i.type==='dir'; }).forEach(function(i) {
+        html += '<div class="ws-tree-item ws-tree-dir" onclick="wsLoadFilesTree(\'' + wsEsc(i.path) + '\')">' +
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>' + wsEsc(i.name) + '/</div>';
+      });
+      items.filter(function(i){ return i.type==='file'; }).forEach(function(i) {
+        var sz = i.size > 1024 ? (i.size/1024).toFixed(1)+'KB' : i.size+'B';
+        html += '<div class="ws-tree-item" onclick="wsOpenFile(\'' + wsEsc(i.path) + '\')">' +
+          wsFileIcon(i.name) + wsEsc(i.name) + '<span class="ws-tree-size">' + sz + '</span></div>';
+      });
+      tree.innerHTML = html;
+    });
+}
+function wsLoadLeftTree() { wsLoadFilesTree('.'); }
+
+function wsOpenFile(path) {
+  _wsCurrentFilePath = path;
+  wsSetView('code');
+  var viewer = document.getElementById('wsFilesViewer');
+  if (!viewer) return;
+  viewer.innerHTML = '<div class="ws-file-empty"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="ws-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/file?path=' + encodeURIComponent(path))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.error) { viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">' + wsEsc(data.error) + '</span></div>'; return; }
+      var ext = path.split('.').pop().toLowerCase();
+      var lm = {js:'javascript',ts:'typescript',tsx:'typescript',jsx:'javascript',py:'python',html:'html',css:'css',json:'json',yml:'yaml',yaml:'yaml',sh:'shell',bash:'shell',md:'markdown',sql:'sql',rs:'rust',go:'go',java:'java',php:'php',rb:'ruby',cpp:'cpp',c:'c',h:'c',toml:'ini',xml:'xml',dockerfile:'dockerfile',env:'ini',gitignore:'ini'};
+      var lang = lm[ext] || 'plaintext';
+      var isBin = ['jpg','jpeg','png','gif','svg','ico','woff','woff2','ttf','eot','zip','tar','gz','pdf'].includes(ext);
+      var saveIcon = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>';
+      var saveBtn = !isBin ? '<button class="ws-preview-btn" id="wsFileSaveBtn" onclick="wsMonacoSave()" style="margin-left:.4rem;padding:.2rem .45rem;font-size:.7rem">' + saveIcon + ' Save</button>' : '';
+      viewer.innerHTML = '<div class="ws-file-bar"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg> ' + wsEsc(path) + saveBtn + '<span class="ws-badge" style="margin-left:auto">' + lang + '</span></div>';
+      var editorDiv = document.createElement('div');
+      editorDiv.id = 'wsMonacoContainer';
+      editorDiv.style.cssText = 'flex:1;min-height:0;overflow:auto';
+      viewer.appendChild(editorDiv);
+      if (window._wsMonacoEditor) { try { window._wsMonacoEditor.destroy(); } catch(e){} window._wsMonacoEditor = null; }
+      if (!isBin && window.CodeMirrorEditor) {
+        var CM = window.CodeMirrorEditor;
+        var langExt = CM.langMap[lang] ? CM.langMap[lang]() : [];
+        var extensions = [CM.basicSetup, CM.oneDark, CM.keymap.of([CM.indentWithTab])];
+        if (Array.isArray(langExt)) { extensions = extensions.concat(langExt); } else { extensions.push(langExt); }
+        var view = new CM.EditorView({
+          state: CM.EditorState.create({ doc: data.content || '', extensions: extensions }),
+          parent: editorDiv
+        });
+        // Ctrl+S / Cmd+S → save
+        editorDiv.addEventListener('keydown', function(e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); wsMonacoSave(); }
+        });
+        window._wsMonacoEditor = { getValue: function(){ return view.state.doc.toString(); }, destroy: function(){ view.destroy(); } };
+      } else if (isBin) {
+        editorDiv.innerHTML = '<div style="padding:2rem;color:var(--text-muted);text-align:center">Binary file — preview not available</div>';
+      } else {
+        // Fallback textarea (CodeMirror not available)
+        var ta = document.createElement('textarea');
+        ta.value = data.content || '';
+        ta.style.cssText = 'width:100%;height:100%;background:#1e1e1e;color:#d4d4d4;border:none;padding:.75rem;font-family:"SF Mono","Fira Code","Monaco","Courier New",monospace;font-size:13px;resize:none;outline:none;box-sizing:border-box;tab-size:2';
+        ta.spellcheck = false;
+        editorDiv.style.cssText = 'flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column';
+        editorDiv.appendChild(ta);
+        window._wsMonacoEditor = { getValue: function(){ return ta.value; }, destroy: function(){} };
+      }
+    })
+    .catch(function(e) { if (viewer) viewer.innerHTML = '<div class="ws-file-empty"><span style="color:var(--red)">Erreur: ' + wsEsc(String(e)) + '</span></div>'; });
+}
+
+function wsMonacoSave() {
+  if (!window._wsMonacoEditor || !_wsCurrentFilePath) return;
+  var content = window._wsMonacoEditor.getValue();
+  var btn = document.getElementById('wsFileSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/file/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: _wsCurrentFilePath, content: content})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; }
+      wsSetStatus(d.ok ? 'Sauvegardé ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2000);
+    }).catch(function(){ if (btn) { btn.disabled = false; } wsSetStatus('Erreur save','running'); });
+}
+
+// ── Tool Calls ──────────────────────────────────────────────────
+function wsLoadToolcalls() {
+  var body = document.getElementById('wsToolcallsBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/tool-calls')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez une mission pour voir les tool calls</span></div>'; return; }
+      var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Paramètres</th><th>Statut</th><th>Durée</th></tr></thead><tbody>';
+      items.forEach(function(tc) {
+        var params = ''; try { var p=JSON.parse(tc.parameters_json||'{}'); params=JSON.stringify(p).substring(0,80); } catch(e){}
+        html += '<tr class="ws-table-row"><td><span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span></td><td class="ws-tc-params" title="' + wsEsc(params) + '">' + wsEsc(params) + '</td><td><span class="' + (tc.success?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (tc.success?'OK':'Err') + '</span></td><td class="ws-tc-dur">' + (tc.duration_ms||0) + 'ms</td></tr>';
+      });
+      html += '</tbody></table>'; body.innerHTML = html;
+    }).catch(function(){});
+}
+
+function wsLoadAgentsToolcalls() {
+  var body = document.getElementById('wsAgentsToolcalls');
+  if (!body) return;
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/tool-calls')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span></div>'; return; }
+      var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Statut</th><th>Date</th></tr></thead><tbody>';
+      items.slice(0,30).forEach(function(tc) {
+        html += '<tr class="ws-table-row"><td><span class="ws-tc-tool">' + wsEsc(tc.tool_name) + '</span></td><td><span class="' + (tc.success?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (tc.success?'OK':'Err') + '</span></td><td class="ws-tc-ts">' + wsEsc((tc.timestamp||'').substring(0,16)) + '</td></tr>';
+      });
+      html += '</tbody></table>'; body.innerHTML = html;
+    }).catch(function(){});
+}
+
+// ── Docker ──────────────────────────────────────────────────────
+function wsLoadDocker() {
+  var body = document.getElementById('wsDockerBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var containers = data.containers || [], dockerFiles = data.docker_files || [];
+      var html = '';
+      if (containers.length) {
+        html += containers.map(function(c) {
+          var up = c.status && c.status.toLowerCase().startsWith('up');
+          return '<div class="ws-docker-container"><div class="ws-docker-header"><div class="ws-docker-status ' + (up?'up':'down') + '"></div><span class="ws-docker-name">' + wsEsc(c.name) + '</span><span class="ws-docker-image">' + wsEsc(c.image||'') + '</span><span style="margin-left:auto;font-size:.7rem;color:var(--text-secondary)">' + wsEsc(c.status||'') + '</span>' + (c.ports?'<span class="ws-docker-port" onclick="wsDockPreview(\''+wsEsc(c.ports)+'\')">'+wsEsc(c.ports)+'</span>':'') + '</div><div class="ws-docker-actions"><button class="ws-docker-btn" onclick="wsDockAction(\''+wsEsc(c.name)+'\',\'start\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>Start</button><button class="ws-docker-btn" onclick="wsDockAction(\''+wsEsc(c.name)+'\',\'stop\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>Stop</button></div><pre class="ws-docker-logs">' + wsEsc(c.logs||'— Aucun log —') + '</pre></div>';
+        }).join('');
+      } else {
+        html += '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>Aucun container en cours</span>' + (dockerFiles.length ? '<span class="ws-empty-hint">Fichiers Docker: ' + dockerFiles.map(function(f){return f.name;}).join(', ') + '</span><button class="ws-docker-compose-up-btn" onclick="wsDockComposeUp(this)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> docker compose up</button>' : '<span class="ws-empty-hint">Aucun Dockerfile trouvé</span>') + '</div>';
+      }
+      if (dockerFiles.length) {
+        html += '<div style="margin-top:.75rem;">' + dockerFiles.map(function(f) {
+          return '<details style="margin-bottom:.5rem;"><summary style="cursor:pointer;font-size:.72rem;font-weight:600;color:var(--text-secondary);padding:.35rem .5rem;background:var(--bg-secondary);border-radius:4px;">' + wsEsc(f.name) + '</summary><pre style="background:var(--bg-secondary);padding:.5rem;font-size:.68rem;overflow:auto;max-height:200px;border-radius:0 0 4px 4px;margin:0">' + wsEsc(f.content) + '</pre></details>';
+        }).join('') + '</div>';
+      }
+      body.innerHTML = html;
+    });
+}
+
+function wsDockAction(name, action) {
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/docker/' + encodeURIComponent(action), {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({container:name})})
+    .then(function(){ setTimeout(wsLoadDocker, 1500); });
+}
+
+function wsDockComposeUp(btn) {
+  // Run in Output panel which streams logs in real time
+  wsSetView('code');
+  wsRunOutput('docker compose up --build -d');
+}
+
+function wsDockPreview(ports) {
+  var m = ports.match(/(\d{4,5})->/)||ports.match(/0\.0\.0\.0:(\d+)/);
+  if (m) { var url=window.location.protocol+'//'+window.location.hostname+':'+m[1]; document.getElementById('wsPreviewUrl').value=url; wsSetView('preview'); setTimeout(function(){wsPreviewLoad(url);},100); }
+}
+
+// ── Agents ──────────────────────────────────────────────────────
+function wsShowLaunchMission() {
+  var panel = document.getElementById('wsLaunchMissionPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+  if (panel.style.display === 'flex') {
+    // Load available workflows
+    fetch('/api/workflows').then(function(r){ return r.json(); }).then(function(d) {
+      var sel = document.getElementById('wsLaunchWorkflow');
+      if (!sel) return;
+      var wfs = (d.workflows || d.items || d || []).filter(function(w){ return w.id && w.name; });
+      if (!wfs.length) return;
+      sel.innerHTML = '<option value="">Choisir un workflow…</option>';
+      wfs.forEach(function(w) {
+        sel.innerHTML += '<option value="' + wsEsc(w.id) + '">' + wsEsc(w.name || w.id) + '</option>';
+      });
+    }).catch(function(){});
+  }
+}
+
+function wsLaunchMission() {
+  var wfId = document.getElementById('wsLaunchWorkflow')?.value;
+  var brief = document.getElementById('wsLaunchBrief')?.value?.trim();
+  var status = document.getElementById('wsLaunchMissionStatus');
+  if (!wfId || !brief) { if (status) status.textContent = '⚠ Workflow et brief requis'; return; }
+  if (status) status.textContent = '⏳ Lancement…';
+  fetch('/api/missions/start', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ workflow_id: wfId, brief: brief, project_id: _wsProjectId })
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (d.error) { if (status) status.textContent = '✗ ' + d.error; return; }
+      if (status) status.textContent = 'Mission ' + (d.mission_id||'') + ' lancée !';
+      document.getElementById('wsLaunchBrief').value = '';
+      setTimeout(function(){
+        var p = document.getElementById('wsLaunchMissionPanel');
+        if (p) p.style.display = 'none';
+        if (status) status.textContent = '';
+        wsLoadAgents();
+      }, 3000);
+    }).catch(function(e){ if (status) status.textContent = '✗ Erreur: ' + e.message; });
+}
+
+function wsLoadAgents() {
+  var body = document.getElementById('wsAgentsBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/agents')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var items = data.items || [];
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Aucun agent actif</span></div>'; return; }
+      body.innerHTML = items.map(function(a) {
+        var pct = a.progress || 0;
+        return '<div class="ws-agent-row">' + (a.avatar?'<img class="ws-agent-avatar" src="'+wsEsc(a.avatar)+'" alt="">':'<div class="ws-agent-avatar ws-agent-avatar-placeholder">' + wsEsc((a.agent_name||'?')[0]) + '</div>') + '<div class="ws-agent-info"><div class="ws-agent-name">' + wsEsc(a.agent_name||a.agent_id) + '</div><div class="ws-agent-mission">' + wsEsc(a.mission_title||a.session_id) + '</div>' + (a.phase?'<div class="ws-agent-phase">'+wsEsc(a.phase)+'</div>':'') + '<div class="ws-progress-bar"><div class="ws-progress-fill" style="width:'+pct+'%"></div></div></div><span class="ws-badge '+(a.status==='active'?'ws-badge-ok':'ws-badge-idle')+'">'+wsEsc(a.status||'')+'</span></div>';
+      }).join('');
+    });
+}
+
+// ── Git ─────────────────────────────────────────────────────────
+function wsLoadGit() {
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var commits = data.commits||[], changes = data.changes||[], branch = data.branch||'';
+      if (branch) { var el=document.getElementById('wsGitBranchName'); if(el){el.textContent=branch; document.getElementById('wsGitBranch').style.display='';} }
+      // Left panel: changes + commit form
+      var leftHtml = '';
+      if (changes.length) {
+        leftHtml += '<div class="ws-git-section-title">Modifications ('+changes.length+')</div><div class="ws-git-changes">';
+        changes.forEach(function(f){ var color=f.status==='M'?'#f0883e':f.status==='A'?'#3fb950':'#f85149'; leftHtml+='<div class="ws-git-change-row" onclick="wsGitDiff(\''+wsEsc(f.path||f.file||'')+'\')"><span style="color:'+color+';font-family:monospace;font-weight:700;width:16px;flex-shrink:0">'+wsEsc(f.status||'M')+'</span><span class="ws-git-change-path">'+wsEsc(f.path||f.file||'')+'</span></div>'; });
+        leftHtml += '</div>';
+      }
+      leftHtml += '<div class="ws-git-form"><div class="ws-git-form-title">Commit rapide</div><textarea id="wsGitMsg" placeholder="feat: …" rows="2"></textarea><div class="ws-git-form-row"><label style="font-size:.72rem;display:flex;align-items:center;gap:.35rem;"><input type="checkbox" id="wsGitPush"> Push</label><button class="btn btn-sm btn-primary" onclick="wsGitCommit()" style="margin-left:auto">Commit</button></div></div>';
+      document.getElementById('wsGitBody').innerHTML = leftHtml;
+      // Right panel: log
+      var logHtml = '';
+      if (commits.length) {
+        logHtml += '<div class="ws-git-section-title" style="margin-bottom:.5rem">Historique ('+commits.length+')</div><div class="ws-git-log">';
+        commits.forEach(function(c){ logHtml+='<div class="ws-git-commit"><span class="ws-git-sha">'+wsEsc((c.hash||'').substring(0,7))+'</span><span class="ws-git-msg">'+wsEsc(c.message||'')+'</span><span class="ws-git-meta">'+wsEsc(c.author||'')+' · '+wsEsc((c.date||'').substring(0,10))+'</span></div>'; });
+        logHtml += '</div>';
+      } else {
+        logHtml = '<div class="ws-empty-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7M6 9v12"/></svg><span>Pas de dépôt Git ou vide</span></div>';
+      }
+      document.getElementById('wsGitLogArea').innerHTML = logHtml;
+    });
+}
+
+function wsGitDiff(path) {
+  wsGitMainTab(document.querySelector('[data-tab="diff"]'), 'diff');
+  var area = document.getElementById('wsGitDiffArea');
+  area.textContent = 'Chargement diff ' + path + '…';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git/diff?file=' + encodeURIComponent(path))
+    .then(function(r){ return r.json(); })
+    .then(function(d){ area.textContent = d.diff || '(aucun diff)'; })
+    .catch(function(){ area.textContent = '(erreur)'; });
+}
+
+function wsGitCommit() {
+  var msg = document.getElementById('wsGitMsg').value.trim(); if(!msg){alert('Message requis');return;}
+  var push = document.getElementById('wsGitPush').checked;
+  wsSetStatus('Commit…','running');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/git/commit', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({message:msg,push:push})})
+    .then(function(r){return r.json();})
+    .then(function(d){wsSetStatus('Prêt','idle');if(d.ok){wsLoadGit();}else{alert(d.error||'Erreur');}});
+}
+
+// ── Preview ─────────────────────────────────────────────────────
+function wsLoadPreview() { var url=document.getElementById('wsPreviewUrl').value.trim(); if(url) wsPreviewLoad(url); }
+function wsPreviewLoad(url) {
+  if(!url) url=document.getElementById('wsPreviewUrl').value.trim(); if(!url) return;
+  document.getElementById('wsPreviewEmpty').style.display='none';
+  var f=document.getElementById('wsPreviewFrame'); f.style.display=''; f.src=url;
+}
+function wsPreviewToggleMobile() {
+  _wsPreviewMobile=!_wsPreviewMobile;
+  var f=document.getElementById('wsPreviewFrame'); var btn=document.getElementById('wsPreviewMobileBtn');
+  if(f) f.classList.toggle('mobile',_wsPreviewMobile);
+  if(btn) btn.style.color=_wsPreviewMobile?'var(--purple)':'';
+}
+
+// ── Backlog ─────────────────────────────────────────────────────
+function wsLoadBacklog() {
+  var body = document.getElementById('wsBacklogBody');
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/backlog')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var missions = data.missions || [];
+      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucune mission pour ce projet</span><span class="ws-empty-hint">Créez une mission depuis la page projet</span></div>'; return; }
+      var html = '';
+      missions.forEach(function(m) {
+        var sc = m.status==='active'?'ws-badge-ok':m.status==='planning'?'ws-badge-idle':'ws-badge-err';
+        var typeIcon = {'architecture':'ARQ','feature':'FT','security':'SEC','tma':'TMA','debt':'DT','maintenance':'MNT'}[m.type] || 'GEN';
+        html += '<div class="ws-docker-container">';
+        html += '<div class="ws-docker-header">';
+        html += '<div class="ws-docker-status '+(m.status==='active'?'up':'down')+'"></div>';
+        html += '<span class="ws-docker-name">'+typeIcon+' '+wsEsc(m.title||m.id)+'</span>';
+        if (m.type) html += '<span class="ws-badge ws-badge-idle" style="margin-left:.4rem;font-size:.65rem">'+wsEsc(m.type)+'</span>';
+        html += '<span class="ws-badge '+sc+'" style="margin-left:auto">'+wsEsc(m.status||'')+'</span>';
+        html += '</div>';
+        if (m.goal) html += '<div style="padding:.25rem .75rem .4rem;font-size:.72rem;color:var(--text-secondary);font-style:italic">'+wsEsc(m.goal.substring(0,120))+'</div>';
+        if (m.tasks && m.tasks.length) {
+          html += '<table class="ws-table"><thead><tr><th>Tâche</th><th>Type</th><th>Statut</th><th>Assigné</th></tr></thead><tbody>';
+          m.tasks.forEach(function(t){ html+='<tr class="ws-table-row"><td>'+wsEsc(t.title||t.id)+'</td><td style="color:var(--text-secondary);font-size:.7rem">'+wsEsc(t.type||'')+'</td><td><span class="ws-badge '+(t.status==='done'?'ws-badge-ok':t.status==='active'||t.status==='in_progress'?'ws-badge-running':'ws-badge-idle')+'">'+wsEsc(t.status||'')+'</span></td><td style="font-size:.72rem;color:var(--text-secondary)">'+wsEsc(t.agent||'')+'</td></tr>'; });
+          html += '</tbody></table>';
+        }
+        html += '</div>';
+      });
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>'; });
+}
+
+// ── Compliance ───────────────────────────────────────────────────
+function wsLoadCompliance() {
+  var body = document.getElementById('wsComplianceBody');
+  var summary = document.getElementById('wsComplianceSummary');
+  if (!body) return;
+  body.innerHTML = '<div class="ws-empty-state"><span>Chargement…</span></div>';
+  wsFetch('/api/compliance/project/' + encodeURIComponent(_wsProjectId))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var recent = data.recent || [];
+      if (summary) {
+        var by = data.by_agent || [];
+        var totalPass = by.reduce(function(s,a){return s+a.pass;},0);
+        var totalFail = by.reduce(function(s,a){return s+a.fail;},0);
+        summary.innerHTML = '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> <strong>'+totalPass+'</strong> PASS</span><span style="margin-left:.5rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <strong>'+totalFail+'</strong> FAIL</span><span style="margin-left:.5rem;opacity:.6">'+by.length+' agents</span>';
+      }
+      if (!recent.length) {
+        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'une mission avec des agents de conformité</span></div>';
+        return;
+      }
+      var html = '<table class="ws-table"><thead><tr><th>Milestone</th><th>Agent</th><th>Verdict</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
+      recent.forEach(function(v) {
+        var bc = v.verdict==='PASS'?'ws-badge-ok':v.verdict==='FAIL'?'ws-badge-err':'ws-badge-idle';
+        var block = v.is_blocking?'<span class="ws-badge ws-badge-err" style="font-size:.6rem;margin-left:.3rem">BLOCKING</span>':'';
+        html += '<tr class="ws-table-row">';
+        html += '<td style="font-size:.72rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+wsEsc(v.milestone_id||'')+'">'+wsEsc((v.milestone_id||'—').substring(0,40))+'</td>';
+        html += '<td style="font-size:.7rem;color:var(--text-secondary)">'+wsEsc(v.agent_id||'')+'</td>';
+        html += '<td><span class="ws-badge '+bc+'" style="font-size:.68rem">'+wsEsc(v.verdict||'')+'</span>'+block+'</td>';
+        html += '<td style="font-size:.7rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+wsEsc(v.goal||'')+'">'+wsEsc((v.goal||'').substring(0,80))+'</td>';
+        html += '<td style="font-size:.68rem;color:var(--text-secondary);white-space:nowrap">'+wsEsc((v.created_at||'').substring(0,16))+'</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>'; });
+}
+
+// ── Database ────────────────────────────────────────────────────
+function wsLoadDatabase() {
+  var panel = document.getElementById('wsDbFiles');
+  panel.innerHTML = '<div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/db')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      _wsDbFiles = data.files || [];
+      if (!_wsDbFiles.length) {
+        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;line-height:1.6">Aucune base SQLite détectée<br><span style="font-size:.68rem">Pour Postgres/MySQL/MongoDB,<br>utilisez l\'onglet <strong>DbGate</strong> →</span></div>';
+        return;
+      }
+      var html = '';
+      _wsDbFiles.forEach(function(f) {
+        html += '<div class="ws-db-file-label" style="padding:.4rem .75rem .2rem;font-size:.68rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);letter-spacing:.05em">' + wsEsc(f.name) + '</div>';
+        (f.tables || []).forEach(function(t) {
+          html += '<div class="ws-db-table-item" onclick="wsDbSelectTable(' + JSON.stringify(f.file) + ',' + JSON.stringify(t.name) + ')">' +
+            '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3z"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>' +
+            wsEsc(t.name) + '<span style="margin-left:auto;font-size:.65rem;color:var(--text-secondary)">' + (t.row_count||0) + '</span></div>';
+        });
+      });
+      panel.innerHTML = html;
+      if (_wsDbFiles.length && _wsDbFiles[0].tables && _wsDbFiles[0].tables.length) {
+        _wsDbCurrentFile = _wsDbFiles[0].file;
+      }
+    }).catch(function(){ panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem">Erreur</div>'; });
+}
+
+function wsDbSelectTable(file, table) {
+  _wsDbCurrentFile = file;
+  document.getElementById('wsDbTableLabel').textContent = table;
+  document.getElementById('wsDbQuery').value = 'SELECT * FROM "' + table + '" LIMIT 100;';
+  wsDbRun();
+}
+
+function wsDbRun() {
+  var sql = document.getElementById('wsDbQuery').value.trim();
+  if (!sql) return;
+  if (!_wsDbCurrentFile) { document.getElementById('wsDbStatus').textContent = 'Sélectionnez un fichier'; return; }
+  document.getElementById('wsDbStatus').textContent = '…';
+  document.getElementById('wsDbResults').innerHTML = '<div class="ws-empty-state"><span>Exécution…</span></div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/db/query', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:_wsDbCurrentFile,sql:sql})})
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      if (data.error) { document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem;font-family:monospace">'+wsEsc(data.error)+'</div>'; return; }
+      var cols=data.columns||[], rows=data.rows||[];
+      document.getElementById('wsDbStatus').textContent = rows.length + ' ligne(s)';
+      if (!cols.length) { document.getElementById('wsDbResults').innerHTML='<div class="ws-empty-state"><span>Aucun résultat</span></div>'; return; }
+      var html='<table class="ws-db-table"><thead><tr>'+cols.map(function(c){return '<th>'+wsEsc(c)+'</th>';}).join('')+'</tr></thead><tbody>';
+      rows.forEach(function(row){ html+='<tr>'+row.map(function(v){return '<td title="'+wsEsc(String(v===null?'NULL':v))+'">'+wsEsc(String(v===null?'NULL':v))+'</td>';}).join('')+'</tr>'; });
+      html+='</tbody></table>';
+      document.getElementById('wsDbResults').innerHTML=html;
+    })
+    .catch(function(e){ document.getElementById('wsDbStatus').textContent='Erreur'; document.getElementById('wsDbResults').innerHTML='<div style="padding:.75rem;color:#f85149;font-size:.78rem">'+wsEsc(String(e))+'</div>'; });
+}
+document.getElementById('wsDbQuery').addEventListener('keydown', function(e){ if(e.ctrlKey&&e.key==='Enter') wsDbRun(); });
+
+// ── Portainer Stats ─────────────────────────────────────────────
+function wsLoadPortainerStats() {
+  var el = document.getElementById('wsPortainerStats');
+  if (!el) return;
+  wsFetch('/api/docker/stats')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      el.innerHTML = '<span class="ws-badge ws-badge-ok">' + (d.running||0) + ' running</span> <span class="ws-badge">' + (d.total||0) + ' total</span>';
+    }).catch(function(){ el.innerHTML = '<span class="ws-badge">—</span>'; });
+}
+
+var _wsDbGateToken = null;
+var _wsDbGateReady = false;
+
+function wsDbGateAutoLogin(callback) {
+  if (_wsDbGateReady) { if (callback) callback(); return; }
+  var frame = document.getElementById('wsDbGateFrame');
+  wsFetch('/api/dbgate/token')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.token || !frame) {
+        if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
+        _wsDbGateReady = true;
+        if (callback) callback();
+        return;
+      }
+      _wsDbGateToken = d.token;
+      // Use URL-based token (avoids cross-origin localStorage restrictions)
+      var url = '/dbgate/?accessToken=' + encodeURIComponent(_wsDbGateToken);
+      frame.onload = function() { _wsDbGateReady = true; frame.onload = null; if (callback) callback(); };
+      frame.src = url;
+    }).catch(function(){
+      if (frame && frame.src === 'about:blank') frame.src = '/dbgate/';
+      if (callback) callback();
+    });
+}
+
+function wsLoadDbGateConnections() {
+  var el = document.getElementById('wsDbGateConnections');
+  if (!el) return;
+  el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Connexion à DbGate…</div>';
+  // Auto-login first
+  wsDbGateAutoLogin(function() {
+    // Then configure connections
+    wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/dbgate/configure', {method:'POST'})
+      .then(function(r){ return r.json(); })
+      .then(function(d) {
+        if (d.configured > 0) {
+          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">' +
+            '<span class="ws-badge ws-badge-ok">✓ ' + d.configured + ' connexion(s) auto-configurée(s)</span> ' +
+            '<button class="ws-secret-btn" onclick="var f=document.getElementById(\'wsDbGateFrame\');f.src=f.src" title="Recharger">↺ Recharger</button></div>';
+        } else {
+          el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate ci-dessous</div>';
+        }
+      }).catch(function(){
+        el.innerHTML = '<div style="padding:.35rem .75rem;font-size:.72rem;color:var(--text-secondary)">Ajoutez vos connexions dans DbGate</div>';
+      });
+  });
+}
+
+// ── Secrets / Vault ─────────────────────────────────────────────
+var _wsSecretsCurrentFile = null;
+var _wsSecretsData = {};
+var _wsSecretsShowAll = false;
+
+function wsLoadSecrets() {
+  var panel = document.getElementById('wsSecretsFiles');
+  panel.innerHTML = '<div class="ws-tree-item" style="color:var(--text-secondary);font-size:.72rem;cursor:default;padding:.75rem;">Scan…</div>';
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/secrets')
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      _wsSecretsData = {};
+      var files = data.files || [];
+      (data.env_info || []).forEach(function(ei) { /* extra info */ });
+      if (!files.length) {
+        panel.innerHTML = '<div style="padding:.75rem;color:var(--text-secondary);font-size:.72rem;text-align:center;">Aucun fichier .env</div>';
+        return;
+      }
+      var html = '';
+      files.forEach(function(f) {
+        _wsSecretsData[f.path] = f.vars || [];
+        var badge = f.vars.length + ' var' + (f.vars.length > 1 ? 's' : '');
+        html += '<div class="ws-tree-item" onclick="wsSecretsSelect(\'' + wsEsc(f.path) + '\')">' +
+          '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' +
+          wsEsc(f.name) + '<span class="ws-tree-size">' + badge + '</span></div>';
+      });
+      panel.innerHTML = html;
+      if (files.length) wsSecretsSelect(files[0].path);
+    }).catch(function(){ panel.innerHTML = '<div style="padding:.75rem;color:#f85149;font-size:.72rem">Erreur</div>'; });
+}
+
+function wsSecretsSelect(path) {
+  _wsSecretsCurrentFile = path;
+  document.getElementById('wsSecretsFileName').textContent = path;
+  document.getElementById('wsSecretsSaveBtn').disabled = false;
+  document.getElementById('wsSecretsAddRow').style.display = 'flex';
+  wsSecretsRender();
+  // Highlight active file
+  document.querySelectorAll('#wsSecretsFiles .ws-tree-item').forEach(function(el) {
+    el.classList.toggle('active', el.textContent.trim().startsWith(path.replace(/^\./,'')));
+  });
+}
+
+function wsSecretsRender() {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile] || [];
+  var list = document.getElementById('wsSecretsList');
+  if (!vars.length) {
+    list.innerHTML = '<div style="padding:.5rem;color:var(--text-secondary);font-size:.75rem;text-align:center">Aucune variable — ajoutez-en ci-dessous</div>';
+    return;
+  }
+  var html = '';
+  vars.forEach(function(v, i) {
+    var masked = _wsSecretsShowAll ? wsEsc(v.value) : (v.value ? '•'.repeat(Math.min(v.value.length, 12)) : '—');
+    html += '<div class="ws-secret-row" data-idx="' + i + '">' +
+      '<span class="ws-secret-key">' + wsEsc(v.key) + '</span>' +
+      '<span class="ws-secret-val" data-idx="' + i + '">' + masked + '</span>' +
+      '<input class="ws-secret-input" type="text" value="' + wsEsc(v.value) + '" data-idx="' + i + '" onchange="wsSecretsEdit(' + i + ',this.value)" style="display:none">' +
+      '<button class="ws-secret-btn" onclick="wsSecretsToggleEdit(' + i + ')" title="Modifier">✎</button>' +
+      '<button class="ws-secret-btn ws-secret-del" onclick="wsSecretsDelete(' + i + ')" title="Supprimer">✕</button>' +
+      '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function wsSecretsToggleEdit(idx) {
+  var span = document.querySelector('.ws-secret-val[data-idx="' + idx + '"]');
+  var inp = document.querySelector('.ws-secret-input[data-idx="' + idx + '"]');
+  if (span && inp) {
+    var editing = inp.style.display !== 'none';
+    span.style.display = editing ? '' : 'none';
+    inp.style.display = editing ? 'none' : '';
+    if (!editing) inp.focus();
+  }
+}
+
+function wsSecretsEdit(idx, val) {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile];
+  if (vars && vars[idx]) vars[idx].value = val;
+  wsSecretsRender();
+}
+
+function wsSecretsDelete(idx) {
+  if (!_wsSecretsCurrentFile) return;
+  _wsSecretsData[_wsSecretsCurrentFile].splice(idx, 1);
+  wsSecretsRender();
+}
+
+function wsSecretsAdd() {
+  var key = document.getElementById('wsSecretsNewKey').value.trim().toUpperCase().replace(/[^A-Z0-9_]/g,'_');
+  var val = document.getElementById('wsSecretsNewVal').value;
+  if (!key || !_wsSecretsCurrentFile) return;
+  if (!_wsSecretsData[_wsSecretsCurrentFile]) _wsSecretsData[_wsSecretsCurrentFile] = [];
+  // Update if exists
+  var existing = _wsSecretsData[_wsSecretsCurrentFile].find(function(v){ return v.key === key; });
+  if (existing) { existing.value = val; } else { _wsSecretsData[_wsSecretsCurrentFile].push({key:key, value:val}); }
+  document.getElementById('wsSecretsNewKey').value = '';
+  document.getElementById('wsSecretsNewVal').value = '';
+  wsSecretsRender();
+}
+
+function wsSecretsToggleAll() {
+  _wsSecretsShowAll = !_wsSecretsShowAll;
+  var btn = document.getElementById('wsSecretsShowAllBtn');
+  if (btn) btn.style.color = _wsSecretsShowAll ? 'var(--purple)' : '';
+  wsSecretsRender();
+}
+
+function wsSecretsSave() {
+  if (!_wsSecretsCurrentFile) return;
+  var vars = _wsSecretsData[_wsSecretsCurrentFile] || [];
+  var btn = document.getElementById('wsSecretsSaveBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/secrets/save', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({path: _wsSecretsCurrentFile, vars: vars})
+  }).then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Sauvegarder'; }
+      wsSetStatus(d.ok ? 'Secrets sauvegardés ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2500);
+    }).catch(function(){ if(btn){ btn.disabled=false; } wsSetStatus('Erreur save','running'); });
+}
+
+function wsSecretsNewFile() {
+  var name = prompt('Nom du fichier (.env, .env.local, .env.production…)', '.env');
+  if (!name || !name.startsWith('.env')) return;
+  _wsSecretsData[name] = [];
+  _wsSecretsCurrentFile = name;
+  // Add to UI
+  var panel = document.getElementById('wsSecretsFiles');
+  var existing = panel.querySelector('[data-file="' + name + '"]');
+  if (!existing) {
+    panel.insertAdjacentHTML('beforeend', '<div class="ws-tree-item" onclick="wsSecretsSelect(\'' + wsEsc(name) + '\')">' +
+      '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>' + wsEsc(name) + '<span class="ws-tree-size">0 var</span></div>');
+  }
+  wsSecretsSelect(name);
+  // Auto-save to create the file
+  wsSecretsSave();
+}
+
+
+function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el)return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
+function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function wsShowDiff() {
+  var ref = document.getElementById('wsDiffRef')?.value || 'HEAD~1';
+  document.getElementById('wsDiffPanel').style.display = 'block';
+  document.getElementById('wsDiffContent').innerHTML = '<div style="color:#888">Loading diff…</div>';
+  fetch('/api/projects/'+_wsProjectId+'/workspace/diff?ref='+encodeURIComponent(ref), {credentials:'include'})
+    .then(function(r){return r.json();}).then(function(data){wsRenderDiff(data);})
+    .catch(function(e){ document.getElementById('wsDiffContent').innerHTML='<div style="color:red">Error: '+e+'</div>'; });
+}
+function wsRenderDiff(data) {
+  var html = '';
+  (data.files||[]).forEach(function(f) {
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-weight:bold;padding:4px 8px;background:#1e2a3a;color:#58a6ff">'+wsEsc(f.path)+'</div>';
+    html += '<div style="background:#0d1117">';
+    (f.hunks||[]).forEach(function(h) {
+      html += '<div style="color:#8b949e;padding:2px 8px;background:#161b22">'+wsEsc(h.header)+'</div>';
+      (h.lines||[]).forEach(function(l) {
+        var bg = l.type==='add'?'rgba(46,160,67,0.15)':l.type==='del'?'rgba(248,81,73,0.15)':'transparent';
+        var color = l.type==='add'?'#3fb950':l.type==='del'?'#f85149':'#c9d1d9';
+        var prefix = l.type==='add'?'+':l.type==='del'?'-':' ';
+        html += '<div style="padding:0 8px;background:'+bg+';color:'+color+'"><span style="user-select:none;opacity:.5;margin-right:8px">'+prefix+'</span>'+wsEsc(l.content)+'</div>';
+      });
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('wsDiffContent').innerHTML = html || '<div style="color:#888">No changes</div>';
+}
+
+// ── File icons by extension ────────────────────────────────────────
+var _wsIconMap = {
+  js:'js',jsx:'js',mjs:'js', ts:'ts',tsx:'ts',
+  py:'py',pyw:'py', html:'html',htm:'html', css:'css',scss:'css',less:'css',
+  json:'json',jsonc:'json', md:'md',mdx:'md', sh:'sh',bash:'sh',zsh:'sh',
+  sql:'sql', rs:'rust', go:'go', yaml:'yaml',yml:'yaml',
+};
+var _wsIconSVGs = {
+  js:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="2" width="20" height="20" rx="2"/><text x="5" y="17" style="font-size:10px;font-weight:700;fill:#1e1e1e">JS</text></svg>',
+  ts:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="2" width="20" height="20" rx="2"/><text x="4" y="17" style="font-size:10px;font-weight:700;fill:#fff">TS</text></svg>',
+  py:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8 2 7 4 7 6v2h10V6c0-2-1-4-5-4z"/><path d="M7 8v8c0 2 1 4 5 4s5-2 5-4V8"/></svg>',
+  html: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  css:  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>',
+  json: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  md:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  sh:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>',
+  sql:  '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+  rust: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><line x1="1.05" y1="12" x2="7" y2="12"/><line x1="17.01" y1="12" x2="22.96" y2="12"/></svg>',
+  go:   '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="M12 5l7 7-7 7"/></svg>',
+  yaml: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/></svg>',
+  default: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>',
+};
+function wsFileIcon(name) {
+  var ext = (name.split('.').pop() || '').toLowerCase();
+  var type = _wsIconMap[ext] || 'default';
+  var cls = 'ws-icon-' + (type === 'default' ? 'default' : type);
+  return '<span class="' + cls + '" style="display:inline-flex;align-items:center;flex-shrink:0">' + (_wsIconSVGs[type] || _wsIconSVGs.default) + '</span>';
+}
+
+// ── Search across files ───────────────────────────────────────────
+function wsRunSearch() {
+  var q = document.getElementById('wsSearchQuery')?.value?.trim();
+  var glob = document.getElementById('wsSearchGlob')?.value?.trim() || '';
+  var caseSens = document.getElementById('wsSearchCase')?.checked || false;
+  var isRegex = document.getElementById('wsSearchRegex')?.checked || false;
+  var res = document.getElementById('wsSearchResults');
+  var cnt = document.getElementById('wsSearchCount');
+  if (!q || !res) return;
+  res.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.3rem">Recherche…</div>';
+  if (cnt) cnt.textContent = '';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/search?q=' + encodeURIComponent(q) +
+        '&glob=' + encodeURIComponent(glob) + '&case=' + caseSens + '&regex=' + isRegex)
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var matches = d.matches || [];
+      if (!matches.length) { res.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.3rem">Aucun résultat.</div>'; return; }
+      if (cnt) cnt.textContent = d.total_matches + ' résultats dans ' + matches.length + ' fichiers';
+      var html = '';
+      matches.forEach(function(f) {
+        html += '<div class="ws-search-file" onclick="wsOpenFile(\'' + wsEsc(f.file) + '\')">' +
+          wsFileIcon(f.file) + ' ' + wsEsc(f.file) +
+          '<span style="margin-left:auto;font-size:.65rem;color:var(--text-muted)">' + f.lines.length + ' ×</span></div>';
+        f.lines.forEach(function(l) {
+          var highlighted = wsEsc(l.text).replace(new RegExp('(' + wsEsc(q) + ')', 'gi'), '<em>$1</em>');
+          html += '<div class="ws-search-match" onclick="wsOpenFile(\'' + wsEsc(f.file) + '\')">' +
+            '<span class="ws-search-lnum">' + l.line + '</span>' + highlighted + '</div>';
+        });
+      });
+      res.innerHTML = html;
+    })
+    .catch(function(e) { res.innerHTML = '<div style="color:#ef4444;font-size:.75rem">Erreur: ' + e.message + '</div>'; });
+}
+
+// ── Timeline ─────────────────────────────────────────────────────
+function wsLoadTimeline() {
+  var body = document.getElementById('wsTimelineBody');
+  var filter = document.getElementById('wsTimelineFilter')?.value || 'all';
+  if (!body) return;
+  body.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.5rem">Chargement…</div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/timeline?filter=' + filter)
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var items = d.events || [];
+      if (!items.length) { body.innerHTML = '<div style="color:var(--text-secondary);font-size:.78rem;padding:.5rem">Aucun événement trouvé.</div>'; return; }
+      var html = '';
+      items.forEach(function(ev) {
+        var t = ev.type || 'commit';
+        var ts = ev.ts ? new Date(ev.ts).toLocaleString('fr-FR', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+        html += '<div class="ws-tl-item ' + wsEsc(t) + '">';
+        html += '<div class="ws-tl-meta">';
+        html += '<div class="ws-tl-title"><span class="ws-tl-badge ' + wsEsc(t) + '">' + wsEsc(t) + '</span>' + wsEsc(ev.title || ev.message || '') + '</div>';
+        if (ev.description) html += '<div class="ws-tl-desc">' + wsEsc(ev.description) + '</div>';
+        if (ev.author) html += '<div class="ws-tl-desc" style="color:var(--purple-light)">' + wsEsc(ev.author) + '</div>';
+        html += '</div>';
+        html += '<div class="ws-tl-time">' + wsEsc(ts) + '</div>';
+        html += '</div>';
+      });
+      body.innerHTML = html;
+    })
+    .catch(function(e) { body.innerHTML = '<div style="color:#ef4444;font-size:.75rem">Erreur: ' + e.message + '</div>'; });
+}
+
+// ── Live metrics ────────────────────────────────────────────────
+function wsLoadMetrics() {
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/metrics')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      var el = function(id){ return document.getElementById(id); };
+      if (el('wsMetricAgents')) el('wsMetricAgents').textContent = d.active_agents || 0;
+      if (el('wsMetricCalls')) el('wsMetricCalls').textContent = d.tool_calls_last_hour || 0;
+      if (el('wsMetricFiles')) el('wsMetricFiles').textContent = d.files_written || 0;
+      if (el('wsMetricMissions')) el('wsMetricMissions').textContent = d.mission_runs_active || 0;
+      if (d.last_commit_hash && el('wsMetricCommit')) {
+        el('wsMetricCommit').style.display = '';
+        el('wsMetricCommitSep').style.display = '';
+        el('wsMetricCommitHash').textContent = d.last_commit_hash;
+        el('wsMetricCommitMsg').textContent = d.last_commit_msg || '';
+      }
+    }).catch(function(){});
+}
+
+function wsLoadWallet() {
+  fetch('/api/projects/'+_wsProjectId+'/wallet', {credentials:'include'})
+    .then(r=>r.json()).then(d=>{
+      if(d.balance !== undefined)
+        document.getElementById('wsWalletBalance').textContent = '$'+d.balance.toFixed(2);
+    }).catch(()=>{});
+}
+
+// ── PROGRESS.md ─────────────────────────────────────────────────
+function wsLoadProgress() {
+  var el = document.getElementById('ws-code-progress');
+  if (!el) return;
+  wsFetch('/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/progress')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      if (!d.exists || !d.content) {
+        el.innerHTML = '<div class="ws-empty-state"><span>Pas de PROGRESS.md</span><span class="ws-empty-hint">Sera créé par les agents lors d\'une mission</span></div>';
+        return;
+      }
+      // Simple markdown → HTML (headings, bold, code blocks, lists)
+      var html = wsMarkdownLite(d.content);
+      el.innerHTML = html;
+      if (d.mtime) {
+        el.insertAdjacentHTML('afterbegin', '<div style="font-size:.68rem;color:var(--text-secondary);margin-bottom:.5rem">Mis à jour: ' + wsEsc(new Date(d.mtime).toLocaleString('fr-FR')) + '</div>');
+      }
+    }).catch(function(){ el.innerHTML = '<div class="ws-empty-state"><span>Erreur chargement PROGRESS.md</span></div>'; });
+}
+
+function wsMarkdownLite(text) {
+  if (!text) return '';
+  var lines = text.split('\n');
+  var html = ''; var inCode = false;
+  lines.forEach(function(line) {
+    if (line.startsWith('```')) { inCode = !inCode; html += inCode ? '<pre>' : '</pre>'; return; }
+    if (inCode) { html += wsEsc(line) + '\n'; return; }
+    if (line.startsWith('# ')) { html += '<h1>' + wsEsc(line.slice(2)) + '</h1>'; return; }
+    if (line.startsWith('## ')) { html += '<h2>' + wsEsc(line.slice(3)) + '</h2>'; return; }
+    if (line.startsWith('### ')) { html += '<h3>' + wsEsc(line.slice(4)) + '</h3>'; return; }
+    if (line.startsWith('- ') || line.startsWith('* ')) { html += '<li>' + wsEsc(line.slice(2)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') + '</li>'; return; }
+    if (line.trim() === '') { html += '<br>'; return; }
+    html += '<p>' + wsEsc(line).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`(.+?)`/g, '<code style="background:var(--bg-secondary);padding:0 3px;border-radius:2px;font-family:monospace">$1</code>') + '</p>';
+  });
+  return html;
+}
+
+// ── Live Feed (view) ─────────────────────────────────────────────
+var _wsLiveEv_icons = {
+  tool_call: '→', file_write: '»', message: '·', git_commit: '⎇',
+  agent_status: '→', mission_phase: '→'
+};
+
+function wsLivePush(type, data) {
+  // Add to buffer
+  _wsLiveBuf.unshift({type: type, data: data, ts: data.ts || new Date().toISOString()});
+  if (_wsLiveBuf.length > 200) _wsLiveBuf.pop();
+  // Notify badge on live btn if not active
+  wsNotifAdd('live');
+  // Render if live view is active
+  if (_wsCurrentView === 'live') wsLiveRenderAll();
+}
+
+function wsLiveFilter(btn, f) {
+  _wsLiveFilter = f;
+  document.querySelectorAll('.ws-live-filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  btn.classList.add('active');
+  wsLiveRenderAll();
+}
+
+function wsLiveClear() { _wsLiveBuf = []; wsLiveRenderAll(); }
+
+function wsLiveRenderAll() {
+  var feed = document.getElementById('wsLiveFeed');
+  if (!feed) return;
+  var items = _wsLiveFilter === 'all' ? _wsLiveBuf : _wsLiveBuf.filter(function(e){ return e.type === _wsLiveFilter; });
+  if (!items.length) {
+    feed.innerHTML = '<div class="ws-empty-state"><span>En attente d\'événements…</span><span class="ws-empty-hint">Les tool calls, fichiers, commits et messages apparaissent ici en temps réel</span></div>';
+    return;
+  }
+  var html = '';
+  items.slice(0, 100).forEach(function(ev) {
+    var icon = _wsLiveEv_icons[ev.type] || '•';
+    var d = ev.data || {};
+    var agent = wsEsc(d.agent_id || d.from_agent || '');
+    var tsStr = d.ts ? d.ts.substring(11, 19) : '';
+    var body = '';
+    if (ev.type === 'tool_call') {
+      body = '<span class="ws-tc-tool">' + wsEsc(d.tool_name||'') + '</span>';
+      if (d.file) body += ' <span class="ws-live-event-file">' + wsEsc(d.file) + '</span>';
+      if (d.success === false) body += ' <span class="ws-badge ws-badge-err" style="font-size:.65rem">Err</span>';
+    } else if (ev.type === 'file_write') {
+      body = '<span class="ws-live-event-file">' + wsEsc(d.path||'') + '</span>';
+    } else if (ev.type === 'message') {
+      body = wsEsc((d.preview||'').substring(0,100));
+    } else if (ev.type === 'git_commit') {
+      body = '<span style="font-family:monospace;color:#79c0ff">' + wsEsc((d.hash||'').substring(0,8)) + '</span> ' + wsEsc(d.message||'');
+    } else if (ev.type === 'agent_status') {
+      body = wsEsc(d.status||'') + (d.phase?' → '+wsEsc(d.phase):'') + (d.mission?' ('+wsEsc(d.mission.substring(0,30))+')':'');
+    } else if (ev.type === 'mission_phase') {
+      body = wsEsc(d.workflow||'') + ' → ' + wsEsc(d.phase||d.status||'');
+    }
+    html += '<div class="ws-live-event">';
+    html += '<span class="ws-live-event-icon">' + icon + '</span>';
+    html += '<span class="ws-live-event-agent">' + agent + '</span>';
+    html += '<span class="ws-live-event-body">' + body + '</span>';
+    html += '<span class="ws-live-event-ts">' + wsEsc(tsStr) + '</span>';
+    html += '</div>';
+  });
+  feed.innerHTML = html;
+}
+
+// ── SSE Live stream ──────────────────────────────────────────────
+function wsStartLiveStream() {
+  if (_wsLiveEs) { try { _wsLiveEs.close(); } catch(e){} }
+  var url = '/api/projects/' + encodeURIComponent(_wsProjectId) + '/workspace/live';
+  _wsLiveEs = new EventSource(url);
+  _attachSysStats(_wsLiveEs);
+
+  function handleEv(type) {
+    return function(e) {
+      try {
+        var data = JSON.parse(e.data);
+        // Update badge
+        document.getElementById('wsLiveBadge').classList.add('connected');
+        // Push to live feed buffer
+        wsLivePush(type, data);
+        // Side effects per type
+        if (type === 'tool_call') {
+          wsToolCallPrepend(data);
+          wsNotifAdd('code');
+          wsNotifAdd('agents');
+        }
+        if (type === 'agent_status') {
+          wsNotifAdd('agents');
+        }
+        if (type === 'file_write') {
+          wsFileTreeHighlight(data.path);
+        }
+        if (type === 'git_commit') {
+          if (_wsCurrentView === 'git') wsLoadGit();
+          wsNotifAdd('git');
+          // Update metrics commit
+          var hel = document.getElementById('wsMetricCommitHash');
+          var mel = document.getElementById('wsMetricCommitMsg');
+          var cel = document.getElementById('wsMetricCommit');
+          var sep = document.getElementById('wsMetricCommitSep');
+          if (hel) hel.textContent = (data.hash||'').substring(0,8);
+          if (mel) mel.textContent = data.message||'';
+          if (cel) cel.style.display = '';
+          if (sep) sep.style.display = '';
+        }
+        if (type === 'mission_phase') {
+          wsNotifAdd('agents');
+        }
+        if (type === 'compliance_done') {
+          wsNotifAdd('compliance');
+          if (_wsCurrentView === 'compliance') wsLoadCompliance();
+        }
+      } catch(ex) {}
+    };
+  }
+
+  _wsLiveEs.addEventListener('tool_call', handleEv('tool_call'));
+  _wsLiveEs.addEventListener('agent_status', handleEv('agent_status'));
+  _wsLiveEs.addEventListener('file_write', handleEv('file_write'));
+  _wsLiveEs.addEventListener('git_commit', handleEv('git_commit'));
+  _wsLiveEs.addEventListener('message', handleEv('message'));
+  _wsLiveEs.addEventListener('mission_phase', handleEv('mission_phase'));
+  _wsLiveEs.addEventListener('cost_update', function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      var el = document.getElementById('wsLiveCost');
+      if (!el) return;
+      var totalTok = (d.tokens_in || 0) + (d.tokens_out || 0);
+      var tokStr = totalTok >= 1000 ? Math.round(totalTok / 1000) + 'k' : totalTok;
+      var costStr = '$' + (d.cost_usd || 0).toFixed(4);
+      el.textContent = costStr + ' | ' + tokStr + ' tok';
+      el.classList.toggle('ws-cost-warning', (d.cost_usd || 0) > 1.00);
+      if (totalTok > 100000) {
+        el.classList.add('ws-cost-runaway');
+        el.title = 'Runaway détecté: ' + tokStr + ' tokens en 1h';
+      } else {
+        el.classList.remove('ws-cost-runaway');
+        el.title = 'Tokens cumulés (1h)';
+      }
+    } catch(ex) {}
+  });
+
+  _wsLiveEs.onerror = function() {
+    document.getElementById('wsLiveBadge').classList.remove('connected');
+    // Auto-reconnect after 5s
+    setTimeout(wsStartLiveStream, 5000);
+  };
+  _wsLiveEs.onopen = function() {
+    document.getElementById('wsLiveBadge').classList.add('connected');
+  };
+}
+
+function wsToolCallPrepend(data) {
+  var body = document.getElementById('wsToolcallsBody');
+  if (!body) return;
+  var params = '';
+  try { params = JSON.stringify(JSON.parse('{}' )).substring(0,80); } catch(e){}
+  if (data.file) params = data.file;
+  var row = document.createElement('tr');
+  row.className = 'ws-table-row ws-new-row';
+  row.innerHTML = '<td><span class="ws-tc-tool">' + wsEsc(data.tool_name||'') + '</span></td>' +
+    '<td class="ws-tc-params" title="' + wsEsc(params) + '">' + wsEsc(params) + '</td>' +
+    '<td><span class="' + (data.success!==false?'ws-badge ws-badge-ok':'ws-badge ws-badge-err') + '">' + (data.success!==false?'OK':'Err') + '</span></td>' +
+    '<td class="ws-tc-ts">' + wsEsc((data.ts||'').substring(11,19)) + '</td>';
+  var existing = body.querySelector('table tbody');
+  if (existing) {
+    existing.insertBefore(row, existing.firstChild);
+    // Remove if > 50 rows
+    var rows = existing.querySelectorAll('tr');
+    if (rows.length > 50) rows[rows.length-1].remove();
+  } else {
+    // Replace empty state with table
+    body.innerHTML = '<table class="ws-table"><thead><tr><th>Outil</th><th>Fichier/Params</th><th>Statut</th><th>Heure</th></tr></thead><tbody></tbody></table>';
+    body.querySelector('tbody').appendChild(row);
+  }
+  // Remove highlight after 3s
+  setTimeout(function(){ row.classList.remove('ws-new-row'); }, 3000);
+}
+
+function wsFileTreeHighlight(path) {
+  if (!path) return;
+  var fname = path.split('/').pop();
+  document.querySelectorAll('.ws-tree-item').forEach(function(el) {
+    if (el.textContent.trim().indexOf(fname) >= 0) {
+      el.classList.add('ws-just-written');
+      setTimeout(function(){ el.classList.remove('ws-just-written'); }, 5000);
+    }
+  });
+  // Also refresh tree if code view is active
+  if (_wsCurrentView === 'code') {
+    // Just highlight, don't reload (too expensive)
+  }
+}
+
+// ── Init ────────────────────────────────────────────────────────
+(function() {
+  var view = localStorage.getItem('ws_view_' + _wsProjectId) || 'code';
+  wsSetView(view);
+  wsLoadLeftTree();
+  wsLoadGit();
+  // Load metrics
+  wsLoadMetrics();
+  setInterval(wsLoadMetrics, 30000);
+  wsLoadWallet();
+  setInterval(wsLoadWallet, 60000);
+  // Restore bottom collapse
+  if (localStorage.getItem('ws_bottom_collapsed')) {
+    document.getElementById('wsBottomPanel').classList.add('ws-collapsed');
+    var icon = document.getElementById('wsBottomCollapseIcon');
+    if (icon) icon.setAttribute('points', '6 9 12 15 18 9');
+  }
+  // Start SSE live stream (replaces polling setIntervals)
+  wsStartLiveStream();
+  // Fallback polling for agents only if SSE unavailable (degraded)
+  setInterval(function() {
+    if (!_wsLiveEs || _wsLiveEs.readyState === 2) {
+      if (document.getElementById('ws-view-agents').classList.contains('active')) { wsLoadAgents(); }
+    }
+  }, 30000);
+})();
+
+// ── Package Manager ───────────────────────────────────────────────────────────
+var _wsPkgAll = [];
+
+function wsPkgLoad() {
+  var el = document.getElementById('wsPkgList');
+  el.innerHTML = '<div class="ws-empty-state"><span>Chargement…</span></div>';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/packages')
+    .then(function(r){ return r.json(); })
+    .then(function(d) {
+      _wsPkgAll = d.packages || [];
+      var lbl = document.getElementById('wsPkgTypeLabel');
+      if (lbl) lbl.textContent = d.type ? '(' + d.type + ')' : '';
+      var cnt = document.getElementById('wsPkgCount');
+      if (cnt) cnt.textContent = _wsPkgAll.length + ' packages';
+      if (!d.manifest) {
+        el.innerHTML = '<div class="ws-empty-state"><span>Aucun gestionnaire détecté</span><span class="ws-empty-hint">Créez un package.json, requirements.txt, Cargo.toml ou pom.xml</span></div>';
+        return;
+      }
+      wsPkgRender();
+    })
+    .catch(function() {
+      el.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>';
+    });
+}
+
+function wsPkgRender() {
+  var filter = (document.getElementById('wsPkgFilter').value || '').toLowerCase();
+  var items = filter ? _wsPkgAll.filter(function(p){ return p.name.toLowerCase().includes(filter); }) : _wsPkgAll;
+  var el = document.getElementById('wsPkgList');
+  if (!items.length) { el.innerHTML = '<div class="ws-empty-state"><span>Aucun package</span></div>'; return; }
+  var rows = items.map(function(p) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:.25rem .5rem;border-bottom:1px solid var(--border-faint,rgba(128,128,128,.12));font-size:.75rem">'
+      + '<span style="color:var(--text-primary)">' + p.name + '</span>'
+      + (p.version ? '<span style="color:var(--text-muted);font-family:monospace">' + p.version + '</span>' : '')
+      + '</div>';
+  });
+  el.innerHTML = rows.join('');
+}
+
+function wsPkgFilter_() { wsPkgRender(); }
+
+function wsPkgInstall() {
+  var pkg = (document.getElementById('wsPkgSearch').value || '').trim();
+  _wsPkgRunInstall(pkg);
+}
+
+function wsPkgReinstallAll() { _wsPkgRunInstall(''); }
+
+function _wsPkgRunInstall(pkg) {
+  var out = document.getElementById('wsPkgInstallOutput');
+  out.style.display = 'block';
+  out.textContent = '';
+  fetch('/api/projects/' + _wsProjectId + '/workspace/packages/install', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ package: pkg })
+  }).then(function(resp) {
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    function read() {
+      reader.read().then(function(r) {
+        if (r.done) { wsPkgLoad(); document.getElementById('wsPkgSearch').value = ''; return; }
+        var text = decoder.decode(r.value, { stream: true });
+        text.split('\n').forEach(function(line) {
+          if (line.startsWith('data: ')) {
+            var msg = line.slice(6);
+            if (msg === '[DONE]') return;
+            out.textContent += msg + '\n';
+            out.scrollTop = out.scrollHeight;
+          }
+        });
+        read();
+      });
+    }
+    read();
+  }).catch(function(e) { out.textContent += '[error: ' + e + ']\n'; });
+}
+</script>
+
+<!-- ── Command Palette ────────────────────────────────────────────────────── -->
+<div id="cmdPalette" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:flex-start;justify-content:center;padding-top:12vh">
+  <div style="background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:8px;width:560px;max-width:92vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;padding:.7rem 1rem;gap:.6rem;border-bottom:1px solid var(--border)">
+      <span style="color:var(--text-muted);opacity:.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+      <input id="cmdInput" type="text" placeholder="Rechercher fichiers, actions…" autocomplete="off"
+        oninput="cmdFilter()" onkeydown="cmdKey(event)"
+        style="flex:1;background:none;border:none;color:var(--text-primary);font-size:.85rem;outline:none">
+      <kbd style="font-size:.68rem;color:var(--text-muted);background:var(--bg-secondary);padding:1px 6px;border-radius:3px">Esc</kbd>
+    </div>
+    <div id="cmdResults" style="max-height:360px;overflow-y:auto;padding:.25rem 0"></div>
+  </div>
+</div>
+
+<!-- ── GitHub Import Modal ────────────────────────────────────────────────── -->
+<div id="importGitModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;align-items:center;justify-content:center">
+  <div style="background:var(--bg-panel,#1e1e1e);border:1px solid var(--border);border-radius:8px;padding:1.5rem;width:480px;max-width:92vw">
+    <h3 style="margin:0 0 1rem;font-size:.9rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Importer un dépôt GitHub / GitLab</h3>
+    <input id="importGitUrl" type="text" placeholder="https://github.com/user/repo" autocomplete="off"
+      style="width:100%;box-sizing:border-box;background:var(--bg-input,#111);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:.45rem .6rem;font-size:.78rem;margin-bottom:.75rem">
+    <div style="display:flex;gap:.4rem;justify-content:flex-end">
+      <button onclick="document.getElementById('importGitModal').style.display='none'" class="ws-btn ws-btn-sm">Annuler</button>
+      <button onclick="wsImportGit()" class="ws-btn ws-btn-sm" style="background:var(--green-dim,#1a3a1a);color:var(--green,#4ade80)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Cloner</button>
+    </div>
+    <div id="importGitLog" style="display:none;margin-top:.75rem;background:#0a0a0a;border-radius:4px;padding:.5rem;max-height:160px;overflow-y:auto;font-size:.7rem;font-family:monospace;color:#aaa"></div>
+  </div>
+</div>
+
+<script>
+// ── Command Palette ──────────────────────────────────────────────────────────
+var _cmdItems = [];
+var _cmdSel = 0;
+var CMD_ACTIONS = [
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>', label:'Explorateur de fichiers', sub:'Vue', fn:function(){wsSetView('code');}},
+  {icon:'<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"18\" cy=\"18\" r=\"3\"/><circle cx=\"6\" cy=\"6\" r=\"3\"/><path d=\"M13 6h3a2 2 0 0 1 2 2v7M6 9v12\"/></svg>', label:'Git — Historique', sub:'Vue', fn:function(){wsSetView('git');}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>', label:'Git — Commit', sub:'Vue', fn:function(){wsSetView('git');wsGitMainTab(document.querySelector('[data-tab="commit"]'),'commit');wsGitRefreshStatus();}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>', label:'Assistant IA', sub:'Vue', fn:function(){wsSetView('aichat');}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><circle cx="6" cy="18" r="3"/></svg>', label:'Pull Requests', sub:'Vue', fn:function(){wsSetView('prs');wsPrLoad();}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>', label:'Deploy Logs', sub:'Vue', fn:function(){wsSetView('deploylogs');wsDeployLogsStart();}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>', label:'Package Manager', sub:'Vue', fn:function(){wsSetView('packages');if(typeof wsPkgLoad==='function')wsPkgLoad();}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>', label:'Importer un dépôt GitHub', sub:'Action', fn:function(){document.getElementById('importGitModal').style.display='flex';}},
+  {icon:'<svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"18\" cy=\"18\" r=\"3\"/><circle cx=\"6\" cy=\"6\" r=\"3\"/><path d=\"M13 6h3a2 2 0 0 1 2 2v7M6 9v12\"/></svg>', label:'Changer de branche', sub:'Action', fn:function(){wsBranchOpen();}},
+  {icon:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>', label:'Analytics & Coûts', sub:'Navigation', fn:function(){window.open('/analytics','_blank');}},
+];
+function openCmdPalette() {
+  document.getElementById('cmdPalette').style.display = 'flex';
+  setTimeout(function(){document.getElementById('cmdInput').focus();}, 40);
+  cmdFilter();
+}
+function closeCmdPalette() {
+  document.getElementById('cmdPalette').style.display = 'none';
+  document.getElementById('cmdInput').value = '';
+}
+function cmdFilter() {
+  var q = document.getElementById('cmdInput').value.toLowerCase();
+  _cmdSel = 0;
+  _cmdItems = CMD_ACTIONS.filter(function(a){ return !q || a.label.toLowerCase().includes(q) || a.sub.toLowerCase().includes(q); }).slice(0,12);
+  document.getElementById('cmdResults').innerHTML = _cmdItems.map(function(item, i) {
+    return '<div class="cmd-item" data-idx="'+i+'" onclick="cmdRun('+i+')"'+
+      ' style="padding:.5rem 1rem;cursor:pointer;display:flex;align-items:center;gap:.6rem;'+(i===0?'background:var(--bg-hover,#2a3a4a)':'')+'">'+
+      '<span style="font-size:1rem;width:20px">'+item.icon+'</span>'+
+      '<span style="flex:1"><span style="font-size:.8rem;color:var(--text-primary)">'+item.label+'</span>'+
+      '<span style="font-size:.68rem;color:var(--text-muted);display:block">'+item.sub+'</span></span></div>';
+  }).join('');
+}
+function cmdRun(i) { closeCmdPalette(); if(_cmdItems[i]) _cmdItems[i].fn(); }
+function cmdKey(e) {
+  var items = document.querySelectorAll('.cmd-item');
+  if (e.key==='Escape') { closeCmdPalette(); return; }
+  if (e.key==='ArrowDown') { _cmdSel = Math.min(_cmdSel+1, items.length-1); }
+  if (e.key==='ArrowUp') { _cmdSel = Math.max(_cmdSel-1, 0); }
+  if (e.key==='Enter') { cmdRun(_cmdSel); return; }
+  items.forEach(function(el,i){ el.style.background = i===_cmdSel ? 'var(--bg-hover,#2a3a4a)' : ''; });
+}
+document.getElementById('cmdPalette').addEventListener('click', function(e){
+  if (e.target === document.getElementById('cmdPalette')) closeCmdPalette();
+});
+document.addEventListener('keydown', function(e){
+  if ((e.metaKey||e.ctrlKey) && e.key==='k') { e.preventDefault(); openCmdPalette(); }
+  if (e.key==='Escape' && document.getElementById('cmdPalette').style.display!=='none') closeCmdPalette();
+});
+
+// ── Branch switcher ──────────────────────────────────────────────────────────
+function wsBranchOpen() {
+  var dd = document.getElementById('wsBranchDropdown');
+  if (dd.style.display !== 'none') { dd.style.display = 'none'; return; }
+  dd.innerHTML = '<div style="padding:.5rem .75rem;font-size:.72rem;color:var(--text-muted)">Chargement…</div>';
+  dd.style.display = 'block';
+  fetch('/api/projects/{{ project.id }}/workspace/branches').then(function(r){return r.json();}).then(function(data){
+    dd.innerHTML = (data.branches||[]).map(function(b){
+      return '<div onclick="wsBranchCheckout(\''+b+'\')" style="padding:.4rem .75rem;cursor:pointer;font-size:.72rem;'+(b===data.current?'color:#60a5fa;font-weight:700':'')+'" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'\'">'+
+        (b===data.current?'✓ ':'')+b+'</div>';
+    }).join('') || '<div style="padding:.5rem;color:var(--text-muted);font-size:.72rem">Aucune branche</div>';
+  }).catch(function(){dd.innerHTML='<div style="padding:.5rem;color:#f87171;font-size:.72rem">Erreur</div>';});
+}
+function wsBranchCheckout(branch) {
+  document.getElementById('wsBranchDropdown').style.display = 'none';
+  fetch('/api/projects/{{ project.id }}/workspace/checkout', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({branch:branch})
+  }).then(function(r){return r.json();}).then(function(d){
+    if (d.ok) {
+      document.getElementById('wsGitBranchName').textContent = branch;
+      if (typeof wsShowNotif==='function') wsShowNotif('Checkout '+branch);
+    } else {
+      alert('Erreur: '+(d.error||'inconnue'));
+    }
+  });
+}
+document.addEventListener('click', function(e){
+  if (!e.target.closest('#wsGitBranch') && !e.target.closest('#wsBranchDropdown'))
+    document.getElementById('wsBranchDropdown').style.display = 'none';
+});
+
+// ── GitHub import ────────────────────────────────────────────────────────────
+async function wsImportGit() {
+  var url = document.getElementById('importGitUrl').value.trim();
+  var log = document.getElementById('importGitLog');
+  log.style.display = 'block';
+  log.innerHTML = '';
+  var resp = await fetch('/api/projects/{{ project.id }}/workspace/import-git', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url:url})
+  });
+  var reader = resp.body.getReader();
+  var decoder = new TextDecoder();
+  var buf = '';
+  while(true) {
+    var res = await reader.read();
+    if(res.done) break;
+    buf += decoder.decode(res.value);
+    var parts = buf.split('\n\n');
+    buf = parts.pop();
+    parts.forEach(function(part){
+      if(!part.startsWith('data: ')) return;
+      try {
+        var e = JSON.parse(part.slice(6));
+        var div = document.createElement('div');
+        div.textContent = e.msg;
+        if(e.type==='error') div.style.color='#f87171';
+        if(e.type==='done') { div.style.color='#4ade80'; if(typeof wsLoadTree==='function') setTimeout(wsLoadTree,500); }
+        log.appendChild(div);
+        log.scrollTop = log.scrollHeight;
+      } catch(ex){}
+    });
+  }
+}
+
+// ── AI Chat ──────────────────────────────────────────────────────────────────
+var _currentAiFile = '';
+function wsAiClear() { document.getElementById('aiChatMsgs').innerHTML = ''; }
+async function wsAiSend() {
+  var input = document.getElementById('aiChatInput');
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+  var ctx = '';
+  var ctxSel = document.getElementById('aiCtxSelect').value;
+  if (ctxSel==='file') ctx = (_currentAiFile ? 'Fichier: '+_currentAiFile+'\n' : '') + (document.getElementById('wsCodeEditor') ? '' : '');
+  var msgs = document.getElementById('aiChatMsgs');
+  var userDiv = document.createElement('div');
+  userDiv.innerHTML = '<div style="background:var(--bg-secondary);border-radius:6px;padding:.4rem .6rem;font-size:.72rem;color:var(--text-primary);align-self:flex-end;max-width:90%">'+msg.replace(/</g,'&lt;')+'</div>';
+  msgs.appendChild(userDiv);
+  var botId = 'ai-'+Date.now();
+  var botWrap = document.createElement('div');
+  botWrap.innerHTML = '<div id="'+botId+'" style="font-size:.72rem;color:var(--text-secondary);white-space:pre-wrap;padding:.2rem 0;line-height:1.5"></div>';
+  msgs.appendChild(botWrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  try {
+    var resp = await fetch('/api/projects/{{ project.id }}/workspace/chat', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({message:msg, context:ctx})
+    });
+    var reader = resp.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = '', fullText = '';
+    var botEl = document.getElementById(botId);
+    while(true) {
+      var res = await reader.read();
+      if(res.done) break;
+      buf += decoder.decode(res.value);
+      var parts = buf.split('\n\n');
+      buf = parts.pop();
+      parts.forEach(function(part){
+        if(!part.startsWith('data: ')) return;
+        try {
+          var e = JSON.parse(part.slice(6));
+          if(e.type==='chunk') { fullText += e.text; botEl.textContent = fullText; msgs.scrollTop = msgs.scrollHeight; }
+          if(e.type==='error') { botEl.style.color='#f87171'; botEl.textContent = e.text; }
+        } catch(ex){}
+      });
+    }
+  } catch(ex) {
+    document.getElementById(botId).textContent = 'Erreur: '+ex.message;
+  }
+}
+
+// ── PR viewer ────────────────────────────────────────────────────────────────
+function wsPrLoad() {
+  var list = document.getElementById('prList');
+  var repo = document.getElementById('prRepoLabel');
+  list.innerHTML = '<div style="color:var(--text-muted);font-size:.72rem;padding:.5rem">Chargement…</div>';
+  fetch('/api/projects/{{ project.id }}/workspace/prs').then(function(r){return r.json();}).then(function(d){
+    if(d.repo) repo.textContent = d.repo;
+    if(d.prs && d.prs.length===0) { list.innerHTML='<div style="color:var(--text-muted);font-size:.72rem;padding:.5rem">'+(d.error||'Aucune PR ouverte')+'</div>'; return; }
+    list.innerHTML = (d.prs||[]).map(function(pr){
+      return '<a href="'+pr.url+'" target="_blank" style="text-decoration:none;display:block;padding:.5rem .75rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-secondary)" onmouseover="this.style.borderColor=\'var(--accent)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'+
+        '<div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.25rem">'+
+        '<span style="color:#60a5fa;font-weight:700;font-size:.72rem">#'+pr.number+'</span>'+
+        (pr.draft?'<span style="background:#333;color:#aaa;font-size:.62rem;padding:0 4px;border-radius:8px">Draft</span>':'')+
+        '<span style="color:var(--text-primary);font-size:.72rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+pr.title.replace(/</g,'&lt;')+'</span></div>'+
+        '<div style="color:var(--text-muted);font-size:.65rem">'+pr.branch+' → '+pr.base+' · '+pr.author+' · '+pr.created_at+'</div></a>';
+    }).join('');
+  }).catch(function(e){ list.innerHTML='<div style="color:#f87171;font-size:.72rem;padding:.5rem">Erreur: '+e+'</div>'; });
+}
+
+// ── Deploy Logs ──────────────────────────────────────────────────────────────
+var _deployLogsReader = null;
+async function wsDeployLogsStart() {
+  if(_deployLogsReader) { try { _deployLogsReader.cancel(); } catch(e){} }
+  var list = document.getElementById('deployLogList');
+  var _addLine = function(text, color) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    if(color) div.style.color = color;
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+  };
+  _addLine('Connexion…', '#60a5fa');
+  try {
+    var resp = await fetch('/api/projects/{{ project.id }}/workspace/deploy-logs');
+    _deployLogsReader = resp.body.getReader();
+    var decoder = new TextDecoder(), buf = '';
+    while(true) {
+      var res = await _deployLogsReader.read();
+      if(res.done) break;
+      buf += decoder.decode(res.value);
+      var parts = buf.split('\n\n');
+      buf = parts.pop();
+      parts.forEach(function(part){
+        if(!part.startsWith('data: ')) return;
+        try {
+          var e = JSON.parse(part.slice(6));
+          _addLine(e.line, e.src==='error'?'#f87171':e.src==='system'?'#60a5fa':null);
+        } catch(ex){}
+      });
+    }
+  } catch(ex) { _addLine('Err: '+ex.message, '#f87171'); }
+}
+
+// ── Git Commit UI ────────────────────────────────────────────────────────────
+function wsGitRefreshStatus() {
+  var list = document.getElementById('wsCommitFileList');
+  list.innerHTML = '<span style="color:var(--text-muted);font-size:.7rem">Chargement…</span>';
+  fetch('/api/projects/{{ project.id }}/workspace/git').then(function(r){return r.json();}).then(function(d){
+    if(!d.changes || d.changes.length===0) { list.innerHTML='<span style="color:var(--text-muted);font-size:.7rem">Aucune modification</span>'; return; }
+    list.innerHTML = d.changes.map(function(f){
+      var fp = f.path||f.name||JSON.stringify(f);
+      var st = f.status||'M';
+      var color = st==='?'?'#aaa':st.startsWith('M')?'#60a5fa':'#4ade80';
+      return '<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem 0"><input type="checkbox" class="ws-commit-cb" value="'+fp+'" checked>'+
+        '<span style="color:'+color+';font-size:.68rem;width:1.5rem">'+st+'</span>'+
+        '<span style="font-size:.68rem;word-break:break-all">'+fp+'</span></div>';
+    }).join('');
+  }).catch(function(){ list.innerHTML='<span style="color:#f87171;font-size:.7rem">Erreur</span>'; });
+}
+async function wsGitDoCommit() {
+  var msg = document.getElementById('wsCommitMsg').value.trim();
+  var res = document.getElementById('wsCommitResult');
+  res.style.display = 'block';
+  if(!msg) { res.style.color='#f87171'; res.textContent='Message de commit requis'; return; }
+  res.style.color = 'var(--text-muted)';
+  res.textContent = 'Commit en cours…';
+  var r = await fetch('/api/projects/{{ project.id }}/workspace/git/commit', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg})
+  });
+  var d = await r.json();
+  if(d.ok) { res.style.color='#4ade80'; res.textContent='Commit effectué'; document.getElementById('wsCommitMsg').value=''; wsGitRefreshStatus(); }
+  else { res.style.color='#f87171'; res.textContent=(d.error||'Erreur'); }
+}
+
+// ── System stats SSE handler ─────────────────────────────────────────────────
+// This is added after wsStartLiveStream is defined — attach it at init
+var _sysStatsAttached = false;
+function _attachSysStats(es) {
+  if(_sysStatsAttached) return;
+  _sysStatsAttached = true;
+  es.addEventListener('system_stats', function(e){
+    try {
+      var d = JSON.parse(e.data);
+      var cpu = document.getElementById('wsMetricCpu');
+      var ram = document.getElementById('wsMetricRam');
+      if(!cpu) return;
+      cpu.textContent = d.cpu+'%';
+      ram.textContent = d.ram+'%';
+      cpu.style.display = 'inline';
+      ram.style.display = 'inline';
+      document.getElementById('wsMetricSysSep').style.display = 'inline';
+      document.getElementById('wsMetricRamSep').style.display = 'inline';
+    } catch(ex){}
+  });
+}
+</script>
+{% endblock %}

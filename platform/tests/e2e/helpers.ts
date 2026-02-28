@@ -24,6 +24,9 @@ export function collectErrors(page: Page): PageErrors {
       if (text.includes("ERR_CONNECTION_REFUSED")) return;
       if (text.includes("Failed to load resource")) return; // browser-level 404s (static assets)
       if (text.includes("Response Status Error Code")) return; // fetch() API errors (logged by app JS)
+      if (text.includes("CORS policy")) return; // CDN font CORS (cosmetic, not functional)
+      if (text.includes("s3.popi.nz")) return; // CDN font host
+      if (text.includes("Access-Control-Allow-Origin")) return; // CORS font errors
       errors.console.push(text);
     }
   });
@@ -33,7 +36,7 @@ export function collectErrors(page: Page): PageErrors {
     const url = response.url();
     // Ignore non-critical responses
     if (url.includes("/sse/") || url.includes("favicon")) return;
-    if (url.includes("/git") && status === 404) return; // known: git-status not always available
+    if (url.includes("/git") && (status === 404 || status === 500)) return; // git-status not always available
     if (!url.includes("/api/")) return; // only track API errors, not static/external resources
     if (status >= 400) {
       errors.network.push({

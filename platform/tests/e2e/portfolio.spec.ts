@@ -9,10 +9,10 @@ import { collectErrors, assertNoErrors, safeGoto } from "./helpers";
 test.describe("Portfolio (Home) page", () => {
   test("loads with projects and badges", async ({ page }) => {
     const errors = collectErrors(page);
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
 
     // Title
-    await expect(page).toHaveTitle(/Macaron/i);
+    await expect(page).toHaveTitle(/Software Factory/i);
 
     // Sidebar nav visible
     await expect(page.locator("nav.sidebar, .sidebar")).toBeVisible();
@@ -46,7 +46,7 @@ test.describe("Portfolio (Home) page", () => {
 
   test("project cards have status and missions", async ({ page }) => {
     const errors = collectErrors(page);
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
 
     const card = page.locator(".project-mission-card").first();
     await expect(card).toBeVisible();

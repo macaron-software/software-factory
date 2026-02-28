@@ -1,0 +1,162 @@
+<style>
+.metrics-kpi-row{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem}
+.metrics-kpi{flex:1;min-width:160px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem}
+.metrics-kpi .kpi-label{font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.3rem}
+.metrics-kpi .kpi-value{font-size:1.6rem;font-weight:700;color:var(--text-primary);line-height:1.1}
+.metrics-kpi .kpi-sub{font-size:0.72rem;color:var(--text-secondary);margin-top:0.2rem}
+.metrics-section{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1.25rem;margin-bottom:1.25rem}
+.metrics-section h4{margin:0 0 0.75rem;font-size:0.88rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.metrics-table{width:100%;border-collapse:collapse;font-size:0.82rem}
+.metrics-table th{text-align:left;padding:6px 10px;color:var(--text-secondary);border-bottom:1px solid var(--border);font-weight:500}
+.metrics-table td{padding:6px 10px;border-bottom:1px solid var(--border)}
+.metrics-table tbody tr:hover{background:var(--bg-hover,rgba(255,255,255,.03))}
+.metrics-table tbody tr:last-child td{border-bottom:none}
+.metrics-traces-wrap{max-height:320px;overflow-y:auto}
+.badge-provider{display:inline-block;padding:2px 7px;border-radius:4px;font-size:0.7rem;background:var(--bg-secondary);border:1px solid var(--border)}
+.timeline-wrap{overflow-x:auto}
+</style>
+
+<!-- KPI cards -->
+<div class="metrics-kpi-row" id="llm-kpis">
+    <div class="metrics-kpi"><div class="kpi-label">Total calls (24h)</div><div class="kpi-value" id="kpi-calls">—</div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Total cost (24h)</div><div class="kpi-value" id="kpi-cost">—</div><div class="kpi-sub" id="kpi-cost-7d"></div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Avg latency</div><div class="kpi-value" id="kpi-latency">—</div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Top provider</div><div class="kpi-value" id="kpi-provider" style="font-size:1rem;padding-top:0.3rem">—</div></div>
+</div>
+
+<!-- By provider -->
+<div class="metrics-section">
+    <h4>Par provider / modèle</h4>
+    <div id="llm-provider-table"><p style="color:var(--text-secondary);font-size:0.82rem">Chargement…</p></div>
+</div>
+
+<!-- Top agents -->
+<div class="metrics-section">
+    <h4>Top agents coûteux (7j)</h4>
+    <div id="llm-agents-table"><p style="color:var(--text-secondary);font-size:0.82rem">Chargement…</p></div>
+</div>
+
+<!-- Timeline 24h -->
+<div class="metrics-section">
+    <h4>Timeline 24h (appels par heure)</h4>
+    <div class="timeline-wrap" id="llm-timeline"><p style="color:var(--text-secondary);font-size:0.82rem">Chargement…</p></div>
+</div>
+
+<!-- Recent traces -->
+<div class="metrics-section">
+    <h4>Traces récentes</h4>
+    <div class="metrics-traces-wrap" id="llm-traces-table"><p style="color:var(--text-secondary);font-size:0.82rem">Chargement…</p></div>
+</div>
+
+<script>
+(function(){
+    let _refreshTimer = null;
+
+    async function loadLlmMetrics() {
+        try {
+            const [statsRes, tracesRes, topRes] = await Promise.all([
+                fetch('/api/metrics/llm'),
+                fetch('/api/metrics/llm/traces?limit=100'),
+                fetch('/api/metrics/llm/top-agents?hours=168'),
+            ]);
+            const stats = await statsRes.json();
+            const tracesData = await tracesRes.json();
+            const topData = await topRes.json();
+
+            const h24 = stats.h24 || {};
+            const h7d = stats.h168 || {};
+
+            // KPIs
+            document.getElementById('kpi-calls').textContent = h24.total_calls ?? 0;
+            document.getElementById('kpi-cost').textContent = '$' + ((h24.total_cost_usd||0).toFixed(4));
+            document.getElementById('kpi-cost-7d').textContent = '7j: $' + ((h7d.total_cost_usd||0).toFixed(4));
+            document.getElementById('kpi-latency').textContent = Math.round(h24.avg_duration_ms||0) + ' ms';
+            const topProv = (h24.by_provider||[])[0];
+            document.getElementById('kpi-provider').textContent = topProv ? (topProv.provider + ' / ' + topProv.model).slice(0,20) : '—';
+
+            // Provider table
+            const providers = h24.by_provider || [];
+            if (providers.length === 0) {
+                document.getElementById('llm-provider-table').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Aucune donnée sur 24h.</p>';
+            } else {
+                let html = '<table class="metrics-table"><thead><tr><th>Provider</th><th>Modèle</th><th>Calls</th><th>Tokens in</th><th>Tokens out</th><th>Coût USD</th><th>Latency moy.</th></tr></thead><tbody>';
+                for (const p of providers) {
+                    html += `<tr><td><span class="badge-provider">${p.provider||'—'}</span></td><td style="font-family:monospace;font-size:0.78rem">${p.model||'—'}</td><td>${p.calls||0}</td><td>${(p.tokens_in||0).toLocaleString()}</td><td>${(p.tokens_out||0).toLocaleString()}</td><td>$${(p.cost_usd||0).toFixed(4)}</td><td>${Math.round(p.avg_ms||0)} ms</td></tr>`;
+                }
+                html += '</tbody></table>';
+                document.getElementById('llm-provider-table').innerHTML = html;
+            }
+
+            // Top agents
+            const agents = topData.top_agents || [];
+            if (agents.length === 0) {
+                document.getElementById('llm-agents-table').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Aucun agent avec activité LLM.</p>';
+            } else {
+                let html = '<table class="metrics-table"><thead><tr><th>Agent</th><th>Calls</th><th>Tokens out</th><th>Coût USD</th></tr></thead><tbody>';
+                for (const a of agents) {
+                    html += `<tr><td style="font-family:monospace;font-size:0.8rem">${a.agent_id||'—'}</td><td>${a.calls||0}</td><td>${(a.tokens_out||0).toLocaleString()}</td><td>$${(a.cost_usd||0).toFixed(4)}</td></tr>`;
+                }
+                html += '</tbody></table>';
+                document.getElementById('llm-agents-table').innerHTML = html;
+            }
+
+            // Timeline SVG (bar chart, group by hour)
+            const traces = tracesData.traces || [];
+            renderTimeline(traces);
+
+            // Recent traces
+            if (traces.length === 0) {
+                document.getElementById('llm-traces-table').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Aucune trace récente.</p>';
+            } else {
+                let html = '<table class="metrics-table"><thead><tr><th>ID</th><th>Timestamp</th><th>Provider</th><th>Modèle</th><th>Agent</th><th>T.in</th><th>T.out</th><th>Coût</th><th>Latency</th></tr></thead><tbody>';
+                for (const t of traces.slice(0, 100)) {
+                    html += `<tr><td style="font-family:monospace;font-size:0.72rem">${t.id||''}</td><td style="font-size:0.75rem;color:var(--text-secondary)">${(t.created_at||'').slice(0,16)}</td><td><span class="badge-provider">${t.provider||''}</span></td><td style="font-family:monospace;font-size:0.75rem">${(t.model||'').slice(0,20)}</td><td style="font-size:0.75rem">${(t.agent_id||'').slice(0,24)}</td><td>${t.tokens_in||0}</td><td>${t.tokens_out||0}</td><td>$${(t.cost_usd||0).toFixed(4)}</td><td>${t.duration_ms||0} ms</td></tr>`;
+                }
+                html += '</tbody></table>';
+                document.getElementById('llm-traces-table').innerHTML = html;
+            }
+        } catch(e) {
+            console.warn('LLM metrics error', e);
+        }
+    }
+
+    function renderTimeline(traces) {
+        // Group by hour (last 24h)
+        const now = Date.now();
+        const buckets = {};
+        for (let i = 23; i >= 0; i--) {
+            const h = new Date(now - i * 3600000);
+            buckets[h.getHours()] = {hour: h.getHours(), label: h.getHours() + 'h', count: 0};
+        }
+        for (const t of traces) {
+            if (!t.created_at) continue;
+            const d = new Date(t.created_at + 'Z');
+            const age = (now - d.getTime()) / 3600000;
+            if (age <= 24) {
+                const h = d.getHours();
+                if (buckets[h] !== undefined) buckets[h].count++;
+            }
+        }
+        const data = Object.values(buckets);
+        const maxVal = Math.max(1, ...data.map(b => b.count));
+        const W = 700, H = 100, pad = 4, barW = Math.floor((W - pad * 2) / 24) - 1;
+
+        let svg = `<svg viewBox="0 0 ${W} ${H + 20}" style="width:100%;height:120px;background:var(--bg-secondary);border-radius:6px">`;
+        data.forEach((b, i) => {
+            const bh = Math.max(4, Math.round((b.count / maxVal) * H));
+            const x = pad + i * (barW + 1);
+            const y = H - bh;
+            const col = b.count > 0 ? 'var(--purple,#7c3aed)' : 'var(--border,#333)';
+            svg += `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}" rx="2" opacity="0.85"><title>${b.label}: ${b.count} calls</title></rect>`;
+            if (i % 4 === 0) svg += `<text x="${x + barW/2}" y="${H + 14}" font-size="8" fill="var(--text-secondary,#888)" text-anchor="middle">${b.label}</text>`;
+        });
+        svg += '</svg>';
+        document.getElementById('llm-timeline').innerHTML = svg;
+    }
+
+    // Auto-refresh every 30s
+    loadLlmMetrics();
+    if (_refreshTimer) clearInterval(_refreshTimer);
+    _refreshTimer = setInterval(loadLlmMetrics, 30000);
+})();
+</script>

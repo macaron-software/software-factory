@@ -26,8 +26,14 @@ async def metrics_tab_dora(request: Request):
     period = int(request.query_params.get("period", "30"))
 
     dora = get_dora_metrics()
-    summary = dora.summary(project_id, period)
-    trend = dora.trend(project_id, weeks=12)
+    try:
+        summary = dora.summary(project_id, period)
+    except Exception:
+        summary = {}
+    try:
+        trend = dora.trend(project_id, weeks=12)
+    except Exception:
+        trend = {"deploy": [], "lead_time": [], "failure": [], "mttr": []}
 
     return _templates(request).TemplateResponse(
         "_partial_dora.html",
@@ -93,6 +99,34 @@ async def metrics_tab_pipeline(request: Request):
     return _templates(request).TemplateResponse(
         "_partial_pipeline.html",
         {"request": request, "projects": projects},
+    )
+
+
+@router.get("/metrics/tab/knowledge", response_class=HTMLResponse)
+async def metrics_tab_knowledge(request: Request):
+    """Knowledge health tab partial."""
+    from ....memory.compactor import get_memory_health
+    from ....db.migrations import get_db
+
+    health = get_memory_health()
+    # Last knowledge-maintenance run
+    last_run = None
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT mr.id, mr.status, mr.started_at, mr.completed_at, mr.llm_cost_usd "
+            "FROM mission_runs mr "
+            "JOIN missions m ON mr.mission_id = m.id "
+            "WHERE m.workflow_id = 'knowledge-maintenance' "
+            "ORDER BY mr.started_at DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        last_run = dict(row) if row else None
+    except Exception:
+        pass
+    return _templates(request).TemplateResponse(
+        "_partial_knowledge.html",
+        {"request": request, "health": health, "last_run": last_run},
     )
 
 
@@ -262,28 +296,49 @@ async def burndown_data(epic_id: str):
 
 @router.get("/api/metrics/velocity")
 async def velocity_data():
-    """Get velocity across sprints."""
+    """Get velocity across weeks — from mission_runs completed per week."""
+    from datetime import datetime, timedelta
+
     from ....db.migrations import get_db
 
     db = get_db()
     try:
-        sprints = db.execute(
-            "SELECT id, name, status, velocity, planned_sp, started_at FROM sprints "
-            "ORDER BY started_at DESC LIMIT 20"
+        # Last 12 weeks of completed mission runs, grouped by week
+        cutoff = (datetime.utcnow() - timedelta(weeks=12)).isoformat()
+        rows = db.execute(
+            """SELECT completed_at FROM mission_runs
+               WHERE status='completed' AND completed_at IS NOT NULL AND completed_at >= ?
+               ORDER BY completed_at""",
+            (cutoff,),
         ).fetchall()
-        return JSONResponse(
-            [
+
+        # Group by ISO week
+        week_counts: dict[str, int] = {}
+        for r in rows:
+            try:
+                dt = datetime.fromisoformat(str(r["completed_at"])[:19])
+                wk = dt.strftime("%Y-W%V")
+                week_counts[wk] = week_counts.get(wk, 0) + 1
+            except Exception:
+                pass
+
+        # Build last 12 weeks in order (fill missing with 0)
+        result = []
+        now = datetime.utcnow()
+        for i in range(11, -1, -1):
+            dt = now - timedelta(weeks=i)
+            wk = dt.strftime("%Y-W%V")
+            result.append(
                 {
-                    "id": s["id"],
-                    "name": s["name"],
-                    "status": s["status"],
-                    "velocity": s["velocity"],
-                    "planned_sp": s["planned_sp"],
-                    "started_at": s["started_at"],
+                    "id": wk,
+                    "name": wk,
+                    "status": "closed",
+                    "velocity": week_counts.get(wk, 0),
+                    "planned_sp": 0,
+                    "started_at": (now - timedelta(weeks=i)).isoformat(),
                 }
-                for s in sprints
-            ]
-        )
+            )
+        return JSONResponse(result)
     except Exception:
         return JSONResponse([])
     finally:
@@ -292,47 +347,36 @@ async def velocity_data():
 
 @router.get("/api/metrics/cycle-time")
 async def cycle_time_data(project_id: str = ""):
-    """Cycle time distribution — time from created to completed for features and stories."""
+    """Cycle time distribution — time from created to completed for missions."""
+    from datetime import datetime
+
     from ....db.migrations import get_db
 
     db = get_db()
     try:
-        where = (
-            "AND f.epic_id IN (SELECT id FROM missions WHERE project_id=?)"
-            if project_id
-            else ""
-        )
+        where = "AND m.project_id=?" if project_id else ""
         params = (project_id,) if project_id else ()
 
-        features = db.execute(
-            f"""
-            SELECT f.name,
-                   julianday(f.completed_at) - julianday(f.created_at) as days
-            FROM features f
-            WHERE f.status='done' AND f.completed_at IS NOT NULL AND f.created_at IS NOT NULL {where}
-            ORDER BY days
-        """,
+        missions = db.execute(
+            f"""SELECT m.name, m.created_at, mr.completed_at
+                FROM missions m
+                JOIN mission_runs mr ON mr.mission_id = m.id
+                WHERE mr.status='completed' AND mr.completed_at IS NOT NULL
+                  AND m.created_at IS NOT NULL {where}
+                ORDER BY mr.completed_at""",
             params,
         ).fetchall()
 
-        stories = db.execute(
-            f"""
-            SELECT s.title,
-                   julianday(s.completed_at) - julianday(s.created_at) as days
-            FROM user_stories s
-            JOIN features f ON s.feature_id = f.id
-            WHERE s.status='done' AND s.completed_at IS NOT NULL AND s.created_at IS NOT NULL {where}
-            ORDER BY days
-        """,
-            params,
-        ).fetchall()
-
-        feat_days = [
-            round(r["days"], 1) for r in features if r["days"] and r["days"] > 0
-        ]
-        story_days = [
-            round(r["days"], 1) for r in stories if r["days"] and r["days"] > 0
-        ]
+        feat_days = []
+        for r in missions:
+            try:
+                ca = datetime.fromisoformat(str(r["created_at"])[:19])
+                done = datetime.fromisoformat(str(r["completed_at"])[:19])
+                d = (done - ca).total_seconds() / 86400
+                if d > 0:
+                    feat_days.append(round(d, 1))
+            except Exception:
+                pass
 
         def histogram(values, bins=10):
             if not values:
@@ -368,16 +412,7 @@ async def cycle_time_data(project_id: str = ""):
                     else 0,
                     "histogram": histogram(feat_days),
                 },
-                "stories": {
-                    "count": len(story_days),
-                    "avg_days": round(sum(story_days) / len(story_days), 1)
-                    if story_days
-                    else 0,
-                    "median_days": round(sorted(story_days)[len(story_days) // 2], 1)
-                    if story_days
-                    else 0,
-                    "histogram": histogram(story_days),
-                },
+                "stories": {"count": 0, "histogram": []},
             }
         )
     except Exception:
@@ -514,6 +549,33 @@ async def llm_costs():
             LIMIT 10
         """).fetchall()
 
+        # Per-project breakdown (join with mission_runs)
+        by_project = db.execute("""
+            SELECT mr.project_id,
+                   COUNT(DISTINCT mr.id) as missions,
+                   COUNT(t.id) as llm_calls,
+                   COALESCE(SUM(t.tokens_in), 0) as tokens_in,
+                   COALESCE(SUM(t.tokens_out), 0) as tokens_out,
+                   COALESCE(SUM(t.cost_usd), 0) as cost_usd,
+                   SUM(CASE WHEN mr.status='completed' THEN 1 ELSE 0 END) as completed,
+                   SUM(CASE WHEN mr.status='paused' THEN 1 ELSE 0 END) as paused
+            FROM mission_runs mr
+            LEFT JOIN llm_traces t ON t.mission_id = mr.id
+            GROUP BY mr.project_id
+            ORDER BY cost_usd DESC
+            LIMIT 20
+        """).fetchall()
+
+        # Paused missions stats with resume attempts
+        paused_stats = db.execute("""
+            SELECT
+                COUNT(*) as total_paused,
+                COALESCE(AVG(COALESCE(resume_attempts,0)),0) as avg_attempts,
+                SUM(CASE WHEN COALESCE(human_input_required,0)=1 THEN 1 ELSE 0 END) as human_input_needed,
+                SUM(CASE WHEN COALESCE(resume_attempts,0)>=3 THEN 1 ELSE 0 END) as exhausted
+            FROM mission_runs WHERE status='paused'
+        """).fetchone()
+
         by_agent = db.execute("""
             SELECT agent_id,
                    COUNT(*) as calls,
@@ -536,29 +598,75 @@ async def llm_costs():
             ORDER BY date
         """).fetchall()
 
-        return JSONResponse({
-            "total_cost_usd": round(total, 6),
-            "by_provider": [
-                {"provider": r["provider"], "model": r["model"],
-                 "calls": r["calls"], "tokens": r["tokens"] or 0,
-                 "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_provider
-            ],
-            "by_mission": [
-                {"mission_id": r["mission_id"], "calls": r["calls"],
-                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_mission
-            ],
-            "by_agent": [
-                {"agent_id": r["agent_id"], "calls": r["calls"],
-                 "tokens": r["tokens"] or 0, "cost_usd": round(r["cost_usd"], 6)}
-                for r in by_agent
-            ],
-            "daily": [
-                {"date": r["date"], "calls": r["calls"], "cost_usd": round(r["cost_usd"], 6)}
-                for r in daily
-            ],
-        })
+        return JSONResponse(
+            {
+                "total_cost_usd": round(total, 6),
+                "by_provider": [
+                    {
+                        "provider": r["provider"],
+                        "model": r["model"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_provider
+                ],
+                "by_mission": [
+                    {
+                        "mission_id": r["mission_id"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_mission
+                ],
+                "by_project": [
+                    {
+                        "project_id": r["project_id"],
+                        "missions": r["missions"],
+                        "llm_calls": r["llm_calls"],
+                        "tokens_in": r["tokens_in"],
+                        "tokens_out": r["tokens_out"],
+                        "cost_usd": round(r["cost_usd"], 6),
+                        "completed": r["completed"],
+                        "paused": r["paused"],
+                        "success_rate": round(r["completed"] / r["missions"], 2)
+                        if r["missions"]
+                        else 0,
+                    }
+                    for r in by_project
+                ],
+                "paused_stats": {
+                    "total": paused_stats["total_paused"] if paused_stats else 0,
+                    "avg_resume_attempts": round(paused_stats["avg_attempts"] or 0, 1)
+                    if paused_stats
+                    else 0,
+                    "human_input_needed": paused_stats["human_input_needed"]
+                    if paused_stats
+                    else 0,
+                    "exhausted_retries": paused_stats["exhausted"]
+                    if paused_stats
+                    else 0,
+                },
+                "by_agent": [
+                    {
+                        "agent_id": r["agent_id"],
+                        "calls": r["calls"],
+                        "tokens": r["tokens"] or 0,
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in by_agent
+                ],
+                "daily": [
+                    {
+                        "date": r["date"],
+                        "calls": r["calls"],
+                        "cost_usd": round(r["cost_usd"], 6),
+                    }
+                    for r in daily
+                ],
+            }
+        )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:
@@ -587,7 +695,10 @@ async def releases_data(project_id: str):
         import json as _json
 
         for run in runs:
-            phases = _json.loads(run["phases_json"] or "[]")
+            try:
+                phases = _json.loads(run["phases_json"] or "[]")
+            except Exception:
+                phases = []
             done_phases = [p["name"] for p in phases if p.get("status") == "completed"]
             releases.append(
                 {
@@ -603,42 +714,236 @@ async def releases_data(project_id: str):
                 }
             )
 
-        # 2. Active epics with partial completion (backlog view)
-        active = db.execute(
-            f"SELECT id, name, status FROM missions WHERE type='epic' "
-            f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
-            params,
-        ).fetchall()
-        for epic in active:
-            features = db.execute(
-                "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
-                (epic["id"],),
+        # 2. Active epics with partial completion (backlog view) — skip if tables missing
+        try:
+            active = db.execute(
+                f"SELECT id, name, status FROM missions WHERE type='epic' "
+                f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
+                params,
             ).fetchall()
-            done = [f for f in features if f["status"] == "done"]
-            total = len(features)
-            if total == 0:
-                continue
-            releases.append(
-                {
-                    "epic_id": epic["id"],
-                    "epic_name": epic["name"] + " (in progress)",
-                    "completed_at": None,
-                    "feature_count": total,
-                    "done_count": len(done),
-                    "progress_pct": round(len(done) / total * 100) if total else 0,
-                    "total_sp": sum(f["story_points"] or 0 for f in features),
-                    "features": [
-                        {
-                            "name": f["name"],
-                            "sp": f["story_points"],
-                            "status": f["status"],
-                            "date": f["completed_at"],
-                        }
-                        for f in features
-                    ],
-                }
+            for epic in active:
+                try:
+                    features = db.execute(
+                        "SELECT name, status, story_points, completed_at FROM features WHERE epic_id=? ORDER BY status, completed_at",
+                        (epic["id"],),
+                    ).fetchall()
+                except Exception:
+                    features = []
+                done = [f for f in features if f["status"] == "done"]
+                total = len(features)
+                if total == 0:
+                    continue
+                releases.append(
+                    {
+                        "epic_id": epic["id"],
+                        "epic_name": epic["name"] + " (in progress)",
+                        "completed_at": None,
+                        "feature_count": total,
+                        "done_count": len(done),
+                        "progress_pct": round(len(done) / total * 100) if total else 0,
+                        "total_sp": sum(f["story_points"] or 0 for f in features),
+                        "features": [
+                            {
+                                "name": f["name"],
+                                "sp": f["story_points"],
+                                "status": f["status"],
+                                "date": f["completed_at"],
+                            }
+                            for f in features
+                        ],
+                    }
+                )
+        except Exception:
+            pass  # missions/features tables may not exist yet
+
+        import datetime as _dt
+
+        def _serial(obj):
+            if isinstance(obj, (_dt.datetime, _dt.date)):
+                return obj.isoformat()
+            raise TypeError(
+                f"Object of type {type(obj).__name__} is not JSON serializable"
             )
 
-        return JSONResponse({"project_id": project_id, "releases": releases})
+        return JSONResponse(
+            content=_json.loads(
+                _json.dumps(
+                    {"project_id": project_id, "releases": releases}, default=_serial
+                )
+            )
+        )
+    except Exception as exc:
+        return JSONResponse(
+            {"project_id": project_id, "releases": [], "error": str(exc)}
+        )
     finally:
         db.close()
+
+
+@router.get("/api/audit-log")
+async def get_audit_log(limit: int = 100):
+    from ....db.migrations import get_db
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM admin_audit_log ORDER BY timestamp DESC LIMIT ?",
+        (min(limit, 500),),
+    ).fetchall()
+    conn.close()
+    return {"entries": [dict(r) for r in rows]}
+
+
+@router.get("/api/analytics/cost")
+async def cost_analytics(request: Request, period: str = "7d"):
+    """Cost & token analytics from llm_usage table. period: 1d|7d|30d"""
+    from datetime import datetime, timedelta
+
+    from ....db.migrations import get_db
+
+    _days = {"1d": 1, "7d": 7, "30d": 30}
+    days = _days.get(period, 7)
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+    db = get_db()
+    try:
+        totals = db.execute(
+            """SELECT COALESCE(SUM(cost_usd),0) as cost,
+                      COALESCE(SUM(tokens_in),0) as tokens_in,
+                      COALESCE(SUM(tokens_out),0) as tokens_out,
+                      COUNT(*) as calls
+               FROM llm_usage WHERE created_at >= ?""",
+            (cutoff,),
+        ).fetchone()
+
+        by_model = db.execute(
+            """SELECT model,
+                      COALESCE(SUM(cost_usd),0) as cost,
+                      COUNT(*) as calls,
+                      COALESCE(SUM(tokens_in),0) as tokens_in,
+                      COALESCE(SUM(tokens_out),0) as tokens_out
+               FROM llm_usage WHERE created_at >= ?
+               GROUP BY model ORDER BY cost DESC LIMIT 20""",
+            (cutoff,),
+        ).fetchall()
+
+        by_project = db.execute(
+            """SELECT mr.project_id,
+                      COALESCE(SUM(u.cost_usd),0) as cost,
+                      COALESCE(SUM(u.tokens_in)+SUM(u.tokens_out),0) as tokens,
+                      COUNT(DISTINCT u.mission_run_id) as missions
+               FROM llm_usage u
+               JOIN mission_runs mr ON mr.id = u.mission_run_id
+               WHERE u.created_at >= ?
+               GROUP BY mr.project_id ORDER BY cost DESC LIMIT 20""",
+            (cutoff,),
+        ).fetchall()
+
+        by_day = db.execute(
+            """SELECT substr(created_at,1,10) as date,
+                      COALESCE(SUM(cost_usd),0) as cost,
+                      COALESCE(SUM(tokens_in)+SUM(tokens_out),0) as tokens
+               FROM llm_usage WHERE created_at >= ?
+               GROUP BY date ORDER BY date""",
+            (cutoff,),
+        ).fetchall()
+
+        mission_stats = db.execute(
+            """SELECT COUNT(*) as total,
+                      SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed
+               FROM mission_runs WHERE created_at >= ?""",
+            (cutoff,),
+        ).fetchone()
+
+        total_cost = totals["cost"] or 0.0
+        total_missions = mission_stats["total"] or 0
+        completed = mission_stats["completed"] or 0
+        success_rate = round(completed / total_missions, 4) if total_missions else 0.0
+        avg_cost = round(total_cost / total_missions, 6) if total_missions else 0.0
+
+        return JSONResponse(
+            {
+                "period": period,
+                "total_cost_usd": round(total_cost, 6),
+                "total_tokens_in": totals["tokens_in"] or 0,
+                "total_tokens_out": totals["tokens_out"] or 0,
+                "total_calls": totals["calls"] or 0,
+                "by_project": [
+                    {
+                        "project_id": r["project_id"] or "unknown",
+                        "name": r["project_id"] or "unknown",
+                        "cost": round(r["cost"], 6),
+                        "tokens": r["tokens"] or 0,
+                        "missions": r["missions"] or 0,
+                    }
+                    for r in by_project
+                ],
+                "by_model": [
+                    {
+                        "model": r["model"] or "unknown",
+                        "cost": round(r["cost"], 6),
+                        "calls": r["calls"] or 0,
+                        "tokens_in": r["tokens_in"] or 0,
+                        "tokens_out": r["tokens_out"] or 0,
+                    }
+                    for r in by_model
+                ],
+                "by_day": [
+                    {
+                        "date": r["date"],
+                        "cost": round(r["cost"], 6),
+                        "tokens": r["tokens"] or 0,
+                    }
+                    for r in by_day
+                ],
+                "success_rate": success_rate,
+                "avg_cost_per_mission": avg_cost,
+            }
+        )
+    except Exception as e:
+        logger.warning("cost_analytics error: %s", e)
+        return JSONResponse(
+            {
+                "period": period,
+                "total_cost_usd": 0.0,
+                "total_tokens_in": 0,
+                "total_tokens_out": 0,
+                "total_calls": 0,
+                "by_project": [],
+                "by_model": [],
+                "by_day": [],
+                "success_rate": 0.0,
+                "avg_cost_per_mission": 0.0,
+            }
+        )
+    finally:
+        db.close()
+
+
+@router.get("/api/domains")
+async def list_domains_api():
+    """List all configured domains with their key settings."""
+    try:
+        from ....projects.domains import list_domains
+
+        domains = list_domains()
+        return JSONResponse(
+            {
+                "domains": [
+                    {
+                        "id": d.id,
+                        "name": d.name,
+                        "env": d.env,
+                        "description": d.description,
+                        "compliance_blocking": d.compliance_blocking,
+                        "default_pattern": d.default_pattern,
+                        "default_agents": d.default_agents,
+                        "compliance_agents": d.compliance_agents,
+                        "color": d.color,
+                    }
+                    for d in domains
+                ]
+            }
+        )
+    except Exception as e:
+        logger.warning("list_domains_api error: %s", e)
+        return JSONResponse({"domains": []})

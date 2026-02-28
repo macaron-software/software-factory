@@ -1,0 +1,20 @@
+# Sharelook 2.0
+# ==============
+
+project:
+  id: sharelook-2
+  name: sharelook-2
+  display_name: "Sharelook 2.0"
+  root_path: ""
+  domain: ""
+  description: >
+    Next-gen Sharelook: refonte complète avec micro-services,
+    WebRTC, et architecture event-driven.
+
+domains:
+  java:
+    paths: [services/]
+    extensions: [.java]
+  angular:
+    paths: [apps/]
+    extensions: [.ts, .html]

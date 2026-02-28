@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}{% endblock %}
+
+{% block content %}
+<style>
+.home-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--bg-secondary); padding:0 1rem; }
+.home-tab { padding:0.6rem 1.1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); border:none; border-bottom:2px solid transparent; background:none; cursor:pointer; display:flex; align-items:center; gap:0.4rem; transition:color .15s; white-space:nowrap; }
+.home-tab:hover { color:var(--text-primary); }
+.home-tab.active { color:var(--text-primary); border-bottom-color:var(--purple); }
+.home-tab svg { width:13px; height:13px; }
+#home-tab-content { flex:1; overflow:auto; transition:opacity 0.08s ease; }
+#home-tab-content.htmx-swapping { opacity:0; }
+.home-loading { display:flex; align-items:center; justify-content:center; padding:4rem; color:var(--text-secondary); font-size:0.82rem; gap:0.5rem; }
+</style>
+
+<div class="tabs home-tabs" id="homeTabs">
+  <button class="home-tab {% if active_tab == 'cto' %}active{% endif %}"
+          hx-get="/cto" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=cto" onclick="homeTab(this, 'cto')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    CTO Jarvis
+  </button>
+  <button class="home-tab {% if active_tab == 'mkt-ideation' %}active{% endif %}"
+          hx-get="/mkt-ideation" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=mkt-ideation" onclick="homeTab(this, 'mkt-ideation')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    Idéation Business
+  </button>
+  <button class="home-tab {% if active_tab == 'ideation' %}active{% endif %}"
+          hx-get="/ideation" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=ideation" onclick="homeTab(this, 'ideation')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+    Idéation Projet
+  </button>
+  <button class="home-tab {% if active_tab == 'knowledge' %}active{% endif %}"
+          hx-get="/group/knowledge" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=knowledge" onclick="homeTab(this, 'knowledge')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    Knowledge
+  </button>
+  <button class="home-tab {% if active_tab == 'archi' %}active{% endif %}"
+          hx-get="/group/archi" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=archi" onclick="homeTab(this, 'archi')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Architecture
+  </button>
+  <button class="home-tab {% if active_tab == 'security' %}active{% endif %}"
+          hx-get="/group/security" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=security" onclick="homeTab(this, 'security')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Sécurité
+  </button>
+  <button class="home-tab {% if active_tab == 'data-ai' %}active{% endif %}"
+          hx-get="/group/data-ai" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=data-ai" onclick="homeTab(this, 'data-ai')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Data &amp; IA
+  </button>
+  <button class="home-tab {% if active_tab == 'pi-planning' %}active{% endif %}"
+          hx-get="/group/pi-planning" hx-target="#home-tab-content" hx-swap="innerHTML swap:80ms settle:100ms"
+          hx-push-url="/?tab=pi-planning" onclick="homeTab(this, 'pi-planning')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    PI Planning
+  </button>
+</div>
+
+<div id="home-tab-content">
+  <div class="home-loading">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+    Chargement…
+  </div>
+</div>
+
+<script>
+function homeTab(btn, tab) {
+  document.querySelectorAll('.home-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  localStorage.setItem('home_tab', tab);
+}
+
+// Auto-load active tab on page load
+(function() {
+  const urlTab = new URLSearchParams(location.search).get('tab');
+  const storedTab = localStorage.getItem('home_tab');
+  const tab = urlTab || storedTab || 'cto';
+
+  const urls = { 'cto': '/cto', 'mkt-ideation': '/mkt-ideation', 'ideation': '/ideation', 'knowledge': '/group/knowledge', 'archi': '/group/archi', 'security': '/group/security', 'data-ai': '/group/data-ai', 'pi-planning': '/group/pi-planning' };
+  const url = urls[tab] || urls['cto'];
+
+  // Highlight correct tab button
+  document.querySelectorAll('.home-tab').forEach(b => {
+    const bu = b.getAttribute('hx-push-url') || '';
+    b.classList.toggle('active', bu.includes('tab=' + tab));
+  });
+
+  // Load content
+  htmx.ajax('GET', url, { target: '#home-tab-content', swap: 'innerHTML' });
+})();
+</script>
+{% endblock %}

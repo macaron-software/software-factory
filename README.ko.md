@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[라이브 데모: sf.macaron-software.com](https://sf.macaron-software.com)** — "Skip (Demo)"를 클릭하여 탐색
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [기능](#기능) · [빠른 시작](#빠른-시작) · [스크린샷](#스크린샷) · [아키텍처](#아키텍처) · [기여하기](#기여하기)
 
@@ -31,11 +41,16 @@
 
 Software Factory는 아이디어 구상부터 배포까지 전체 소프트웨어 개발 라이프사이클을 오케스트레이션하는 **자율 멀티 에이전트 플랫폼**입니다. 전문화된 AI 에이전트들이 협업하여 작업을 수행합니다.
 
-**가상 소프트웨어 공장**으로 생각하면 됩니다. 161개의 AI 에이전트가 구조화된 워크플로우를 통해 협업하며, SAFe 방법론, TDD 실천, 자동화된 품질 게이트를 따릅니다.
+**가상 소프트웨어 공장**으로 생각하면 됩니다. 191개의 AI 에이전트가 구조화된 워크플로우를 통해 협업하며, SAFe 방법론, TDD 실천, 자동화된 품질 게이트를 따릅니다.
 
 ### 주요 특징
 
-- **161개 전문 에이전트** — 아키텍트, 개발자, 테스터, SRE, 보안 분석가, 프로덕트 오너
+- **191개 전문 에이전트** — 아키텍트, 개발자, 테스터, SRE, 보안 분석가, 프로덕트 오너
+- **36개 내장 워크플로우** — SAFe 세리머니, 품질 게이트, 야간 유지보수, 보안, 지식 관리
+- **지식 관리** — 4개 전용 에이전트, ART 지식 팀, 야간 `knowledge-maintenance` 워크플로우
+- **메모리 인텔리전스** — 관련성 점수, 접근 추적, 오래된 항목 자동 삭제
+- **LLM 비용 추적** — 미션 타임라인 탭 헤더에 미션별 비용 표시
+- **미션 타임라인** — Mission Control의 수영 레인 타임라인 탭으로 단계 지속 시간 표시
 - **10가지 오케스트레이션 패턴** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe 정렬 라이프사이클** — Portfolio → Epic → Feature → Story (PI 주기 포함)
 - **자동 복구** — 자율적 인시던트 감지, 분류 및 자가 수리
@@ -86,6 +101,26 @@ Software Factory는 아이디어 구상부터 배포까지 전체 소프트웨�
 <td width="50%">
 <strong>온보딩 — SAFe 역할 선택 마법사</strong><br>
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>홈 — CTO Jarvis / 비즈니스 아이디어 / 프로젝트 아이디어 탭</strong><br>
+<img src="docs/screenshots/en/home.png" alt="홈" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 전략적 AI 어드바이저</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>비즈니스 아이디어 — 6에이전트 마케팅 팀</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="비즈니스 아이디어" width="100%">
+</td>
+<td width="50%">
+<strong>프로젝트 아이디어 — 멀티 에이전트 기술 팀</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="프로젝트 아이디어" width="100%">
 </td>
 </tr>
 </table>
@@ -160,17 +195,13 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 설치 후 아이디어에서 실제 프로젝트까지의 진행 방법:
 
-### 경로 A: 아이디어에서 시작 (아이디에이션 워크숍)
+### 경로 A: CTO Jarvis에게 묻기 (가장 빠름)
 
-1. **아이디에이션 페이지 열기** — `/ideation`으로 이동 (또는 사이드바에서 "Ideation" 클릭)
-2. **아이디어 설명** — 예: *"실시간 매칭 기능이 있는 기업용 카풀 앱"*
-3. **에이전트 토론 관찰** — 5개의 전문 에이전트(프로덕트 매니저, 비즈니스 분석가, 아키텍트, UX 디자이너, 보안)가 SSE 스트리밍을 통해 실시간으로 아이디어를 분석
-4. **결과에서 프로젝트 생성** — **"Create an Epic from this idea"**를 클릭하면 플랫폼이:
-   - 생성된 `VISION.md`와 CI/CD 스캐폴딩이 포함된 새 **프로젝트** 생성
-   - PO 에이전트가 분해한 기능과 사용자 스토리가 포함된 **에픽** 생성
-   - **TMA**(유지보수), **보안**, **기술 부채** 미션 자동 프로비저닝
+1. **홈 페이지 열기** (`/`) — 플랫폼이 CTO Jarvis 탭에서 시작됩니다
+2. **프로젝트 아이디어 입력** — 예: *"React와 Python을 사용한 기업용 카풀 앱 새 프로젝트 생성해줘"*
+3. **Jarvis (Gabriel Mercier, 전략적 오케스트레이터)** 가 요청을 분석하고, 프로젝트를 생성하고, SAFe 백로그를 프로비저닝하고 첫 번째 미션을 시작합니다 — 모두 한 번의 대화에서
 
-이제 실행 준비가 된 완전한 SAFe 백로그가 있습니다.
+이것이 모든 새 프로젝트의 **권장 진입점**입니다.
 
 ### 경로 B: 수동으로 프로젝트 생성
 
@@ -210,7 +241,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## 기능
 
-### 161개 전문 AI 에이전트
+### 191개 전문 AI 에이전트
 
 에이전트는 실제 소프트웨어 조직을 반영하는 팀으로 구성됩니다:
 
@@ -474,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -580,34 +611,9 @@ Mission Created
 ### 배포
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (권장) → http://localhost:8090
+로컬 (개발)   → http://localhost:8090
+프로덕션      → 자체 인프라
 ```
 
 ## 프로젝트 구성
@@ -766,6 +772,46 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ---
 
+## v2.7.0의 새로운 기능 (2026년)
+
+### 지식 관리 시스템
+- **4개의 새 에이전트** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART 지식 팀** — 지식 운영 전용 Agile Release Train
+- **야간 `knowledge-maintenance` 워크플로우** — 자동 큐레이션, 중복 제거, 신선도 점수 매기기
+- **메모리 건강 대시보드** — 메트릭 탭의 지식 건강 메트릭 패널
+- **지식 건강 배지** — 설정 페이지에 표시
+
+### 메모리 인텔리전스
+- **관련성 점수** — `신뢰도 × 최신성 × 접근 부스트` 공식으로 순위 검색
+- **접근 추적** — 각 메모리 항목의 `access_count` 및 `last_read_at` 필드
+- **자동 삭제** — 야간 실행마다 임계값 미만의 오래된 항목 제거
+
+### LLM 비용 추적
+- **미션별 비용** — 미션 타임라인 탭 헤더에 표시
+- **자동 합산** — `llm_traces` 테이블에서 집계
+
+### 미션 타임라인
+- **수영 레인 타임라인 탭** — Mission Control에서 에이전트 단계를 수평 수영 레인으로 표시
+- **단계 지속 시간** — 각 단계에 소요된 시간의 시각적 표현
+
+### 품질 점수
+- **PhaseRun의 `quality_score` 필드** — 각 단계 후 적대적 가드가 채움
+
+### 프로젝트 내보내기/가져오기
+- **ZIP 아카이브** — `project.json` + 모든 미션 + 실행 + 메모리 포함
+
+### 입력 유효성 검사
+- **Pydantic 모델** — 모든 POST/PATCH 라우트에 엄격한 입력 스키마 적용
+
+### BSCC 도메인 가이드라인
+- **도메인 아키텍처 가이드라인** — 프로젝트 도메인별로 Confluence/Solaris 가이드라인 적용
+
+### 설정 통합 허브
+- **설정 가능한 도구 통합** — Jira, Confluence, SonarQube를 모든 에이전트에서 사용 가능
+
+### 브라우저 푸시 알림
+- **Web Push API (VAPID)** — 미션 이벤트를 위한 네이티브 브라우저 푸시 알림
+
 ## v2.1.0의 새로운 기능 (2026년 2월)
 
 ### 품질 메트릭 — 산업적 모니터링
@@ -901,6 +947,47 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **라우팅 매트릭스** — 카테고리별(추론, 생산/코드, 작업, 문서 작성) 무거운/가벼운 모델 구성
 - **Darwin LLM A/B 섹션** — 진행 중인 모델 실험의 실시간 보기
 
+## v3.0.0의 새로운 기능 (2026년)
+
+### 에이전트 마켓플레이스
+- **191개 에이전트 카탈로그화** — `/marketplace`에서 전체 텍스트 검색, ART/역할/스킬 필터링
+- **에이전트 프로파일** — 도구, 스킬 및 최근 세션 기록이 있는 상세 보기
+- **원클릭 시작** — 프로파일 페이지에서 모든 에이전트와 직접 세션 시작
+
+### 미션 리플레이
+- **단계별 리플레이** — `/missions/{id}/replay`에서 모든 에이전트 턴과 도구 호출 재생
+- **단계별 비용 및 토큰** — 에이전트별 세분화된 LLM 지출 내역
+- **내보낼 수 있는 기록** — 디버깅 및 감사를 위한 JSON 리플레이 다운로드
+
+### LLM 메트릭 대시보드
+- **비용/지연시간/프로바이더 실시간 모니터링** (`/metrics`)
+- **에이전트 및 미션별 지출** — 비용이 높은 에이전트 식별 및 최적화
+- **프로바이더 비교** — 프로바이더별 P50/P95 지연시간 및 비용 비교
+
+### RBAC + 속도 제한
+- **워크스페이스 범위 RBAC** — 플랫폼 전체가 아닌 워크스페이스별 역할 할당
+- **사용자별 속도 제한** — 역할별 구성 가능한 토큰/요청 쿼터
+- **감사 추적** — 모든 RBAC 변경 사항을 행위자, 타임스탬프, 변경 상세와 함께 기록
+
+### 에이전트 평가 프레임워크
+- **LLM-as-judge 채점** — `/evals`에서 골든 데이터셋에 대한 자동 평가
+- **에이전트별 벤치마크** — 시간 경과에 따른 품질 추적 및 회귀 감지
+- **구성 가능한 판사** — 설정된 모든 LLM 프로바이더를 평가 판사로 사용
+
+### 도구 빌더
+- **노코드 도구 생성** (`/tool-builder`) — HTTP, SQL, 셸 도구
+- **즉시 활성화** — 저장 즉시 에이전트에게 도구 제공
+- **파라미터 템플릿** — 타입과 검증이 포함된 입력 스키마 정의
+
+### 멀티테넌트 워크스페이스
+- **격리된 네임스페이스** (`/workspaces`) — 워크스페이스별로 분리된 데이터, 에이전트, 메모리
+- **클라이언트별 배포** — 교차 오염 없이 여러 클라이언트 온보딩
+- **워크스페이스별 RBAC** — 네임스페이스별 세분화된 역할 할당
+
+### YAML 에이전트 핫 리로드
+- **라이브 에이전트 업데이트** — 에이전트 YAML 파일을 편집하고 플랫폼 재시작 없이 리로드
+- **무중단** — 진행 중인 미션은 이전 에이전트 정의로 계속 실행
+
 ## 기여하기
 
 기여를 환영합니다! 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
@@ -911,6 +998,6 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ## 지원
 
-- 라이브 데모: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - 이슈: https://github.com/macaron-software/software-factory/issues
 - 토론: https://github.com/macaron-software/software-factory/discussions

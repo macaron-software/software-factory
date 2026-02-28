@@ -20,7 +20,6 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-
 @router.get("/missions", response_class=HTMLResponse)
 async def missions_page(request: Request):
     """List all missions with filters."""
@@ -85,7 +84,6 @@ async def missions_page(request: Request):
             "workflows": all_workflows,
         },
     )
-
 
 
 @router.get("/missions/{mission_id}", response_class=HTMLResponse)
@@ -166,7 +164,6 @@ async def mission_detail_page(request: Request, mission_id: str):
     )
 
 
-
 @router.post("/api/missions", responses={200: {"model": OkResponse}})
 async def create_mission(request: Request):
     """Create a new mission."""
@@ -190,8 +187,6 @@ async def create_mission(request: Request):
     if _is_json_request(request):
         return JSONResponse({"ok": True, "mission": {"id": m.id, "name": m.name}})
     return RedirectResponse(f"/missions/{m.id}", status_code=303)
-
-
 
 
 @router.get("/api/missions", responses={200: {"model": MissionListResponse}})
@@ -235,8 +230,6 @@ async def list_missions_api(request: Request):
             }
         )
     return JSONResponse({"missions": result, "total": len(result)})
-
-
 
 
 @router.delete("/api/missions/{mission_id}", responses={200: {"model": OkResponse}})
@@ -306,7 +299,6 @@ async def delete_mission(mission_id: str):
     return JSONResponse({"status": "deleted", "name": mission[1]})
 
 
-
 @router.get(
     "/api/missions/{mission_id}",
     responses={200: {"model": MissionDetail}, 404: {"model": ErrorResponse}},
@@ -320,8 +312,6 @@ async def api_mission_status(request: Request, mission_id: str):
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(mission.model_dump(mode="json"))
-
-
 
 
 @router.get("/api/missions/{mission_id}/children")
@@ -353,8 +343,6 @@ async def api_mission_children(request: Request, mission_id: str):
     )
 
 
-
-
 @router.get("/missions/start/{workflow_id}", response_class=HTMLResponse)
 async def mission_start_page(request: Request, workflow_id: str):
     """Start a new mission — show brief form."""
@@ -371,8 +359,6 @@ async def mission_start_page(request: Request, workflow_id: str):
             "workflow": wf,
         },
     )
-
-
 
 
 @router.get("/mission-control", response_class=HTMLResponse)
@@ -398,8 +384,6 @@ async def missions_list_page(request: Request):
     )
 
 
-
-
 @router.get("/missions/{mission_id}/control", response_class=HTMLResponse)
 async def mission_control_page(request: Request, mission_id: str):
     """Mission Control dashboard — pipeline visualization + CDP activity."""
@@ -414,3 +398,14 @@ async def mission_control_page(request: Request, mission_id: str):
     return _templates(request).TemplateResponse("mission_control.html", ctx)
 
 
+@router.get("/missions/{mission_id}/replay", response_class=HTMLResponse)
+async def mission_replay_page(request: Request, mission_id: str):
+    """Mission Replay — step-by-step timeline visualization."""
+    return _templates(request).TemplateResponse(
+        "mission_replay.html",
+        {
+            "request": request,
+            "page_title": "Mission Replay",
+            "mission_id": mission_id,
+        },
+    )

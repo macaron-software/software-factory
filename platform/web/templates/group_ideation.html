@@ -1,0 +1,539 @@
+{# Generic Group Ideation — htmx partial loaded in home tab #}
+
+<div class="mkt-layout">
+
+  <!-- ── Left: Chat area ── -->
+  <div class="mkt-chat">
+
+    <!-- History toggle -->
+    <button class="mkt-history-btn" onclick="grpToggleSidebar()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+      {{ past_sessions|length if past_sessions else 0 }}
+    </button>
+
+    <!-- History sidebar -->
+    <div class="mkt-sidebar" id="grpSidebar">
+      <div class="mkt-sidebar-header">
+        <span class="mkt-sidebar-title">Historique</span>
+        <button class="mkt-sidebar-close" onclick="grpToggleSidebar()">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="mkt-sidebar-list" id="grpSidebarList">
+        {% for s in past_sessions %}
+        <div class="mkt-sidebar-item" onclick="grpLoadSession('{{ s.id }}')">
+          <div class="mkt-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
+          <div class="mkt-sidebar-item-meta">
+            <span class="mkt-sidebar-badge {{ s.status }}">{{ s.status }}</span>
+            <span style="font-size:0.65rem;color:var(--text-muted)">{{ (s.created_at | string)[:10] if s.created_at else '' }}</span>
+          </div>
+        </div>
+        {% endfor %}
+        {% if not past_sessions %}
+        <div style="text-align:center;padding:1rem;font-size:0.7rem;color:var(--text-tertiary)">Aucun historique</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Messages -->
+    <div class="mkt-messages" id="grpMessages">
+      <div class="mkt-empty" id="grpPlaceholder">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:{{ group.color }}">
+          {{ group.icon_path | safe }}
+        </svg>
+        <div class="mkt-empty-title">{{ group.name }}</div>
+        <div class="mkt-empty-subtitle">{{ group.description }}</div>
+        <div class="mkt-examples">
+          {% for ex in group.examples %}
+          <button class="mkt-example" onclick="grpSetPrompt(this.textContent)">{{ ex }}</button>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Input bar -->
+    <div class="mkt-input-bar">
+      <textarea class="mkt-input" id="grpInput" rows="1"
+        placeholder="{{ group.placeholder }}"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();grpSend()}"></textarea>
+      <button class="mkt-send" id="grpSend" onclick="grpSend()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Right: Panel ── -->
+  <div class="mkt-panel" id="grpPanel">
+
+    <!-- Agent graph -->
+    <div class="idea-graph" style="margin-bottom:0.5rem">
+      <div class="idea-graph-title" onclick="grpToggleGraph()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:{{ group.color }}">
+          {{ group.icon_path | safe }}
+        </svg>
+        {{ group.name }} &amp; Flow
+        <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="idea-graph-canvas" id="grpGraphCanvas">
+        <svg id="grpGraphSvg" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="grp-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/></marker>
+            <marker id="grp-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/></marker>
+            <marker id="grp-arrow-report" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/></marker>
+          </defs>
+          <g id="grpEdges"></g>
+          <g id="grpNodes"></g>
+        </svg>
+      </div>
+      <div class="idea-graph-legend" id="grpGraphLegend"></div>
+    </div>
+
+    <!-- Popover overlay for agent cards -->
+    <div class="ig-popover-overlay" id="grpIgOverlay" onclick="grpClosePopover()"></div>
+    <div class="ig-popover" id="grpIgPopover">
+      <div class="ig-popover-header">
+        <div id="grpIgPopAvatar"></div>
+        <div class="ig-popover-info">
+          <div class="ig-popover-name" id="grpIgPopName"></div>
+          <div class="ig-popover-role" id="grpIgPopRole"></div>
+        </div>
+        <button class="ig-popover-close" onclick="grpClosePopover()">
+          <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div class="ig-popover-body" id="grpIgPopBody"></div>
+    </div>
+
+    <!-- Key insights -->
+    <div class="mkt-section">
+      <div class="mkt-section-header" onclick="grpToggleSection('grpFindingsBody')">
+        <div class="mkt-section-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+          Insights Clés
+        </div>
+        <svg class="mkt-section-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="mkt-section-body" id="grpFindingsBody">
+        <div class="mkt-findings" id="grpFindings">
+          <div class="mkt-findings-empty">Les insights apparaîtront au fil des analyses</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /mkt-panel -->
+</div><!-- /mkt-layout -->
+
+<script>
+/* ── Group data from server ── */
+var GRP_AGENTS = {{ group.agents | tojson }};
+var GRP_GROUP_ID = {{ group.id | tojson }};
+var GRP_COLOR = {{ group.color | tojson }};
+var GRP_COLORS = {};
+var GRP_ROLES = {};
+GRP_AGENTS.forEach(a => { GRP_COLORS[a.id] = a.color; GRP_ROLES[a.id] = a.short_role; });
+
+var grpSessionId = null;
+var grpOriginalPrompt = '';
+var grpGraphBuilt = false;
+
+/* ── md renderer ── */
+var grpMd = typeof window.md === 'function' ? window.md : (s => s.replace(/\n/g,'<br>'));
+
+/* ── Section toggle ── */
+function grpToggleSection(id) {
+  const el = document.getElementById(id);
+  const hdr = el.previousElementSibling;
+  const toggle = hdr.querySelector('.mkt-section-toggle');
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if (toggle) { toggle.classList.toggle('open', !open); toggle.classList.toggle('closed', open); }
+}
+
+/* ── Sidebar ── */
+function grpToggleSidebar() {
+  document.getElementById('grpSidebar').classList.toggle('open');
+}
+
+/* ── Set prompt from example chip ── */
+function grpSetPrompt(txt) {
+  const inp = document.getElementById('grpInput');
+  inp.value = txt;
+  inp.dispatchEvent(new Event('input'));
+  inp.focus();
+}
+
+/* ── Auto-resize textarea ── */
+document.getElementById('grpInput').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+/* ── Add message bubble ── */
+var grpMsgCounter = 0;
+function grpAddMsg(type, agentId, agentName, content, color, avatarUrl) {
+  const placeholder = document.getElementById('grpPlaceholder');
+  if (placeholder) placeholder.remove();
+
+  const id = `grp-msg-${++grpMsgCounter}`;
+  const isUser = type === 'user';
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = `mu mu--chat ${isUser ? 'mu--user' : 'mu--agent'}`;
+
+  const icon = avatarUrl
+    ? `<img src="${avatarUrl}" alt="${agentName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+    : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+
+  if (!isUser) {
+    div.innerHTML = `
+      <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+      <div class="mu__bubble mu__bubble--agent">
+        <div class="mu__sender">
+          <span class="mu__name" style="color:${color}">${agentName}</span>
+          <span class="mu__role">${GRP_ROLES[agentId] || ''}</span>
+        </div>
+        <div class="mu__content md-rendered" id="content-${id}">${grpMd(content)}</div>
+      </div>`;
+  } else {
+    div.innerHTML = `
+      <div class="mu__bubble mu__bubble--user">
+        <div class="mu__content">${grpMd(content)}</div>
+      </div>`;
+  }
+
+  document.getElementById('grpMessages').appendChild(div);
+  document.getElementById('grpMessages').scrollTop = 99999;
+  return id;
+}
+
+/* ── Agent status ── */
+function grpSetAgentStatus(agentId, status) {
+  const node = document.getElementById(`grp-node-${agentId}`);
+  if (node) {
+    if (status === 'thinking') { node.classList.remove('active'); node.classList.add('thinking'); }
+    else if (status === 'done') { node.classList.remove('thinking'); node.classList.add('active'); }
+  }
+}
+
+/* ── Graph rendering ── */
+var GRP_NW = 130, GRP_NH = 56;
+var GRP_PATTERNS = {
+  network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
+  hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
+  report:       {color:'#ef4444', dash:'3 3',       label:'Report'},
+  bidirectional:{color:'#8b5cf6', dash:'2 4 8 4',  label:'Network'},
+};
+
+function grpBuildGraph() {
+  if (grpGraphBuilt) return;
+  const svg = document.getElementById('grpGraphSvg');
+  if (!svg) return;
+
+  // Layout: lead top-center, experts below
+  const lead = GRP_AGENTS.find(a => a.is_lead) || GRP_AGENTS[0];
+  const experts = GRP_AGENTS.filter(a => a.id !== lead.id);
+  const W = 500, H = 290;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+  const nodes = [];
+  // Lead: centered at top
+  nodes.push({id: lead.id, x: (W - GRP_NW) / 2, y: 10});
+  // Experts: distributed in a row below
+  const spacing = Math.min(120, (W - GRP_NW) / Math.max(experts.length - 1, 1));
+  const totalW = (experts.length - 1) * spacing + GRP_NW;
+  const startX = (W - totalW) / 2;
+  experts.forEach((a, i) => {
+    nodes.push({id: a.id, x: startX + i * spacing, y: i % 2 === 0 ? 130 : 190});
+  });
+
+  const edges = [];
+  // Lead -> each expert (hierarchical)
+  experts.forEach(a => edges.push({from: lead.id, to: a.id, pattern: 'hierarchical', label: 'brief'}));
+  // Experts -> lead (report)
+  experts.forEach(a => edges.push({from: a.id, to: lead.id, pattern: 'report', label: 'synthèse'}));
+  // Expert pairs (network)
+  for (let i = 0; i < experts.length - 1; i++) {
+    edges.push({from: experts[i].id, to: experts[i+1].id, pattern: 'network', label: ''});
+  }
+
+  const edgesG = document.getElementById('grpEdges');
+  const nodesG = document.getElementById('grpNodes');
+  edgesG.innerHTML = ''; nodesG.innerHTML = '';
+
+  const activePatterns = new Set();
+
+  edges.forEach(e => {
+    const fn = nodes.find(n => n.id === e.from);
+    const tn = nodes.find(n => n.id === e.to);
+    if (!fn || !tn) return;
+    const style = GRP_PATTERNS[e.pattern] || GRP_PATTERNS.network;
+    activePatterns.add(e.pattern === 'bidirectional' ? 'network' : e.pattern);
+
+    const fx=fn.x+GRP_NW/2, fy=fn.y+GRP_NH/2, tx=tn.x+GRP_NW/2, ty=tn.y+GRP_NH/2;
+    const mx=(fx+tx)/2, my=(fy+ty)/2;
+    const dx=tx-fx, dy=ty-fy, d=Math.sqrt(dx*dx+dy*dy)||1;
+    const curve = d * 0.18;
+    const cx2 = mx - dy/d*curve, cy2 = my + dx/d*curve;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', `M${fx},${fy} Q${cx2},${cy2} ${tx},${ty}`);
+    path.setAttribute('class','ig-edge');
+    path.setAttribute('id', `grp-edge-${e.from}-${e.to}`);
+    path.style.stroke = style.color;
+    const markerType = e.pattern === 'bidirectional' ? 'network' : e.pattern;
+    path.style.markerEnd = `url(#grp-arrow-${markerType})`;
+    if (style.dash) path.style.strokeDasharray = style.dash;
+    edgesG.appendChild(path);
+    if (e.label) {
+      const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+      lbl.setAttribute('class','ig-edge-label');
+      lbl.setAttribute('x', cx2); lbl.setAttribute('y', cy2);
+      lbl.style.fill = style.color;
+      lbl.textContent = e.label;
+      edgesG.appendChild(lbl);
+    }
+  });
+
+  nodes.forEach(n => {
+    const agent = GRP_AGENTS.find(a => a.id === n.id);
+    const col = agent ? agent.color : GRP_COLOR;
+    const name = agent ? agent.name : n.id;
+    const role = agent ? (agent.short_role || '') : '';
+    const avatarUrl = agent ? (agent.avatar_url || '') : '';
+
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('class','ig-node');
+    g.setAttribute('transform',`translate(${n.x},${n.y})`);
+    g.setAttribute('id', `grp-node-${n.id}`);
+
+    const avatarR=14, avatarCx=20, avatarCy=GRP_NH/2;
+    const avatarSvg = avatarUrl
+      ? `<clipPath id="grp-clip-${n.id}"><circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}"/></clipPath>
+         <image href="${avatarUrl}" x="${avatarCx-avatarR}" y="${avatarCy-avatarR}" width="${avatarR*2}" height="${avatarR*2}" clip-path="url(#grp-clip-${n.id})"/>`
+      : `<circle cx="${avatarCx}" cy="${avatarCy}" r="${avatarR}" fill="${col}" opacity="0.25"/>
+         <text x="${avatarCx}" y="${avatarCy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${name.substring(0,2)}</text>`;
+
+    g.innerHTML = `
+      <rect class="ig-node-bg" width="${GRP_NW}" height="${GRP_NH}" rx="8" ry="8"/>
+      <line class="ig-node-bar" x1="0" y1="0" x2="${GRP_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+      ${avatarSvg}
+      <text class="ig-node-name" x="40" y="22">${name.length>14?name.substring(0,13)+'…':name}</text>
+      <text class="ig-node-role" x="40" y="36">${role.length>16?role.substring(0,15)+'…':role}</text>
+      <circle class="ig-node-dot" cx="${GRP_NW-12}" cy="14" r="4" fill="${col}" opacity="0.6" id="dot-${n.id}"/>
+    `;
+    g.addEventListener('click', ev=>{ ev.stopPropagation(); grpShowPopover(n.id, ev); });
+    nodesG.appendChild(g);
+  });
+
+  // Legend
+  const legendEl = document.getElementById('grpGraphLegend');
+  legendEl.innerHTML = '';
+  activePatterns.forEach(p => {
+    const s = GRP_PATTERNS[p]; if(!s) return;
+    const item = document.createElement('div');
+    item.className = 'idea-graph-legend-item';
+    item.innerHTML = `<svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg><span>${s.label}</span>`;
+    legendEl.appendChild(item);
+  });
+
+  grpGraphBuilt = true;
+}
+
+function grpToggleGraph() {
+  const canvas = document.getElementById('grpGraphCanvas');
+  const legend = document.getElementById('grpGraphLegend');
+  const toggle = document.querySelector('.idea-graph-toggle');
+  const hidden = canvas.style.display === 'none';
+  canvas.style.display = hidden ? '' : 'none';
+  legend.style.display = hidden ? '' : 'none';
+  if(toggle) { toggle.classList.toggle('open', hidden); toggle.classList.toggle('closed', !hidden); }
+}
+
+function grpShowPopover(agentId, ev) {
+  const agent = GRP_AGENTS.find(a=>a.id===agentId); if(!agent) return;
+  const overlay = document.getElementById('grpIgOverlay');
+  const pop = document.getElementById('grpIgPopover');
+  const avatarEl = document.getElementById('grpIgPopAvatar');
+  if(agent.avatar_url){
+    avatarEl.innerHTML = `<img class="ig-popover-avatar" src="${agent.avatar_url}" alt="${agent.name}">`;
+  } else {
+    avatarEl.innerHTML = `<div class="ig-popover-avatar-fallback" style="background:${agent.color}">${agent.name.substring(0,2)}</div>`;
+  }
+  document.getElementById('grpIgPopName').textContent = agent.name;
+  document.getElementById('grpIgPopRole').textContent = agent.short_role || '';
+  let html = '';
+  if(agent.tagline) html += `<div class="ig-popover-text" style="font-style:italic;font-size:0.75rem;color:var(--text-secondary)">${agent.tagline}</div>`;
+  if(agent.description) html += `<div><div class="ig-popover-section-title">Description</div><div class="ig-popover-text">${agent.description.substring(0,300)}${agent.description.length>300?'…':''}</div></div>`;
+  document.getElementById('grpIgPopBody').innerHTML = html;
+  const vw=window.innerWidth, vh=window.innerHeight;
+  let left=ev.clientX+12, top=ev.clientY-20;
+  if(left+330>vw) left=vw-340;
+  if(top+250>vh) top=Math.max(10,vh-280);
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  overlay.classList.add('visible'); pop.classList.add('visible');
+}
+function grpClosePopover() {
+  document.getElementById('grpIgOverlay').classList.remove('visible');
+  document.getElementById('grpIgPopover').classList.remove('visible');
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') grpClosePopover(); });
+
+/* ── Add finding ── */
+function grpAddFinding(text) {
+  const container = document.getElementById('grpFindings');
+  const empty = container.querySelector('.mkt-findings-empty');
+  if (empty) empty.remove();
+  const div = document.createElement('div');
+  div.className = 'mkt-finding opportunity';
+  div.innerHTML = `<span class="mkt-finding-text">${text}</span>`;
+  container.appendChild(div);
+}
+
+/* ── SSE connection ── */
+var grpESActive = null;
+var grpStreamBuffers = {};
+var grpStreamBubbles = {};
+
+function grpConnectSSE(sessionId) {
+  if (grpESActive) { try { grpESActive.close(); } catch(e){} grpESActive = null; }
+  grpStreamBuffers = {};
+  grpStreamBubbles = {};
+
+  const es = new EventSource(`/api/sessions/${sessionId}/sse`);
+  grpESActive = es;
+
+  es.onmessage = function(e) {
+    let evt;
+    try { evt = JSON.parse(e.data); } catch { return; }
+
+    if (evt.type === 'stream_start' && evt.agent_id) {
+      grpSetAgentStatus(evt.agent_id, 'thinking');
+      const color = GRP_COLORS[evt.agent_id] || '#8b949e';
+      const agentName = evt.agent_name || GRP_AGENTS.find(a=>a.id===evt.agent_id)?.name || evt.agent_id;
+      const avatarUrl = GRP_AGENTS.find(a=>a.id===evt.agent_id)?.avatar_url || '';
+      const div = document.createElement('div');
+      const bubbleId = `grp-stream-${evt.agent_id}-${++grpMsgCounter}`;
+      grpStreamBubbles[evt.agent_id] = bubbleId;
+      const placeholder = document.getElementById('grpPlaceholder');
+      if (placeholder) placeholder.remove();
+      const icon = avatarUrl
+        ? `<img src="${avatarUrl}" alt="${agentName}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+        : `<svg class="icon icon-sm" style="color:${color}"><use href="#icon-bot"/></svg>`;
+      div.id = bubbleId;
+      div.className = 'mu mu--chat mu--agent';
+      div.innerHTML = `
+        <div class="mu__avatar" style="background:${color}20;border-color:${color}">${icon}</div>
+        <div class="mu__bubble mu__bubble--agent">
+          <div class="mu__sender">
+            <span class="mu__name" style="color:${color}">${agentName}</span>
+            <span class="mu__role">${GRP_ROLES[evt.agent_id] || ''}</span>
+          </div>
+          <div class="mu__content md-rendered" id="content-${bubbleId}">
+            <span class="typing-indicator"><span></span><span></span><span></span></span>
+          </div>
+        </div>`;
+      document.getElementById('grpMessages').appendChild(div);
+      document.getElementById('grpMessages').scrollTop = 99999;
+    }
+    else if (evt.type === 'stream_delta' && evt.agent_id) {
+      grpStreamBuffers[evt.agent_id] = (grpStreamBuffers[evt.agent_id] || '') + evt.delta;
+      const bubbleId = grpStreamBubbles[evt.agent_id];
+      const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+      if (el) {
+        el.innerHTML = grpMd(grpStreamBuffers[evt.agent_id]);
+        document.getElementById('grpMessages').scrollTop = 99999;
+      }
+    }
+    else if (evt.type === 'stream_end' && evt.agent_id) {
+      grpSetAgentStatus(evt.agent_id, 'done');
+      const bubbleId = grpStreamBubbles[evt.agent_id];
+      const el = bubbleId ? document.getElementById(`content-${bubbleId}`) : null;
+      if (el && evt.content) el.innerHTML = grpMd(evt.content);
+      // Extract insights from lead agent
+      const content = evt.content || grpStreamBuffers[evt.agent_id] || '';
+      const leadAgent = GRP_AGENTS.find(a => a.is_lead);
+      if (leadAgent && evt.agent_id === leadAgent.id && content.length > 30) {
+        const lines = content.split('\n').filter(l => l.trim().length > 30).slice(0, 3);
+        lines.forEach(l => grpAddFinding(l.trim().replace(/^[•\-\*]\s*/, '').slice(0, 140)));
+      }
+      delete grpStreamBuffers[evt.agent_id];
+      delete grpStreamBubbles[evt.agent_id];
+    }
+    else if (evt.type === 'pattern_end') {
+      es.close();
+      grpESActive = null;
+      document.getElementById('grpSend').disabled = false;
+    }
+    else if (evt.type === 'error') {
+      grpAddMsg('system', 'system', 'Système', evt.message || 'Erreur', '#ef4444', '');
+    }
+  };
+
+  es.onerror = function() {
+    if (es.readyState === EventSource.CLOSED) {
+      grpESActive = null;
+      document.getElementById('grpSend').disabled = false;
+    }
+  };
+}
+
+/* ── Send ── */
+async function grpSend() {
+  const inp = document.getElementById('grpInput');
+  const prompt = inp.value.trim();
+  if (!prompt) return;
+
+  grpOriginalPrompt = prompt;
+  const sendBtn = document.getElementById('grpSend');
+  sendBtn.disabled = true;
+
+  document.getElementById('grpFindings').innerHTML = '<div class="mkt-findings-empty">Analyse en cours…</div>';
+
+  grpBuildGraph();
+
+  grpAddMsg('user', 'user', 'Vous', prompt, '#8b949e', '');
+  inp.value = '';
+  inp.style.height = 'auto';
+
+  GRP_AGENTS.forEach(a => grpSetAgentStatus(a.id, 'idle'));
+
+  try {
+    const resp = await fetch(`/api/group/${GRP_GROUP_ID}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ prompt, session_id: grpSessionId || '' }),
+    });
+    const data = await resp.json();
+    if (data.error) {
+      grpAddMsg('system', 'system', 'Système', data.error, '#ef4444', '');
+      sendBtn.disabled = false;
+      return;
+    }
+    grpSessionId = data.session_id;
+    grpConnectSSE(grpSessionId);
+  } catch(e) {
+    grpAddMsg('system', 'system', 'Système', 'Erreur: ' + e.message, '#ef4444', '');
+    sendBtn.disabled = false;
+  }
+}
+
+/* ── Load past session ── */
+async function grpLoadSession(sessionId) {
+  grpToggleSidebar();
+  try {
+    const resp = await fetch(`/api/group/${GRP_GROUP_ID}/sessions/${sessionId}`);
+    const data = await resp.json();
+    if (data.error) return;
+
+    grpSessionId = sessionId;
+    grpOriginalPrompt = data.prompt || '';
+
+    document.getElementById('grpMessages').innerHTML = '';
+    if (data.prompt) grpAddMsg('user', 'user', 'Vous', data.prompt, '#8b949e', '');
+    document.getElementById('grpFindings').innerHTML = '<div class="mkt-findings-empty">Session rechargée</div>';
+    grpAddMsg('system', 'system', 'Système', `Session "${data.title}" chargée (${data.status})`, '#8b949e', '');
+  } catch(e) {}
+}
+
+/* ── Init graph after htmx swap ── */
+setTimeout(grpBuildGraph, 200);
+</script>

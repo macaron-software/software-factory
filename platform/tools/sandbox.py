@@ -17,6 +17,7 @@ Configuration (env vars):
   SANDBOX_TIMEOUT=300        — max execution time (seconds)
   SANDBOX_MEMORY=512m        — memory limit
 """
+
 from __future__ import annotations
 
 import logging
@@ -94,10 +95,13 @@ class SandboxExecutor:
     ) -> SandboxResult:
         """Execute command — in Docker if sandbox enabled, else direct subprocess."""
         import time
+
         t0 = time.monotonic()
 
         if SANDBOX_ENABLED:
-            result = self._run_docker(command, cwd, timeout, image, network, env, agent_id)
+            result = self._run_docker(
+                command, cwd, timeout, image, network, env, agent_id
+            )
         else:
             result = self._run_direct(command, cwd, timeout, env)
 
@@ -124,11 +128,17 @@ class SandboxExecutor:
             uid = 10000 + (hash(agent_id) % 50000)
 
         docker_cmd = [
-            "docker", "run", "--rm",
-            "--network", network,
-            "--memory", SANDBOX_MEMORY,
-            "--cpus", "2",
-            "--tmpfs", "/tmp:rw,nosuid,size=200m",
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            network,
+            "--memory",
+            SANDBOX_MEMORY,
+            "--cpus",
+            "2",
+            "--tmpfs",
+            "/tmp:rw,nosuid,size=200m",
         ]
 
         # Mount workspace: use named volume if configured (Docker-in-Docker),
@@ -144,10 +154,16 @@ class SandboxExecutor:
             else:
                 docker_cmd.extend(["-w", "/workspace"])
         else:
-            docker_cmd.extend([
-                "-v", f"{self.workspace}:/workspace",
-                "-w", f"/workspace/{os.path.relpath(workdir, self.workspace)}" if workdir != self.workspace else "/workspace",
-            ])
+            docker_cmd.extend(
+                [
+                    "-v",
+                    f"{self.workspace}:/workspace",
+                    "-w",
+                    f"/workspace/{os.path.relpath(workdir, self.workspace)}"
+                    if workdir != self.workspace
+                    else "/workspace",
+                ]
+            )
 
         # Run as non-root agent-specific user
         if uid:
@@ -218,6 +234,7 @@ class SandboxExecutor:
                 cwd=cwd or self.workspace,
                 timeout=timeout,
                 env=run_env,
+                preexec_fn=lambda: os.nice(10),  # low CPU priority
             )
             return SandboxResult(
                 stdout=r.stdout[-5000:],

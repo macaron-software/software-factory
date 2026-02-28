@@ -7,10 +7,88 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import traceback
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def _compute_quality_score(
+    session_id: str, agent_ids: list[str], phase_start_ts: float, db
+) -> float:
+    """Compute a composite quality_score from observable phase signals.
+
+    Formula (each capped at 1.0):
+      - 0.35 × tool_success_rate  (successful tool calls / total)
+      - 0.30 × commit_signal      (1.0 if ≥1 commit, 0.5 if any code_write, 0.0 otherwise)
+      - 0.25 × message_density    (log-scaled messages count: 1.0 at 20 messages)
+      - 0.10 × duration_signal    (1.0 if phase took 30–600s, less otherwise)
+    """
+    try:
+        from datetime import datetime as _dt
+
+        phase_start_iso = _dt.utcfromtimestamp(phase_start_ts).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Tool call success rate in this session during this phase
+        tc_row = db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok "
+            "FROM tool_calls WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        total_tc = int(tc_row[0] or 0)
+        ok_tc = int(tc_row[1] or 0)
+        tool_success_rate = (ok_tc / total_tc) if total_tc > 0 else 0.5
+
+        # Commit signal: did agents commit code?
+        commit_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name='git_commit' AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        code_write_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name IN ('code_write','code_edit','code_create') AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        commits = int(commit_row[0] or 0)
+        code_writes = int(code_write_row[0] or 0)
+        commit_signal = (
+            1.0
+            if commits >= 1
+            else (0.6 if code_writes >= 2 else (0.3 if code_writes >= 1 else 0.0))
+        )
+
+        # Message density: how many agent messages were exchanged
+        msg_row = db.execute(
+            "SELECT COUNT(*) FROM messages WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        msg_count = int(msg_row[0] or 0)
+        import math as _math
+
+        message_density = min(
+            1.0, _math.log(msg_count + 1) / _math.log(21)
+        )  # 1.0 at 20 messages
+
+        # Duration signal (healthy phase is 30s–600s)
+        duration = time.monotonic() - phase_start_ts
+        if 30 <= duration <= 600:
+            duration_signal = 1.0
+        elif duration < 30:
+            duration_signal = max(0.0, duration / 30)
+        else:
+            duration_signal = max(0.0, 1.0 - (duration - 600) / 1200)
+
+        score = (
+            0.35 * tool_success_rate
+            + 0.30 * commit_signal
+            + 0.25 * message_density
+            + 0.10 * duration_signal
+        )
+        return round(min(1.0, max(0.0, score)), 4)
+    except Exception:
+        return 0.0
 
 
 class MissionOrchestrator:
@@ -101,7 +179,11 @@ class MissionOrchestrator:
 
             get_event_store().emit(
                 MISSION_STARTED,
-                {"workflow": wf.id, "phases": len(mission.phases), "session_id": session_id},
+                {
+                    "workflow": wf.id,
+                    "phases": len(mission.phases),
+                    "session_id": session_id,
+                },
                 entity_type="mission",
                 entity_id=mission.id,
                 actor=self.orch_id,
@@ -117,7 +199,9 @@ class MissionOrchestrator:
 
             mgr = get_loop_manager()
             await mgr.stop_session(session_id)
-            logger.warning("ORCH stopped existing agent loops for session %s", session_id)
+            logger.warning(
+                "ORCH stopped existing agent loops for session %s", session_id
+            )
         except Exception as e:
             logger.warning("ORCH stop loops: %s", e)
 
@@ -136,11 +220,17 @@ class MissionOrchestrator:
             run_evidence_checks,
         )
 
-        wf_config = wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
-        acceptance_criteria = get_criteria_for_workflow(wf.id, wf_config, workspace=workspace)
+        wf_config = (
+            wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
+        )
+        acceptance_criteria = get_criteria_for_workflow(
+            wf.id, wf_config, workspace=workspace
+        )
         if acceptance_criteria:
             logger.warning(
-                "ORCH evidence gate: %d criteria for %s", len(acceptance_criteria), wf.id
+                "ORCH evidence gate: %d criteria for %s",
+                len(acceptance_criteria),
+                wf.id,
             )
 
         i = 0
@@ -167,7 +257,9 @@ class MissionOrchestrator:
 
             # Dynamic team resolution: pick agents from graph nodes or defaults
             if not aids and cfg.get("dynamic_team"):
-                wf_graph = (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                wf_graph = (
+                    (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                )
                 graph_nodes = wf_graph.get("nodes", [])
                 phase_agents = []
                 for gn in graph_nodes:
@@ -177,16 +269,22 @@ class MissionOrchestrator:
                             phase_agents.append(aid)
                 if phase_agents:
                     aids = phase_agents
-                    logger.warning("ORCH team for %s: %s (from graph)", wf_phase.id, aids)
+                    logger.warning(
+                        "ORCH team for %s: %s (from graph)", wf_phase.id, aids
+                    )
                 else:
                     # Fallback: assign generic dev agents
                     fallback = ["lead_dev", "lead_backend", "lead_frontend"]
-                    aids = [a for a in fallback if agent_store.get(a)][:3] or ["lead_dev"]
+                    aids = [a for a in fallback if agent_store.get(a)][:3] or [
+                        "lead_dev"
+                    ]
                     logger.warning("ORCH team for %s: %s (fallback)", wf_phase.id, aids)
 
             # Dynamic lead/reviewer resolution
             if not aids and cfg.get("dynamic_lead"):
-                wf_graph = (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                wf_graph = (
+                    (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                )
                 for gn in wf_graph.get("nodes", []):
                     if gn.get("phase") == wf_phase.id and gn.get("agent_id"):
                         aid = gn["agent_id"]
@@ -233,7 +331,9 @@ class MissionOrchestrator:
                     )
                     cdp_context = f"Workspace: {n_files} fichiers"
                     if git_log.stdout.strip():
-                        cdp_context += f" | Git: {git_log.stdout.strip().split(chr(10))[0]}"
+                        cdp_context += (
+                            f" | Git: {git_log.stdout.strip().split(chr(10))[0]}"
+                        )
                 except Exception:
                     pass
 
@@ -269,6 +369,7 @@ class MissionOrchestrator:
 
             _ss_pre = _get_ss()
             _pre_phase_msg_count = len(_ss_pre.get_messages(session_id, limit=1000))
+            _phase_start_time = time.monotonic()
 
             # Update phase status
             phase.status = PhaseStatus.RUNNING
@@ -289,7 +390,11 @@ class MissionOrchestrator:
 
                 get_event_store().emit(
                     PHASE_STARTED,
-                    {"phase_name": wf_phase.name, "pattern": pattern_type, "agents": aids},
+                    {
+                        "phase_name": wf_phase.name,
+                        "pattern": pattern_type,
+                        "agents": aids,
+                    },
                     entity_type="phase",
                     entity_id=phase.phase_id,
                     actor=self.orch_id,
@@ -314,16 +419,18 @@ class MissionOrchestrator:
             # RL Policy hook: recommend pattern adaptation before phase starts
             try:
                 from ..agents.rl_policy import get_rl_policy
+
                 _rl = get_rl_policy()
                 _rej_rate = 0.0
                 _qual = 0.0
                 try:
                     from ..db.migrations import get_db as _rldb
+
                     _db = _rldb()
                     _row = _db.execute(
                         "SELECT rejected, iterations, quality_score FROM agent_scores"
                         " WHERE epic_id=? ORDER BY iterations DESC LIMIT 1",
-                        (mission.id,)
+                        (mission.id,),
                     ).fetchone()
                     _db.close()
                     if _row and _row["iterations"] > 0:
@@ -332,10 +439,17 @@ class MissionOrchestrator:
                 except Exception:
                     pass
                 _rl_rec = _rl.recommend(
-                    wf_id=mission.workflow_id or "",
-                    phase_index=i,
-                    rejection_rate=_rej_rate,
-                    quality_score=_qual,
+                    mission_id=mission.id,
+                    phase_id=phase.phase_id,
+                    state_dict={
+                        "workflow_id": mission.workflow_id or "",
+                        "phase_idx": i,
+                        "phase_count": len(self.wf.phases)
+                        if hasattr(self, "wf") and self.wf
+                        else len(mission.phases),
+                        "rejection_pct": _rej_rate,
+                        "quality_score": _qual,
+                    },
                 )
                 if _rl_rec and _rl_rec.get("fired") and _rl_rec.get("action") != "keep":
                     _new_pattern = {
@@ -347,7 +461,9 @@ class MissionOrchestrator:
                     if _new_pattern and _new_pattern != pattern_type:
                         logger.warning(
                             "RL hook: phase=%s pattern %s→%s (conf=%.2f)",
-                            phase.phase_id, pattern_type, _new_pattern,
+                            phase.phase_id,
+                            pattern_type,
+                            _new_pattern,
                             _rl_rec.get("confidence", 0),
                         )
                         pattern_type = _new_pattern
@@ -361,7 +477,9 @@ class MissionOrchestrator:
             if not leader and aids:
                 ranked = sorted(
                     aids,
-                    key=lambda a: agent_store.get(a).hierarchy_rank if agent_store.get(a) else 50,
+                    key=lambda a: agent_store.get(a).hierarchy_rank
+                    if agent_store.get(a)
+                    else 50,
                 )
                 leader = ranked[0]
 
@@ -389,7 +507,10 @@ class MissionOrchestrator:
 
             # Sprint loop
             phase_key_check = (
-                wf_phase.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+                wf_phase.name.lower()
+                .replace(" ", "-")
+                .replace("é", "e")
+                .replace("è", "e")
             )
             is_dev_phase = (
                 "sprint" in phase_key_check
@@ -397,7 +518,7 @@ class MissionOrchestrator:
                 or "features" in phase_key_check
                 or "test" in phase_key_check
             )
-            is_retryable = (
+            _is_retryable = (
                 is_dev_phase
                 or "cicd" in phase_key_check
                 or "qa" in phase_key_check
@@ -405,7 +526,9 @@ class MissionOrchestrator:
                 or "setup" in phase_key_check
             )
             # Evidence gate only for TDD sprints (not E2E/QA which can't run tests)
-            is_evidence_gated = "sprint" in phase_key_check and "e2e" not in phase_key_check
+            is_evidence_gated = (
+                "sprint" in phase_key_check and "e2e" not in phase_key_check
+            )
             max_sprints = (
                 wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2)
                 if is_dev_phase
@@ -424,7 +547,9 @@ class MissionOrchestrator:
             current_sprint_id = None
 
             for sprint_num in range(1, max_sprints + 1):
-                sprint_label = f"Sprint {sprint_num}/{max_sprints}" if max_sprints > 1 else ""
+                sprint_label = (
+                    f"Sprint {sprint_num}/{max_sprints}" if max_sprints > 1 else ""
+                )
 
                 # SAFe: Auto-create Sprint record for dev phases
                 if is_dev_phase:
@@ -456,7 +581,8 @@ class MissionOrchestrator:
 
                 if max_sprints > 1:
                     await self._sse_orch_msg(
-                        f"Lancement {sprint_label} pour «{wf_phase.name}»", phase.phase_id
+                        f"Lancement {sprint_label} pour «{wf_phase.name}»",
+                        phase.phase_id,
                     )
                     await asyncio.sleep(0.5)
                     phase_task = _build_phase_prompt(
@@ -473,9 +599,7 @@ class MissionOrchestrator:
                         f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
                     )
                     if sprint_num == 1:
-                        phase_task += (
-                            "Focus: mise en place structure projet, première feature MVP.\n"
-                        )
+                        phase_task += "Focus: mise en place structure projet, première feature MVP.\n"
                     elif sprint_num < max_sprints:
                         phase_task += "Focus: itérez sur les features suivantes du backlog, utilisez le code existant.\n"
                     else:
@@ -487,12 +611,14 @@ class MissionOrchestrator:
                             from ..memory.manager import get_memory_manager
 
                             mem = get_memory_manager()
-                            backlog_items = mem.project_get(mission.id, category="product")
-                            arch_items = mem.project_get(mission.id, category="architecture")
+                            backlog_items = mem.project_get(
+                                mission.id, category="product"
+                            )
+                            arch_items = mem.project_get(
+                                mission.id, category="architecture"
+                            )
                             if backlog_items or arch_items:
-                                phase_task += (
-                                    "\n\n--- Backlog et architecture (phases précédentes) ---\n"
-                                )
+                                phase_task += "\n\n--- Backlog et architecture (phases précédentes) ---\n"
                                 for item in (backlog_items or [])[:5]:
                                     phase_task += f"- [Backlog] {item.get('key', '')}: {item.get('value', '')[:200]}\n"
                                 for item in (arch_items or [])[:5]:
@@ -508,7 +634,9 @@ class MissionOrchestrator:
                             pb = get_product_backlog()
                             features = pb.list_features(epic_id=mission.id)
                             if features:
-                                phase_task += "\n\n--- Features Backlog (WSJF priorité) ---\n"
+                                phase_task += (
+                                    "\n\n--- Features Backlog (WSJF priorité) ---\n"
+                                )
                                 for fi, feat in enumerate(features[:8]):
                                     status_icon = {
                                         "backlog": "⏳",
@@ -530,9 +658,11 @@ class MissionOrchestrator:
                             mem = get_memory_manager()
                             learnings = mem.global_search("retrospective sprint")
                             if learnings:
-                                phase_task += "\n\n--- Learnings des sprints précédents ---\n"
-                                for l in learnings[:3]:
-                                    phase_task += f"- {l.get('value', '')[:200]}\n"
+                                phase_task += (
+                                    "\n\n--- Learnings des sprints précédents ---\n"
+                                )
+                                for lr in learnings[:3]:
+                                    phase_task += f"- {lr.get('value', '')[:200]}\n"
                         except Exception:
                             pass
 
@@ -560,7 +690,8 @@ class MissionOrchestrator:
                                 failed_nodes = [
                                     n
                                     for n in result.nodes.values()
-                                    if n.status not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+                                    if n.status
+                                    not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
                                 ]
                                 if result.error:
                                     phase_error = result.error
@@ -687,7 +818,9 @@ class MissionOrchestrator:
                                         timeout=10,
                                     )
                                     files_changed = (
-                                        res.stdout.count("|") if res.returncode == 0 else 0
+                                        res.stdout.count("|")
+                                        if res.returncode == 0
+                                        else 0
                                     )
                                     velocity = max(1, files_changed)
                                     _ms.update_sprint_velocity(
@@ -708,7 +841,9 @@ class MissionOrchestrator:
                         remediation_msg = f"{retry_label} terminé avec des problèmes. Relance avec feedback correctif…"
                         await self._sse_orch_msg(remediation_msg, phase.phase_id)
                         await asyncio.sleep(0.8)
-                        prev_context += f"\n- REJET itération {sprint_num}: {phase_error[:500]}"
+                        prev_context += (
+                            f"\n- REJET itération {sprint_num}: {phase_error[:500]}"
+                        )
                         phase_error = ""
                         continue
                     # Max sprints exhausted — continue pipeline with issues (don't block)
@@ -717,10 +852,13 @@ class MissionOrchestrator:
                         phase.phase_id,
                     )
                     logger.warning(
-                        "Phase %s max sprints exhausted — continuing with issues", phase.phase_id
+                        "Phase %s max sprints exhausted — continuing with issues",
+                        phase.phase_id,
                     )
                     phase_success = True
-                    phase_error = f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
+                    phase_error = (
+                        f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
+                    )
                     break
 
                 # ── Evidence Gate: check acceptance criteria after dev sprints ──
@@ -729,7 +867,9 @@ class MissionOrchestrator:
                     for c in acceptance_criteria:
                         c.passed = False
                         c.detail = ""
-                    all_passed, results = run_evidence_checks(workspace, acceptance_criteria)
+                    all_passed, results = run_evidence_checks(
+                        workspace, acceptance_criteria
+                    )
                     evidence_report = format_evidence_report(results)
                     passed_count = sum(1 for c in results if c.passed)
                     total_count = len(results)
@@ -793,12 +933,15 @@ class MissionOrchestrator:
                         phase.phase_id,
                     )
                     phase_success = True  # Continue pipeline despite evidence gap
-                    phase_error = f"Evidence gate: {passed_count}/{total_count} criteria met"
+                    phase_error = (
+                        f"Evidence gate: {passed_count}/{total_count} criteria met"
+                    )
                     break
 
                 if max_sprints > 1 and sprint_num < max_sprints:
                     await self._sse_orch_msg(
-                        f"{sprint_label} terminé. Passage au sprint suivant…", phase.phase_id
+                        f"{sprint_label} terminé. Passage au sprint suivant…",
+                        phase.phase_id,
                     )
                     await asyncio.sleep(0.8)
 
@@ -841,7 +984,9 @@ class MissionOrchestrator:
                             "phase_id": phase.phase_id,
                         },
                     )
-                    await self._sse_orch_msg("Epic arrêtée — décision NOGO.", phase.phase_id)
+                    await self._sse_orch_msg(
+                        "Epic arrêtée — décision NOGO.", phase.phase_id
+                    )
                     mission.status = MissionStatus.FAILED
                     run_store.update(mission)
                     return
@@ -856,13 +1001,22 @@ class MissionOrchestrator:
                 ):
                     phase.status = PhaseStatus.DONE_WITH_ISSUES
 
-            phase_actually_done = phase.status in (PhaseStatus.DONE, PhaseStatus.DONE_WITH_ISSUES)
+            phase_actually_done = phase.status in (
+                PhaseStatus.DONE,
+                PhaseStatus.DONE_WITH_ISSUES,
+            )
             phase_success = phase_actually_done
-            logger.warning("ORCH phase=%s status=%s", phase.phase_id, phase.status.value)
+            logger.warning(
+                "ORCH phase=%s status=%s", phase.phase_id, phase.status.value
+            )
 
             # Emit event: phase completed/failed
             try:
-                from ..events.store import PHASE_COMPLETED, PHASE_FAILED, get_event_store
+                from ..events.store import (
+                    PHASE_COMPLETED,
+                    PHASE_FAILED,
+                    get_event_store,
+                )
 
                 evt = PHASE_COMPLETED if phase_success else PHASE_FAILED
                 get_event_store().emit(
@@ -918,6 +1072,82 @@ class MissionOrchestrator:
                     phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
                 phases_done += 1
 
+                # RL: record experience (phase succeeded → positive reward)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=1.0,
+                    )
+                except Exception:
+                    pass
+
+                # Record real execution outcome for GA empirical fitness + chemistry
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
+                    _db = _get_db()
+                    # Composite quality score from real phase signals
+                    _qual_val = _compute_quality_score(
+                        session_id, aids or [], _phase_start_time, _db
+                    )
+                    _db.execute(
+                        """INSERT INTO phase_outcomes
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            mission.id,
+                            mission.workflow_id or "",
+                            phase.phase_id,
+                            pattern_type,
+                            _json.dumps(aids),
+                            _json.dumps(aids),
+                            len(aids),
+                            1,
+                            _qual_val,
+                            int(_rej_val * max(1, len(aids))),
+                            round(_duration, 1),
+                            round(_duration, 1),
+                            _complexity,
+                        ),
+                    )
+                    if len(aids) >= 2:
+                        from itertools import combinations as _combos
+
+                        for _ag_a, _ag_b in _combos(sorted(aids), 2):
+                            _db.execute(
+                                """INSERT INTO agent_pair_scores
+                                   (agent_a, agent_b, co_appearances, joint_successes, joint_quality_sum, last_seen)
+                                   VALUES (?,?,1,1,?,datetime('now'))
+                                   ON CONFLICT(agent_a, agent_b) DO UPDATE SET
+                                       co_appearances = co_appearances + 1,
+                                       joint_successes = joint_successes + 1,
+                                       joint_quality_sum = joint_quality_sum + excluded.joint_quality_sum,
+                                       last_seen = excluded.last_seen""",
+                                (_ag_a, _ag_b, _qual_val),
+                            )
+                    _db.commit()
+                    _db.close()
+                except Exception:
+                    pass
+
                 summary_text = f"[{wf_phase.name}] terminée"
                 if mission.workspace_path:
                     try:
@@ -931,9 +1161,7 @@ class MissionOrchestrator:
                             timeout=5,
                         )
                         if diff_stat.stdout.strip():
-                            summary_text += (
-                                f" | Fichiers: {diff_stat.stdout.strip().split(chr(10))[-1]}"
-                            )
+                            summary_text += f" | Fichiers: {diff_stat.stdout.strip().split(chr(10))[-1]}"
                     except Exception:
                         pass
                 try:
@@ -954,6 +1182,67 @@ class MissionOrchestrator:
             else:
                 phase.summary = f"Phase échouée — {phase_error[:200]}"
                 phases_failed += 1
+                # RL: record negative experience (phase failed)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=-1.0,
+                    )
+                except Exception:
+                    pass
+                # Record failed phase outcome (success=0)
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _db = _get_db()
+                    # Composite quality score from real phase signals (even on failure)
+                    _qual_fail = _compute_quality_score(
+                        session_id, aids or [], _phase_start_time, _db
+                    )
+                    _db.execute(
+                        """INSERT INTO phase_outcomes
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            mission.id,
+                            mission.workflow_id or "",
+                            phase.phase_id,
+                            pattern_type,
+                            _json.dumps(aids),
+                            _json.dumps(aids),
+                            len(aids),
+                            0,
+                            _qual_fail,
+                            int(
+                                (_rej_rate if "_rej_rate" in dir() else 1.0)
+                                * max(1, len(aids))
+                            ),
+                            round(time.monotonic() - _phase_start_time, 1),
+                            round(time.monotonic() - _phase_start_time, 1),
+                            _complexity,
+                        ),
+                    )
+                    _db.commit()
+                    _db.close()
+                except Exception:
+                    pass
             run_store.update(mission)
 
             # Extract features from phase output into PO backlog
@@ -1056,7 +1345,9 @@ class MissionOrchestrator:
 
                     if mission.project_id:
                         on_deploy_failed(
-                            mission.project_id, mission.id, phase_error or "Deploy phase failed"
+                            mission.project_id,
+                            mission.id,
+                            phase_error or "Deploy phase failed",
                         )
                 except Exception as _fb_err:
                     logger.warning("Feedback on_deploy_failed failed: %s", _fb_err)
@@ -1077,31 +1368,46 @@ class MissionOrchestrator:
 
             # Feedback loop: track TMA fix for recurring incident detection
             if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
-                if mission.type in ("bug", "program") and mission.project_id:
+                _mission_type = getattr(mission, "type", None)
+                _mission_config = getattr(mission, "config", None) or {}
+                _mission_name = getattr(mission, "name", mission.workflow_name)
+                if mission.project_id and (
+                    _mission_type in ("bug", "program")
+                    or "tma" in mission.workflow_id.lower()
+                ):
                     try:
                         from ..missions.feedback import on_tma_incident_fixed
 
-                        incident_key = (mission.config or {}).get("incident_key", mission.name)
+                        incident_key = _mission_config.get(
+                            "incident_key", _mission_name
+                        )
                         on_tma_incident_fixed(mission.project_id, incident_key)
                     except Exception as _fb_err:
-                        logger.warning("Feedback on_tma_incident_fixed failed: %s", _fb_err)
+                        logger.warning(
+                            "Feedback on_tma_incident_fixed failed: %s", _fb_err
+                        )
 
             # CDP announces result
             if i < len(mission.phases) - 1:
                 if phase_success:
-                    cdp_msg = f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
+                    cdp_msg = (
+                        f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
+                    )
                     await self._sse_orch_msg(cdp_msg, phase.phase_id)
                     await asyncio.sleep(0.8)
                 else:
                     phase_gate = getattr(wf_phase, "gate", "always") or "always"
                     phase_key = phase.phase_id.lower() if phase.phase_id else ""
                     is_execution_phase = any(
-                        k in phase_key for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline")
+                        k in phase_key
+                        for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline")
                     )
                     is_hitl_gate = phase_gate == "all_approved" and pattern_type in (
                         "human-in-the-loop",
                     )
-                    is_blocking = phase_gate in ("all_approved", "no_veto") or is_execution_phase
+                    is_blocking = (
+                        phase_gate in ("all_approved", "no_veto") or is_execution_phase
+                    )
                     short_err = phase_error[:200] if phase_error else "erreur inconnue"
                     if is_hitl_gate:
                         cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
@@ -1151,7 +1457,9 @@ class MissionOrchestrator:
                                 else:
                                     phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
                             else:
-                                phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
+                                phase.summary = (
+                                    f"{len(aids)} agents, pattern: {pattern_type}"
+                                )
                         except Exception:
                             phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
                     await self._sse_orch_msg(cdp_msg, phase.phase_id)
@@ -1192,7 +1500,9 @@ class MissionOrchestrator:
                         )
                     except Exception as hook_err:
                         logger.warning(
-                            "Post-phase hooks timeout/error for %s: %s", phase.phase_id, hook_err
+                            "Post-phase hooks timeout/error for %s: %s",
+                            phase.phase_id,
+                            hook_err,
                         )
 
                 await _safe_hooks()  # AWAIT — don't fire-and-forget
@@ -1249,7 +1559,10 @@ class MissionOrchestrator:
                     dev_idx = None
                     for j, wp_j in enumerate(wf.phases):
                         pk_j = (
-                            wp_j.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+                            wp_j.name.lower()
+                            .replace(" ", "-")
+                            .replace("é", "e")
+                            .replace("è", "e")
                         )
                         if "sprint" in pk_j or "dev" in pk_j:
                             dev_idx = j
@@ -1284,9 +1597,7 @@ class MissionOrchestrator:
                             },
                         )
                         error_feedback = "\n".join(reloop_errors)
-                        prev_context += (
-                            f"\n\n--- RELOOP FEEDBACK (erreurs à corriger) ---\n{error_feedback}\n"
-                        )
+                        prev_context += f"\n\n--- RELOOP FEEDBACK (erreurs à corriger) ---\n{error_feedback}\n"
                         i = dev_idx
                         continue
 
@@ -1306,9 +1617,7 @@ class MissionOrchestrator:
                 if reloop_count > 0
                 else ""
             )
-            final_msg = (
-                f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
-            )
+            final_msg = f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
         else:
             # COMPLETED si au moins une phase terminée (même avec avertissements)
             # FAILED seulement si toutes les phases ont échoué sans produire de résultat
@@ -1323,7 +1632,9 @@ class MissionOrchestrator:
                 else ""
             )
             issues_info = (
-                f", {phases_with_issues} avec avertissements" if phases_with_issues > 0 else ""
+                f", {phases_with_issues} avec avertissements"
+                if phases_with_issues > 0
+                else ""
             )
             final_msg = f"Epic terminée — {phases_done} réussies{issues_info}, {phases_failed} échouées sur {total} phases{reloop_info}."
         run_store.update(mission)
@@ -1331,9 +1642,17 @@ class MissionOrchestrator:
 
         # Emit event: mission completed/failed
         try:
-            from ..events.store import MISSION_COMPLETED, MISSION_FAILED, get_event_store
+            from ..events.store import (
+                MISSION_COMPLETED,
+                MISSION_FAILED,
+                get_event_store,
+            )
 
-            evt_type = MISSION_COMPLETED if mission.status == MissionStatus.COMPLETED else MISSION_FAILED
+            evt_type = (
+                MISSION_COMPLETED
+                if mission.status == MissionStatus.COMPLETED
+                else MISSION_FAILED
+            )
             get_event_store().emit(
                 evt_type,
                 {
@@ -1352,9 +1671,18 @@ class MissionOrchestrator:
             pass
 
         try:
-            await _auto_retrospective(mission, session_id, phase_summaries, self._push_sse)
+            await _auto_retrospective(
+                mission, session_id, phase_summaries, self._push_sse
+            )
         except Exception as retro_err:
             logger.warning(f"Auto-retrospective failed: {retro_err}")
+
+        # Promote recurring project decisions to global memory
+        if mission.status == MissionStatus.COMPLETED:
+            try:
+                _promote_mission_to_global(mission)
+            except Exception as promo_err:
+                logger.warning(f"Global memory promotion failed: {promo_err}")
 
     def _build_edges(self, pattern_type: str, aids: list, leader: str) -> list:
         """Build edges for the pattern graph."""
@@ -1374,7 +1702,9 @@ class MissionOrchestrator:
 
         elif pattern_type == "sequential":
             for idx_a in range(len(aids) - 1):
-                edges.append({"from": aids[idx_a], "to": aids[idx_a + 1], "type": "sequential"})
+                edges.append(
+                    {"from": aids[idx_a], "to": aids[idx_a + 1], "type": "sequential"}
+                )
             if len(aids) > 2:
                 edges.append({"from": aids[-1], "to": aids[0], "type": "feedback"})
 
@@ -1384,7 +1714,9 @@ class MissionOrchestrator:
             workers = [
                 a
                 for a in others
-                if (self.agent_store.get(a) or type("", (), {"hierarchy_rank": 50})).hierarchy_rank
+                if (
+                    self.agent_store.get(a) or type("", (), {"hierarchy_rank": 50})
+                ).hierarchy_rank
                 >= 40
             ]
             for idx_a, a in enumerate(workers):
@@ -1428,3 +1760,45 @@ class MissionOrchestrator:
                 edges.append({"from": w, "to": dispatcher, "type": "report"})
 
         return edges
+
+
+def _promote_mission_to_global(mission) -> None:
+    """Promote high-confidence project decisions to global memory after a successful mission.
+
+    Selects entries with category in (architecture, stack, convention, decision)
+    and confidence >= 0.7, then upserts them in memory_global so they benefit
+    future projects on the same platform.
+    """
+    from ..memory.manager import get_memory_manager
+
+    project_id = getattr(mission, "project_id", "") or mission.id
+    mem = get_memory_manager()
+    # Pull high-confidence facts from this project
+    entries = mem.project_get(project_id, limit=100)
+    promotable_categories = {
+        "architecture",
+        "stack",
+        "convention",
+        "decision",
+        "pattern",
+    }
+    promoted = 0
+    for entry in entries:
+        cat = (entry.get("category") or "").lower()
+        conf = float(entry.get("confidence") or 0)
+        if cat in promotable_categories and conf >= 0.7:
+            key = entry.get("key", "")
+            value = entry.get("value", "")
+            if key and value:
+                mem.global_store(
+                    key=key,
+                    value=value[:500],
+                    category=cat,
+                    project_id=project_id,
+                    confidence=conf,
+                )
+                promoted += 1
+    if promoted:
+        logger.info(
+            "Promoted %d entries to global memory from project %s", promoted, project_id
+        )

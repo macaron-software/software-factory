@@ -8,7 +8,7 @@ import { test, expect, type Page } from "@playwright/test";
 test.describe("Ideation Flow", () => {
   test("homepage loads with navigation", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/Macaron/i);
+    await expect(page).toHaveTitle(/Software Factory/i);
     // Sidebar navigation visible
     await expect(page.locator("nav, .sidebar, .nav")).toBeVisible();
   });

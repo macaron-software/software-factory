@@ -6,12 +6,62 @@ Git branch isolation: agents commit to agent/{agent_id}/ branches, never main/ma
 
 from __future__ import annotations
 
+import os
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
+from . import rtk_run
 
 # Protected branches — agents cannot commit directly
 _PROTECTED_BRANCHES = {"main", "master", "develop", "release", "production", "staging"}
+
+# Factory keys directory (mounted in Docker: /app/.config/factory)
+_FACTORY_KEYS_DIR = os.path.expanduser("~/.config/factory")
+
+
+def _configure_git_credentials(cwd: str) -> None:
+    """Configure git credentials from GITHUB_TOKEN env var or factory keys file.
+    Sets up token-based HTTPS authentication for the current repo.
+    Called before git push to ensure credentials are available.
+    """
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        token_file = os.path.join(_FACTORY_KEYS_DIR, "github.token")
+        if os.path.exists(token_file):
+            with open(token_file) as f:
+                token = f.read().strip()
+    if not token:
+        return  # No token available, rely on existing git config (SSH keys, etc.)
+
+    # Rewrite remote URL to embed token for HTTPS auth
+    try:
+        r = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=5,
+        )
+        url = r.stdout.strip()
+        if url.startswith("https://") and "github.com" in url and "@" not in url:
+            # Inject token: https://token@github.com/...
+            authed = url.replace("https://", f"https://{token}@")
+            subprocess.run(
+                ["git", "remote", "set-url", "origin", authed],
+                cwd=cwd,
+                timeout=5,
+                check=False,
+            )
+        # Set user identity if not already configured
+        for key, val in [
+            ("user.email", "agent@software-factory.local"),
+            ("user.name", "SF Agent"),
+        ]:
+            subprocess.run(
+                ["git", "config", "--local", key, val], cwd=cwd, timeout=5, check=False
+            )
+    except Exception:
+        pass  # Non-fatal: push will fail with auth error if creds are wrong
 
 
 def _current_branch(cwd: str) -> str:
@@ -19,7 +69,10 @@ def _current_branch(cwd: str) -> str:
     try:
         r = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True, text=True, cwd=cwd, timeout=5,
+            capture_output=True,
+            text=True,
+            cwd=cwd,
+            timeout=5,
         )
         return r.stdout.strip()
     except Exception:
@@ -38,17 +91,81 @@ def _ensure_agent_branch(cwd: str, agent_id: str, session_id: str = "") -> str:
     # Check if branch exists
     check = subprocess.run(
         ["git", "rev-parse", "--verify", branch_name],
-        capture_output=True, text=True, cwd=cwd, timeout=5,
+        capture_output=True,
+        text=True,
+        cwd=cwd,
+        timeout=5,
     )
     if check.returncode == 0:
         # Branch exists, checkout
-        subprocess.run(["git", "checkout", branch_name],
-                        capture_output=True, cwd=cwd, timeout=10)
+        subprocess.run(
+            ["git", "checkout", branch_name], capture_output=True, cwd=cwd, timeout=10
+        )
     else:
         # Create new branch from current
-        subprocess.run(["git", "checkout", "-b", branch_name],
-                        capture_output=True, cwd=cwd, timeout=10)
+        subprocess.run(
+            ["git", "checkout", "-b", branch_name],
+            capture_output=True,
+            cwd=cwd,
+            timeout=10,
+        )
     return ""
+
+
+class GitInitTool(BaseTool):
+    name = "git_init"
+    description = "Initialize a git repository in the given directory (git init + initial commit if files exist)"
+    category = "git"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        cwd = params.get("cwd", ".")
+        initial_message = params.get("message", "chore: initial commit")
+        try:
+            # Check if already a git repo
+            check = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=5,
+            )
+            if check.returncode == 0:
+                return f"Already a git repository at {cwd} (branch: {_current_branch(cwd)})"
+
+            subprocess.run(["git", "init"], cwd=cwd, timeout=10, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "agent@software-factory"],
+                cwd=cwd,
+                timeout=5,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Software Factory Agent"],
+                cwd=cwd,
+                timeout=5,
+            )
+
+            # Stage and commit if there are files
+            status = subprocess.run(
+                ["git", "status", "--short"],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=5,
+            )
+            if status.stdout.strip():
+                subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True)
+                r = subprocess.run(
+                    ["git", "commit", "-m", initial_message],
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=30,
+                )
+                return f"Git initialized at {cwd}\n{r.stdout or r.stderr}".strip()
+            return f"Git initialized at {cwd} (empty repo, no files to commit)"
+        except Exception as e:
+            return f"Error: {e}"
 
 
 class GitStatusTool(BaseTool):
@@ -59,9 +176,12 @@ class GitStatusTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         cwd = params.get("cwd", ".")
         try:
-            r = subprocess.run(
+            r = rtk_run(
                 ["git", "--no-pager", "status", "--short"],
-                capture_output=True, text=True, cwd=cwd, timeout=10,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=10,
             )
             branch = _current_branch(cwd)
             status = r.stdout or "Clean working tree"
@@ -82,7 +202,7 @@ class GitDiffTool(BaseTool):
         if path:
             cmd.extend(["--", path])
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=30)
+            r = rtk_run(cmd, capture_output=True, text=True, cwd=cwd, timeout=30)
             return r.stdout[:10000] or "No changes"
         except Exception as e:
             return f"Error: {e}"
@@ -97,10 +217,19 @@ class GitLogTool(BaseTool):
         cwd = params.get("cwd", ".")
         limit = params.get("limit", 10)
         try:
-            r = subprocess.run(
-                ["git", "--no-pager", "log", f"--max-count={limit}",
-                 "--oneline", "--decorate"],
-                capture_output=True, text=True, cwd=cwd, timeout=10,
+            r = rtk_run(
+                [
+                    "git",
+                    "--no-pager",
+                    "log",
+                    f"--max-count={limit}",
+                    "--oneline",
+                    "--decorate",
+                ],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=10,
             )
             return r.stdout or "No commits"
         except Exception as e:
@@ -141,7 +270,10 @@ class GitCommitTool(BaseTool):
                 subprocess.run(["git", "add", "-A"], cwd=cwd, timeout=10, check=True)
             r = subprocess.run(
                 ["git", "commit", "-m", message],
-                capture_output=True, text=True, cwd=cwd, timeout=30,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
             )
             return (r.stdout or r.stderr) + branch_msg
         except Exception as e:
@@ -161,9 +293,16 @@ class GitPushTool(BaseTool):
             branch = _current_branch(cwd)
             if not branch:
                 return "Error: could not determine current branch"
+
+            # Configure git credentials if GITHUB_TOKEN available
+            _configure_git_credentials(cwd)
+
             r = subprocess.run(
                 ["git", "push", "--set-upstream", remote, branch],
-                capture_output=True, text=True, cwd=cwd, timeout=60,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
             )
             if r.returncode == 0:
                 return f"Pushed branch '{branch}' to {remote}.\n{r.stdout.strip()}"
@@ -192,19 +331,32 @@ class GitCreatePRTool(BaseTool):
             # Push first if not already pushed
             subprocess.run(
                 ["git", "push", "--set-upstream", "origin", branch],
-                capture_output=True, cwd=cwd, timeout=60,
+                capture_output=True,
+                cwd=cwd,
+                timeout=60,
             )
-            cmd = ["gh", "pr", "create",
-                   "--title", title,
-                   "--body", body or f"Automated fix by agent on branch `{branch}`",
-                   "--base", base]
+            cmd = [
+                "gh",
+                "pr",
+                "create",
+                "--title",
+                title,
+                "--body",
+                body or f"Automated fix by agent on branch `{branch}`",
+                "--base",
+                base,
+            ]
             r = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=60)
             if r.returncode == 0:
                 pr_url = r.stdout.strip()
                 # Fire PR notification
                 try:
                     from ..services.notifications import emit_notification
-                    from ..services.notification_service import get_notification_service, NotificationPayload
+                    from ..services.notification_service import (
+                        get_notification_service,
+                        NotificationPayload,
+                    )
+
                     agent_name = getattr(agent, "id", "agent") if agent else "agent"
                     emit_notification(
                         f"PR Created: {title}",
@@ -217,8 +369,10 @@ class GitCreatePRTool(BaseTool):
                     svc = get_notification_service()
                     if svc.is_configured:
                         import asyncio
+
                         payload = NotificationPayload(
-                            event="pr_created", title=f"PR Created: {title}",
+                            event="pr_created",
+                            title=f"PR Created: {title}",
                             message=f"{pr_url}\n\nAgent: {agent_name}",
                             severity="info",
                         )
@@ -233,6 +387,7 @@ class GitCreatePRTool(BaseTool):
                 try:
                     import asyncio
                     from ..missions.store import MissionDef, get_mission_store
+
                     pr_number = pr_url.rstrip("/").split("/")[-1]
                     ms = get_mission_store()
                     review_mission = MissionDef(
@@ -265,7 +420,9 @@ class GitCreatePRTool(BaseTool):
 
 class GitGetPRDiffTool(BaseTool):
     name = "git_get_pr_diff"
-    description = "Fetch the diff of a GitHub Pull Request for code review (by PR number or URL)"
+    description = (
+        "Fetch the diff of a GitHub Pull Request for code review (by PR number or URL)"
+    )
     category = "git"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
@@ -278,13 +435,26 @@ class GitGetPRDiffTool(BaseTool):
             pr_ref = str(pr).split("/")[-1] if "github.com" in str(pr) else str(pr)
             # Get PR metadata
             meta_r = subprocess.run(
-                ["gh", "pr", "view", pr_ref, "--json", "title,number,author,baseRefName,headRefName,body"],
-                capture_output=True, text=True, cwd=cwd, timeout=30,
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    pr_ref,
+                    "--json",
+                    "title,number,author,baseRefName,headRefName,body",
+                ],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=30,
             )
             # Get diff
             diff_r = subprocess.run(
                 ["gh", "pr", "diff", pr_ref],
-                capture_output=True, text=True, cwd=cwd, timeout=60,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
             )
             if diff_r.returncode != 0:
                 return f"Error fetching PR diff: {diff_r.stderr.strip()[:300]}"
@@ -292,7 +462,10 @@ class GitGetPRDiffTool(BaseTool):
             # Truncate large diffs
             MAX = 12000
             if len(diff) > MAX:
-                diff = diff[:MAX] + f"\n\n... [diff truncated at {MAX} chars — {len(diff_r.stdout)} total] ..."
+                diff = (
+                    diff[:MAX]
+                    + f"\n\n... [diff truncated at {MAX} chars — {len(diff_r.stdout)} total] ..."
+                )
             meta = meta_r.stdout if meta_r.returncode == 0 else ""
             return f"PR #{pr_ref} metadata:\n{meta}\n\nDiff:\n{diff}"
         except FileNotFoundError:
@@ -325,7 +498,10 @@ class GitPostPRReviewTool(BaseTool):
             pr_ref = str(pr).split("/")[-1] if "github.com" in str(pr) else str(pr)
             r = subprocess.run(
                 ["gh", "pr", "review", pr_ref, event_flag, "--body", body],
-                capture_output=True, text=True, cwd=cwd, timeout=60,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
             )
             if r.returncode == 0:
                 return f"Review posted on PR #{pr_ref} ({event})"
@@ -338,6 +514,7 @@ class GitPostPRReviewTool(BaseTool):
 
 def register_git_tools(registry):
     """Register all git tools."""
+    registry.register(GitInitTool())
     registry.register(GitStatusTool())
     registry.register(GitDiffTool())
     registry.register(GitLogTool())

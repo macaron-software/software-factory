@@ -18,12 +18,13 @@ Usage:
     c.track_anonymization("email", 3)
     snapshot = c.snapshot()
 """
+
 from __future__ import annotations
 
 import threading
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -68,9 +69,17 @@ class MetricsCollector:
         self._endpoint_latencies: dict[str, list[float]] = defaultdict(list)
         self._max_latencies = 200  # keep last 200 per endpoint
 
+        # rtk (Rust Token Killer) savings tracking
+        # https://github.com/rtk-ai/rtk
+        self._rtk_calls: int = 0
+        self._rtk_bytes_raw: int = 0
+        self._rtk_bytes_compressed: int = 0
+
     # ── HTTP Tracking ──
 
-    def track_request(self, method: str, path: str, status_code: int, duration_ms: float):
+    def track_request(
+        self, method: str, path: str, status_code: int, duration_ms: float
+    ):
         prefix = _path_prefix(path)
         with self._lock:
             c = self._http[(method, prefix)]
@@ -87,7 +96,9 @@ class MetricsCollector:
             key = f"{method} {prefix}"
             self._endpoint_latencies[key].append(duration_ms)
             if len(self._endpoint_latencies[key]) > self._max_latencies:
-                self._endpoint_latencies[key] = self._endpoint_latencies[key][-self._max_latencies:]
+                self._endpoint_latencies[key] = self._endpoint_latencies[key][
+                    -self._max_latencies :
+                ]
 
     # ── MCP Tracking ──
 
@@ -120,8 +131,14 @@ class MetricsCollector:
 
     # ── LLM Cost Tracking ──
 
-    def track_llm_cost(self, provider: str, model: str, cost_usd: float,
-                       tokens_in: int = 0, tokens_out: int = 0):
+    def track_llm_cost(
+        self,
+        provider: str,
+        model: str,
+        cost_usd: float,
+        tokens_in: int = 0,
+        tokens_out: int = 0,
+    ):
         key = f"{provider}/{model}"
         with self._lock:
             d = self._llm_costs[key]
@@ -129,6 +146,15 @@ class MetricsCollector:
             d["cost_usd"] += cost_usd
             d["tokens_in"] += tokens_in
             d["tokens_out"] += tokens_out
+
+    # ── rtk Savings Tracking ──
+
+    def track_rtk_call(self, bytes_raw: int, bytes_compressed: int):
+        """Track one rtk-wrapped command: original vs compressed output size."""
+        with self._lock:
+            self._rtk_calls += 1
+            self._rtk_bytes_raw += bytes_raw
+            self._rtk_bytes_compressed += bytes_compressed
 
     # ── Snapshot ──
 
@@ -140,11 +166,15 @@ class MetricsCollector:
             # HTTP
             top_endpoints = sorted(
                 [
-                    (ep, len(lats), round(sum(lats)/len(lats), 1),
-                     round(sorted(lats)[int(len(lats)*0.95)] if lats else 0, 1))
+                    (
+                        ep,
+                        len(lats),
+                        round(sum(lats) / len(lats), 1),
+                        round(sorted(lats)[int(len(lats) * 0.95)] if lats else 0, 1),
+                    )
                     for ep, lats in self._endpoint_latencies.items()
                 ],
-                key=lambda x: -x[1]
+                key=lambda x: -x[1],
             )[:15]
             http_by_status = dict(sorted(self._http_status.items()))
             # 4xx vs 5xx breakdown
@@ -166,8 +196,10 @@ class MetricsCollector:
 
             # LLM costs
             llm_by_provider = {
-                k: dict(v) for k, v in
-                sorted(self._llm_costs.items(), key=lambda x: -x[1]["cost_usd"])
+                k: dict(v)
+                for k, v in sorted(
+                    self._llm_costs.items(), key=lambda x: -x[1]["cost_usd"]
+                )
             }
             total_llm_cost = sum(v["cost_usd"] for v in self._llm_costs.values())
 
@@ -178,7 +210,11 @@ class MetricsCollector:
                     "total_errors": self._http_total.errors,
                     "errors_4xx": errors_4xx,
                     "errors_5xx": errors_5xx,
-                    "avg_ms": round(self._http_total.total_ms / self._http_total.count, 1) if self._http_total.count else 0,
+                    "avg_ms": round(
+                        self._http_total.total_ms / self._http_total.count, 1
+                    )
+                    if self._http_total.count
+                    else 0,
                     "by_status": http_by_status,
                     "top_endpoints": [
                         {"endpoint": ep, "hits": hits, "avg_ms": avg, "p95_ms": p95}
@@ -188,7 +224,9 @@ class MetricsCollector:
                 "mcp": {
                     "total_calls": self._mcp_total.count,
                     "total_errors": self._mcp_total.errors,
-                    "avg_ms": round(self._mcp_total.total_ms / self._mcp_total.count, 1) if self._mcp_total.count else 0,
+                    "avg_ms": round(self._mcp_total.total_ms / self._mcp_total.count, 1)
+                    if self._mcp_total.count
+                    else 0,
                     "by_tool": mcp_tools,
                 },
                 "anonymization": {
@@ -202,6 +240,22 @@ class MetricsCollector:
                 "llm_costs": {
                     "total_usd": round(total_llm_cost, 4),
                     "by_provider": llm_by_provider,
+                },
+                "rtk": {
+                    "calls": self._rtk_calls,
+                    "bytes_raw": self._rtk_bytes_raw,
+                    "bytes_compressed": self._rtk_bytes_compressed,
+                    "bytes_saved": self._rtk_bytes_raw - self._rtk_bytes_compressed,
+                    "ratio_pct": round(
+                        100 * (1 - self._rtk_bytes_compressed / self._rtk_bytes_raw), 1
+                    )
+                    if self._rtk_bytes_raw > 0
+                    else 0,
+                    # Estimated tokens saved at ~4 chars/token
+                    "tokens_saved_est": (
+                        self._rtk_bytes_raw - self._rtk_bytes_compressed
+                    )
+                    // 4,
                 },
             }
 

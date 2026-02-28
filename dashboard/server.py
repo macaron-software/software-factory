@@ -20,14 +20,12 @@ import sqlite3
 import subprocess
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
 from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 # Add parent to path for imports
@@ -38,6 +36,16 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 PROJECTS_DIR = BASE_DIR / "projects"
 PID_DIR = Path("/tmp/factory")
+
+# Load .env if present (for AZURE_PLATFORM_URL, OVH_PLATFORM_URL, etc.)
+_env_file = BASE_DIR / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            if _k.strip() not in os.environ:
+                os.environ[_k.strip()] = _v.strip().strip('"').strip("'")
 
 # FastAPI app
 app = FastAPI(title="Software Factory Dashboard", version="1.0.0")
@@ -63,6 +71,7 @@ def _cache_set(key: str, value, ttl: float):
 
 def cached(ttl: float):
     """Decorator: cache the return value for `ttl` seconds. Sync functions only."""
+
     def decorator(fn):
         def wrapper(*args):
             key = fn.__name__ + str(args)
@@ -72,14 +81,17 @@ def cached(ttl: float):
             result = fn(*args)
             _cache_set(key, result, ttl)
             return result
+
         wrapper.__name__ = fn.__name__
         return wrapper
+
     return decorator
 
 
 # ============================================================================
 # DATABASE HELPERS
 # ============================================================================
+
 
 def get_db(db_name: str = "factory.db") -> sqlite3.Connection:
     """Get database connection."""
@@ -88,28 +100,143 @@ def get_db(db_name: str = "factory.db") -> sqlite3.Connection:
     return conn
 
 
+# ============================================================================
+# DEPLOY STATUS (Azure Prod + OVH Demo)
+# ============================================================================
+
+_ENVS = [
+    {
+        "name": "Azure Prod",
+        "key": "azure",
+        "url": os.environ.get("AZURE_PLATFORM_URL", ""),
+        "ssh_host": os.environ.get("AZURE_SSH_HOST", ""),
+        "ssh_user": os.environ.get("AZURE_SSH_USER", "macaron"),
+    },
+    {
+        "name": "OVH Demo",
+        "key": "ovh",
+        "url": os.environ.get("OVH_PLATFORM_URL", ""),
+        "ssh_host": os.environ.get("OVH_SSH_HOST", ""),
+        "ssh_user": os.environ.get("OVH_SSH_USER", "debian"),
+    },
+]
+
+
+@cached(ttl=30)
+def _get_deploy_status() -> List[Dict]:
+    """Check health of each remote environment (non-blocking, 3s timeout)."""
+    import urllib.request
+    import urllib.error
+
+    results = []
+    local_sha = ""
+    try:
+        local_sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(BASE_DIR),
+            text=True,
+            timeout=3,
+        ).strip()
+    except Exception:
+        pass
+
+    for env in _ENVS:
+        entry: Dict[str, Any] = {
+            "name": env["name"],
+            "key": env["key"],
+            "url": env["url"],
+            "status": "unknown",
+            "version": "",
+            "local_version": local_sha,
+            "up_to_date": None,
+            "ssh_ok": False,
+        }
+        if not env["url"]:
+            entry["status"] = "not_configured"
+            results.append(entry)
+            continue
+        # HTTP health check
+        try:
+            req = urllib.request.Request(
+                env["url"].rstrip("/") + "/api/health",
+                headers={"User-Agent": "SF-Dashboard/1.0"},
+            )
+            with urllib.request.urlopen(req, timeout=3) as resp:
+                if resp.status == 200:
+                    entry["status"] = "online"
+                    try:
+                        data = json.loads(resp.read().decode())
+                        entry["version"] = data.get("version", "")
+                        if local_sha and entry["version"]:
+                            entry["up_to_date"] = entry["version"].startswith(local_sha)
+                    except Exception:
+                        pass
+                else:
+                    entry["status"] = "error"
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403):
+                entry["status"] = "online"  # Auth required = server is up
+            else:
+                entry["status"] = "error"
+        except Exception:
+            entry["status"] = "offline"
+        # SSH check (quick)
+        if env["ssh_host"]:
+            try:
+                result = subprocess.run(
+                    [
+                        "ssh",
+                        "-o",
+                        "ConnectTimeout=2",
+                        "-o",
+                        "BatchMode=yes",
+                        f"{env['ssh_user']}@{env['ssh_host']}",
+                        "echo ok",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=4,
+                )
+                entry["ssh_ok"] = result.returncode == 0
+            except Exception:
+                entry["ssh_ok"] = False
+        results.append(entry)
+    return results
+
+
 @cached(ttl=15)
 def get_project_stats(project_id: str) -> Dict[str, int]:
     """Get task statistics for a project."""
     with get_db() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT status, COUNT(*) as cnt
             FROM tasks
             WHERE project_id = ?
             GROUP BY status
-        """, (project_id,)).fetchall()
+        """,
+            (project_id,),
+        ).fetchall()
 
     stats = {row["status"]: row["cnt"] for row in rows}
     return {
         "deployed": stats.get("deployed", 0),
         "pending": stats.get("pending", 0),
-        "in_progress": sum(stats.get(s, 0) for s in [
-            "tdd_in_progress", "build_in_progress", "deploying_staging",
-            "deploying_prod", "code_written", "locked"
-        ]),
-        "failed": sum(stats.get(s, 0) for s in [
-            "build_failed", "tdd_failed", "integration_failed"
-        ]),
+        "in_progress": sum(
+            stats.get(s, 0)
+            for s in [
+                "tdd_in_progress",
+                "build_in_progress",
+                "deploying_staging",
+                "deploying_prod",
+                "code_written",
+                "locked",
+            ]
+        ),
+        "failed": sum(
+            stats.get(s, 0)
+            for s in ["build_failed", "tdd_failed", "integration_failed"]
+        ),
         "completed": stats.get("completed", 0),
         "decomposed": stats.get("decomposed", 0),
         "total": sum(stats.values()),
@@ -136,20 +263,32 @@ def get_global_stats() -> Dict[str, int]:
         "deployed": deployed,
         "completed": completed,
         "pending": stats.get("pending", 0),
-        "in_progress": sum(stats.get(s, 0) for s in [
-            "tdd_in_progress", "build_in_progress", "deploying_staging",
-            "deploying_prod", "code_written", "locked", "queued_for_deploy"
-        ]),
-        "failed": sum(stats.get(s, 0) for s in [
-            "build_failed", "tdd_failed", "integration_failed"
-        ]),
-        "success_pct": round((deployed + completed) / total * 100, 1) if total > 0 else 0,
+        "in_progress": sum(
+            stats.get(s, 0)
+            for s in [
+                "tdd_in_progress",
+                "build_in_progress",
+                "deploying_staging",
+                "deploying_prod",
+                "code_written",
+                "locked",
+                "queued_for_deploy",
+            ]
+        ),
+        "failed": sum(
+            stats.get(s, 0)
+            for s in ["build_failed", "tdd_failed", "integration_failed"]
+        ),
+        "success_pct": round((deployed + completed) / total * 100, 1)
+        if total > 0
+        else 0,
     }
 
 
 # ============================================================================
 # PROJECT HELPERS
 # ============================================================================
+
 
 @cached(ttl=60)
 def load_project_config(project_id: str) -> Optional[Dict]:
@@ -183,17 +322,43 @@ def get_all_projects() -> List[Dict]:
         # Get domains from config
         domains = list(config.get("domains", {}).keys())
 
-        projects.append({
-            "id": project_id,
-            "name": project_config.get("name", project_id),
-            "display_name": project_config.get("display_name", project_id),
-            "root_path": project_config.get("root_path", ""),
-            "stats": stats,
-            "daemons": daemon_status,
-            "domains": domains,
-            "running": daemon_status.get("cycle", {}).get("running", False),
-            "workers": get_worker_count(project_id),
-        })
+        # Load arch_domain badge
+        arch_domain_id = project_config.get("domain", "")
+        arch_domain_label = ""
+        arch_domain_color = "#6B7280"
+        if arch_domain_id:
+            try:
+                import sys
+                import os
+
+                _sf_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                if _sf_root not in sys.path:
+                    sys.path.insert(0, _sf_root)
+                from platform.projects.domains import load_domain
+
+                d = load_domain(arch_domain_id)
+                if d:
+                    arch_domain_label = d.name
+                    arch_domain_color = d.color
+            except Exception:
+                arch_domain_label = arch_domain_id
+
+        projects.append(
+            {
+                "id": project_id,
+                "name": project_config.get("name", project_id),
+                "display_name": project_config.get("display_name", project_id),
+                "root_path": project_config.get("root_path", ""),
+                "stats": stats,
+                "daemons": daemon_status,
+                "domains": domains,
+                "running": daemon_status.get("cycle", {}).get("running", False),
+                "workers": get_worker_count(project_id),
+                "arch_domain": arch_domain_id,
+                "arch_domain_label": arch_domain_label,
+                "arch_domain_color": arch_domain_color,
+            }
+        )
 
     # Sort by running first, then by deployed count
     projects.sort(key=lambda p: (-p["running"], -p["stats"]["deployed"]))
@@ -203,6 +368,7 @@ def get_all_projects() -> List[Dict]:
 # ============================================================================
 # DAEMON HELPERS
 # ============================================================================
+
 
 def check_pid_running(pid: int) -> bool:
     """Check if a PID is running."""
@@ -242,7 +408,10 @@ def get_daemon_status(project_id: str) -> Dict[str, Dict]:
                 try:
                     pid = int(pid_file.read_text().strip())
                     running = check_pid_running(pid)
-                    daemons[daemon_type] = {"running": running, "pid": pid if running else None}
+                    daemons[daemon_type] = {
+                        "running": running,
+                        "pid": pid if running else None,
+                    }
                     found = True
                     break
                 except (ValueError, FileNotFoundError):
@@ -262,7 +431,7 @@ def get_worker_count(project_id: str) -> int:
             ["pgrep", "-f", f"opencode.*{project_id}"],
             capture_output=True,
             text=True,
-            timeout=2
+            timeout=2,
         )
         if result.returncode == 0:
             return len(result.stdout.strip().split("\n"))
@@ -274,6 +443,7 @@ def get_worker_count(project_id: str) -> int:
 # ============================================================================
 # METRICS HELPERS
 # ============================================================================
+
 
 @cached(ttl=30)
 def get_metrics(project_id: str) -> Dict:
@@ -294,14 +464,17 @@ def get_metrics(project_id: str) -> Dict:
         metrics = {}
         for layer in ["l0", "l1_code", "l1_security", "l2_arch"]:
             placeholders = ",".join("?" * len(project_names))
-            row = conn.execute(f"""
+            row = conn.execute(
+                f"""
                 SELECT
                     COUNT(*) as total,
                     SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) as rejected,
                     SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved
                 FROM critic_metrics
                 WHERE project_id IN ({placeholders}) AND layer = ?
-            """, (*project_names, layer)).fetchone()
+            """,
+                (*project_names, layer),
+            ).fetchone()
 
             total = row["total"] or 0
             rejected = row["rejected"] or 0
@@ -314,16 +487,21 @@ def get_metrics(project_id: str) -> Dict:
 
         # Final approved
         placeholders = ",".join("?" * len(project_names))
-        final = conn.execute(f"""
+        final = conn.execute(
+            f"""
             SELECT COUNT(*) as cnt FROM critic_metrics
             WHERE project_id IN ({placeholders}) AND layer = 'final' AND result = 'approved'
-        """, project_names).fetchone()
+        """,
+            project_names,
+        ).fetchone()
 
         total_started = metrics["l0"]["total"]
         final_approved = final["cnt"] or 0
         metrics["final"] = {
             "approved": final_approved,
-            "success_rate": round(final_approved / total_started * 100, 1) if total_started > 0 else 0,
+            "success_rate": round(final_approved / total_started * 100, 1)
+            if total_started > 0
+            else 0,
         }
 
     return metrics
@@ -332,6 +510,7 @@ def get_metrics(project_id: str) -> Dict:
 # ============================================================================
 # TASKS HELPERS
 # ============================================================================
+
 
 def get_tasks(
     project_id: Optional[str] = None,
@@ -368,6 +547,7 @@ def get_tasks(
 # ============================================================================
 # API ENDPOINTS
 # ============================================================================
+
 
 @app.get("/api/projects")
 async def api_projects(response: Response):
@@ -411,13 +591,18 @@ async def api_metrics(project_id: str, response: Response):
     return await asyncio.to_thread(get_metrics, project_id)
 
 
+@app.get("/api/deploy/status")
+async def api_deploy_status():
+    """Get live deploy status for all environments."""
+    return await asyncio.to_thread(_get_deploy_status)
+
+
 @app.get("/api/daemons")
 async def api_daemons():
     """Get all daemon statuses."""
     result = {}
     project_ids = [
-        f.stem for f in PROJECTS_DIR.glob("*.yaml")
-        if not f.name.startswith("_")
+        f.stem for f in PROJECTS_DIR.glob("*.yaml") if not f.name.startswith("_")
     ]
     statuses = await asyncio.gather(
         *[asyncio.to_thread(get_daemon_status, pid) for pid in project_ids]
@@ -443,7 +628,10 @@ async def api_daemon_start(project_id: str, daemon: str):
             stderr=subprocess.DEVNULL,
         )
         await asyncio.sleep(1)
-        return {"success": True, "status": get_daemon_status(project_id).get(daemon, {})}
+        return {
+            "success": True,
+            "status": get_daemon_status(project_id).get(daemon, {}),
+        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -458,7 +646,10 @@ async def api_daemon_stop(project_id: str, daemon: str):
         cmd = f"python3 cli/factory.py {project_id} {daemon} stop"
         subprocess.run(cmd, shell=True, cwd=str(BASE_DIR), timeout=10)
         await asyncio.sleep(1)
-        return {"success": True, "status": get_daemon_status(project_id).get(daemon, {})}
+        return {
+            "success": True,
+            "status": get_daemon_status(project_id).get(daemon, {}),
+        }
     except Exception as e:
         return {"error": str(e)}
 
@@ -497,7 +688,9 @@ async def api_logs_stream(project_id: str):
         # Then tail for new lines
         try:
             process = await asyncio.create_subprocess_exec(
-                "tail", "-f", str(log_file),
+                "tail",
+                "-f",
+                str(log_file),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -522,6 +715,7 @@ async def api_logs_stream(project_id: str):
 # HTML PAGES
 # ============================================================================
 
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Dashboard home page."""
@@ -529,11 +723,39 @@ async def home(request: Request):
         asyncio.to_thread(get_global_stats),
         asyncio.to_thread(get_all_projects),
     )
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "stats": stats,
-        "projects": projects,
-    })
+    # Load Azure / OVH deploy status (non-blocking, cached)
+    deploy_status = await asyncio.to_thread(_get_deploy_status)
+
+    # Group projects by domain
+    domain_groups: dict[str, dict] = {}
+    for p in projects:
+        key = p.get("arch_domain") or "_none"
+        label = p.get("arch_domain_label") or "Sans domaine"
+        color = p.get("arch_domain_color") or "#6B7280"
+        if key not in domain_groups:
+            domain_groups[key] = {
+                "id": key,
+                "label": label,
+                "color": color,
+                "projects": [],
+            }
+        domain_groups[key]["projects"].append(p)
+    # Sort groups: known domains first (alphabetically), then _none last
+    sorted_groups = sorted(
+        domain_groups.values(),
+        key=lambda g: ("z" if g["id"] == "_none" else g["label"]),
+    )
+
+    return templates.TemplateResponse(
+        "index.html",
+        {
+            "request": request,
+            "stats": stats,
+            "projects": projects,
+            "domain_groups": sorted_groups,
+            "deploy_status": deploy_status,
+        },
+    )
 
 
 @app.get("/project/{project_id}", response_class=HTMLResponse)
@@ -549,15 +771,18 @@ async def project_page(request: Request, project_id: str):
         asyncio.to_thread(get_metrics, project_id),
         asyncio.to_thread(get_tasks, project_id, None, None, 100),
     )
-    return templates.TemplateResponse("project.html", {
-        "request": request,
-        "project_id": project_id,
-        "config": config,
-        "stats": stats,
-        "daemons": daemons,
-        "metrics": metrics,
-        "tasks": tasks,
-    })
+    return templates.TemplateResponse(
+        "project.html",
+        {
+            "request": request,
+            "project_id": project_id,
+            "config": config,
+            "stats": stats,
+            "daemons": daemons,
+            "metrics": metrics,
+            "tasks": tasks,
+        },
+    )
 
 
 @app.get("/tasks", response_class=HTMLResponse)
@@ -571,25 +796,131 @@ async def tasks_page(
         asyncio.to_thread(get_all_projects),
         asyncio.to_thread(get_tasks, project, status, None, 100),
     )
-    return templates.TemplateResponse("tasks.html", {
-        "request": request,
-        "projects": projects,
-        "tasks": tasks,
-        "filter_project": project,
-        "filter_status": status,
-    })
+    return templates.TemplateResponse(
+        "tasks.html",
+        {
+            "request": request,
+            "projects": projects,
+            "tasks": tasks,
+            "filter_project": project,
+            "filter_status": status,
+        },
+    )
+
+
+# ============================================================================
+# LIVE ACTIVITY FEED
+# ============================================================================
+
+
+def _get_live_activity(since_ts: str | None = None) -> dict:
+    """Fetch recent platform activity from platform.db."""
+    db_path = DATA_DIR / "platform.db"
+    if not db_path.exists():
+        return {"tool_calls": [], "messages": [], "llm_cost": 0.0, "active_agents": []}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        # Default: last 30 seconds
+        if not since_ts:
+            since_ts = (
+                __import__("datetime").datetime.utcnow()
+                - __import__("datetime").timedelta(seconds=30)
+            ).strftime("%Y-%m-%d %H:%M:%S")
+
+        tool_calls = conn.execute(
+            "SELECT agent_id, tool_name, success, timestamp FROM tool_calls "
+            "WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 50",
+            (since_ts,),
+        ).fetchall()
+
+        messages = conn.execute(
+            "SELECT from_agent, to_agent, substr(content,1,120) as preview, timestamp "
+            "FROM messages WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 30",
+            (since_ts,),
+        ).fetchall()
+
+        # Active agents (sessions active last 5 min)
+        active = conn.execute(
+            "SELECT DISTINCT from_agent as agent_id FROM messages "
+            "WHERE timestamp >= datetime('now','-5 minutes') LIMIT 20",
+        ).fetchall()
+
+        # LLM cost (last hour)
+        cost_row = conn.execute(
+            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= datetime('now','-1 hour')",
+        ).fetchone()
+        cost = float(cost_row[0] or 0.0)
+
+        # Commits (today)
+        commits = conn.execute(
+            "SELECT agent_id, tool_name, timestamp FROM tool_calls "
+            "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
+        ).fetchall()
+
+        conn.close()
+        return {
+            "tool_calls": [dict(r) for r in tool_calls],
+            "messages": [dict(r) for r in messages],
+            "commits": [dict(r) for r in commits],
+            "active_agents": [r["agent_id"] for r in active],
+            "llm_cost_last_hour": round(cost, 4),
+        }
+    except Exception as e:
+        return {"error": str(e), "tool_calls": [], "messages": [], "active_agents": []}
+
+
+@app.get("/api/live/stream")
+async def live_stream(since: str | None = None):
+    """SSE stream of live platform activity (tool calls, messages, commits)."""
+    import json as _json
+
+    async def generate():
+        _since = since
+        while True:
+            try:
+                data = await asyncio.to_thread(_get_live_activity, _since)
+                # Update cursor to now
+                _since = (
+                    __import__("datetime")
+                    .datetime.utcnow()
+                    .strftime("%Y-%m-%d %H:%M:%S")
+                )
+
+                if data.get("tool_calls") or data.get("messages"):
+                    yield f"event: activity\ndata: {_json.dumps(data)}\n\n"
+                else:
+                    yield ": ping\n\n"
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                yield f"event: error\ndata: {_json.dumps({'error': str(e)})}\n\n"
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/live", response_class=HTMLResponse)
+async def live_page(request: Request):
+    """Live activity feed page."""
+    return templates.TemplateResponse("live.html", {"request": request})
 
 
 # ============================================================================
 # MAIN
 # ============================================================================
 
+
 def main():
     """Run the dashboard server."""
     import uvicorn
 
     port = int(os.environ.get("PORT", 8080))
-    print(f"\n🏭 Software Factory Dashboard")
+    print("\n🏭 Software Factory Dashboard")
     print(f"   http://localhost:{port}\n")
 
     uvicorn.run(

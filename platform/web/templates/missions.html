@@ -82,7 +82,7 @@
         </div>
         <div class="item-meta">
             <span class="item-badge">{{ m.sprint_count }} sprint{{ 's' if m.sprint_count != 1 }}</span>
-            <span class="item-badge muted">{{ m.mission.created_at[:10] }}</span>
+            <span class="item-badge muted">{{ m.mission.created_at | ts('date') }}</span>
         </div>
     </a>
     {% else %}

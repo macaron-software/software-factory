@@ -153,6 +153,16 @@
             {% endfor %}
         </div>
 
+        <!-- Agent step activity panel (live, polls every 4s when session active) -->
+        {% if session.status == 'active' %}
+        <div id="agent-activity"
+             hx-get="/api/sessions/{{ session.id }}/checkpoints"
+             hx-trigger="load, every 4s"
+             hx-swap="innerHTML"
+             style="margin-top:0.5rem">
+        </div>
+        {% endif %}
+
         <!-- Log entries -->
         <div id="log-entries" class="conv-log-entries">
             {% for msg in messages %}

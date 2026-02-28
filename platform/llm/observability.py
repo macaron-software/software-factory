@@ -12,11 +12,10 @@ Usage:
     tracer.trace_call(provider="minimax", model="MiniMax-M2.5", ...)
     stats = tracer.stats()
 """
+
 from __future__ import annotations
 
 import logging
-import os
-import time
 import uuid
 from dataclasses import dataclass
 from typing import Optional
@@ -130,24 +129,49 @@ class LLMTracer:
         cost = _estimate_cost(model, tokens_in, tokens_out)
 
         conn = get_db()
-        conn.execute("""
+        conn.execute(
+            """
             INSERT INTO llm_traces
             (id, provider, model, agent_id, session_id, mission_id,
              tokens_in, tokens_out, duration_ms, cost_usd,
              status, error, input_preview, output_preview)
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        """, (trace_id, provider, model, agent_id, session_id, mission_id,
-              tokens_in, tokens_out, duration_ms, cost,
-              status, error, input_preview[:500], output_preview[:500]))
+        """,
+            (
+                trace_id,
+                provider,
+                model,
+                agent_id,
+                session_id,
+                mission_id,
+                tokens_in,
+                tokens_out,
+                duration_ms,
+                cost,
+                status,
+                error,
+                input_preview[:500],
+                output_preview[:500],
+            ),
+        )
         conn.commit()
         conn.close()
 
-        logger.info("LLM trace %s: %s/%s %din/%dout $%.4f %dms",
-                     trace_id, provider, model, tokens_in, tokens_out, cost, duration_ms)
+        logger.info(
+            "LLM trace %s: %s/%s %din/%dout $%.4f %dms",
+            trace_id,
+            provider,
+            model,
+            tokens_in,
+            tokens_out,
+            cost,
+            duration_ms,
+        )
 
         # Feed metrics collector
         try:
             from ..metrics.collector import get_collector
+
             get_collector().track_llm_cost(provider, model, cost, tokens_in, tokens_out)
         except Exception:
             pass
@@ -163,7 +187,8 @@ class LLMTracer:
             where += " AND session_id = ?"
             params.append(session_id)
 
-        row = conn.execute(f"""
+        row = conn.execute(
+            f"""
             SELECT
                 COUNT(*) as total_calls,
                 COALESCE(SUM(tokens_in), 0) as total_tokens_in,
@@ -172,9 +197,12 @@ class LLMTracer:
                 COALESCE(AVG(duration_ms), 0) as avg_duration_ms,
                 COALESCE(SUM(CASE WHEN status='error' THEN 1 ELSE 0 END), 0) as error_count
             FROM llm_traces {where}
-        """, params).fetchone()
+        """,
+            params,
+        ).fetchone()
 
-        by_provider = conn.execute(f"""
+        by_provider = conn.execute(
+            f"""
             SELECT provider, model,
                    COUNT(*) as calls,
                    SUM(tokens_in) as tokens_in,
@@ -184,9 +212,12 @@ class LLMTracer:
             FROM llm_traces {where}
             GROUP BY provider, model
             ORDER BY calls DESC
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
 
-        by_agent = conn.execute(f"""
+        by_agent = conn.execute(
+            f"""
             SELECT agent_id,
                    COUNT(*) as calls,
                    SUM(cost_usd) as cost_usd,
@@ -196,9 +227,30 @@ class LLMTracer:
             GROUP BY agent_id
             ORDER BY cost_usd DESC
             LIMIT 20
-        """, params).fetchall()
+        """,
+            params,
+        ).fetchall()
 
         conn.close()
+
+        # Enrich by_agent with capability_grade from agent store
+        try:
+            from ..agents.store import get_agent_store
+            from ..agents.tool_schemas import _get_capability_grade
+
+            _agent_cache = {a.id: a for a in get_agent_store().list_all()}
+        except Exception:
+            _agent_cache = {}
+
+        def _grade(agent_id: str) -> str:
+            a = _agent_cache.get(agent_id)
+            if a is None:
+                return "executor"
+            try:
+                return _get_capability_grade(a)
+            except Exception:
+                return "executor"
+
         return {
             "total_calls": row["total_calls"],
             "total_tokens_in": row["total_tokens_in"],
@@ -207,7 +259,9 @@ class LLMTracer:
             "avg_duration_ms": round(row["avg_duration_ms"]),
             "error_count": row["error_count"],
             "by_provider": [dict(r) for r in by_provider],
-            "by_agent": [dict(r) for r in by_agent],
+            "by_agent": [
+                {**dict(r), "capability_grade": _grade(r["agent_id"])} for r in by_agent
+            ],
         }
 
     def recent(self, limit: int = 50, session_id: str = "") -> list[dict]:
@@ -216,11 +270,12 @@ class LLMTracer:
         if session_id:
             rows = conn.execute(
                 "SELECT * FROM llm_traces WHERE session_id=? ORDER BY created_at DESC LIMIT ?",
-                (session_id, limit)).fetchall()
+                (session_id, limit),
+            ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT * FROM llm_traces ORDER BY created_at DESC LIMIT ?",
-                (limit,)).fetchall()
+                "SELECT * FROM llm_traces ORDER BY created_at DESC LIMIT ?", (limit,)
+            ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 

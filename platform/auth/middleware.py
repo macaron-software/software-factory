@@ -67,6 +67,39 @@ def _check_api_key(request: Request) -> bool:
 
 async def get_current_user(request: Request) -> User | None:
     """Get authenticated user from request. Returns None if not authenticated."""
+    # Check X-API-Key header (platform API keys)
+    x_api_key = request.headers.get("X-API-Key", "")
+    if x_api_key:
+        import hashlib as _hashlib
+        from ..db.migrations import get_db as _get_db
+
+        _key_hash = _hashlib.sha256(x_api_key.encode()).hexdigest()
+        try:
+            _conn = _get_db()
+            _row = _conn.execute(
+                "SELECT id, name, workspace, is_active, rate_limit FROM platform_api_keys WHERE key_hash=?",
+                (_key_hash,),
+            ).fetchone()
+            _conn.close()
+            if _row and _row["is_active"]:
+                _conn2 = _get_db()
+                _conn2.execute(
+                    "UPDATE platform_api_keys SET last_used_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (_row["id"],),
+                )
+                _conn2.commit()
+                _conn2.close()
+                request.state.api_key_id = _row["id"]
+                return User(
+                    id=f"api-key-{_row['id']}",
+                    email=f"api:{_row['name']}",
+                    display_name=f"API Key: {_row['name']}",
+                    role="admin",
+                    auth_provider="api_key",
+                )
+        except Exception:
+            pass
+
     token = _extract_token(request)
     if token:
         user = verify_access_token(token)
@@ -202,12 +235,11 @@ PUBLIC_PATHS = {
     "/setup",
     "/static",
     "/favicon.ico",
+    "/manifest.json",
     "/health",
     "/docs",
     "/openapi.json",
     "/js-error",
-    "/api/analytics",
-    "/api/teams",
 }
 
 

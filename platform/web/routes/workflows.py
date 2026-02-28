@@ -375,6 +375,22 @@ async def _run_workflow_background(
     """Background workflow execution."""
     from ...workflows.store import run_workflow
     from ...sessions.store import get_session_store, MessageDef
+    from .helpers import _active_mission_tasks
+
+    # Mark mission_run as running at task start — overrides any 'paused' set by
+    # startup cleanup that raced with asyncio task scheduling.
+    try:
+        from ...db.migrations import get_db as _gdb_start
+
+        _db_start = _gdb_start()
+        _db_start.execute(
+            "UPDATE mission_runs SET status='running' WHERE session_id=?",
+            (session_id,),
+        )
+        _db_start.commit()
+        _db_start.close()
+    except Exception:
+        pass
 
     try:
         result = await run_workflow(
@@ -454,6 +470,20 @@ async def _run_workflow_background(
             get_session_store().update_status(session_id, "failed")
         except Exception:
             pass
+    finally:
+        # Update linked mission_run status so it doesn't stay 'running' on restart
+        try:
+            from ...db.migrations import get_db as _gdb
+
+            _db = _gdb()
+            _db.execute(
+                "UPDATE mission_runs SET status=? WHERE session_id=? AND status IN ('running','paused')",
+                ("completed", session_id),
+            )
+            _db.commit()
+        except Exception:
+            pass
+        _active_mission_tasks.pop(session_id, None)
 
 
 # ── Workflow Resume ───────────────────────────────────────────────
@@ -732,7 +762,9 @@ async def dsi_board_page(request: Request):
                         "session_name": sess.name or sess.id[:8],
                         "agent_name": msg.from_agent or "Agent",
                         "content": msg.content[:120],
-                        "time": msg.timestamp[:16] if msg.timestamp else "",
+                        "time": str(msg.timestamp)[:16].replace(" ", "T")
+                        if msg.timestamp
+                        else "",
                         "status": "approved",
                     }
                 )
@@ -993,7 +1025,7 @@ async def dsi_workflow_page(request: Request, workflow_id: str):
                     "to_name": to_info["name"] if to_info else None,
                     "to_id": msg.to_agent,
                     "content": display,
-                    "time": (msg.timestamp or "")[:16],
+                    "time": str(msg.timestamp or "")[:16].replace(" ", "T"),
                     "action": action,
                     "message_type": msg.message_type,
                 }

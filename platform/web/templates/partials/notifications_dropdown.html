@@ -24,7 +24,7 @@
             <div class="notif-body">
                 <div class="notif-title">{{ n.title }}</div>
                 {% if n.message %}<div class="notif-msg">{{ n.message }}</div>{% endif %}
-                <div class="notif-time">{{ n.created_at[:16] | replace('T', ' ') }}</div>
+                <div class="notif-time">{{ n.created_at | ts }}</div>
             </div>
         </div>
         {% endfor %}

@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[Live-Demo: sf.macaron-software.com](https://sf.macaron-software.com)** — klicken Sie auf "Skip (Demo)" zum Erkunden
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [Funktionen](#funktionen) · [Schnellstart](#schnellstart) · [Screenshots](#screenshots) · [Architektur](#architektur) · [Mitwirken](#mitwirken)
 
@@ -31,11 +41,16 @@
 
 Software Factory ist eine **autonome Multi-Agenten-Plattform**, die den gesamten Software-Entwicklungszyklus orchestriert — von der Ideenfindung bis zur Bereitstellung — mithilfe spezialisierter KI-Agenten, die zusammenarbeiten.
 
-Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
+Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 191 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
 
 ### Hauptmerkmale
 
-- **161 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **191 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **36 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
+- **Wissensmanagement** — 4 dedizierte Agenten, ART-Knowledge-Team, naechlicher `knowledge-maintenance`-Workflow
+- **Memory Intelligence** — Relevanzbewertung, Zugriffsverfolgung, automatisches Bereinigen veralteter Eintraege
+- **LLM-Kostenverfolgung** — Kosten pro Mission im Timeline-Tab-Header angezeigt
+- **Mission-Timeline** — Swimlane-Timeline-Tab zeigt Phasendauern in Mission Control
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
@@ -86,6 +101,26 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten ue
 <td width="50%">
 <strong>Onboarding — SAFe-Rollenauswahl-Assistent</strong><br>
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Startseite — CTO Jarvis / Business-Ideation / Projekt-Ideation</strong><br>
+<img src="docs/screenshots/en/home.png" alt="Startseite" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — Strategischer KI-Berater</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Business-Ideation — 6-Agenten-Marketing-Team</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="Business-Ideation" width="100%">
+</td>
+<td width="50%">
+<strong>Projekt-Ideation — Multi-Agenten-Tech-Team</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
 </table>
@@ -160,17 +195,13 @@ Sie koennen Anbieter auch ueber die **Einstellungen**-Seite im Dashboard konfigu
 
 Nach der Installation koennen Sie wie folgt von der Idee zum fertigen Projekt gelangen:
 
-### Weg A: Von einer Idee starten (Ideation Workshop)
+### Weg A: CTO Jarvis fragen (Schnellster Einstieg)
 
-1. **Oeffnen Sie die Ideation-Seite** — gehen Sie zu `/ideation` (oder klicken Sie auf "Ideation" in der Seitenleiste)
-2. **Beschreiben Sie Ihre Idee** — z.B. *"Unternehmens-Fahrgemeinschafts-App mit Echtzeit-Matching"*
-3. **Beobachten Sie die Agenten-Diskussion** — 5 spezialisierte Agenten (Product Manager, Business Analyst, Architekt, UX Designer, Security) analysieren Ihre Idee in Echtzeit per SSE-Streaming
-4. **Erstellen Sie ein Projekt aus dem Ergebnis** — klicken Sie auf **"Epic aus dieser Idee erstellen"**. Die Plattform wird:
-   - Ein neues **Projekt** mit generierter `VISION.md` und CI/CD-Gerueststruktur erstellen
-   - Ein **Epic** mit Features und User Stories erstellen, aufgeschluesselt durch den PO-Agenten
-   - Automatisch **TMA**- (Wartung), **Sicherheits**- und **Technische-Schulden**-Missionen bereitstellen
+1. **Oeffnen Sie die Startseite** (`/`) — die Plattform startet im CTO-Jarvis-Tab
+2. **Tippen Sie Ihre Projektidee** — z.B. *"Erstelle ein Projekt fuer eine Unternehmens-Fahrgemeinschafts-App mit React und Python"*
+3. **Jarvis (Gabriel Mercier, Strategischer Orchestrator)** analysiert die Anfrage, erstellt das Projekt, provisioniert den SAFe-Backlog und startet die erste Mission — alles in einem Gespraech
 
-Sie haben nun einen vollstaendigen SAFe-Backlog, der zur Ausfuehrung bereit ist.
+Dies ist der **empfohlene Einstiegspunkt** fuer jedes neue Projekt.
 
 ### Weg B: Projekt manuell erstellen
 
@@ -210,7 +241,7 @@ Alle vier werden mit dem Projekt erstellt. TMA, Sicherheit und Selbstheilung sta
 
 ## Funktionen
 
-### 161 spezialisierte KI-Agenten
+### 191 spezialisierte KI-Agenten
 
 Agenten sind in Teams organisiert, die echte Software-Organisationen widerspiegeln:
 
@@ -474,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -580,34 +611,9 @@ Mission Created
 ### Bereitstellung
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (empfohlen) → http://localhost:8090
+Lokal (Entwicklung) → http://localhost:8090
+Produktion          → eigene Infrastruktur
 ```
 
 ## Projektkonfiguration
@@ -901,6 +907,87 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Routing-Matrix** — schwer/leicht pro Kategorie (Reasoning, Produktion/Code, Aufgaben, Redaktion)
 - **Darwin LLM A/B-Bereich** — Live-Ansicht laufender Modellexperimente
 
+## Neuheiten in v2.7.0 (2026)
+
+### Wissensmanagement-System
+- **4 neue Agenten** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART-Knowledge-Team** — dediziertes Agile Release Train fuer Wissensoperationen
+- **Naechlicher `knowledge-maintenance`-Workflow** — automatische Kuratierung, Deduplizierung, Frische-Scoring
+- **Memory-Health-Dashboard** — Wissens-Gesundheitsmetriken im Metriken-Tab
+- **Knowledge-Health-Badge** — sichtbar auf der Einstellungsseite
+
+### Memory Intelligence
+- **Relevanzbewertung** — `Konfidenz × Aktualitaet × Zugriffs-Boost`-Formel fuer gewichtetes Retrieval
+- **Zugriffsverfolgung** — `access_count`- und `last_read_at`-Felder fuer jeden Speichereintrag
+- **Automatisches Bereinigen** — veraltete Eintraege werden bei jedem naechlichen Lauf entfernt
+
+### LLM-Kostenverfolgung
+- **Kosten pro Mission** — im Mission-Timeline-Tab-Header angezeigt
+- **Automatisch summiert** — aus `llm_traces`-Tabelle aggregiert
+
+### Mission-Timeline
+- **Swimlane-Timeline-Tab** — in Mission Control, zeigt Agentenphasen als horizontale Spuren
+- **Phasendauern** — visuelle Darstellung der Zeit pro Phase
+
+### Qualitaets-Scoring
+- **`quality_score`-Feld auf PhaseRun** — vom adversarialen Guard nach jeder Phase befuellt
+
+### Projekt-Export/Import
+- **ZIP-Archiv** — enthaelt `project.json` + alle Missionen + Runs + Speicher
+
+### Eingabevalidierung
+- **Pydantic-Modelle** — alle POST/PATCH-Routen mit strikten Schemata validiert
+
+### BSCC-Domain-Richtlinien
+- **Domain-Architekturrichtlinien** — Confluence/Solaris pro Projektdomaene durchgesetzt
+
+### Einstellungs-Integrations-Hub
+- **Konfigurierbare Tool-Integrationen** — Jira, Confluence, SonarQube fuer alle Agenten verfuegbar
+
+### Browser-Push-Benachrichtigungen
+- **Web Push API (VAPID)** — native Browser-Push-Benachrichtigungen fuer Missions-Ereignisse
+
+## Neuheiten in v3.0.0 (2026)
+
+### Agent-Marktplatz
+- **191 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
+- **Agentenprofile** — Detailansicht mit Werkzeugen, Skills und jüngster Sitzungshistorie
+- **Ein-Klick-Start** — direkte Sitzung mit jedem Agenten von seiner Profilseite starten
+
+### Mission-Replay-UI
+- **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
+- **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
+- **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### LLM-Metrik-Dashboard
+- **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
+- **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren
+- **Anbietervergleich** — P50/P95-Latenz und Kosten verschiedener Anbieter nebeneinander
+
+### RBAC + Rate-Limiting
+- **Workspace-bezogenes RBAC** — Rollenzuweisungen je Workspace, nicht nur plattformweit
+- **Nutzer-bezogenes Rate-Limiting** — konfigurierbare Token-/Anfragequoten je Rolle
+- **Audit-Trail** — alle RBAC-Änderungen mit Akteur, Zeitstempel und Details protokolliert
+
+### Agent-Evaluierungs-Framework
+- **LLM-als-Richter-Bewertung** — automatische Auswertung gegen goldene Datensätze unter `/evals`
+- **Agenten-Benchmarks** — Qualität im Zeitverlauf verfolgen und Regressionen erkennen
+- **Konfigurierbare Richter** — beliebigen LLM-Anbieter als Bewertungsrichter verwenden
+
+### Tool-Builder
+- **No-Code-Werkzeugerstellung** unter `/tool-builder` — HTTP-, SQL- und Shell-Werkzeuge
+- **Sofortige Aktivierung** — Werkzeuge stehen Agenten unmittelbar nach dem Speichern zur Verfügung
+- **Parametertemplates** — Eingabeschemata mit Typen und Validierung definieren
+
+### Multi-Tenant-Workspaces
+- **Isolierte Namespaces** unter `/workspaces` — separate Daten, Agenten und Gedächtnis je Workspace
+- **Pro-Client-Deployment** — mehrere Kunden ohne gegenseitige Beeinflussung onboarden
+- **RBAC je Workspace** — granulare Rollenzuweisungen je Namespace
+
+### YAML-Agenten-Hot-Reload
+- **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
+- **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
 ## Mitwirken
 
 Wir freuen uns ueber Beitraege! Bitte lesen Sie [CONTRIBUTING.md](CONTRIBUTING.md) fuer Richtlinien.
@@ -911,6 +998,6 @@ Dieses Projekt ist unter der AGPL v3 Lizenz lizenziert — siehe die [LICENSE](L
 
 ## Support
 
-- Live-Demo: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Diskussionen: https://github.com/macaron-software/software-factory/discussions

@@ -1,0 +1,20 @@
+# Finary — Personal Finance Tracker
+# =====================================
+
+project:
+  id: finary
+  name: finary
+  display_name: "Finary"
+  root_path: ""
+  domain: fintech
+  description: >
+    Agrégateur de patrimoine personnel.
+    Comptes bancaires, investissements, immobilier, crypto.
+
+domains:
+  python:
+    paths: [backend/]
+    extensions: [.py]
+  typescript:
+    paths: [web/]
+    extensions: [.ts, .tsx]

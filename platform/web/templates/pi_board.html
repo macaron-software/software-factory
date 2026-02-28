@@ -16,6 +16,17 @@
 {% endblock %}
 {% block content %}
 <style>
+.mf-btn{font-size:0.72rem;font-weight:600;padding:0.22rem 0.65rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;transition:all .15s;white-space:nowrap}
+.mf-btn:hover{border-color:var(--purple-dim);color:var(--text-primary)}
+.mf-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
+.mf-btn.mf-running.active{background:#7c3aed;border-color:#7c3aed}
+.mf-btn.mf-completed.active{background:#16a34a;border-color:#16a34a}
+.mf-btn.mf-failed.active{background:#dc2626;border-color:#dc2626}
+.mf-btn.mf-paused.active,.mf-btn.mf-pending.active{background:#6b7280;border-color:#6b7280}
+.mpager-btn{font-size:0.75rem;font-weight:600;padding:0.25rem 0.6rem;border-radius:5px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;transition:all .15s;min-width:28px}
+.mpager-btn:hover:not(:disabled){border-color:var(--purple-dim);color:var(--text-primary)}
+.mpager-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
+.mpager-btn:disabled{opacity:0.35;cursor:default}
 .mission-list{display:flex;flex-direction:column;gap:0.75rem}
 .mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
 .mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
@@ -276,7 +287,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -306,7 +317,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -335,7 +346,7 @@
                 {% if t.goal %}<div class="tma-card-desc" style="opacity:0.7"><svg class="icon icon-sm" style="width:12px;height:12px;vertical-align:-2px"><use href="#icon-target"/></svg> {{ t.goal[:120] }}</div>{% endif %}
                 <div class="tma-card-footer">
                     <span class="tma-card-project">{{ t.project_name }}</span>
-                    <span class="tma-card-date">{{ t.created_at[:10] if t.created_at else '' }}</span>
+                    <span class="tma-card-date">{{ t.created_at | ts('date') }}</span>
                 </div>
             </div>
             {% endfor %}
@@ -352,7 +363,7 @@
     <div class="pi-section-header" onclick="toggleSection('missions')">
         <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
         <h2><svg class="icon icon-sm"><use href="#icon-zap"/></svg> Missions en cours
-            <span class="pi-count">{{ runs|length }}</span>
+            <span class="pi-count" id="missionsVisibleCount">{{ runs|length }}</span>
         </h2>
         <div class="view-toggle" onclick="event.stopPropagation()">
             <button title="Cards" onclick="setViewMode('missions','card')" data-mode="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
@@ -360,7 +371,26 @@
             <button title="Compact" onclick="setViewMode('missions','compact')" data-mode="compact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="14" x2="21" y2="14"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
         </div>
     </div>
-    <div class="pi-section-body" id="body-missions">
+    <!-- Filter bar -->
+    <div id="missionFilters" style="display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center;margin-bottom:0.85rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px" onclick="event.stopPropagation()">
+        <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem">Type</span>
+        <button class="mf-btn active" data-filter="type" data-val="" onclick="setMF('type','',this)">Tous</button>
+        <button class="mf-btn" data-filter="type" data-val="product-lifecycle" onclick="setMF('type','product-lifecycle',this)">Full Projet</button>
+        <button class="mf-btn" data-filter="type" data-val="tma-maintenance" onclick="setMF('type','tma-maintenance',this)">Fix / TMA</button>
+        <button class="mf-btn" data-filter="type" data-val="security-hacking" onclick="setMF('type','security-hacking',this)">Sécu</button>
+        <button class="mf-btn" data-filter="type" data-val="feature-request" onclick="setMF('type','feature-request',this)">Feature</button>
+        <button class="mf-btn" data-filter="type" data-val="pi-planning" onclick="setMF('type','pi-planning',this)">PI Planning</button>
+        <div style="width:1px;height:16px;background:var(--border);margin:0 0.25rem"></div>
+        <span style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-right:0.25rem">Statut</span>
+        <button class="mf-btn active" data-filter="st" data-val="" onclick="setMF('st','',this)">Tous</button>
+        <button class="mf-btn mf-running" data-filter="st" data-val="running" onclick="setMF('st','running',this)">Running</button>
+        <button class="mf-btn mf-pending" data-filter="st" data-val="pending" onclick="setMF('st','pending',this)">Pending</button>
+        <button class="mf-btn mf-completed" data-filter="st" data-val="completed" onclick="setMF('st','completed',this)">Terminé</button>
+        <button class="mf-btn mf-failed" data-filter="st" data-val="failed" onclick="setMF('st','failed',this)">Failed</button>
+        <button class="mf-btn mf-paused" data-filter="st" data-val="paused" onclick="setMF('st','paused',this)">Paused</button>
+        <div style="margin-left:auto;font-size:0.75rem;color:var(--text-secondary)" id="mfStats"></div>
+    </div>
+    <div class="pi-section-body" id="body-missions" hx-on::after-swap="initMF()">
 {% if runs %}
 {% include "partials/mission_list.html" %}
 {% else %}
@@ -374,6 +404,8 @@
 </div>
 {% endif %}
     </div>
+    <!-- Pagination -->
+    <div id="missionPager" style="display:none;align-items:center;justify-content:center;gap:0.5rem;padding:0.75rem 0;margin-top:0.25rem"></div>
 </div>
 
 <!-- Release Notes Section -->
@@ -792,4 +824,96 @@ function closeTMAModal() {
     to { transform: translateX(400px); opacity: 0; }
 }
 </style>
+
+<script>
+// ── Mission Filter + Pagination ─────────────────────────────────────────────
+const MF_PER_PAGE = 15;
+let _mfType = '', _mfSt = '', _mfPage = 1;
+
+function setMF(dim, val, btn) {
+    if (dim === 'type') { _mfType = val; }
+    else { _mfSt = val; }
+    _mfPage = 1;
+    // Update active buttons for this dimension
+    document.querySelectorAll(`#missionFilters .mf-btn[data-filter="${dim}"]`).forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderMF();
+}
+
+function renderMF() {
+    const list = document.getElementById('missionList');
+    if (!list) return;
+    const cards = Array.from(list.querySelectorAll('.mission-card-wrap'));
+    // Filter
+    const visible = cards.filter(c => {
+        const wf = c.dataset.wf || '';
+        const st = c.dataset.st || '';
+        const typeOk = !_mfType || wf === _mfType;
+        const stOk   = !_mfSt   || st === _mfSt;
+        return typeOk && stOk;
+    });
+    const total = visible.length;
+    const pageCount = Math.ceil(total / MF_PER_PAGE) || 1;
+    if (_mfPage > pageCount) _mfPage = pageCount;
+    const start = (_mfPage - 1) * MF_PER_PAGE;
+    // Show/hide
+    cards.forEach(c => c.style.display = 'none');
+    visible.slice(start, start + MF_PER_PAGE).forEach(c => c.style.display = '');
+    // Count badge
+    const badge = document.getElementById('missionsVisibleCount');
+    if (badge) badge.textContent = total + (total !== cards.length ? '/' + cards.length : '');
+    // Stats
+    const stats = document.getElementById('mfStats');
+    if (stats) stats.textContent = total + ' mission' + (total > 1 ? 's' : '') + (total !== cards.length ? ' (sur ' + cards.length + ')' : '');
+    // Pagination
+    renderPager(pageCount, total);
+}
+
+function renderPager(pageCount, total) {
+    const pager = document.getElementById('missionPager');
+    if (!pager) return;
+    if (pageCount <= 1) { pager.style.display = 'none'; return; }
+    pager.style.display = 'flex';
+    const btns = [];
+    // Prev
+    btns.push(`<button class="mpager-btn" onclick="goMFPage(${_mfPage-1})" ${_mfPage<=1?'disabled':''}>‹</button>`);
+    // Page numbers (compact: max 7 buttons)
+    const range = pagerRange(_mfPage, pageCount);
+    let prev = null;
+    range.forEach(p => {
+        if (prev !== null && p - prev > 1) btns.push(`<span style="color:var(--text-secondary);padding:0 0.2rem">…</span>`);
+        btns.push(`<button class="mpager-btn${p===_mfPage?' active':''}" onclick="goMFPage(${p})">${p}</button>`);
+        prev = p;
+    });
+    // Next
+    btns.push(`<button class="mpager-btn" onclick="goMFPage(${_mfPage+1})" ${_mfPage>=pageCount?'disabled':''}>›</button>`);
+    btns.push(`<span style="font-size:0.72rem;color:var(--text-secondary);margin-left:0.25rem">Page ${_mfPage}/${pageCount}</span>`);
+    pager.innerHTML = btns.join('');
+}
+
+function pagerRange(cur, total) {
+    if (total <= 7) return Array.from({length:total},(_,i)=>i+1);
+    const r = new Set([1, total, cur, cur-1, cur+1, cur-2, cur+2].filter(p=>p>=1&&p<=total));
+    return [...r].sort((a,b)=>a-b);
+}
+
+function goMFPage(p) {
+    _mfPage = p;
+    renderMF();
+    document.getElementById('section-missions')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function initMF() {
+    // Restore active button states on HTMX swap
+    document.querySelectorAll('#missionFilters .mf-btn').forEach(b => {
+        const dim = b.dataset.filter, val = b.dataset.val;
+        const cur = dim==='type' ? _mfType : _mfSt;
+        b.classList.toggle('active', val === cur);
+    });
+    renderMF();
+}
+
+// Init on page load
+document.addEventListener('DOMContentLoaded', initMF);
+</script>
 {% endblock %}

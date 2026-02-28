@@ -18,6 +18,7 @@ class ProjectInfo:
     domains: list[str] = field(default_factory=list)
     description: str = ""
     yaml_path: Optional[str] = None
+    arch_domain: str = ""  # Architectural domain (e.g. "bscc") for guidelines injection
 
     @property
     def exists(self) -> bool:
@@ -31,9 +32,13 @@ class ProjectInfo:
         # Check if inside a parent git repo
         try:
             import subprocess
+
             result = subprocess.run(
                 ["git", "rev-parse", "--git-dir"],
-                cwd=self.path, capture_output=True, text=True, timeout=5,
+                cwd=self.path,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             return result.returncode == 0
         except Exception:
@@ -42,57 +47,64 @@ class ProjectInfo:
 
 _PERSONAL_IDS = {"fervenza", "finary", "popinz", "psy", "yolonow", "sharelook-2"}
 
-# Local-only projects — only loaded when SF_LOCAL=1 (dev machine)
-_LOCAL_PROJECTS: list[dict] = [
-    {"id": "factory", "name": "Software Factory (Self)", "path": "", "factory_type": "sf",
-     "domains": ["python"], "description": "Self-improving software factory"},
-    {"id": "fervenza", "name": "Fervenza IoT Platform", "path": "", "factory_type": "sf",
-     "domains": ["rust", "typescript"], "description": "IoT sensor platform"},
-    {"id": "finary", "name": "Finary", "path": "", "factory_type": "standalone",
-     "domains": ["python", "typescript"], "description": "Personal finance tracker"},
-    {"id": "logs-facteur", "name": "Logs Facteur - Support N1 La Poste", "path": "", "factory_type": "sf",
-     "domains": ["rust"], "description": "Mail carrier support tool"},
-    {"id": "lpd", "name": "LPD", "path": "", "factory_type": "standalone",
-     "domains": ["rust"], "description": "La Poste Distribution"},
-    {"id": "popinz", "name": "Popinz SaaS", "path": "", "factory_type": "sf",
-     "domains": ["rust", "svelte", "swift", "kotlin"], "description": "Event discovery SaaS platform"},
-    {"id": "psy", "name": "Macaron-Software PSY Platform", "path": "", "factory_type": "sf",
-     "domains": ["rust", "svelte"], "description": "PSY consultation platform"},
-    {"id": "sharelook", "name": "Sharelook Platform", "path": "", "factory_type": "sf",
-     "domains": ["java", "angular"], "description": "Video collaboration platform"},
-    {"id": "sharelook-2", "name": "Sharelook 2.0", "path": "", "factory_type": "sf",
-     "domains": ["java", "angular"], "description": "Next-gen Sharelook platform"},
-    {"id": "solaris", "name": "Solaris Design System (La Poste)", "path": "", "factory_type": "sf",
-     "domains": ["svelte"], "description": "La Poste design system"},
-    {"id": "veligo", "name": "Veligo Platform", "path": "", "factory_type": "sf",
-     "domains": ["rust", "svelte"], "description": "Bike sharing platform"},
-    {"id": "yolonow", "name": "YoloNow - Event Discovery Platform", "path": "", "factory_type": "sf",
-     "domains": ["rust", "svelte", "swift", "kotlin"], "description": "Event discovery app"},
-]
-
 # Demo projects — realistic fictional projects for fresh/public installs
 _DEMO_PROJECTS: list[dict] = [
-    {"id": "greenfleet", "name": "GreenFleet — EV Fleet Management", "path": "", "factory_type": "sf",
-     "domains": ["python", "typescript", "react"],
-     "description": "Real-time EV fleet tracking, route optimization, and charging station management for logistics companies"},
-    {"id": "mediboard", "name": "MediBoard — Hospital Dashboard", "path": "", "factory_type": "sf",
-     "domains": ["java", "angular"],
-     "description": "Clinical dashboard for hospital staff — patient flow, bed occupancy, lab results, and alert management"},
-    {"id": "neobank-api", "name": "NeoBank API Platform", "path": "", "factory_type": "sf",
-     "domains": ["rust", "typescript"],
-     "description": "Core banking API — accounts, payments, KYC/AML compliance, and real-time fraud detection engine"},
-    {"id": "eduspark", "name": "EduSpark — E-Learning Platform", "path": "", "factory_type": "sf",
-     "domains": ["python", "svelte"],
-     "description": "Adaptive learning platform with AI-powered content recommendations, progress analytics, and live classrooms"},
-    {"id": "payflow", "name": "PayFlow — Payment Orchestration", "path": "", "factory_type": "sf",
-     "domains": ["go", "typescript", "react"],
-     "description": "Payment orchestration platform — multi-PSP routing, 3DS2 authentication, reconciliation engine, and real-time fraud scoring"},
-    {"id": "dataforge", "name": "DataForge — Real-time Data Pipeline", "path": "", "factory_type": "sf",
-     "domains": ["python", "rust", "typescript"],
-     "description": "Enterprise data pipeline — ingestion, transformation, quality checks, and lineage tracking with sub-second latency"},
-    {"id": "urbanpulse", "name": "UrbanPulse — Smart City Mobility", "path": "", "factory_type": "sf",
-     "domains": ["rust", "svelte", "python"],
-     "description": "Smart city mobility platform — real-time traffic flow, public transport optimization, bike/scooter fleet management, and air quality monitoring"},
+    {
+        "id": "greenfleet",
+        "name": "GreenFleet — EV Fleet Management",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["python", "typescript", "react"],
+        "description": "Real-time EV fleet tracking, route optimization, and charging station management for logistics companies",
+    },
+    {
+        "id": "mediboard",
+        "name": "MediBoard — Hospital Dashboard",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["java", "angular"],
+        "description": "Clinical dashboard for hospital staff — patient flow, bed occupancy, lab results, and alert management",
+    },
+    {
+        "id": "neobank-api",
+        "name": "NeoBank API Platform",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["rust", "typescript"],
+        "description": "Core banking API — accounts, payments, KYC/AML compliance, and real-time fraud detection engine",
+    },
+    {
+        "id": "eduspark",
+        "name": "EduSpark — E-Learning Platform",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["python", "svelte"],
+        "description": "Adaptive learning platform with AI-powered content recommendations, progress analytics, and live classrooms",
+    },
+    {
+        "id": "payflow",
+        "name": "PayFlow — Payment Orchestration",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["go", "typescript", "react"],
+        "description": "Payment orchestration platform — multi-PSP routing, 3DS2 authentication, reconciliation engine, and real-time fraud scoring",
+    },
+    {
+        "id": "dataforge",
+        "name": "DataForge — Real-time Data Pipeline",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["python", "rust", "typescript"],
+        "description": "Enterprise data pipeline — ingestion, transformation, quality checks, and lineage tracking with sub-second latency",
+    },
+    {
+        "id": "urbanpulse",
+        "name": "UrbanPulse — Smart City Mobility",
+        "path": "",
+        "factory_type": "sf",
+        "domains": ["rust", "svelte", "python"],
+        "description": "Smart city mobility platform — real-time traffic flow, public transport optimization, bike/scooter fleet management, and air quality monitoring",
+    },
 ]
 
 
@@ -128,6 +140,18 @@ class ProjectRegistry:
                 except Exception:
                     pass
 
+        # Also scan git repo's projects/ directory (local dev — git repo != SF_ROOT instance)
+        if _is_local_dev():
+            _repo_dir = Path(__file__).parent.parent.parent / "projects"
+            if _repo_dir.is_dir() and _repo_dir != sf_dir:
+                for f in sorted(_repo_dir.glob("*.yaml")):
+                    if f.name.startswith("_"):
+                        continue
+                    try:
+                        self._load_sf_yaml(f)
+                    except Exception:
+                        pass
+
         # Migration Factory projects
         mf_base = Path(self._mf_root)
         mf_dir = mf_base / "projects"
@@ -142,10 +166,8 @@ class ProjectRegistry:
                 except Exception:
                     pass
 
-        # Manual additions: local projects on dev machine, demo projects on all installs
+        # Manual additions: demo projects on all installs (personal projects now via YAML)
         projects_to_add = list(_DEMO_PROJECTS)  # Always include demo projects
-        if _is_local_dev():
-            projects_to_add.extend(_LOCAL_PROJECTS)
         is_azure = os.environ.get("AZURE_DEPLOY", "")
         for m in projects_to_add:
             pid = m["id"]
@@ -162,11 +184,18 @@ class ProjectRegistry:
 
         # Support both flat and nested structures
         project_section = data.get("project", data)
-        pid = project_section.get("project_id") or project_section.get("name") or path.stem
+        pid = (
+            project_section.get("project_id")
+            or project_section.get("name")
+            or path.stem
+        )
         if pid == "_template":
             return
 
         root = project_section.get("root_path", data.get("root_path", ""))
+        # Safe path normalization: expand user (~) and normalize separators, never empty → ""
+        if root:
+            root = os.path.normpath(os.path.expanduser(root))
         domains_cfg = data.get("domains", {})
         domain_list = list(domains_cfg.keys()) if isinstance(domains_cfg, dict) else []
         display = project_section.get("display_name") or pid.replace("-", " ").title()
@@ -179,6 +208,7 @@ class ProjectRegistry:
             domains=domain_list,
             description=data.get("description", ""),
             yaml_path=str(path),
+            arch_domain=project_section.get("domain", ""),
         )
 
     def _load_mf_yaml(self, path: Path) -> None:
@@ -186,7 +216,9 @@ class ProjectRegistry:
             data = yaml.safe_load(fh) or {}
 
         project_section = data.get("project", data)
-        pid = project_section.get("id") or project_section.get("project_id") or path.stem
+        pid = (
+            project_section.get("id") or project_section.get("project_id") or path.stem
+        )
         migration = data.get("migration", {})
         root = migration.get("root_path") or project_section.get("root_path", "")
         display = project_section.get("name") or pid.replace("-", " ").title()

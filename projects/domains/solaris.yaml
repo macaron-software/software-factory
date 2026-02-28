@@ -1,0 +1,63 @@
+# Domaine Solaris — Design System La Poste
+# ==========================================
+# Projets de contribution / maintenance du Design System Solaris.
+# Specs composants directement depuis MCP mcp-solaris (Figma + WCAG).
+
+name: "Solaris Design System"
+env: prod
+color: "#FFD700"   # jaune La Poste
+extends: la-poste
+
+description: >
+  Design System officiel La Poste (Solaris).
+  41 composants Figma, tokens de design, patterns WCAG 2.1 AA.
+  Les agents doivent systématiquement utiliser le MCP mcp-solaris
+  pour accéder aux specs exactes (dimensions, couleurs, variantes)
+  avant de toucher au code.
+
+stack:
+  backend: ""   # DS only — pas de backend applicatif
+  frontend: "Angular 17+ + SCSS avec tokens Solaris"
+  database: ""  # DS only
+  infra: "npm publish (registry interne La Poste)"
+  ci: "GitLab CI/CD — pipeline lint + test + publish"
+  extra:
+    - "Tokens : variables CSS Solaris ($color-*, $spacing-*, $font-*)"
+    - "Pas de valeurs px hardcodées — utiliser les tokens"
+    - "Pas de couleurs hex hardcodées — utiliser les tokens"
+    - "Tests visuels : Storybook + Chromatic"
+    - "Tests a11y : axe-core sur chaque composant"
+
+design_system: >
+  Solaris est le sujet lui-même.
+  Utiliser mcp-solaris pour : variants Figma, node_id, padding exact,
+  borderRadius, couleurs de token, patterns WCAG, exemples HTML.
+  Toute implémentation doit correspondre exactement à la spec Figma.
+
+compliance:
+  - "WCAG 2.1 niveau AA (minimum)"
+  - "RGAA 4.1"
+  - "Audit a11y sur chaque composant avant merge"
+
+mcp_tools:
+  - mcp-solaris
+
+confluence_space: "IAN"
+
+conventions: |
+  - Utiliser mcp-solaris avant TOUTE décision de style ou structure
+  - Nommage tokens : $color-{role}-{variant}, $spacing-{size}
+  - Chaque composant : story Storybook + test axe-core + snapshot visuel
+  - Aucun composant fusionné sans validation design QA
+  - Versioning semver strict (patch = fix, minor = nouveau composant, major = breaking)
+
+compliance_agents:
+  - solaris-compliance-critic
+
+compliance_blocking: true
+
+default_pattern: adversarial-cascade
+
+default_agents:
+  - lead-dev
+  - solaris-compliance-critic

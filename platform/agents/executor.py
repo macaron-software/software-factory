@@ -20,265 +20,60 @@ from dataclasses import dataclass, field
 
 from ..agents.store import AgentDef
 from ..llm.client import LLMClient, LLMMessage, LLMResponse, get_llm_client
-
-logger = logging.getLogger(__name__)
-
-# Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 8
-
-# Regex to strip raw MiniMax/internal tool-call tokens from LLM output
-_RAW_TOKEN_RE = re.compile(
-    r"<\|(?:tool_calls_section_begin|tool_calls_section_end|tool_call_begin|tool_call_end|"
-    r"tool_call_argument_begin|tool_call_argument_end|tool_sep|im_end|im_start)\|>"
-)
-
-# Provider for tool-calling agents (OpenAI models handle tools reliably)
-_TOOL_PROVIDER = "azure-openai"
-_TOOL_MODEL = "gpt-5-mini"
-# Providers that support native function calling
-_TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai"}
-
-# Multi-model routing — roles/tags → (provider, model)
-# gpt-5.2:        deep reasoning — architecture, leadership, planning
-# gpt-5.1-codex:  code production — developer, tester, security
-# gpt-5.1-mini:   light tasks — routing, summaries, docs, discussion
-_REASONING_ROLES = {
-    "architect",
-    "product_owner",
-    "scrum_master",
-    "tech_lead",
-    "cto",
-    "ceo",
-}
-_REASONING_TAGS = {
-    "architecture",
-    "reasoning",
-    "leadership",
-    "planning",
-    "strategy",
-    "analysis",
-}
-_CODE_ROLES = {
-    "developer",
-    "tester",
-    "qa",
-    "security",
-    "devops",
-    "data_engineer",
-    "ml_engineer",
-}
-_CODE_TAGS = {
-    "code",
-    "coding",
-    "test",
-    "tests",
-    "security",
-    "refactor",
-    "review",
-    "ci",
-    "cd",
-    "devops",
-}
-
-# Cache for routing config loaded from DB
-_routing_cache: dict | None = None
-_routing_cache_ts: float = 0.0
-_ROUTING_CACHE_TTL = 60.0  # 1 min
-
-
-def _invalidate_routing_cache():
-    global _routing_cache, _routing_cache_ts
-    _routing_cache = None
-    _routing_cache_ts = 0.0
-
-
-def _load_routing_config() -> dict:
-    """Load LLM routing config from DB (cached 60s)."""
-    import time
-
-    global _routing_cache, _routing_cache_ts
-    now = time.time()
-    if _routing_cache is not None and (now - _routing_cache_ts) < _ROUTING_CACHE_TTL:
-        return _routing_cache
-    try:
-        from ..db.migrations import get_db
-        import json
-
-        db = get_db()
-        row = db.execute(
-            "SELECT value FROM session_state WHERE key='llm_routing'"
-        ).fetchone()
-        db.close()
-        if row:
-            _routing_cache = json.loads(row[0])
-            _routing_cache_ts = now
-            return _routing_cache
-    except Exception:
-        pass
-    _routing_cache = {}
-    return {}
-
-
-def _select_model_for_agent(
-    agent: "AgentDef",
-    technology: str = "generic",
-    phase_type: str = "generic",
-    pattern_id: str = "",
-    mission_id: str | None = None,
-) -> tuple[str, str]:
-    """Select (provider, model) using routing config + Darwin LLM Thompson Sampling.
-
-    Priority:
-    1. Darwin LLM Thompson Sampling (if multiple models tested for this agent×context)
-    2. DB routing config (Settings → LLM tab)
-    3. Hardcoded role/tag defaults
-    Falls back to minimax on local dev (AZURE_DEPLOY unset).
-    """
-    import os
-
-    if not os.environ.get("AZURE_DEPLOY", ""):
-        return agent.provider, agent.model
-
-    azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
-    role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
-    tags = {t.lower() for t in (agent.tags or [])}
-
-    # Determine task category from role/tags
-    if role in _REASONING_ROLES or tags & _REASONING_TAGS:
-        category_heavy, category_light = "reasoning_heavy", "reasoning_light"
-    elif role in _CODE_ROLES or tags & _CODE_TAGS:
-        category_heavy, category_light = "production_heavy", "production_light"
-    else:
-        category_heavy, category_light = "tasks_heavy", "tasks_light"
-
-    # Load routing config from DB
-    routing = _load_routing_config()
-    heavy_cfg = routing.get(category_heavy, {})
-    light_cfg = routing.get(category_light, {})
-
-    # Build candidate models for Darwin LLM Thompson Sampling
-    candidates: list[tuple[str, str]] = []
-    if azure_ai_key:
-        # Add both heavy and light candidates so Darwin can compare
-        h_provider = heavy_cfg.get("provider", "azure-ai")
-        h_model = heavy_cfg.get(
-            "model",
-            "gpt-5.2" if category_heavy == "reasoning_heavy" else "gpt-5.1-codex",
-        )
-        l_provider = light_cfg.get("provider", "azure-openai")
-        l_model = light_cfg.get("model", "gpt-5-mini")
-        candidates = [(h_model, h_provider), (l_model, l_provider)]
-    else:
-        candidates = [("gpt-5-mini", "azure-openai")]
-
-    # Darwin LLM Thompson Sampling (if pattern_id available and Azure key present)
-    if pattern_id and azure_ai_key and len(candidates) > 1:
-        try:
-            from ..patterns.team_selector import LLMTeamSelector
-
-            model, provider = LLMTeamSelector.select_model(
-                agent_id=agent.id,
-                pattern_id=pattern_id,
-                technology=technology,
-                phase_type=phase_type,
-                candidate_models=candidates,
-                mission_id=mission_id,
-            )
-            if model and model != "default":
-                return provider, model
-        except Exception as exc:
-            logger.debug("LLMTeamSelector.select_model error: %s", exc)
-
-    # Fallback: use static routing config
-    if heavy_cfg.get("provider") and azure_ai_key:
-        return heavy_cfg["provider"], heavy_cfg.get("model", "gpt-5-mini")
-
-    # Hardcoded defaults
-    if role in _REASONING_ROLES or tags & _REASONING_TAGS:
-        return (
-            ("azure-ai", "gpt-5.2") if azure_ai_key else ("azure-openai", "gpt-5-mini")
-        )
-    if role in _CODE_ROLES or tags & _CODE_TAGS:
-        return (
-            ("azure-ai", "gpt-5.1-codex")
-            if azure_ai_key
-            else ("azure-openai", "gpt-5-mini")
-        )
-    return "azure-openai", "gpt-5-mini"
-
-
-def _route_provider(
-    agent: AgentDef,
-    tools: list | None,
-    technology: str = "generic",
-    phase_type: str = "generic",
-    pattern_id: str = "",
-    mission_id: str | None = None,
-) -> tuple[str, str]:
-    """Route to the best provider+model using Darwin LLM Thompson Sampling + routing config.
-
-    Priority:
-    1. Darwin LLM Thompson Sampling (same team, competing models)
-    2. DB routing config (Settings → LLM tab)
-    3. Hardcoded role/tag defaults (gpt-5.2 / gpt-5.1-codex / gpt-5-mini)
-    Overrides: tool-calling → must use _TOOL_CAPABLE_PROVIDERS; high rejection → escalate
-    """
-    best_provider, best_model = _select_model_for_agent(
-        agent,
-        technology=technology,
-        phase_type=phase_type,
-        pattern_id=pattern_id,
-        mission_id=mission_id,
-    )
-
-    # Override: if tools required and selected provider can't do tool-calling, escalate
-    if tools and best_provider not in _TOOL_CAPABLE_PROVIDERS:
-        return _TOOL_PROVIDER, _TOOL_MODEL
-
-    # Quality escalation: if agent has high rejection rate, use gpt-5-mini as floor
-    if best_provider not in _TOOL_CAPABLE_PROVIDERS:
-        try:
-            from .selection import rejection_rate
-
-            if rejection_rate(agent.id) > 0.40:
-                logger.debug(
-                    "Escalating %s to azure-openai (high rejection rate)", agent.id
-                )
-                return _TOOL_PROVIDER, _TOOL_MODEL
-        except Exception:
-            pass
-
-    return best_provider, best_model
-
-
-def _strip_raw_tokens(text: str) -> str:
-    """Remove raw model tokens that leak into content (e.g. MiniMax format)."""
-    if "<|" not in text:
-        return text
-    cleaned = _RAW_TOKEN_RE.sub("", text)
-    # Also remove raw function call lines like "functions.code_read:0"
-    cleaned = re.sub(r"^functions\.\w+:\d+$", "", cleaned, flags=re.MULTILINE)
-    return cleaned.strip()
-
-
-# Tool registry, schemas, execution — extracted to tool_runner.py
-# Prompt building — extracted to prompt_builder.py
-from .prompt_builder import (
-    _build_messages,
-    _build_system_prompt,
-)
+from .prompt_builder import _build_messages, _build_system_prompt
+from .routing import _route_provider, _strip_raw_tokens
 from .tool_runner import (
     _execute_tool,
     _get_tool_registry,
     _parse_xml_tool_calls,
     _record_artifact,
 )
+from .tool_schemas import _filter_schemas, _get_tool_schemas
 
-# Tool schemas, role mapping — from tool_schemas.py
-from .tool_schemas import (
-    _filter_schemas,
-    _get_tool_schemas,
-)
+logger = logging.getLogger(__name__)
+
+# Max tool-calling rounds to prevent infinite loops
+MAX_TOOL_ROUNDS = 8
+
+# Tools that produce code changes and should trigger auto-verification
+_CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
+# Max automatic repair rounds after a failed verification (lint/build)
+MAX_REPAIR_ROUNDS = 3
+
+# Secrets detection patterns (block hardcoded credentials in code writes)
+import re as _re_secrets
+
+_SECRET_PATTERNS = [
+    _re_secrets.compile(
+        r'(?i)(api[_\-]?key|apikey|api[_\-]?secret)\s*[=:]\s*["\']?[A-Za-z0-9+/]{20,}'
+    ),
+    _re_secrets.compile(r'(?i)(password|passwd|pwd)\s*[=:]\s*["\'][^"\']{6,}["\']'),
+    _re_secrets.compile(r'(?i)(secret[_\-]?key|secret)\s*[=:]\s*["\'][^"\']{8,}["\']'),
+    _re_secrets.compile(
+        r'(?i)(aws_access_key_id|aws_secret)\s*[=:]\s*["\']?[A-Z0-9]{16,}'
+    ),
+    _re_secrets.compile(r"sk-[A-Za-z0-9\-]{20,}"),  # OpenAI-style key (sk- or sk-proj-)
+    _re_secrets.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub personal access token
+]
+
+
+def _scan_for_secrets(content: str) -> list[str]:
+    """Return list of secret pattern matches found in content."""
+    hits = []
+    for pat in _SECRET_PATTERNS:
+        m = pat.search(content)
+        if m:
+            hits.append(m.group(0)[:40] + "…")
+    return hits
+
+
+_routing_cache: dict | None = None
+_routing_cache_ts: float = 0.0
+
+# Workspace file write lock: maps (project_id, normalized_path) → agent_id
+# Prevents concurrent agents from clobbering the same file
+_file_write_locks: dict[tuple[str, str], str] = {}
+_file_write_lock_meta: dict = {}  # (project_id, path) → {"agent": str, "ts": float}
 
 
 @dataclass
@@ -295,6 +90,8 @@ class ExecutionContext:
     project_context: str = ""
     # Project memory files (CLAUDE.md, copilot-instructions.md, etc.)
     project_memory: str = ""
+    # Domain context (injected from projects/domains/<id>.yaml)
+    domain_context: str = ""
     # Skills content (injected into system prompt)
     skills_prompt: str = ""
     # Vision document (if project has one)
@@ -307,6 +104,8 @@ class ExecutionContext:
     on_tool_call: object | None = None  # async callable(tool_name, args, result)
     # Mission run ID (for CDP phase tools)
     mission_run_id: str | None = None
+    # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
+    capability_grade: str = "executor"
 
 
 @dataclass
@@ -325,6 +124,168 @@ class ExecutionResult:
     error: str | None = None
 
 
+class BudgetExceededError(RuntimeError):
+    """Raised when a session exceeds its configured USD budget."""
+
+
+# ── Settings cache (refreshed every 60 s) ────────────────────────────────────
+_settings_cache: dict[str, str] = {}
+_settings_cache_ts: float = 0.0
+_SETTINGS_TTL = 60.0
+
+
+def _get_rate_limit_setting(key: str, default: str) -> str:
+    """Return a rate-limit setting from platform_settings, with 60 s cache."""
+    global _settings_cache, _settings_cache_ts
+    now = time.monotonic()
+    if now - _settings_cache_ts > _SETTINGS_TTL:
+        try:
+            from ..db.migrations import get_db
+
+            db = get_db()
+            rows = db.execute(
+                "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
+            ).fetchall()
+            db.close()
+            _settings_cache = {r[0]: r[1] for r in rows}
+            _settings_cache_ts = now
+        except Exception:
+            pass
+    return _settings_cache.get(key, default)
+
+
+def _check_session_budget(session_id: str) -> None:
+    """Raise BudgetExceededError if the session has exceeded its per-session USD cap."""
+    try:
+        enabled = _get_rate_limit_setting("rate_limit_enabled", "true")
+        if enabled.lower() not in ("true", "1", "yes"):
+            return
+        cap_str = _get_rate_limit_setting("rate_limit_usd_per_session", "2.00")
+        cap = float(cap_str)
+        if cap <= 0:
+            return
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        db.close()
+        spent = float(row[0]) if row else 0.0
+        if spent >= cap:
+            logger.warning(
+                "Session %s exceeded budget cap $%.2f (spent $%.4f)",
+                session_id,
+                cap,
+                spent,
+            )
+            raise BudgetExceededError(
+                f"Session budget cap of ${cap:.2f} exceeded (spent ${spent:.4f})"
+            )
+    except BudgetExceededError:
+        raise
+    except Exception:
+        pass  # never block on DB errors
+
+
+def _write_llm_usage(
+    provider: str,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    project_id: str | None,
+    agent_id: str,
+    session_id: str,
+) -> None:
+    """Insert one row into llm_usage. Never raises."""
+    try:
+        from ..db.migrations import get_db
+        from ..llm.observability import _estimate_cost
+
+        cost = _estimate_cost(model, tokens_in, tokens_out)
+        db = get_db()
+        db.execute(
+            "INSERT INTO llm_usage (provider, model, tokens_in, tokens_out,"
+            " cost_estimate, project_id, agent_id, session_id) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                provider,
+                model,
+                tokens_in,
+                tokens_out,
+                cost,
+                project_id or "",
+                agent_id,
+                session_id,
+            ),
+        )
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
+def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -> None:
+    """Debit project wallet for LLM cost. Never raises."""
+    if not cost_usd or cost_usd <= 0 or not project_id:
+        return
+    try:
+        import uuid as _uuid_w
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT balance FROM project_wallets WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if not row:
+            db.execute(
+                "INSERT INTO project_wallets (project_id, balance, total_earned, total_spent)"
+                " VALUES (?,100.0,100.0,0)",
+                (project_id,),
+            )
+        db.execute(
+            "UPDATE project_wallets SET balance=balance-?, total_spent=total_spent+?,"
+            " updated_at=datetime('now') WHERE project_id=?",
+            (cost_usd, cost_usd, project_id),
+        )
+        db.execute(
+            "INSERT INTO token_transactions (id, project_id, amount, reason, reference_id)"
+            " VALUES (?,?,?,?,?)",
+            (str(_uuid_w.uuid4()), project_id, -cost_usd, "llm_usage", reference_id),
+        )
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
+def _update_mission_cost(session_id: str, mission_run_id: str | None) -> None:
+    """Update mission_runs.llm_cost_usd from llm_traces. Never raises."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        mid = mission_run_id
+        if not mid and session_id:
+            row = db.execute(
+                "SELECT id FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if row:
+                mid = row[0]
+        if mid:
+            db.execute(
+                "UPDATE mission_runs SET llm_cost_usd="
+                "(SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?)"
+                " WHERE id=?",
+                (session_id, mid),
+            )
+            db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
 class AgentExecutor:
     """Executes agent logic: prompt → LLM → tool loop → response."""
 
@@ -337,6 +298,54 @@ class AgentExecutor:
         from ..sessions.runner import _push_sse
 
         await _push_sse(session_id, event)
+
+    @staticmethod
+    def _write_step_checkpoint(
+        session_id: str,
+        agent_id: str,
+        step_index: int,
+        tool_calls: list[dict],
+        partial_content: str,
+    ) -> None:
+        """Persist a step checkpoint after each tool-call round.
+
+        Enables crash recovery: if the agent crashes mid-run, the control plane
+        can see how far it got and restart from the last completed step.
+        Inspired by the Uruk stateless model (Orthanc ADR-0014).
+        """
+        try:
+            import json as _json
+            from ..db.migrations import get_db
+
+            db = get_db()
+            db.execute(
+                """CREATE TABLE IF NOT EXISTS agent_step_checkpoints (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    step_index INTEGER NOT NULL,
+                    tool_calls TEXT NOT NULL,
+                    partial_content TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )"""
+            )
+            db.execute(
+                """INSERT OR REPLACE INTO agent_step_checkpoints
+                   (id, session_id, agent_id, step_index, tool_calls, partial_content)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    f"{session_id}:{agent_id}:{step_index}",
+                    session_id,
+                    agent_id,
+                    step_index,
+                    _json.dumps(tool_calls[-5:]),  # keep last 5 tool calls only
+                    partial_content[:500] if partial_content else "",
+                ),
+            )
+            db.commit()
+            db.close()
+        except Exception:
+            pass  # checkpointing is best-effort, never block execution
 
     async def run(self, ctx: ExecutionContext, user_message: str) -> ExecutionResult:
         """Run the agent with tool-calling loop."""
@@ -378,8 +387,16 @@ class AgentExecutor:
             )
 
             # Route provider: Darwin LLM Thompson Sampling + routing config
+            # cheap_mode: if allowed_tools are all cheap (memory/read), use MiniMax
+            from .routing import CHEAP_TOOLS as _CHEAP_TOOLS
+
+            _cheap_mode = bool(
+                ctx.allowed_tools
+                and ctx.tools_enabled
+                and all(t in _CHEAP_TOOLS for t in (ctx.allowed_tools or []))
+            )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id
+                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode
             )
 
             # Tool-calling loop
@@ -397,6 +414,44 @@ class AgentExecutor:
 
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
+                _write_llm_usage(
+                    llm_resp.provider,
+                    llm_resp.model,
+                    llm_resp.tokens_in,
+                    llm_resp.tokens_out,
+                    ctx.project_id,
+                    agent.id,
+                    ctx.session_id,
+                )
+                _check_session_budget(ctx.session_id)
+
+                # Push live cost/token update via SSE (workspace live feed)
+                if ctx.session_id:
+                    try:
+                        from ..llm.observability import _estimate_cost
+                        import asyncio as _asyncio
+
+                        _running_cost = _estimate_cost(
+                            llm_resp.model, total_tokens_in, total_tokens_out
+                        )
+                        _asyncio.ensure_future(
+                            self._push_mission_sse(
+                                ctx.session_id,
+                                {
+                                    "type": "token_usage",
+                                    "agent_id": agent.id,
+                                    "tokens_in": total_tokens_in,
+                                    "tokens_out": total_tokens_out,
+                                    "tokens_total": total_tokens_in + total_tokens_out,
+                                    "cost_usd": round(_running_cost, 6),
+                                    "model": llm_resp.model,
+                                    "runaway": (total_tokens_in + total_tokens_out)
+                                    > 100_000,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
 
                 # Parse XML tool calls from content (MiniMax sometimes returns these)
                 if not llm_resp.tool_calls and llm_resp.content:
@@ -441,6 +496,29 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
+                    # ── Workspace conflict guard: warn if another agent is writing this file ──
+                    if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
+                        import time as _time
+
+                        _fp = str(tc.arguments.get("path", "")).strip("/")
+                        _lock_key = (ctx.project_id, _fp)
+                        _existing = _file_write_locks.get(_lock_key)
+                        if _existing and _existing != ctx.session_id:
+                            _meta = _file_write_lock_meta.get(_lock_key, {})
+                            _age = _time.time() - _meta.get("ts", 0)
+                            if _age < 30:  # warn only if recent (< 30s)
+                                logger.warning(
+                                    "File conflict: %s already being written by agent %s (session %s) — %s proceeding",
+                                    _fp,
+                                    _meta.get("agent", "?"),
+                                    _existing,
+                                    agent.id,
+                                )
+                        _file_write_locks[_lock_key] = ctx.session_id
+                        _file_write_lock_meta[_lock_key] = {
+                            "agent": agent.id,
+                            "ts": _time.time(),
+                        }
                     result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     all_tool_calls.append(
                         {
@@ -482,6 +560,119 @@ class AgentExecutor:
                         )
                     )
 
+                    # ── Auto-verification: after code writes, run lint and repair if needed ──
+                    if (
+                        tc.function_name in _CODE_WRITE_TOOLS
+                        and not result.startswith("Error")
+                        and ctx.project_path
+                    ):
+                        # Secrets scan: block if hardcoded secrets detected
+                        _secret_content = str(tc.arguments.get("content", ""))
+                        _secrets_found = _scan_for_secrets(_secret_content)
+                        if _secrets_found:
+                            logger.warning(
+                                "Agent %s: SECRETS DETECTED in code_write: %s",
+                                agent.id,
+                                _secrets_found,
+                            )
+                            messages.append(
+                                LLMMessage(
+                                    role="system",
+                                    content=(
+                                        "🚨 SECURITY ALERT: Hardcoded secrets detected in your last code_write. "
+                                        f"Found: {_secrets_found[:3]}. "
+                                        "Remove ALL hardcoded credentials immediately. Use environment variables instead."
+                                    ),
+                                )
+                            )
+
+                        for _repair_round in range(MAX_REPAIR_ROUNDS):
+                            try:
+                                lint_tool = self._registry.get("lint")
+                                if lint_tool is None:
+                                    break
+                                lint_result = await lint_tool.execute(
+                                    {"cwd": ctx.project_path, "fix": False}, agent
+                                )
+                                if ctx.on_tool_call:
+                                    try:
+                                        await ctx.on_tool_call(
+                                            "lint",
+                                            {"cwd": ctx.project_path},
+                                            lint_result,
+                                        )
+                                    except Exception:
+                                        pass
+                                # No errors → stop repair loop
+                                if (
+                                    "error" not in lint_result.lower()
+                                    and "warning" not in lint_result.lower()[:100]
+                                ):
+                                    break
+                                # Lint found issues → inject repair instruction
+                                import uuid as _uuid
+
+                                repair_id = f"auto_lint_{_uuid.uuid4().hex[:6]}"
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=f"[AUTO-LINT] {lint_result[:1500]}",
+                                        tool_call_id=repair_id,
+                                        name="lint",
+                                    )
+                                )
+                                messages.append(
+                                    LLMMessage(
+                                        role="system",
+                                        content=(
+                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
+                                            "Fix all reported issues NOW before proceeding to the next step. "
+                                            f"Repair round {_repair_round + 1}/{MAX_REPAIR_ROUNDS}."
+                                        ),
+                                    )
+                                )
+                                logger.info(
+                                    "Agent %s: lint failed, repair round %d",
+                                    agent.id,
+                                    _repair_round + 1,
+                                )
+                                # Allow LLM to fix — fire one more tool round immediately
+                                fix_resp = await self._llm.chat(
+                                    messages=messages,
+                                    provider=use_provider,
+                                    model=use_model,
+                                    temperature=agent.temperature,
+                                    max_tokens=agent.max_tokens,
+                                    system_prompt="",
+                                    tools=tools,
+                                )
+                                total_tokens_in += fix_resp.tokens_in
+                                total_tokens_out += fix_resp.tokens_out
+                                if not fix_resp.tool_calls:
+                                    break
+                                for fix_tc in fix_resp.tool_calls:
+                                    fix_res = await _execute_tool(
+                                        fix_tc, ctx, self._registry, self._llm
+                                    )
+                                    all_tool_calls.append(
+                                        {
+                                            "name": fix_tc.function_name,
+                                            "args": fix_tc.arguments,
+                                            "result": fix_res[:500],
+                                        }
+                                    )
+                                    messages.append(
+                                        LLMMessage(
+                                            role="tool",
+                                            content=fix_res[:2000],
+                                            tool_call_id=fix_tc.id,
+                                            name=fix_tc.function_name,
+                                        )
+                                    )
+                            except Exception as _ve:
+                                logger.warning("Auto-verify error: %s", _ve)
+                                break
+
                 # After deep_search, disable tools to force synthesis
                 if deep_search_used:
                     tools = None
@@ -499,6 +690,16 @@ class AgentExecutor:
                     agent.id,
                     round_num + 1,
                     len(llm_resp.tool_calls),
+                )
+
+                # Step checkpoint: persist progress after each tool round
+                # so crash recovery can see how far this agent got
+                self._write_step_checkpoint(
+                    session_id=ctx.session_id,
+                    agent_id=agent.id,
+                    step_index=round_num,
+                    tool_calls=all_tool_calls,
+                    partial_content="",
                 )
 
                 # Limit message window to prevent OOM (keep first 2 + last 15)
@@ -530,7 +731,8 @@ class AgentExecutor:
                 content = content[: content.index("<think>")].strip()
             delegations = self._parse_delegations(content)
 
-            return ExecutionResult(
+            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
+            result = ExecutionResult(
                 content=content,
                 agent_id=agent.id,
                 model=llm_resp.model,
@@ -541,9 +743,28 @@ class AgentExecutor:
                 tool_calls=all_tool_calls,
                 delegations=delegations,
             )
+            # Debit project wallet for LLM cost
+            try:
+                from ..llm.observability import _estimate_cost
+
+                _cost = _estimate_cost(
+                    llm_resp.model, total_tokens_in, total_tokens_out
+                )
+                _debit_project_wallet(ctx.project_id, _cost, ctx.session_id)
+            except Exception:
+                pass
+            return result
 
         except Exception as exc:
             err_str = str(exc)
+            if isinstance(exc, BudgetExceededError):
+                elapsed = int((time.monotonic() - t0) * 1000)
+                return ExecutionResult(
+                    content=f"Session budget exceeded: {exc}",
+                    agent_id=agent.id,
+                    duration_ms=elapsed,
+                    error="budget_exceeded",
+                )
             is_llm_error = (
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
@@ -627,8 +848,15 @@ class AgentExecutor:
             )
 
             # Route provider: Darwin LLM Thompson Sampling + routing config
+            from .routing import CHEAP_TOOLS as _CHEAP_TOOLS_2
+
+            _cheap_mode_2 = bool(
+                ctx.allowed_tools
+                and ctx.tools_enabled
+                and all(t in _CHEAP_TOOLS_2 for t in (ctx.allowed_tools or []))
+            )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id
+                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode_2
             )
 
             for round_num in range(MAX_TOOL_ROUNDS):
@@ -681,6 +909,16 @@ class AgentExecutor:
 
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
+                _write_llm_usage(
+                    llm_resp.provider,
+                    llm_resp.model,
+                    llm_resp.tokens_in,
+                    llm_resp.tokens_out,
+                    ctx.project_id,
+                    agent.id,
+                    ctx.session_id,
+                )
+                _check_session_budget(ctx.session_id)
                 logger.warning(
                     "TOOL_DBG agent=%s round=%d tc=%d clen=%d fin=%s",
                     agent.id,
@@ -816,6 +1054,116 @@ class AgentExecutor:
                         )
                     )
 
+                    # ── Auto-verification (streaming): after code writes, run lint ──
+                    if (
+                        tc.function_name in _CODE_WRITE_TOOLS
+                        and not result.startswith("Error")
+                        and ctx.project_path
+                    ):
+                        # Secrets scan
+                        _ss_content = str(tc.arguments.get("content", ""))
+                        _ss_hits = _scan_for_secrets(_ss_content)
+                        if _ss_hits:
+                            logger.warning(
+                                "Agent %s (streaming): SECRETS DETECTED: %s",
+                                agent.id,
+                                _ss_hits,
+                            )
+                            messages.append(
+                                LLMMessage(
+                                    role="system",
+                                    content=(
+                                        "🚨 SECURITY ALERT: Hardcoded secrets detected in your last code_write. "
+                                        f"Found: {_ss_hits[:3]}. Use environment variables instead."
+                                    ),
+                                )
+                            )
+                        for _srep in range(MAX_REPAIR_ROUNDS):
+                            try:
+                                _slint = self._registry.get("lint")
+                                if _slint is None:
+                                    break
+                                _slint_res = await _slint.execute(
+                                    {"cwd": ctx.project_path, "fix": False}, agent
+                                )
+                                if ctx.on_tool_call:
+                                    try:
+                                        await ctx.on_tool_call(
+                                            "lint",
+                                            {"cwd": ctx.project_path},
+                                            _slint_res,
+                                        )
+                                    except Exception:
+                                        pass
+                                if (
+                                    "error" not in _slint_res.lower()
+                                    and "warning" not in _slint_res.lower()[:100]
+                                ):
+                                    break
+                                import uuid as _uuid_s
+
+                                _srid = f"auto_lint_{_uuid_s.uuid4().hex[:6]}"
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=f"[AUTO-LINT] {_slint_res[:1500]}",
+                                        tool_call_id=_srid,
+                                        name="lint",
+                                    )
+                                )
+                                messages.append(
+                                    LLMMessage(
+                                        role="system",
+                                        content=(
+                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
+                                            "Fix all reported issues NOW before proceeding to the next step. "
+                                            f"Repair round {_srep + 1}/{MAX_REPAIR_ROUNDS}."
+                                        ),
+                                    )
+                                )
+                                logger.info(
+                                    "Agent %s (streaming): lint failed, repair round %d",
+                                    agent.id,
+                                    _srep + 1,
+                                )
+                                _sfix = await self._llm.chat(
+                                    messages=messages,
+                                    provider=use_provider,
+                                    model=use_model,
+                                    temperature=agent.temperature,
+                                    max_tokens=agent.max_tokens,
+                                    system_prompt="",
+                                    tools=tools,
+                                )
+                                total_tokens_in += _sfix.tokens_in
+                                total_tokens_out += _sfix.tokens_out
+                                if not _sfix.tool_calls:
+                                    break
+                                for _stc in _sfix.tool_calls:
+                                    _sres = await _execute_tool(
+                                        _stc, ctx, self._registry, self._llm
+                                    )
+                                    all_tool_calls.append(
+                                        {
+                                            "name": _stc.function_name,
+                                            "args": _stc.arguments,
+                                            "result": _sres[:500],
+                                        }
+                                    )
+                                    messages.append(
+                                        LLMMessage(
+                                            role="tool",
+                                            content=_sres[:2000],
+                                            tool_call_id=_stc.id,
+                                            name=_stc.function_name,
+                                        )
+                                    )
+                            except Exception as _sve:
+                                logger.warning(
+                                    "Auto-verify (streaming) error: %s", _sve
+                                )
+                                break
+
                 # Limit message window to prevent OOM
                 if len(messages) > 20:
                     tail = messages[-15:]
@@ -889,6 +1237,7 @@ class AgentExecutor:
             final_content = _strip_raw_tokens(final_content)
             delegations = self._parse_delegations(final_content)
 
+            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
             yield (
                 "result",
                 ExecutionResult(

@@ -62,20 +62,21 @@ async def setup_page(request: Request):
 
 @router.get("/", response_class=HTMLResponse)
 async def home_page(request: Request):
-    """Adaptive dashboard — content varies by SAFe perspective."""
+    """Home — CTO Jarvis, Idéation Business, Idéation Projet."""
+    tab = request.query_params.get("tab", "cto")
+    return _templates(request).TemplateResponse(
+        "home.html",
+        {"request": request, "page_title": "Home", "active_tab": tab},
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    """Dashboard redirect to portfolio (backward compat)."""
     from starlette.responses import RedirectResponse
 
-    perspective = getattr(request.state, "perspective", "admin")
-    # Only DSI, Business Owner, and Overview land on the portfolio tabs
-    tab_map = {"dsi": "dsi", "business_owner": "metier", "overview": "overview"}
-    if perspective in tab_map:
-        return RedirectResponse(
-            url=f"/portfolio?tab={tab_map[perspective]}", status_code=302
-        )
-    return _templates(request).TemplateResponse(
-        "dashboard.html",
-        {"request": request, "page_title": "Dashboard"},
-    )
+    tab = request.query_params.get("tab", "overview")
+    return RedirectResponse(url=f"/portfolio?tab={tab}", status_code=302)
 
 
 @router.get("/portfolio", response_class=HTMLResponse)
@@ -383,7 +384,7 @@ async def pi_board_page(request: Request):
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
 
-    runs = get_mission_run_store().list_runs(limit=50)
+    runs = get_mission_run_store().list_runs(limit=500)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
@@ -504,6 +505,7 @@ async def workflows_page(request: Request, tab: str = "templates"):
 async def workflows_list(request: Request):
     """Partial: workflow templates list (no tabs wrapper)."""
     from ...workflows.store import get_workflow_store
+
     workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse(
         "partials/workflows_list.html",
@@ -517,35 +519,57 @@ async def workflows_evolution(request: Request):
     from ...db.migrations import get_db
     from ...workflows.store import get_workflow_store
     import json as _json
+
     db = get_db()
-    proposals = [dict(r) for r in db.execute(
-        "SELECT * FROM evolution_proposals ORDER BY fitness DESC, created_at DESC LIMIT 50"
-    ).fetchall()]
-    runs = [dict(r) for r in db.execute(
-        "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
-    ).fetchall()]
+    proposals = [
+        dict(r)
+        for r in db.execute(
+            "SELECT * FROM evolution_proposals ORDER BY fitness DESC, created_at DESC LIMIT 50"
+        ).fetchall()
+    ]
+    runs = [
+        dict(r)
+        for r in db.execute(
+            "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
+        ).fetchall()
+    ]
     db.close()
+    from datetime import datetime as _datetime_type
+
     for p in proposals:
         try:
             p["genome"] = _json.loads(p.pop("genome_json", "{}"))
         except Exception:
             p["genome"] = {}
+        for k, v in p.items():
+            if isinstance(v, _datetime_type):
+                p[k] = v.isoformat()
     for r in runs:
         try:
             r["fitness_history"] = _json.loads(r.pop("fitness_history_json", "[]"))
         except Exception:
             r["fitness_history"] = []
+        for k, v in r.items():
+            if isinstance(v, _datetime_type):
+                r[k] = v.isoformat()
     # RL stats
     rl_stats = {}
     try:
         from ...agents.rl_policy import get_rl_policy
+
         rl_stats = get_rl_policy().stats()
     except Exception:
         pass
     workflows = get_workflow_store().list_all()
     return _templates(request).TemplateResponse(
         "partials/workflows_evolution.html",
-        {"request": request, "proposals": proposals, "runs": runs, "rl_stats": rl_stats, "workflows": workflows},
+        {
+            "request": request,
+            "proposals": proposals,
+            "runs": runs,
+            "rl_stats": rl_stats,
+            "workflows": workflows,
+        },
     )
 
 
@@ -737,7 +761,6 @@ async def monitoring_page(request: Request):
 @router.get("/ops", response_class=HTMLResponse)
 async def ops_page(request: Request):
     """Observability — LLM latency, errors, queue, provider Thompson."""
-    import json as _json
     from ...db.migrations import get_db
 
     db = get_db()
@@ -764,6 +787,7 @@ async def ops_page(request: Request):
     llm_thompson = []
     try:
         from ...llm.llm_thompson import llm_thompson_stats
+
         llm_thompson = llm_thompson_stats()
     except Exception:
         pass
@@ -772,8 +796,11 @@ async def ops_page(request: Request):
     active_missions = []
     try:
         from ...missions.store import get_mission_run_store
+
         runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [r for r in runs if getattr(r, "status", "") in ("active", "running")]
+        active_missions = [
+            r for r in runs if getattr(r, "status", "") in ("active", "running")
+        ]
     except Exception:
         pass
 
@@ -796,6 +823,7 @@ async def ops_page(request: Request):
     rl_stats = {}
     try:
         from ...agents.rl_policy import get_rl_policy
+
         rl_stats = get_rl_policy().stats()
     except Exception:
         pass
@@ -838,11 +866,14 @@ async def settings_page(request: Request):
     cfg = get_config()
     db = get_db()
     try:
-        rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
+        rows = db.execute(
+            "SELECT * FROM integrations ORDER BY category, name"
+        ).fetchall()
         integrations = []
         for r in rows:
             d = dict(r)
             d["config"] = _json.loads(d.get("config_json") or "{}")
+            d["agent_roles"] = _json.loads(d.get("agent_roles") or "[]")
             integrations.append(d)
     except Exception:
         integrations = []
@@ -860,6 +891,81 @@ async def settings_page(request: Request):
     )
 
 
+@router.post("/api/settings/orchestrator")
+async def save_orchestrator_settings(request: Request):
+    """Save mission concurrency + backpressure + worker_nodes settings and apply them live."""
+    from ...config import get_config, save_config
+    from ..helpers import get_mission_semaphore
+
+    body = await request.json()
+    cfg = get_config()
+    oc = cfg.orchestrator
+
+    if "mission_semaphore" in body:
+        oc.mission_semaphore = max(1, min(10, int(body["mission_semaphore"])))
+    if "resume_stagger_startup" in body:
+        oc.resume_stagger_startup = max(1.0, float(body["resume_stagger_startup"]))
+    if "resume_stagger_watchdog" in body:
+        oc.resume_stagger_watchdog = max(1.0, float(body["resume_stagger_watchdog"]))
+    if "resume_batch_startup" in body:
+        oc.resume_batch_startup = max(1, min(20, int(body["resume_batch_startup"])))
+    if "cpu_green" in body:
+        oc.cpu_green = max(10.0, min(60.0, float(body["cpu_green"])))
+    if "cpu_yellow" in body:
+        oc.cpu_yellow = max(oc.cpu_green + 5, min(80.0, float(body["cpu_yellow"])))
+    if "cpu_red" in body:
+        oc.cpu_red = max(oc.cpu_yellow + 5, min(95.0, float(body["cpu_red"])))
+    if "ram_red" in body:
+        oc.ram_red = max(50.0, min(95.0, float(body["ram_red"])))
+    if "max_active_projects" in body:
+        oc.max_active_projects = max(0, min(20, int(body["max_active_projects"])))
+    if "deployed_container_ttl_hours" in body:
+        oc.deployed_container_ttl_hours = max(
+            0.0, min(168.0, float(body["deployed_container_ttl_hours"]))
+        )
+    if "worker_nodes" in body:
+        raw = body["worker_nodes"]
+        if isinstance(raw, list):
+            oc.worker_nodes = [u.strip() for u in raw if u.strip()]
+        elif isinstance(raw, str):
+            oc.worker_nodes = [u.strip() for u in raw.splitlines() if u.strip()]
+
+    save_config(cfg)
+    # Apply semaphore change live
+    get_mission_semaphore()
+
+    # Append live system metrics to response
+    try:
+        import psutil
+
+        _cpu_now = psutil.cpu_percent(interval=0.5)
+        _ram = psutil.virtual_memory()
+        _ram_now = _ram.percent
+        _ram_total_gb = round(_ram.total / 1024**3, 1)
+        _ram_used_gb = round(_ram.used / 1024**3, 1)
+    except Exception:
+        _cpu_now = _ram_now = _ram_total_gb = _ram_used_gb = 0
+
+    return {
+        "ok": True,
+        "mission_semaphore": oc.mission_semaphore,
+        "resume_stagger_startup": oc.resume_stagger_startup,
+        "resume_stagger_watchdog": oc.resume_stagger_watchdog,
+        "resume_batch_startup": oc.resume_batch_startup,
+        "cpu_green": oc.cpu_green,
+        "cpu_yellow": oc.cpu_yellow,
+        "cpu_red": oc.cpu_red,
+        "ram_red": oc.ram_red,
+        "max_active_projects": oc.max_active_projects,
+        "deployed_container_ttl_hours": oc.deployed_container_ttl_hours,
+        "worker_nodes": oc.worker_nodes,
+        "cpu_now": _cpu_now,
+        "ram_now": _ram_now,
+        "ram_total_gb": _ram_total_gb,
+        "ram_used_gb": _ram_used_gb,
+    }
+
+
 # ── Admin Users ──────────────────────────────────────────────────
 
 
@@ -867,6 +973,7 @@ async def settings_page(request: Request):
 async def admin_users_page(request: Request):
     """Admin page for user management (CRUD) — kept for backward compat."""
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse("/rbac", status_code=302)
 
 
@@ -1232,7 +1339,6 @@ async def product_line_page(request: Request):
         milestones = []
         if proj_missions:
             completed = sum(1 for e in epics_data if e["status"] == "completed")
-            running = sum(1 for e in epics_data if e["status"] == "running")
             total_ep = len(epics_data)
 
             milestones.append(
@@ -1475,145 +1581,6 @@ async def product_page(request: Request):
     )
 
 
-@router.get("/ops", response_class=HTMLResponse)
-async def ops_page(request: Request):
-    """Ops observability dashboard — system health, logs, TMA, RL/GA status."""
-    import os as _os
-    from ...db.migrations import get_db
-
-    db = get_db()
-
-    # LLM usage last 24h per provider
-    llm_providers = []
-    try:
-        rows = db.execute("""
-            SELECT provider, model,
-                COUNT(*) as total_calls,
-                SUM(CASE WHEN error THEN 1 ELSE 0 END) as errors,
-                AVG(CASE WHEN NOT error THEN tokens_in + tokens_out ELSE NULL END) as avg_tokens,
-                MAX(created_at) as last_call
-            FROM llm_usage
-            WHERE created_at >= datetime('now', '-24 hours')
-            GROUP BY provider, model
-            ORDER BY total_calls DESC
-        """).fetchall()
-        llm_providers = [dict(r) for r in rows]
-    except Exception:
-        pass
-
-    # Active missions
-    active_missions = []
-    try:
-        from ...missions.store import get_mission_run_store
-        runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [r for r in runs if getattr(r, "status", "") in ("active", "running")]
-    except Exception:
-        pass
-
-    # Top errors last 24h
-    top_errors = []
-    try:
-        rows = db.execute("""
-            SELECT error_type, COUNT(*) as cnt, MAX(created_at) as last_seen
-            FROM incidents
-            WHERE created_at >= datetime('now', '-24 hours')
-            GROUP BY error_type
-            ORDER BY cnt DESC
-            LIMIT 10
-        """).fetchall()
-        top_errors = [dict(r) for r in rows]
-    except Exception:
-        pass
-
-    # RL + GA summary
-    rl_stats = {}
-    try:
-        from ...agents.rl_policy import get_rl_policy
-        rl_stats = get_rl_policy().stats()
-    except Exception:
-        pass
-
-    ga_summary = {}
-    try:
-        rows2 = db.execute(
-            "SELECT COUNT(*) as total, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending, "
-            "MAX(fitness) as best_fitness FROM evolution_proposals"
-        ).fetchone()
-        ga_summary = dict(rows2) if rows2 else {}
-    except Exception:
-        pass
-
-    # System health
-    db_size_kb = 0
-    try:
-        from ...config import DB_PATH
-        db_size_kb = DB_PATH.stat().st_size // 1024
-    except Exception:
-        pass
-
-    nb_agents = 0
-    try:
-        from ...agents.store import get_agent_store
-        nb_agents = len(get_agent_store().list_all())
-    except Exception:
-        pass
-
-    # Recent error logs from server log file
-    recent_logs: list[str] = []
-    try:
-        from ...config import FACTORY_ROOT
-        for log_name in ("server_8099.log", "server.log"):
-            log_path = FACTORY_ROOT / log_name
-            if log_path.exists():
-                lines = log_path.read_text(errors="replace").splitlines()
-                recent_logs = [
-                    l for l in lines
-                    if "ERROR" in l or "WARNING" in l or "CRITICAL" in l
-                ][-20:]
-                break
-    except Exception:
-        pass
-
-    # TMA heartbeat stats
-    tma_stats: dict = {}
-    try:
-        from ...ops.auto_heal import get_autoheal_stats
-        tma_stats = get_autoheal_stats()
-    except Exception:
-        pass
-
-    # DB table sizes
-    table_sizes: dict[str, int] = {}
-    _tables = ("missions", "mission_runs", "llm_usage", "memory_global",
-               "evolution_proposals", "rl_experience", "agent_scores", "incidents")
-    for tbl in _tables:
-        try:
-            row = db.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
-            table_sizes[tbl] = row[0] if row else 0
-        except Exception:
-            pass
-
-    db.close()
-
-    return _templates(request).TemplateResponse(
-        "ops.html",
-        {
-            "request": request,
-            "page_title": "Ops",
-            "llm_providers": llm_providers,
-            "active_missions": active_missions,
-            "top_errors": top_errors,
-            "rl_stats": rl_stats,
-            "ga_summary": ga_summary,
-            "db_size_kb": db_size_kb,
-            "nb_agents": nb_agents,
-            "recent_logs": recent_logs,
-            "tma_stats": tma_stats,
-            "table_sizes": table_sizes,
-        },
-    )
-
-
 @router.get("/manifest.json")
 async def manifest_json():
     """Serve PWA manifest."""
@@ -1626,7 +1593,10 @@ async def manifest_json():
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request):
-    """Analytics dashboard — redirects to unified Metrics page."""
-    from starlette.responses import RedirectResponse
+    """Analytics dashboard — cost & token analytics."""
+    from ..helpers import _templates
 
-    return RedirectResponse("/metrics?tab=analytics", status_code=302)
+    return _templates(request).TemplateResponse(
+        "analytics.html",
+        {"request": request, "page_title": "Analytics"},
+    )

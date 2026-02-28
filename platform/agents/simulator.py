@@ -3,6 +3,7 @@ Mission Simulator — synthetic training data generator for GA + RL cold start.
 
 Generates N simulated workflow runs with plausible phase outcomes based on
 domain knowledge priors (pattern effectiveness, gate strictness, agent seniority).
+Priors are auto-calibrated from real phase_outcomes when sufficient data exists.
 
 Usage:
     from platform.agents.simulator import MissionSimulator
@@ -20,9 +21,11 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-# ── Priors ──────────────────────────────────────────────────────────────────
+# ── Priors (complexity-scaled; overridden by calibrate_pattern_mods()) ────────
 
-# Pattern modifier: how much each pattern improves P(phase_success) over base
+# Pattern modifier: how much each pattern improves P(phase_success) over base.
+# These are DEFAULT priors — calibrate_pattern_mods() overrides them with real data.
+# Note: complex workflows amplify these; trivial workflows suppress them entirely.
 PATTERN_MODS: dict[str, float] = {
     "parallel": 0.15,
     "hierarchical": 0.10,
@@ -38,6 +41,9 @@ PATTERN_MODS: dict[str, float] = {
     "swarm": 0.0,
 }
 
+# Whether PATTERN_MODS have been calibrated from real data this session
+_CALIBRATED = False
+
 # Gate modifier: gate strictness improves quality but costs duration
 GATE_MODS: dict[str, tuple[float, float]] = {
     # (quality_bonus, duration_penalty)
@@ -52,6 +58,14 @@ BASE_SUCCESS_RATE = 0.60  # baseline P(phase_success)
 NOISE_SIGMA = 0.10  # gaussian noise std
 QUALITY_BASE = 0.55  # baseline quality score
 QUALITY_SIGMA = 0.12
+
+# Complexity scaling: how much pattern bonuses apply per tier
+_COMPLEXITY_SCALE = {
+    "trivial": 0.0,  # 1-2 phase workflows: patterns irrelevant
+    "simple": 0.4,  # tma, cicd, sast
+    "medium": 0.7,  # feature, quality-improvement
+    "complex": 1.0,  # product-lifecycle, ideation-to-prod
+}
 
 
 class MissionSimulator:
@@ -70,6 +84,75 @@ class MissionSimulator:
             self._agent_store = get_agent_store()
 
     # ── Public API ──────────────────────────────────────────────────────────
+
+    def calibrate_pattern_mods(self, min_rows: int = 30) -> dict[str, float]:
+        """
+        Override PATTERN_MODS with empirical averages from real phase_outcomes.
+        Only updates patterns with enough data (min_rows per pattern).
+        Returns the updated dict (patterns not yet calibrated keep prior values).
+        """
+        global PATTERN_MODS, _CALIBRATED
+        try:
+            from ..db.migrations import get_db
+
+            db = get_db()
+            rows = db.execute(
+                """
+                SELECT pattern_id,
+                       AVG(success) as avg_success,
+                       AVG(quality_score) as avg_quality,
+                       COUNT(*) as n
+                FROM phase_outcomes
+                GROUP BY pattern_id
+                HAVING COUNT(*) >= ?
+            """,
+                (min_rows,),
+            ).fetchall()
+            db.close()
+
+            if not rows:
+                log.debug(
+                    "Simulator: no phase_outcomes for calibration yet, using priors"
+                )
+                return PATTERN_MODS
+
+            # Compute global baseline from all data
+            db2 = db  # already closed, re-fetch
+            try:
+                from ..db.migrations import get_db as _gdb
+
+                db2 = _gdb()
+                baseline_row = db2.execute(
+                    "SELECT AVG(success), AVG(quality_score) FROM phase_outcomes"
+                ).fetchone()
+                db2.close()
+                global_success = float(baseline_row[0] or BASE_SUCCESS_RATE)
+            except Exception:
+                global_success = BASE_SUCCESS_RATE
+
+            calibrated = 0
+            for r in rows:
+                pat = r["pattern_id"] if hasattr(r, "__getitem__") else r[0]
+                avg_s = float(r["avg_success"] if hasattr(r, "__getitem__") else r[1])
+                n = int(r["n"] if hasattr(r, "__getitem__") else r[3])
+                # Real modifier = empirical success delta vs global baseline
+                real_mod = avg_s - global_success
+                old = PATTERN_MODS.get(pat, 0.0)
+                # Weighted blend: more data → trust empirical more
+                weight = min(0.9, n / 500.0)  # 500+ rows = 90% empirical
+                PATTERN_MODS[pat] = round((1 - weight) * old + weight * real_mod, 4)
+                calibrated += 1
+
+            _CALIBRATED = True
+            log.info(
+                f"Simulator: calibrated {calibrated} pattern mods from real data. "
+                f"parallel={PATTERN_MODS.get('parallel', 0):.3f} "
+                f"sequential={PATTERN_MODS.get('sequential', 0):.3f}"
+            )
+            return PATTERN_MODS
+        except Exception as e:
+            log.debug(f"Simulator calibrate_pattern_mods: {e}")
+            return PATTERN_MODS
 
     def run_all(self, n_runs_per_workflow: int = 200) -> dict[str, int]:
         """Simulate n_runs_per_workflow for every known workflow. Returns {wf_id: rows_inserted}."""
@@ -138,11 +221,14 @@ class MissionSimulator:
         )
         return updated
 
-    def simulate_genome(self, genome: list[dict[str, Any]], n: int = 50) -> float:
+    def simulate_genome(
+        self, genome: list[dict[str, Any]], n: int = 50, complexity: str = "simple"
+    ) -> float:
         """
         Simulate n runs of a GA genome (list of PhaseSpec dicts) and return
         estimated fitness = avg(success_rate × quality_score).
         Called by GA engine for evolved offspring without real data.
+        Pattern bonuses are scaled by complexity tier.
         """
         if not genome:
             return 0.0
@@ -155,7 +241,9 @@ class MissionSimulator:
             phase_successes: list[float] = []
             phase_qualities: list[float] = []
             for phase_spec in genome:
-                success, quality = self._simulate_phase_spec(phase_spec, all_agents)
+                success, quality = self._simulate_phase_spec(
+                    phase_spec, all_agents, complexity
+                )
                 phase_successes.append(success)
                 phase_qualities.append(quality)
             # Fitness: geometric mean of phase successes × avg quality
@@ -179,7 +267,9 @@ class MissionSimulator:
         for agent_id in agents:
             agent = all_agents.get(agent_id)
             seniority = self._agent_seniority(agent)
-            p_success, quality = self._compute_outcome(pattern_id, gate, seniority)
+            p_success, quality = self._compute_outcome(
+                pattern_id, gate, seniority, "simple"
+            )
             accepted = 1 if random.random() < p_success else 0
             rejected = 1 - accepted
             results[agent_id] = {
@@ -190,7 +280,7 @@ class MissionSimulator:
         return results
 
     def _simulate_phase_spec(
-        self, phase_spec: dict, all_agents: dict
+        self, phase_spec: dict, all_agents: dict, complexity: str = "simple"
     ) -> tuple[float, float]:
         """Return (success_prob, quality) for a GA genome phase spec."""
         pattern_id = phase_spec.get("pattern_id", "sequential")
@@ -201,13 +291,16 @@ class MissionSimulator:
         seniority = sum(self._agent_seniority(all_agents.get(a)) for a in agents) / len(
             agents
         )
-        return self._compute_outcome(pattern_id, gate, seniority)
+        return self._compute_outcome(pattern_id, gate, seniority, complexity)
 
     def _compute_outcome(
-        self, pattern_id: str, gate: str, seniority: float
+        self, pattern_id: str, gate: str, seniority: float, complexity: str = "simple"
     ) -> tuple[float, float]:
-        """Compute (p_success, quality_score) given priors + gaussian noise."""
-        p_mod = PATTERN_MODS.get(pattern_id, 0.0)
+        """Compute (p_success, quality_score) given priors + gaussian noise.
+        Pattern mods are scaled by complexity tier — trivial workflows get 0 bonus.
+        """
+        scale = _COMPLEXITY_SCALE.get(complexity, 0.7)
+        p_mod = PATTERN_MODS.get(pattern_id, 0.0) * scale
         g_qual, _g_dur = GATE_MODS.get(gate, (0.0, 0.0))
         # Seniority: rank 10=top → 1.0 bonus, rank 50=mid → 0, rank 90=low → -0.2
         seniority_bonus = max(-0.20, min(0.25, (50 - seniority) / 200.0))
@@ -236,10 +329,10 @@ class MissionSimulator:
                     INSERT INTO agent_scores (agent_id, epic_id, accepted, rejected, iterations, quality_score)
                     VALUES (?, ?, ?, ?, ?, ?)
                     ON CONFLICT(agent_id, epic_id) DO UPDATE SET
-                        accepted = accepted + excluded.accepted,
-                        rejected = rejected + excluded.rejected,
-                        iterations = iterations + 1,
-                        quality_score = (quality_score + excluded.quality_score) / 2.0
+                        accepted = agent_scores.accepted + excluded.accepted,
+                        rejected = agent_scores.rejected + excluded.rejected,
+                        iterations = agent_scores.iterations + 1,
+                        quality_score = (agent_scores.quality_score + excluded.quality_score) / 2.0
                 """,
                     (
                         agent_id,

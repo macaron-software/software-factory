@@ -15,6 +15,35 @@ SCHEMA_PG_PATH = Path(__file__).parent / "schema_pg.sql"
 
 _USE_PG = is_postgresql()
 
+# Increment this when adding new migration blocks (SQLite or PG).
+_SCHEMA_VERSION = 2
+
+
+def get_schema_version() -> int:
+    """Return the schema version recorded in the DB (0 if not yet tracked)."""
+    try:
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT version FROM schema_version ORDER BY version DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        return row[0] if row else 0
+    except Exception:
+        return 0
+
+
+def _bump_schema_version(conn, version: int) -> None:
+    """Record the applied schema version (idempotent)."""
+    try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER PRIMARY KEY, applied_at TEXT DEFAULT (datetime('now')))"
+        )
+        conn.execute(
+            "INSERT OR REPLACE INTO schema_version (version) VALUES (?)", (version,)
+        )
+    except Exception:
+        pass
+
 
 def _pg_column_exists(conn, table: str, column: str) -> bool:
     """Check if a column exists in a PostgreSQL table."""
@@ -35,8 +64,13 @@ def _pg_table_exists(conn, table: str) -> bool:
 
 def init_db(db_path: Path = DB_PATH):
     """Initialize database with schema. Safe to call multiple times."""
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
     if _USE_PG:
-        return _init_pg()
+        conn = _init_pg()
+        _log.info("DB (PostgreSQL) schema v%s ready", _SCHEMA_VERSION)
+        return conn
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
@@ -49,6 +83,7 @@ def init_db(db_path: Path = DB_PATH):
     conn.execute("PRAGMA foreign_keys=ON")
     _migrate(conn)
     conn.commit()
+    _log.info("DB (SQLite) schema v%s ready", _SCHEMA_VERSION)
     return conn
 
 
@@ -58,6 +93,7 @@ def _init_pg():
     schema = SCHEMA_PG_PATH.read_text()
     conn.executescript(schema)
     conn.commit()
+    _migrate_pg(conn)
     return conn
 
 
@@ -119,6 +155,20 @@ def _migrate(conn):
             conn.execute(
                 "ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''"
             )
+        if mr_cols and "llm_cost_usd" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN llm_cost_usd REAL DEFAULT 0.0"
+            )
+        if mr_cols and "resume_attempts" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN resume_attempts INTEGER DEFAULT 0"
+            )
+        if mr_cols and "human_input_required" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN human_input_required INTEGER DEFAULT 0"
+            )
+        if mr_cols and "last_resume_at" not in mr_cols:
+            conn.execute("ALTER TABLE mission_runs ADD COLUMN last_resume_at TEXT")
     except Exception:
         pass
 
@@ -431,6 +481,384 @@ def _migrate(conn):
                 integ,
             )
 
+    # ── Integrations: add category/icon/description/agent_roles columns (v2+) ──
+    for col, typedef in [
+        ("category", "TEXT DEFAULT 'devops'"),
+        ("icon", "TEXT DEFAULT '🔌'"),
+        ("description", "TEXT DEFAULT ''"),
+        ("agent_roles", "TEXT DEFAULT '[]'"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE integrations ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
+
+    # ── Seed extended integrations (30+ tools across all agent categories) ──
+    _integ_extended = [
+        # ── Dev & DevOps ──
+        (
+            "jira",
+            "Jira",
+            "project_management",
+            "devops",
+            "🎯",
+            "Backlog, sprints, tickets, bidirectional sync.",
+            '{"url":"","project_key":"","mode":"import"}',
+            '["dev","qa","product","architecture","tma"]',
+        ),
+        (
+            "confluence",
+            "Confluence",
+            "documentation",
+            "devops",
+            "📄",
+            "Import pages into Memory. Auto-publish ADRs, retros, guidelines.",
+            '{"url":"","space_key":"","auto_publish":["adr","retro"]}',
+            '["dev","architecture","product","tma"]',
+        ),
+        (
+            "gitlab",
+            "GitLab",
+            "devops",
+            "devops",
+            "🦊",
+            "MR reviews, CI/CD pipelines, container registry, Wiki.",
+            '{"url":"","project_id":"","ci_sync":true}',
+            '["dev","architecture","security","qa"]',
+        ),
+        (
+            "azure-devops",
+            "Azure DevOps",
+            "devops",
+            "devops",
+            "🔷",
+            "Boards, Pipelines, Repos, Artifacts sync.",
+            '{"org":"","project":"","boards_sync":true}',
+            '["dev","architecture","qa"]',
+        ),
+        (
+            "sonarqube",
+            "SonarQube",
+            "quality",
+            "devops",
+            "📊",
+            "Quality gates, coverage, code smells, security hotspots.",
+            '{"url":"","project_key":"","quality_gate":true}',
+            '["dev","architecture","security","qa","reviewer"]',
+        ),
+        (
+            "xray",
+            "Xray",
+            "test_management",
+            "testing",
+            "🧪",
+            "Test plans, test runs, traceability to requirements.",
+            '{"url":"","test_plan_sync":true}',
+            '["qa","dev"]',
+        ),
+        # ── Communication & Alerting ──
+        (
+            "slack",
+            "Slack",
+            "communication",
+            "communication",
+            "💬",
+            "Post notifications, alerts, and reports. Receive commands.",
+            '{"webhook_url":"","channel":"#platform","notify_on":["mission_done","incident","deploy"]}',
+            '["dev","qa","product","architecture","security","marketing","tma","tmc"]',
+        ),
+        (
+            "teams",
+            "Microsoft Teams",
+            "communication",
+            "communication",
+            "👥",
+            "Post to Teams channels. Adaptive cards for mission reports.",
+            '{"webhook_url":"","channel":"","tenant_id":""}',
+            '["dev","qa","product","architecture","tma","tmc"]',
+        ),
+        (
+            "email-smtp",
+            "Email / SMTP",
+            "communication",
+            "communication",
+            "📧",
+            "Send reports, alerts, and summaries by email.",
+            '{"host":"","port":587,"user":"","from":"","tls":true}',
+            '["dev","qa","product","marketing","tma","tmc","security"]',
+        ),
+        # ── Monitoring / Observability ──
+        (
+            "grafana",
+            "Grafana",
+            "monitoring",
+            "monitoring",
+            "📈",
+            "Query dashboards, alerts, annotations. Trigger runbooks.",
+            '{"url":"","api_key":"","org_id":1}',
+            '["dev","architecture","tmc","security"]',
+        ),
+        (
+            "datadog",
+            "Datadog",
+            "monitoring",
+            "monitoring",
+            "🐶",
+            "Metrics, traces, logs, SLOs, incidents.",
+            '{"api_key":"","app_key":"","site":"datadoghq.eu"}',
+            '["dev","architecture","tmc","security"]',
+        ),
+        (
+            "sentry",
+            "Sentry",
+            "monitoring",
+            "monitoring",
+            "🚨",
+            "Error tracking, performance, release health.",
+            '{"dsn":"","org":"","project":"","token":""}',
+            '["dev","qa","tmc"]',
+        ),
+        (
+            "pagerduty",
+            "PagerDuty",
+            "incident",
+            "monitoring",
+            "🔔",
+            "Create/resolve incidents, escalate on-call, runbooks.",
+            '{"api_key":"","service_id":"","escalation_policy":""}',
+            '["dev","tmc","security","architecture"]',
+        ),
+        (
+            "opsgenie",
+            "OpsGenie",
+            "incident",
+            "monitoring",
+            "🚒",
+            "Alert management, on-call schedules, incident response.",
+            '{"api_key":"","team":""}',
+            '["dev","tmc","security"]',
+        ),
+        # ── Security ──
+        (
+            "snyk",
+            "Snyk",
+            "security",
+            "security",
+            "🛡️",
+            "Dependency vulnerabilities, IaC security, container scanning.",
+            '{"token":"","org_id":"","auto_fix":false}',
+            '["security","dev","architecture"]',
+        ),
+        (
+            "trivy",
+            "Trivy",
+            "security",
+            "security",
+            "🔍",
+            "Container image and filesystem vulnerability scanner.",
+            '{"server_url":"","severity":"CRITICAL,HIGH"}',
+            '["security","dev"]',
+        ),
+        (
+            "wiz",
+            "Wiz",
+            "security",
+            "security",
+            "🌪️",
+            "Cloud security posture, CSPM, CWPP.",
+            '{"api_endpoint":"","client_id":"","client_secret":""}',
+            '["security","architecture"]',
+        ),
+        # ── ITSM / TMA / MCO ──
+        (
+            "servicenow",
+            "ServiceNow",
+            "itsm",
+            "itsm",
+            "🏢",
+            "Incidents, change requests, CMDB, SLA tracking.",
+            '{"instance":"","user":"","table":"incident"}',
+            '["tma","tmc","product","architecture"]',
+        ),
+        (
+            "glpi",
+            "GLPI",
+            "itsm",
+            "itsm",
+            "🖥️",
+            "IT asset management, helpdesk tickets, inventory.",
+            '{"url":"","app_token":"","user_token":""}',
+            '["tma","tmc"]',
+        ),
+        (
+            "freshservice",
+            "Freshservice",
+            "itsm",
+            "itsm",
+            "🎫",
+            "IT service management, asset tracking, CMDB.",
+            '{"domain":"","api_key":""}',
+            '["tma","tmc","product"]',
+        ),
+        (
+            "zendesk",
+            "Zendesk",
+            "itsm",
+            "itsm",
+            "🎭",
+            "Customer support tickets, macros, analytics.",
+            '{"subdomain":"","email":"","api_token":""}',
+            '["tma","marketing","product"]',
+        ),
+        # ── Marketing & Analytics ──
+        (
+            "google-analytics",
+            "Google Analytics",
+            "analytics",
+            "marketing",
+            "📊",
+            "Traffic, conversions, events, user journeys.",
+            '{"property_id":"","view_id":"","service_account_json":""}',
+            '["marketing","product"]',
+        ),
+        (
+            "matomo",
+            "Matomo",
+            "analytics",
+            "marketing",
+            "📉",
+            "Privacy-first web analytics. Custom events, funnels.",
+            '{"url":"","token":"","site_id":1}',
+            '["marketing","product"]',
+        ),
+        (
+            "hubspot",
+            "HubSpot",
+            "crm",
+            "marketing",
+            "🟠",
+            "CRM contacts, deals, campaigns, lead scoring.",
+            '{"api_key":"","portal_id":""}',
+            '["marketing","product"]',
+        ),
+        (
+            "mixpanel",
+            "Mixpanel",
+            "analytics",
+            "marketing",
+            "🔮",
+            "Product analytics, A/B tests, user retention.",
+            '{"project_token":"","secret":""}',
+            '["marketing","product"]',
+        ),
+        # ── Cloud & Infra ──
+        (
+            "aws",
+            "Amazon Web Services",
+            "cloud",
+            "infra",
+            "☁️",
+            "EC2, S3, Lambda, RDS, CloudWatch. Deploy and monitor.",
+            '{"access_key_id":"","region":"eu-west-1","account_id":""}',
+            '["dev","architecture","tmc","security"]',
+        ),
+        (
+            "azure-cloud",
+            "Microsoft Azure",
+            "cloud",
+            "infra",
+            "🔵",
+            "AKS, App Service, Azure Functions, Blob Storage.",
+            '{"subscription_id":"","tenant_id":"","client_id":""}',
+            '["dev","architecture","tmc","security"]',
+        ),
+        (
+            "gcp",
+            "Google Cloud Platform",
+            "cloud",
+            "infra",
+            "🌤️",
+            "GKE, Cloud Run, BigQuery, Pub/Sub.",
+            '{"project_id":"","service_account_json":""}',
+            '["dev","architecture","tmc"]',
+        ),
+        (
+            "docker-registry",
+            "Docker Registry",
+            "registry",
+            "infra",
+            "🐳",
+            "Private image registry (Docker Hub, Harbor, ECR, ACR, GCR).",
+            '{"url":"","username":"","type":"hub"}',
+            '["dev","architecture"]',
+        ),
+        # ── Design ──
+        (
+            "figma",
+            "Figma",
+            "design",
+            "design",
+            "🎨",
+            "Component specs, design tokens, style guides via MCP.",
+            '{"access_token":"","team_id":"","file_key":""}',
+            '["ux","product","dev"]',
+        ),
+        (
+            "storybook",
+            "Storybook",
+            "design",
+            "design",
+            "📖",
+            "Component library, visual testing, accessibility checks.",
+            '{"url":"","token":""}',
+            '["ux","dev","qa"]',
+        ),
+        # ── Testing ──
+        (
+            "testrail",
+            "TestRail",
+            "test_management",
+            "testing",
+            "🧾",
+            "Test cases, suites, runs, milestones. Traceability.",
+            '{"url":"","user":"","api_key":""}',
+            '["qa","dev","product"]',
+        ),
+        (
+            "browserstack",
+            "BrowserStack",
+            "test_management",
+            "testing",
+            "🌐",
+            "Cross-browser, mobile, accessibility testing.",
+            '{"username":"","access_key":""}',
+            '["qa","dev"]',
+        ),
+        # ── Architecture / Wiki Guidelines ──
+        (
+            "wiki-guidelines",
+            "Architecture Guidelines (Wiki)",
+            "knowledge",
+            "architecture",
+            "📐",
+            "Scrape Confluence/GitLab Wiki → inject DSI guidelines in agent system prompts.",
+            '{"source":"confluence","space":"","confluence_url":"","domain":"","auto_inject":true}',
+            '["dev","architecture","security","reviewer","qa"]',
+        ),
+    ]
+    for row in _integ_extended:
+        iid, name, itype, category, icon, desc, cfg, roles = row
+        conn.execute(
+            "INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, config_json, agent_roles) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (iid, name, itype, category, icon, desc, cfg, roles),
+        )
+        # Update category/icon/description for existing rows (in case seeded without them)
+        conn.execute(
+            "UPDATE integrations SET category=?, icon=?, description=?, agent_roles=? WHERE id=?",
+            (category, icon, desc, roles, iid),
+        )
+
     # Auth & RBAC tables
     conn.execute("""
         CREATE TABLE IF NOT EXISTS session_state (
@@ -659,8 +1087,12 @@ def _migrate(conn):
             reviewed_at TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status)"
+    )
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS evolution_runs (
@@ -687,7 +1119,9 @@ def _migrate(conn):
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id)"
+    )
 
     # ── Simulation runs log ───────────────────────────────────────────
     conn.execute("""
@@ -722,16 +1156,808 @@ def _migrate(conn):
             (provider, model, inp, out),
         )
 
+    # ── Real execution analytics ──────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT NOT NULL,
+            workflow_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL DEFAULT 'sequential',
+            agent_ids_json TEXT NOT NULL DEFAULT '[]',
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            rejection_count INTEGER DEFAULT 0,
+            duration_secs REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
+
     # Add cost_usd to llm_traces if not present
     try:
         conn.execute("ALTER TABLE llm_traces ADD COLUMN cost_usd REAL DEFAULT 0.0")
     except Exception:
         pass
 
+    # ── Darwin / Thompson / GA / RL tables ───────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            avg_iterations REAL DEFAULT 0.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            retired INTEGER DEFAULT 0,
+            retired_at TIMESTAMP,
+            pinned INTEGER DEFAULT 0,
+            weight_multiplier REAL DEFAULT 1.0,
+            UNIQUE(agent_id, pattern_id, technology, phase_type)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tf_context ON team_fitness(technology, phase_type)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            generation INTEGER DEFAULT 0,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_selections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            workflow_id TEXT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            selection_method TEXT DEFAULT 'thompson',
+            score REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_ab_tests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            wins_a INTEGER DEFAULT 0,
+            wins_b INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            winner TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_okr (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective TEXT NOT NULL,
+            key_result TEXT NOT NULL,
+            target REAL DEFAULT 0.0,
+            current_value REAL DEFAULT 0.0,
+            unit TEXT DEFAULT '%',
+            period TEXT DEFAULT 'Q1-2026',
+            status TEXT DEFAULT 'on_track',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Knowledge Intelligence columns — memory_pattern
+    try:
+        mpt_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_pattern)").fetchall()
+        }
+        if mpt_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_pattern ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_pattern ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_pattern ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_pattern ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mpt_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+
+    # Agent role column in memory_project (cross-session role-scoped memory)
+    try:
+        mp_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
+        }
+        if mp_cols and "agent_role" not in mp_cols:
+            conn.execute(
+                "ALTER TABLE memory_project ADD COLUMN agent_role TEXT DEFAULT ''"
+            )
+    except Exception:
+        pass
+
+    # Knowledge Intelligence columns — access tracking + relevance scoring
+    try:
+        mp_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
+        }
+        if mp_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_project ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_project ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_project ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_project ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mp_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+    try:
+        mg_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_global)").fetchall()
+        }
+        if mg_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_global ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_global ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_global ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_global ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mg_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+
+    _ensure_sqlite_tables(conn)
+    _bump_schema_version(conn, _SCHEMA_VERSION)
+    conn.commit()
+
+
+def _ensure_sqlite_tables(conn) -> None:
+    """Create SQLite-only tables that may be missing on older DBs."""
+    # MCP server registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mcps (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            command TEXT NOT NULL DEFAULT '',
+            args_json TEXT DEFAULT '[]',
+            env_json TEXT DEFAULT '{}',
+            tools_json TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'stopped',
+            is_builtin INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Marketing ideation tables
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'running',
+            result_json TEXT DEFAULT '{}',
+            mission_id TEXT,
+            project_id TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            role TEXT DEFAULT 'assistant',
+            content TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Admin audit log
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            actor TEXT NOT NULL DEFAULT 'system',
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            detail TEXT,
+            ip TEXT,
+            user_agent TEXT
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
+    # Platform settings (rate limits, budget config, etc.)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        )
+    """)
+    # ── Multi-tenant Workspaces (added 2026-06) ──────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workspaces (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            color TEXT DEFAULT '#6366f1',
+            owner TEXT DEFAULT 'admin',
+            created_at TEXT DEFAULT (datetime('now')),
+            settings TEXT DEFAULT '{}'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workspace_members (
+            workspace_id TEXT,
+            user_id TEXT,
+            role TEXT DEFAULT 'member',
+            PRIMARY KEY (workspace_id, user_id)
+        )
+    """)
+    conn.execute(
+        "INSERT OR IGNORE INTO workspaces (id, name, slug, description) VALUES ('default', 'Default', 'default', 'Workspace par défaut')"
+    )
+    for table in ["sessions", "missions", "projects"]:
+        try:
+            existing_cols = {
+                r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if "workspace_id" not in existing_cols:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN workspace_id TEXT DEFAULT 'default'"
+                )
+        except Exception:
+            pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_key_scopes (
+            key_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            PRIMARY KEY (key_id, scope)
+        )
+    """)
+    # Group ideation sessions (added 2026-06)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
+    )
+    conn.commit()
+
+
 def _migrate_pg(conn):
     """PostgreSQL incremental migrations (safe ALTER TABLE IF NOT EXISTS)."""
-    # PG schema_pg.sql already includes all columns, but for future migrations:
-    pass
+    # Marketing ideation tables (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            project_id TEXT,
+            mission_id TEXT,
+            marketing_plan TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_messages (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            agent_id TEXT,
+            agent_name TEXT,
+            content TEXT,
+            color TEXT,
+            avatar_url TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_msgs_session ON mkt_ideation_messages(session_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mkt_ideation_findings (
+            id SERIAL PRIMARY KEY,
+            session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+            type TEXT,
+            text TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id)"
+    )
+    # Group ideation sessions table (added 2026-06)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
+    )
+    # MCP server registry (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS mcps (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            command TEXT NOT NULL,
+            args_json TEXT DEFAULT '[]',
+            env_json TEXT DEFAULT '{}',
+            tools_json TEXT DEFAULT '[]',
+            status TEXT DEFAULT 'stopped',
+            is_builtin INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # Projects: lifecycle phases (added 2026-02)
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS current_phase TEXT DEFAULT ''"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS phases_json TEXT DEFAULT '[]'"
+        )
+    except Exception:
+        pass
+    # Missions: category + active_phases (added 2026-02)
+    try:
+        conn.execute(
+            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'functional'"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS active_phases_json TEXT DEFAULT '[]'"
+        )
+    except Exception:
+        pass
+    # Backfill: mark auto-provisioned system missions as category='system'
+    try:
+        conn.execute(
+            "UPDATE missions SET category='system' WHERE type IN ('program','security','debt') AND config_json LIKE '%auto_provisioned%' AND category='functional'"
+        )
+        conn.execute(
+            "UPDATE missions SET category='system' WHERE name LIKE 'Self-Healing %' AND config_json LIKE '%auto_heal%' AND category='functional'"
+        )
+    except Exception:
+        pass
+    # GA/RL empirical data tables (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id SERIAL PRIMARY KEY,
+            workflow_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            agent_ids TEXT NOT NULL,
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            duration_s REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+    # Ensure all columns exist (migrate old schema that may be missing some)
+    for _col, _type, _default in [
+        ("complexity_tier", "TEXT", "'simple'"),
+        ("mission_id", "TEXT", "''"),
+        ("agent_ids_json", "TEXT", "''"),
+        ("rejection_count", "INTEGER", "0"),
+        ("duration_secs", "REAL", "0.0"),
+    ]:
+        try:
+            conn.execute(
+                f"ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS {_col} {_type} DEFAULT {_default}"
+            )
+        except Exception:
+            pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id SERIAL PRIMARY KEY,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
+    # Eval framework (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_datasets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            agent_id TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_cases (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            expected_output TEXT DEFAULT '',
+            tags TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_runs (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT NOT NULL,
+            agent_id TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            score_avg REAL,
+            created_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_results (
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            actual_output TEXT DEFAULT '',
+            score REAL,
+            judge_feedback TEXT DEFAULT '',
+            latency_ms INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    # Tool Builder (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS custom_tools (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            type TEXT NOT NULL,
+            config TEXT DEFAULT '{}',
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    _bump_schema_version(conn, _SCHEMA_VERSION)
+    conn.commit()
+
+
+def _ensure_darwin_tables(conn) -> None:
+    """Create Darwin/adaptive-AI tables if missing (called for existing DBs)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            wins INTEGER DEFAULT 0,
+            losses INTEGER DEFAULT 0,
+            avg_iterations REAL DEFAULT 0.0,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            retired INTEGER DEFAULT 0,
+            retired_at TIMESTAMP,
+            pinned INTEGER DEFAULT 0,
+            weight_multiplier REAL DEFAULT 1.0,
+            UNIQUE(agent_id, pattern_id, technology, phase_type)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tf_context ON team_fitness(technology, phase_type)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_fitness_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            snapshot_date TEXT NOT NULL DEFAULT (date('now')),
+            fitness_score REAL DEFAULT 0.0,
+            runs INTEGER DEFAULT 0,
+            generation INTEGER DEFAULT 0,
+            recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_selections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT,
+            workflow_id TEXT,
+            agent_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            selection_method TEXT DEFAULT 'thompson',
+            score REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_ab_tests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            technology TEXT NOT NULL DEFAULT 'generic',
+            phase_type TEXT NOT NULL DEFAULT 'generic',
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            wins_a INTEGER DEFAULT 0,
+            wins_b INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'active',
+            started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ended_at TIMESTAMP,
+            winner TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS team_okr (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            objective TEXT NOT NULL,
+            key_result TEXT NOT NULL,
+            target REAL DEFAULT 0.0,
+            current_value REAL DEFAULT 0.0,
+            unit TEXT DEFAULT '%',
+            period TEXT DEFAULT 'Q1-2026',
+            status TEXT DEFAULT 'on_track',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
+    # Real execution data: phase_outcomes for empirical GA fitness
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT NOT NULL,
+            workflow_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL DEFAULT 'sequential',
+            agent_ids_json TEXT NOT NULL DEFAULT '[]',
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            rejection_count INTEGER DEFAULT 0,
+            duration_secs REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+
+    # Migrate existing phase_outcomes: add complexity_tier if missing
+    try:
+        po_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(phase_outcomes)").fetchall()
+        }
+        if po_cols and "complexity_tier" not in po_cols:
+            conn.execute(
+                "ALTER TABLE phase_outcomes ADD COLUMN complexity_tier TEXT DEFAULT 'simple'"
+            )
+    except Exception:
+        pass
+
+    # Agent pair chemistry: how well each pair of agents works together
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
+
+    # Agent role column in memory_project (cross-session role-scoped memory)
+    conn.execute("""
+        ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS agent_role TEXT DEFAULT ''
+    """)
+
+    # Knowledge Intelligence columns — access tracking + relevance scoring
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS last_read_at TEXT DEFAULT NULL"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS relevance_score REAL DEFAULT 0.5"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS tags_json TEXT DEFAULT '[]'"""
+    )
+
+    # Admin audit log
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            actor TEXT NOT NULL DEFAULT 'system',
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            detail TEXT,
+            ip TEXT,
+            user_agent TEXT
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
+
+    # Platform API keys
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_api_keys (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            key_prefix TEXT NOT NULL,
+            key_hash TEXT NOT NULL UNIQUE,
+            workspace TEXT DEFAULT 'default',
+            permissions TEXT DEFAULT '["read","write"]',
+            rate_limit INTEGER DEFAULT 1000,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            last_used_at TEXT,
+            expires_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_key_scopes (
+            key_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            PRIMARY KEY (key_id, scope)
+        )
+    """)
+
+    # Webhook configs
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS webhook_configs (
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            event_filter TEXT DEFAULT '*',
+            workflow_id TEXT NOT NULL,
+            project_id TEXT,
+            is_active INTEGER DEFAULT 1,
+            secret_env TEXT DEFAULT '',
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            description TEXT DEFAULT ''
+        )
+    """)
+
+    conn.commit()
 
 
 def get_db(db_path: Path = DB_PATH):
@@ -746,4 +1972,11 @@ def get_db(db_path: Path = DB_PATH):
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
+    # Ensure Darwin tables exist on existing DBs (idempotent)
+    try:
+        conn.execute("SELECT COUNT(*) FROM team_fitness")
+    except Exception:
+        _ensure_darwin_tables(conn)
+    # Ensure all SQLite-only tables exist on existing DBs (idempotent)
+    _ensure_sqlite_tables(conn)
     return conn

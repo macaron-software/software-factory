@@ -1,8 +1,8 @@
-# 🏭 Software Factory — Wiki
+# Software Factory — Wiki
 
-**Macaron Software Factory** is an AI-powered agent orchestration platform for software engineering teams. It coordinates 156 specialized agents through 36 workflows using SAFe methodology.
+**Macaron Software Factory** is an AI-powered agent orchestration platform for software engineering teams. It coordinates 191 specialized agents through 42 workflows using SAFe methodology.
 
-> **Latest release: [v2.2.0](https://github.com/macaron-software/software-factory/releases/tag/v2.2.0)** — Multi-Model LLM Routing + Darwin LLM Thompson Sampling
+> **Latest release: [v3.0.0](https://github.com/macaron-software/software-factory/releases/tag/v3.0.0)** — Knowledge Management + Memory Intelligence + Mission Timeline + LLM Cost Tracking
 
 ## Navigation
 
@@ -11,16 +11,17 @@
 | [Architecture](Architecture) | Platform architecture, components, data flow |
 | [Deployment Guide](Deployment-Guide) | 3 environments: Azure, OVH, Local |
 | [API Reference](API-Reference) | REST API endpoints, authentication |
-| [Agents](Agents) | 156 agents across 9 domains |
-| [Workflows](Workflows) | 36 built-in workflows |
+| [Agents](Agents) | 181 agents across 9 domains |
+| [Workflows](Workflows) | 42 built-in workflows |
 | [Patterns](Patterns) | 15 orchestration patterns |
 | [Security](Security) | Auth, adversarial validation, secrets |
 | [LLM Configuration](LLM-Configuration) | Multi-model routing, Darwin LLM A/B, providers |
 | [Darwin Teams](Darwin-Teams) | Evolutionary team selection + LLM Thompson Sampling |
+| [Knowledge](Knowledge) | Knowledge Management, memory health, nightly curation |
 
 ## Translations
 
-🇫🇷 [Français](Home‐FR) · 🇪🇸 [Español](Home‐ES) · 🇩🇪 [Deutsch](Home‐DE) · 🇮🇹 [Italiano](Home‐IT) · 🇧🇷 [Português](Home‐PT) · 🇨🇳 [中文](Home‐ZH) · 🇯🇵 [日本語](Home‐JA)
+[Français](Home-FR) · [Español](Home-ES) · [Deutsch](Home-DE) · [Italiano](Home-IT) · [Português](Home-PT) · [中文](Home-ZH) · [日本語](Home-JA) · [한국어](Home-KO) · [हिन्दी](Home-HI) · [Русский](Home-RU) · [العربية](Home-AR) · [Bahasa](Home-ID) · [Türkçe](Home-TR) · [Nederlands](Home-NL) · [Tiếng Việt](Home-VI) · [Polski](Home-PL) · [Svenska](Home-SV)
 
 ## Quick Start
 

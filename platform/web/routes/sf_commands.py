@@ -44,14 +44,18 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
     lines = []
 
     # Header
-    header_line = "  ".join(h.ljust(w) for h, w in zip(headers, col_widths, strict=True))
+    header_line = "  ".join(
+        h.ljust(w) for h, w in zip(headers, col_widths, strict=True)
+    )
     lines.append(header_line)
     lines.append("-" * len(header_line))
 
     # Rows
     for row in rows:
         lines.append(
-            "  ".join(str(cell).ljust(w) for cell, w in zip(row, col_widths, strict=False))
+            "  ".join(
+                str(cell).ljust(w) for cell, w in zip(row, col_widths, strict=False)
+            )
         )
 
     return "\n".join(lines)
@@ -137,7 +141,9 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
             missions = [m for m in missions if m.status == status_filter]
 
         if not missions:
-            return SFCommandResponse(success=True, output="No missions found", data={"count": 0})
+            return SFCommandResponse(
+                success=True, output="No missions found", data={"count": 0}
+            )
 
         # Format as table
         headers = ["ID", "Name", "Type", "Status", "Agent", "Created"]
@@ -149,8 +155,12 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
                     getattr(m, "name", getattr(m, "title", "untitled"))[:40],
                     getattr(m, "type", "generic") or "generic",
                     getattr(m, "status", "pending") or "pending",
-                    m.agent_id[:15] if hasattr(m, "agent_id") and m.agent_id else "none",
-                    m.created_at[:10] if hasattr(m, "created_at") and m.created_at else "unknown",
+                    m.agent_id[:15]
+                    if hasattr(m, "agent_id") and m.agent_id
+                    else "none",
+                    str(m.created_at)[:10]
+                    if hasattr(m, "created_at") and m.created_at
+                    else "unknown",
                 ]
             )
 
@@ -160,7 +170,9 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
         if len(missions) > limit:
             output += f"\n\n... {len(missions) - limit} more missions (use --limit=N to see more)"
 
-        return SFCommandResponse(success=True, output=output, data={"count": len(missions)})
+        return SFCommandResponse(
+            success=True, output=output, data={"count": len(missions)}
+        )
     except Exception as e:
         logger.exception("Error listing missions")
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
@@ -197,7 +209,9 @@ Context:
 {getattr(mission, "context", "No context") or "No context"}
 """
 
-        return SFCommandResponse(success=True, output=output, data={"mission": mission.id})
+        return SFCommandResponse(
+            success=True, output=output, data={"mission": mission.id}
+        )
     except Exception as e:
         logger.exception("Error showing mission")
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
@@ -218,10 +232,14 @@ async def cmd_agents_list(args: list[str]) -> SFCommandResponse:
                 role_filter = arg.split("=")[1]
 
         if role_filter:
-            agents = [a for a in agents if role_filter.lower() in (a.role or "").lower()]
+            agents = [
+                a for a in agents if role_filter.lower() in (a.role or "").lower()
+            ]
 
         if not agents:
-            return SFCommandResponse(success=True, output="No agents found", data={"count": 0})
+            return SFCommandResponse(
+                success=True, output="No agents found", data={"count": 0}
+            )
 
         # Format as table
         headers = ["ID", "Name", "Role", "Skills", "Tools"]
@@ -243,7 +261,9 @@ async def cmd_agents_list(args: list[str]) -> SFCommandResponse:
         if len(agents) > 50:
             output += f"\n\n... {len(agents) - 50} more agents"
 
-        return SFCommandResponse(success=True, output=output, data={"count": len(agents)})
+        return SFCommandResponse(
+            success=True, output=output, data={"count": len(agents)}
+        )
     except Exception as e:
         logger.exception("Error listing agents")
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
@@ -258,7 +278,9 @@ async def cmd_agents_show(agent_id: str) -> SFCommandResponse:
         agent = store.get(agent_id)
 
         if not agent:
-            return SFCommandResponse(success=False, output="", error=f"Agent not found: {agent_id}")
+            return SFCommandResponse(
+                success=False, output="", error=f"Agent not found: {agent_id}"
+            )
 
         skills_list = "\n  • ".join(agent.skills or ["None"])
         tools_list = "\n  • ".join(agent.tools or ["None"])
@@ -319,7 +341,9 @@ async def cmd_skills_sync() -> SFCommandResponse:
         output += f"\n✓ Total: {synced} skills synced from {len(sources)} repositories"
 
         return SFCommandResponse(
-            success=True, output=output, data={"synced": synced, "sources": len(sources)}
+            success=True,
+            output=output,
+            data={"synced": synced, "sources": len(sources)},
         )
     except Exception as e:
         logger.exception("Error syncing skills")
@@ -346,7 +370,9 @@ async def cmd_skills_search(query: str) -> SFCommandResponse:
 
         if not matches:
             return SFCommandResponse(
-                success=True, output=f"No skills found matching '{query}'", data={"count": 0}
+                success=True,
+                output=f"No skills found matching '{query}'",
+                data={"count": 0},
             )
 
         # Format results
@@ -361,7 +387,9 @@ async def cmd_skills_search(query: str) -> SFCommandResponse:
         if len(matches) > 20:
             output += f"\n\n... {len(matches) - 20} more matches"
 
-        return SFCommandResponse(success=True, output=output, data={"count": len(matches)})
+        return SFCommandResponse(
+            success=True, output=output, data={"count": len(matches)}
+        )
     except Exception as e:
         logger.exception("Error searching skills")
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
@@ -376,7 +404,9 @@ async def cmd_projects_list() -> SFCommandResponse:
         projects = store.list_all()
 
         if not projects:
-            return SFCommandResponse(success=True, output="No projects found", data={"count": 0})
+            return SFCommandResponse(
+                success=True, output="No projects found", data={"count": 0}
+            )
 
         # Format as table
         headers = ["ID", "Name", "Type", "Status"]
@@ -394,7 +424,9 @@ async def cmd_projects_list() -> SFCommandResponse:
         output = f"Projects ({len(projects)} total)\n\n"
         output += format_table(headers, rows)
 
-        return SFCommandResponse(success=True, output=output, data={"count": len(projects)})
+        return SFCommandResponse(
+            success=True, output=output, data={"count": len(projects)}
+        )
     except Exception as e:
         logger.exception("Error listing projects")
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
@@ -426,7 +458,9 @@ async def cmd_db_status() -> SFCommandResponse:
 
         for (table_name,) in tables:
             try:
-                count_result = db.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+                count_result = db.execute(
+                    f"SELECT COUNT(*) FROM {table_name}"
+                ).fetchone()
                 count = count_result[0] if count_result else 0
                 rows.append([table_name, str(count)])
                 total_rows += count
@@ -437,7 +471,9 @@ async def cmd_db_status() -> SFCommandResponse:
         output += f"\n\nTotal rows: {total_rows}"
 
         return SFCommandResponse(
-            success=True, output=output, data={"tables": len(tables), "total_rows": total_rows}
+            success=True,
+            output=output,
+            data={"tables": len(tables), "total_rows": total_rows},
         )
     except Exception as e:
         logger.exception("Error getting DB status")

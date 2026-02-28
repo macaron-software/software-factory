@@ -6,17 +6,18 @@ role-based access control mappings. Extracted from executor.py.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..agents.store import AgentDef
+
 # Tool JSON schemas for OpenAI function-calling API
 _TOOL_SCHEMAS: list[dict] | None = None
 
 
-def _get_tool_schemas() -> list[dict]:
-    """Build OpenAI-compatible tool definitions from the registry."""
-    global _TOOL_SCHEMAS
-    if _TOOL_SCHEMAS is not None:
-        return _TOOL_SCHEMAS
-
-    schemas = [
+def _core_schemas() -> list[dict]:
+    """Core file/code/git/shell/communication tool schemas."""
+    return [
         {
             "type": "function",
             "function": {
@@ -321,8 +322,14 @@ def _get_tool_schemas() -> list[dict]:
                     "type": "object",
                     "properties": {
                         "title": {"type": "string", "description": "PR title"},
-                        "body": {"type": "string", "description": "PR description (markdown)"},
-                        "base": {"type": "string", "description": "Base branch (default: main)"},
+                        "body": {
+                            "type": "string",
+                            "description": "PR description (markdown)",
+                        },
+                        "base": {
+                            "type": "string",
+                            "description": "Base branch (default: main)",
+                        },
                         "cwd": {"type": "string", "description": "Working directory"},
                     },
                     "required": ["title"],
@@ -337,7 +344,10 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pr": {"type": "string", "description": "PR number or full GitHub URL"},
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or full GitHub URL",
+                        },
                         "cwd": {"type": "string", "description": "Working directory"},
                     },
                     "required": ["pr"],
@@ -352,8 +362,14 @@ def _get_tool_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "pr": {"type": "string", "description": "PR number or GitHub URL"},
-                        "body": {"type": "string", "description": "Review body (markdown)"},
+                        "pr": {
+                            "type": "string",
+                            "description": "PR number or GitHub URL",
+                        },
+                        "body": {
+                            "type": "string",
+                            "description": "Review body (markdown)",
+                        },
                         "event": {
                             "type": "string",
                             "enum": ["APPROVE", "REQUEST_CHANGES", "COMMENT"],
@@ -365,6 +381,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _phase_schemas() -> list[dict]:
+    """Phase orchestration tool schemas."""
+    return [
         # ── Phase orchestration tools (CDP Mission Control) ──
         {
             "type": "function",
@@ -447,6 +469,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _web_schemas() -> list[dict]:
+    """Web/Playwright/screenshot tool schemas."""
+    return [
         # ── Playwright test/screenshot tools ──
         {
             "type": "function",
@@ -510,6 +538,70 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "browse",
+                "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "URL to open (e.g. http://localhost:3000)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "take_screenshot",
+                "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Screenshot name (e.g. homepage, login-page)",
+                        },
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "inspect_page",
+                "description": "Get the accessibility tree of the current browser page for assertions.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "run_e2e_tests",
+                "description": "Run full E2E test suite automatically: installs dependencies, starts dev server, takes browser screenshots, runs unit tests, returns full report. Call this for complete QA validation.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "port": {
+                            "type": "integer",
+                            "description": "Port for dev server (default 3000)",
+                        },
+                    },
+                },
+            },
+        },
+    ]
+
+
+def _mcp_schemas() -> list[dict]:
+    """MCP tool schemas (LRM, Figma, Solaris, GitHub, JIRA)."""
+    return [
         # ── MCP: LRM tools (project knowledge) ──
         {
             "type": "function",
@@ -626,6 +718,224 @@ def _get_tool_schemas() -> list[dict]:
                         },
                     },
                     "required": ["category"],
+                },
+            },
+        },
+        # ── MCP: Component Gallery (60 UI components, 2600+ DS implementations) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_list",
+                "description": "List all 60 UI components from The Component Gallery: accordion, alert, avatar, badge, button, card, carousel, checkbox, combobox, datepicker, drawer, modal, pagination, select, skeleton, spinner, table, tabs, toast, tooltip, tree-view... each cross-referenced across 50+ Design Systems.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_get",
+                "description": "Get full documentation for a UI component: description, all aliases used across design systems, N implementations with DS name + URL + tech stack. Also includes semantic HTML markup, ARIA patterns, CSS when available. Use before implementing any UI component.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "component": {
+                            "type": "string",
+                            "description": "Component slug: accordion, alert, avatar, badge, button, card, carousel, checkbox, combobox, datepicker, drawer, dropdown-menu, empty-state, footer, form, header, icon, modal, navigation, pagination, popover, progress-bar, radio-button, rating, search-input, select, separator, skeleton, slider, spinner, stepper, table, tabs, text-input, textarea, toast, toggle, tooltip, tree-view, visually-hidden...",
+                        },
+                        "tech": {
+                            "type": "string",
+                            "description": "Filter by tech: React, Vue, Angular, CSS, Web Components, Svelte, etc.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max implementations (default 20)",
+                        },
+                    },
+                    "required": ["component"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_search",
+                "description": "Full-text search across all 60 UI components and their aliases. Use to discover which components relate to a concept (e.g. 'loading', 'navigation', 'error', 'notification').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search terms (component name, concept, alias)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_ds",
+                "description": "Get all components from a specific Design System and how they name them. Useful to align with a target DS vocabulary (e.g. Material Design, Carbon, Atlassian, Ant Design, Spectrum, Primer, Fluent).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ds_name": {
+                            "type": "string",
+                            "description": "Design system name (partial ok): Material, Carbon, Atlassian, Ant Design, Spectrum, Primer, Fluent, Chakra, MUI, Radix, shadcn...",
+                        },
+                    },
+                    "required": ["ds_name"],
+                },
+            },
+        },
+        # ── MCP: Architecture Guidelines (Confluence / GitLab Wiki / Markdown) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_summary",
+                "description": "Get the architecture/tech guidelines summary for the current project: required tech stack, forbidden libs/patterns, standards. Always call before generating code to ensure compliance with DSI/org rules.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "Project ID (defaults to current project)",
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "Agent role: dev, architecture, security, frontend",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_search",
+                "description": "Search the org/project architecture guidelines wiki for rules, decisions, or guidance on a specific topic (e.g. 'auth', 'database choice', 'API standards', 'logging').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search terms"},
+                        "project": {"type": "string", "description": "Project ID"},
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default 5)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_get",
+                "description": "Get full content of a specific architecture guideline page by title.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (partial match ok)",
+                        },
+                        "project": {"type": "string", "description": "Project ID"},
+                        "page_id": {
+                            "type": "string",
+                            "description": "Exact page ID (alternative to title)",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_stack",
+                "description": "Get required tech stack for the project by topic (backend, frontend, database, auth, infra, security). Use before choosing technologies to ensure DSI compliance.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project ID"},
+                        "topic": {
+                            "type": "string",
+                            "description": "Filter by topic: backend, frontend, database, auth, infra, security, quality",
+                        },
+                    },
+                },
+            },
+        },
+        # ── LRM: Confluence & Jira ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_confluence_search",
+                "description": "Search Confluence wiki pages (full-text). Use to find architecture docs, ADRs, conventions, or project specs in the company knowledge base.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search keywords"},
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key (default: IAN)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default: 10)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_confluence_read",
+                "description": "Read a Confluence page content by title or page ID. Use to get full architecture specs, conventions, or design decisions.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title to find",
+                        },
+                        "page_id": {
+                            "type": "string",
+                            "description": "Confluence page ID (alternative to title)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Space key (default: IAN)",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_jira_search",
+                "description": "Search Jira issues via JQL or keywords. Use to find tickets, bugs, epics or user stories linked to the current project.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "JQL query or plain text keywords",
+                        },
+                        "project": {
+                            "type": "string",
+                            "description": "Jira project key (optional filter)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default: 20)",
+                        },
+                    },
+                    "required": ["query"],
                 },
             },
         },
@@ -961,6 +1271,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _build_schemas() -> list[dict]:
+    """Build, test, and CI tool schemas."""
+    return [
         # ── Build & Test tools ──
         {
             "type": "function",
@@ -1251,6 +1567,12 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+    ]
+
+
+def _platform_schemas() -> list[dict]:
+    """Platform introspection and lifecycle tool schemas."""
+    return [
         # ── Platform introspection tools (self-aware) ──
         {
             "type": "function",
@@ -1339,6 +1661,202 @@ def _get_tool_schemas() -> list[dict]:
                 "name": "platform_workflows",
                 "description": "List available ceremony templates (workflows) with their phases and patterns.",
                 "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        # ── Project lifecycle tools (Architecture First) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "get_project_health",
+                "description": "Get a project's health: missions by category, current phase, docs status (spec/schema/workflows/conventions/security).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string", "description": "Project ID"},
+                    },
+                    "required": ["project_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "get_phase_gate",
+                "description": "Check if a project can transition to a target phase. Returns allowed=true/false and blockers. Always call before set_project_phase.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "target_phase": {
+                            "type": "string",
+                            "enum": [
+                                "discovery",
+                                "mvp",
+                                "v1",
+                                "run",
+                                "maintenance",
+                                "scale",
+                            ],
+                        },
+                    },
+                    "required": ["project_id", "target_phase"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "set_project_phase",
+                "description": "Transition a project to a new lifecycle phase. Blocked if gate not satisfied. Call get_phase_gate first.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "phase": {
+                            "type": "string",
+                            "enum": [
+                                "discovery",
+                                "mvp",
+                                "v1",
+                                "run",
+                                "maintenance",
+                                "scale",
+                            ],
+                        },
+                        "force": {
+                            "type": "boolean",
+                            "description": "Bypass gate check — only if user explicitly authorized",
+                            "default": False,
+                        },
+                    },
+                    "required": ["project_id", "phase"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "suggest_next_missions",
+                "description": "Suggest next missions to create or activate based on project phase and health.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                    },
+                    "required": ["project_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "read_project_doc",
+                "description": "Read an architecture doc from project's docs/ folder (spec.md, schema.md, workflows.md, conventions.md, security.md).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "filename": {
+                            "type": "string",
+                            "enum": [
+                                "spec.md",
+                                "schema.md",
+                                "workflows.md",
+                                "conventions.md",
+                                "security.md",
+                            ],
+                        },
+                    },
+                    "required": ["project_id", "filename"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "update_project_doc",
+                "description": "Write or update an architecture doc in project's docs/ folder. Use to fill spec, schema, workflows, conventions or security docs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project_id": {"type": "string"},
+                        "filename": {
+                            "type": "string",
+                            "enum": [
+                                "spec.md",
+                                "schema.md",
+                                "workflows.md",
+                                "conventions.md",
+                                "security.md",
+                            ],
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Full markdown content to write",
+                        },
+                    },
+                    "required": ["project_id", "filename", "content"],
+                },
+            },
+        },
+        # ── Platform creation tools (CTO Jarvis: create projects + missions) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "create_project",
+                "description": "Create a new project on the platform. Returns the project id and name.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Project name (required)",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Project description",
+                        },
+                        "factory_type": {
+                            "type": "string",
+                            "enum": ["software", "data", "security", "standalone"],
+                            "description": "Type of project",
+                        },
+                    },
+                    "required": ["name"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "create_mission",
+                "description": "Create a new mission (epic) on the platform. Returns the mission id.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Mission name (required)",
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Mission description",
+                        },
+                        "goal": {
+                            "type": "string",
+                            "description": "Mission goal / acceptance criteria",
+                        },
+                        "project_id": {
+                            "type": "string",
+                            "description": "Parent project ID",
+                        },
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow template ID (optional)",
+                        },
+                    },
+                    "required": ["name"],
+                },
             },
         },
         # ── Backlog tools (create features/stories for AO traceability) ──
@@ -1858,76 +2376,140 @@ def _get_tool_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Ideation & Community Launch tools (Jarvis / CTO delegation) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_ideation",
+                "description": (
+                    "Launch a multi-agent ideation session (Business Analyst, Solution Architect, "
+                    "UX Designer, Product Manager, Tech Lead). Returns session_id and URL. "
+                    "Use to explore product ideas, architecture questions, strategic directions."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The question or topic to explore with the ideation team",
+                        },
+                    },
+                    "required": ["prompt"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_mkt_ideation",
+                "description": (
+                    "Launch a marketing ideation session (CMO, Content Strategist, Growth Hacker, "
+                    "Brand Strategist, Community Manager). Returns session_id and URL. "
+                    "Use for campaigns, go-to-market, brand positioning, growth strategies."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The marketing topic or campaign to ideate on",
+                        },
+                    },
+                    "required": ["prompt"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_group_ideation",
+                "description": (
+                    "Launch a specialized community ideation with domain experts. "
+                    "Available groups: 'knowledge' (Knowledge & Recherche), "
+                    "'archi' (Architecture & Design), 'security' (Sécurité & Conformité), "
+                    "'data-ai' (Data & IA), 'pi-planning' (PI Planning & SAFe). "
+                    "Returns session_id and URL."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "group_id": {
+                            "type": "string",
+                            "enum": ["knowledge", "archi", "security", "data-ai", "pi-planning"],
+                            "description": "The expert community to engage",
+                        },
+                        "prompt": {
+                            "type": "string",
+                            "description": "The question or topic for the expert community",
+                        },
+                    },
+                    "required": ["group_id", "prompt"],
+                },
+            },
+        },
     ]
-    # ── Simple Playwright aliases (LLM-friendly short names) ──
-    schemas.extend(
-        [
-            {
-                "type": "function",
-                "function": {
-                    "name": "browse",
-                    "description": "Open a URL in the browser for visual testing. Call this BEFORE take_screenshot.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "url": {
-                                "type": "string",
-                                "description": "URL to open (e.g. http://localhost:3000)",
-                            },
-                        },
-                        "required": ["url"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "take_screenshot",
-                    "description": "Take a PNG screenshot of the current browser page. Call browse(url) first.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Screenshot name (e.g. homepage, login-page)",
-                            },
-                        },
-                        "required": ["name"],
-                    },
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "inspect_page",
-                    "description": "Get the accessibility tree of the current browser page for assertions.",
-                    "parameters": {"type": "object", "properties": {}},
-                },
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_e2e_tests",
-                    "description": "Run full E2E test suite automatically: installs dependencies, starts dev server, takes browser screenshots, runs unit tests, returns full report. Call this for complete QA validation.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "port": {
-                                "type": "integer",
-                                "description": "Port for dev server (default 3000)",
-                            },
-                        },
-                    },
-                },
-            },
-        ]
+
+
+def _get_tool_schemas() -> list[dict]:
+    """Build OpenAI-compatible tool definitions from the registry."""
+    global _TOOL_SCHEMAS
+    if _TOOL_SCHEMAS is not None:
+        return _TOOL_SCHEMAS
+    _TOOL_SCHEMAS = (
+        _core_schemas()
+        + _phase_schemas()
+        + _web_schemas()
+        + _mcp_schemas()
+        + _build_schemas()
+        + _platform_schemas()
     )
-    _TOOL_SCHEMAS = schemas
-    return schemas
+    return _TOOL_SCHEMAS
 
 
 # Tools available to each agent role category
 ROLE_TOOL_MAP: dict[str, list[str]] = {
+    "cto": [
+        # SF Platform — primary tools for project/mission queries
+        "platform_missions",
+        "platform_metrics",
+        "platform_agents",
+        "platform_memory_search",
+        "platform_sessions",
+        "platform_workflows",
+        # Memory
+        "memory_search",
+        "memory_store",
+        # Project context (read-only, no filesystem browsing)
+        "get_project_context",
+        # Git read (on explicit user request with workspace context)
+        "git_status",
+        "git_log",
+        "git_diff",
+        # Git write ops (explicit user requests only)
+        "git_init",
+        "git_commit",
+        "git_push",
+        "git_create_pr",
+        # GitHub
+        "github_issues",
+        "github_prs",
+        "github_code_search",
+        # Orchestration (delegate / create)
+        "create_project",
+        "create_team",
+        "create_mission",
+        "create_sub_mission",
+        "compose_workflow",
+        "run_e2e_tests",
+        "screenshot",
+        # Ideation & community delegation
+        "launch_ideation",
+        "launch_mkt_ideation",
+        "launch_group_ideation",
+        # Web / fetch
+        "mcp_fetch_fetch",
+        "deep_search",
+    ],
     "product": [
         "code_read",
         "code_search",
@@ -1953,6 +2535,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_component_gallery_list",
+        "lrm_component_gallery_get",
+        "lrm_component_gallery_search",
+        "lrm_component_gallery_ds",
     ],
     "architecture": [
         "code_read",
@@ -1982,6 +2568,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_get",
+        "lrm_guidelines_stack",
     ],
     "ux": [
         "code_read",
@@ -1997,6 +2587,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "figma_get_styles",
         "solaris_wcag",
         "solaris_component",
+        "lrm_component_gallery_list",
+        "lrm_component_gallery_get",
+        "lrm_component_gallery_search",
+        "lrm_component_gallery_ds",
     ],
     "dev": [
         "code_read",
@@ -2023,6 +2617,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_conventions",
         "lrm_build",
         "lrm_examples",
+        "lrm_confluence_search",
+        "lrm_confluence_read",
+        "lrm_jira_search",
         "github_prs",
         "github_code_search",
         "android_build",
@@ -2032,6 +2629,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_get",
+        "lrm_guidelines_stack",
     ],
     "qa": [
         "code_read",
@@ -2124,6 +2725,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "dependency_audit",
         "secrets_scan",
         "get_si_blueprint",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_stack",
     ],
     "cdp": [
         "memory_search",
@@ -2192,11 +2796,26 @@ for _role_key in ROLE_TOOL_MAP:
     ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
 
 
-def _classify_agent_role(agent: AgentDef) -> str:
+# Project lifecycle tools — available to CDP (PM) and architecture roles
+_PROJECT_TOOLS = [
+    "get_project_health",
+    "get_phase_gate",
+    "set_project_phase",
+    "suggest_next_missions",
+    "read_project_doc",
+    "update_project_doc",
+]
+for _prole in ("cdp", "architecture"):
+    if _prole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_prole].extend(_PROJECT_TOOLS)
+
+
+def _classify_agent_role(agent) -> str:
     """Classify an agent into a tool-mapping role category."""
     role = (agent.role or "").lower()
     name = (agent.name or "").lower()
-    combined = f"{role} {name}"
+    agent_id = (agent.id or "").lower()
+    combined = f"{role} {name} {agent_id}"
 
     if any(
         k in combined
@@ -2210,16 +2829,21 @@ def _classify_agent_role(agent: AgentDef) -> str:
         )
     ):
         return "product"
+    if any(
+        k in combined
+        for k in ("chief technology", "cto", "directeur technique", "tech lead")
+    ):
+        return "cto"
     if any(k in combined for k in ("archi", "architect")):
         return "architecture"
-    if any(k in combined for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")):
+    if any(
+        k in combined
+        for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")
+    ):
         return "reviewer"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
         return "ux"
-    if any(
-        k in combined
-        for k in ("qa", "test", "qualit", "fixture", "perf")
-    ):
+    if any(k in combined for k in ("qa", "test", "qualit", "fixture", "perf")):
         return "qa"
     if any(
         k in combined
@@ -2264,6 +2888,26 @@ def _get_tools_for_agent(agent: AgentDef) -> list[str] | None:
     """Return the list of allowed tool names for this agent, or None for all."""
     role_cat = _classify_agent_role(agent)
     return ROLE_TOOL_MAP.get(role_cat)
+
+
+# Uruk model: Organizers receive full project-scoped context (constitution, ADRs, vision,
+# full history). Executors receive task-scoped context only (recent history, no vision).
+# See: https://gitlab.com/Akanoa/orthanc — ADR-0010, ADR-0013
+_ORGANIZER_ROLES: frozenset[str] = frozenset(
+    {"cto", "architecture", "cdp", "product", "reviewer"}
+)
+
+
+def _get_capability_grade(agent) -> str:
+    """Return 'organizer' or 'executor' for an agent.
+
+    Organizers (cto, architect, cdp, product, reviewer) receive full project-scoped
+    context and longer history windows. Executors (dev, qa, security, ux, devops)
+    receive task-scoped context only — reduces token usage by 60-80% for dev agents.
+    """
+    return (
+        "organizer" if _classify_agent_role(agent) in _ORGANIZER_ROLES else "executor"
+    )
 
 
 def _filter_schemas(schemas: list[dict], allowed: list[str] | None) -> list[dict]:

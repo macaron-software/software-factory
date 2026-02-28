@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
-[![Usage interne](https://img.shields.io/badge/Usage-Interne%20La%20Poste-yellow.svg)]()
+[![Usage interne](https://img.shields.io/badge/Usage-La%20Poste%20UDD%20IA%20Native-yellow.svg)]()
 
 ---
 
@@ -20,7 +20,147 @@ Elle s'inscrit dans le cadre de la démarche **UDD IA Native** et suit la métho
 - **Patterns d'orchestration** — solo, séquentiel, parallèle, hiérarchique, réseau, boucle, routeur, agrégateur
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Interface web** — FastAPI + HTMX, pas de framework frontend, SSE temps réel
-- **Mémoire multi-couches** — par session, par pattern, par projet, globale (FTS5)
+- **Mémoire multi-couches** — par session, par pattern, par projet, globale (FTS PostgreSQL)
+
+---
+
+## Nouvelles fonctionnalités v2.3.0
+
+### CTO Jarvis — Conseiller IA Stratégique
+
+![CTO Jarvis](docs/screenshots/fr/jarvis.png)
+
+L'onglet **CTO Jarvis** (accessible depuis la page d'accueil `/`) offre un panneau de chat persistant avec un conseiller IA de niveau directeur technique :
+
+- **Mémoire persistante** — les décisions techniques et contextes de session sont conservés entre les conversations
+- **Conseiller stratégique** — aide à la prise de décision architecturale, choix technologiques, arbitrages
+- **Intégration plateforme** — connait l'état du portfolio, les projets en cours et les équipes agents
+- **Accessible depuis** : Accueil → onglet CTO Jarvis
+
+#### Capacités outils
+
+| Domaine | Outils disponibles |
+|---------|-------------------|
+| **Code** | Lire, chercher, éditer, écrire, lister fichiers |
+| **Git** | Commit, diff, log, status · GitHub issues / PRs / search |
+| **Build / Deploy** | Build, lint, test, deploy, Docker, run_command, infra |
+| **Sécurité** | SAST, secrets scan, audit dépendances |
+| **MCPs** | Web fetch, Knowledge graph, Playwright browser, GitHub |
+| **Projet** | Jira, Confluence, phases SAFe, LRM context |
+| **Mémoire** | Lecture + écriture Knowledge graph |
+
+#### Raccourcis contextuels (chips)
+
+`Stats portfolio` · `Missions en cours` · `Monter une équipe` · `GitHub` · `AO Veligo` · `Migration Angular 16→17` · `Dette tech · sécu · a11y · RGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Mise à jour Wiki`
+
+#### Exemples de questions
+
+> *« Quel est l'état de santé global du portfolio ? Quels projets sont en retard ? »*
+
+> *« Lance un audit SAST sur le projet Veligo et dis-moi les 3 CVE critiques à traiter en priorité. »*
+
+> *« On doit migrer l'API de REST vers GraphQL — quelle équipe d'agents recommandes-tu et par où commencer ? »*
+
+> *« Montre-moi le diff des 5 derniers commits sur la branche feature/auth et résume les changements. »*
+
+> *« Crée une mission de refactoring pour réduire la complexité cyclomatique des fichiers au-dessus de 15. »*
+
+> *« Quelle est notre dette technique actuelle ? Priorise les items par impact/effort. »*
+
+> *« Rédige les user stories pour la fonctionnalité de connexion SSO Azure AD et ouvre les tickets Jira. »*
+
+> *« Lance les tests E2E Playwright et capture des screenshots des pages critiques. »*
+
+> *« Compare nos métriques DORA ce mois-ci vs le mois dernier — où régressons-nous ? »*
+
+> *« Met à jour le wiki de l'architecture avec les dernières décisions sur la migration PostgreSQL. »*
+
+### Idéation Business (`/mkt-ideation`) — Équipe Marketing IA
+
+![Idéation Business](docs/screenshots/fr/mkt_ideation.png)
+
+L'onglet **Idéation Business** déploie une équipe de 6 agents marketing pilotée par Sophie Laurent (CMO) :
+
+| Agent | Rôle |
+|-------|------|
+| Sophie Laurent | CMO — chef d'équipe marketing |
+| Alex Dupont | Analyste SWOT & marché |
+| Marie Chen | Stratège TAM/SAM/SOM |
+| Pierre Martin | Responsable brand strategy |
+| Julie Bernard | Experte go-to-market |
+| Luc Rousseau | Analyste KPIs & budget |
+
+- **Sortie structurée** — génère un plan marketing complet en JSON : SWOT, TAM/SAM/SOM, stratégie de marque, go-to-market, KPIs, budget
+- **Graphe d'agents** — visualisation des agents avec photos avatars, arêtes de collaboration et popovers détaillés
+- **Accessible depuis** : Accueil → onglet Idéation Business
+
+### Idéation Projet (`/ideation`) — Équipe Tech Multi-Agents
+
+![Idéation Projet](docs/screenshots/fr/ideation_projet.png)
+
+L'onglet **Idéation Projet** orchestre un PM et 4 experts techniques pour transformer une idée en Epic SAFe :
+
+- **Équipe de 5 agents** — Product Manager + Architecte + Dev Backend + QA + SRE
+- **Sortie Epic** — génère automatiquement une Epic structurée avec Features, Stories et critères d'acceptance
+- **Graphe interactif** — graphe ig-node avec cartes d'agents, photos avatars et popovers de contexte
+- **Accessible depuis** : Accueil → onglet Idéation Projet
+
+### Navigation Restructurée
+
+La navigation a été reorganisée autour de deux pages principales :
+
+| Page | URL | Onglets |
+|------|-----|---------|
+| **Accueil** | `/` | CTO Jarvis · Idéation Business · Idéation Projet |
+| **Dashboard** | `/portfolio` | Vue d'ensemble · DSI · Business |
+
+La sidebar latérale ne comporte plus que ces deux entrées, simplifiant l'accès aux fonctionnalités principales.
+
+### Migration PostgreSQL
+
+La base de données a migré de SQLite vers **PostgreSQL** :
+
+- **Scripts de migration complets** — migration de schéma et de données inclus
+- **FTS natif PostgreSQL** — recherche plein texte via `tsvector/tsquery` (plus performante)
+- **40+ index PG** — couverture complète des chemins de requêtes chauds
+- **Darwin Teams** — Thompson Sampling pour la sélection d'équipes agents par contexte (technologie + phase)
+
+---
+
+## Captures d'écran
+
+<table>
+<tr>
+<td width="50%">
+<strong>Accueil — Onglets CTO Jarvis / Idéation Business / Idéation Projet</strong><br>
+<img src="docs/screenshots/fr/home.png" alt="Accueil" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — Conseiller IA Stratégique</strong><br>
+<img src="docs/screenshots/fr/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Idéation Business — Équipe Marketing 6 Agents</strong><br>
+<img src="docs/screenshots/fr/mkt_ideation.png" alt="Idéation Business" width="100%">
+</td>
+<td width="50%">
+<strong>Idéation Projet — Équipe Tech Multi-Agents</strong><br>
+<img src="docs/screenshots/fr/ideation_projet.png" alt="Idéation Projet" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Dashboard — Perspective SAFe Adaptative</strong><br>
+<img src="docs/screenshots/fr/dashboard.png" alt="Dashboard" width="100%">
+</td>
+<td width="50%">
+<strong>Idéation — Brainstorming Multi-Agents IA</strong><br>
+<img src="docs/screenshots/fr/ideation.png" alt="Idéation" width="100%">
+</td>
+</tr>
+</table>
 
 ---
 
@@ -88,7 +228,7 @@ Les OKR servent de signal de fitness pour le GA et de récompense pour le RL :
 
 ```
 FastAPI + HTMX + SSE (pas de WebSocket, pas de build frontend)
-SQLite WAL + FTS5
+PostgreSQL + FTS natif (tsvector/tsquery)
 LLM : Azure OpenAI (gpt-4o / gpt-5-mini)
 ```
 
@@ -101,7 +241,7 @@ platform/
 ├── llm/           ← Client multi-provider + Darwin LLM
 ├── memory/        ← Gestionnaire mémoire 4 couches
 ├── web/           ← Routes FastAPI + templates Jinja2
-└── db/            ← Migrations SQLite
+└── db/            ← Migrations PostgreSQL (40+ index)
 ```
 
 ---
@@ -111,6 +251,7 @@ platform/
 ### Prérequis
 
 - Python 3.10+
+- PostgreSQL 14+
 - Azure OpenAI (endpoint + clé API)
 
 ### Installation
@@ -125,7 +266,7 @@ pip install -r requirements.txt
 
 # Configurer les variables d'environnement
 cp .env.example .env
-# Éditer .env : AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
+# Éditer .env : AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, DATABASE_URL
 
 # Lancer la plateforme
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
@@ -151,6 +292,7 @@ AZURE_OPENAI_API_KEY=...
 AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/
 PLATFORM_LLM_PROVIDER=azure-openai
 PLATFORM_LLM_MODEL=gpt-5-mini
+DATABASE_URL=postgresql://user:password@localhost:5432/software_factory
 ```
 
 ---
@@ -168,97 +310,3 @@ Pour démarrer, ajoutez vos propres :
 Voir `platform/skills/definitions/_template.yaml` pour le format.
 
 ---
-
-## Usage interne
-
-Ce projet est à usage interne La Poste — UDD IA Native.
-Toute diffusion externe est soumise à validation de la DSI.
-
-
-```
-FastAPI + HTMX + SSE (pas de WebSocket, pas de build frontend)
-SQLite WAL + FTS5
-LLM : Azure OpenAI (gpt-4o / gpt-5-mini)
-```
-
-```
-platform/
-├── agents/        ← Boucle d'exécution, outils, mémoire
-├── patterns/      ← Moteur d'orchestration (8 types)
-├── missions/      ← SAFe lifecycle + Product Backlog
-├── workflows/     ← Templates de cérémonie
-├── llm/           ← Client multi-provider
-├── memory/        ← Gestionnaire mémoire 4 couches
-├── web/           ← Routes FastAPI + templates Jinja2
-└── db/            ← Migrations SQLite
-```
-
----
-
-## Démarrage rapide
-
-### Prérequis
-
-- Python 3.10+
-- Azure OpenAI (endpoint + clé API)
-
-### Installation
-
-```bash
-# Cloner le repo
-git clone <GITLAB_URL>/software-factory.git
-cd software-factory
-
-# Installer les dépendances
-pip install -r requirements.txt
-
-# Configurer les variables d'environnement
-cp .env.example .env
-# Éditer .env : AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
-
-# Lancer la plateforme
-python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
-```
-
-Accès : http://localhost:8090
-
-### Docker
-
-```bash
-make setup
-make run
-```
-
----
-
-## Configuration
-
-Variables d'environnement (`.env`) :
-
-```bash
-AZURE_OPENAI_API_KEY=...
-AZURE_OPENAI_ENDPOINT=https://<resource>.openai.azure.com/
-PLATFORM_LLM_PROVIDER=azure-openai
-PLATFORM_LLM_MODEL=gpt-5-mini
-```
-
----
-
-## Structure du squelette
-
-Ce repo est un **squelette** — les définitions d'agents (`platform/skills/definitions/`), 
-les workflows (`platform/workflows/definitions/`) et les projets (`projects/`) sont vides.
-
-Pour démarrer, ajoutez vos propres :
-- Définitions d'agents dans `platform/skills/definitions/*.yaml`
-- Workflows dans `platform/workflows/definitions/*.yaml`
-- Projets dans `projects/*.yaml`
-
-Voir `platform/skills/definitions/_template.yaml` pour le format.
-
----
-
-## Usage interne
-
-Ce projet est à usage interne La Poste — UDD IA Native.
-Toute diffusion externe est soumise à validation de la DSI.

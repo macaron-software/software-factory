@@ -11,13 +11,13 @@
 {% set _full_access = ('admin', 'overview', 'dsi') %}
 <div class="tabs">
     {% if p in _full_access + ('portfolio_manager',) %}
-    <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/" onclick="switchTab(this)">{{ _("overview") }}</button>
+    <button class="tab {% if active_tab == 'overview' %}active{% endif %}" hx-get="/portfolio?tab=overview" hx-select="#portfolio-inner" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=overview" onclick="switchTab(this)">{{ _("overview") }}</button>
     {% endif %}
     {% if p in _full_access %}
-    <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=dsi" onclick="switchTab(this)">{{ _("dsi") }}</button>
+    <button class="tab {% if active_tab == 'dsi' %}active{% endif %}" hx-get="/dsi" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=dsi" onclick="switchTab(this)">{{ _("dsi") }}</button>
     {% endif %}
     {% if p in _full_access + ('business_owner',) %}
-    <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
+    <button class="tab {% if active_tab == 'metier' %}active{% endif %}" hx-get="/metier" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" hx-push-url="/portfolio?tab=metier" onclick="switchTab(this)">{{ _("business") }}</button>
     {% endif %}
 </div>
 <div id="tab-content">

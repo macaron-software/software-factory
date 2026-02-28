@@ -264,6 +264,18 @@ body {
   font-size: var(--text-xl);
   font-weight: 600;
 }
+.app-version {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  vertical-align: middle;
+  letter-spacing: 0.02em;
+  cursor: default;
+}
 .topbar-right {
   display: flex;
   align-items: center;

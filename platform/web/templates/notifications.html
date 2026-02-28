@@ -28,7 +28,7 @@
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="notif-type-tag">{{ n.type }}</span>
                     <span class="notif-title" style="font-size:13px">{{ n.title }}</span>
-                    <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);white-space:nowrap">{{ n.created_at[:16] | replace('T', ' ') }}</span>
+                    <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);white-space:nowrap">{{ n.created_at | ts }}</span>
                 </div>
                 {% if n.message %}
                 <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{{ n.message }}</div>

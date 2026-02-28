@@ -65,7 +65,7 @@
             <td><span class="role-badge role-{{ u.role }}">{{ u.role }}</span></td>
             <td><span class="provider-badge">{{ u.auth_provider or 'local' }}</span></td>
             <td><span class="status-dot {{ 'active' if u.is_active else 'inactive' }}"></span>{{ 'Active' if u.is_active else 'Inactive' }}</td>
-            <td class="user-meta">{{ u.last_login[:16] if u.last_login else '—' }}</td>
+            <td class="user-meta">{{ u.last_login | ts }}</td>
             <td>
                 <div class="user-actions">
                     <button onclick="editUser('{{ u.id }}','{{ u.display_name }}','{{ u.email }}','{{ u.role }}')">Edit</button>

@@ -1,0 +1,2902 @@
+[
+  {
+    "date": "2025-06-26",
+    "type": "Appartement",
+    "prix": 233000.0,
+    "surface": 66.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3530,
+    "voie": "DU GRAND CHAMP"
+  },
+  {
+    "date": "2025-06-04",
+    "type": "Appartement",
+    "prix": 145400.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3381,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-05-28",
+    "type": "Appartement",
+    "prix": 60000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2727,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-05-20",
+    "type": "Appartement",
+    "prix": 180000.0,
+    "surface": 52.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3462,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-05-19",
+    "type": "Maison",
+    "prix": 390000.0,
+    "surface": 78.0,
+    "terrain": 300.0,
+    "pieces": 4,
+    "prix_m2": 5000,
+    "voie": "UMBERTO ECO"
+  },
+  {
+    "date": "2025-05-12",
+    "type": "Maison",
+    "prix": 384650.0,
+    "surface": 90.0,
+    "terrain": 250.0,
+    "pieces": 3,
+    "prix_m2": 4274,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2025-05-06",
+    "type": "Appartement",
+    "prix": 286000.0,
+    "surface": 66.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 4333,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2025-05-06",
+    "type": "Appartement",
+    "prix": 40000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 1818,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-04-24",
+    "type": "Appartement",
+    "prix": 133000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3093,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-04-23",
+    "type": "Appartement",
+    "prix": 267000.0,
+    "surface": 67.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3985,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2025-04-14",
+    "type": "Appartement",
+    "prix": 85710.0,
+    "surface": 15.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 5714,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2025-04-01",
+    "type": "Appartement",
+    "prix": 176000.0,
+    "surface": 62.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2839,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-03-31",
+    "type": "Appartement",
+    "prix": 65000.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3250,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-03-31",
+    "type": "Maison",
+    "prix": 397000.0,
+    "surface": 126.0,
+    "terrain": 600.0,
+    "pieces": 4,
+    "prix_m2": 3151,
+    "voie": "DE LA CROIX DE GUILLERY"
+  },
+  {
+    "date": "2025-03-27",
+    "type": "Appartement",
+    "prix": 100990.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2729,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-03-26",
+    "type": "Maison",
+    "prix": 175000.0,
+    "surface": 80.0,
+    "terrain": 47.0,
+    "pieces": 3,
+    "prix_m2": 2188,
+    "voie": "DROITE"
+  },
+  {
+    "date": "2025-03-26",
+    "type": "Appartement",
+    "prix": 64000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3048,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-03-25",
+    "type": "Appartement",
+    "prix": 233200.0,
+    "surface": 82.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 2844,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2025-03-24",
+    "type": "Maison",
+    "prix": 292400.0,
+    "surface": 100.0,
+    "terrain": 890.0,
+    "pieces": 3,
+    "prix_m2": 2924,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2025-03-19",
+    "type": "Appartement",
+    "prix": 120000.0,
+    "surface": 45.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2667,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-03-17",
+    "type": "Maison",
+    "prix": 295000.0,
+    "surface": 144.0,
+    "terrain": 765.0,
+    "pieces": 4,
+    "prix_m2": 2049,
+    "voie": "DES PERDREAUX"
+  },
+  {
+    "date": "2025-03-10",
+    "type": "Maison",
+    "prix": 125000.0,
+    "surface": 80.0,
+    "terrain": 41.0,
+    "pieces": 3,
+    "prix_m2": 1562,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2025-02-28",
+    "type": "Appartement",
+    "prix": 137000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3114,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-02-27",
+    "type": "Appartement",
+    "prix": 63000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3000,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-02-27",
+    "type": "Appartement",
+    "prix": 300000.0,
+    "surface": 101.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 2970,
+    "voie": "DU FAUBOURG"
+  },
+  {
+    "date": "2025-02-25",
+    "type": "Appartement",
+    "prix": 58725.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2796,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-02-24",
+    "type": "Maison",
+    "prix": 445500.0,
+    "surface": 160.0,
+    "terrain": 275.0,
+    "pieces": 5,
+    "prix_m2": 2784,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2025-02-24",
+    "type": "Maison",
+    "prix": 252730.0,
+    "surface": 110.0,
+    "terrain": 63.0,
+    "pieces": 4,
+    "prix_m2": 2298,
+    "voie": "DU FAUBOURG"
+  },
+  {
+    "date": "2025-02-21",
+    "type": "Appartement",
+    "prix": 52000.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2600,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-02-08",
+    "type": "Appartement",
+    "prix": 57000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2714,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-02-04",
+    "type": "Appartement",
+    "prix": 255000.0,
+    "surface": 69.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3696,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2025-01-28",
+    "type": "Appartement",
+    "prix": 152000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3455,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-01-24",
+    "type": "Appartement",
+    "prix": 67900.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3233,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-01-22",
+    "type": "Appartement",
+    "prix": 59480.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2974,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2025-01-21",
+    "type": "Maison",
+    "prix": 335000.0,
+    "surface": 89.0,
+    "terrain": 325.0,
+    "pieces": 4,
+    "prix_m2": 3764,
+    "voie": "EUGENE BELGRAND"
+  },
+  {
+    "date": "2025-01-16",
+    "type": "Appartement",
+    "prix": 143000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3326,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-01-15",
+    "type": "Appartement",
+    "prix": 127410.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2600,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2025-01-07",
+    "type": "Appartement",
+    "prix": 70850.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3220,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2025-01-06",
+    "type": "Appartement",
+    "prix": 84500.0,
+    "surface": 32.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2641,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-12-26",
+    "type": "Maison",
+    "prix": 495000.0,
+    "surface": 85.0,
+    "terrain": 2514.0,
+    "pieces": 4,
+    "prix_m2": 5824,
+    "voie": "REDONNEL"
+  },
+  {
+    "date": "2024-12-23",
+    "type": "Appartement",
+    "prix": 149550.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3052,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2024-12-23",
+    "type": "Appartement",
+    "prix": 280000.0,
+    "surface": 72.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3889,
+    "voie": "DE MONTPELLIER"
+  },
+  {
+    "date": "2024-12-20",
+    "type": "Appartement",
+    "prix": 198000.0,
+    "surface": 62.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3194,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-12-13",
+    "type": "Maison",
+    "prix": 420300.0,
+    "surface": 82.0,
+    "terrain": 595.0,
+    "pieces": 4,
+    "prix_m2": 5126,
+    "voie": "DU MAS DE MATOUR"
+  },
+  {
+    "date": "2024-12-13",
+    "type": "Appartement",
+    "prix": 366500.0,
+    "surface": 82.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 4470,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2024-12-12",
+    "type": "Appartement",
+    "prix": 254500.0,
+    "surface": 72.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3535,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2024-12-11",
+    "type": "Appartement",
+    "prix": 285000.0,
+    "surface": 63.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 4524,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2024-12-05",
+    "type": "Appartement",
+    "prix": 209000.0,
+    "surface": 74.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2824,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2024-12-02",
+    "type": "Appartement",
+    "prix": 145000.0,
+    "surface": 42.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3452,
+    "voie": "DES GARRIGUETTES"
+  },
+  {
+    "date": "2024-11-27",
+    "type": "Maison",
+    "prix": 190000.0,
+    "surface": 60.0,
+    "terrain": 36.0,
+    "pieces": 3,
+    "prix_m2": 3167,
+    "voie": "DU PORTAIL"
+  },
+  {
+    "date": "2024-11-27",
+    "type": "Appartement",
+    "prix": 131950.0,
+    "surface": 34.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3881,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-11-26",
+    "type": "Appartement",
+    "prix": 320700.0,
+    "surface": 79.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 4059,
+    "voie": "DANTE ALIGHIERI"
+  },
+  {
+    "date": "2024-11-21",
+    "type": "Maison",
+    "prix": 245000.0,
+    "surface": 54.0,
+    "terrain": 433.0,
+    "pieces": 2,
+    "prix_m2": 4537,
+    "voie": "RIEUMASSEL"
+  },
+  {
+    "date": "2024-11-21",
+    "type": "Appartement",
+    "prix": 192000.0,
+    "surface": 51.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3765,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2024-11-20",
+    "type": "Maison",
+    "prix": 1500.0,
+    "surface": 120.0,
+    "terrain": 56.0,
+    "pieces": 4,
+    "prix_m2": 12,
+    "voie": "PIQUET"
+  },
+  {
+    "date": "2024-11-15",
+    "type": "Appartement",
+    "prix": 86207.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 1959,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-11-12",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 63.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3175,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-11-08",
+    "type": "Appartement",
+    "prix": 63000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2864,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-11-07",
+    "type": "Appartement",
+    "prix": 190000.0,
+    "surface": 64.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2969,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-10-31",
+    "type": "Appartement",
+    "prix": 206700.0,
+    "surface": 63.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3281,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2024-10-31",
+    "type": "Appartement",
+    "prix": 50000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2273,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-10-30",
+    "type": "Appartement",
+    "prix": 48500.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2310,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-10-28",
+    "type": "Appartement",
+    "prix": 181300.0,
+    "surface": 66.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2747,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-10-22",
+    "type": "Maison",
+    "prix": 536000.0,
+    "surface": 143.0,
+    "terrain": 941.0,
+    "pieces": 5,
+    "prix_m2": 3748,
+    "voie": "DE LA COLLINE"
+  },
+  {
+    "date": "2024-10-22",
+    "type": "Appartement",
+    "prix": 242920.0,
+    "surface": 84.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 2892,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-10-22",
+    "type": "Maison",
+    "prix": 403000.0,
+    "surface": 83.0,
+    "terrain": 1004.0,
+    "pieces": 4,
+    "prix_m2": 4855,
+    "voie": "DE GUILLERY"
+  },
+  {
+    "date": "2024-10-21",
+    "type": "Appartement",
+    "prix": 166000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3860,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-10-18",
+    "type": "Maison",
+    "prix": 459500.0,
+    "surface": 100.0,
+    "terrain": 574.0,
+    "pieces": 3,
+    "prix_m2": 4595,
+    "voie": "DE LAS COUSTIERRASSAS"
+  },
+  {
+    "date": "2024-10-15",
+    "type": "Maison",
+    "prix": 170000.0,
+    "surface": 35.0,
+    "terrain": 85.0,
+    "pieces": 2,
+    "prix_m2": 4857,
+    "voie": "DU CALVAIRE"
+  },
+  {
+    "date": "2024-10-14",
+    "type": "Appartement",
+    "prix": 68500.0,
+    "surface": 17.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 4029,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-10-10",
+    "type": "Maison",
+    "prix": 278000.0,
+    "surface": 68.0,
+    "terrain": 172.0,
+    "pieces": 3,
+    "prix_m2": 4088,
+    "voie": "DES CARIGNANS"
+  },
+  {
+    "date": "2024-09-30",
+    "type": "Maison",
+    "prix": 1850000.0,
+    "surface": 320.0,
+    "terrain": 1739.0,
+    "pieces": 9,
+    "prix_m2": 5781,
+    "voie": "DU ROSSIGNOL"
+  },
+  {
+    "date": "2024-09-30",
+    "type": "Maison",
+    "prix": 1850000.0,
+    "surface": 78.0,
+    "terrain": 1739.0,
+    "pieces": 3,
+    "prix_m2": 23718,
+    "voie": "DU ROSSIGNOL"
+  },
+  {
+    "date": "2024-09-13",
+    "type": "Appartement",
+    "prix": 142860.0,
+    "surface": 34.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 4202,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-09-12",
+    "type": "Maison",
+    "prix": 1700000.0,
+    "surface": 50.0,
+    "terrain": 3400.0,
+    "pieces": 2,
+    "prix_m2": 34000,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-09-12",
+    "type": "Maison",
+    "prix": 559410.0,
+    "surface": 161.0,
+    "terrain": 651.0,
+    "pieces": 4,
+    "prix_m2": 3475,
+    "voie": "RENE CASSIN"
+  },
+  {
+    "date": "2024-09-10",
+    "type": "Appartement",
+    "prix": 162000.0,
+    "surface": 66.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2455,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-09-10",
+    "type": "Maison",
+    "prix": 494200.0,
+    "surface": 118.0,
+    "terrain": 796.0,
+    "pieces": 5,
+    "prix_m2": 4188,
+    "voie": "DE LA MOSSON"
+  },
+  {
+    "date": "2024-09-03",
+    "type": "Maison",
+    "prix": 295700.0,
+    "surface": 71.0,
+    "terrain": 286.0,
+    "pieces": 3,
+    "prix_m2": 4165,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2024-08-30",
+    "type": "Appartement",
+    "prix": 142500.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2908,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2024-08-23",
+    "type": "Appartement",
+    "prix": 55000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2500,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-08-23",
+    "type": "Appartement",
+    "prix": 680000.0,
+    "surface": 62.0,
+    "terrain": 1301.0,
+    "pieces": 3,
+    "prix_m2": 10968,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-08-19",
+    "type": "Maison",
+    "prix": 465000.0,
+    "surface": 115.0,
+    "terrain": 298.0,
+    "pieces": 5,
+    "prix_m2": 4043,
+    "voie": "DE LA PLAINE"
+  },
+  {
+    "date": "2024-08-12",
+    "type": "Appartement",
+    "prix": 35000.0,
+    "surface": 30.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 1167,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-08-08",
+    "type": "Appartement",
+    "prix": 122000.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3297,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2024-08-05",
+    "type": "Maison",
+    "prix": 898500.0,
+    "surface": 184.0,
+    "terrain": 500.0,
+    "pieces": 6,
+    "prix_m2": 4883,
+    "voie": "RUE ALPHONSE DAUDET"
+  },
+  {
+    "date": "2024-08-02",
+    "type": "Maison",
+    "prix": 307400.0,
+    "surface": 76.0,
+    "terrain": 200.0,
+    "pieces": 4,
+    "prix_m2": 4045,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2024-08-02",
+    "type": "Appartement",
+    "prix": 129320.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2939,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-08-01",
+    "type": "Appartement",
+    "prix": 143000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3326,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-07-31",
+    "type": "Appartement",
+    "prix": 63000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2864,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-07-30",
+    "type": "Appartement",
+    "prix": 216260.0,
+    "surface": 64.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3379,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-07-30",
+    "type": "Maison",
+    "prix": 346220.0,
+    "surface": 87.0,
+    "terrain": 163.0,
+    "pieces": 4,
+    "prix_m2": 3980,
+    "voie": "DES CISTES"
+  },
+  {
+    "date": "2024-07-26",
+    "type": "Appartement",
+    "prix": 50000.0,
+    "surface": 19.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2632,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-07-24",
+    "type": "Appartement",
+    "prix": 154000.0,
+    "surface": 50.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3080,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2024-07-23",
+    "type": "Appartement",
+    "prix": 133000.0,
+    "surface": 41.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3244,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-07-22",
+    "type": "Appartement",
+    "prix": 148400.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3373,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-07-17",
+    "type": "Maison",
+    "prix": 350000.0,
+    "surface": 95.0,
+    "terrain": 600.0,
+    "pieces": 4,
+    "prix_m2": 3684,
+    "voie": "LE RIO"
+  },
+  {
+    "date": "2024-07-10",
+    "type": "Maison",
+    "prix": 290000.0,
+    "surface": 130.0,
+    "terrain": 451.0,
+    "pieces": 6,
+    "prix_m2": 2231,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2024-07-08",
+    "type": "Maison",
+    "prix": 601000.0,
+    "surface": 120.0,
+    "terrain": 1031.0,
+    "pieces": 4,
+    "prix_m2": 5008,
+    "voie": "DE LA COLLINE"
+  },
+  {
+    "date": "2024-07-05",
+    "type": "Maison",
+    "prix": 383650.0,
+    "surface": 94.0,
+    "terrain": 391.0,
+    "pieces": 4,
+    "prix_m2": 4081,
+    "voie": "PLAN DE MAULE"
+  },
+  {
+    "date": "2024-07-04",
+    "type": "Appartement",
+    "prix": 157000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3651,
+    "voie": "DANTE ALIGHIERI"
+  },
+  {
+    "date": "2024-07-03",
+    "type": "Appartement",
+    "prix": 260300.0,
+    "surface": 72.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3615,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2024-06-28",
+    "type": "Appartement",
+    "prix": 53000.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2650,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-06-26",
+    "type": "Appartement",
+    "prix": 259000.0,
+    "surface": 84.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3083,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-06-26",
+    "type": "Appartement",
+    "prix": 172420.0,
+    "surface": 50.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3448,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2024-06-24",
+    "type": "Maison",
+    "prix": 420850.0,
+    "surface": 116.0,
+    "terrain": 500.0,
+    "pieces": 4,
+    "prix_m2": 3628,
+    "voie": "DANTE ALIGHIERI"
+  },
+  {
+    "date": "2024-06-21",
+    "type": "Appartement",
+    "prix": 274000.0,
+    "surface": 84.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3262,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-06-20",
+    "type": "Appartement",
+    "prix": 82520.0,
+    "surface": 32.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2579,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-06-18",
+    "type": "Appartement",
+    "prix": 68000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3238,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-06-10",
+    "type": "Appartement",
+    "prix": 100005.0,
+    "surface": 27.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3704,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2024-06-07",
+    "type": "Maison",
+    "prix": 402800.0,
+    "surface": 90.0,
+    "terrain": 600.0,
+    "pieces": 5,
+    "prix_m2": 4476,
+    "voie": "DES LAVANDES"
+  },
+  {
+    "date": "2024-06-06",
+    "type": "Appartement",
+    "prix": 128000.0,
+    "surface": 48.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2667,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2024-06-03",
+    "type": "Appartement",
+    "prix": 180000.0,
+    "surface": 64.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2812,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-05-31",
+    "type": "Appartement",
+    "prix": 373000.0,
+    "surface": 68.0,
+    "terrain": 776.0,
+    "pieces": 3,
+    "prix_m2": 5485,
+    "voie": "DU PERDIGAL"
+  },
+  {
+    "date": "2024-05-31",
+    "type": "Appartement",
+    "prix": 81000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3682,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-05-24",
+    "type": "Maison",
+    "prix": 437250.0,
+    "surface": 95.0,
+    "terrain": 388.0,
+    "pieces": 4,
+    "prix_m2": 4603,
+    "voie": "DE LA CROIX DE GUILLERY"
+  },
+  {
+    "date": "2024-05-17",
+    "type": "Appartement",
+    "prix": 141000.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2878,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2024-05-16",
+    "type": "Maison",
+    "prix": 353050.0,
+    "surface": 100.0,
+    "terrain": 686.0,
+    "pieces": 5,
+    "prix_m2": 3530,
+    "voie": "LE PRADAS"
+  },
+  {
+    "date": "2024-05-15",
+    "type": "Appartement",
+    "prix": 90225.0,
+    "surface": 24.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3759,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-05-13",
+    "type": "Maison",
+    "prix": 278800.0,
+    "surface": 65.0,
+    "terrain": 177.0,
+    "pieces": 3,
+    "prix_m2": 4289,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2024-05-07",
+    "type": "Maison",
+    "prix": 454000.0,
+    "surface": 124.0,
+    "terrain": 612.0,
+    "pieces": 7,
+    "prix_m2": 3661,
+    "voie": "LE BOSQUET"
+  },
+  {
+    "date": "2024-05-07",
+    "type": "Maison",
+    "prix": 390000.0,
+    "surface": 105.0,
+    "terrain": 519.0,
+    "pieces": 6,
+    "prix_m2": 3714,
+    "voie": "GUIZARD"
+  },
+  {
+    "date": "2024-04-29",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 61.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3279,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2024-04-25",
+    "type": "Maison",
+    "prix": 390000.0,
+    "surface": 88.0,
+    "terrain": 400.0,
+    "pieces": 4,
+    "prix_m2": 4432,
+    "voie": "BEATRICE PORTINARI"
+  },
+  {
+    "date": "2024-04-25",
+    "type": "Appartement",
+    "prix": 63000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3000,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-04-16",
+    "type": "Appartement",
+    "prix": 99275.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2309,
+    "voie": "DE LA BADIANE"
+  },
+  {
+    "date": "2024-04-12",
+    "type": "Appartement",
+    "prix": 139500.0,
+    "surface": 38.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3671,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-04-11",
+    "type": "Maison",
+    "prix": 173822.0,
+    "surface": 68.0,
+    "terrain": 261.0,
+    "pieces": 3,
+    "prix_m2": 2556,
+    "voie": "DES ECOLES"
+  },
+  {
+    "date": "2024-04-09",
+    "type": "Appartement",
+    "prix": 155000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3605,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-04-05",
+    "type": "Maison",
+    "prix": 322800.0,
+    "surface": 74.0,
+    "terrain": 213.0,
+    "pieces": 3,
+    "prix_m2": 4362,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2024-03-27",
+    "type": "Appartement",
+    "prix": 138425.0,
+    "surface": 45.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3076,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-03-15",
+    "type": "Appartement",
+    "prix": 130000.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3514,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-03-14",
+    "type": "Maison",
+    "prix": 361350.0,
+    "surface": 81.0,
+    "terrain": 300.0,
+    "pieces": 4,
+    "prix_m2": 4461,
+    "voie": "HILAIRE BERNIGAUD"
+  },
+  {
+    "date": "2024-03-08",
+    "type": "Appartement",
+    "prix": 222000.0,
+    "surface": 70.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3171,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-03-08",
+    "type": "Appartement",
+    "prix": 260000.0,
+    "surface": 72.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3611,
+    "voie": "DE MONTPELLIER"
+  },
+  {
+    "date": "2024-03-08",
+    "type": "Maison",
+    "prix": 350850.0,
+    "surface": 90.0,
+    "terrain": 381.0,
+    "pieces": 4,
+    "prix_m2": 3898,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2024-03-08",
+    "type": "Maison",
+    "prix": 337250.0,
+    "surface": 89.0,
+    "terrain": 203.0,
+    "pieces": 4,
+    "prix_m2": 3789,
+    "voie": "DE LA PLAINE"
+  },
+  {
+    "date": "2024-02-29",
+    "type": "Appartement",
+    "prix": 148370.0,
+    "surface": 48.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3091,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2024-02-28",
+    "type": "Maison",
+    "prix": 65130.0,
+    "surface": 35.0,
+    "terrain": 822.0,
+    "pieces": 1,
+    "prix_m2": 1861,
+    "voie": "PRADAS"
+  },
+  {
+    "date": "2024-02-28",
+    "type": "Maison",
+    "prix": 2280000.0,
+    "surface": 230.0,
+    "terrain": 1000.0,
+    "pieces": 7,
+    "prix_m2": 9913,
+    "voie": "PLATEAU DE PIQUET"
+  },
+  {
+    "date": "2024-02-26",
+    "type": "Maison",
+    "prix": 150540.0,
+    "surface": 32.0,
+    "terrain": 35.0,
+    "pieces": 1,
+    "prix_m2": 4704,
+    "voie": "DU PORCHE"
+  },
+  {
+    "date": "2024-02-21",
+    "type": "Appartement",
+    "prix": 67000.0,
+    "surface": 19.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3526,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-02-19",
+    "type": "Maison",
+    "prix": 510300.0,
+    "surface": 118.0,
+    "terrain": 1500.0,
+    "pieces": 5,
+    "prix_m2": 4325,
+    "voie": "DE GUILLERY"
+  },
+  {
+    "date": "2024-02-16",
+    "type": "Appartement",
+    "prix": 154240.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3148,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2024-02-09",
+    "type": "Appartement",
+    "prix": 61940.0,
+    "surface": 29.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2136,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-02-08",
+    "type": "Appartement",
+    "prix": 150000.0,
+    "surface": 45.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3333,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2024-02-07",
+    "type": "Appartement",
+    "prix": 145500.0,
+    "surface": 48.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3031,
+    "voie": "DE LA TREILLE"
+  },
+  {
+    "date": "2024-02-06",
+    "type": "Maison",
+    "prix": 190000.0,
+    "surface": 79.0,
+    "terrain": 712.0,
+    "pieces": 3,
+    "prix_m2": 2405,
+    "voie": "LE CALIXTE"
+  },
+  {
+    "date": "2024-02-02",
+    "type": "Maison",
+    "prix": 361827.0,
+    "surface": 78.0,
+    "terrain": 300.0,
+    "pieces": 4,
+    "prix_m2": 4639,
+    "voie": "UMBERTO ECO"
+  },
+  {
+    "date": "2024-01-31",
+    "type": "Appartement",
+    "prix": 41000.0,
+    "surface": 17.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2412,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2024-01-25",
+    "type": "Appartement",
+    "prix": 65000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2955,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2024-01-18",
+    "type": "Maison",
+    "prix": 387000.0,
+    "surface": 56.0,
+    "terrain": 519.0,
+    "pieces": 3,
+    "prix_m2": 6911,
+    "voie": "DE BEL AIR"
+  },
+  {
+    "date": "2024-01-12",
+    "type": "Appartement",
+    "prix": 102330.0,
+    "surface": 30.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3411,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-12-29",
+    "type": "Appartement",
+    "prix": 54000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2455,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-12-29",
+    "type": "Appartement",
+    "prix": 116270.0,
+    "surface": 34.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3420,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-12-21",
+    "type": "Appartement",
+    "prix": 176000.0,
+    "surface": 62.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2839,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-12-20",
+    "type": "Maison",
+    "prix": 285000.0,
+    "surface": 85.0,
+    "terrain": 300.0,
+    "pieces": 3,
+    "prix_m2": 3353,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-12-20",
+    "type": "Maison",
+    "prix": 217546.0,
+    "surface": 55.0,
+    "terrain": 38.0,
+    "pieces": 2,
+    "prix_m2": 3955,
+    "voie": "DU CALVAIRE"
+  },
+  {
+    "date": "2023-12-19",
+    "type": "Appartement",
+    "prix": 66000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3000,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-12-18",
+    "type": "Appartement",
+    "prix": 127000.0,
+    "surface": 84.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 1512,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2023-12-14",
+    "type": "Appartement",
+    "prix": 74000.0,
+    "surface": 23.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3217,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-12-11",
+    "type": "Maison",
+    "prix": 250000.0,
+    "surface": 65.0,
+    "terrain": 111.0,
+    "pieces": 3,
+    "prix_m2": 3846,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2023-12-08",
+    "type": "Maison",
+    "prix": 187320.0,
+    "surface": 60.0,
+    "terrain": 74.0,
+    "pieces": 3,
+    "prix_m2": 3122,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2023-12-01",
+    "type": "Maison",
+    "prix": 690000.0,
+    "surface": 133.0,
+    "terrain": 1000.0,
+    "pieces": 5,
+    "prix_m2": 5188,
+    "voie": "JACQUES PREVERT"
+  },
+  {
+    "date": "2023-12-01",
+    "type": "Maison",
+    "prix": 370000.0,
+    "surface": 104.0,
+    "terrain": 721.0,
+    "pieces": 4,
+    "prix_m2": 3558,
+    "voie": "LES CIGALES"
+  },
+  {
+    "date": "2023-11-30",
+    "type": "Maison",
+    "prix": 403000.0,
+    "surface": 145.0,
+    "terrain": 529.0,
+    "pieces": 6,
+    "prix_m2": 2779,
+    "voie": "LE MAS D'ARMAND II"
+  },
+  {
+    "date": "2023-11-16",
+    "type": "Appartement",
+    "prix": 64700.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3081,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-11-10",
+    "type": "Appartement",
+    "prix": 153500.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3489,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-11-10",
+    "type": "Maison",
+    "prix": 375000.0,
+    "surface": 104.0,
+    "terrain": 191.0,
+    "pieces": 4,
+    "prix_m2": 3606,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2023-10-31",
+    "type": "Maison",
+    "prix": 465591.0,
+    "surface": 125.0,
+    "terrain": 266.0,
+    "pieces": 5,
+    "prix_m2": 3725,
+    "voie": "DES CARIGNANS"
+  },
+  {
+    "date": "2023-10-26",
+    "type": "Appartement",
+    "prix": 118000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2682,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-10-20",
+    "type": "Appartement",
+    "prix": 107450.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2904,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-10-13",
+    "type": "Appartement",
+    "prix": 59000.0,
+    "surface": 19.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3105,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-10-09",
+    "type": "Maison",
+    "prix": 412400.0,
+    "surface": 101.0,
+    "terrain": 637.0,
+    "pieces": 4,
+    "prix_m2": 4083,
+    "voie": "LES MOURGUETTES"
+  },
+  {
+    "date": "2023-10-09",
+    "type": "Appartement",
+    "prix": 57450.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2736,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-10-04",
+    "type": "Appartement",
+    "prix": 235000.0,
+    "surface": 69.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3406,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-10-04",
+    "type": "Maison",
+    "prix": 219000.0,
+    "surface": 95.0,
+    "terrain": 125.0,
+    "pieces": 3,
+    "prix_m2": 2305,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-10-03",
+    "type": "Appartement",
+    "prix": 181000.0,
+    "surface": 57.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3175,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-09-25",
+    "type": "Appartement",
+    "prix": 50000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2381,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-09-20",
+    "type": "Appartement",
+    "prix": 110000.0,
+    "surface": 170.0,
+    "terrain": 0,
+    "pieces": 5,
+    "prix_m2": 647,
+    "voie": "DU MAS DE MA TOUR"
+  },
+  {
+    "date": "2023-09-20",
+    "type": "Maison",
+    "prix": 240000.0,
+    "surface": 104.0,
+    "terrain": 721.0,
+    "pieces": 4,
+    "prix_m2": 2308,
+    "voie": "LES CIGALES"
+  },
+  {
+    "date": "2023-09-19",
+    "type": "Maison",
+    "prix": 266700.0,
+    "surface": 77.0,
+    "terrain": 137.0,
+    "pieces": 3,
+    "prix_m2": 3464,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2023-09-11",
+    "type": "Maison",
+    "prix": 399000.0,
+    "surface": 110.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3627,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-08-28",
+    "type": "Appartement",
+    "prix": 266400.0,
+    "surface": 85.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3134,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-08-23",
+    "type": "Appartement",
+    "prix": 230000.0,
+    "surface": 77.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 2987,
+    "voie": "DE LA BERGERIE"
+  },
+  {
+    "date": "2023-08-16",
+    "type": "Maison",
+    "prix": 539000.0,
+    "surface": 135.0,
+    "terrain": 574.0,
+    "pieces": 5,
+    "prix_m2": 3993,
+    "voie": "DES CARIGNANS"
+  },
+  {
+    "date": "2023-08-16",
+    "type": "Maison",
+    "prix": 405380.0,
+    "surface": 100.0,
+    "terrain": 802.0,
+    "pieces": 4,
+    "prix_m2": 4054,
+    "voie": "DE GUILLERY"
+  },
+  {
+    "date": "2023-08-11",
+    "type": "Appartement",
+    "prix": 64000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2909,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-08-09",
+    "type": "Appartement",
+    "prix": 62000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2952,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-08-03",
+    "type": "Appartement",
+    "prix": 135000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3140,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-08-01",
+    "type": "Appartement",
+    "prix": 127500.0,
+    "surface": 42.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3036,
+    "voie": "DES GARRIGUETTES"
+  },
+  {
+    "date": "2023-07-31",
+    "type": "Maison",
+    "prix": 600000.0,
+    "surface": 139.0,
+    "terrain": 993.0,
+    "pieces": 4,
+    "prix_m2": 4317,
+    "voie": "DE LA CROIX DE GUILLERY"
+  },
+  {
+    "date": "2023-07-26",
+    "type": "Appartement",
+    "prix": 175000.0,
+    "surface": 46.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3804,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-07-26",
+    "type": "Appartement",
+    "prix": 66000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3000,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-07-20",
+    "type": "Maison",
+    "prix": 520000.0,
+    "surface": 95.0,
+    "terrain": 537.0,
+    "pieces": 3,
+    "prix_m2": 5474,
+    "voie": "DES GARRIGUETTES"
+  },
+  {
+    "date": "2023-07-19",
+    "type": "Appartement",
+    "prix": 60080.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3004,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-07-18",
+    "type": "Maison",
+    "prix": 353000.0,
+    "surface": 72.0,
+    "terrain": 394.0,
+    "pieces": 3,
+    "prix_m2": 4903,
+    "voie": "DE LA GERBE"
+  },
+  {
+    "date": "2023-07-17",
+    "type": "Appartement",
+    "prix": 147000.0,
+    "surface": 50.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2940,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-07-13",
+    "type": "Appartement",
+    "prix": 77000.0,
+    "surface": 15.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 5133,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2023-07-13",
+    "type": "Appartement",
+    "prix": 126500.0,
+    "surface": 36.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3514,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-07-13",
+    "type": "Appartement",
+    "prix": 258300.0,
+    "surface": 45.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 5740,
+    "voie": "DU PORTAIL"
+  },
+  {
+    "date": "2023-07-12",
+    "type": "Appartement",
+    "prix": 170000.0,
+    "surface": 59.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2881,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-07-12",
+    "type": "Appartement",
+    "prix": 128800.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3481,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-07-10",
+    "type": "Appartement",
+    "prix": 138670.0,
+    "surface": 56.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2476,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2023-07-06",
+    "type": "Appartement",
+    "prix": 77000.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3850,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-30",
+    "type": "Maison",
+    "prix": 390000.0,
+    "surface": 109.0,
+    "terrain": 663.0,
+    "pieces": 5,
+    "prix_m2": 3578,
+    "voie": "DU PLATEAU"
+  },
+  {
+    "date": "2023-06-30",
+    "type": "Maison",
+    "prix": 738000.0,
+    "surface": 145.0,
+    "terrain": 1000.0,
+    "pieces": 5,
+    "prix_m2": 5090,
+    "voie": "DU RIVIERAL"
+  },
+  {
+    "date": "2023-06-30",
+    "type": "Appartement",
+    "prix": 180000.0,
+    "surface": 68.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2647,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-06-29",
+    "type": "Maison",
+    "prix": 308900.0,
+    "surface": 142.0,
+    "terrain": 86.0,
+    "pieces": 3,
+    "prix_m2": 2175,
+    "voie": "DU CALVAIRE"
+  },
+  {
+    "date": "2023-06-29",
+    "type": "Maison",
+    "prix": 458200.0,
+    "surface": 139.0,
+    "terrain": 1338.0,
+    "pieces": 5,
+    "prix_m2": 3296,
+    "voie": "DE BEL AIR"
+  },
+  {
+    "date": "2023-06-29",
+    "type": "Maison",
+    "prix": 464500.0,
+    "surface": 89.0,
+    "terrain": 651.0,
+    "pieces": 4,
+    "prix_m2": 5219,
+    "voie": "DU PRADAS"
+  },
+  {
+    "date": "2023-06-29",
+    "type": "Maison",
+    "prix": 350000.0,
+    "surface": 151.0,
+    "terrain": 701.0,
+    "pieces": 6,
+    "prix_m2": 2318,
+    "voie": "LES GRILLONS"
+  },
+  {
+    "date": "2023-06-27",
+    "type": "Appartement",
+    "prix": 199000.0,
+    "surface": 46.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 4326,
+    "voie": "DU GRAND CHAMP"
+  },
+  {
+    "date": "2023-06-27",
+    "type": "Appartement",
+    "prix": 271570.0,
+    "surface": 70.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3880,
+    "voie": "DE LA BERGERIE"
+  },
+  {
+    "date": "2023-06-23",
+    "type": "Appartement",
+    "prix": 169520.0,
+    "surface": 42.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 4036,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-06-19",
+    "type": "Appartement",
+    "prix": 210000.0,
+    "surface": 58.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3621,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-06-19",
+    "type": "Appartement",
+    "prix": 65000.0,
+    "surface": 33.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 1970,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-15",
+    "type": "Appartement",
+    "prix": 47000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2238,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-14",
+    "type": "Maison",
+    "prix": 462500.0,
+    "surface": 106.0,
+    "terrain": 586.0,
+    "pieces": 4,
+    "prix_m2": 4363,
+    "voie": "DE ROQUEBLANQUE"
+  },
+  {
+    "date": "2023-06-13",
+    "type": "Appartement",
+    "prix": 59050.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2952,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-13",
+    "type": "Appartement",
+    "prix": 178920.0,
+    "surface": 66.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2711,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-06-09",
+    "type": "Appartement",
+    "prix": 38500.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 1750,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-09",
+    "type": "Appartement",
+    "prix": 71250.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3562,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-02",
+    "type": "Appartement",
+    "prix": 50800.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2419,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-06-01",
+    "type": "Maison",
+    "prix": 620000.0,
+    "surface": 140.0,
+    "terrain": 462.0,
+    "pieces": 5,
+    "prix_m2": 4429,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-06-01",
+    "type": "Appartement",
+    "prix": 254000.0,
+    "surface": 57.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 4456,
+    "voie": "DE MONTPELLIER"
+  },
+  {
+    "date": "2023-05-25",
+    "type": "Maison",
+    "prix": 180000.0,
+    "surface": 90.0,
+    "terrain": 80.0,
+    "pieces": 5,
+    "prix_m2": 2000,
+    "voie": "DU PLANEL"
+  },
+  {
+    "date": "2023-05-23",
+    "type": "Maison",
+    "prix": 850000.0,
+    "surface": 155.0,
+    "terrain": 660.0,
+    "pieces": 7,
+    "prix_m2": 5484,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-05-23",
+    "type": "Maison",
+    "prix": 850000.0,
+    "surface": 40.0,
+    "terrain": 953.0,
+    "pieces": 2,
+    "prix_m2": 21250,
+    "voie": "JEAN CANONGE"
+  },
+  {
+    "date": "2023-05-17",
+    "type": "Appartement",
+    "prix": 140000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3182,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-05-10",
+    "type": "Maison",
+    "prix": 340000.0,
+    "surface": 108.0,
+    "terrain": 405.0,
+    "pieces": 4,
+    "prix_m2": 3148,
+    "voie": "GUSTAVE BOUCHARDAT"
+  },
+  {
+    "date": "2023-05-09",
+    "type": "Maison",
+    "prix": 267000.0,
+    "surface": 73.0,
+    "terrain": 187.0,
+    "pieces": 4,
+    "prix_m2": 3658,
+    "voie": "DES CARIGNANS"
+  },
+  {
+    "date": "2023-05-05",
+    "type": "Maison",
+    "prix": 384600.0,
+    "surface": 104.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3698,
+    "voie": "DU PERDIGAL"
+  },
+  {
+    "date": "2023-05-05",
+    "type": "Appartement",
+    "prix": 52800.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2400,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-05-04",
+    "type": "Maison",
+    "prix": 329000.0,
+    "surface": 109.0,
+    "terrain": 344.0,
+    "pieces": 6,
+    "prix_m2": 3018,
+    "voie": "DU CALVAIRE"
+  },
+  {
+    "date": "2023-05-03",
+    "type": "Appartement",
+    "prix": 87000.0,
+    "surface": 25.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3480,
+    "voie": "DE L HORLOGE"
+  },
+  {
+    "date": "2023-05-02",
+    "type": "Maison",
+    "prix": 320000.0,
+    "surface": 90.0,
+    "terrain": 292.0,
+    "pieces": 4,
+    "prix_m2": 3556,
+    "voie": "DU CALVAIRE"
+  },
+  {
+    "date": "2023-04-28",
+    "type": "Appartement",
+    "prix": 59000.0,
+    "surface": 23.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2565,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-04-19",
+    "type": "Appartement",
+    "prix": 40000.0,
+    "surface": 21.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 1905,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-04-14",
+    "type": "Appartement",
+    "prix": 155000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3523,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Maison",
+    "prix": 598568.8,
+    "surface": 164.0,
+    "terrain": 965.0,
+    "pieces": 6,
+    "prix_m2": 3650,
+    "voie": "DE LA COLLINE"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Maison",
+    "prix": 670000.0,
+    "surface": 145.0,
+    "terrain": 655.0,
+    "pieces": 5,
+    "prix_m2": 4621,
+    "voie": "DE LAS COUSTIERRASSAS"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 60.0,
+    "terrain": 1309.0,
+    "pieces": 3,
+    "prix_m2": 3333,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 70.0,
+    "terrain": 1309.0,
+    "pieces": 3,
+    "prix_m2": 2857,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 50.0,
+    "terrain": 1309.0,
+    "pieces": 2,
+    "prix_m2": 4000,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Appartement",
+    "prix": 200000.0,
+    "surface": 80.0,
+    "terrain": 1309.0,
+    "pieces": 3,
+    "prix_m2": 2500,
+    "voie": "DE MONTFERRIER"
+  },
+  {
+    "date": "2023-04-13",
+    "type": "Appartement",
+    "prix": 215000.0,
+    "surface": 61.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3525,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2023-04-11",
+    "type": "Appartement",
+    "prix": 156000.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3184,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2023-04-07",
+    "type": "Appartement",
+    "prix": 145000.0,
+    "surface": 72.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2014,
+    "voie": "DU CHATEAU"
+  },
+  {
+    "date": "2023-04-03",
+    "type": "Appartement",
+    "prix": 146150.0,
+    "surface": 49.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2983,
+    "voie": "EDOUARD BRANLY"
+  },
+  {
+    "date": "2023-03-28",
+    "type": "Appartement",
+    "prix": 270000.0,
+    "surface": 67.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 4030,
+    "voie": "DE LA TREILLE"
+  },
+  {
+    "date": "2023-03-24",
+    "type": "Maison",
+    "prix": 579805.0,
+    "surface": 152.0,
+    "terrain": 884.0,
+    "pieces": 5,
+    "prix_m2": 3815,
+    "voie": "PIERRE RONSARD"
+  },
+  {
+    "date": "2023-03-24",
+    "type": "Appartement",
+    "prix": 57500.0,
+    "surface": 19.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3026,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-03-21",
+    "type": "Appartement",
+    "prix": 62700.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 3135,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-03-17",
+    "type": "Appartement",
+    "prix": 307000.0,
+    "surface": 99.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 3101,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-03-15",
+    "type": "Appartement",
+    "prix": 91090.0,
+    "surface": 31.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2938,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-03-15",
+    "type": "Appartement",
+    "prix": 225000.0,
+    "surface": 76.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 2961,
+    "voie": "DE LA BERGERIE"
+  },
+  {
+    "date": "2023-03-13",
+    "type": "Appartement",
+    "prix": 1035000.0,
+    "surface": 28.0,
+    "terrain": 1780.0,
+    "pieces": 2,
+    "prix_m2": 36964,
+    "voie": "DES BRUYERES"
+  },
+  {
+    "date": "2023-03-13",
+    "type": "Appartement",
+    "prix": 1035000.0,
+    "surface": 45.0,
+    "terrain": 1780.0,
+    "pieces": 3,
+    "prix_m2": 23000,
+    "voie": "DES BRUYERES"
+  },
+  {
+    "date": "2023-03-13",
+    "type": "Appartement",
+    "prix": 1035000.0,
+    "surface": 25.0,
+    "terrain": 1780.0,
+    "pieces": 1,
+    "prix_m2": 41400,
+    "voie": "DES BRUYERES"
+  },
+  {
+    "date": "2023-03-13",
+    "type": "Appartement",
+    "prix": 1035000.0,
+    "surface": 97.0,
+    "terrain": 1780.0,
+    "pieces": 7,
+    "prix_m2": 10670,
+    "voie": "DES BRUYERES"
+  },
+  {
+    "date": "2023-03-07",
+    "type": "Appartement",
+    "prix": 240000.0,
+    "surface": 62.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3871,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2023-03-07",
+    "type": "Maison",
+    "prix": 431800.0,
+    "surface": 125.0,
+    "terrain": 365.0,
+    "pieces": 5,
+    "prix_m2": 3454,
+    "voie": "DES PLATANES"
+  },
+  {
+    "date": "2023-03-07",
+    "type": "Appartement",
+    "prix": 204580.0,
+    "surface": 65.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3147,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-02-28",
+    "type": "Appartement",
+    "prix": 162000.0,
+    "surface": 39.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 4154,
+    "voie": "FRANCOIS RANCHIN"
+  },
+  {
+    "date": "2023-02-27",
+    "type": "Maison",
+    "prix": 965850.0,
+    "surface": 119.0,
+    "terrain": 2330.0,
+    "pieces": 5,
+    "prix_m2": 8116,
+    "voie": "PLAN DE MAULE"
+  },
+  {
+    "date": "2023-02-24",
+    "type": "Maison",
+    "prix": 469000.0,
+    "surface": 139.0,
+    "terrain": 350.0,
+    "pieces": 6,
+    "prix_m2": 3374,
+    "voie": "DU FRAGON"
+  },
+  {
+    "date": "2023-02-22",
+    "type": "Maison",
+    "prix": 350000.0,
+    "surface": 125.0,
+    "terrain": 903.0,
+    "pieces": 4,
+    "prix_m2": 2800,
+    "voie": "DU FAUBOURG"
+  },
+  {
+    "date": "2023-02-14",
+    "type": "Appartement",
+    "prix": 176600.0,
+    "surface": 48.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3679,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-02-14",
+    "type": "Appartement",
+    "prix": 187750.0,
+    "surface": 69.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2721,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-02-10",
+    "type": "Appartement",
+    "prix": 142000.0,
+    "surface": 53.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2679,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-02-10",
+    "type": "Maison",
+    "prix": 628300.0,
+    "surface": 168.0,
+    "terrain": 700.0,
+    "pieces": 6,
+    "prix_m2": 3740,
+    "voie": "DE MONTPELLIER"
+  },
+  {
+    "date": "2023-02-10",
+    "type": "Maison",
+    "prix": 335000.0,
+    "surface": 120.0,
+    "terrain": 42.0,
+    "pieces": 4,
+    "prix_m2": 2792,
+    "voie": "DE LA FONTAINE"
+  },
+  {
+    "date": "2023-02-09",
+    "type": "Appartement",
+    "prix": 58470.0,
+    "surface": 20.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2924,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-02-06",
+    "type": "Maison",
+    "prix": 421500.0,
+    "surface": 100.0,
+    "terrain": 488.0,
+    "pieces": 5,
+    "prix_m2": 4215,
+    "voie": "HILAIRE BERNIGAUD"
+  },
+  {
+    "date": "2023-02-02",
+    "type": "Appartement",
+    "prix": 142000.0,
+    "surface": 48.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 2958,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-01-30",
+    "type": "Maison",
+    "prix": 860000.0,
+    "surface": 143.0,
+    "terrain": 7837.0,
+    "pieces": 4,
+    "prix_m2": 6014,
+    "voie": "DES MESANGES"
+  },
+  {
+    "date": "2023-01-25",
+    "type": "Appartement",
+    "prix": 59000.0,
+    "surface": 22.0,
+    "terrain": 0,
+    "pieces": 1,
+    "prix_m2": 2682,
+    "voie": "ALPHONSE BEAU DE ROCHAS"
+  },
+  {
+    "date": "2023-01-25",
+    "type": "Appartement",
+    "prix": 156880.0,
+    "surface": 37.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 4240,
+    "voie": "DE L OLIVERAIE"
+  },
+  {
+    "date": "2023-01-20",
+    "type": "Appartement",
+    "prix": 178500.0,
+    "surface": 50.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3570,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-01-18",
+    "type": "Maison",
+    "prix": 449800.0,
+    "surface": 111.0,
+    "terrain": 694.0,
+    "pieces": 4,
+    "prix_m2": 4052,
+    "voie": "RIEUMASSEL"
+  },
+  {
+    "date": "2023-01-17",
+    "type": "Maison",
+    "prix": 347000.0,
+    "surface": 100.0,
+    "terrain": 227.0,
+    "pieces": 4,
+    "prix_m2": 3470,
+    "voie": "DES CINSAULTS"
+  },
+  {
+    "date": "2023-01-17",
+    "type": "Appartement",
+    "prix": 164000.0,
+    "surface": 52.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 3154,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-01-16",
+    "type": "Appartement",
+    "prix": 201730.0,
+    "surface": 70.0,
+    "terrain": 0,
+    "pieces": 3,
+    "prix_m2": 2882,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-01-13",
+    "type": "Appartement",
+    "prix": 380000.0,
+    "surface": 84.0,
+    "terrain": 807.0,
+    "pieces": 4,
+    "prix_m2": 4524,
+    "voie": "DE LA PINEDE"
+  },
+  {
+    "date": "2023-01-13",
+    "type": "Appartement",
+    "prix": 380000.0,
+    "surface": 70.0,
+    "terrain": 807.0,
+    "pieces": 3,
+    "prix_m2": 5429,
+    "voie": "DE LA PINEDE"
+  },
+  {
+    "date": "2023-01-10",
+    "type": "Appartement",
+    "prix": 150000.0,
+    "surface": 47.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3191,
+    "voie": "ANTOINE JEROME BALARD"
+  },
+  {
+    "date": "2023-01-09",
+    "type": "Appartement",
+    "prix": 147000.0,
+    "surface": 43.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3419,
+    "voie": "DE LA VALSIERE"
+  },
+  {
+    "date": "2023-01-06",
+    "type": "Maison",
+    "prix": 390000.0,
+    "surface": 75.0,
+    "terrain": 0,
+    "pieces": 4,
+    "prix_m2": 5200,
+    "voie": "DU PERDIGAL"
+  },
+  {
+    "date": "2023-01-06",
+    "type": "Appartement",
+    "prix": 148000.0,
+    "surface": 44.0,
+    "terrain": 0,
+    "pieces": 2,
+    "prix_m2": 3364,
+    "voie": "DE LA VALSIERE"
+  }
+]

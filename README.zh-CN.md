@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[在线演示: sf.macaron-software.com](https://sf.macaron-software.com)** — 点击 "Skip (Demo)" 即可探索
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [功能特性](#功能特性) · [快速开始](#快速开始) · [截图预览](#截图预览) · [架构设计](#架构设计) · [参与贡献](#参与贡献)
 
@@ -31,11 +41,16 @@
 
 Software Factory 是一个**自主多智能体平台**，它编排整个软件开发生命周期 — 从构思到部署 — 使用专业化 AI 智能体协同工作。
 
-可以将其视为一个**虚拟软件工厂**，其中 161 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
+可以将其视为一个**虚拟软件工厂**，其中 191 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
 
 ### 核心亮点
 
-- **161 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **191 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **36 个内置工作流** — SAFe 仪式、质量门控、夜间维护、安全、知识管理
+- **知识管理** — 4 个专用智能体、ART 知识团队、夜间 `knowledge-maintenance` 工作流
+- **内存智能** — 相关性评分、访问追踪、自动清除过期条目
+- **LLM 成本追踪** — 任务时间线标签页标题中显示每个任务的成本
+- **任务时间线** — Mission Control 中以泳道方式显示阶段持续时间的时间线标签页
 - **10 种编排模式** — 单智能体、顺序、并行、层级、网络、循环、路由、聚合、波次、人机协作
 - **SAFe 对齐生命周期** — Portfolio → Epic → Feature → Story，PI 节奏驱动
 - **自动修复** — 自主事件检测、分类和自修复
@@ -86,6 +101,26 @@ Software Factory 是一个**自主多智能体平台**，它编排整个软件�
 <td width="50%">
 <strong>新手引导 — SAFe 角色选择向导</strong><br>
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>首页 — CTO Jarvis / 业务创意 / 项目创意 标签页</strong><br>
+<img src="docs/screenshots/en/home.png" alt="首页" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 战略AI顾问</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>业务创意 — 6智能体营销团队</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="业务创意" width="100%">
+</td>
+<td width="50%">
+<strong>项目创意 — 多智能体技术团队</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="项目创意" width="100%">
 </td>
 </tr>
 </table>
@@ -160,17 +195,13 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 安装完成后，以下是从创意到可用项目的流程：
 
-### 路径 A：从创意开始（创意工坊）
+### 路径 A：询问 CTO Jarvis（最快）
 
-1. **打开创意页面** — 前往 `/ideation`（或点击侧边栏中的 "Ideation"）
-2. **描述您的创意** — 例如 *"具有实时匹配功能的企业拼车应用"*
-3. **观察智能体讨论** — 5 个专业智能体（产品经理、业务分析师、架构师、UX 设计师、安全专家）通过 SSE 流式传输实时分析您的创意
-4. **从结果创建项目** — 点击 **"Create an Epic from this idea"**。平台将：
-   - 创建一个新**项目**，包含生成的 `VISION.md` 和 CI/CD 脚手架
-   - 创建一个**史诗**，由 PO 智能体分解为功能特性和用户故事
-   - 自动配置 **TMA**（运维）、**安全** 和 **技术债务** 任务
+1. **打开首页** (`/`) — 平台从 CTO Jarvis 标签启动
+2. **输入您的项目想法** — 例如 *"用 React 和 Python 创建一个企业拼车应用的新项目"*
+3. **Jarvis（Gabriel Mercier，战略编排者）** 分析请求、创建项目、配置 SAFe 待办事项列表并启动首个任务 — 全在一次对话中完成
 
-现在您已拥有一个完整的 SAFe 待办事项列表，可以开始执行了。
+这是所有新项目的**推荐入口**。
 
 ### 路径 B：手动创建项目
 
@@ -210,7 +241,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## 功能特性
 
-### 161 个专业 AI 智能体
+### 191 个专业 AI 智能体
 
 智能体按团队组织，镜像真实软件组织结构：
 
@@ -409,7 +440,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 191 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -474,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -580,34 +611,9 @@ Mission Created
 ### 部署架构
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker（推荐）→ http://localhost:8090
+本地（开发） → http://localhost:8090
+生产环境      → 您自己的基础设施
 ```
 
 ## 项目配置
@@ -901,6 +907,87 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **路由矩阵** — 按类别（推理、生产/代码、任务、撰写）配置重/轻模型
 - **Darwin LLM A/B 区域** — 正在进行的模型实验的实时视图
 
+## v2.7.0 新功能（2026 年）
+
+### 知识管理系统
+- **4 个新智能体** — `knowledge-manager`、`knowledge-curator`、`knowledge-seeder`、`wiki-maintainer`
+- **ART 知识团队** — 专注知识运营的敏捷发布火车
+- **夜间 `knowledge-maintenance` 工作流** — 自动整理、去重、新鲜度评分
+- **内存健康仪表盘** — 指标标签页中的知识健康指标面板
+- **知识健康徽章** — 在设置页面可见
+
+### 内存智能
+- **相关性评分** — `置信度 × 新近度 × 访问增益` 公式实现排序检索
+- **访问追踪** — 每个内存条目的 `access_count` 和 `last_read_at` 字段
+- **自动清除** — 每次夜间运行时删除低于阈值的过期条目
+
+### LLM 成本追踪
+- **每任务成本** — 显示在任务时间线标签页标题中
+- **自动汇总** — 从 `llm_traces` 表聚合
+
+### 任务时间线
+- **泳道时间线标签页** — 在 Mission Control 中以水平泳道展示智能体阶段
+- **阶段持续时间** — 每个阶段耗时的可视化展示
+
+### 质量评分
+- **PhaseRun 的 `quality_score` 字段** — 每个阶段后由对抗守卫填充
+
+### 项目导出/导入
+- **ZIP 压缩包** — 包含 `project.json` + 所有任务 + 运行 + 记忆
+
+### 输入验证
+- **Pydantic 模型** — 所有 POST/PATCH 路由使用严格的输入模式验证
+
+### BSCC 领域指南
+- **领域架构指南** — 按项目领域强制执行 Confluence/Solaris 指南
+
+### 设置集成中心
+- **可配置工具集成** — Jira、Confluence、SonarQube 可供所有智能体使用
+
+### 浏览器推送通知
+- **Web Push API (VAPID)** — 任务事件的原生浏览器推送通知
+
+## v3.0.0 新功能（2026 年）
+
+### 智能体市场
+- **191 个智能体已编目** — `/marketplace` 支持全文搜索，按 ART/角色/技能筛选
+- **智能体档案** — 包含工具、技能和近期会话历史的详细视图
+- **一键启动** — 从档案页面直接与任意智能体发起会话
+
+### 任务回放界面
+- **逐步回放** — 在 `/missions/{id}/replay` 重放每个智能体轮次和工具调用
+- **每步成本和令牌** — 按智能体细分的 LLM 花费明细
+- **可导出历史** — 以 JSON 格式下载回放用于调试和审计
+
+### LLM 指标仪表盘
+- **成本/延迟/提供商实时监控** (`/metrics`)
+- **按智能体和任务的花费** — 识别高成本智能体并优化
+- **提供商对比** — 各提供商 P50/P95 延迟和成本并排比较
+
+### RBAC + 速率限制
+- **工作区范围的 RBAC** — 按工作区（而非仅按平台）分配角色
+- **按用户速率限制** — 按角色配置可调的令牌/请求配额
+- **审计跟踪** — 所有 RBAC 变更均记录行为者、时间戳和变更详情
+
+### 智能体评估框架
+- **LLM 即评判者评分** — 在 `/evals` 对黄金数据集进行自动评估
+- **按智能体基准** — 追踪随时间变化的质量并检测回归
+- **可配置评判者** — 使用任意已配置的 LLM 提供商作为评估评判者
+
+### 工具构建器
+- **无代码工具创建** (`/tool-builder`) — HTTP、SQL 和 Shell 工具
+- **即时激活** — 工具保存后立即对智能体可用
+- **参数模板** — 定义带类型和验证的输入架构
+
+### 多租户工作区
+- **隔离命名空间** (`/workspaces`) — 每个工作区拥有独立的数据、智能体和记忆
+- **按客户部署** — 无交叉污染地接入多个客户
+- **按工作区的 RBAC** — 每个命名空间的细粒度角色分配
+
+### YAML 智能体热重载
+- **实时智能体更新** — 编辑智能体 YAML 文件并在不重启平台的情况下重新加载
+- **零停机** — 进行中的任务继续使用先前的智能体定义
+
 ## 参与贡献
 
 欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献指南。
@@ -911,6 +998,6 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ## 支持
 
-- 在线演示: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - 问题反馈: https://github.com/macaron-software/software-factory/issues
 - 讨论区: https://github.com/macaron-software/software-factory/discussions

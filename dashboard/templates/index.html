@@ -3,6 +3,62 @@
 {% block title %}Dashboard - Software Factory{% endblock %}
 
 {% block content %}
+<!-- Deploy Status -->
+{% if deploy_status %}
+<div class="mb-6">
+    <h2 class="text-lg font-bold mb-3">Environments</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+    {% for env in deploy_status %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex items-center justify-between">
+        <div>
+            <div class="font-semibold text-sm">{{ env.name }}</div>
+            {% if env.url %}
+            <div class="text-xs text-gray-500 mt-0.5"><a href="{{ env.url }}" target="_blank" class="hover:underline">{{ env.url }}</a></div>
+            {% else %}
+            <div class="text-xs text-gray-400 italic">Not configured (set {{ env.key | upper }}_PLATFORM_URL)</div>
+            {% endif %}
+            {% if env.version %}
+            <div class="text-xs text-gray-400 mt-1">
+                remote: <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{{ env.version[:8] }}</code>
+                {% if env.local_version %}
+                · local: <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{{ env.local_version }}</code>
+                {% endif %}
+                {% if env.up_to_date == true %}
+                <span class="text-green-600 ml-1">✓ up-to-date</span>
+                {% elif env.up_to_date == false %}
+                <span class="text-orange-500 ml-1">⚡ outdated</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        <div class="flex flex-col items-end gap-1">
+            {% if env.status == 'online' %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 mr-1"></span>Online
+            </span>
+            {% elif env.status == 'offline' %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                <span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1"></span>Offline
+            </span>
+            {% elif env.status == 'not_configured' %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">—</span>
+            {% else %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                <span class="w-1.5 h-1.5 rounded-full bg-yellow-500 mr-1"></span>{{ env.status | title }}
+            </span>
+            {% endif %}
+            {% if env.ssh_ok %}
+            <span class="text-xs text-green-600">SSH ✓</span>
+            {% elif env.ssh_host %}
+            <span class="text-xs text-red-500">SSH ✗</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 <!-- Global Stats Cards -->
 <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
@@ -38,11 +94,19 @@
     </div>
 </div>
 
-<!-- Projects Grid -->
+<!-- Projects Grid (grouped by domain) -->
 <h2 class="text-xl font-bold mb-4">Projects</h2>
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-    {% for project in projects %}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
+{% if domain_groups %}
+  {% for group in domain_groups %}
+  <div class="mb-6">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-3 h-3 rounded-full inline-block" style="background-color: {{ group.color }};"></span>
+      <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300">{{ group.label }}</h3>
+      <span class="text-xs text-gray-400">({{ group.projects|length }})</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for project in group.projects %}
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
         <div class="p-4">
             <!-- Header -->
             <div class="flex items-center justify-between mb-3">
@@ -56,11 +120,19 @@
                         {{ project.display_name }}
                     </a>
                 </div>
-                {% if project.running %}
-                <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
-                    {{ project.workers }} worker{% if project.workers != 1 %}s{% endif %}
-                </span>
-                {% endif %}
+                <div class="flex items-center space-x-1">
+                    {% if project.arch_domain_label %}
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+                          style="background-color: {{ project.arch_domain_color }};">
+                        {{ project.arch_domain_label }}
+                    </span>
+                    {% endif %}
+                    {% if project.running %}
+                    <span class="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-1 rounded">
+                        {{ project.workers }} worker{% if project.workers != 1 %}s{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
 
             <!-- Stats -->
@@ -124,9 +196,24 @@
                 </div>
             </div>
         </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {% for project in projects %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-3">
+                <a href="/project/{{ project.id }}" class="font-semibold text-lg hover:text-blue-600">{{ project.display_name }}</a>
+            </div>
+        </div>
     </div>
     {% endfor %}
 </div>
+{% endif %}
 
 <!-- Team of Rivals Metrics -->
 <h2 class="text-xl font-bold mb-4">Team of Rivals - Quality Metrics</h2>

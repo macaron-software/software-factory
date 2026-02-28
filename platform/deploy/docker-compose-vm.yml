@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   platform:
     build:
       context: /opt/macaron
@@ -20,6 +35,7 @@ services:
       - MF_ROOT=/app/mf_projects
       - ANDROID_BUILDER_CONTAINER=android-builder
       - AZURE_DEPLOY=1
+      - PLATFORM_AUTO_RESUME_ENABLED=${PLATFORM_AUTO_RESUME_ENABLED:-0}
       - SANDBOX_ENABLED=true
       - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
       - SANDBOX_NETWORK=bridge
@@ -27,12 +43,23 @@ services:
       - JIRA_PROJECT=${JIRA_PROJECT:-}
       - JIRA_BOARD_ID=${JIRA_BOARD_ID:-}
       - JIRA_TOKEN=${JIRA_TOKEN:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
     volumes:
       - platform-data:/app/data
       - workspace-data:/app/workspace
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/macaron/repos:/opt/macaron/repos
+      # Live code volumes — overrides baked image code; docker restart = code reload
+      - /opt/macaron/platform:/app/macaron_platform
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /opt/macaron/mcp_lrm:/app/mcp_lrm
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/health', timeout=10)"]
@@ -66,3 +93,4 @@ services:
 volumes:
   platform-data:
   workspace-data:
+  pg-data:

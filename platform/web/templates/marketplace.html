@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+/* ── Marketplace ────────────────────────────────── */
+.mkt-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.mkt-search{flex:1;min-width:200px;padding:0.55rem 0.9rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-primary);font-size:0.88rem;outline:none}
+.mkt-search:focus{border-color:var(--purple)}
+.mkt-filters{display:flex;gap:0.5rem;flex-wrap:wrap}
+.mkt-select{padding:0.5rem 0.75rem;border-radius:8px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);font-size:0.82rem;cursor:pointer}
+.mkt-select:focus{border-color:var(--purple);outline:none}
+.mkt-count{font-size:0.78rem;color:var(--text-secondary);align-self:center}
+
+/* Grid */
+.mkt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1rem}
+.mkt-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.1rem;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.mkt-card:hover{border-color:var(--purple);transform:translateY(-2px);box-shadow:0 4px 20px rgba(108,99,255,.12)}
+.mkt-card-top{display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem}
+.mkt-avatar{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.3rem}
+.mkt-name{font-size:0.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
+.mkt-role{font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-top:0.1rem}
+.mkt-tagline{font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.65rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.mkt-skills{display:flex;gap:0.3rem;flex-wrap:wrap}
+.mkt-skill{background:var(--bg-tertiary);color:var(--text-secondary);border-radius:4px;padding:0.15rem 0.45rem;font-size:0.68rem;border:1px solid var(--border)}
+.mkt-builtin{position:absolute;top:0.6rem;right:0.6rem;font-size:0.6rem;background:var(--purple);color:#fff;border-radius:4px;padding:0.1rem 0.35rem;text-transform:uppercase}
+
+/* Panel */
+.mkt-panel-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:900}
+.mkt-panel-overlay.open{display:flex;align-items:flex-start;justify-content:flex-end}
+.mkt-panel{width:420px;max-width:95vw;height:100vh;background:var(--bg-primary);border-left:1px solid var(--border);overflow-y:auto;padding:1.5rem;position:relative}
+.mkt-panel-close{position:absolute;top:1rem;right:1rem;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.2rem;line-height:1}
+.mkt-panel-avatar{width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:1rem}
+.mkt-panel-name{font-size:1.2rem;font-weight:700;color:var(--text-primary)}
+.mkt-panel-role{font-size:0.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:0.5rem}
+.mkt-panel-tagline{font-size:0.85rem;color:var(--purple);margin-bottom:0.75rem;font-style:italic}
+.mkt-panel-desc{font-size:0.84rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1rem}
+.mkt-section-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-secondary);margin:1rem 0 0.5rem}
+.mkt-tags-row{display:flex;gap:0.35rem;flex-wrap:wrap;margin-bottom:0.75rem}
+.mkt-tag{background:var(--bg-secondary);border:1px solid var(--border);border-radius:5px;padding:0.2rem 0.55rem;font-size:0.72rem;color:var(--text-secondary)}
+.mkt-sessions-list{display:flex;flex-direction:column;gap:0.4rem}
+.mkt-session-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.78rem;color:var(--text-secondary)}
+.mkt-session-item strong{color:var(--text-primary)}
+.mkt-launch-btn{width:100%;margin-top:1.25rem;padding:0.7rem;background:var(--purple);color:#fff;border:none;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;transition:opacity .15s}
+.mkt-launch-btn:hover{opacity:0.88}
+.mkt-empty{grid-column:1/-1;text-align:center;padding:3rem;color:var(--text-secondary)}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<span id="mktCount" class="mkt-count"></span>
+{% endblock %}
+
+{% block content %}
+<div class="mkt-header">
+    <input type="search" class="mkt-search" id="mktSearch" placeholder="Rechercher un agent…" oninput="applyFilters()">
+    <div class="mkt-filters">
+        <select class="mkt-select" id="mktRole" onchange="applyFilters()">
+            <option value="">Tous les rôles</option>
+            <option value="brain">Brain</option>
+            <option value="worker">Worker</option>
+            <option value="critic">Critic</option>
+            <option value="devops">DevOps</option>
+            <option value="pm">PM</option>
+            <option value="tester">Tester</option>
+            <option value="domain">Domain</option>
+            <option value="custom">Custom</option>
+        </select>
+        <select class="mkt-select" id="mktArt" onchange="applyFilters()">
+            <option value="">Tous les ART</option>
+            <option value="art">ART</option>
+            <option value="safe">SAFe</option>
+            <option value="dev">Dev</option>
+        </select>
+    </div>
+</div>
+
+<div class="mkt-grid" id="mktGrid">
+    <div class="mkt-empty">Chargement…</div>
+</div>
+
+<!-- Detail panel -->
+<div class="mkt-panel-overlay" id="mktOverlay" onclick="closePanel(event)">
+    <div class="mkt-panel" id="mktPanel">
+        <button class="mkt-panel-close" onclick="closePanel()">✕</button>
+        <div id="mktPanelContent"></div>
+    </div>
+</div>
+
+<script>
+let _agents = [];
+
+async function loadAgents() {
+    const resp = await fetch('/api/marketplace/agents');
+    _agents = await resp.json();
+    applyFilters();
+}
+
+function applyFilters() {
+    const q = document.getElementById('mktSearch').value.trim().toLowerCase();
+    const role = document.getElementById('mktRole').value;
+    const art = document.getElementById('mktArt').value;
+    let filtered = _agents.filter(a => {
+        if (role && a.role !== role) return false;
+        if (art) {
+            const tagStr = (a.tags || []).join(' ').toLowerCase();
+            if (!tagStr.includes(art.toLowerCase())) return false;
+        }
+        if (q) {
+            const hay = (a.name + ' ' + a.description + ' ' + (a.tags||[]).join(' ')).toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
+    renderGrid(filtered);
+    document.getElementById('mktCount').textContent = `${filtered.length} agent${filtered.length !== 1 ? 's' : ''}`;
+}
+
+function renderGrid(agents) {
+    const grid = document.getElementById('mktGrid');
+    if (!agents.length) {
+        grid.innerHTML = '<div class="mkt-empty">Aucun agent trouvé</div>';
+        return;
+    }
+    grid.innerHTML = agents.map(a => `
+        <div class="mkt-card" onclick="openPanel('${a.id}')">
+            ${a.is_builtin ? '<span class="mkt-builtin">builtin</span>' : ''}
+            <div class="mkt-card-top">
+                <div class="mkt-avatar" style="background:${a.color}20;border:1px solid ${a.color}40">
+                    <svg class="icon" style="color:${a.color}"><use href="#icon-${a.icon || 'bot'}"/></svg>
+                </div>
+                <div>
+                    <div class="mkt-name">${escHtml(a.name)}</div>
+                    <div class="mkt-role">${escHtml(a.role)}</div>
+                </div>
+            </div>
+            ${a.tagline ? `<div class="mkt-tagline">${escHtml(a.tagline)}</div>` : `<div class="mkt-tagline">${escHtml(a.description||'').substring(0,80)}…</div>`}
+            <div class="mkt-skills">
+                ${(a.skills||[]).slice(0,3).map(s=>`<span class="mkt-skill">${escHtml(s)}</span>`).join('')}
+            </div>
+        </div>
+    `).join('');
+}
+
+async function openPanel(agentId) {
+    document.getElementById('mktOverlay').classList.add('open');
+    document.getElementById('mktPanelContent').innerHTML = '<p style="color:var(--text-secondary)">Chargement…</p>';
+
+    const [detailResp, sessResp] = await Promise.all([
+        fetch(`/api/marketplace/agents/${agentId}`),
+        fetch(`/api/sessions?agent_id=${agentId}&limit=5`).catch(() => null),
+    ]);
+    const a = await detailResp.json();
+    let sessions = [];
+    if (sessResp && sessResp.ok) {
+        const sd = await sessResp.json();
+        sessions = Array.isArray(sd) ? sd : (sd.sessions || []);
+    }
+
+    document.getElementById('mktPanelContent').innerHTML = `
+        <div class="mkt-panel-avatar" style="background:${a.color}20;border:1px solid ${a.color}40">
+            <svg class="icon icon-lg" style="color:${a.color}"><use href="#icon-${a.icon||'bot'}"/></svg>
+        </div>
+        <div class="mkt-panel-name">${escHtml(a.name)}</div>
+        <div class="mkt-panel-role">${escHtml(a.role)}${a.provider ? ` · ${escHtml(a.provider)}` : ''}</div>
+        ${a.tagline ? `<div class="mkt-panel-tagline">${escHtml(a.tagline)}</div>` : ''}
+        <div class="mkt-panel-desc">${escHtml(a.description||'')}</div>
+
+        ${a.skills && a.skills.length ? `
+        <div class="mkt-section-title">Skills</div>
+        <div class="mkt-tags-row">${a.skills.map(s=>`<span class="mkt-tag">${escHtml(s)}</span>`).join('')}</div>
+        ` : ''}
+
+        ${a.tools && a.tools.length ? `
+        <div class="mkt-section-title">Tools</div>
+        <div class="mkt-tags-row">${a.tools.map(t=>`<span class="mkt-tag">⚙ ${escHtml(t)}</span>`).join('')}</div>
+        ` : ''}
+
+        ${a.tags && a.tags.length ? `
+        <div class="mkt-section-title">Tags</div>
+        <div class="mkt-tags-row">${a.tags.map(t=>`<span class="mkt-tag">#${escHtml(t)}</span>`).join('')}</div>
+        ` : ''}
+
+        <div class="mkt-section-title">Sessions récentes</div>
+        <div class="mkt-sessions-list">
+            ${sessions.length ? sessions.slice(0,5).map(s=>`
+                <div class="mkt-session-item">
+                    <strong>${escHtml(s.title||s.id||'Session')}</strong>
+                    <span style="float:right;font-size:0.68rem">${s.status||''}</span>
+                </div>
+            `).join('') : '<div class="mkt-session-item" style="opacity:.6">Aucune session</div>'}
+        </div>
+
+        <button class="mkt-launch-btn" onclick="launchSession('${escHtml(a.id)}')">
+            ▶ Lancer une session directe
+        </button>
+    `;
+}
+
+async function launchSession(agentId) {
+    const resp = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({agent_id: agentId, title: 'Session Marketplace'}),
+    });
+    if (resp.ok) {
+        const data = await resp.json();
+        const id = data.id || data.session_id;
+        if (id) { window.location.href = `/sessions/${id}`; return; }
+    }
+    window.location.href = '/sessions';
+}
+
+function closePanel(e) {
+    if (e && e.target !== document.getElementById('mktOverlay')) return;
+    document.getElementById('mktOverlay').classList.remove('open');
+}
+
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadAgents();
+</script>
+{% endblock %}

@@ -23,7 +23,7 @@ _sf_dir = os.path.dirname(_cli_dir)
 if _sf_dir not in sys.path:
     sys.path.insert(0, _sf_dir)
 
-from cli import _output as out
+from cli import _output as out  # noqa: E402
 
 DEFAULT_URL = os.environ.get("MACARON_URL", "http://localhost:8090")
 
@@ -98,8 +98,34 @@ def cmd_status(args):
     b = get_backend(args)
     health = b.health()
     mon = b.monitoring()
-    health.update(mon)
-    output(args, health)
+    if getattr(args, "json_output", False):
+        health.update(mon)
+        out.out_json(health)
+        return
+    status_val = health.get("status", "?")
+    color_fn = out.green if status_val == "ok" else out.red
+    print(f"Platform: {color_fn(status_val)}  {b.base_url}")
+    db = mon.get("database", {})
+    rtk = mon.get("rtk", {})
+    db_size = db.get("size_mb", 0)
+    print(
+        f"DB: {db_size:.1f}MB  tables={db.get('tables', '?')}  schema_version={db.get('schema_version', '?')}"
+    )
+    if rtk.get("calls", 0) > 0:
+        saved_kb = rtk.get("bytes_saved", 0) / 1024
+        print(
+            f"RTK: {rtk['calls']} calls  {saved_kb:.1f}KB saved  ~{rtk.get('tokens_saved_est', 0)} tokens  {rtk.get('ratio_pct', 0):.1f}% compression"
+        )
+    agents_count = health.get("agents", {})
+    if isinstance(agents_count, dict):
+        print(
+            f"Agents: {agents_count.get('total', 0)} total  {agents_count.get('active', 0)} active"
+        )
+    missions_count = health.get("missions", {})
+    if isinstance(missions_count, dict):
+        print(
+            f"Missions: {missions_count.get('running', 0)} running  {missions_count.get('total', 0)} total"
+        )
 
 
 # ── Projects ──
@@ -150,12 +176,55 @@ def cmd_projects_chat(args):
     print_stream(url, "POST", {"message": msg})
 
 
+def cmd_projects_phase(args):
+    """Get or set the current phase of a project."""
+    b = get_backend(args)
+    phase = getattr(args, "phase", None)
+    if phase:
+        output(args, b.project_phase_set(args.id, phase))
+    else:
+        output(args, b.project_phase_get(args.id))
+
+
+def cmd_projects_health(args):
+    """Get project health: mission success rates."""
+    b = get_backend(args)
+    data = b.project_health(args.id)
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+    score = data.get("health", data.get("health_score", 0))
+    total = data.get("stats", {}).get("total", data.get("total", 0))
+    color_fn = out.green if score >= 70 else (out.yellow if score >= 40 else out.red)
+    print(f"Project {args.id}: health {color_fn(str(score) + '%')}  ({total} missions)")
+    counts = data.get("stats", data.get("mission_counts", {}))
+    if isinstance(counts, dict):
+        for status, cnt in sorted(counts.items()):
+            print(f"  {status:15s} {cnt}")
+
+
+def cmd_projects_missions_suggest(args):
+    """Suggest next missions for a project based on current phase."""
+    b = get_backend(args)
+    data = b.project_missions_suggest(args.id)
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+    phase = data.get("current_phase", "?")
+    suggestions = data.get("suggestions", [])
+    print(f"Project {args.id} (phase: {phase}) — suggested missions:")
+    for i, s in enumerate(suggestions, 1):
+        print(f"  {i}. {s}")
+
+
 # ── Missions ──
 
 
 def cmd_missions_list(args):
     b = get_backend(args)
-    missions = b.missions_list(getattr(args, "project", None), getattr(args, "status", None))
+    missions = b.missions_list(
+        getattr(args, "project", None), getattr(args, "status", None)
+    )
     cols = ["id", "name", "status", "type", "project_id", "wsjf_score"]
     rows = [{c: m.get(c, "") for c in cols} for m in missions]
     if getattr(args, "json_output", False):
@@ -171,7 +240,9 @@ def cmd_missions_show(args):
 
 def cmd_missions_create(args):
     b = get_backend(args)
-    output(args, b.mission_create(args.name, args.project, getattr(args, "type", "epic")))
+    output(
+        args, b.mission_create(args.name, args.project, getattr(args, "type", "epic"))
+    )
 
 
 def cmd_missions_start(args):
@@ -335,7 +406,9 @@ def cmd_stories_update(args):
 
 def cmd_sprints_create(args):
     b = get_backend(args)
-    output(args, b.sprint_create(args.mission_id, args.name, getattr(args, "number", 1)))
+    output(
+        args, b.sprint_create(args.mission_id, args.name, getattr(args, "number", 1))
+    )
 
 
 def cmd_sprints_assign(args):
@@ -369,8 +442,18 @@ def cmd_backlog_reorder(args):
 def cmd_agents_list(args):
     b = get_backend(args)
     agents = b.agents_list(getattr(args, "level", None))
-    cols = ["id", "name", "role", "provider", "model"]
-    rows = [{c: a.get(c, "") for c in cols} for a in agents]
+    cols = ["id", "name", "role", "grade", "provider", "model"]
+    rows = [
+        {
+            "id": a.get("id", ""),
+            "name": a.get("name", ""),
+            "role": a.get("role", ""),
+            "grade": a.get("capability_grade", ""),
+            "provider": a.get("provider", ""),
+            "model": a.get("model", ""),
+        }
+        for a in agents
+    ]
     if getattr(args, "json_output", False):
         out.out_json(agents)
     else:
@@ -411,7 +494,9 @@ def cmd_sessions_create(args):
     agents = args.agents.split(",") if getattr(args, "agents", None) else None
     output(
         args,
-        b.session_create(getattr(args, "project", None), agents, getattr(args, "pattern", "solo")),
+        b.session_create(
+            getattr(args, "project", None), agents, getattr(args, "pattern", "solo")
+        ),
     )
 
 
@@ -430,6 +515,23 @@ def cmd_sessions_chat(args):
 def cmd_sessions_stop(args):
     b = get_backend(args)
     output(args, b.session_stop(args.id))
+
+
+def cmd_sessions_checkpoints(args):
+    """Show live agent activity (step checkpoints) for a session."""
+    b = get_backend(args)
+    data = b.session_checkpoints(args.id)
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+    checkpoints = data.get("checkpoints", [])
+    if not checkpoints:
+        print(f"No agent activity recorded for session {args.id}")
+        return
+    print(f"Agent activity — session {args.id} ({data.get('agent_count', 0)} agents)")
+    cols = ["agent_id", "step", "last_tool", "preview"]
+    rows = [{c: cp.get(c, "") for c in cols} for cp in checkpoints]
+    print(out.table(rows, cols))
 
 
 # ── Ideation ──
@@ -517,6 +619,26 @@ def cmd_llm_stats(args):
     output(args, b.llm_stats())
 
 
+def cmd_llm_rtk(args):
+    """Show RTK (Reusable Token Knowledge) compression stats."""
+    b = get_backend(args)
+    mon = b.monitoring()
+    rtk = mon.get("rtk", {})
+    if getattr(args, "json_output", False):
+        out.out_json(rtk)
+        return
+    if rtk.get("calls", 0) == 0:
+        print("No RTK calls recorded yet.")
+        return
+    saved_kb = rtk.get("bytes_saved", 0) / 1024
+    print("RTK Compression Stats")
+    print(f"  Calls:        {rtk.get('calls', 0)}")
+    print(f"  Bytes raw:    {rtk.get('bytes_raw', 0):,}")
+    print(f"  Bytes saved:  {rtk.get('bytes_saved', 0):,} ({saved_kb:.1f} KB)")
+    print(f"  Compression:  {rtk.get('ratio_pct', 0):.1f}%")
+    print(f"  Tokens saved: ~{rtk.get('tokens_saved_est', 0):,} (estimated)")
+
+
 def cmd_llm_usage(args):
     b = get_backend(args)
     output(args, b.llm_usage())
@@ -525,6 +647,44 @@ def cmd_llm_usage(args):
 def cmd_llm_traces(args):
     b = get_backend(args)
     output(args, b.llm_traces(getattr(args, "limit", 20)))
+
+
+# ── Tasks (Copilot→SF delegation) ──
+
+
+def cmd_tasks_brief(args):
+    """Submit a task brief to the SF — creates a TMA mission for agents to execute."""
+    b = get_backend(args)
+    brief = {
+        "type": getattr(args, "type", "chore"),
+        "title": " ".join(args.title),
+        "description": getattr(args, "description", ""),
+        "project_id": getattr(args, "project", "software-factory"),
+    }
+    if getattr(args, "files", None):
+        brief["files"] = args.files.split(",")
+    if getattr(args, "expected", None):
+        brief["expected"] = args.expected
+    if getattr(args, "test_cmd", None):
+        brief["test_cmd"] = args.test_cmd
+    result = b.task_brief_submit(brief)
+    if getattr(args, "json_output", False):
+        out.out_json(result)
+        return
+    mid = result.get("mission_id", "?")
+    status = result.get("status", "?")
+    url = result.get("session_url", "")
+    print(f"Mission created: {mid}  status={status}")
+    print(f"  sf missions show {mid}")
+    print(f"  sf missions start {mid}   (to launch agents)")
+    if url:
+        print(f"  URL: {b.base_url}{url}")
+
+
+def cmd_tasks_status(args):
+    """Get status of a copilot-brief mission."""
+    b = get_backend(args)
+    output(args, b.task_brief_status(args.id))
 
 
 # ── Memory ──
@@ -746,12 +906,26 @@ def cmd_teams_leaderboard(args):
     if getattr(args, "json_output", False):
         out.out_json(teams)
     elif teams:
-        cols = ["agent_name", "pattern_id", "fitness_score", "runs", "wins", "losses", "badge"]
+        cols = [
+            "agent_name",
+            "pattern_id",
+            "fitness_score",
+            "runs",
+            "wins",
+            "losses",
+            "badge",
+        ]
         rows = [{c: str(t.get(c, "")) for c in cols} for t in teams]
-        print(out.bold(f"Leaderboard — {d.get('technology','?')} / {d.get('phase_type','?')}"))
+        print(
+            out.bold(
+                f"Leaderboard — {d.get('technology', '?')} / {d.get('phase_type', '?')}"
+            )
+        )
         print(out.table(rows, cols))
     else:
-        print(out.dim("No fitness data yet. Run missions with skill:* agent references."))
+        print(
+            out.dim("No fitness data yet. Run missions with skill:* agent references.")
+        )
 
 
 def cmd_teams_okr(args):
@@ -764,7 +938,15 @@ def cmd_teams_okr(args):
     if getattr(args, "json_output", False):
         out.out_json(okrs)
     elif okrs:
-        cols = ["team_key", "phase_type", "kpi_name", "kpi_current", "kpi_target", "kpi_unit", "progress_pct"]
+        cols = [
+            "team_key",
+            "phase_type",
+            "kpi_name",
+            "kpi_current",
+            "kpi_target",
+            "kpi_unit",
+            "progress_pct",
+        ]
         rows = [{c: str(o.get(c, "")) for c in cols} for o in okrs]
         print(out.table(rows, cols))
     else:
@@ -778,7 +960,14 @@ def cmd_teams_selections(args):
     if getattr(args, "json_output", False):
         out.out_json(sels)
     elif sels:
-        cols = ["selected_at", "agent_id", "pattern_id", "selection_mode", "technology", "phase_type"]
+        cols = [
+            "selected_at",
+            "agent_id",
+            "pattern_id",
+            "selection_mode",
+            "technology",
+            "phase_type",
+        ]
         rows = [{c: str(s.get(c, "")) for c in cols} for s in sels]
         print(out.table(rows, cols))
     else:
@@ -787,12 +976,22 @@ def cmd_teams_selections(args):
 
 def cmd_teams_ab_tests(args):
     b = get_backend(args)
-    d = b.teams_ab_tests(status=getattr(args, "status", "") or "", limit=getattr(args, "limit", 20))
+    d = b.teams_ab_tests(
+        status=getattr(args, "status", "") or "", limit=getattr(args, "limit", 20)
+    )
     tests = d.get("data", []) if isinstance(d, dict) else []
     if getattr(args, "json_output", False):
         out.out_json(tests)
     elif tests:
-        cols = ["started_at", "technology", "phase_type", "team_a_agent", "team_b_agent", "status", "winner"]
+        cols = [
+            "started_at",
+            "technology",
+            "phase_type",
+            "team_a_agent",
+            "team_b_agent",
+            "status",
+            "winner",
+        ]
         rows = [{c: str(t.get(c, "")) for c in cols} for t in tests]
         print(out.table(rows, cols))
     else:
@@ -801,17 +1000,23 @@ def cmd_teams_ab_tests(args):
 
 def cmd_teams_retire(args):
     b = get_backend(args)
-    r = b.teams_retire(args.agent_id, args.pattern_id,
-                       getattr(args, "technology", "generic") or "generic",
-                       getattr(args, "phase_type", "generic") or "generic")
+    r = b.teams_retire(
+        args.agent_id,
+        args.pattern_id,
+        getattr(args, "technology", "generic") or "generic",
+        getattr(args, "phase_type", "generic") or "generic",
+    )
     output(args, r)
 
 
 def cmd_teams_unretire(args):
     b = get_backend(args)
-    r = b.teams_unretire(args.agent_id, args.pattern_id,
-                         getattr(args, "technology", "generic") or "generic",
-                         getattr(args, "phase_type", "generic") or "generic")
+    r = b.teams_unretire(
+        args.agent_id,
+        args.pattern_id,
+        getattr(args, "technology", "generic") or "generic",
+        getattr(args, "phase_type", "generic") or "generic",
+    )
     output(args, r)
 
 
@@ -833,8 +1038,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Global flags
     p.add_argument("--url", default=DEFAULT_URL, help="Platform URL")
-    p.add_argument("--json", dest="json_output", action="store_true", help="Raw JSON output")
-    p.add_argument("--token", default=os.environ.get("MACARON_TOKEN"), help="Auth token")
+    p.add_argument(
+        "--json", dest="json_output", action="store_true", help="Raw JSON output"
+    )
+    p.add_argument(
+        "--token", default=os.environ.get("MACARON_TOKEN"), help="Auth token"
+    )
     p.add_argument("--api", action="store_true", help="Force API mode")
     p.add_argument("--db", action="store_true", help="Force DB mode")
     p.add_argument("--db-path", dest="db_path", help="SQLite DB path")
@@ -844,13 +1053,17 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", help="Command")
 
     # status
-    sub.add_parser("status", help="Platform health and stats").set_defaults(func=cmd_status)
+    sub.add_parser("status", help="Platform health and stats").set_defaults(
+        func=cmd_status
+    )
 
     # ── projects ──
     proj = sub.add_parser("projects", help="Project management")
     proj_sub = proj.add_subparsers(dest="subcmd")
 
-    proj_sub.add_parser("list", help="List projects").set_defaults(func=cmd_projects_list)
+    proj_sub.add_parser("list", help="List projects").set_defaults(
+        func=cmd_projects_list
+    )
 
     pc = proj_sub.add_parser("create", help="Create project")
     pc.add_argument("name")
@@ -872,6 +1085,21 @@ def build_parser() -> argparse.ArgumentParser:
     pch.add_argument("id")
     pch.add_argument("message", nargs="+")
     pch.set_defaults(func=cmd_projects_chat)
+
+    pph = proj_sub.add_parser("phase", help="Get or set project phase")
+    pph.add_argument("id")
+    pph.add_argument(
+        "phase", nargs="?", default=None, help="New phase (omit to get current)"
+    )
+    pph.set_defaults(func=cmd_projects_phase)
+
+    phlt = proj_sub.add_parser("health", help="Project health score")
+    phlt.add_argument("id")
+    phlt.set_defaults(func=cmd_projects_health)
+
+    pms = proj_sub.add_parser("missions-suggest", help="Suggest next missions")
+    pms.add_argument("id")
+    pms.set_defaults(func=cmd_projects_missions_suggest)
 
     # ── missions ──
     miss = sub.add_parser("missions", help="Mission management")
@@ -1062,6 +1290,10 @@ def build_parser() -> argparse.ArgumentParser:
     sst.add_argument("id")
     sst.set_defaults(func=cmd_sessions_stop)
 
+    scp = sess_sub.add_parser("checkpoints", help="Live agent activity for a session")
+    scp.add_argument("id")
+    scp.set_defaults(func=cmd_sessions_checkpoints)
+
     # ── ideation ──
     ide = sub.add_parser("ideation", help="Multi-agent ideation")
     ide_sub = ide.add_subparsers(dest="subcmd")
@@ -1090,13 +1322,17 @@ def build_parser() -> argparse.ArgumentParser:
     md.add_argument("--project-id", "-p")
     md.set_defaults(func=cmd_metrics_dora)
 
-    met_sub.add_parser("velocity", help="Sprint velocity").set_defaults(func=cmd_metrics_velocity)
+    met_sub.add_parser("velocity", help="Sprint velocity").set_defaults(
+        func=cmd_metrics_velocity
+    )
 
     mb = met_sub.add_parser("burndown", help="Burndown chart")
     mb.add_argument("--epic-id", "-e")
     mb.set_defaults(func=cmd_metrics_burndown)
 
-    met_sub.add_parser("cycle-time", help="Cycle time").set_defaults(func=cmd_metrics_cycle_time)
+    met_sub.add_parser("cycle-time", help="Cycle time").set_defaults(
+        func=cmd_metrics_cycle_time
+    )
 
     # ── llm ──
     llm = sub.add_parser("llm", help="LLM monitoring")
@@ -1108,6 +1344,38 @@ def build_parser() -> argparse.ArgumentParser:
     lt = llm_sub.add_parser("traces", help="LLM call traces")
     lt.add_argument("--limit", "-n", type=int, default=20)
     lt.set_defaults(func=cmd_llm_traces)
+
+    llm_sub.add_parser("rtk", help="RTK token compression stats").set_defaults(
+        func=cmd_llm_rtk
+    )
+
+    # ── tasks (Copilot→SF delegation) ──
+    tasks = sub.add_parser("tasks", help="Delegate tasks to SF agents")
+    tasks_sub = tasks.add_subparsers(dest="subcmd")
+
+    tb = tasks_sub.add_parser("brief", help="Submit a task brief to the SF")
+    tb.add_argument("title", nargs="+", help="Task title")
+    tb.add_argument(
+        "--type",
+        "-t",
+        default="chore",
+        choices=["bug_fix", "feature", "refactor", "docs", "test", "chore"],
+        help="Task type",
+    )
+    tb.add_argument("--desc", "-d", dest="description", default="", help="Description")
+    tb.add_argument(
+        "--files", "-f", default=None, help="Comma-separated file:line refs"
+    )
+    tb.add_argument("--expected", "-e", default=None, help="Expected behavior")
+    tb.add_argument(
+        "--test-cmd", default=None, dest="test_cmd", help="Test command to run"
+    )
+    tb.add_argument("--project", "-p", default="software-factory", help="Project ID")
+    tb.set_defaults(func=cmd_tasks_brief)
+
+    ts = tasks_sub.add_parser("status", help="Status of a copilot-brief mission")
+    ts.add_argument("id")
+    ts.set_defaults(func=cmd_tasks_status)
 
     # ── memory ──
     mem = sub.add_parser("memory", help="Memory/knowledge management")
@@ -1130,7 +1398,9 @@ def build_parser() -> argparse.ArgumentParser:
     wf = sub.add_parser("workflows", help="Workflow management")
     wf_sub = wf.add_subparsers(dest="subcmd")
 
-    wf_sub.add_parser("list", help="List workflows").set_defaults(func=cmd_workflows_list)
+    wf_sub.add_parser("list", help="List workflows").set_defaults(
+        func=cmd_workflows_list
+    )
 
     wfs = wf_sub.add_parser("show", help="Show workflow")
     wfs.add_argument("id")
@@ -1140,7 +1410,9 @@ def build_parser() -> argparse.ArgumentParser:
     pat = sub.add_parser("patterns", help="Pattern management")
     pat_sub = pat.add_subparsers(dest="subcmd")
 
-    pat_sub.add_parser("list", help="List patterns").set_defaults(func=cmd_patterns_list)
+    pat_sub.add_parser("list", help="List patterns").set_defaults(
+        func=cmd_patterns_list
+    )
 
     pts = pat_sub.add_parser("show", help="Show pattern")
     pts.add_argument("id")
@@ -1150,7 +1422,9 @@ def build_parser() -> argparse.ArgumentParser:
     cha = sub.add_parser("chaos", help="Chaos testing")
     cha_sub = cha.add_subparsers(dest="subcmd")
 
-    cha_sub.add_parser("history", help="Chaos run history").set_defaults(func=cmd_chaos_history)
+    cha_sub.add_parser("history", help="Chaos run history").set_defaults(
+        func=cmd_chaos_history
+    )
 
     ct = cha_sub.add_parser("trigger", help="Trigger chaos scenario")
     ct.add_argument("--scenario", "-s")
@@ -1159,13 +1433,17 @@ def build_parser() -> argparse.ArgumentParser:
     # ── watchdog ──
     wd = sub.add_parser("watchdog", help="Watchdog monitoring")
     wd_sub = wd.add_subparsers(dest="subcmd")
-    wd_sub.add_parser("metrics", help="Watchdog metrics").set_defaults(func=cmd_watchdog_metrics)
+    wd_sub.add_parser("metrics", help="Watchdog metrics").set_defaults(
+        func=cmd_watchdog_metrics
+    )
 
     # ── incidents ──
     inc = sub.add_parser("incidents", help="Incident management")
     inc_sub = inc.add_subparsers(dest="subcmd")
 
-    inc_sub.add_parser("list", help="List incidents").set_defaults(func=cmd_incidents_list)
+    inc_sub.add_parser("list", help="List incidents").set_defaults(
+        func=cmd_incidents_list
+    )
 
     icr = inc_sub.add_parser("create", help="Create incident")
     icr.add_argument("title")
@@ -1175,8 +1453,12 @@ def build_parser() -> argparse.ArgumentParser:
     # ── autoheal ──
     ah = sub.add_parser("autoheal", help="Auto-healing")
     ah_sub = ah.add_subparsers(dest="subcmd")
-    ah_sub.add_parser("stats", help="Autoheal statistics").set_defaults(func=cmd_autoheal_stats)
-    ah_sub.add_parser("trigger", help="Trigger autoheal").set_defaults(func=cmd_autoheal_trigger)
+    ah_sub.add_parser("stats", help="Autoheal statistics").set_defaults(
+        func=cmd_autoheal_stats
+    )
+    ah_sub.add_parser("trigger", help="Trigger autoheal").set_defaults(
+        func=cmd_autoheal_trigger
+    )
 
     # ── search ──
     srch = sub.add_parser("search", help="Global search")
@@ -1207,7 +1489,9 @@ def build_parser() -> argparse.ArgumentParser:
     # ── runs (headless) ──
     runs = sub.add_parser("runs", help="Background runs")
     runs_sub = runs.add_subparsers(dest="subcmd")
-    runs_sub.add_parser("list", help="List active runs").set_defaults(func=cmd_runs_list)
+    runs_sub.add_parser("list", help="List active runs").set_defaults(
+        func=cmd_runs_list
+    )
 
     rsh = runs_sub.add_parser("show", help="Show run output")
     rsh.add_argument("run_id")

@@ -1,5 +1,5 @@
 -- Macaron Agent Platform — PostgreSQL Schema v3
--- Requires extensions: pgvector, pg_trgm, uuid-ossp
+-- Requires extensions: pg_trgm (optional: pgvector for vector search)
 
 -- ============================================================================
 -- WORKFLOWS (created at runtime by WorkflowStore)
@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS projects (
     active_pattern_id TEXT DEFAULT '',
     status TEXT DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    git_url TEXT DEFAULT '',
+    container_url TEXT DEFAULT ''
 );
 
 -- ============================================================================
@@ -165,7 +167,8 @@ CREATE TABLE IF NOT EXISTS missions (
     time_criticality REAL DEFAULT 0,
     risk_reduction REAL DEFAULT 0,
     job_duration REAL DEFAULT 1,
-    kanban_status TEXT DEFAULT 'funnel'
+    kanban_status TEXT DEFAULT 'funnel',
+    jira_key TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_missions_project ON missions(project_id);
 CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
@@ -218,7 +221,9 @@ CREATE TABLE IF NOT EXISTS features (
     status TEXT DEFAULT 'backlog',
     story_points INTEGER DEFAULT 0,
     assigned_to TEXT DEFAULT '',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TEXT,
+    jira_key TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id);
 
@@ -244,7 +249,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     goal TEXT DEFAULT '',
     config_json TEXT DEFAULT '{}',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TIMESTAMP
+    completed_at TIMESTAMP,
+    mission_id TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status);
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
@@ -320,12 +326,11 @@ CREATE TABLE IF NOT EXISTS memory_project (
     search_tsv tsvector GENERATED ALWAYS AS (
         to_tsvector('simple', coalesce(key, '') || ' ' || coalesce(value, ''))
     ) STORED,
-    embedding vector(1536)
+    embedding TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_memproj_project ON memory_project(project_id);
 CREATE INDEX IF NOT EXISTS idx_memproj_category ON memory_project(category);
 CREATE INDEX IF NOT EXISTS idx_memproj_fts ON memory_project USING GIN(search_tsv);
-CREATE INDEX IF NOT EXISTS idx_memproj_vec ON memory_project USING ivfflat(embedding vector_cosine_ops) WITH (lists = 10);
 
 CREATE TABLE IF NOT EXISTS memory_global (
     id SERIAL PRIMARY KEY,
@@ -340,7 +345,7 @@ CREATE TABLE IF NOT EXISTS memory_global (
     search_tsv tsvector GENERATED ALWAYS AS (
         to_tsvector('simple', coalesce(key, '') || ' ' || coalesce(value, ''))
     ) STORED,
-    embedding vector(1536)
+    embedding TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_memglob_category ON memory_global(category);
 CREATE INDEX IF NOT EXISTS idx_memglob_fts ON memory_global USING GIN(search_tsv);
@@ -409,6 +414,45 @@ CREATE TABLE IF NOT EXISTS ideation_findings (
     text TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_ideation_findings_session ON ideation_findings(session_id);
+
+-- ============================================================================
+-- MARKETING IDEATION
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS mkt_ideation_sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT,
+    prompt TEXT,
+    status TEXT DEFAULT 'active',
+    project_id TEXT,
+    mission_id TEXT,
+    marketing_plan TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS mkt_ideation_messages (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+    agent_id TEXT,
+    agent_name TEXT,
+    content TEXT,
+    color TEXT,
+    avatar_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mkt_ideation_msgs_session ON mkt_ideation_messages(session_id);
+
+CREATE TABLE IF NOT EXISTS mkt_ideation_findings (
+    id SERIAL PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
+    type TEXT,
+    text TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id);
 
 -- ============================================================================
 -- RETROSPECTIVES
@@ -507,7 +551,8 @@ CREATE TABLE IF NOT EXISTS mission_runs (
     brief TEXT DEFAULT '',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    completed_at TEXT
+    completed_at TEXT,
+    parent_mission_id TEXT DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
@@ -563,6 +608,49 @@ CREATE TABLE IF NOT EXISTS support_tickets (
 CREATE INDEX IF NOT EXISTS idx_tickets_mission ON support_tickets(mission_id);
 
 -- ============================================================================
+-- PLATFORM INCIDENTS (auto-heal, ops monitoring)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS platform_incidents (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    severity TEXT DEFAULT 'P3',
+    status TEXT DEFAULT 'open',
+    source TEXT DEFAULT 'auto',
+    error_type TEXT,
+    error_detail TEXT,
+    mission_id TEXT,
+    agent_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    resolution TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_incidents_created ON platform_incidents(created_at);
+
+-- ============================================================================
+-- LLM TRACES (observability)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS llm_traces (
+    id TEXT PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    agent_id TEXT DEFAULT '',
+    session_id TEXT DEFAULT '',
+    mission_id TEXT DEFAULT '',
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    duration_ms INTEGER DEFAULT 0,
+    cost_usd REAL DEFAULT 0.0,
+    status TEXT DEFAULT 'ok',
+    error TEXT DEFAULT '',
+    input_preview TEXT DEFAULT '',
+    output_preview TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_llm_traces_session ON llm_traces(session_id);
+
+-- ============================================================================
 -- PERFORMANCE INDEXES (missing from initial schema)
 -- ============================================================================
 
@@ -599,3 +687,373 @@ CREATE INDEX IF NOT EXISTS idx_ideation_project ON ideation_sessions(project_id)
 
 -- Artifacts: by type
 CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type);
+
+-- ============================================================================
+-- AGENT SCORES (Thompson Sampling raw outcomes)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS agent_scores (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    epic_id TEXT NOT NULL,
+    accepted INTEGER DEFAULT 0,
+    rejected INTEGER DEFAULT 0,
+    iterations INTEGER DEFAULT 0,
+    quality_score REAL DEFAULT 0.0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, epic_id)
+);
+CREATE INDEX IF NOT EXISTS idx_agent_scores_agent ON agent_scores(agent_id);
+
+-- ============================================================================
+-- DARWIN TEAMS (fitness-based agent selection)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS team_fitness (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    fitness_score REAL DEFAULT 0.0,
+    runs INTEGER DEFAULT 0,
+    wins INTEGER DEFAULT 0,
+    losses INTEGER DEFAULT 0,
+    avg_iterations REAL DEFAULT 0.0,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    retired INTEGER DEFAULT 0,
+    retired_at TIMESTAMP,
+    pinned INTEGER DEFAULT 0,
+    weight_multiplier REAL DEFAULT 1.0,
+    UNIQUE(agent_id, pattern_id, technology, phase_type)
+);
+CREATE INDEX IF NOT EXISTS idx_tf_tech_phase ON team_fitness(technology, phase_type);
+CREATE INDEX IF NOT EXISTS idx_tf_agent ON team_fitness(agent_id);
+
+CREATE TABLE IF NOT EXISTS team_fitness_history (
+    id SERIAL PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    snapshot_date TEXT NOT NULL,
+    fitness_score REAL DEFAULT 0.0,
+    runs INTEGER DEFAULT 0,
+    UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)
+);
+CREATE INDEX IF NOT EXISTS idx_tfh_key ON team_fitness_history(agent_id, pattern_id, technology, phase_type);
+
+CREATE TABLE IF NOT EXISTS team_selections (
+    id SERIAL PRIMARY KEY,
+    mission_id TEXT,
+    workflow_id TEXT,
+    agent_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    selection_mode TEXT DEFAULT 'fitness',
+    thompson_score REAL,
+    selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tsel_mission ON team_selections(mission_id);
+CREATE INDEX IF NOT EXISTS idx_tsel_at ON team_selections(selected_at DESC);
+
+CREATE TABLE IF NOT EXISTS team_ab_tests (
+    id SERIAL PRIMARY KEY,
+    mission_id TEXT,
+    workflow_id TEXT,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    team_a_agent TEXT NOT NULL,
+    team_a_pattern TEXT NOT NULL,
+    team_b_agent TEXT NOT NULL,
+    team_b_pattern TEXT NOT NULL,
+    trigger TEXT DEFAULT 'auto',
+    winner TEXT,
+    team_a_score REAL,
+    team_b_score REAL,
+    evaluator_agent TEXT,
+    status TEXT DEFAULT 'pending',
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tab_status ON team_ab_tests(status);
+
+CREATE TABLE IF NOT EXISTS team_okr (
+    id SERIAL PRIMARY KEY,
+    team_key TEXT NOT NULL,
+    technology TEXT NOT NULL DEFAULT 'generic',
+    phase_type TEXT NOT NULL DEFAULT 'generic',
+    okr_text TEXT NOT NULL,
+    kpi_name TEXT NOT NULL,
+    kpi_target REAL NOT NULL,
+    kpi_current REAL DEFAULT 0.0,
+    kpi_unit TEXT DEFAULT '%',
+    period TEXT DEFAULT 'quarter',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(team_key, technology, phase_type, kpi_name)
+);
+
+-- ============================================================================
+-- RL EXPERIENCE (Reinforcement Learning policy data)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS rl_experience (
+    id SERIAL PRIMARY KEY,
+    state_json TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reward REAL NOT NULL,
+    next_state_json TEXT NOT NULL,
+    mission_id TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_rl_exp_mission ON rl_experience(mission_id);
+
+-- ============================================================================
+-- GA EVOLUTION (Genetic Algorithm proposals)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS evolution_proposals (
+    id TEXT PRIMARY KEY,
+    base_wf_id TEXT NOT NULL,
+    mutated_config TEXT NOT NULL,
+    fitness_score REAL DEFAULT 0.0,
+    generation INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_evprop_wf ON evolution_proposals(base_wf_id);
+CREATE INDEX IF NOT EXISTS idx_evprop_status ON evolution_proposals(status);
+
+CREATE TABLE IF NOT EXISTS evolution_runs (
+    id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    generation INTEGER DEFAULT 0,
+    best_fitness REAL DEFAULT 0.0,
+    population_size INTEGER DEFAULT 0,
+    completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── Missing tables (migrated from SQLite schema) ──────────────────────────
+
+CREATE TABLE IF NOT EXISTS endurance_metrics (
+    id SERIAL PRIMARY KEY,
+    ts TEXT NOT NULL,
+    metric TEXT NOT NULL,
+    value REAL DEFAULT 0,
+    detail TEXT DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    entity_type TEXT NOT NULL DEFAULT '',
+    entity_id TEXT NOT NULL DEFAULT '',
+    actor TEXT NOT NULL DEFAULT '',
+    data TEXT NOT NULL DEFAULT '{}',
+    project_id TEXT NOT NULL DEFAULT '',
+    mission_id TEXT NOT NULL DEFAULT ''
+);
+
+CREATE TABLE IF NOT EXISTS integrations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    type TEXT NOT NULL,
+    enabled INTEGER DEFAULT 0,
+    config_json TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'disconnected',
+    last_sync TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS llm_cache (
+    cache_key TEXT PRIMARY KEY,
+    model TEXT NOT NULL,
+    temperature REAL NOT NULL,
+    response TEXT NOT NULL,
+    tokens_in INTEGER DEFAULT 0,
+    tokens_out INTEGER DEFAULT 0,
+    created_at REAL NOT NULL,
+    hit_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS llm_cost_rates (
+    id SERIAL PRIMARY KEY,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    input_per_1k REAL DEFAULT 0.0,
+    output_per_1k REAL DEFAULT 0.0,
+    updated_at TEXT DEFAULT '',
+    UNIQUE(provider, model)
+);
+
+CREATE TABLE IF NOT EXISTS llm_provider_scores (
+    provider TEXT PRIMARY KEY,
+    accepted INTEGER DEFAULT 0,
+    rejected INTEGER DEFAULT 0,
+    total_calls INTEGER DEFAULT 0,
+    avg_quality REAL DEFAULT 0.0,
+    last_used TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT DEFAULT '',
+    url TEXT DEFAULT '',
+    severity TEXT DEFAULT 'info',
+    source TEXT DEFAULT '',
+    ref_id TEXT DEFAULT '',
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS session_state (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL DEFAULT '',
+    display_name TEXT NOT NULL DEFAULT '',
+    role TEXT NOT NULL DEFAULT 'viewer',
+    avatar TEXT DEFAULT '',
+    is_active INTEGER DEFAULT 1,
+    auth_provider TEXT DEFAULT 'local',
+    provider_id TEXT DEFAULT '',
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    refresh_token_hash TEXT NOT NULL,
+    user_agent TEXT DEFAULT '',
+    ip_address TEXT DEFAULT '',
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS wiki_pages (
+    slug TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT DEFAULT '',
+    category TEXT DEFAULT 'general',
+    icon TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 100,
+    parent_slug TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ── Performance indexes (added 2026-02) ──────────────────────────────────────
+
+-- missions: hot sort + parent lookup
+CREATE INDEX IF NOT EXISTS idx_missions_created      ON missions(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_missions_wsjf         ON missions(wsjf_score DESC, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_missions_parent       ON missions(parent_mission_id) WHERE parent_mission_id IS NOT NULL AND parent_mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_missions_kanban       ON missions(kanban_status);
+
+-- mission_runs: parent + session + created sort
+CREATE INDEX IF NOT EXISTS idx_mruns_parent          ON mission_runs(parent_mission_id) WHERE parent_mission_id IS NOT NULL AND parent_mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_mruns_session         ON mission_runs(session_id)   WHERE session_id != '';
+CREATE INDEX IF NOT EXISTS idx_mruns_created         ON mission_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mruns_workflow        ON mission_runs(workflow_id);
+
+-- sessions: created sort (hot for list page)
+CREATE INDEX IF NOT EXISTS idx_sessions_created      ON sessions(created_at DESC);
+
+-- messages: compound (session+timestamp) for conversation fetch
+CREATE INDEX IF NOT EXISTS idx_messages_sess_ts      ON messages(session_id, timestamp ASC);
+
+-- tool_calls: mission (no index yet)
+CREATE INDEX IF NOT EXISTS idx_toolcalls_mission     ON tool_calls(mission_id) WHERE mission_id IS NOT NULL AND mission_id != '';
+
+-- llm_traces: mission + compound (provider+model+created) for cost reports
+CREATE INDEX IF NOT EXISTS idx_llm_mission           ON llm_traces(mission_id) WHERE mission_id != '';
+CREATE INDEX IF NOT EXISTS idx_llm_created_prov      ON llm_traces(created_at DESC, provider, model);
+
+-- llm_cache: hash lookup is PK, but also used with model+hash
+CREATE INDEX IF NOT EXISTS idx_llm_cache_model       ON llm_cache(model, hash);
+
+-- notifications: is_read filter + created sort (polled every ~5s)
+CREATE INDEX IF NOT EXISTS idx_notif_read_created    ON notifications(is_read, created_at DESC);
+
+-- events: timestamp range queries
+CREATE INDEX IF NOT EXISTS idx_events_ts             ON events(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_events_type           ON events(event_type, timestamp DESC);
+
+-- user_sessions: user_id (logout all) + expires_at (cleanup)
+CREATE INDEX IF NOT EXISTS idx_usess_user            ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_usess_expires         ON user_sessions(expires_at);
+
+-- wiki_pages: category + sort_order (nav rendering)
+CREATE INDEX IF NOT EXISTS idx_wiki_category         ON wiki_pages(category, sort_order);
+CREATE INDEX IF NOT EXISTS idx_wiki_parent           ON wiki_pages(parent_slug) WHERE parent_slug IS NOT NULL;
+
+-- support_tickets / incidents: status filter
+CREATE INDEX IF NOT EXISTS idx_tickets_status        ON support_tickets(status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tickets_severity      ON support_tickets(severity);
+CREATE INDEX IF NOT EXISTS idx_incidents_mission     ON platform_incidents(mission_id) WHERE mission_id IS NOT NULL;
+
+-- team_selections: agent + workflow for Darwin leaderboard
+CREATE INDEX IF NOT EXISTS idx_tsel_agent            ON team_selections(agent_id);
+CREATE INDEX IF NOT EXISTS idx_tsel_workflow         ON team_selections(workflow_id);
+
+-- org hierarchy
+CREATE INDEX IF NOT EXISTS idx_arts_portfolio        ON org_arts(portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_teams_art             ON org_teams(art_id);
+CREATE INDEX IF NOT EXISTS idx_team_members_agent    ON org_team_members(agent_id);
+
+-- tasks: compound (mission+status) and (sprint+status)
+CREATE INDEX IF NOT EXISTS idx_tasks_miss_status     ON tasks(mission_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_sprint_status   ON tasks(sprint_id, status);
+
+-- retrospectives
+CREATE INDEX IF NOT EXISTS idx_retro_scope           ON retrospectives(scope_id);
+
+-- rl_experience: created sort
+CREATE INDEX IF NOT EXISTS idx_rl_created            ON rl_experience(created_at DESC);
+
+-- features: epic_id (already has idx_features_epic — add project via epic join, no direct project_id col)
+
+-- phase_outcomes: real GA/RL execution data per phase
+CREATE TABLE IF NOT EXISTS phase_outcomes (
+    id SERIAL PRIMARY KEY,
+    mission_id TEXT NOT NULL DEFAULT '',
+    workflow_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    phase_id TEXT NOT NULL,
+    agent_ids TEXT NOT NULL DEFAULT '[]',
+    agent_ids_json TEXT NOT NULL DEFAULT '[]',
+    team_size INTEGER DEFAULT 1,
+    success INTEGER DEFAULT 0,
+    quality_score REAL DEFAULT 0.0,
+    rejection_count INTEGER DEFAULT 0,
+    duration_s REAL DEFAULT 0.0,
+    duration_secs REAL DEFAULT 0.0,
+    complexity_tier TEXT DEFAULT 'simple',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_po_workflow   ON phase_outcomes(workflow_id, pattern_id);
+CREATE INDEX IF NOT EXISTS idx_po_phase      ON phase_outcomes(phase_id, success);
+CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id);
+
+-- agent_pair_scores: chemistry between agent pairs
+CREATE TABLE IF NOT EXISTS agent_pair_scores (
+    id SERIAL PRIMARY KEY,
+    agent_a TEXT NOT NULL,
+    agent_b TEXT NOT NULL,
+    co_appearances INTEGER DEFAULT 0,
+    joint_successes INTEGER DEFAULT 0,
+    joint_quality_sum REAL DEFAULT 0.0,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(agent_a, agent_b)
+);
+CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b);

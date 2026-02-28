@@ -65,19 +65,21 @@ DIRS_TO_SYNC=(
     "mcp_lrm"
     "deploy"
     "tests"
+    "docs/screenshots/fr"
 )
 
 for dir in "${DIRS_TO_SYNC[@]}"; do
     [ -d "$GITHUB_REPO/$dir" ] || continue
     echo "  → $dir/"
+    $DRY_RUN || mkdir -p "$LAPOSTE_REPO/$dir"
     rsync $RSYNC_OPTS "${EXCLUDES[@]}" \
         --exclude="skills/definitions/*.yaml" \
         --exclude="workflows/definitions/*.yaml" \
         "$GITHUB_REPO/$dir/" "$LAPOSTE_REPO/$dir/"
 done
 
-# Fichiers racine
-ROOT_FILES=(Makefile Dockerfile docker-compose.yml .gitignore .env.example pyproject.toml setup_env.sh nginx.conf)
+# Fichiers racine (LICENSE exclu — GitHub only, pas GitLab La Poste)
+ROOT_FILES=(Makefile Dockerfile docker-compose.yml .gitignore .env.example pyproject.toml setup_env.sh nginx.conf .gitlab-ci.yml)
 for f in "${ROOT_FILES[@]}"; do
     [ -f "$GITHUB_REPO/$f" ] || continue
     echo "  → $f"
@@ -107,6 +109,19 @@ $DRY_RUN || cp "$GITHUB_REPO/README.laposte.md" "$LAPOSTE_REPO/README.md"
 # ── 5. Commit + push ──────────────────────────────────────────────────────────
 if ! $DRY_RUN; then
     cd "$LAPOSTE_REPO"
+
+    # Pull remote commits first (postiers may have committed directly on GitLab)
+    echo "-> Pull GitLab (intégration commits postiers)..."
+    git fetch origin 2>/dev/null || true
+    if git rev-parse origin/main >/dev/null 2>&1; then
+        git rebase origin/main 2>/dev/null || {
+            # Rebase conflict: ours always wins (GitHub is source of truth for platform code)
+            git rebase --abort 2>/dev/null || true
+            git reset --hard origin/main 2>/dev/null || true
+            echo "   ⚠ Conflit rebase — reset sur origin/main (GitHub source of truth)"
+        }
+    fi
+
     git add -A
     if git diff --cached --quiet; then
         echo "-> Déjà à jour — aucun changement"

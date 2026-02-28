@@ -115,58 +115,29 @@ async def lifespan(app: FastAPI):
     if n:
         logger.info("Seeded %d skills into DB", n)
 
-    # Seed projects from SF/MF registry into DB
+    # Ensure every project has TMA + Security + Debt (+ MVP if applicable) missions
     from .projects.manager import get_project_store
 
     ps = get_project_store()
     ps.seed_from_registry()
 
-    # Auto-provision TMA/Security/Debt missions for projects missing them
-    from .missions.store import MissionDef, get_mission_store
-
-    ms = get_mission_store()
-    all_missions = ms.list_missions(limit=500)
     _prov_count = 0
     for proj in ps.list_all():
-        proj_missions = [m for m in all_missions if m.project_id == proj.id]
-        has_tma = any(
-            m.type == "program" or m.name.startswith("TMA") or "[TMA" in m.name
-            for m in proj_missions
-        )
-        if not has_tma:
-            try:
-                ps.auto_provision(proj.id, proj.name)
-                _prov_count += 1
-            except Exception as e:
-                logger.warning("auto_provision failed for %s: %s", proj.id, e)
-        else:
-            # Ensure security mission exists even if TMA already present
-            has_secu = any(
-                m.type == "security" or m.name.startswith("Sécu") for m in proj_missions
-            )
-            if not has_secu:
-                try:
-                    ms.create_mission(
-                        MissionDef(
-                            name=f"Sécurité — {proj.name}",
-                            type="security",
-                            status="active",
-                            project_id=proj.id,
-                            workflow_id="review-cycle",
-                            wsjf_score=12,
-                            created_by="devsecops",
-                            config={"auto_provisioned": True, "schedule": "weekly"},
-                            description=f"Audit sécurité périodique pour {proj.name}.",
-                            goal="Score sécurité ≥ 80%, zéro CVE critique.",
-                        )
-                    )
-                    _prov_count += 1
-                except Exception as e:
-                    logger.warning("security provision failed for %s: %s", proj.id, e)
+        try:
+            created = ps.heal_missions(proj)
+            _prov_count += len(created)
+        except Exception as e:
+            logger.warning("heal_missions failed for %s: %s", proj.id, e)
     if _prov_count:
         logger.warning(
-            "Auto-provisioned TMA/Security/Debt for %d projects", _prov_count
+            "heal_missions: created %d missions across all projects", _prov_count
         )
+
+    # Scaffold all projects: ensure workspace + git + docker + docs + code exist
+    from .projects.manager import heal_all_projects as _heal
+    import asyncio as _asyncio
+
+    _asyncio.get_event_loop().run_in_executor(None, _heal)
 
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
@@ -235,7 +206,8 @@ async def lifespan(app: FastAPI):
         # Also fix phases stuck at "running" inside phases_json
         _stuck_phases = 0
         _rows = _rdb.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE '%\"running\"%'"
+            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE ?",
+            ('%"running"%',),
         ).fetchall()
         for _row in _rows:
             import json as _json
@@ -286,28 +258,147 @@ async def lifespan(app: FastAPI):
     # Start evolution scheduler (nightly GA + RL retraining at 02:00 UTC)
     try:
         from .agents.evolution_scheduler import start_evolution_scheduler as _evo_sched
+
         _asyncio.create_task(_evo_sched())
         logger.info("Evolution scheduler started as background task")
     except Exception as e:
         logger.warning("Failed to start evolution scheduler: %s", e)
+
+    # Start memory compactor (nightly at 03:00 UTC)
+    try:
+        from .memory.compactor import memory_compactor_loop as _mem_compact
+
+        _asyncio.create_task(_mem_compact())
+        logger.info("Memory compactor scheduled (nightly 03:00 UTC)")
+    except Exception as e:
+        logger.warning("Failed to start memory compactor: %s", e)
+
+    # Start knowledge scheduler (nightly at 04:00 UTC)
+    try:
+        from .ops.knowledge_scheduler import knowledge_scheduler_loop as _know_sched
+
+        _asyncio.create_task(_know_sched())
+        logger.info("Knowledge scheduler started (nightly 04:00 UTC)")
+    except Exception as e:
+        logger.warning("Failed to start knowledge scheduler: %s", e)
+
+    # Start zombie mission cleanup watchdog (every 10 minutes)
+    try:
+        from .ops.zombie_cleanup import start_zombie_watchdog as _zombie_wd
+
+        _asyncio.create_task(_zombie_wd())
+        logger.info("Zombie cleanup watchdog started (every 10 min)")
+    except Exception as e:
+        logger.warning("Failed to start zombie cleanup watchdog: %s", e)
 
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init
         try:
             from .db.migrations import get_db as _sdb
+
             _db = _sdb()
             _count = _db.execute("SELECT COUNT(*) FROM agent_scores").fetchone()[0]
             _db.close()
             if _count == 0:
                 from .agents.simulator import MissionSimulator
+
                 sim = MissionSimulator()
                 results = sim.run_all(n_runs_per_workflow=50)
-                logger.warning("Simulator cold-start: seeded %d agent_scores rows", sum(results.values()))
+                logger.warning(
+                    "Simulator cold-start: seeded %d agent_scores rows",
+                    sum(results.values()),
+                )
         except Exception as e:
             logger.warning("Simulator cold-start failed: %s", e)
 
     _asyncio.create_task(_seed_simulator_if_empty())
+
+    # Seed Darwin team_fitness if empty (cold start / fresh deployment)
+    async def _seed_darwin_if_empty():
+        await _asyncio.sleep(10)  # wait for agents to be seeded first
+        try:
+            import random as _rand
+            from .db.migrations import get_db as _ddb
+            from .patterns.team_selector import (
+                _get_agents_with_skill,
+                _upsert_team_fitness,
+                update_team_fitness,
+            )
+
+            def _do_seed():
+                _db2 = _ddb()
+                _cnt = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
+                _has_new_feature = _db2.execute(
+                    "SELECT COUNT(*) FROM team_fitness WHERE phase_type='new_feature'"
+                ).fetchone()[0]
+                if _cnt >= 50 and _has_new_feature >= 10:
+                    _db2.close()
+                    return 0
+                _skills = ["developer", "tester", "security", "devops"]
+                _patterns = [
+                    "loop",
+                    "sequential",
+                    "parallel",
+                    "hierarchical",
+                    "aggregator",
+                ]
+                _phases = [
+                    "new_feature",
+                    "bugfix",
+                    "refactoring",
+                    "migration",
+                    "review",
+                    "testing",
+                    "audit",
+                    "design",
+                    "docs",
+                    "tdd",
+                    "feature",
+                    "sprint",
+                    "deploy",
+                    "exploitation",
+                    "load",
+                    "perf",
+                ]
+                _techs = ["generic", "python", "typescript", "java", "rust", "go"]
+                _seeded = 0
+                for _sk in _skills:
+                    _agents = _get_agents_with_skill(_db2, _sk)
+                    if not _agents:
+                        continue
+                    for _pt in _patterns[:4]:
+                        for _ph in _phases:
+                            for _tc in _techs[:3]:
+                                for _aid in _agents[:6]:
+                                    _upsert_team_fitness(_db2, _aid, _pt, _tc, _ph)
+                                    _runs = _rand.randint(5, 15)
+                                    _wins = int(_runs * _rand.uniform(0.4, 0.92))
+                                    for _r in range(_runs):
+                                        update_team_fitness(
+                                            _db2,
+                                            _aid,
+                                            _pt,
+                                            _tc,
+                                            _ph,
+                                            won=(_r < _wins),
+                                            iterations=_rand.randint(1, 3),
+                                        )
+                                        _seeded += 1
+                                if _seeded % 1000 == 0:
+                                    _db2.commit()
+                _db2.commit()
+                _after = _db2.execute("SELECT COUNT(*) FROM team_fitness").fetchone()[0]
+                _db2.close()
+                return _after
+
+            _after = await _asyncio.to_thread(_do_seed)
+            if _after:
+                logger.warning("Darwin cold-start: seeded %d team_fitness rows", _after)
+        except Exception as e:
+            logger.warning("Darwin cold-start failed: %s", e)
+
+    _asyncio.create_task(_seed_darwin_if_empty())
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
@@ -426,6 +517,25 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
+    # Load persisted browser push subscriptions and ensure VAPID keys exist
+    try:
+        from .services.push import ensure_vapid_keys
+
+        ensure_vapid_keys()
+    except Exception as exc:
+        logger.warning("VAPID key init failed: %s", exc)
+
+    try:
+        from .web.routes.api.push import _get_db_subscriptions
+        from .services.notification_service import get_notification_service as _get_ns
+
+        _push_subs = _get_db_subscriptions()
+        _get_ns().load_push_subscriptions(_push_subs)
+        if _push_subs:
+            logger.info("Loaded %d browser push subscriptions", len(_push_subs))
+    except Exception as exc:
+        logger.warning("Failed to load push subscriptions: %s", exc)
+
     yield
 
     # Stop MCP servers
@@ -495,6 +605,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # ── Rate limiting via slowapi ───────────────────────────────────────────
+    try:
+        from slowapi import _rate_limit_exceeded_handler
+        from slowapi.errors import RateLimitExceeded
+        from .rate_limit import limiter
+
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    except Exception:
+        pass  # slowapi not installed — fall back to middleware-only limiting
+
     # ── Security: Auth middleware (API key) ────────────────────────────────
     from .security import AuthMiddleware
 
@@ -524,49 +645,181 @@ def create_app() -> FastAPI:
     async def security_headers(request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none'"
+        response.headers["Permissions-Policy"] = (
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+            "accelerometer=(), gyroscope=()"
         )
-        if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+
+        path = request.url.path
+        # Workspace pages need iframes (preview, dbgate, portainer)
+        if path.startswith("/projects/") and path.endswith("/workspace"):
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "font-src 'self' data:; "
+                "img-src 'self' data: blob: https:; "
+                "connect-src 'self'; "
+                "frame-src 'self' http://localhost:* http://127.0.0.1:* https:; "
+                "frame-ancestors 'none'"
             )
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'self'; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+                "font-src 'self' https://fonts.gstatic.com; "
+                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
+                "connect-src 'self' wss: ws:; "
+                "frame-ancestors 'none'"
+            )
+        # HSTS: also set on HTTP to pre-empt before HTTPS upgrade
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=31536000; includeSubDomains"
+        )
         return response
 
-    # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
+    # ── Rate limiting (API endpoints, 120 req/min per IP) ───────────────
     import time as _rl_time
     from collections import defaultdict as _dd
 
     _rate_buckets: dict[str, list[float]] = _dd(list)
     _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
     _RATE_WINDOW = 60.0
+    # Tighter limit for LLM-consuming endpoints (mission create, ideation)
+    _LLM_BUCKETS: dict[str, list[float]] = _dd(list)
+    _LLM_RATE_LIMIT = int(os.environ.get("LLM_RATE_LIMIT", "20"))  # per minute
+    _LLM_PATHS = {
+        "/api/missions",
+        "/api/ideation/start",
+        "/api/projects/chat",
+        "/api/ideation",
+        "/api/group/",
+    }
+    # Strict limit for API key management (10/min)
+    _APIKEY_BUCKETS: dict[str, list[float]] = _dd(list)
+    _APIKEY_RATE_LIMIT = 10  # per minute
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
-        if request.url.path.startswith("/api/"):
+        if (
+            request.url.path.startswith("/api/")
+            and os.environ.get("PLATFORM_ENV") != "test"
+        ):
             client_ip = request.client.host if request.client else "unknown"
             now = _rl_time.time()
+
+            # API key management: 10/min
+            if request.method == "POST" and request.url.path == "/api/api-keys":
+                ak_bucket = _APIKEY_BUCKETS[client_ip]
+                ak_bucket[:] = [t for t in ak_bucket if now - t < _RATE_WINDOW]
+                if len(ak_bucket) >= _APIKEY_RATE_LIMIT:
+                    from starlette.responses import JSONResponse as _JR
+
+                    remaining = max(0, _APIKEY_RATE_LIMIT - len(ak_bucket))
+                    resp = _JR(
+                        {
+                            "error": "rate_limit_exceeded",
+                            "retry_after": 60,
+                            "type": "api-keys",
+                        },
+                        status_code=429,
+                    )
+                    resp.headers["X-RateLimit-Limit"] = str(_APIKEY_RATE_LIMIT)
+                    resp.headers["X-RateLimit-Remaining"] = "0"
+                    resp.headers["X-RateLimit-Window"] = "60"
+                    return resp
+                ak_bucket.append(now)
+
+            # Strict LLM rate limit on POST to LLM-consuming endpoints
+            if request.method == "POST" and any(
+                request.url.path.startswith(p) for p in _LLM_PATHS
+            ):
+                llm_bucket = _LLM_BUCKETS[client_ip]
+                llm_bucket[:] = [t for t in llm_bucket if now - t < _RATE_WINDOW]
+                if len(llm_bucket) >= _LLM_RATE_LIMIT:
+                    from starlette.responses import JSONResponse as _JR
+
+                    resp = _JR(
+                        {
+                            "error": "rate_limit_exceeded",
+                            "retry_after": 60,
+                            "type": "llm",
+                        },
+                        status_code=429,
+                    )
+                    resp.headers["X-RateLimit-Limit"] = str(_LLM_RATE_LIMIT)
+                    resp.headers["X-RateLimit-Remaining"] = "0"
+                    resp.headers["X-RateLimit-Window"] = "60"
+                    return resp
+                llm_bucket.append(now)
+            # General rate limit
             bucket = _rate_buckets[client_ip]
             bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
             if len(bucket) >= _RATE_LIMIT:
                 from starlette.responses import JSONResponse as _JR
 
-                return _JR(
+                resp = _JR(
                     {"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429
                 )
+                resp.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+                resp.headers["X-RateLimit-Remaining"] = "0"
+                resp.headers["X-RateLimit-Window"] = "60"
+                return resp
             bucket.append(now)
+            response = await call_next(request)
+            remaining = max(0, _RATE_LIMIT - len(bucket))
+            response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            response.headers["X-RateLimit-Window"] = "60"
+            return response
         return await call_next(request)
 
     # ── Trace ID middleware ─────────────────────────────────────────────
+    @app.middleware("http")
+    async def audit_middleware(request, call_next):
+        response = await call_next(request)
+        method = request.method
+        path = request.url.path
+        audit_paths = (
+            "/api/agents",
+            "/api/projects",
+            "/api/missions",
+            "/api/settings",
+            "/api/patterns",
+            "/api/teams",
+        )
+        if method in ("POST", "PUT", "PATCH", "DELETE") and any(
+            path.startswith(p) for p in audit_paths
+        ):
+            try:
+                from .security.audit import audit_log
+
+                actor = getattr(request.state, "user", "anonymous")
+                if hasattr(actor, "email"):
+                    actor = actor.email
+                actor = actor or "anonymous"
+                ip = request.client.host if request.client else ""
+                ua = request.headers.get("user-agent", "")[:100]
+                parts = path.strip("/").split("/")
+                rtype = parts[1] if len(parts) > 1 else ""
+                rid = parts[2] if len(parts) > 2 else ""
+                audit_log(
+                    f"{method} {path}",
+                    rtype,
+                    rid,
+                    actor=str(actor),
+                    ip=ip,
+                    user_agent=ua,
+                )
+            except Exception:
+                pass
+        return response
+
     @app.middleware("http")
     async def trace_id_middleware(request, call_next):
         import uuid as _uuid
@@ -595,7 +848,15 @@ def create_app() -> FastAPI:
             skip_setup = (
                 path.startswith("/static")
                 or path.startswith("/api/auth")
-                or path in ("/setup", "/health", "/favicon.ico", "/api/health")
+                or path
+                in (
+                    "/setup",
+                    "/health",
+                    "/favicon.ico",
+                    "/manifest.json",
+                    "/sw.js",
+                    "/api/health",
+                )
             )
             if not skip_setup:
                 try:
@@ -612,8 +873,8 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
-        if path.startswith("/api/analytics") or path.startswith("/api/health"):
-            return await call_next(request)
+        # NOTE: auth bypass removed — is_public_path() handles /api/health
+        # /api/analytics/* requires auth (contains cost/agent data)
 
         # Skip auth in test mode
         if os.environ.get("PLATFORM_ENV") == "test":
@@ -643,9 +904,22 @@ def create_app() -> FastAPI:
         skip = (
             path.startswith("/static")
             or path.startswith("/api/")
-            or path in ("/login", "/setup", "/onboarding", "/health", "/favicon.ico")
+            or path
+            in (
+                "/login",
+                "/setup",
+                "/onboarding",
+                "/health",
+                "/favicon.ico",
+                "/manifest.json",
+                "/sw.js",
+            )
         )
-        if not skip and not request.cookies.get("onboarding_done"):
+        if (
+            not skip
+            and not request.cookies.get("onboarding_done")
+            and os.environ.get("PLATFORM_ENV") != "test"
+        ):
             from starlette.responses import RedirectResponse
 
             return RedirectResponse(url="/onboarding", status_code=302)
@@ -781,10 +1055,35 @@ def create_app() -> FastAPI:
     @app.get("/manifest.json")
     async def pwa_manifest():
         from fastapi.responses import FileResponse
+
         manifest_path = STATIC_DIR / "manifest.json"
         if manifest_path.exists():
-            return FileResponse(str(manifest_path), media_type="application/manifest+json")
+            return FileResponse(
+                str(manifest_path), media_type="application/manifest+json"
+            )
         return {"error": "manifest not found"}
+
+    @app.get("/sw.js")
+    async def service_worker():
+        from fastapi.responses import FileResponse
+
+        sw_path = STATIC_DIR / "sw.js"
+        if sw_path.exists():
+            return FileResponse(
+                str(sw_path),
+                media_type="application/javascript",
+                headers={"Service-Worker-Allowed": "/"},
+            )
+
+    # Serve favicon.ico
+    @app.get("/favicon.ico")
+    async def favicon():
+        from fastapi.responses import FileResponse
+
+        favicon_path = STATIC_DIR / "favicon.ico"
+        if favicon_path.exists():
+            return FileResponse(str(favicon_path), media_type="image/x-icon")
+        return FileResponse(str(favicon_path))  # 404 handled by FastAPI
 
     # Templates
     templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
@@ -835,6 +1134,7 @@ def create_app() -> FastAPI:
     def _relative_time(ts) -> str:
         """Human-readable relative time from ISO timestamp string."""
         from datetime import datetime, timezone
+
         if not ts:
             return "—"
         try:
@@ -845,17 +1145,50 @@ def create_app() -> FastAPI:
             if diff < 60:
                 return "just now"
             if diff < 3600:
-                return f"{int(diff//60)}m ago"
+                return f"{int(diff // 60)}m ago"
             if diff < 86400:
-                return f"{int(diff//3600)}h ago"
+                return f"{int(diff // 3600)}h ago"
             if diff < 2592000:
-                return f"{int(diff//86400)}d ago"
+                return f"{int(diff // 86400)}d ago"
             return str(ts)[:10]
         except Exception:
             return str(ts)[:10]
 
     templates.env.filters["avatar_color"] = _avatar_color
     templates.env.filters["relative_time"] = _relative_time
+
+    def _ts_filter(value, fmt: str = "datetime") -> str:
+        """Normalize datetime/string timestamp for safe display in templates.
+
+        Handles both str (SQLite) and datetime objects (PostgreSQL psycopg2).
+        Usage in templates:
+          {{ obj.created_at | ts }}          → "2024-01-01 12:34"
+          {{ obj.created_at | ts('date') }}  → "2024-01-01"
+          {{ obj.created_at | ts('%d/%m') }} → "01/01"
+        """
+        if not value:
+            return "—"
+        from datetime import datetime, date
+
+        if isinstance(value, (datetime, date)):
+            if fmt == "date":
+                return value.strftime("%Y-%m-%d")
+            if fmt == "datetime":
+                return value.strftime("%Y-%m-%d %H:%M")
+            return value.strftime(fmt)
+        s = str(value)
+        if fmt == "date":
+            return s[:10]
+        if fmt == "datetime":
+            return s[:16].replace("T", " ")
+        # Custom strftime: parse then format
+        try:
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00").replace(" ", "T"))
+            return dt.strftime(fmt)
+        except Exception:
+            return s[:16]
+
+    templates.env.filters["ts"] = _ts_filter
 
     # i18n — make _() available in all templates
     from .i18n import SUPPORTED_LANGS, _catalog
@@ -876,6 +1209,37 @@ def create_app() -> FastAPI:
     templates.env.globals["i18n_catalog"] = _i18n_catalog_global()
     templates.env.globals["SUPPORTED_LANGS"] = SUPPORTED_LANGS
 
+    # Version + git commit for header display
+    import subprocess as _sp
+    from pathlib import Path as _Path
+
+    _ver_file = _Path(__file__).parent / "VERSION"
+    if _ver_file.exists():
+        _parts = _ver_file.read_text().strip().split(":")
+        _tag, _sha = (
+            (_parts[0], _parts[1]) if len(_parts) == 2 else (_parts[0], _parts[0])
+        )
+    else:
+        try:
+            _sha = (
+                _sp.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
+            _tag = (
+                _sp.check_output(
+                    ["git", "describe", "--tags", "--abbrev=0"], stderr=_sp.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            _sha, _tag = "unknown", ""
+    templates.env.globals["app_commit"] = _sha
+    templates.env.globals["app_version"] = _tag or _sha
+
     # Middleware to set current language per-request
     from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -893,6 +1257,11 @@ def create_app() -> FastAPI:
 
     app.add_middleware(I18nMiddleware)
 
+    # ── Workspace middleware ─────────────────────────────────────────────────
+    from .web.middleware.workspace import WorkspaceMiddleware
+
+    app.add_middleware(WorkspaceMiddleware)
+
     # ── OpenTelemetry ASGI middleware (last = runs first) ────────────────────
     if _otel_provider is not None:
         try:
@@ -904,24 +1273,53 @@ def create_app() -> FastAPI:
 
     app.state.templates = templates
 
-    # Routes
+    # Routes — core (required)
     from .web.routes import router as web_router
     from .web.routes.auth import router as auth_router
-    from .web.routes.mercato import router as mercato_router
-    from .web.routes.oauth import router as oauth_router
     from .web.ws import router as sse_router
-    from .web.routes.websocket import router as ws_router
-    from .web.routes.dag import router as dag_router
-    from .web.routes.evolution import router as evolution_router
 
     app.include_router(auth_router)
-    app.include_router(oauth_router)
-    app.include_router(mercato_router)
-    app.include_router(ws_router)
-    app.include_router(dag_router)
-    app.include_router(evolution_router)
     app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
+
+    # Routes — optional (safe mode: import failures are logged, not fatal)
+    _loaded_modules: list[str] = []
+    _failed_modules: list[str] = []
+
+    _OPTIONAL_ROUTERS: list[tuple[str, str, dict]] = [
+        ("mercato", ".web.routes.mercato", {}),
+        ("oauth", ".web.routes.oauth", {}),
+        ("websocket", ".web.routes.websocket", {}),
+        ("dag", ".web.routes.dag", {}),
+        ("evolution", ".web.routes.evolution", {}),
+        ("push", ".web.routes.api.push", {}),
+        ("tasks", ".web.routes.api.tasks", {}),
+        ("modules", ".web.routes.api.modules", {}),
+        ("guidelines", ".web.routes.api.guidelines", {}),
+        ("knowledge", ".web.routes.api.knowledge", {}),
+        ("api-keys", ".web.routes.api.api_keys", {}),
+        ("webhooks", ".web.routes.api.webhooks", {}),
+    ]
+
+    for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:
+        try:
+            import importlib as _imp
+
+            _pkg = __name__.rsplit(".", 1)[0]
+            _m = _imp.import_module(_mod_path, package=_pkg)
+            app.include_router(_m.router, **_kwargs)
+            _loaded_modules.append(_mod_name)
+        except Exception as _exc:
+            _failed_modules.append(_mod_name)
+            logger.warning("Optional module '%s' failed to load: %s", _mod_name, _exc)
+
+    # Store module load status on app state for /api/health/modules
+    app.state.loaded_modules = _loaded_modules
+    app.state.failed_modules = _failed_modules
+    if _failed_modules:
+        logger.warning(
+            "Safe mode: %d module(s) skipped: %s", len(_failed_modules), _failed_modules
+        )
 
     return app
 

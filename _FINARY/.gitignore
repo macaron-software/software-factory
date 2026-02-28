@@ -21,3 +21,4 @@ frontend/web/.next/
 
 # OS
 .DS_Store
+scrapers/data/dvf/*.zip

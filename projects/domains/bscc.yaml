@@ -1,0 +1,60 @@
+# Domaine BSCC — Backend Services Citoyens Communs
+# ==================================================
+# Hérite de la-poste + contraintes BSCC spécifiques.
+# Specs depuis Confluence La Poste espace IAN.
+
+name: "BSCC — Services Citoyens"
+env: prod
+color: "#003189"   # bleu La Poste foncé
+extends: la-poste
+
+description: >
+  Services numériques citoyens La Poste (BSCC).
+  Hérite de tous les standards La Poste + contraintes spécifiques
+  à l'exposition de services publics : haute disponibilité,
+  traçabilité, conformité CNIL renforcée.
+
+stack:
+  # Surcharges vs la-poste
+  backend: "Java 17 + Spring Boot 3.x + Spring Security 6"
+  database: "PostgreSQL 15+ avec chiffrement at-rest"
+  extra:
+    - "API : OpenAPI 3.1 obligatoire + contrat d'interface versionné"
+    - "Logs : ELK Stack + audit trail immuable (actions citoyens)"
+    - "Rate limiting : Spring Cloud Gateway"
+    - "Circuit breaker : Resilience4j"
+    - "Tests : JUnit 5 + Testcontainers + tests de charge (Gatling)"
+    - "SLA : 99.9% uptime, MTTR < 15 min"
+
+compliance:
+  - "RGPD (traitement données personnelles citoyens — CNIL)"
+  - "RGAA 4.1 (accessibilité — niveau AA)"
+  - "ANSSI NP SN"
+  - "DNUM standards La Poste"
+  - "OWASP Top 10"
+  - "Hébergement données sensibles : souverain (Azure francecentral)"
+
+mcp_tools:
+  - mcp-solaris
+
+confluence_space: "IAN"
+
+conventions: |
+  - Tous les endpoints exposés doivent avoir un contrat OpenAPI versionné
+  - Toute action citizen doit être loguée dans l'audit trail
+  - Pas d'exposition directe de la BDD — DTO obligatoire
+  - Validation des entrées : Bean Validation (Jakarta) côté backend
+  - Frontend : composants Solaris uniquement, RGAA AA validé par agent a11y
+
+compliance_agents:
+  - bscc-compliance-critic
+  - solaris-compliance-critic
+
+compliance_blocking: true
+
+default_pattern: adversarial-cascade
+
+default_agents:
+  - lead-dev
+  - bscc-compliance-critic
+  - solaris-compliance-critic

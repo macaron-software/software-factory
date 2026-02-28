@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block head_extra %}
+{% block scripts %}
 <script src="/static/js/chart.umd.min.js"></script>
 {% endblock %}
 {% block content %}
@@ -46,6 +46,14 @@
     <button class="metrics-tab" data-tab="pipeline"
             hx-get="/metrics/tab/pipeline" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
         <svg class="icon"><use href="#icon-git-branch"/></svg> Pipeline
+    </button>
+    <button class="metrics-tab" data-tab="knowledge"
+            hx-get="/metrics/tab/knowledge" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-database"/></svg> Knowledge
+    </button>
+    <button class="metrics-tab" data-tab="llm"
+            hx-get="/metrics/tab/llm" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-cpu"/></svg> LLM
     </button>
 </div>
 

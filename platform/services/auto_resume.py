@@ -4,32 +4,95 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 - Resumes paused mission_runs (all of them, batched with stagger)
 - Retries failed continuous background missions (TMA, security, self-healing, debt…)
 - Launches unstarted continuous missions (first run ever)
+- Hourly: cleans up orphaned workspaces + old llm_traces + cancelled run records
 """
+
 from __future__ import annotations
 
 import asyncio
 import json
 import logging
+import os
+import shutil
 
 logger = logging.getLogger(__name__)
 
 # Mission name/type patterns that should always be running
 _CONTINUOUS_KEYWORDS = (
-    "tma", "sécurité", "securite", "security",
-    "dette technique", "tech debt", "self-heal", "self_heal",
-    "tmc", "load test", "chaos", "endurance",
-    "monitoring", "audit",
+    "tma",
+    "sécurité",
+    "securite",
+    "security",
+    "dette technique",
+    "tech debt",
+    "self-heal",
+    "self_heal",
+    "tmc",
+    "load test",
+    "chaos",
+    "endurance",
+    "monitoring",
+    "audit",
 )
 
 # Watchdog loop interval (seconds)
 _WATCHDOG_INTERVAL = 300
-# Stagger between each resume
-_STAGGER_STARTUP = 1.5
-_STAGGER_WATCHDOG = 3.0
+# Stagger between each resume — defaults, overridden by config at runtime
+_STAGGER_STARTUP = 60.0  # 60s between each launch on first pass
+_STAGGER_WATCHDOG = 15.0
+_MAX_STARTUP_BATCH = 1  # only 1 mission at startup (safe default)
+# Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
+_CLEANUP_EVERY_N_CYCLES = 12
+# GA health: P1 if all proposals pending > 1h with no approved
+_GA_STALL_THRESHOLD_SECS = 3600  # 1h
 
 # Auto-launch new runs
-_LAUNCH_PER_CYCLE = 5   # max new launches per watchdog cycle (avoid thundering herd)
-_LAUNCH_STAGGER = 2.0   # seconds between each new launch
+_LAUNCH_PER_CYCLE = 2  # max new launches per watchdog cycle
+_LAUNCH_STAGGER = 5.0  # seconds between each new launch
+
+# CPU/RAM backpressure thresholds
+_CPU_GREEN = 40.0  # below → launch freely
+_CPU_YELLOW = 65.0  # 40-65 → slow down (2× stagger)
+_CPU_RED = 80.0  # above → skip launch this cycle
+_RAM_RED = 75.0  # RAM % above → skip launch (was 85 — too permissive)
+
+
+def _get_system_load() -> tuple[float, float]:
+    """Return (cpu_percent_1s, ram_percent). Falls back to (0, 0) if psutil unavailable."""
+    try:
+        import psutil
+
+        cpu = psutil.cpu_percent(interval=1)
+        ram = psutil.virtual_memory().percent
+        return cpu, ram
+    except Exception:
+        return 0.0, 0.0
+
+
+def _get_backpressure_config() -> tuple[float, float, float, float]:
+    """Return (cpu_green, cpu_yellow, cpu_red, ram_red) from config or defaults."""
+    try:
+        from ..config import get_config
+
+        oc = get_config().orchestrator
+        return oc.cpu_green, oc.cpu_yellow, oc.cpu_red, oc.ram_red
+    except Exception:
+        return _CPU_GREEN, _CPU_YELLOW, _CPU_RED, _RAM_RED
+
+
+def _get_resume_config():
+    """Read concurrency settings from platform config (live, allows runtime changes)."""
+    try:
+        from ..config import get_config
+
+        oc = get_config().orchestrator
+        return (
+            oc.resume_stagger_startup,
+            oc.resume_stagger_watchdog,
+            oc.resume_batch_startup,
+        )
+    except Exception:
+        return _STAGGER_STARTUP, _STAGGER_WATCHDOG, _MAX_STARTUP_BATCH
 
 
 def _is_continuous(mission_name: str, mission_type: str) -> bool:
@@ -43,19 +106,21 @@ async def auto_resume_missions() -> None:
     Watchdog loop: resumes paused/failed mission_runs and launches unstarted continuous missions.
     First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
-    await asyncio.sleep(5)  # Let platform fully initialize first
+    if os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
+        logger.warning("auto_resume: disabled via PLATFORM_AUTO_RESUME_ENABLED=0")
+        return
 
-    # Hot-patch startup: use release() to both add slots AND wake up waiting coroutines
+    # Let platform fully initialize + allow operator intervention window
+    _startup_delay = int(os.environ.get("PLATFORM_AUTO_RESUME_DELAY", "60"))
+    await asyncio.sleep(_startup_delay)
+
+    # Semaphore is set to 2 in helpers.py — no hot-patch needed
+
+    # Cleanup stale workspace containers before launching missions
     try:
-        from ..web.routes.helpers import _mission_semaphore
-        target = 10
-        added = max(0, target - _mission_semaphore._value)
-        for _ in range(added):
-            _mission_semaphore.release()
-        if added:
-            logger.warning("auto_resume: released %d semaphore slots → value=%d (wakes waiters)", added, _mission_semaphore._value)
-    except Exception as _e_sem:
-        logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
+        await _cleanup_workspace_containers()
+    except Exception as e:
+        logger.warning("auto_resume: workspace container cleanup error: %s", e)
 
     # First: repair all failed runs (reset to paused + create TMA incidents)
     try:
@@ -64,30 +129,43 @@ async def auto_resume_missions() -> None:
         logger.error("auto_resume: handle_failed_runs error: %s", e)
 
     first_pass = True
+    cycle_count = 0
     while True:
-        # Hot-patch per cycle: use release() to add slots and wake up waiting coroutines
+        # Read concurrency settings live from config (allows runtime changes via UI)
+        stagger_startup, stagger_watchdog, _ = _get_resume_config()
         try:
-            from ..web.routes.helpers import _mission_semaphore
-            target = 10
-            added = max(0, target - _mission_semaphore._value)
-            for _ in range(added):
-                _mission_semaphore.release()
-            if added:
-                logger.warning("auto_resume: released %d semaphore slots → value=%d", added, _mission_semaphore._value)
-        except Exception as _e_sem:
-            logger.warning("auto_resume: semaphore patch failed: %s", _e_sem)
-        try:
-            stagger = _STAGGER_STARTUP if first_pass else _STAGGER_WATCHDOG
+            stagger = stagger_startup if first_pass else stagger_watchdog
             resumed = await _resume_batch(stagger=stagger)
             if resumed > 0:
-                logger.warning("auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass)
+                logger.warning(
+                    "auto_resume: %d runs resumed (first_pass=%s)", resumed, first_pass
+                )
             # Launch unstarted continuous missions (new in v2)
             try:
                 launched = await auto_launch_continuous_missions()
                 if launched > 0:
-                    logger.warning("auto_resume: %d new continuous missions launched", launched)
+                    logger.warning(
+                        "auto_resume: %d new continuous missions launched", launched
+                    )
             except Exception as e_launch:
                 logger.error("auto_resume: auto_launch error: %s", e_launch)
+            # Hourly disk cleanup
+            cycle_count += 1
+            if cycle_count % _CLEANUP_EVERY_N_CYCLES == 0:
+                try:
+                    await _cleanup_disk()
+                except Exception as e_clean:
+                    logger.error("auto_resume: disk cleanup error: %s", e_clean)
+            # Every cycle: enforce container TTL + project slots
+            try:
+                await _enforce_container_ttl_and_slots()
+            except Exception as e_ttl:
+                logger.warning("auto_resume: container TTL error: %s", e_ttl)
+            # Every cycle: GA health P1 check (stall > 1h → auto-approve bootstrap)
+            try:
+                await check_ga_health()
+            except Exception as e_ga:
+                logger.warning("auto_resume: GA health check error: %s", e_ga)
             first_pass = False
         except Exception as e:
             logger.error("auto_resume watchdog error: %s", e)
@@ -102,13 +180,16 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     db = get_db()
     try:
-        # All paused runs with workflow
+        # All paused runs with workflow — exclude human_input_required and > 48h old
         paused_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
-                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
+                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active'),
+                   COALESCE(mr.resume_attempts, 0)
             FROM mission_runs mr
             LEFT JOIN missions m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
+              AND COALESCE(mr.human_input_required, 0) = 0
+              AND mr.updated_at >= datetime('now', '-48 hours')
             ORDER BY mr.created_at DESC
             LIMIT 500
         """).fetchall()
@@ -152,9 +233,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         db.close()
 
     continuous_paused, others_paused, continuous_failed, stuck_pending = [], [], [], []
-    for run_id, wf_id, mname, mtype, mstatus in paused_rows:
+    # Map run_id → resume_attempts for backoff filtering
+    _attempts: dict[str, int] = {}
+    for run_id, wf_id, mname, mtype, mstatus, attempts in paused_rows:
         if mstatus not in ("active", None, ""):
             continue
+        _attempts[run_id] = attempts
         if _is_continuous(mname, mtype):
             continuous_paused.append(run_id)
         else:
@@ -168,27 +252,151 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         if _is_continuous(mname, mtype):
             continuous_failed.append(run_id)
 
-    to_resume = continuous_paused + others_paused + stuck_pending + continuous_failed
+    # Apply exponential backoff: skip missions with too many recent attempts
+    # Attempt 0-2: always retry; attempt 3: skip 50% chance (use mod); attempt 4+: skip unless low load
+    import time as _time
+
+    _now_minute = int(_time.time() // 60)
+
+    def _backoff_ok(run_id: str) -> bool:
+        attempts = _attempts.get(run_id, 0)
+        if attempts <= 2:
+            return True
+        if attempts <= 5:
+            # Retry every (2^attempts) minutes — skip if not on the right minute
+            interval = 2 ** (attempts - 2)  # 2, 4, 8, 16, 32 min
+            return (_now_minute % interval) == 0
+        return False  # > 5 attempts → wait for manual review or human_input_required
+
+    candidates = [
+        r
+        for r in (continuous_paused + others_paused + stuck_pending + continuous_failed)
+        if _backoff_ok(r)
+    ]
+    to_resume = candidates
+
+    # On startup (large stagger), cap batch to avoid CPU saturation
+    stagger_startup, _, batch_max = _get_resume_config()
+    if stagger >= stagger_startup:
+        to_resume = to_resume[:batch_max]
 
     if not to_resume:
         return 0
 
     logger.warning(
         "auto_resume: %d candidates (paused-continuous=%d, paused-other=%d, stuck-pending=%d, failed-continuous=%d)",
-        len(to_resume), len(continuous_paused), len(others_paused), len(stuck_pending), len(continuous_failed),
+        len(to_resume),
+        len(continuous_paused),
+        len(others_paused),
+        len(stuck_pending),
+        len(continuous_failed),
     )
 
     resumed = 0
+    skipped_load = 0
     for run_id in to_resume:
+        # Backpressure: check CPU/RAM before each launch
+        cpu, ram = _get_system_load()
+        cpu_green, cpu_yellow, cpu_red, ram_red = _get_backpressure_config()
+        if cpu >= cpu_red or ram >= ram_red:
+            logger.warning(
+                "auto_resume: backpressure RED — cpu=%.0f%% ram=%.0f%% — stopping batch (%d/%d launched)",
+                cpu,
+                ram,
+                resumed,
+                len(to_resume),
+            )
+            break  # Stop this cycle entirely, retry next watchdog pass
+        effective_stagger = stagger
+        if cpu >= cpu_yellow:
+            effective_stagger = stagger * 2  # slow down in yellow zone
+            skipped_load += 1
+            logger.info(
+                "auto_resume: backpressure YELLOW cpu=%.0f%% — doubling stagger to %.0fs",
+                cpu,
+                effective_stagger,
+            )
         try:
-            await _launch_run(run_id)
+            # Try to dispatch to a less-loaded worker node first
+            dispatched = await _try_dispatch_to_worker(run_id)
+            if not dispatched:
+                await _launch_run(run_id)
             resumed += 1
-            logger.warning("auto_resume: launched run %s", run_id)
+            logger.warning(
+                "auto_resume: launched run %s (cpu=%.0f%% ram=%.0f%% dispatched=%s)",
+                run_id,
+                cpu,
+                ram,
+                dispatched,
+            )
         except Exception as e:
             logger.warning("auto_resume: skipped %s: %s", run_id, e)
-        await asyncio.sleep(stagger)
+        await asyncio.sleep(effective_stagger)
 
+    if skipped_load:
+        logger.info("auto_resume: %d launches slowed due to CPU pressure", skipped_load)
     return resumed
+
+
+async def _try_dispatch_to_worker(run_id: str) -> bool:
+    """Try to dispatch a mission run to a less-loaded worker node.
+    Returns True if dispatched remotely, False if should run locally.
+    Worker nodes are configured in OrchestratorConfig.worker_nodes (list of URLs).
+    """
+    try:
+        from ..config import get_config
+
+        workers = getattr(get_config().orchestrator, "worker_nodes", [])
+        if not workers:
+            return False
+
+        import urllib.request
+
+        local_cpu, local_ram = _get_system_load()
+        local_score = local_cpu * 0.6 + local_ram * 0.4
+
+        best_url = None
+        best_score = local_score  # only dispatch if worker is lighter than us
+
+        for worker_url in workers:
+            try:
+                req = urllib.request.Request(
+                    f"{worker_url.rstrip('/')}/api/metrics/load",
+                    headers={"Accept": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    data = json.loads(resp.read().decode())
+                    score = data.get("load_score", 100)
+                    if score < best_score:
+                        best_score = score
+                        best_url = worker_url
+            except Exception as e:
+                logger.debug("auto_resume: worker %s unreachable: %s", worker_url, e)
+
+        if not best_url:
+            return False  # run locally
+
+        # Dispatch: POST /api/missions/runs/{run_id}/resume to the worker
+        payload = json.dumps({"run_id": run_id}).encode()
+        req = urllib.request.Request(
+            f"{best_url.rstrip('/')}/api/missions/runs/{run_id}/resume",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status in (200, 202):
+                logger.warning(
+                    "auto_resume: dispatched run %s to worker %s (score=%.0f vs local=%.0f)",
+                    run_id,
+                    best_url,
+                    best_score,
+                    local_score,
+                )
+                return True
+    except Exception as e:
+        logger.debug("auto_resume: dispatch failed for %s: %s", run_id, e)
+    return False
 
 
 async def _launch_run(run_id: str) -> None:
@@ -198,7 +406,7 @@ async def _launch_run(run_id: str) -> None:
     from ..models import MissionStatus
     from ..services.mission_orchestrator import MissionOrchestrator
     from ..sessions.runner import _push_sse
-    from ..web.routes.helpers import _active_mission_tasks, _mission_semaphore
+    from ..web.routes.helpers import _active_mission_tasks, get_mission_semaphore
     from ..workflows.store import get_workflow_store
 
     run_store = get_mission_run_store()
@@ -218,6 +426,7 @@ async def _launch_run(run_id: str) -> None:
     # Ensure a session row exists for this mission_run (needed for messages FK)
     if mission.session_id:
         from ..db.migrations import get_db as _get_db
+
         _db = _get_db()
         try:
             exists = _db.execute(
@@ -226,6 +435,7 @@ async def _launch_run(run_id: str) -> None:
             if not exists:
                 from datetime import datetime as _dt
                 import json as _json
+
                 _db.execute(
                     "INSERT OR IGNORE INTO sessions "
                     "(id, name, status, config_json, created_at) "
@@ -233,8 +443,12 @@ async def _launch_run(run_id: str) -> None:
                     (
                         mission.session_id,
                         f"mission-{mission.session_id[:8]}",
-                        _json.dumps({"workflow_id": mission.workflow_id,
-                                     "project_id": mission.project_id}),
+                        _json.dumps(
+                            {
+                                "workflow_id": mission.workflow_id,
+                                "project_id": mission.project_id,
+                            }
+                        ),
                         _dt.utcnow().isoformat(),
                     ),
                 )
@@ -264,12 +478,18 @@ async def _launch_run(run_id: str) -> None:
 
     async def _safe_run():
         try:
-            async with _mission_semaphore:
+            async with get_mission_semaphore():
                 logger.warning("auto_resume: mission_run=%s acquired semaphore", run_id)
                 await orchestrator.run_phases()
         except Exception as exc:
             import traceback
-            logger.error("auto_resume: run=%s CRASHED: %s\n%s", run_id, exc, traceback.format_exc())
+
+            logger.error(
+                "auto_resume: run=%s CRASHED: %s\n%s",
+                run_id,
+                exc,
+                traceback.format_exc(),
+            )
             try:
                 mission.status = MissionStatus.FAILED
                 run_store.update(mission)
@@ -320,10 +540,24 @@ async def handle_failed_runs() -> int:
 
     repaired = 0
     tma_created = 0
-    for run_id, wf_id, wf_name, cur_phase, phases_raw, project_id, brief, mname, mtype in rows:
+    for (
+        run_id,
+        wf_id,
+        wf_name,
+        cur_phase,
+        phases_raw,
+        project_id,
+        brief,
+        mname,
+        mtype,
+    ) in rows:
         try:
             phases = json.loads(phases_raw) if phases_raw else []
-            done_phases = [p for p in phases if p.get("status") in ("done", "done_with_issues", "skipped")]
+            done_phases = [
+                p
+                for p in phases
+                if p.get("status") in ("done", "done_with_issues", "skipped")
+            ]
 
             # Reset failed/running phases back to pending so orchestrator retries them
             repaired_phases = _reset_failed_phases(phases)
@@ -368,7 +602,8 @@ async def handle_failed_runs() -> int:
 
     logger.warning(
         "handle_failed_runs: %d repaired → paused (%d TMA incidents created)",
-        repaired, tma_created,
+        repaired,
+        tma_created,
     )
     return repaired
 
@@ -376,6 +611,7 @@ async def handle_failed_runs() -> int:
 def _reset_failed_phases(phases: list) -> list:
     """Reset failed/stuck-running phases to pending so orchestrator retries them."""
     import copy
+
     result = []
     for p in phases:
         phase = copy.deepcopy(p)
@@ -412,30 +648,36 @@ async def _create_tma_incident(
 
     db = get_db()
     try:
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO mission_runs
               (id, workflow_id, workflow_name, project_id, status, current_phase,
                phases_json, brief, parent_mission_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'pending', '',
                     '[]', ?, ?, datetime('now'), datetime('now'))
-        """, (
-            incident_id,
-            _TMA_WORKFLOW_ID,
-            "TMA — Incident Auto-Détecté",
-            project_id,
-            brief,
-            failed_run_id,
-        ))
+        """,
+            (
+                incident_id,
+                _TMA_WORKFLOW_ID,
+                "TMA — Incident Auto-Détecté",
+                project_id,
+                brief,
+                failed_run_id,
+            ),
+        )
         db.commit()
         logger.warning(
             "handle_failed_runs: TMA incident %s created for failed run %s (phase=%s)",
-            incident_id, failed_run_id, failed_phase,
+            incident_id,
+            failed_run_id,
+            failed_phase,
         )
     finally:
         db.close()
 
 
 # ─── Auto-launch continuous missions with no runs ───────────────────────────
+
 
 async def auto_launch_continuous_missions() -> int:
     """
@@ -470,19 +712,19 @@ async def auto_launch_continuous_missions() -> int:
         return 0
 
     # Filter: only continuous missions
-    candidates = [
-        r for r in rows
-        if _is_continuous(r[1], r[2])
-    ]
+    candidates = [r for r in rows if _is_continuous(r[1], r[2])]
 
     if not candidates:
-        logger.warning("auto_launch: %d unstarted active missions, 0 continuous", len(rows))
+        logger.warning(
+            "auto_launch: %d unstarted active missions, 0 continuous", len(rows)
+        )
         return 0
 
     to_launch = candidates[:_LAUNCH_PER_CYCLE]
     logger.warning(
         "auto_launch: %d continuous missions unstarted, launching %d this cycle",
-        len(candidates), len(to_launch),
+        len(candidates),
+        len(to_launch),
     )
 
     launched = 0
@@ -497,7 +739,11 @@ async def auto_launch_continuous_missions() -> int:
                 mission_name=name,
             )
             launched += 1
-            logger.warning("auto_launch: started run for mission %s (%s)", mission_id[:8], name[:50])
+            logger.warning(
+                "auto_launch: started run for mission %s (%s)",
+                mission_id[:8],
+                name[:50],
+            )
         except Exception as e:
             logger.warning("auto_launch: failed to start %s: %s", mission_id[:8], e)
         await asyncio.sleep(_LAUNCH_STAGGER)
@@ -541,16 +787,26 @@ async def _launch_new_run(
     # Workspace under data/workspaces/
     ws_base = os.path.join(
         os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "data", "workspaces", run_id,
+        "data",
+        "workspaces",
+        run_id,
     )
     os.makedirs(ws_base, exist_ok=True)
     # Ensure workspace has a git repo so git tools work
     if not os.path.isdir(os.path.join(ws_base, ".git")):
         subprocess.run(["git", "init"], cwd=ws_base, capture_output=True)
-        subprocess.run(["git", "commit", "--allow-empty", "-m", "init workspace"],
-                       cwd=ws_base, capture_output=True,
-                       env={**os.environ, "GIT_AUTHOR_NAME": "agent", "GIT_AUTHOR_EMAIL": "agent@sf",
-                            "GIT_COMMITTER_NAME": "agent", "GIT_COMMITTER_EMAIL": "agent@sf"})
+        subprocess.run(
+            ["git", "commit", "--allow-empty", "-m", "init workspace"],
+            cwd=ws_base,
+            capture_output=True,
+            env={
+                **os.environ,
+                "GIT_AUTHOR_NAME": "agent",
+                "GIT_AUTHOR_EMAIL": "agent@sf",
+                "GIT_COMMITTER_NAME": "agent",
+                "GIT_COMMITTER_EMAIL": "agent@sf",
+            },
+        )
 
     run = MissionRun(
         id=run_id,
@@ -568,3 +824,240 @@ async def _launch_new_run(
     get_mission_run_store().create(run)
     await _launch_run(run_id)
     return run_id
+
+
+async def check_ga_health() -> None:
+    """P1 watchdog: if all GA proposals are pending for > 1h with none approved,
+    auto-approve the best per workflow (bootstrap) and log a P1 warning.
+    Runs every watchdog cycle (~5 min) but only acts once per stall episode."""
+    from ..db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Count pending proposals older than threshold
+        stall_row = db.execute(
+            """SELECT COUNT(*) FROM evolution_proposals
+               WHERE status = 'pending'
+               AND (strftime('%s','now') - strftime('%s', created_at)) > ?""",
+            (_GA_STALL_THRESHOLD_SECS,),
+        ).fetchone()
+        stalled_count = stall_row[0] if stall_row else 0
+        if stalled_count == 0:
+            return
+
+        # Check if any approved exist (would mean GA is healthy)
+        approved_row = db.execute(
+            "SELECT COUNT(*) FROM evolution_proposals WHERE status = 'approved'"
+        ).fetchone()
+        approved_count = approved_row[0] if approved_row else 0
+
+        if approved_count > 0:
+            return  # GA has approved proposals — not stalled
+
+        # P1: GA fully stalled — auto-approve best per workflow to bootstrap
+        logger.warning(
+            "P1 GA STALL: %d proposals pending >1h, 0 approved — auto-approving best per workflow",
+            stalled_count,
+        )
+        db.execute(
+            """UPDATE evolution_proposals
+               SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP
+               WHERE id IN (
+                   SELECT id FROM evolution_proposals ep1
+                   WHERE status = 'pending' AND fitness > 0
+                   AND NOT EXISTS (
+                       SELECT 1 FROM evolution_proposals ep2
+                       WHERE ep2.base_wf_id = ep1.base_wf_id
+                         AND ep2.fitness > ep1.fitness
+                         AND ep2.status = 'pending'
+                   )
+               )"""
+        )
+        db.commit()
+        approved_now = db.execute(
+            "SELECT COUNT(*) FROM evolution_proposals WHERE status = 'approved'"
+        ).fetchone()[0]
+        logger.warning("P1 GA STALL resolved: %d proposals auto-approved", approved_now)
+    except Exception as e:
+        logger.error("check_ga_health error: %s", e)
+    finally:
+        db.close()
+
+
+async def _cleanup_disk() -> None:
+    """Hourly cleanup: orphaned workspaces + old LLM traces + stale cancelled runs."""
+    from ..db.migrations import get_db
+
+    db = get_db()
+
+    # 1. Remove workspaces for non-active sessions
+    ws_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "workspaces")
+    ws_dir = os.path.normpath(ws_dir)
+    if not os.path.isdir(ws_dir):
+        # Try absolute path used in container
+        ws_dir = "/app/data/workspaces"
+    if os.path.isdir(ws_dir):
+        active_sessions = {
+            r[0]
+            for r in db.execute(
+                "SELECT session_id FROM mission_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
+            ).fetchall()
+        }
+        removed_ws = 0
+        for ws_name in os.listdir(ws_dir):
+            if ws_name not in active_sessions:
+                try:
+                    shutil.rmtree(os.path.join(ws_dir, ws_name))
+                    removed_ws += 1
+                except Exception:
+                    pass
+        if removed_ws:
+            logger.warning("cleanup_disk: removed %d orphaned workspaces", removed_ws)
+
+    # 2. Purge LLM traces older than 14 days (keep recent for observability)
+    deleted_traces = db.execute(
+        "DELETE FROM llm_traces WHERE created_at < datetime('now', '-14 days')"
+    ).rowcount
+    if deleted_traces:
+        db.commit()
+        logger.warning("cleanup_disk: purged %d LLM traces >14d", deleted_traces)
+
+    # 3. Purge cancelled run records older than 7 days
+    deleted_runs = db.execute(
+        "DELETE FROM mission_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
+    ).rowcount
+    if deleted_runs:
+        db.commit()
+        logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
+
+    # 4. SQLite VACUUM to reclaim space after mass deletes
+    if deleted_traces + deleted_runs > 100:
+        db.execute("VACUUM")
+        logger.warning(
+            "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
+        )
+
+
+async def _cleanup_workspace_containers() -> None:
+    """Kill stale proj-* and macaron-app-* containers that accumulate from past missions."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception:
+        return
+
+    killed = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        name, status = parts
+        # Kill stopped/exited workspace containers (proj-* and macaron-app-*)
+        if (name.startswith("proj-") or name.startswith("macaron-app-")) and (
+            "Exited" in status or "Created" in status
+        ):
+            try:
+                subprocess.run(
+                    ["docker", "rm", "-f", name], capture_output=True, timeout=10
+                )
+                killed.append(name)
+            except Exception:
+                pass
+
+    if killed:
+        logger.warning(
+            "auto_resume: cleaned up %d stale workspace containers: %s",
+            len(killed),
+            killed[:5],
+        )
+
+
+async def _enforce_container_ttl_and_slots() -> None:
+    """Stop deployed app containers (macaron-app-*) that are too old or exceed the active-project slot limit.
+
+    Reads config.orchestrator.max_active_projects and deployed_container_ttl_hours.
+    Called every watchdog cycle.
+    """
+    import subprocess
+    import re
+    from datetime import datetime, timezone
+
+    try:
+        from ..config import get_config
+
+        oc = get_config().orchestrator
+        max_slots = oc.max_active_projects  # 0 = unlimited
+        ttl_hours = oc.deployed_container_ttl_hours  # 0 = no TTL
+    except Exception:
+        max_slots = 3
+        ttl_hours = 4.0
+
+    if max_slots == 0 and ttl_hours == 0:
+        return
+
+    try:
+        result = subprocess.run(
+            ["docker", "ps", "--format", "{{.Names}}\t{{.CreatedAt}}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except Exception:
+        return
+
+    now = datetime.now(timezone.utc)
+    app_containers: list[tuple[str, datetime]] = []
+
+    for line in result.stdout.splitlines():
+        parts = line.split("\t", 1)
+        if len(parts) != 2:
+            continue
+        name, created_str = parts
+        if not (name.startswith("macaron-app-") or name.startswith("proj-")):
+            continue
+        try:
+            # Docker format: "2026-01-15 10:23:45 +0000 UTC" or "2026-01-15T10:23:45Z"
+            created_str = re.sub(r"\s+UTC$", "", created_str.strip())
+            dt = datetime.fromisoformat(
+                created_str.replace(" ", "T").replace(" +0000", "+00:00")
+            )
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            app_containers.append((name, dt))
+        except Exception:
+            app_containers.append((name, now))  # unknown age → treat as fresh
+
+    if not app_containers:
+        return
+
+    # Sort oldest first
+    app_containers.sort(key=lambda x: x[1])
+
+    to_stop = []
+    for name, created in app_containers:
+        age_hours = (now - created).total_seconds() / 3600
+        if ttl_hours > 0 and age_hours > ttl_hours:
+            to_stop.append((name, f"age={age_hours:.1f}h > ttl={ttl_hours}h"))
+
+    # Enforce slot limit: stop oldest beyond max_slots
+    if max_slots > 0 and len(app_containers) > max_slots:
+        over = app_containers[: len(app_containers) - max_slots]
+        for name, created in over:
+            if name not in [n for n, _ in to_stop]:
+                to_stop.append((name, f"slots={len(app_containers)} > max={max_slots}"))
+
+    for name, reason in to_stop:
+        try:
+            subprocess.run(["docker", "stop", name], capture_output=True, timeout=15)
+            subprocess.run(["docker", "rm", name], capture_output=True, timeout=10)
+            logger.warning(
+                "auto_resume: stopped deployed container %s (%s)", name, reason
+            )
+        except Exception as e:
+            logger.warning("auto_resume: failed to stop %s: %s", name, e)

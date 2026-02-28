@@ -46,3 +46,5 @@ logs/
 platform/tests/e2e/playwright-report/
 platform/tests/e2e/test-results/
 Thumbs.db
+platform/VERSION
+data/component_gallery.db

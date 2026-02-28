@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   platform:
     build:
       context: .
@@ -8,11 +23,45 @@ services:
     env_file:
       - .env
     environment:
-      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-demo}
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
       - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - DBGATE_URL=http://dbgate:3000
+      - DBGATE_PASSWORD=dbgate2024
     volumes:
       - platform-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "989"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: --no-http-disabled --base-url=/portainer
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: unless-stopped
+
+  dbgate:
+    image: dbgate/dbgate:5.2.0
+    ports:
+      - "3002:3000"
+    environment:
+      - ROOT_PATH=/dbgate
+      - LOGIN=admin
+      - PASSWORD=dbgate2024
+    volumes:
+      - dbgate-data:/root/.dbgate
     restart: unless-stopped
 
 volumes:
   platform-data:
+  pg-data:
+  portainer-data:
+  dbgate-data:

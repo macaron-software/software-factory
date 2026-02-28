@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 # ENUMS
 # ============================================================================
 
+
 class AgentStatus(str, Enum):
     IDLE = "idle"
     THINKING = "thinking"
@@ -83,17 +84,19 @@ class ArtifactType(str, Enum):
 
 
 class VetoLevel(str, Enum):
-    ABSOLUTE = "absolute"       # Cannot be overridden (security)
-    STRONG = "strong"           # Requires escalation to override
-    ADVISORY = "advisory"       # Can be overridden with justification
+    ABSOLUTE = "absolute"  # Cannot be overridden (security)
+    STRONG = "strong"  # Requires escalation to override
+    ADVISORY = "advisory"  # Can be overridden with justification
 
 
 # ============================================================================
 # AGENT MODELS
 # ============================================================================
 
+
 class AgentPermissions(BaseModel):
     """What an agent is allowed to do."""
+
     can_veto: bool = False
     veto_level: VetoLevel = VetoLevel.ADVISORY
     can_delegate: bool = False
@@ -101,14 +104,19 @@ class AgentPermissions(BaseModel):
     escalation_to: Optional[str] = None
     require_human_approval_for: list[str] = Field(default_factory=list)
     # File access control
-    allowed_paths: list[str] = Field(default_factory=list)   # glob patterns, empty = project_path only
-    denied_paths: list[str] = Field(default_factory=list)    # explicit denials (e.g. "*.env", "secrets/")
-    can_write: bool = True       # False = read-only agent (e.g. security auditor)
-    can_execute: bool = True     # False = no build/test/shell execution
+    allowed_paths: list[str] = Field(
+        default_factory=list
+    )  # glob patterns, empty = project_path only
+    denied_paths: list[str] = Field(
+        default_factory=list
+    )  # explicit denials (e.g. "*.env", "secrets/")
+    can_write: bool = True  # False = read-only agent (e.g. security auditor)
+    can_execute: bool = True  # False = no build/test/shell execution
 
 
 class AgentCommunication(BaseModel):
     """Who the agent can talk to."""
+
     responds_to: list[str] = Field(default_factory=list)
     can_contact: list[str] = Field(default_factory=list)
     broadcast_channels: list[str] = Field(default_factory=list)
@@ -116,13 +124,15 @@ class AgentCommunication(BaseModel):
 
 class AgentTrigger(BaseModel):
     """Automatic trigger for an agent."""
-    event: str                   # "on_code_pushed", "on_test_failed", etc.
-    action: str                  # What to do
-    auto: bool = False           # Auto-execute or wait for approval
+
+    event: str  # "on_code_pushed", "on_test_failed", etc.
+    action: str  # What to do
+    auto: bool = False  # Auto-execute or wait for approval
 
 
 class AgentLLMConfig(BaseModel):
     """LLM configuration for an agent."""
+
     model: str = "gpt-5.1"
     temperature: float = 0.7
     max_tokens: int = 4096
@@ -131,6 +141,7 @@ class AgentLLMConfig(BaseModel):
 
 class AgentRole(BaseModel):
     """Definition of an agent role (loaded from YAML)."""
+
     id: str
     name: str
     role: str = ""
@@ -152,6 +163,7 @@ class AgentRole(BaseModel):
 
 class AgentInstance(BaseModel):
     """A running instance of an agent."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     role_id: str
     session_id: Optional[str] = None
@@ -170,31 +182,36 @@ class AgentInstance(BaseModel):
 # A2A MESSAGE MODELS
 # ============================================================================
 
+
 class A2AMessage(BaseModel):
     """A message between agents (Agent-to-Agent protocol)."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
-    from_agent: str                          # Agent instance ID or "user"
-    to_agent: Optional[str] = None           # None = broadcast
+    from_agent: str  # Agent instance ID or "user"
+    to_agent: Optional[str] = None  # None = broadcast
     message_type: MessageType = MessageType.INFORM
     content: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
     artifacts: list[str] = Field(default_factory=list)
-    parent_id: Optional[str] = None          # Thread chain
-    priority: int = 5                        # 1=low, 10=critical
+    parent_id: Optional[str] = None  # Thread chain
+    priority: int = 5  # 1=low, 10=critical
     requires_response: bool = False
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
 class NegotiationState(BaseModel):
     """State of an ongoing negotiation between agents."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
     topic: str
     initiator: str
     participants: list[str]
     proposals: list[A2AMessage] = Field(default_factory=list)
-    votes: dict[str, str] = Field(default_factory=dict)  # agent_id → "accept"|"reject"|"counter"
+    votes: dict[str, str] = Field(
+        default_factory=dict
+    )  # agent_id → "accept"|"reject"|"counter"
     status: str = "open"  # open, accepted, rejected, escalated
     round: int = 0
     max_rounds: int = 10
@@ -205,17 +222,19 @@ class NegotiationState(BaseModel):
 # SESSION MODELS
 # ============================================================================
 
+
 class Session(BaseModel):
     """A collaborative work session."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     description: str = ""
     pattern: OrchestrationPattern = OrchestrationPattern.HIERARCHICAL
-    agents: list[str] = Field(default_factory=list)       # Agent instance IDs
+    agents: list[str] = Field(default_factory=list)  # Agent instance IDs
     status: SessionStatus = SessionStatus.PLANNING
     goal: str = ""
     context: dict[str, Any] = Field(default_factory=dict)
-    project_id: Optional[str] = None                      # Link to Factory project
+    project_id: Optional[str] = None  # Link to Factory project
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
 
@@ -224,16 +243,18 @@ class Session(BaseModel):
 # ARTIFACT MODELS
 # ============================================================================
 
+
 class Artifact(BaseModel):
     """A shared artifact produced by agents."""
+
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     session_id: str
     type: ArtifactType = ArtifactType.CODE
     name: str
     content: str = ""
-    language: Optional[str] = None          # For code: "python", "rust", etc.
+    language: Optional[str] = None  # For code: "python", "rust", etc.
     version: int = 1
-    created_by: str                         # Agent instance ID
+    created_by: str  # Agent instance ID
     last_modified_by: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
     modified_at: datetime = Field(default_factory=datetime.utcnow)
@@ -243,18 +264,21 @@ class Artifact(BaseModel):
 # TOOL MODELS
 # ============================================================================
 
+
 class ToolDefinition(BaseModel):
     """Definition of a tool available to agents."""
+
     name: str
     description: str
     parameters: dict[str, Any] = Field(default_factory=dict)  # JSON Schema
     requires_approval: bool = False
-    allowed_roles: list[str] = Field(default_factory=list)     # Empty = all
-    category: str = "general"                                   # code, git, build, azure
+    allowed_roles: list[str] = Field(default_factory=list)  # Empty = all
+    category: str = "general"  # code, git, build, azure
 
 
 class ToolResult(BaseModel):
     """Result of a tool execution."""
+
     tool_name: str
     success: bool
     output: str = ""
@@ -268,8 +292,10 @@ class ToolResult(BaseModel):
 # METRICS
 # ============================================================================
 
+
 class AgentMetrics(BaseModel):
     """Aggregated metrics for an agent."""
+
     agent_id: str
     role_id: str
     total_messages: int = 0
@@ -287,6 +313,7 @@ class AgentMetrics(BaseModel):
 # MISSION CONTROL
 # ============================================================================
 
+
 class PhaseStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -299,6 +326,7 @@ class PhaseStatus(str, Enum):
 
 class PhaseRun(BaseModel):
     """Tracks execution of a single phase within a mission."""
+
     phase_id: str
     phase_name: str = ""
     pattern_id: str = ""
@@ -310,6 +338,10 @@ class PhaseRun(BaseModel):
     error: Optional[str] = ""
     iteration: int = 0
     sprint_count: int = 0
+    quality_score: Optional[int] = None  # 0-100 adversarial guard score
+    output_schema: Optional[dict] = None  # expected JSON schema
+    output_validated: bool = False  # whether output matched schema
+    output_parse_errors: int = 0  # retry count
 
 
 class MissionStatus(str, Enum):
@@ -319,22 +351,27 @@ class MissionStatus(str, Enum):
     FAILED = "failed"
     PAUSED = "paused"
     CANCELLED = "cancelled"
+    ABANDONED = "abandoned"
 
 
 class MissionRun(BaseModel):
     """Tracks execution of a full mega-workflow (multi-phase mission)."""
+
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
     workflow_id: str
     workflow_name: str = ""
     session_id: str = ""
     cdp_agent_id: str = "chef_de_programme"
     project_id: str = ""
-    workspace_path: str = ""  # filesystem path for agent tools (code_write, git, docker)
+    workspace_path: str = (
+        ""  # filesystem path for agent tools (code_write, git, docker)
+    )
     parent_mission_id: str = ""  # SAFe: Epic→Feature hierarchy
     status: MissionStatus = MissionStatus.PENDING
     current_phase: str = ""
     phases: list[PhaseRun] = Field(default_factory=list)
     brief: str = ""
+    llm_cost_usd: float = 0.0  # accumulated LLM cost for this mission
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None

@@ -21,6 +21,9 @@
         <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_workflow') }}
     </button>
     {% endif %}
+    <a href="/missions/{{ mission.id }}/replay" class="btn btn-sm btn-ghost">
+        <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Replay
+    </a>
 </div>
 {% endblock %}
 

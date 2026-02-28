@@ -1,0 +1,25 @@
+# Fervenza — IoT Platform
+# =======================
+
+project:
+  id: fervenza
+  name: fervenza
+  display_name: "Fervenza IoT Platform"
+  root_path: ""
+  domain: iot
+  description: >
+    Plateforme IoT pour la collecte et traitement de données de capteurs industriels.
+    Edge computing + streaming temps réel + dashboards.
+
+domains:
+  rust:
+    paths: [src/]
+    extensions: [.rs]
+  typescript:
+    paths: [web/]
+    extensions: [.ts, .tsx]
+
+stack:
+  backend: "Rust + Tokio"
+  frontend: "React + TypeScript"
+  infra: "MQTT + Kafka + InfluxDB"

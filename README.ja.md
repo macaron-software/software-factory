@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[Live Demo: sf.macaron-software.com](https://sf.macaron-software.com)** — 「Skip (Demo)」をクリックして探索
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Contributing](#contributing)
 
@@ -31,11 +41,16 @@
 
 Software Factory は**自律型マルチエージェントプラットフォーム**で、専門AIエージェントが連携して、アイデア出しからデプロイまでのソフトウェア開発ライフサイクル全体を統括します。
 
-161のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
+191のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
 
 ### 主な特徴
 
-- **161の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
+- **191の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
+- **36の組み込みワークフロー** — SAFeセレモニー、品質ゲート、夜間メンテナンス、セキュリティ、ナレッジ管理
+- **ナレッジ管理** — 4つの専用エージェント、ARTナレッジチーム、夜間`knowledge-maintenance`ワークフロー
+- **メモリインテリジェンス** — 関連性スコアリング、アクセス追跡、古いエントリの自動削除
+- **LLMコスト追跡** — ミッションタイムラインタブヘッダーにミッションごとのコスト表示
+- **ミッションタイムライン** — Mission Controlにスイムレーンタイムラインタブでフェーズ期間を表示
 - **10のオーケストレーションパターン** — ソロ、シーケンシャル、パラレル、階層、ネットワーク、ループ、ルーター、アグリゲーター、ウェーブ、ヒューマン・イン・ザ・ループ
 - **SAFe準拠のライフサイクル** — Portfolio → Epic → Feature → Story（PIケイデンス付き）
 - **自動修復** — 自律的なインシデント検出、トリアージ、セルフリペア
@@ -86,6 +101,26 @@ Software Factory は**自律型マルチエージェントプラットフォー�
 <td width="50%">
 <strong>Onboarding — SAFe Role Selection Wizard</strong><br>
 <img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ホーム — CTO Jarvis / ビジネスアイデア / プロジェクトアイデア タブ</strong><br>
+<img src="docs/screenshots/en/home.png" alt="ホーム" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 戦略的AIアドバイザー</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ビジネスアイデア — 6エージェント・マーケティングチーム</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="ビジネスアイデア" width="100%">
+</td>
+<td width="50%">
+<strong>プロジェクトアイデア — マルチエージェント技術チーム</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="プロジェクトアイデア" width="100%">
 </td>
 </tr>
 </table>
@@ -160,17 +195,13 @@ Then restart: `make run` (Docker) or `make dev` (local)
 
 インストール後、アイデアから実働プロジェクトへの手順：
 
-### パス A: アイデアから始める（アイデアワークショップ）
+### パス A: CTO Jarvis に聞く（最速）
 
-1. **Open the Ideation page** — go to `/ideation` (or click "Ideation" in the sidebar)
-2. **Describe your idea** — e.g. *"Enterprise carpooling app with real-time matching"*
-3. **Watch agents discuss** — 5 specialized agents (Product Manager, Business Analyst, Architect, UX Designer, Security) analyze your idea in real-time via SSE streaming
-4. **Create a project from the result** — click **"Create an Epic from this idea"**. The platform will:
-   - Create a new **project** with generated `VISION.md` and CI/CD scaffolding
-   - Create an **epic** with features and user stories broken down by the PO agent
-   - Auto-provision **TMA** (maintenance), **Security**, and **Tech Debt** missions
+1. **ホームページを開く** (`/`) — プラットフォームは CTO Jarvis タブから起動します
+2. **プロジェクトのアイデアを入力** — 例: *"React と Python を使ったエンタープライズ向けカープール アプリの新しいプロジェクトを作成して"*
+3. **Jarvis (Gabriel Mercier、戦略的オーケストレーター)** がリクエストを分析し、プロジェクトを作成し、SAFe バックログをプロビジョニングして最初のミッションを開始します — すべて一つの会話で完結
 
-You now have a full SAFe backlog ready to execute.
+これは新しいプロジェクトの**推奨エントリーポイント**です。
 
 ### パス B: プロジェクトを手動で作成
 
@@ -210,7 +241,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## 機能
 
-### 161の専門AIエージェント
+### 191の専門AIエージェント
 
 エージェントは実際のソフトウェア組織を反映したチームに編成されています：
 
@@ -409,7 +440,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 191 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -474,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -580,34 +611,9 @@ Mission Created
 ### デプロイ
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (推奨) → http://localhost:8090
+ローカル (開発) → http://localhost:8090
+本番環境        → 独自のインフラ
 ```
 
 ## プロジェクト設定
@@ -901,6 +907,87 @@ Every project automatically gets 4 operational missions:
 - **ルーティングマトリックス** — カテゴリ別（推論・本番/コード・タスク・文書作成）の重い/軽いモデル設定
 - **Darwin LLM A/B セクション** — 進行中のモデル実験のライブビュー
 
+## v2.7.0 の新機能 (2026年)
+
+### ナレッジ管理システム
+- **4つの新しいエージェント** — `knowledge-manager`、`knowledge-curator`、`knowledge-seeder`、`wiki-maintainer`
+- **ARTナレッジチーム** — ナレッジ運用専用のAgile Release Train
+- **夜間`knowledge-maintenance`ワークフロー** — 自動キュレーション、重複排除、鮮度スコアリング
+- **メモリヘルスダッシュボード** — メトリクスタブのナレッジ健全性メトリクスパネル
+- **ナレッジヘルスバッジ** — 設定ページに表示
+
+### メモリインテリジェンス
+- **関連性スコアリング** — `信頼度 × 最新性 × アクセスブースト`の式によるランク付き取得
+- **アクセス追跡** — 各メモリエントリの`access_count`と`last_read_at`フィールド
+- **自動削除** — 夜間実行ごとに閾値以下の古いエントリを削除
+
+### LLMコスト追跡
+- **ミッションごとのコスト** — ミッションタイムラインタブヘッダーに表示
+- **自動集計** — `llm_traces`テーブルから集計
+
+### ミッションタイムライン
+- **スイムレーンタイムラインタブ** — Mission Controlでエージェントフェーズを横方向スイムレーンとして表示
+- **フェーズ期間** — 各フェーズの所要時間の視覚的表示
+
+### 品質スコアリング
+- **PhaseRunの`quality_score`フィールド** — 各フェーズ後にアドバーサリアルガードが設定
+
+### プロジェクトのエクスポート/インポート
+- **ZIPアーカイブ** — `project.json` + 全ミッション + 実行 + メモリを含む
+
+### 入力バリデーション
+- **Pydanticモデル** — 全POSTおよびPATCHルートの厳密なスキーマバリデーション
+
+### BSSCドメインガイドライン
+- **ドメインアーキテクチャガイドライン** — プロジェクトドメインごとにConfluence/Solarisガイドラインを適用
+
+### 設定インテグレーションハブ
+- **設定可能なツールインテグレーション** — Jira、Confluence、SonarQubeが全エージェントで利用可能
+
+### ブラウザプッシュ通知
+- **Web Push API (VAPID)** — ミッションイベントのネイティブブラウザプッシュ通知
+
+## v3.0.0 の新機能 (2026年)
+
+### エージェント・マーケットプレイス
+- **191エージェントをカタログ化** — `/marketplace` でフルテキスト検索、ART/ロール/スキルでフィルタリング
+- **エージェントプロファイル** — ツール、スキル、最近のセッション履歴の詳細ビュー
+- **ワンクリック起動** — プロファイルページから任意のエージェントとの直接セッションを開始
+
+### ミッション・リプレイUI
+- **ステップバイステップのリプレイ** — `/missions/{id}/replay` で各エージェントターンとツール呼び出しを再現
+- **ステップごとのコストとトークン** — エージェントごとの詳細なLLM支出内訳
+- **エクスポート可能な履歴** — デバッグと監査のためにリプレイをJSONとしてダウンロード
+
+### LLMメトリクス・ダッシュボード
+- **コスト/レイテンシ/プロバイダーのリアルタイム監視** — `/metrics`
+- **エージェントとミッションごとの支出** — コストの高いエージェントを特定して最適化
+- **プロバイダー比較** — プロバイダー間でP50/P95レイテンシとコストを並べて比較
+
+### RBAC + レート制限
+- **ワークスペース単位のRBAC** — プラットフォーム全体ではなく、ワークスペースごとのロール割り当て
+- **ユーザーごとのレート制限** — ロールごとに設定可能なトークン/リクエストのクォータ
+- **監査トレイル** — すべてのRBAC変更をアクター、タイムスタンプ、変更詳細とともに記録
+
+### エージェント評価フレームワーク
+- **LLM-as-judge採点** — `/evals` でゴールデンデータセットに対する自動評価
+- **エージェントごとのベンチマーク** — 時系列での品質追跡と回帰検出
+- **設定可能なジャッジ** — 任意の設定済みLLMプロバイダーを評価ジャッジとして使用
+
+### ツール・ビルダー
+- **ノーコードのツール作成** — `/tool-builder` でHTTP、SQL、シェルツール
+- **即時アクティベーション** — 保存後すぐにエージェントがツールを利用可能
+- **パラメータテンプレート** — 型とバリデーションを含む入力スキーマを定義
+
+### マルチテナント・ワークスペース
+- **分離された名前空間** — `/workspaces` でワークスペースごとに分離されたデータ、エージェント、メモリ
+- **クライアントごとのデプロイ** — 相互汚染なしに複数クライアントをオンボード
+- **ワークスペースごとのRBAC** — 名前空間ごとの詳細なロール割り当て
+
+### YAMLエージェントのホットリロード
+- **ライブエージェント更新** — エージェントYAMLファイルを編集し、プラットフォームを再起動せずにリロード
+- **ダウンタイムなし** — 進行中のミッションは以前のエージェント定義で継続
+
 ## 貢献
 
 貢献を歓迎します！ガイドラインについては [CONTRIBUTING.md](CONTRIBUTING.md) をお読みください。
@@ -911,6 +998,6 @@ Every project automatically gets 4 operational missions:
 
 ## サポート
 
-- Live Demo: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Discussions: https://github.com/macaron-software/software-factory/discussions

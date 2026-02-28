@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<a href="/agents" class="btn btn-ghost btn-sm">
+    <svg class="icon icon-sm"><use href="#icon-arrow-left"/></svg> Back
+</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:860px;margin:0 auto;padding:1rem;display:flex;flex-direction:column;height:calc(100vh - 80px)">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;flex-shrink:0">
+        <div class="agent-dot" style="background:{{ agent.color or 'var(--purple)' }};width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center">
+            <svg class="icon icon-sm" style="color:#fff"><use href="#icon-{{ agent.icon or 'bot' }}"/></svg>
+        </div>
+        <div>
+            <div style="font-weight:600;font-size:1rem">{{ agent.name }}</div>
+            <div style="font-size:0.75rem;color:var(--text-secondary)">{{ agent.role }} · {{ agent.provider }}:{{ agent.model }}</div>
+        </div>
+        {% if projects %}
+        <div style="margin-left:auto">
+            <select id="project-select" style="font-size:0.78rem;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:0.3rem 0.5rem;border-radius:6px">
+                <option value="">No project context</option>
+                {% for p in projects %}
+                <option value="{{ p.id }}" {% if p.id == project_id %}selected{% endif %}>{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Chat area -->
+    <div id="chat-area" style="flex:1;overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.75rem;display:flex;flex-direction:column;gap:0.5rem;background:var(--bg-secondary)">
+        <div style="text-align:center;font-size:0.75rem;color:var(--text-secondary);padding:0.5rem">
+            Start a conversation with {{ agent.name }}
+        </div>
+    </div>
+
+    <!-- Input area -->
+    <div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-shrink:0">
+        <textarea id="chat-input" rows="2" placeholder="Type your message..." style="flex:1;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.5rem 0.75rem;color:var(--text-primary);font-size:0.88rem;resize:none;font-family:inherit" onkeydown="handleKey(event)"></textarea>
+        <div style="display:flex;flex-direction:column;gap:0.4rem">
+            <button class="btn btn-primary btn-sm" onclick="sendMessage()" id="send-btn">Send</button>
+            <button class="btn btn-ghost btn-sm" id="save-btn" style="display:none;font-size:0.72rem" onclick="saveToMemory()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const AGENT_ID = "{{ agent.id }}";
+let conversation = [];
+let lastQ = "";
+let lastA = "";
+
+function handleKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function appendMsg(role, content, streaming) {
+    const area = document.getElementById("chat-area");
+    const div = document.createElement("div");
+    div.style.cssText = `max-width:80%;padding:0.5rem 0.75rem;border-radius:8px;font-size:0.88rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;`;
+    if (role === "user") {
+        div.style.alignSelf = "flex-end";
+        div.style.background = "var(--purple)";
+        div.style.color = "#fff";
+    } else {
+        div.style.alignSelf = "flex-start";
+        div.style.background = "var(--bg-tertiary)";
+        div.style.color = "var(--text-primary)";
+        div.style.border = "1px solid var(--border)";
+    }
+    div.textContent = content;
+    if (streaming) div.id = "streaming-bubble";
+    area.appendChild(div);
+    area.scrollTop = area.scrollHeight;
+    return div;
+}
+
+async function sendMessage() {
+    const input = document.getElementById("chat-input");
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = "";
+    document.getElementById("send-btn").disabled = true;
+    document.getElementById("save-btn").style.display = "none";
+    lastQ = msg;
+
+    appendMsg("user", msg, false);
+    const bubble = appendMsg("agent", "", true);
+    bubble.textContent = "";
+
+    const projectId = document.getElementById("project-select") ? document.getElementById("project-select").value : "";
+
+    try {
+        const res = await fetch(`/api/agents/${AGENT_ID}/chat`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({message: msg, project_id: projectId, conversation})
+        });
+
+        const reader = res.body.getReader();
+        const dec = new TextDecoder();
+        let buf = "";
+        let full = "";
+
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += dec.decode(value, {stream: true});
+            const lines = buf.split("\n");
+            buf = lines.pop();
+            for (const line of lines) {
+                if (!line.startsWith("data: ")) continue;
+                try {
+                    const evt = JSON.parse(line.slice(6));
+                    if (evt.token) { full += evt.token; bubble.textContent = full; document.getElementById("chat-area").scrollTop = 99999; }
+                    if (evt.done) { lastA = evt.full || full; }
+                    if (evt.error) { bubble.textContent = "Error: " + evt.error; bubble.style.color = "var(--red)"; }
+                } catch(e) {}
+            }
+        }
+
+        conversation.push({role: "user", content: msg});
+        conversation.push({role: "assistant", content: full});
+        if (conversation.length > 20) conversation = conversation.slice(-20);
+
+        document.getElementById("save-btn").style.display = "";
+    } catch(e) {
+        bubble.textContent = "Request failed: " + e;
+        bubble.style.color = "var(--red)";
+    } finally {
+        bubble.removeAttribute("id");
+        document.getElementById("send-btn").disabled = false;
+        document.getElementById("chat-input").focus();
+    }
+}
+
+async function saveToMemory() {
+    const projectId = document.getElementById("project-select") ? document.getElementById("project-select").value : "";
+    if (!projectId) { alert("Select a project to save to memory."); return; }
+    if (!lastQ || !lastA) return;
+    try {
+        await fetch("/api/memory/project", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                project_id: projectId,
+                category: "chat",
+                key: lastQ.slice(0, 80),
+                value: lastA.slice(0, 2000),
+                source: "agent_chat"
+            })
+        });
+        document.getElementById("save-btn").textContent = "Saved";
+        document.getElementById("save-btn").disabled = true;
+        setTimeout(() => {
+            document.getElementById("save-btn").textContent = "Save";
+            document.getElementById("save-btn").disabled = false;
+        }, 2000);
+    } catch(e) { alert("Save failed: " + e); }
+}
+</script>
+{% endblock %}

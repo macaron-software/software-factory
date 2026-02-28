@@ -35,12 +35,13 @@ from typing import Any, Dict, List, Optional
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mcp_lrm.exclusions import should_exclude_path, filter_paths, get_included_extensions
+from mcp_lrm.exclusions import should_exclude_path, get_included_extensions
 
 
 # ============================================================================
 # MCP PROTOCOL HELPERS
 # ============================================================================
+
 
 async def read_message() -> Optional[Dict]:
     """Read a JSON-RPC message from stdin"""
@@ -74,6 +75,7 @@ def make_error(id: Any, code: int, message: str) -> Dict:
 # MCP LRM SERVER
 # ============================================================================
 
+
 class MCPLRMServer:
     """
     MCP server for LRM project context access.
@@ -91,6 +93,7 @@ class MCPLRMServer:
         """Load project configuration"""
         try:
             from core.project_registry import get_project
+
             self.project_config = get_project(self.project_name)
             self.project_root = self.project_config.root_path
         except Exception as e:
@@ -100,6 +103,7 @@ class MCPLRMServer:
 
         try:
             from core.task_store import TaskStore
+
             self.task_store = TaskStore()
         except Exception as e:
             print(f"Warning: Could not initialize task store: {e}", file=sys.stderr)
@@ -261,6 +265,65 @@ class MCPLRMServer:
                 },
             },
             {
+                "name": "component_gallery_list",
+                "description": "List all 60 UI components from the Component Gallery knowledge base with descriptions. Cross-references 50+ Design Systems (Material, Carbon, Atlassian, Ant, etc.)",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "component_gallery_get",
+                "description": "Get full documentation for a UI component: description, all aliases/names used across design systems, N implementations with DS name + URL + tech stack. Also includes static markup/ARIA/CSS doc when available.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "component": {
+                            "type": "string",
+                            "description": "Component slug (e.g. 'accordion', 'button', 'tabs', 'modal', 'toast', 'tooltip', 'skeleton')",
+                        },
+                        "tech": {
+                            "type": "string",
+                            "description": "Filter implementations by tech stack: React, Vue, Angular, CSS, Web Components, etc.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max implementations to return (default 20, max 200)",
+                            "default": 20,
+                        },
+                    },
+                    "required": ["component"],
+                },
+            },
+            {
+                "name": "component_gallery_search",
+                "description": "Full-text search across all 60 UI components and their aliases. Use to find which components relate to a concept (e.g. 'loading', 'navigation', 'form')",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search terms (component name, concept, or alias)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "component_gallery_ds",
+                "description": "Show how a specific Design System names/implements its components. Useful to understand a DS vocabulary.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "ds_name": {
+                            "type": "string",
+                            "description": "Design system name (partial match ok), e.g. 'Material', 'Carbon', 'Atlassian', 'Ant Design', 'Spectrum'",
+                        },
+                    },
+                    "required": ["ds_name"],
+                },
+            },
+            {
                 "name": "context",
                 "description": "Get project context from RAG (vision, architecture, requirements, conventions)",
                 "inputSchema": {
@@ -293,6 +356,10 @@ class MCPLRMServer:
             "subtask_create": self._tool_subtask_create,
             "build": self._tool_build,
             "context": self._tool_context,
+            "component_gallery_list": self._tool_component_gallery_list,
+            "component_gallery_get": self._tool_component_gallery_get,
+            "component_gallery_search": self._tool_component_gallery_search,
+            "component_gallery_ds": self._tool_component_gallery_ds,
         }
 
         handler = handlers.get(name)
@@ -359,7 +426,9 @@ class MCPLRMServer:
                             try:
                                 content = path.read_text(errors="ignore")
                                 if query.lower() in content.lower():
-                                    results.append(str(path.relative_to(self.project_root)))
+                                    results.append(
+                                        str(path.relative_to(self.project_root))
+                                    )
                                     if len(results) >= limit:
                                         break
                             except Exception:
@@ -387,17 +456,35 @@ class MCPLRMServer:
                 lines = content.split("\n")
 
                 # Extract key information
-                imports = [l for l in lines[:50] if l.strip().startswith(("import ", "use ", "from "))]
-                functions = [l for l in lines if l.strip().startswith(("fn ", "def ", "function ", "async ", "pub fn"))]
-                classes = [l for l in lines if l.strip().startswith(("class ", "struct ", "enum ", "interface "))]
+                imports = [
+                    l
+                    for l in lines[:50]
+                    if l.strip().startswith(("import ", "use ", "from "))
+                ]
+                functions = [
+                    l
+                    for l in lines
+                    if l.strip().startswith(
+                        ("fn ", "def ", "function ", "async ", "pub fn")
+                    )
+                ]
+                classes = [
+                    l
+                    for l in lines
+                    if l.strip().startswith(
+                        ("class ", "struct ", "enum ", "interface ")
+                    )
+                ]
 
-                summaries.append({
-                    "file": file_path,
-                    "lines": len(lines),
-                    "imports": imports[:10],
-                    "functions": [f.strip()[:80] for f in functions[:10]],
-                    "classes": [c.strip()[:80] for c in classes[:10]],
-                })
+                summaries.append(
+                    {
+                        "file": file_path,
+                        "lines": len(lines),
+                        "imports": imports[:10],
+                        "functions": [f.strip()[:80] for f in functions[:10]],
+                        "classes": [c.strip()[:80] for c in classes[:10]],
+                    }
+                )
             except Exception as e:
                 summaries.append({"file": file_path, "error": str(e)})
 
@@ -443,7 +530,9 @@ class MCPLRMServer:
 
             # Add framework-specific conventions (e.g., axum 0.7 rules)
             if "conventions" in domain_config:
-                domain_conventions["framework_conventions"] = domain_config["conventions"]
+                domain_conventions["framework_conventions"] = domain_config[
+                    "conventions"
+                ]
 
         return {"domain": domain, "conventions": domain_conventions}
 
@@ -480,10 +569,12 @@ class MCPLRMServer:
                 content = path.read_text()
                 # Get first 100 lines as example
                 lines = content.split("\n")[:100]
-                examples.append({
-                    "file": str(path.relative_to(self.project_root)),
-                    "content": "\n".join(lines),
-                })
+                examples.append(
+                    {
+                        "file": str(path.relative_to(self.project_root)),
+                        "content": "\n".join(lines),
+                    }
+                )
                 if len(examples) >= 3:
                     break
             except Exception:
@@ -577,6 +668,7 @@ class MCPLRMServer:
         # Use global build queue to prevent CPU saturation (1 build at a time)
         try:
             from core.build_queue import GlobalBuildQueue
+
             queue = GlobalBuildQueue.instance()
 
             # Enqueue and wait for completion
@@ -590,6 +682,7 @@ class MCPLRMServer:
 
             # Wait for job completion (async)
             import asyncio
+
             job = await queue.wait_for(job_id)
 
             return {
@@ -600,7 +693,7 @@ class MCPLRMServer:
                 "queued": True,
                 "job_id": job_id,
             }
-        except (ImportError, Exception) as e:
+        except (ImportError, Exception):
             # Fallback if build_queue not available - direct execution
             try:
                 proc = subprocess.run(
@@ -637,6 +730,7 @@ class MCPLRMServer:
 
         try:
             from core.project_context import ProjectContext
+
             ctx = ProjectContext(self.project_name)
 
             # Refresh if stale
@@ -649,8 +743,16 @@ class MCPLRMServer:
                 return {
                     "project": self.project_name,
                     "context": summary,
-                    "categories": ["vision", "architecture", "data_model", "api_surface",
-                                   "conventions", "state", "history", "domain"],
+                    "categories": [
+                        "vision",
+                        "architecture",
+                        "data_model",
+                        "api_surface",
+                        "conventions",
+                        "state",
+                        "history",
+                        "domain",
+                    ],
                 }
             else:
                 # Return specific category
@@ -659,8 +761,12 @@ class MCPLRMServer:
                     return {
                         "project": self.project_name,
                         "category": category,
-                        "content": cat_data.content[:max_chars] if hasattr(cat_data, 'content') else str(cat_data)[:max_chars],
-                        "keywords": cat_data.keywords if hasattr(cat_data, 'keywords') else [],
+                        "content": cat_data.content[:max_chars]
+                        if hasattr(cat_data, "content")
+                        else str(cat_data)[:max_chars],
+                        "keywords": cat_data.keywords
+                        if hasattr(cat_data, "keywords")
+                        else [],
                     }
                 else:
                     return {"error": f"Category '{category}' not found"}
@@ -669,9 +775,200 @@ class MCPLRMServer:
         except Exception as e:
             return {"error": str(e)}
 
+    # -------------------------------------------------------------------------
+    # Component Gallery tools (SQLite DB — 60 components, 2600+ implementations)
+    # -------------------------------------------------------------------------
+    _CG_DB_PATH = Path(__file__).parent.parent / "data" / "component_gallery.db"
+    _CG_MD_DIR = (
+        Path(__file__).parent.parent
+        / "skills" / "knowledge" / "component-gallery"
+        / "src" / "content" / "componentContent"
+    )
+
+    def _cg_db(self):
+        """Open component gallery SQLite connection."""
+        import sqlite3
+        if not self._CG_DB_PATH.exists():
+            return None
+        conn = sqlite3.connect(str(self._CG_DB_PATH))
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    async def _tool_component_gallery_list(self, args: Dict) -> Dict:
+        """List all 60 components from DB."""
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+        rows = conn.execute(
+            "SELECT slug, name, description, aliases, "
+            "(SELECT COUNT(*) FROM implementations WHERE component_slug=slug) as impl_count "
+            "FROM components ORDER BY slug"
+        ).fetchall()
+        conn.close()
+        return {
+            "count": len(rows),
+            "source": "https://component.gallery",
+            "components": [
+                {
+                    "slug": r["slug"],
+                    "name": r["name"],
+                    "description": r["description"][:120] + "..." if len(r["description"] or "") > 120 else r["description"],
+                    "aliases": r["aliases"],
+                    "implementations": r["impl_count"],
+                }
+                for r in rows
+            ],
+        }
+
+    async def _tool_component_gallery_get(self, args: Dict) -> Dict:
+        """Get full component data from DB + optional static MD doc."""
+        slug = args.get("component", "").lower().strip()
+        tech_filter = args.get("tech", "").strip()
+        limit = min(int(args.get("limit", 20)), 200)
+
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+
+        # Fuzzy slug match
+        row = conn.execute("SELECT * FROM components WHERE slug = ?", (slug,)).fetchone()
+        if not row:
+            row = conn.execute(
+                "SELECT * FROM components WHERE slug LIKE ? OR name LIKE ? LIMIT 1",
+                (f"%{slug}%", f"%{slug}%")
+            ).fetchone()
+        if not row:
+            available = [r[0] for r in conn.execute("SELECT slug FROM components ORDER BY slug")]
+            conn.close()
+            return {"error": f"Component '{slug}' not found", "available": available}
+
+        real_slug = row["slug"]
+
+        # Get implementations
+        query = "SELECT component_name, ds_name, url, tech, features FROM implementations WHERE component_slug = ?"
+        params: list = [real_slug]
+        if tech_filter:
+            query += " AND tech LIKE ?"
+            params.append(f"%{tech_filter}%")
+        query += f" ORDER BY ds_name LIMIT {limit}"
+        impls = conn.execute(query, params).fetchall()
+        total_impls = conn.execute(
+            "SELECT COUNT(*) FROM implementations WHERE component_slug = ?", (real_slug,)
+        ).fetchone()[0]
+        conn.close()
+
+        result: Dict = {
+            "slug": real_slug,
+            "name": row["name"],
+            "description": row["description"],
+            "aliases": row["aliases"],
+            "source": f"https://component.gallery/components/{real_slug}/",
+            "total_implementations": total_impls,
+            "implementations_returned": len(impls),
+            "implementations": [
+                {
+                    "name_in_ds": i["component_name"],
+                    "design_system": i["ds_name"],
+                    "url": i["url"],
+                    "tech": i["tech"],
+                    "features": i["features"],
+                }
+                for i in impls
+            ],
+        }
+
+        # Append static MD doc if available
+        md_file = self._CG_MD_DIR / f"{real_slug}.md"
+        if md_file.exists():
+            content = md_file.read_text(encoding="utf-8")
+            if content.startswith("---"):
+                end = content.find("---", 3)
+                if end != -1:
+                    content = content[end + 3:].strip()
+            result["docs"] = content
+
+        return result
+
+    async def _tool_component_gallery_search(self, args: Dict) -> Dict:
+        """Full-text search across components."""
+        query = args.get("query", "").strip()
+        if not query:
+            return {"error": "query is required"}
+
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+
+        try:
+            rows = conn.execute(
+                "SELECT slug, name, description, aliases FROM components_fts WHERE components_fts MATCH ? LIMIT 10",
+                (query,)
+            ).fetchall()
+        except Exception:
+            # Fallback to LIKE search
+            rows = conn.execute(
+                "SELECT slug, name, description, aliases FROM components "
+                "WHERE slug LIKE ? OR name LIKE ? OR aliases LIKE ? OR description LIKE ? LIMIT 10",
+                (f"%{query}%",) * 4
+            ).fetchall()
+        conn.close()
+
+        return {
+            "query": query,
+            "count": len(rows),
+            "results": [
+                {"slug": r["slug"], "name": r["name"], "aliases": r["aliases"],
+                 "description": (r["description"] or "")[:150]}
+                for r in rows
+            ],
+        }
+
+    async def _tool_component_gallery_ds(self, args: Dict) -> Dict:
+        """Get all components from a specific Design System."""
+        ds_name = args.get("ds_name", "").strip()
+        if not ds_name:
+            return {"error": "ds_name is required"}
+
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+
+        rows = conn.execute(
+            "SELECT component_slug, component_name, url, tech, features "
+            "FROM implementations WHERE ds_name LIKE ? ORDER BY component_slug",
+            (f"%{ds_name}%",)
+        ).fetchall()
+
+        if not rows:
+            # List available DS names
+            ds_list = [r[0] for r in conn.execute(
+                "SELECT DISTINCT ds_name FROM implementations ORDER BY ds_name"
+            ).fetchall()]
+            conn.close()
+            return {"error": f"Design system '{ds_name}' not found", "available_design_systems": ds_list}
+
+        # Get actual DS name from first result
+        actual_ds = conn.execute(
+            "SELECT DISTINCT ds_name FROM implementations WHERE ds_name LIKE ? LIMIT 1",
+            (f"%{ds_name}%",)
+        ).fetchone()[0]
+        conn.close()
+
+        return {
+            "design_system": actual_ds,
+            "component_count": len(rows),
+            "components": [
+                {"component": r["component_slug"], "called": r["component_name"],
+                 "url": r["url"], "tech": r["tech"]}
+                for r in rows
+            ],
+        }
+
     async def run(self):
         """Run MCP server (stdio)"""
-        print(f"MCP LRM Server starting (project: {self.project_name})", file=sys.stderr)
+        print(
+            f"MCP LRM Server starting (project: {self.project_name})", file=sys.stderr
+        )
 
         while True:
             msg = await read_message()
@@ -683,11 +980,16 @@ class MCPLRMServer:
             params = msg.get("params", {})
 
             if method == "initialize":
-                write_message(make_response(msg_id, {
-                    "protocolVersion": "2024-11-05",
-                    "serverInfo": {"name": "mcp-lrm", "version": "1.0.0"},
-                    "capabilities": {"tools": {}},
-                }))
+                write_message(
+                    make_response(
+                        msg_id,
+                        {
+                            "protocolVersion": "2024-11-05",
+                            "serverInfo": {"name": "mcp-lrm", "version": "1.0.0"},
+                            "capabilities": {"tools": {}},
+                        },
+                    )
+                )
 
             elif method == "tools/list":
                 write_message(make_response(msg_id, {"tools": self.get_tools()}))
@@ -696,19 +998,27 @@ class MCPLRMServer:
                 name = params.get("name")
                 arguments = params.get("arguments", {})
                 result = await self.handle_tool_call(name, arguments)
-                write_message(make_response(msg_id, {"content": [{"type": "text", "text": json.dumps(result)}]}))
+                write_message(
+                    make_response(
+                        msg_id,
+                        {"content": [{"type": "text", "text": json.dumps(result)}]},
+                    )
+                )
 
             elif method == "notifications/initialized":
                 pass  # No response needed
 
             else:
                 if msg_id:
-                    write_message(make_error(msg_id, -32601, f"Method not found: {method}"))
+                    write_message(
+                        make_error(msg_id, -32601, f"Method not found: {method}")
+                    )
 
 
 # ============================================================================
 # MAIN
 # ============================================================================
+
 
 def main():
     """Main entry point"""

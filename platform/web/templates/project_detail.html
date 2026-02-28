@@ -8,6 +8,12 @@
           hx-get="/api/dashboard/quality-badge?project_id={{ project.id }}"
           hx-trigger="load"
           hx-swap="innerHTML"></span>
+    <a href="/projects/{{ project.id }}/hub" class="btn btn-sm btn-ghost" title="Project Hub">
+        <svg class="icon icon-sm"><use href="#icon-home"/></svg> Hub
+    </a>
+    <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost" title="Workspace">
+        <svg class="icon icon-sm"><use href="#icon-terminal"/></svg> Workspace
+    </a>
     <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost" title="Kanban Board">
         <svg class="icon icon-sm"><use href="#icon-columns"/></svg> Board
     </a>
@@ -58,7 +64,7 @@
                href="{% if is_workflow %}/sessions/{{ s.id }}/live{% else %}/projects/{{ project.id }}?session={{ s.id }}{% endif %}">
                 {% if is_workflow %}<svg class="icon icon-xs" style="flex-shrink:0"><use href="#icon-workflow"/></svg>{% endif %}
                 <span class="chat-conv-name">{{ s.name }}</span>
-                <span class="chat-conv-date">{{ s.created_at[:16].replace('T', ' ') if s.created_at else '' }}</span>
+                <span class="chat-conv-date">{{ s.created_at | ts }}</span>
             </a>
             {% endfor %}
             {% if not sessions %}
@@ -199,6 +205,12 @@
                 {% for d in project.domains %}
                 <span class="item-tag">{{ d }}</span>
                 {% endfor %}
+                {% if project.arch_domain %}
+                <span class="item-tag" style="background:rgba(0,101,255,.12);color:#0065ff;border-color:rgba(0,101,255,.3);font-weight:600">
+                    <svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-book-open"/></svg>
+                    DSI: {{ project.arch_domain | upper }}
+                </span>
+                {% endif %}
             </div>
         </div>
 

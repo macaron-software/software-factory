@@ -99,25 +99,47 @@ def _verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
+def _ts(v) -> str | None:
+    """Normalize a timestamp value to ISO string (handles datetime objects from PG)."""
+    if v is None:
+        return None
+    if isinstance(v, str):
+        return v
+    # datetime / date objects (PostgreSQL psycopg2)
+    return v.isoformat()
+
+
 def _row_to_user(row) -> User:
     """Convert DB row to User object."""
     if isinstance(row, tuple):
         return User(
-            id=row[0], email=row[1], display_name=row[3],
-            role=row[4], avatar=row[5] or "", is_active=bool(row[6]),
-            auth_provider=row[7] or "local", last_login=row[9], created_at=row[10],
+            id=row[0],
+            email=row[1],
+            display_name=row[3],
+            role=row[4],
+            avatar=row[5] or "",
+            is_active=bool(row[6]),
+            auth_provider=row[7] or "local",
+            last_login=_ts(row[9]),
+            created_at=_ts(row[10]),
         )
     return User(
-        id=row["id"], email=row["email"], display_name=row["display_name"],
-        role=row["role"], avatar=row["avatar"] or "", is_active=bool(row["is_active"]),
+        id=row["id"],
+        email=row["email"],
+        display_name=row["display_name"],
+        role=row["role"],
+        avatar=row["avatar"] or "",
+        is_active=bool(row["is_active"]),
         auth_provider=row["auth_provider"] or "local",
-        last_login=row["last_login"], created_at=row["created_at"],
+        last_login=_ts(row["last_login"]),
+        created_at=_ts(row["created_at"]),
     )
 
 
 # ---------------------------------------------------------------------------
 # User management
 # ---------------------------------------------------------------------------
+
 
 def user_count() -> int:
     """Return total number of users (for setup wizard check)."""
@@ -159,8 +181,11 @@ def register(
     db.commit()
 
     return User(
-        id=user_id, email=email, display_name=display_name.strip(),
-        role=role, created_at=now,
+        id=user_id,
+        email=email,
+        display_name=display_name.strip(),
+        role=role,
+        created_at=now,
     )
 
 
@@ -192,16 +217,34 @@ def oauth_login_or_create(
         now = datetime.now(timezone.utc).isoformat()
         # First user = admin, rest = developer
         count = db.execute("SELECT COUNT(*) FROM users").fetchone()
-        role = "admin" if (count[0] if isinstance(count, tuple) else count["COUNT(*)"]) == 0 else "developer"
+        role = (
+            "admin"
+            if (count[0] if isinstance(count, tuple) else count["COUNT(*)"]) == 0
+            else "developer"
+        )
         db.execute(
             "INSERT INTO users (id, email, password_hash, display_name, role, avatar, auth_provider, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (user_id, email, "", display_name.strip(), role, avatar, auth_provider, now),
+            (
+                user_id,
+                email,
+                "",
+                display_name.strip(),
+                role,
+                avatar,
+                auth_provider,
+                now,
+            ),
         )
         db.commit()
         user = User(
-            id=user_id, email=email, display_name=display_name.strip(),
-            role=role, avatar=avatar, auth_provider=auth_provider, created_at=now,
+            id=user_id,
+            email=email,
+            display_name=display_name.strip(),
+            role=role,
+            avatar=avatar,
+            auth_provider=auth_provider,
+            created_at=now,
         )
 
     # Generate tokens
@@ -214,8 +257,10 @@ def oauth_login_or_create(
         "access_token": access,
         "refresh_token": refresh,
         "user": {
-            "id": user.id, "email": user.email,
-            "display_name": user.display_name, "role": user.role,
+            "id": user.id,
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": user.role,
             "avatar": user.avatar,
         },
     }
@@ -273,6 +318,7 @@ def delete_user(user_id: str) -> bool:
 # Project roles
 # ---------------------------------------------------------------------------
 
+
 def set_project_role(user_id: str, project_id: str, role: str, granted_by: str = ""):
     """Set user role for a specific project."""
     db = get_db()
@@ -306,8 +352,10 @@ def get_user_projects(user_id: str) -> list[dict]:
         (user_id,),
     ).fetchall()
     return [
-        {"project_id": r[0] if isinstance(r, tuple) else r["project_id"],
-         "role": r[1] if isinstance(r, tuple) else r["role"]}
+        {
+            "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
+            "role": r[1] if isinstance(r, tuple) else r["role"],
+        }
         for r in rows
     ]
 
@@ -325,6 +373,7 @@ def remove_project_role(user_id: str, project_id: str):
 # ---------------------------------------------------------------------------
 # JWT Token management
 # ---------------------------------------------------------------------------
+
 
 def _create_access_token(user: User) -> str:
     """Create JWT access token (short-lived)."""

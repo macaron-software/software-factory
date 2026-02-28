@@ -1,0 +1,26 @@
+# Veligo — Bike Sharing Platform (La Poste)
+# ==========================================
+# Projet domaine la-poste — service mobilité douce
+
+project:
+  id: veligo
+  name: veligo
+  display_name: "Veligo Platform"
+  root_path: ""
+  domain: la-poste
+  description: >
+    Plateforme de gestion des vélos en libre-service La Poste (Veligo).
+    Application mobile + backend API + gestion flotte temps réel.
+
+domains:
+  rust:
+    paths: [src/]
+    extensions: [.rs]
+  svelte:
+    paths: [web/]
+    extensions: [.svelte, .ts]
+
+stack:
+  backend: "Rust + Axum"
+  frontend: "Svelte + TypeScript"
+  mobile: "Flutter"

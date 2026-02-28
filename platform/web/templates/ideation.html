@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends base_template|default("base.html") %}
 
 {% block topbar_actions %}
 {% endblock %}
@@ -31,7 +31,7 @@
                     <div class="idea-sidebar-item-title">{{ s.title or 'Sans titre' }}</div>
                     <div class="idea-sidebar-item-meta">
                         <span class="idea-sidebar-badge {{ s.status }}">{{ s.status }}</span>
-                        <span>{{ s.created_at[:10] if s.created_at else '' }}</span>
+                        <span>{{ s.created_at | ts('date') }}</span>
                     </div>
                 </div>
                 {% endfor %}
@@ -184,18 +184,18 @@
 
 <script>
 /* ── Ideation Graph Data ── */
-const igAgents = {{ agents | tojson }};
-const IG_NW = 130, IG_NH = 56;
+var igAgents = {{ agents | tojson }};
+var IG_NW = 130, IG_NH = 56;
 
 // Graph layout: Product Manager at top (orchestrator), 4 experts below in a network
-const igNodes = [
+var igNodes = [
     {id: 'product_manager', x: 130, y: 10, rank: 0},
     {id: 'metier',          x: 10,  y: 110, rank: 1},
     {id: 'architecte',      x: 90,  y: 200, rank: 1},
     {id: 'ux_designer',     x: 180, y: 110, rank: 1},
     {id: 'securite',        x: 260, y: 200, rank: 1},
 ];
-const igEdges = [
+var igEdges = [
     {from: 'product_manager', to: 'metier',      pattern: 'hierarchical', label: 'brief'},
     {from: 'product_manager', to: 'architecte',   pattern: 'hierarchical', label: 'brief'},
     {from: 'product_manager', to: 'ux_designer',  pattern: 'hierarchical', label: 'brief'},
@@ -207,7 +207,7 @@ const igEdges = [
     {from: 'securite',        to: 'product_manager', pattern: 'report',    label: 'risques'},
 ];
 
-const IG_PATTERNS = {
+var IG_PATTERNS = {
     network:      {color:'#8b5cf6', dash:'2 4 8 4', label:'Network'},
     hierarchical: {color:'#f59e0b', dash:'',         label:'Hierarchical'},
     sequential:   {color:'#3b82f6', dash:'',         label:'Sequential'},
@@ -397,12 +397,12 @@ if(document.readyState === 'loading'){
 }
 
 /* ── Ideation Chat ── */
-const messagesEl = document.getElementById('ideaMessages');
-const inputEl = document.getElementById('ideaInput');
-const sendBtn = document.getElementById('ideaSend');
-const placeholder = document.getElementById('ideaPlaceholder');
-const findingsEl = document.getElementById('ideaFindings');
-let sessionId = '';
+var messagesEl = document.getElementById('ideaMessages');
+var inputEl = document.getElementById('ideaInput');
+var sendBtn = document.getElementById('ideaSend');
+var placeholder = document.getElementById('ideaPlaceholder');
+var findingsEl = document.getElementById('ideaFindings');
+var sessionId = '';
 
 // Lightweight markdown renderer (same as session_live.html)
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); }
@@ -532,7 +532,7 @@ function resetGraphState(){
 }
 
 // Flow order: PM briefs → experts think in parallel → experts report back → PM synthesizes
-const FLOW_SEQUENCE = [
+var FLOW_SEQUENCE = [
     {phase:'brief', agents:['product_manager'], edges:[
         ['product_manager','metier'],['product_manager','architecte'],
         ['product_manager','ux_designer'],['product_manager','securite']
@@ -775,9 +775,9 @@ function collectFindings() {
 }
 
 // Collect the original prompt
-let originalPrompt = '';
-let lastRequestType = 'new_feature';
-let lastPoProposal = {};
+var originalPrompt = '';
+var lastRequestType = 'new_feature';
+var lastPoProposal = {};
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s||''; return d.innerHTML; }
 
@@ -933,8 +933,8 @@ async function loadPastSession(id) {
 }
 
 // Check URL for session param (from history page "Reprendre")
-const urlParams = new URLSearchParams(window.location.search);
-const resumeSession = urlParams.get('session');
+var urlParams = new URLSearchParams(window.location.search);
+var resumeSession = urlParams.get('session');
 if (resumeSession) {
     loadPastSession(resumeSession);
 }

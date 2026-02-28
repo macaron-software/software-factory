@@ -67,6 +67,7 @@ class AgentLoop:
         project_path: str = "",
         think_timeout: float = 300.0,
         max_rounds: int = 10,
+        workspace_id: str = "default",
     ):
         from .store import AgentDef as _AD  # noqa: F811 — type hint only
 
@@ -76,6 +77,7 @@ class AgentLoop:
         self.project_path = project_path
         self.think_timeout = think_timeout
         self.max_rounds = max_rounds
+        self.workspace_id = workspace_id
         self.status: AgentStatus = AgentStatus.IDLE
 
         self.instance = AgentInstance(
@@ -88,7 +90,9 @@ class AgentLoop:
         self._inbox: asyncio.Queue[A2AMessage] = asyncio.Queue(maxsize=100)
         self._stop_event = asyncio.Event()
         self._rounds = 0
-        self._pair_counts: dict[str, int] = {}  # track msg counts per conversation partner
+        self._pair_counts: dict[
+            str, int
+        ] = {}  # track msg counts per conversation partner
 
         # Lazy — initialised in start()
         self._executor: AgentExecutor | None = None  # type: ignore[name-defined]
@@ -116,7 +120,9 @@ class AgentLoop:
             self._run_loop(),
             name=f"agent-loop:{self.session_id}:{self.agent.id}",
         )
-        logger.info("AgentLoop started  agent=%s session=%s", self.agent.id, self.session_id)
+        logger.info(
+            "AgentLoop started  agent=%s session=%s", self.agent.id, self.session_id
+        )
 
     async def _replay_pending_messages(self) -> None:
         """Load recent messages from DB and enqueue ones addressed to this agent."""
@@ -170,7 +176,9 @@ class AgentLoop:
             self._bus.unregister_agent(self.agent.id)
         self.status = AgentStatus.STOPPED
         self.instance.status = AgentStatus.STOPPED
-        logger.info("AgentLoop stopped  agent=%s session=%s", self.agent.id, self.session_id)
+        logger.info(
+            "AgentLoop stopped  agent=%s session=%s", self.agent.id, self.session_id
+        )
 
     # ------------------------------------------------------------------
     # Main loop
@@ -271,7 +279,9 @@ class AgentLoop:
                         timeout=self.think_timeout,
                     )
                     if result is None:
-                        logger.error("Executor returned no result agent=%s", self.agent.id)
+                        logger.error(
+                            "Executor returned no result agent=%s", self.agent.id
+                        )
                         await self._set_status(AgentStatus.ERROR)
                         continue
                     logger.warning(
@@ -306,7 +316,9 @@ class AgentLoop:
 
                 # 6. Parse and execute actions
                 actions = self._parse_actions(result.content)
-                logger.warning("LOOP parsed %d actions for agent=%s", len(actions), self.agent.id)
+                logger.warning(
+                    "LOOP parsed %d actions for agent=%s", len(actions), self.agent.id
+                )
                 if actions:
                     await self._set_status(AgentStatus.ACTING)
                     for action in actions:
@@ -331,11 +343,22 @@ class AgentLoop:
                     len(actions),
                 )
 
+                # 7. Update PROGRESS.md in project workspace (Codex-style living status doc)
+                if self.project_path:
+                    try:
+                        _update_progress_md(
+                            self.project_path, self.agent, result, msg.content
+                        )
+                    except Exception:
+                        pass
+
             except asyncio.CancelledError:
                 raise
             except Exception:
                 logger.exception(
-                    "AgentLoop error  agent=%s session=%s", self.agent.id, self.session_id
+                    "AgentLoop error  agent=%s session=%s",
+                    self.agent.id,
+                    self.session_id,
                 )
                 self.instance.error_count += 1
                 await self._set_status(AgentStatus.ERROR)
@@ -397,39 +420,60 @@ class AgentLoop:
     # ------------------------------------------------------------------
 
     async def _build_context(self) -> ExecutionContext:
-        """Assemble ExecutionContext with history, memory, skills."""
+        """Assemble ExecutionContext with history, memory, skills.
+
+        Context is scoped by Uruk capability grade (ADR-0010/ADR-0013 from Orthanc):
+        - Organizers (cto, arch, cdp, product, reviewer): full project context, 50 msgs
+        - Executors (dev, qa, security, ux, devops): task-scoped, 15 msgs, no vision
+        This reduces token usage by ~60% for executor-grade agents.
+        """
         from ..memory.manager import get_memory_manager
         from ..sessions.store import get_session_store
         from ..skills.library import get_skill_library
         from .executor import ExecutionContext
+        from .tool_schemas import _get_capability_grade
+
+        # Determine capability grade
+        grade = _get_capability_grade(self.agent)
+        is_organizer = grade == "organizer"
+
+        # History window: organizers need full project thread, executors need only recent
+        history_limit = 50 if is_organizer else 15
 
         history_dicts: list[dict] = []
         try:
             store = get_session_store()
-            messages = store.get_messages(self.session_id, limit=50)
+            messages = store.get_messages(self.session_id, limit=history_limit)
             history_dicts = [
-                {"from_agent": m.from_agent, "content": m.content, "message_type": m.message_type}
+                {
+                    "from_agent": m.from_agent,
+                    "content": m.content,
+                    "message_type": m.message_type,
+                }
                 for m in messages
             ]
         except Exception as exc:
             logger.debug("Failed to load history: %s", exc)
 
-        # Project memory
+        # Project memory — organizers get more context entries, executors get fewer
         project_context = ""
         if self.project_id:
             try:
                 mem = get_memory_manager()
-                entries = mem.project_get(self.project_id, limit=10)
+                memory_limit = 10 if is_organizer else 3
+                entries = mem.project_get(self.project_id, limit=memory_limit)
                 if entries:
                     project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
+                        for e in entries
                     )
             except Exception as exc:
                 logger.debug("Failed to load project context: %s", exc)
 
-        # Project memory files
+        # Project memory files (CLAUDE.md, etc.) — organizers only
+        # Executors don't need the full project constitution to implement a task
         project_memory_str = ""
-        if self.project_path:
+        if is_organizer and self.project_path:
             try:
                 from ..memory.project_files import get_project_memory
 
@@ -472,14 +516,16 @@ class AgentLoop:
                     for sid in self.agent.skills[:5]:
                         skill = lib.get(sid)
                         if skill and skill.get("content"):
-                            parts.append(f"### {skill['name']}\n{skill['content'][:1500]}")
+                            parts.append(
+                                f"### {skill['name']}\n{skill['content'][:1500]}"
+                            )
                     skills_prompt = "\n\n".join(parts)
                 except Exception:
                     pass
 
-        # Vision
+        # Vision — organizers only (executors don't need strategic vision to implement a task)
         vision = ""
-        if self.project_id:
+        if is_organizer and self.project_id:
             try:
                 from ..projects.manager import get_project_store
 
@@ -519,6 +565,7 @@ class AgentLoop:
             vision=vision,
             tools_enabled=agent_tools_enabled,
             mission_run_id=mission_run_id,
+            capability_grade=grade,
         )
 
     # ------------------------------------------------------------------
@@ -672,6 +719,97 @@ class AgentLoop:
             "error_count": self.instance.error_count,
             "last_active": self.instance.last_active.isoformat(),
         }
+
+
+# ---------------------------------------------------------------------------
+# PROGRESS.md — living status document (Codex-style)
+# ---------------------------------------------------------------------------
+
+
+def _update_progress_md(
+    project_path: str, agent: "AgentInstance", result: object, user_message: str
+) -> None:
+    """Write/update PROGRESS.md in the project workspace after each agent cycle.
+
+    This mirrors Codex's Documentation.md: current milestone status, decisions,
+    last tool calls, and how to run the project.
+    """
+    import os
+    from datetime import datetime as _dt
+
+    progress_path = os.path.join(project_path, "PROGRESS.md")
+
+    # Read existing header/decisions section to preserve it
+    existing_decisions = ""
+    if os.path.exists(progress_path):
+        with open(progress_path) as f:
+            content = f.read()
+        # Preserve ## Décisions section if present
+        if "## Décisions" in content:
+            idx = content.index("## Décisions")
+            end = content.find("\n## ", idx + 1)
+            existing_decisions = content[
+                idx : end if end != -1 else len(content)
+            ].strip()
+
+    now = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    agent_name = getattr(agent, "name", getattr(agent, "id", "agent"))
+
+    # Summarize tool calls
+    tool_calls = getattr(result, "tool_calls", []) or []
+    tools_summary = ""
+    if tool_calls:
+        for tc in tool_calls[-5:]:  # last 5 tools
+            name = tc.get("name", "?")
+            args = tc.get("args", {})
+            path = args.get("path") or args.get("file") or args.get("cwd") or ""
+            tools_summary += f"  - `{name}`"
+            if path:
+                tools_summary += f" → `{path}`"
+            # Show lint/test status
+            res_snip = tc.get("result", "")[:80].replace("\n", " ")
+            if res_snip:
+                tools_summary += f" — {res_snip}"
+            tools_summary += "\n"
+    else:
+        tools_summary = "  _(aucun outil appelé)_\n"
+
+    # Truncate agent response for summary
+    response_summary = (getattr(result, "content", "") or "")[:300].replace("\n", " ")
+
+    # Tokens used
+    tok_in = getattr(result, "tokens_in", 0)
+    tok_out = getattr(result, "tokens_out", 0)
+
+    _decisions_fallback = "## Décisions\n\n_(à compléter)_"
+    progress = f"""# PROGRESS — {agent_name}
+
+> Mis à jour automatiquement après chaque cycle agent. Ne pas modifier manuellement.
+
+## Dernier cycle
+
+- **Agent** : {agent_name}
+- **Date** : {now}
+- **Tokens** : {tok_in} in / {tok_out} out
+- **Message** : {(user_message or "")[:120]}
+
+## Résumé
+
+{response_summary}{"..." if len(getattr(result, "content", "") or "") > 300 else ""}
+
+## Outils utilisés
+
+{tools_summary}
+## Statut
+
+- Erreur : {getattr(result, "error", None) or "Aucune"}
+- Durée : {getattr(result, "duration_ms", 0)} ms
+
+{existing_decisions if existing_decisions else _decisions_fallback}
+"""
+    os.makedirs(project_path, exist_ok=True)
+    with open(progress_path, "w") as f:
+        f.write(progress)
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 """Session & message store — manages conversations between agents and users."""
+
 from __future__ import annotations
 
 import json
@@ -13,6 +14,7 @@ from ..db.migrations import get_db
 @dataclass
 class SessionDef:
     """A collaboration session."""
+
     id: str = ""
     name: str = ""
     description: str = ""
@@ -28,17 +30,29 @@ class SessionDef:
 @dataclass
 class MessageDef:
     """A message in a session conversation."""
+
     id: str = ""
     session_id: str = ""
     from_agent: str = "user"  # agent_id or "user"
     to_agent: Optional[str] = None  # agent_id or None for broadcast
-    message_type: str = "text"  # text|code|veto|approval|delegation|instruction|artifact|system
+    message_type: str = (
+        "text"  # text|code|veto|approval|delegation|instruction|artifact|system
+    )
     content: str = ""
     metadata: dict = field(default_factory=dict)
     artifacts: list = field(default_factory=list)
     parent_id: Optional[str] = None
     priority: int = 5
     timestamp: str = ""
+
+
+def _to_iso(v) -> str | None:
+    """Normalize a value to ISO string (handles PG datetime objects)."""
+    if v is None:
+        return None
+    if hasattr(v, "isoformat"):
+        return v.isoformat()
+    return str(v) if v else None
 
 
 def _row_to_session(row) -> SessionDef:
@@ -51,8 +65,8 @@ def _row_to_session(row) -> SessionDef:
         status=row["status"] or "planning",
         goal=row["goal"] or "",
         config=json.loads(row["config_json"] or "{}"),
-        created_at=row["created_at"] or "",
-        completed_at=row["completed_at"],
+        created_at=_to_iso(row["created_at"]) or "",
+        completed_at=_to_iso(row["completed_at"]),
     )
 
 
@@ -68,7 +82,7 @@ def _row_to_message(row) -> MessageDef:
         artifacts=json.loads(row["artifacts_json"] or "[]"),
         parent_id=row["parent_id"],
         priority=row["priority"] or 5,
-        timestamp=row["timestamp"] or "",
+        timestamp=_to_iso(row["timestamp"]) or "",
     )
 
 
@@ -84,6 +98,36 @@ class SessionStore:
                 "SELECT * FROM sessions ORDER BY created_at DESC LIMIT ?", (limit,)
             ).fetchall()
             return [_row_to_session(r) for r in rows]
+        finally:
+            db.close()
+
+    def search(
+        self, q: str = "", status: str = "", limit: int = 30, offset: int = 0
+    ) -> tuple[list[SessionDef], int]:
+        """Full-text search across sessions + message content. Returns (sessions, total_count)."""
+        db = get_db()
+        try:
+            conditions = []
+            params: list = []
+            if q:
+                like = f"%{q}%"
+                conditions.append("""(
+                    s.name LIKE ? OR s.goal LIKE ? OR s.description LIKE ?
+                    OR EXISTS (SELECT 1 FROM messages m WHERE m.session_id = s.id AND m.content LIKE ?)
+                )""")
+                params += [like, like, like, like]
+            if status:
+                conditions.append("s.status = ?")
+                params.append(status)
+            where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+            total = db.execute(
+                f"SELECT COUNT(*) FROM sessions s {where}", params
+            ).fetchone()[0]
+            rows = db.execute(
+                f"SELECT s.* FROM sessions s {where} ORDER BY s.created_at DESC LIMIT ? OFFSET ?",
+                params + [limit, offset],
+            ).fetchall()
+            return [_row_to_session(r) for r in rows], total
         finally:
             db.close()
 
@@ -108,9 +152,18 @@ class SessionStore:
                 """INSERT INTO sessions (id, name, description, pattern_id, project_id,
                    status, goal, config_json, created_at, completed_at)
                    VALUES (?,?,?,?,?,?,?,?,?,?)""",
-                (session.id, session.name, session.description, session.pattern_id,
-                 session.project_id, session.status, session.goal,
-                 json.dumps(session.config), session.created_at, session.completed_at),
+                (
+                    session.id,
+                    session.name,
+                    session.description,
+                    session.pattern_id,
+                    session.project_id,
+                    session.status,
+                    session.goal,
+                    json.dumps(session.config),
+                    session.created_at,
+                    session.completed_at,
+                ),
             )
             db.commit()
         finally:
@@ -122,7 +175,11 @@ class SessionStore:
 
             get_event_store().emit(
                 SESSION_CREATED,
-                {"name": session.name, "pattern": session.pattern_id, "goal": (session.goal or "")[:200]},
+                {
+                    "name": session.name,
+                    "pattern": session.pattern_id,
+                    "goal": (session.goal or "")[:200],
+                },
                 entity_type="session",
                 entity_id=session.id,
                 project_id=session.project_id or "",
@@ -135,7 +192,11 @@ class SessionStore:
     def update_status(self, session_id: str, status: str) -> bool:
         db = get_db()
         try:
-            completed = datetime.utcnow().isoformat() if status in ("completed", "failed") else None
+            completed = (
+                datetime.utcnow().isoformat()
+                if status in ("completed", "failed")
+                else None
+            )
             cur = db.execute(
                 "UPDATE sessions SET status = ?, completed_at = ? WHERE id = ?",
                 (status, completed, session_id),
@@ -192,7 +253,9 @@ class SessionStore:
         finally:
             db.close()
 
-    def get_messages_after(self, session_id: str, after_id: str, limit: int = 100) -> list[MessageDef]:
+    def get_messages_after(
+        self, session_id: str, after_id: str, limit: int = 100
+    ) -> list[MessageDef]:
         """Get messages newer than a given message ID (for polling)."""
         db = get_db()
         try:
@@ -223,10 +286,19 @@ class SessionStore:
                    message_type, content, metadata_json, artifacts_json,
                    parent_id, priority, timestamp)
                    VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
-                (msg.id, msg.session_id, msg.from_agent, msg.to_agent,
-                 msg.message_type, msg.content,
-                 json.dumps(msg.metadata), json.dumps(msg.artifacts),
-                 msg.parent_id, msg.priority, msg.timestamp),
+                (
+                    msg.id,
+                    msg.session_id,
+                    msg.from_agent,
+                    msg.to_agent,
+                    msg.message_type,
+                    msg.content,
+                    json.dumps(msg.metadata),
+                    json.dumps(msg.artifacts),
+                    msg.parent_id,
+                    msg.priority,
+                    msg.timestamp,
+                ),
             )
             db.commit()
         finally:

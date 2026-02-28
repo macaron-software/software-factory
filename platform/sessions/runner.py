@@ -8,6 +8,7 @@ When a user sends a message in a session:
 5. Handle delegations / multi-agent conversation rounds
 6. Push SSE events for live UI
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -59,11 +60,16 @@ async def _push_sse(session_id: str, event: dict):
         try:
             q.put_nowait(event)
         except asyncio.QueueFull:
-            logger.warning("SSE queue full for session %s, dropping %s event", session_id, event.get("type"))
+            logger.warning(
+                "SSE queue full for session %s, dropping %s event",
+                session_id,
+                event.get("type"),
+            )
 
     # Bus SSE listeners (global, used by /sse/session/{id} endpoint)
     try:
         from ..a2a.bus import get_bus
+
         bus = get_bus()
         # Inject session_id into dict so the SSE filter in ws.py can match
         enriched = {**event, "session_id": session_id}
@@ -76,7 +82,9 @@ async def _push_sse(session_id: str, event: dict):
         pass
 
 
-async def handle_user_message(session_id: str, content: str, to_agent: str = "") -> Optional[MessageDef]:
+async def handle_user_message(
+    session_id: str, content: str, to_agent: str = ""
+) -> Optional[MessageDef]:
     """Process a user message: call the lead agent, return its response.
 
     This is the main entry point called from the route handler.
@@ -96,19 +104,24 @@ async def handle_user_message(session_id: str, content: str, to_agent: str = "")
         all_agents = agent_store.list_all()
         agent = all_agents[0] if all_agents else None
     if not agent:
-        return store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="system",
-            message_type="system",
-            content="No agent available to respond.",
-        ))
+        return store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="system",
+                message_type="system",
+                content="No agent available to respond.",
+            )
+        )
 
     # Push "thinking" event
-    await _push_sse(session_id, {
-        "type": "agent_status",
-        "agent_id": agent.id,
-        "status": "thinking",
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "agent_status",
+            "agent_id": agent.id,
+            "status": "thinking",
+        },
+    )
 
     # Build context
     ctx = await _build_context(agent, session)
@@ -128,43 +141,52 @@ async def handle_user_message(session_id: str, content: str, to_agent: str = "")
     elif "[DELEGATE:" in result.content:
         msg_type = "delegate"
 
-    agent_msg = store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent=agent.id,
-        to_agent="user",
-        message_type=msg_type,
-        content=result.content,
-        metadata={
-            "model": result.model,
-            "provider": result.provider,
-            "tokens_in": result.tokens_in,
-            "tokens_out": result.tokens_out,
-            "duration_ms": result.duration_ms,
-            "tool_calls": result.tool_calls if result.tool_calls else None,
-        },
-    ))
+    agent_msg = store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent=agent.id,
+            to_agent="user",
+            message_type=msg_type,
+            content=result.content,
+            metadata={
+                "model": result.model,
+                "provider": result.provider,
+                "tokens_in": result.tokens_in,
+                "tokens_out": result.tokens_out,
+                "duration_ms": result.duration_ms,
+                "tool_calls": result.tool_calls if result.tool_calls else None,
+            },
+        )
+    )
 
     # Push SSE
-    await _push_sse(session_id, {
-        "type": "message",
-        "id": agent_msg.id,
-        "from_agent": agent.id,
-        "content": result.content,
-        "message_type": msg_type,
-        "model": result.model,
-        "tokens": result.tokens_in + result.tokens_out,
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "message",
+            "id": agent_msg.id,
+            "from_agent": agent.id,
+            "content": result.content,
+            "message_type": msg_type,
+            "model": result.model,
+            "tokens": result.tokens_in + result.tokens_out,
+        },
+    )
 
-    await _push_sse(session_id, {
-        "type": "agent_status",
-        "agent_id": agent.id,
-        "status": "idle",
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "agent_status",
+            "agent_id": agent.id,
+            "status": "idle",
+        },
+    )
 
     # Handle delegations
     for d in result.delegations:
-        asyncio.create_task(_handle_delegation(
-            session_id, agent.id, d["to_agent"], d["task"]))
+        asyncio.create_task(
+            _handle_delegation(session_id, agent.id, d["to_agent"], d["task"])
+        )
 
     # Store in project memory if meaningful (skip short/trivial)
     if session.project_id and not result.error and len(result.content) > 50:
@@ -189,8 +211,14 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
     """Build the execution context for an agent."""
     store = get_session_store()
     history = store.get_messages(session.id, limit=50)
-    history_dicts = [{"from_agent": m.from_agent, "content": m.content,
-                      "message_type": m.message_type} for m in history]
+    history_dicts = [
+        {
+            "from_agent": m.from_agent,
+            "content": m.content,
+            "message_type": m.message_type,
+        }
+        for m in history
+    ]
 
     # Compress history if too long
     project_name = ""
@@ -204,6 +232,7 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
 
     try:
         from .compressor import compress_history
+
         cached_summary = session.config.get("_summary")
         cached_hash = session.config.get("_summary_hash")
         history_dicts, new_summary, new_hash = await compress_history(
@@ -258,10 +287,94 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
     if project_path:
         try:
             from ..memory.project_files import get_project_memory
+
             pmem = get_project_memory(session.project_id or "", project_path)
             project_memory_str = pmem.combined
         except Exception as exc:
             logger.debug("Failed to load project memory files: %s", exc)
+
+    # Load domain context (projects/domains/<arch_domain>.yaml)
+    domain_context_str = ""
+    try:
+        from ..projects.manager import get_project_store
+        from ..projects.domains import load_domain
+
+        proj = get_project_store().get(session.project_id or "")
+        if proj and proj.arch_domain:
+            domain = load_domain(proj.arch_domain)
+            if domain:
+                domain_context_str = domain.to_context_string()
+                # Live Confluence fetch if domain has a confluence_space
+                if domain.confluence_space:
+                    try:
+                        conf_ctx = await domain.fetch_confluence_context(
+                            query=f"{proj.name} architecture stack {domain.stack.backend or ''}"
+                        )
+                        if conf_ctx:
+                            domain_context_str += conf_ctx
+                            logger.info(
+                                "[Domain] Confluence context fetched (%d chars) for domain '%s'",
+                                len(conf_ctx),
+                                proj.arch_domain,
+                            )
+                    except Exception as _ce:
+                        logger.debug("[Domain] Confluence fetch skipped: %s", _ce)
+                logger.info(
+                    "[Domain] Injecting domain '%s' into agent %s",
+                    proj.arch_domain,
+                    agent.id,
+                )
+    except Exception as exc:
+        logger.debug("Failed to load domain context: %s", exc)
+
+    # Apply role-based tool restrictions
+    from ..agents.tool_schemas import _classify_agent_role, ROLE_TOOL_MAP
+
+    _role_cat = _classify_agent_role(agent)
+    _allowed_tools = ROLE_TOOL_MAP.get(_role_cat)  # None = all tools (fallback)
+
+    # Wire domain MCP tools: if domain declares mcp_tools, extend allowed_tools
+    try:
+        from ..projects.manager import get_project_store
+        from ..projects.domains import load_domain as _ld2
+
+        _proj2 = get_project_store().get(session.project_id or "")
+        if _proj2 and _proj2.arch_domain:
+            _dom2 = _ld2(_proj2.arch_domain)
+            if _dom2 and _dom2.mcp_tools:
+                # Map MCP server IDs → tool name prefixes registered in tool_runner
+                _MCP_TOOL_MAP = {
+                    "mcp-solaris": [
+                        "solaris_component",
+                        "solaris_variant",
+                        "solaris_wcag",
+                        "solaris_knowledge",
+                        "solaris_validation",
+                        "solaris_grep",
+                        "solaris_list_components",
+                        "solaris_stats",
+                    ],
+                    "mcp-fetch": ["mcp_fetch_fetch"],
+                    "mcp-memory": ["memory_search", "memory_store"],
+                }
+                _extra = []
+                for _mcp_id in _dom2.mcp_tools:
+                    _extra.extend(_MCP_TOOL_MAP.get(_mcp_id, []))
+                if _extra:
+                    if _allowed_tools is None:
+                        pass  # Already has all tools
+                    else:
+                        _allowed_tools = list(_allowed_tools) + [
+                            t for t in _extra if t not in _allowed_tools
+                        ]
+                    logger.info(
+                        "[Domain] Added MCP tools %s for domain '%s' agent %s",
+                        _extra,
+                        _proj2.arch_domain,
+                        agent.id,
+                    )
+    except Exception as _mcp_exc:
+        logger.debug("Failed to wire domain MCP tools: %s", _mcp_exc)
 
     return ExecutionContext(
         agent=agent,
@@ -271,42 +384,52 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         history=history_dicts,
         project_context=project_context,
         project_memory=project_memory_str,
+        domain_context=domain_context_str,
         skills_prompt=skills_prompt,
         vision=vision,
+        allowed_tools=_allowed_tools,
     )
 
 
-async def _handle_delegation(session_id: str, from_agent: str,
-                              to_agent_id: str, task: str):
+async def _handle_delegation(
+    session_id: str, from_agent: str, to_agent_id: str, task: str
+):
     """Handle an agent delegating a task to another agent."""
     store = get_session_store()
     agent_store = get_agent_store()
     target = agent_store.get(to_agent_id)
 
     if not target:
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent="system",
-            message_type="system",
-            content=f"Delegation failed: agent '{to_agent_id}' not found.",
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent="system",
+                message_type="system",
+                content=f"Delegation failed: agent '{to_agent_id}' not found.",
+            )
+        )
         return
 
     # Log delegation
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent=from_agent,
-        to_agent=to_agent_id,
-        message_type="delegate",
-        content=f"Delegating to {target.name}: {task}",
-    ))
+    store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent=from_agent,
+            to_agent=to_agent_id,
+            message_type="delegate",
+            content=f"Delegating to {target.name}: {task}",
+        )
+    )
 
-    await _push_sse(session_id, {
-        "type": "delegation",
-        "from": from_agent,
-        "to": to_agent_id,
-        "task": task,
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "delegation",
+            "from": from_agent,
+            "to": to_agent_id,
+            "task": task,
+        },
+    )
 
     # Execute the delegated agent
     session = store.get(session_id)
@@ -315,32 +438,42 @@ async def _handle_delegation(session_id: str, from_agent: str,
         executor = get_executor()
         result = await executor.run(ctx, f"[Task from {from_agent}]: {task}")
 
-        store.add_message(MessageDef(
-            session_id=session_id,
-            from_agent=to_agent_id,
-            to_agent=from_agent,
-            message_type="text",
-            content=result.content,
-            metadata={
-                "model": result.model, "provider": result.provider,
-                "tokens_in": result.tokens_in, "tokens_out": result.tokens_out,
-            },
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=session_id,
+                from_agent=to_agent_id,
+                to_agent=from_agent,
+                message_type="text",
+                content=result.content,
+                metadata={
+                    "model": result.model,
+                    "provider": result.provider,
+                    "tokens_in": result.tokens_in,
+                    "tokens_out": result.tokens_out,
+                },
+            )
+        )
 
-        await _push_sse(session_id, {
-            "type": "message",
-            "id": "",
-            "from_agent": to_agent_id,
-            "content": result.content,
-            "message_type": "text",
-        })
+        await _push_sse(
+            session_id,
+            {
+                "type": "message",
+                "id": "",
+                "from_agent": to_agent_id,
+                "content": result.content,
+                "message_type": "text",
+            },
+        )
 
 
 # ── Multi-agent conversation with streaming ─────────────────────
 
 # Regex to parse @mentions and [DELEGATE:id] in agent output
 _MENTION_RE = re.compile(r"@(\w[\w_-]*)")
-_DELEGATE_RE = re.compile(r"\[DELEGATE:([^\]]+)\]\s*(.*?)(?=\[DELEGATE:|\[VETO|\[APPROVE\]|\[ASK:|\[ESCALATE|\Z)", re.DOTALL)
+_DELEGATE_RE = re.compile(
+    r"\[DELEGATE:([^\]]+)\]\s*(.*?)(?=\[DELEGATE:|\[VETO|\[APPROVE\]|\[ASK:|\[ESCALATE|\Z)",
+    re.DOTALL,
+)
 
 
 async def run_conversation(
@@ -382,14 +515,23 @@ async def run_conversation(
         lead = agents[0]
 
     # Store initial user/system message
-    store.add_message(MessageDef(
-        session_id=session_id, from_agent="user",
-        message_type="delegate", content=initial_message,
-    ))
-    await _push_sse(session_id, {
-        "type": "message", "from_agent": "user",
-        "content": initial_message, "message_type": "delegate",
-    })
+    store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="user",
+            message_type="delegate",
+            content=initial_message,
+        )
+    )
+    await _push_sse(
+        session_id,
+        {
+            "type": "message",
+            "from_agent": "user",
+            "content": initial_message,
+            "message_type": "delegate",
+        },
+    )
 
     # Build agent name map for context
     agent_names = {a.id: a.name for a in agents}
@@ -418,16 +560,23 @@ async def run_conversation(
 
             # Build the prompt with full conversation history
             conv_prompt = _build_conversation_prompt(
-                agent, agents, conversation_msgs, round_num, initial_message,
+                agent,
+                agents,
+                conversation_msgs,
+                round_num,
+                initial_message,
             )
 
             # Signal: agent starts thinking
-            await _push_sse(session_id, {
-                "type": "stream_start",
-                "agent_id": agent.id,
-                "agent_name": agent.name,
-                "round": round_num,
-            })
+            await _push_sse(
+                session_id,
+                {
+                    "type": "stream_start",
+                    "agent_id": agent.id,
+                    "agent_name": agent.name,
+                    "round": round_num,
+                },
+            )
 
             # Stream the response
             full_content = await _stream_agent_response(
@@ -435,38 +584,50 @@ async def run_conversation(
             )
 
             if not full_content or full_content.strip() == "":
-                await _push_sse(session_id, {
-                    "type": "stream_end", "agent_id": agent.id,
-                    "content": "", "skipped": True,
-                })
+                await _push_sse(
+                    session_id,
+                    {
+                        "type": "stream_end",
+                        "agent_id": agent.id,
+                        "content": "",
+                        "skipped": True,
+                    },
+                )
                 continue
 
             anyone_spoke = True
 
             # Store in DB
-            msg = store.add_message(MessageDef(
-                session_id=session_id,
-                from_agent=agent.id,
-                message_type="text",
-                content=full_content,
-            ))
+            msg = store.add_message(
+                MessageDef(
+                    session_id=session_id,
+                    from_agent=agent.id,
+                    message_type="text",
+                    content=full_content,
+                )
+            )
 
             # Push full message for non-streaming clients
-            await _push_sse(session_id, {
-                "type": "stream_end",
-                "agent_id": agent.id,
-                "msg_id": msg.id if msg else "",
-                "content": full_content,
-                "message_type": "text",
-            })
+            await _push_sse(
+                session_id,
+                {
+                    "type": "stream_end",
+                    "agent_id": agent.id,
+                    "msg_id": msg.id if msg else "",
+                    "content": full_content,
+                    "message_type": "text",
+                },
+            )
 
             # Track in conversation
-            conversation_msgs.append({
-                "from": agent.id,
-                "name": agent.name,
-                "role": agent.role,
-                "content": full_content,
-            })
+            conversation_msgs.append(
+                {
+                    "from": agent.id,
+                    "name": agent.name,
+                    "role": agent.role,
+                    "content": full_content,
+                }
+            )
 
             # Small delay between agents for readability
             await asyncio.sleep(0.3)
@@ -479,11 +640,14 @@ async def run_conversation(
             break
 
     # Signal conversation end
-    await _push_sse(session_id, {
-        "type": "conversation_end",
-        "rounds": round_num + 1,
-        "messages": len(conversation_msgs),
-    })
+    await _push_sse(
+        session_id,
+        {
+            "type": "conversation_end",
+            "rounds": round_num + 1,
+            "messages": len(conversation_msgs),
+        },
+    )
 
 
 def _determine_speakers(
@@ -509,7 +673,7 @@ def _determine_speakers(
             agent_name_to_id[part] = a.id
 
     # Look at messages from the last round
-    for msg in conversation[-len(agents):]:
+    for msg in conversation[-len(agents) :]:
         content = msg.get("content", "")
         # @mentions
         for m in _MENTION_RE.finditer(content):
@@ -558,7 +722,7 @@ def _build_conversation_prompt(
         conv_text += f"\n**{speaker}{role_tag}:**\n{msg['content']}\n"
 
     prompt = f"""Tu es {agent.name}, {agent.role}.
-{agent.persona if agent.persona else ''}
+{agent.persona if agent.persona else ""}
 
 ## Réunion en cours — Tour {round_num + 1}
 
@@ -623,16 +787,21 @@ async def _stream_agent_response(
                     in_think = False
                     continue
                 if not in_think:
-                    await _push_sse(session_id, {
-                        "type": "stream_delta",
-                        "agent_id": agent.id,
-                        "delta": chunk.delta,
-                    })
+                    await _push_sse(
+                        session_id,
+                        {
+                            "type": "stream_delta",
+                            "agent_id": agent.id,
+                            "delta": chunk.delta,
+                        },
+                    )
             if chunk.done:
                 break
         # Strip <think> blocks from final content
         if "<think>" in full_content:
-            full_content = re.sub(r"<think>.*?</think>\s*", "", full_content, flags=re.DOTALL).strip()
+            full_content = re.sub(
+                r"<think>.*?</think>\s*", "", full_content, flags=re.DOTALL
+            ).strip()
     except Exception as exc:
         logger.error("Streaming failed for %s: %s", agent.id, exc)
         # Fallback: non-streaming chat() which has its own provider fallback
@@ -646,11 +815,14 @@ async def _stream_agent_response(
                 system_prompt=system,
             )
             full_content = resp.content
-            await _push_sse(session_id, {
-                "type": "stream_delta",
-                "agent_id": agent.id,
-                "delta": full_content,
-            })
+            await _push_sse(
+                session_id,
+                {
+                    "type": "stream_delta",
+                    "agent_id": agent.id,
+                    "delta": full_content,
+                },
+            )
         except Exception as exc2:
             logger.error("Fallback also failed for %s: %s", agent.id, exc2)
             full_content = f"(Error: {exc2})"

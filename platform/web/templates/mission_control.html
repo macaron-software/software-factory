@@ -4,6 +4,9 @@
 <span class="badge" style="background:var(--purple);color:#fff;font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:4px">
     {{ mission.status.value|upper }}
 </span>
+<button class="btn btn-ghost btn-sm" onclick="replayMission()" title="Replay this mission run">
+    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Replay
+</button>
 {% endblock %}
 
 {% block content %}
@@ -106,6 +109,7 @@
                         </div>
                         <span class="mc-phase-pattern">{{ phase.pattern_id }}</span>
                         <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
+                        <button class="btn btn-sm btn-ghost" style="padding:0.1rem 0.4rem;font-size:0.7rem;margin-left:auto" onclick="event.stopPropagation();toggleDebug('{{ phase.phase_id }}')" title="Debug info">Debug</button>
                         <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
                     </div>
                     <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">
@@ -117,6 +121,20 @@
                             <img class="mc-phase-thumb" src="/workspace/{{ mission.id }}/{{ s }}" alt="Screenshot" loading="lazy" onclick="window.open(this.src)" onerror="this.src='/workspace/{{ s }}'">
                             {% endfor %}
                         </div>
+                        {% endif %}
+                    </div>
+                    <!-- Debug drawer for this phase -->
+                    <div id="debug-{{ phase.phase_id }}" style="display:none;padding:0.5rem 0.75rem;border-top:1px solid var(--border);background:var(--bg-tertiary);font-size:0.75rem;font-family:var(--font-mono)">
+                        <div><strong>Phase:</strong> {{ phase.phase_name }} ({{ phase.phase_id }})</div>
+                        <div><strong>Status:</strong> {{ phase.status.value }} | <strong>Pattern:</strong> {{ phase.pattern_id }}</div>
+                        {% if phase.started_at %}<div><strong>Started:</strong> {{ phase.started_at }}</div>{% endif %}
+                        {% if phase.completed_at %}<div><strong>Completed:</strong> {{ phase.completed_at }}</div>{% endif %}
+                        {% if phase.quality_score is not none %}<div><strong>Quality:</strong> {{ phase.quality_score }}/100</div>{% endif %}
+                        {% if phase.summary %}
+                        <details style="margin-top:0.25rem">
+                            <summary style="cursor:pointer;color:var(--text-secondary)">Output ({{ phase.summary|length }} chars)</summary>
+                            <pre style="margin:0.25rem 0 0;white-space:pre-wrap;max-height:200px;overflow-y:auto">{{ phase.summary[:500] }}{% if phase.summary|length > 500 %}...{% endif %}</pre>
+                        </details>
                         {% endif %}
                     </div>
                     <div class="mc-phase-body">
@@ -167,6 +185,53 @@
         {% include 'partials/mc_tabs_default.html' %}
 
         {% endif %}{# end workflow_type conditional tabs #}
+
+        <!-- Tab: Timeline (all workflows) -->
+        <div class="mc-tab-panel" data-tab="timeline">
+            <div style="padding:0.75rem 0 0.25rem">
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                    Durée et statut de chaque phase · {% if mission.llm_cost_usd %}<span style="color:var(--yellow)">${{ "%.4f"|format(mission.llm_cost_usd) }}</span> LLM cost{% endif %}
+                </div>
+                {% if mission.phases %}
+                {% set completed_phases = mission.phases|selectattr('completed_at')|list %}
+                {% set started_phases = mission.phases|selectattr('started_at')|list %}
+                {% set t_start = (mission.phases|selectattr('started_at')|map(attribute='started_at')|list|sort|first) if started_phases else mission.created_at %}
+                <div class="mc-timeline-grid">
+                    {% for phase in mission.phases %}
+                    <div class="mc-tl-row">
+                        <div class="mc-tl-label" title="{{ phase.phase_id }}">
+                            {{ phase.phase_name or phase.phase_id }}
+                        </div>
+                        <div class="mc-tl-bar-wrap">
+                            {% if phase.started_at %}
+                            {% set offset_s = (phase.started_at - t_start).total_seconds() if t_start else 0 %}
+                            {% set dur_s = ((phase.completed_at - phase.started_at).total_seconds() if phase.completed_at else 0) %}
+                            {% set total_s = ((mission.completed_at or mission.updated_at) - t_start).total_seconds() if t_start else 1 %}
+                            {% set pct_start = [(offset_s / total_s * 100)|round(1)|float, 0]|max %}
+                            {% set pct_width = [(dur_s / total_s * 100)|round(1)|float, 2]|max if dur_s > 0 else 2 %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}"
+                                 style="margin-left:{{ pct_start }}%;width:{{ [pct_width, 100 - pct_start]|min }}%"
+                                 title="{{ phase.phase_name }}: {{ dur_s|int }}s">
+                                {% if dur_s > 10 %}<span class="mc-tl-dur">{{ dur_s|int }}s</span>{% endif %}
+                            </div>
+                            {% else %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}" style="width:4px;opacity:0.3"></div>
+                            {% endif %}
+                        </div>
+                        <div class="mc-tl-status">
+                            <span class="mc-tl-dot mc-tl-dot--{{ phase.status.value }}"></span>
+                            {% if phase.quality_score is not none %}
+                            <span class="mc-tl-quality" title="Quality score">Q{{ phase.quality_score }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="color:var(--text-secondary);font-size:0.82rem;padding:2rem;text-align:center">Aucune phase</div>
+                {% endif %}
+            </div>
+        </div>{# end tab: timeline #}
     </div>
 
     <!-- ====== RIGHT SIDEBAR ====== -->
@@ -174,4 +239,24 @@
 </div>
 
 {% include 'partials/mc_scripts.html' %}
+
+<script>
+function toggleDebug(phaseId) {
+    const el = document.getElementById('debug-' + phaseId);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function replayMission() {
+    if (!confirm('Create a new replay run for this mission?')) return;
+    try {
+        const res = await fetch('/api/missions/' + MISSION_ID + '/replay', {method: 'POST'});
+        const data = await res.json();
+        if (data.new_run_id) {
+            window.location.href = '/missions/' + data.new_run_id + '/control';
+        } else {
+            alert('Replay failed: ' + JSON.stringify(data));
+        }
+    } catch(e) { alert('Replay error: ' + e); }
+}
+</script>
 {% endblock %}

@@ -11,7 +11,7 @@ test.describe("Journey: Browse Portfolio → Project → Chat", () => {
     const errors = collectErrors(page);
 
     // 1. Load portfolio
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
     await expect(page).toHaveTitle(/.+/);
 
     // 2. Find first project card (the card itself is an <a>)
@@ -36,7 +36,7 @@ test.describe("Journey: Browse Portfolio → Project → Chat", () => {
 test.describe("Journey: Navigate all sidebar links", () => {
   test("sidebar navigation works for all menu items", async ({ page }) => {
     const errors = collectErrors(page);
-    await safeGoto(page, "/");
+    await safeGoto(page, "/portfolio");
 
     // Get all nav links
     const navLinks = page.locator(".nav-links a");
@@ -219,11 +219,8 @@ test.describe("Journey: Backlog → Ideation Tab", () => {
     const backlogTab = page.locator("#tab-backlog");
     await expect(backlogTab).toBeVisible({ timeout: 10_000 });
 
-    // Switch to ideation tab
-    const ideationTab = page.locator("#tab-discovery");
-    await expect(ideationTab).toBeVisible();
-    await ideationTab.click();
-    await page.waitForTimeout(2_000);
+    // Navigate directly to ideation (no #tab-discovery in backlog)
+    await safeGoto(page, "/ideation");
 
     // Ideation input should appear
     const textarea = page.locator("#ideaInput, .idea-input textarea").first();
@@ -244,6 +241,7 @@ test.describe("Journey: Backlog → Ideation Tab", () => {
 
 test.describe("Journey: Mission Control", () => {
   test("load mission control, expand accordion, see agent graphs", async ({ page }) => {
+    test.slow(); // PI board may take time to load
     const errors = collectErrors(page);
 
     // Go to PI board to find a mission

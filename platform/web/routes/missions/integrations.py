@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Request
@@ -225,7 +226,10 @@ async def patch_project_settings(project_id: str, request: Request):
         return JSONResponse({"error": "Not found"}, status_code=404)
     body = await request.json()
     if "path" in body:
-        project.path = str(body["path"])
+        raw_path = str(body["path"])
+        project.path = (
+            os.path.normpath(os.path.expanduser(raw_path)) if raw_path else ""
+        )
     if "description" in body:
         project.description = str(body["description"])
     if "lead_agent_id" in body:

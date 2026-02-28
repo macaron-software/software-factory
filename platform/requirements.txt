@@ -16,8 +16,16 @@ psutil>=5.9
 numpy>=1.26
 bcrypt>=4.0
 PyJWT>=2.8
+slowapi>=0.1.9
 # OpenTelemetry (opt-in via OTEL_ENABLED=1)
 opentelemetry-api>=1.20
 opentelemetry-sdk>=1.20
 opentelemetry-instrumentation-fastapi>=0.41b0
 opentelemetry-exporter-otlp-proto-http>=1.20
+
+# File upload parsing
+pypdf>=4.0
+python-docx>=1.1
+
+# Browser Web Push (optional — for browser push notifications)
+pywebpush>=2.0

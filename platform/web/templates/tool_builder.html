@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.tb-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; height: calc(100vh - 80px); }
+.tb-sidebar { background: var(--bg-secondary); border-radius: 10px; padding: 14px; overflow-y: auto; border: 1px solid var(--border); }
+.tb-main { overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+.tool-item { padding: 8px 10px; border-radius: 7px; cursor: pointer; border: 1px solid transparent; display: flex; align-items: center; gap: 8px; }
+.tool-item:hover, .tool-item.active { background: var(--bg-tertiary); border-color: var(--border); }
+.tool-item .tool-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); }
+.tool-item .tool-type { font-size: 0.72rem; padding: 1px 6px; border-radius: 8px; background: var(--bg-tertiary); color: var(--text-secondary); }
+.tool-item .tool-enabled { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.tb-card { background: var(--bg-secondary); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
+.tb-card h3 { margin: 0 0 14px; font-size: 1rem; }
+.form-grid { display: grid; gap: 10px; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.field-label { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 4px; }
+.fi { padding: 7px 10px; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); width: 100%; box-sizing: border-box; font-size: 0.85rem; }
+.fi:focus { outline: none; border-color: var(--accent, #58a6ff); }
+select.fi { cursor: pointer; }
+.config-editor { font-family: monospace; font-size: 0.78rem; resize: vertical; }
+.test-result { background: var(--bg-tertiary); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.78rem; white-space: pre-wrap; color: var(--text-primary); max-height: 200px; overflow-y: auto; }
+.btn { padding: 6px 14px; border-radius: 7px; border: 1px solid var(--border); cursor: pointer; font-size: 0.83rem; background: var(--bg-tertiary); color: var(--text-primary); }
+.btn:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent, #238636); border-color: transparent; color: #fff; }
+.btn-danger { background: #3c1c1c; border-color: #6e2020; color: #f47067; }
+.type-http { background: #1c3544; color: #58a6ff; }
+.type-sql { background: #1c3c2a; color: #3fb950; }
+.type-shell { background: #3d2a00; color: #d29922; }
+</style>
+
+<div class="page-header" style="margin-bottom:16px">
+  <h2 style="margin:0;font-size:1.3rem">Tool Builder</h2>
+  <button class="btn btn-primary" onclick="showCreateForm()">+ Nouveau Tool</button>
+</div>
+
+<div class="tb-layout">
+  <!-- Sidebar -->
+  <div class="tb-sidebar">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Custom Tools</div>
+    <div id="tools-list"></div>
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin:14px 0 8px;text-transform:uppercase;letter-spacing:.05em">Builtin Tools</div>
+    <div id="builtin-list" style="font-size:0.78rem;color:var(--text-secondary)">code_read, code_search, memory_search, git_tools, deploy_tools, web_tools…</div>
+  </div>
+
+  <!-- Main -->
+  <div class="tb-main">
+    <!-- Create / Edit form -->
+    <div id="tool-form" class="tb-card" style="display:none">
+      <h3 id="form-title">Nouveau Tool</h3>
+      <div class="form-grid">
+        <div class="form-row">
+          <div>
+            <div class="field-label">Nom *</div>
+            <input id="t-name" class="fi" placeholder="mon_tool">
+          </div>
+          <div>
+            <div class="field-label">Type *</div>
+            <select id="t-type" class="fi" onchange="updateConfigTemplate()">
+              <option value="http">HTTP (API call)</option>
+              <option value="sql">SQL (read-only)</option>
+              <option value="shell">Shell (restricted)</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Description</div>
+          <input id="t-desc" class="fi" placeholder="Ce que fait ce tool...">
+        </div>
+        <div>
+          <div class="field-label">Config (JSON)</div>
+          <textarea id="t-config" class="fi config-editor" rows="6"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="saveTool()">Enregistrer</button>
+          <button class="btn" onclick="document.getElementById('tool-form').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tool detail / test -->
+    <div id="tool-detail" class="tb-card" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 id="detail-name" style="margin:0"></h3>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="editTool()">Éditer</button>
+          <button class="btn" id="toggle-btn" onclick="toggleTool()">Désactiver</button>
+          <button class="btn btn-danger" onclick="deleteTool()">Supprimer</button>
+        </div>
+      </div>
+      <div id="detail-desc" style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:12px"></div>
+      <div style="margin-bottom:10px">
+        <span class="field-label">Type: </span><span id="detail-type" class="tool-type" style="display:inline-block"></span>
+        <span style="margin-left:12px;font-size:0.8rem;color:var(--text-secondary)">Enabled: <span id="detail-enabled"></span></span>
+      </div>
+      <div>
+        <div class="field-label">Config</div>
+        <pre id="detail-config" style="background:var(--bg-tertiary);padding:10px;border-radius:7px;font-size:0.78rem;overflow-x:auto;max-height:160px"></pre>
+      </div>
+      <div style="margin-top:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div class="field-label" style="margin:0">Tester</div>
+          <button class="btn btn-primary" onclick="testTool()">▶ Tester</button>
+        </div>
+        <div id="test-result" class="test-result" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="tb-card" style="text-align:center;color:var(--text-secondary);padding:40px">
+      <div style="font-size:2rem;margin-bottom:8px">🔧</div>
+      <div>Sélectionne un tool ou crée-en un nouveau.</div>
+      <div style="font-size:0.8rem;margin-top:6px">Types disponibles: HTTP (appels API), SQL (requêtes read-only), Shell (commandes autorisées)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentToolId = null;
+let editingId = null;
+
+const CONFIG_TEMPLATES = {
+  http: { url: "https://api.example.com/endpoint", method: "GET", headers: { "Authorization": "Bearer TOKEN" }, body_template: null },
+  sql: { query: "SELECT * FROM agents LIMIT 10" },
+  shell: { command: "echo hello", timeout_s: 5, allow_list: ["echo"] }
+};
+
+function updateConfigTemplate() {
+  const type = document.getElementById('t-type').value;
+  document.getElementById('t-config').value = JSON.stringify(CONFIG_TEMPLATES[type] || {}, null, 2);
+}
+
+function showCreateForm() {
+  editingId = null;
+  document.getElementById('form-title').textContent = 'Nouveau Tool';
+  document.getElementById('t-name').value = '';
+  document.getElementById('t-desc').value = '';
+  document.getElementById('t-type').value = 'http';
+  updateConfigTemplate();
+  document.getElementById('tool-form').style.display = '';
+  document.getElementById('tool-detail').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+}
+
+async function loadTools() {
+  const resp = await fetch('/api/tools/custom');
+  const tools = await resp.json();
+  const el = document.getElementById('tools-list');
+  el.innerHTML = tools.map(t => `
+    <div class="tool-item ${t.id===currentToolId?'active':''}" onclick="selectTool('${t.id}')">
+      <div class="tool-enabled" style="background:${t.enabled?'#3fb950':'#6e7681'}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="tool-name">${t.name}</div>
+      </div>
+      <span class="tool-type type-${t.type}">${t.type}</span>
+    </div>
+  `).join('') || '<div style="color:var(--text-secondary);font-size:0.8rem">Aucun tool</div>';
+}
+
+async function selectTool(toolId) {
+  currentToolId = toolId;
+  loadTools();
+  const resp = await fetch('/api/tools/custom');
+  const tools = await resp.json();
+  const tool = tools.find(t => t.id === toolId);
+  if (!tool) return;
+  document.getElementById('tool-form').style.display = 'none';
+  document.getElementById('tool-detail').style.display = '';
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('detail-name').textContent = tool.name;
+  document.getElementById('detail-desc').textContent = tool.description || '';
+  const tc = document.getElementById('detail-type');
+  tc.textContent = tool.type;
+  tc.className = `tool-type type-${tool.type}`;
+  document.getElementById('detail-enabled').textContent = tool.enabled ? 'Oui' : 'Non';
+  document.getElementById('toggle-btn').textContent = tool.enabled ? 'Désactiver' : 'Activer';
+  try {
+    document.getElementById('detail-config').textContent = JSON.stringify(JSON.parse(tool.config||'{}'), null, 2);
+  } catch { document.getElementById('detail-config').textContent = tool.config; }
+  document.getElementById('test-result').style.display = 'none';
+}
+
+function editTool() {
+  const name = document.getElementById('detail-name').textContent;
+  editingId = currentToolId;
+  document.getElementById('form-title').textContent = 'Éditer Tool';
+  document.getElementById('t-name').value = name;
+  document.getElementById('t-desc').value = document.getElementById('detail-desc').textContent;
+  const typeEl = document.getElementById('detail-type');
+  document.getElementById('t-type').value = typeEl.textContent;
+  document.getElementById('t-config').value = document.getElementById('detail-config').textContent;
+  document.getElementById('tool-form').style.display = '';
+}
+
+async function saveTool() {
+  const payload = {
+    name: document.getElementById('t-name').value.trim(),
+    description: document.getElementById('t-desc').value,
+    type: document.getElementById('t-type').value,
+    config: JSON.parse(document.getElementById('t-config').value || '{}')
+  };
+  if (!payload.name) { alert('Nom requis'); return; }
+  if (editingId) {
+    await fetch(`/api/tools/custom/${editingId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    currentToolId = editingId;
+  } else {
+    const resp = await fetch('/api/tools/custom', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await resp.json();
+    currentToolId = data.id;
+  }
+  document.getElementById('tool-form').style.display = 'none';
+  await loadTools();
+  selectTool(currentToolId);
+}
+
+async function toggleTool() {
+  await fetch(`/api/tools/custom/${currentToolId}/toggle`, { method: 'POST' });
+  await loadTools();
+  selectTool(currentToolId);
+}
+
+async function deleteTool() {
+  if (!confirm('Supprimer ce tool ?')) return;
+  await fetch(`/api/tools/custom/${currentToolId}`, { method: 'DELETE' });
+  currentToolId = null;
+  document.getElementById('tool-detail').style.display = 'none';
+  document.getElementById('empty-state').style.display = '';
+  loadTools();
+}
+
+async function testTool() {
+  const el = document.getElementById('test-result');
+  el.style.display = '';
+  el.textContent = 'Test en cours…';
+  try {
+    const resp = await fetch(`/api/tools/custom/${currentToolId}/test`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    const data = await resp.json();
+    el.textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    el.textContent = `Erreur: ${e.message}`;
+  }
+}
+
+loadTools();
+</script>
+{% endblock %}

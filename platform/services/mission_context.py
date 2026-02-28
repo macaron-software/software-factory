@@ -60,37 +60,54 @@ class MissionContextBuilder:
             for n in g_nodes:
                 aid = n.get("agent_id", "")
                 am = agent_map.get(aid, {})
-                enriched_global.append({
-                    "id": n["id"],
-                    "agent_id": aid,
-                    "label": am.get("name", n.get("label", aid)),
-                    "role": am.get("role", ""),
-                    "avatar": am.get("avatar_url", ""),
-                    "x": n.get("x", 0),
-                    "y": n.get("y", 0),
-                    "hierarchy_rank": am.get("hierarchy_rank", 50),
-                })
+                enriched_global.append(
+                    {
+                        "id": n["id"],
+                        "agent_id": aid,
+                        "label": am.get("name", n.get("label", aid)),
+                        "role": am.get("role", ""),
+                        "avatar": am.get("avatar_url", ""),
+                        "x": n.get("x", 0),
+                        "y": n.get("y", 0),
+                        "hierarchy_rank": am.get("hierarchy_rank", 50),
+                    }
+                )
             if not enriched_global and agents:
                 # fallback: use all agents
                 for i, a in enumerate(agents):
                     am = agent_map.get(a.id, {})
-                    enriched_global.append({
-                        "id": f"n-{a.id}", "agent_id": a.id,
-                        "label": am.get("name", a.id), "role": am.get("role", ""),
-                        "avatar": am.get("avatar_url", ""), "x": 0, "y": 0,
-                        "hierarchy_rank": am.get("hierarchy_rank", 50),
-                    })
+                    enriched_global.append(
+                        {
+                            "id": f"n-{a.id}",
+                            "agent_id": a.id,
+                            "label": am.get("name", a.id),
+                            "role": am.get("role", ""),
+                            "avatar": am.get("avatar_url", ""),
+                            "x": 0,
+                            "y": 0,
+                            "hierarchy_rank": am.get("hierarchy_rank", 50),
+                        }
+                    )
             workflow_graph = {
                 "nodes": enriched_global,
                 "edges": g_edges,
                 "pattern": global_graph.get("pattern", "hierarchical"),
                 "wf_name": wf.name,
                 "wf_id": wf.id,
-                "phases": [{"id": p.id, "name": p.name, "pattern_id": p.pattern_id or "sequential"} for p in wf.phases],
+                "phases": [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "pattern_id": p.pattern_id or "sequential",
+                    }
+                    for p in wf.phases
+                ],
             }
 
         # Session messages
-        messages, phase_messages = self._extract_messages(mission, wf, agent_map, get_session_store)
+        messages, phase_messages = self._extract_messages(
+            mission, wf, agent_map, get_session_store
+        )
 
         # Screenshots
         phase_screenshots = self._extract_screenshots(phase_messages, mission)
@@ -99,10 +116,14 @@ class MissionContextBuilder:
         memories, memory_groups = self._load_memories(mission, get_memory_manager)
 
         # Tool-extracted data
-        tool_commits, tool_prs, tool_features = self._extract_tool_data(mission, get_session_store)
+        tool_commits, tool_prs, tool_features = self._extract_tool_data(
+            mission, get_session_store
+        )
 
         # Pull requests & workspace commits
-        pull_requests, workspace_commits = self._load_git_data(mission, tool_prs, tool_commits)
+        pull_requests, workspace_commits = self._load_git_data(
+            mission, tool_prs, tool_commits
+        )
 
         # SI Blueprint
         si_blueprint = self._load_si_blueprint(mission)
@@ -126,7 +147,9 @@ class MissionContextBuilder:
         archi = self._load_architecture_data(mission, phase_messages, wf)
 
         # Wiki tab
-        wiki_pages, wiki_memories = self._load_wiki_data(mission, lessons, get_memory_manager)
+        wiki_pages, wiki_memories = self._load_wiki_data(
+            mission, lessons, get_memory_manager
+        )
 
         # Tab profiles
         tab_profile, support_tickets = self._build_tab_profile(mission, agent_map)
@@ -208,7 +231,9 @@ class MissionContextBuilder:
                         "color": am.get("color", "#8b949e"),
                         "tagline": getattr(adef, "tagline", "") or "" if adef else "",
                         "persona": getattr(adef, "persona", "") or "" if adef else "",
-                        "motivation": getattr(adef, "motivation", "") or "" if adef else "",
+                        "motivation": getattr(adef, "motivation", "") or ""
+                        if adef
+                        else "",
                         "skills": getattr(adef, "skills", []) or [] if adef else [],
                         "tools": getattr(adef, "tools", []) or [] if adef else [],
                         "model": getattr(adef, "model", "") or "" if adef else "",
@@ -225,7 +250,11 @@ class MissionContextBuilder:
                 p_nodes = [{"id": f"n-{a}", "agent_id": a} for a in aids]
 
             p_node_ids = {n["id"] for n in p_nodes}
-            p_edges = [e for e in all_edges if e["from"] in p_node_ids and e["to"] in p_node_ids]
+            p_edges = [
+                e
+                for e in all_edges
+                if e["from"] in p_node_ids and e["to"] in p_node_ids
+            ]
 
             pattern_id = wp.pattern_id or ""
             if len(p_nodes) >= 2:
@@ -254,7 +283,9 @@ class MissionContextBuilder:
         pids = [n["id"] for n in p_nodes]
         ranked = sorted(
             p_nodes,
-            key=lambda n: agent_map.get(n.get("agent_id", ""), {}).get("hierarchy_rank", 50),
+            key=lambda n: agent_map.get(n.get("agent_id", ""), {}).get(
+                "hierarchy_rank", 50
+            ),
         )
         leader_nid = ranked[0]["id"]
 
@@ -370,7 +401,9 @@ class MissionContextBuilder:
                 if m.message_type == "system" and m.from_agent == "system":
                     continue
                 _c = (m.content or "").strip()
-                if not _c or _c.startswith(("<FunctionCall", "<tool_code", "[TOOL_CALL]{")):
+                if not _c or _c.startswith(
+                    ("<FunctionCall", "<tool_code", "[TOOL_CALL]{")
+                ):
                     continue
                 ag = agent_map.get(m.from_agent)
                 meta = {}
@@ -399,7 +432,9 @@ class MissionContextBuilder:
         for pid, pmsgs in phase_messages.items():
             shots = []
             for m in pmsgs:
-                for match in re.finditer(r"\[SCREENSHOT:([^\]]+)\]", m.get("content", "")):
+                for match in re.finditer(
+                    r"\[SCREENSHOT:([^\]]+)\]", m.get("content", "")
+                ):
                     p = match.group(1).strip().lstrip("./")
                     shots.append(p)
             if shots:
@@ -464,12 +499,17 @@ class MissionContextBuilder:
         tool_features = []
         try:
             session_store = get_session_store()
-            all_msgs = session_store.get_messages(mission.session_id) if mission.session_id else []
+            all_msgs = (
+                session_store.get_messages(mission.session_id)
+                if mission.session_id
+                else []
+            )
             for m in all_msgs:
                 content = m.content or ""
                 if "git_commit" in content or "[TOOL_CALL]" in content:
                     for match in re.finditer(
-                        r'(?:git_commit|git commit)[^\n]*?["\']([^"\']{5,80})["\']', content
+                        r'(?:git_commit|git commit)[^\n]*?["\']([^"\']{5,80})["\']',
+                        content,
                     ):
                         tool_commits.append(
                             {
@@ -478,7 +518,8 @@ class MissionContextBuilder:
                             }
                         )
                     for match in re.finditer(
-                        r"(?:feat|fix|chore|refactor|test|docs)\([^)]+\):\s*(.{10,80})", content
+                        r"(?:feat|fix|chore|refactor|test|docs)\([^)]+\):\s*(.{10,80})",
+                        content,
                     ):
                         msg = match.group(0)
                         if msg not in [c["message"] for c in tool_commits]:
@@ -528,7 +569,13 @@ class MissionContextBuilder:
                 for i, branch in enumerate(branches[:10]):
                     status = "Open"
                     merged = subprocess.run(
-                        ["git", "branch", "--merged", "HEAD", "--format=%(refname:short)"],
+                        [
+                            "git",
+                            "branch",
+                            "--merged",
+                            "HEAD",
+                            "--format=%(refname:short)",
+                        ],
                         cwd=mission.workspace_path,
                         capture_output=True,
                         text=True,
@@ -536,7 +583,9 @@ class MissionContextBuilder:
                     )
                     if branch in merged.stdout:
                         status = "Merged"
-                    pull_requests.append({"number": i + 1, "title": branch, "status": status})
+                    pull_requests.append(
+                        {"number": i + 1, "title": branch, "status": status}
+                    )
             except Exception:
                 pass
             try:
@@ -551,7 +600,10 @@ class MissionContextBuilder:
                     if line.strip():
                         parts = line.strip().split(" ", 1)
                         workspace_commits.append(
-                            {"hash": parts[0], "message": parts[1] if len(parts) > 1 else ""}
+                            {
+                                "hash": parts[0],
+                                "message": parts[1] if len(parts) > 1 else "",
+                            }
                         )
             except Exception:
                 pass
@@ -741,9 +793,11 @@ class MissionContextBuilder:
                 ".tox",
                 "venv",
             }
-            dirs[:] = [d for d in sorted(dirs) if not d.startswith(".") and d not in _ws_exclude][
-                :20
-            ]
+            dirs[:] = [
+                d
+                for d in sorted(dirs)
+                if not d.startswith(".") and d not in _ws_exclude
+            ][:20]
             for f in sorted(files)[:30]:
                 if f.endswith(".bak"):
                     continue
@@ -793,7 +847,13 @@ class MissionContextBuilder:
         if not po_backlog and not po_sprint and not po_done and mission:
             from ..models import PhaseStatus
 
-            done_phases = {"deploy-prod", "qa-execution", "qa-campaign", "tma-router", "tma-fix"}
+            done_phases = {
+                "deploy-prod",
+                "qa-execution",
+                "qa-campaign",
+                "tma-router",
+                "tma-fix",
+            }
             sprint_phases = {"dev-sprint", "cicd"}
             for ph in mission.phases:
                 if not getattr(ph, "summary", None):
@@ -843,7 +903,9 @@ class MissionContextBuilder:
         except Exception:
             pass
         qa_pass_rate = (
-            round(qa_total_accepted / qa_total_iterations * 100) if qa_total_iterations > 0 else 0
+            round(qa_total_accepted / qa_total_iterations * 100)
+            if qa_total_iterations > 0
+            else 0
         )
 
         qa_test_files = []
@@ -891,12 +953,19 @@ class MissionContextBuilder:
                         rel = str(tf.relative_to(ws))
                         ttype = "unit"
                         lower = rel.lower()
-                        if "e2e" in lower or "integration" in lower or "journey" in lower:
+                        if (
+                            "e2e" in lower
+                            or "integration" in lower
+                            or "journey" in lower
+                        ):
                             ttype = "e2e"
                         elif "smoke" in lower:
                             ttype = "smoke"
                         elif (
-                            "ui" in lower or "ihm" in lower or "browser" in lower or "spec" in lower
+                            "ui" in lower
+                            or "ihm" in lower
+                            or "browser" in lower
+                            or "spec" in lower
                         ):
                             ttype = "e2e-ihm"
                         qa_test_files.append({"path": rel, "type": ttype})
@@ -917,7 +986,10 @@ class MissionContextBuilder:
                     if any(part in _qa_exclude for part in cf.relative_to(ws).parts):
                         continue
                     name = cf.name.lower()
-                    if not any(t in name for t in ("test_", "_test.", ".test.", ".spec.", "test")):
+                    if not any(
+                        t in name
+                        for t in ("test_", "_test.", ".test.", ".spec.", "test")
+                    ):
                         code_count += 1
             qa_coverage["code_count"] = code_count
             qa_coverage["ratio"] = round(len(qa_test_files) / max(code_count, 1) * 100)
@@ -947,7 +1019,12 @@ class MissionContextBuilder:
         qa_phase_results = []
         if wf:
             for wp in wf.phases:
-                pk = wp.name.lower().replace(" ", "-").replace("é", "e").replace("è", "e")
+                pk = (
+                    wp.name.lower()
+                    .replace(" ", "-")
+                    .replace("é", "e")
+                    .replace("è", "e")
+                )
                 if "qa" in pk or "test" in pk:
                     pmsgs = phase_messages.get(wp.id, [])
                     for m in pmsgs:
@@ -955,11 +1032,15 @@ class MissionContextBuilder:
                         if not content:
                             continue
                         passes = len(
-                            re.findall(r"(?:✅|PASS|passed|réussi|OK)", content, re.IGNORECASE)
+                            re.findall(
+                                r"(?:✅|PASS|passed|réussi|OK)", content, re.IGNORECASE
+                            )
                         )
                         fails = len(
                             re.findall(
-                                r"(?:❌|FAIL|failed|échoué|ERROR|KO)", content, re.IGNORECASE
+                                r"(?:❌|FAIL|failed|échoué|ERROR|KO)",
+                                content,
+                                re.IGNORECASE,
                             )
                         )
                         if passes or fails:
@@ -1004,7 +1085,9 @@ class MissionContextBuilder:
                     try:
                         archi_content = archi_file.read_text()[:8000]
                         mtime = archi_file.stat().st_mtime
-                        archi_updated = datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
+                        archi_updated = datetime.fromtimestamp(mtime).strftime(
+                            "%d/%m %H:%M"
+                        )
                     except Exception:
                         pass
                     break
@@ -1042,7 +1125,9 @@ class MissionContextBuilder:
                                 "choix",
                             )
                         ):
-                            archi_decisions.append({"phase": wp.name, "text": content[:400]})
+                            archi_decisions.append(
+                                {"phase": wp.name, "text": content[:400]}
+                            )
         archi_decisions = archi_decisions[:10]
         archi_stack = archi_stack[:15]
 
@@ -1074,7 +1159,9 @@ class MissionContextBuilder:
                         content = fpath.read_text()[:5000]
                         if len(content.strip()) > 20:
                             mtime = fpath.stat().st_mtime
-                            updated = datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
+                            updated = datetime.fromtimestamp(mtime).strftime(
+                                "%d/%m %H:%M"
+                            )
                             wiki_pages.append(
                                 {"title": title, "content": content, "updated": updated}
                             )
@@ -1099,7 +1186,9 @@ class MissionContextBuilder:
             wiki_memories.append(
                 {
                     "category": "lesson",
-                    "value": lesson[:200] if isinstance(lesson, str) else str(lesson)[:200],
+                    "value": lesson[:200]
+                    if isinstance(lesson, str)
+                    else str(lesson)[:200],
                 }
             )
         wiki_memories = wiki_memories[:20]
@@ -1161,6 +1250,7 @@ class MissionContextBuilder:
                     "fallback": "pentester-lead",
                 },
                 {"id": "workflow", "label": "Workflow", "icon": "share-2"},
+                {"id": "timeline", "label": "Timeline", "icon": "bar-chart-2"},
             ]
         elif wf_id == "rse-compliance":
             tab_profile = [
@@ -1201,6 +1291,7 @@ class MissionContextBuilder:
                     "fallback": "tech_writer",
                 },
                 {"id": "workflow", "label": "Workflow", "icon": "share-2"},
+                {"id": "timeline", "label": "Timeline", "icon": "bar-chart-2"},
             ]
         elif wf_id in ("tma-maintenance", "dsi-platform-tma"):
             tab_profile = [
@@ -1241,6 +1332,7 @@ class MissionContextBuilder:
                     "fallback": "plat-tma-lead",
                 },
                 {"id": "workflow", "label": "Workflow", "icon": "share-2"},
+                {"id": "timeline", "label": "Timeline", "icon": "bar-chart-2"},
             ]
         else:
             tab_profile = [
@@ -1281,6 +1373,7 @@ class MissionContextBuilder:
                     "fallback": "lead_dev",
                 },
                 {"id": "projet", "label": "Projet", "icon": "code"},
+                {"id": "timeline", "label": "Timeline", "icon": "bar-chart-2"},
                 {"id": "workflow", "label": "Workflow", "icon": "share-2"},
             ]
 

@@ -107,6 +107,13 @@ def _get_tool_registry():
         register_quality_tools(reg)
     except Exception:
         pass
+    # Project lifecycle tools (phase gate, docs, health, set_phase)
+    try:
+        from ..tools.project_tools import register_project_tools
+
+        register_project_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -319,6 +326,16 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
             # If FTS yields nothing, fallback to recent entries from project
             if not results:
                 results = mem.project_get(ctx.project_id, limit=8)
+            # Always include relevant global memory (cross-project learnings)
+            global_results = mem.global_search(query, limit=3) or []
+            for r in global_results:
+                results.append(
+                    {
+                        "key": r.get("key", ""),
+                        "value": r.get("value", ""),
+                        "category": f"global:{r.get('category', '')}",
+                    }
+                )
         else:
             results = mem.global_search(query, limit=5)
         # Also search session pattern memory (what other agents decided in THIS session)
@@ -362,10 +379,19 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
             return (
                 "Error: no project context — cannot store memory without project scope"
             )
+        # Use classified role (same as retrieval in prompt_builder) to ensure consistency
+        from .tool_schemas import _classify_agent_role
+
+        agent_role = _classify_agent_role(ctx.agent)
         mem.project_store(
-            ctx.project_id, key, value, category=category, source=ctx.agent.id
+            ctx.project_id,
+            key,
+            value,
+            category=category,
+            source=ctx.agent.id,
+            agent_role=agent_role,
         )
-        return f"Stored in project memory: [{key}] (by {ctx.agent.id})"
+        return f"Stored in project memory: [{key}] (by {ctx.agent.id}, role={agent_role or 'generic'})"
     except Exception as e:
         return f"Memory store error: {e}"
 
@@ -1103,7 +1129,12 @@ async def _tool_compose(name: str, args: dict, ctx: ExecutionContext) -> str:
     if not tool:
         return f"Error: composition tool '{name}' not found"
     agent_inst = (
-        AgentInstance(id=ctx.agent.id, name=ctx.agent.name, role=ctx.agent.role)
+        AgentInstance(
+            id=ctx.agent.id,
+            role_id=ctx.agent.id,
+            name=ctx.agent.name,
+            role=ctx.agent.role,
+        )
         if ctx.agent
         else None
     )
@@ -1281,46 +1312,45 @@ RULES:
         summary_parts.append(f"\n**Summary:** {llm_resp.content[:500]}")
 
     return "\n".join(summary_parts)
-    """Push a mission control SSE event via the A2A bus SSE listeners."""
-    from ..a2a.bus import get_bus
-
-    data["session_id"] = session_id
-    bus = get_bus()
-    dead = []
-    for q in bus._sse_listeners:
-        try:
-            q.put_nowait(data)
-        except asyncio.QueueFull:
-            dead.append(q)
-    for q in dead:
-        bus._sse_listeners.remove(q)
 
 
 # ── MCP Tool Handlers ─────────────────────────────────────────
 
 
 async def _tool_mcp_lrm(name: str, args: dict, ctx: ExecutionContext) -> str:
-    """Proxy to unified MCP SF server (localhost:9501, merged LRM+Platform)."""
+    """Proxy to LRM MCP server (localhost:9500/call or unified 9501/tool)."""
     import aiohttp
 
     tool_name = name.replace("lrm_", "")
     if ctx.project_id:
         args.setdefault("project", ctx.project_id)
-    try:
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                "http://localhost:9501/tool",
-                json={"name": tool_name, "arguments": args},
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp,
-        ):
-            if resp.status == 200:
-                data = await resp.json()
-                return str(data.get("result", data))[:8000]
-            return f"LRM error {resp.status}"
-    except Exception as e:
-        return f"LRM server unavailable: {e}"
+
+    # Try primary port 9500 (/call endpoint) first, fallback to 9501 (/tool)
+    endpoints = [
+        ("http://localhost:9500/call", {"name": tool_name, "arguments": args}),
+        ("http://localhost:9501/tool", {"name": tool_name, "arguments": args}),
+    ]
+    for url, payload in endpoints:
+        try:
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    url,
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp,
+            ):
+                if resp.status == 200:
+                    data = await resp.json()
+                    return str(data.get("result", data))[:8000]
+                if resp.status == 404:
+                    continue  # Try next endpoint
+                return f"LRM error {resp.status}"
+        except aiohttp.ClientConnectorError:
+            continue  # Try next endpoint
+        except Exception as e:
+            return f"LRM server unavailable: {e}"
+    return f"LRM tool '{tool_name}' unavailable (tried ports 9500, 9501)"
 
 
 async def _tool_mcp_figma(name: str, args: dict, ctx: ExecutionContext) -> str:
@@ -1533,6 +1563,156 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
     return result[:8000] if result else "No response from MCP"
 
 
+async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """PM lifecycle tools: phase management, health, mission suggestions."""
+    from ..projects.manager import get_project_store
+    from ..db.migrations import get_db
+
+    project_id = args.get("project_id") or ctx.project_id or ""
+    if not project_id and name not in ("activate_mission", "pause_mission"):
+        return "Error: project_id required"
+
+    if name == "get_project_health":
+        try:
+            store = get_project_store()
+            project = store.get(project_id)
+            if not project:
+                return f"Error: project '{project_id}' not found"
+            db = get_db()
+            try:
+                missions = db.execute(
+                    "SELECT id, name, type, status, category FROM missions WHERE project_id=? ORDER BY status",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            active = [m for m in missions if m["status"] == "active"]
+            blocked = [m for m in missions if m["status"] in ("failed", "interrupted")]
+            lines = [
+                f"Project: {project.name}",
+                f"Phase: {getattr(project, 'current_phase', '') or 'not set'}",
+                f"Missions: {len(missions)} total / {len(active)} active / {len(blocked)} blocked",
+            ]
+            if blocked:
+                lines.append("Blockers: " + ", ".join(m["name"] for m in blocked[:5]))
+            if active:
+                lines.append("Active: " + ", ".join(m["name"] for m in active[:5]))
+            return "\n".join(lines)
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "set_project_phase":
+        new_phase = args.get("phase", "")
+        if not new_phase:
+            return "Error: phase required"
+        try:
+            store = get_project_store()
+            project = store.get(project_id)
+            if not project:
+                return f"Error: project '{project_id}' not found"
+            db = get_db()
+            try:
+                db.execute(
+                    "UPDATE projects SET current_phase=? WHERE id=?",
+                    (new_phase, project_id),
+                )
+                db.commit()
+            finally:
+                db.close()
+            # Trigger heal_missions to re-evaluate system mission statuses
+            try:
+                from ..ops.auto_heal import heal_missions
+
+                await asyncio.get_event_loop().run_in_executor(
+                    None, heal_missions, project_id
+                )
+            except Exception:
+                pass
+            return f"Phase set to '{new_phase}' for project {project_id}. System missions rebalanced."
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "suggest_next_missions":
+        try:
+            db = get_db()
+            try:
+                existing = db.execute(
+                    "SELECT name, type, status FROM missions WHERE project_id=? ORDER BY status",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            store = get_project_store()
+            project = store.get(project_id)
+            phase = getattr(project, "current_phase", "") or "unknown"
+            active_names = {m["name"] for m in existing if m["status"] == "active"}
+            suggestions = []
+            if phase in ("discovery", "mvp") and not any(
+                "MVP" in n or "Feature" in n for n in active_names
+            ):
+                suggestions.append("Launch a Feature mission for MVP scope definition")
+            if phase in ("v1", "run") and not any(
+                "Security" in n for n in active_names
+            ):
+                suggestions.append(
+                    "Activate Security audit mission (required for production)"
+                )
+            if phase in ("v1", "run", "maintenance") and not any(
+                "TMA" in n or "maintenance" in n.lower() for n in active_names
+            ):
+                suggestions.append("Activate TMA (maintenance) mission")
+            if not suggestions:
+                suggestions.append("Current missions appear well-suited to the phase.")
+            return f"Phase: {phase}\nSuggestions:\n" + "\n".join(
+                f"- {s}" for s in suggestions
+            )
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name in ("activate_mission", "pause_mission"):
+        mission_id = args.get("mission_id", "")
+        if not mission_id:
+            return "Error: mission_id required"
+        new_status = "active" if name == "activate_mission" else "paused"
+        try:
+            db = get_db()
+            try:
+                cur = db.execute(
+                    "UPDATE missions SET status=? WHERE id=?",
+                    (new_status, mission_id),
+                )
+                db.commit()
+            finally:
+                db.close()
+            if cur.rowcount == 0:
+                return f"Error: mission '{mission_id}' not found"
+            return f"Mission {mission_id} → {new_status}"
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    if name == "check_phase_gate":
+        target_phase = args.get("target_phase", "")
+        # Simple gate check: all active missions must not be 'failed'
+        try:
+            db = get_db()
+            try:
+                failed = db.execute(
+                    "SELECT name FROM missions WHERE project_id=? AND status='failed'",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                db.close()
+            if failed:
+                return f"Gate BLOCKED — {len(failed)} failed mission(s): " + ", ".join(
+                    m["name"] for m in failed[:5]
+                )
+            return f"Gate OK — no blockers for transition to '{target_phase}'"
+        except Exception as exc:
+            return f"Error: {exc}"
+
+    return f"Error: unknown PM tool '{name}'"
+
+
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 
@@ -1632,6 +1812,21 @@ async def _execute_tool(
     except Exception as e:
         logger.debug("Permission check skipped: %s", e)
 
+    # ── Guardrails: critical action interception ──
+    try:
+        from .guardrails import check_guardrails
+
+        blocked = check_guardrails(
+            tool_name=name,
+            args=args,
+            agent_id=getattr(ctx.agent, "id", "") if ctx.agent else "",
+            session_id=ctx.session_id or "",
+        )
+        if blocked:
+            return blocked
+    except Exception as e:
+        logger.debug("Guardrails check skipped: %s", e)
+
     # Handle built-in tools that don't go through registry
     if name == "list_files":
         return await _tool_list_files(args)
@@ -1691,6 +1886,17 @@ async def _execute_tool(
     # ── Local CI pipeline ──
     if name == "local_ci":
         return await _tool_local_ci(args, ctx)
+
+    # ── PM lifecycle tools ──
+    if name in (
+        "set_project_phase",
+        "get_project_health",
+        "suggest_next_missions",
+        "activate_mission",
+        "pause_mission",
+        "check_phase_gate",
+    ):
+        return await _tool_pm_lifecycle(name, args, ctx)
 
     if name == "get_si_blueprint":
         return await _tool_si_blueprint(args, ctx)

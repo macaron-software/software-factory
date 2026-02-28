@@ -1,0 +1,26 @@
+# YoloNow — Event Discovery Platform
+# =====================================
+
+project:
+  id: yolonow
+  name: yolonow
+  display_name: "YoloNow - Event Discovery Platform"
+  root_path: ""
+  domain: saas
+  description: >
+    Application de découverte d'événements géolocalisés.
+    Recommandation IA, social features, billetterie intégrée.
+
+domains:
+  rust:
+    paths: [backend/]
+    extensions: [.rs]
+  svelte:
+    paths: [web/]
+    extensions: [.svelte, .ts]
+  swift:
+    paths: [ios/]
+    extensions: [.swift]
+  kotlin:
+    paths: [android/]
+    extensions: [.kt]

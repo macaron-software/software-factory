@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 
-{% block head_extra %}
+{% block scripts %}
     <script src="/static/js/chart.umd.min.js"></script>
-    <style>
+{% endblock %}
+
+{% block content %}
+<style>
         .analytics-container {
             padding: 2rem 3rem;
             max-width: 1800px;
@@ -111,10 +114,42 @@
             margin: 0;
             color: var(--text-primary);
         }
+        /* Cost Analytics */
+        .cost-section { margin-bottom: 3rem; }
+        .cost-section-title {
+            font-size: 1.3rem; font-weight: 700; margin: 0 0 1.25rem;
+            color: var(--text-primary); display: flex; align-items: center; gap: 8px;
+        }
+        .period-selector { display: flex; gap: 6px; }
+        .period-btn {
+            background: var(--bg-secondary); border: 1px solid var(--border);
+            color: var(--text-secondary); padding: 5px 14px; border-radius: var(--radius-md);
+            cursor: pointer; font-size: 0.85rem; transition: all 0.15s;
+        }
+        .period-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+        .period-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+        .cost-tables { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+        @media (max-width: 900px) { .cost-tables { grid-template-columns: 1fr; } }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+        .data-table th {
+            text-align: left; padding: 8px 12px; font-size: 0.78rem;
+            color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border); cursor: pointer; user-select: none;
+        }
+        .data-table th:hover { color: var(--text-primary); }
+        .data-table th.sort-asc::after { content: ' ↑'; }
+        .data-table th.sort-desc::after { content: ' ↓'; }
+        .data-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-subtle, var(--border)); }
+        .data-table tr:last-child td { border-bottom: none; }
+        .data-table tr:hover td { background: var(--bg-hover, rgba(255,255,255,0.03)); }
+        .bar-chart { display: flex; flex-direction: column; gap: 6px; padding: 4px 0; }
+        .bar-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+        .bar-label { width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-secondary); flex-shrink: 0; }
+        .bar-track { flex: 1; background: var(--bg-tertiary, rgba(255,255,255,0.06)); border-radius: 3px; height: 16px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s ease; min-width: 2px; }
+        .bar-val { width: 70px; text-align: right; color: var(--text-primary); font-family: monospace; font-size: 0.8rem; flex-shrink: 0; }
     </style>
-{% endblock %}
 
-{% block content %}
 <div class="analytics-container">
     <div class="page-header">
         <h1>Analytics Dashboard</h1>
@@ -123,7 +158,90 @@
             <span class="timestamp" id="last-update"></span>
         </div>
     </div>
-    
+
+    <!-- ══ Cost & Token Analytics ══ -->
+    <div class="cost-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+            <h2 class="cost-section-title">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+                Cost &amp; Token Analytics
+            </h2>
+            <div class="period-selector">
+                <button class="period-btn" data-period="1d" onclick="selectPeriod('1d')">1d</button>
+                <button class="period-btn active" data-period="7d" onclick="selectPeriod('7d')">7d</button>
+                <button class="period-btn" data-period="30d" onclick="selectPeriod('30d')">30d</button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Total Cost</h3>
+                <div class="stat-value" id="cost-total-usd">—</div>
+                <div class="stat-label">USD in period</div>
+            </div>
+            <div class="stat-card">
+                <h3>Tokens In</h3>
+                <div class="stat-value" id="cost-tokens-in">—</div>
+                <div class="stat-label">prompt tokens</div>
+            </div>
+            <div class="stat-card">
+                <h3>Tokens Out</h3>
+                <div class="stat-value" id="cost-tokens-out">—</div>
+                <div class="stat-label">completion tokens</div>
+            </div>
+            <div class="stat-card">
+                <h3>Success Rate</h3>
+                <div class="stat-value" id="cost-success-rate">—</div>
+                <div class="stat-label">mission completion</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg Cost / Mission</h3>
+                <div class="stat-value" id="cost-avg-mission">—</div>
+                <div class="stat-label">USD per mission run</div>
+            </div>
+            <div class="stat-card">
+                <h3>LLM Calls</h3>
+                <div class="stat-value" id="cost-calls">—</div>
+                <div class="stat-label">total API calls</div>
+            </div>
+        </div>
+
+        <!-- Daily cost bar chart -->
+        <div class="chart-card" style="margin-top:1.5rem;">
+            <h2>Daily Cost (USD)</h2>
+            <div id="cost-daily-chart" class="bar-chart" style="min-height:60px;"></div>
+        </div>
+
+        <!-- Tables: by project + by model -->
+        <div class="cost-tables">
+            <div class="chart-card">
+                <h2>Cost by Project</h2>
+                <table class="data-table" id="cost-project-table">
+                    <thead><tr>
+                        <th onclick="sortTable('cost-project-table',0)">Project</th>
+                        <th onclick="sortTable('cost-project-table',1)" style="text-align:right">Cost (USD)</th>
+                        <th onclick="sortTable('cost-project-table',2)" style="text-align:right">Tokens</th>
+                        <th onclick="sortTable('cost-project-table',3)" style="text-align:right">Missions</th>
+                    </tr></thead>
+                    <tbody id="cost-project-body"><tr><td colspan="4" style="color:var(--text-tertiary);text-align:center;padding:1.5rem">Loading…</td></tr></tbody>
+                </table>
+            </div>
+            <div class="chart-card">
+                <h2>Cost by Model</h2>
+                <table class="data-table" id="cost-model-table">
+                    <thead><tr>
+                        <th onclick="sortTable('cost-model-table',0)">Model</th>
+                        <th onclick="sortTable('cost-model-table',1)" style="text-align:right">Cost (USD)</th>
+                        <th onclick="sortTable('cost-model-table',2)" style="text-align:right">Calls</th>
+                    </tr></thead>
+                    <tbody id="cost-model-body"><tr><td colspan="3" style="color:var(--text-tertiary);text-align:center;padding:1.5rem">Loading…</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <!-- ══ End Cost Analytics ══ -->
+
     <!-- Key Metrics -->
     <div class="stats-grid">
         <div class="stat-card">
@@ -578,5 +696,123 @@ async function resumeAll() {
         alert('Resume failed: ' + e.message);
     }
 }
+
+// ── Cost & Token Analytics ──────────────────────────────────────────────────
+let _costPeriod = '7d';
+let _sortState = {};
+
+function selectPeriod(p) {
+    _costPeriod = p;
+    document.querySelectorAll('.period-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.period === p);
+    });
+    loadCostAnalytics();
+}
+
+function fmtUSD(v) {
+    if (v === 0) return '$0.00';
+    if (v < 0.001) return '$' + v.toFixed(6);
+    if (v < 1) return '$' + v.toFixed(4);
+    return '$' + v.toFixed(2);
+}
+
+function fmtNum(n) {
+    if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n/1e3).toFixed(1) + 'K';
+    return String(n);
+}
+
+function renderBarChart(containerId, items, labelKey, valueKey, fmtFn) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    if (!items || items.length === 0) {
+        el.innerHTML = '<div style="color:var(--text-tertiary);font-size:0.85rem;padding:1rem 0;">No data for this period.</div>';
+        return;
+    }
+    const max = Math.max(...items.map(i => i[valueKey])) || 1;
+    el.innerHTML = items.map(item => {
+        const pct = Math.max(2, (item[valueKey] / max) * 100);
+        return `<div class="bar-row">
+            <span class="bar-label" title="${item[labelKey]}">${item[labelKey]}</span>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            <span class="bar-val">${fmtFn(item[valueKey])}</span>
+        </div>`;
+    }).join('');
+}
+
+function sortTable(tableId, colIdx) {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const key = tableId + ':' + colIdx;
+    const asc = _sortState[key] !== true;
+    _sortState[key] = asc;
+
+    const ths = table.querySelectorAll('th');
+    ths.forEach((th, i) => {
+        th.classList.remove('sort-asc', 'sort-desc');
+        if (i === colIdx) th.classList.add(asc ? 'sort-asc' : 'sort-desc');
+    });
+
+    const tbody = table.querySelector('tbody');
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    rows.sort((a, b) => {
+        const av = a.cells[colIdx]?.dataset.val ?? a.cells[colIdx]?.textContent ?? '';
+        const bv = b.cells[colIdx]?.dataset.val ?? b.cells[colIdx]?.textContent ?? '';
+        const an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+        return asc ? av.localeCompare(bv) : bv.localeCompare(av);
+    });
+    rows.forEach(r => tbody.appendChild(r));
+}
+
+async function loadCostAnalytics() {
+    try {
+        const d = await fetch(`/api/analytics/cost?period=${_costPeriod}`).then(r => r.json());
+
+        document.getElementById('cost-total-usd').textContent = fmtUSD(d.total_cost_usd || 0);
+        document.getElementById('cost-tokens-in').textContent = fmtNum(d.total_tokens_in || 0);
+        document.getElementById('cost-tokens-out').textContent = fmtNum(d.total_tokens_out || 0);
+        document.getElementById('cost-success-rate').textContent = ((d.success_rate || 0) * 100).toFixed(1) + '%';
+        document.getElementById('cost-avg-mission').textContent = fmtUSD(d.avg_cost_per_mission || 0);
+        document.getElementById('cost-calls').textContent = fmtNum(d.total_calls || 0);
+
+        // Daily bar chart
+        renderBarChart('cost-daily-chart', d.by_day || [], 'date', 'cost', fmtUSD);
+
+        // Project table
+        const projBody = document.getElementById('cost-project-body');
+        if (projBody) {
+            if (!d.by_project || d.by_project.length === 0) {
+                projBody.innerHTML = '<tr><td colspan="4" style="color:var(--text-tertiary);text-align:center;padding:1.5rem">No data for this period.</td></tr>';
+            } else {
+                projBody.innerHTML = d.by_project.map(p => `<tr>
+                    <td>${p.name || p.project_id}</td>
+                    <td data-val="${p.cost}" style="text-align:right;font-family:monospace">${fmtUSD(p.cost)}</td>
+                    <td data-val="${p.tokens}" style="text-align:right">${fmtNum(p.tokens)}</td>
+                    <td data-val="${p.missions}" style="text-align:right">${p.missions}</td>
+                </tr>`).join('');
+            }
+        }
+
+        // Model table
+        const modelBody = document.getElementById('cost-model-body');
+        if (modelBody) {
+            if (!d.by_model || d.by_model.length === 0) {
+                modelBody.innerHTML = '<tr><td colspan="3" style="color:var(--text-tertiary);text-align:center;padding:1.5rem">No data for this period.</td></tr>';
+            } else {
+                modelBody.innerHTML = d.by_model.map(m => `<tr>
+                    <td>${m.model}</td>
+                    <td data-val="${m.cost}" style="text-align:right;font-family:monospace">${fmtUSD(m.cost)}</td>
+                    <td data-val="${m.calls}" style="text-align:right">${fmtNum(m.calls)}</td>
+                </tr>`).join('');
+            }
+        }
+    } catch (e) {
+        console.warn('Cost analytics load error:', e);
+    }
+}
+
+loadCostAnalytics();
 </script>
 {% endblock %}
