@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .agents import router as agents_router
 from .analytics import router as analytics_router
+from .cto import router as cto_router
 from .evals import router as evals_router
 from .tool_builder import router as tool_builder_router
 from .api import router as api_router
@@ -38,6 +39,7 @@ router.include_router(notifications_router)
 router.include_router(tma_router)
 router.include_router(wiki_router)
 router.include_router(analytics_router)
+router.include_router(cto_router)
 router.include_router(evals_router)
 router.include_router(tool_builder_router)
 
