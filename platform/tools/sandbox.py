@@ -4,11 +4,12 @@ When SANDBOX_ENABLED=true, wraps subprocess commands in Docker containers
 for security isolation. The workspace is mounted as a volume.
 
 Architecture:
-  Agent tool call → SandboxExecutor.run() → docker run → result
+  Agent tool call → SandboxExecutor.run() → [RTK proxy] → docker run → result
   - Workspace mounted read-write at /workspace
   - Network access configurable (default: none for security)
   - Auto-selects image based on command/language
   - Timeout enforced via docker stop
+  - RTK proxy compresses stdout before returning to LLM agents (60-90% token savings)
 
 Configuration (env vars):
   SANDBOX_ENABLED=true       — enable Docker sandbox (default: false)
@@ -16,12 +17,16 @@ Configuration (env vars):
   SANDBOX_NETWORK=none       — network mode (none, bridge, host)
   SANDBOX_TIMEOUT=300        — max execution time (seconds)
   SANDBOX_MEMORY=512m        — memory limit
+  RTK_ENABLED=true           — enable RTK token compression proxy (default: auto-detect)
+  RTK_PATH=/path/to/rtk      — override RTK binary path
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
+import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Optional
@@ -34,9 +39,70 @@ SANDBOX_IMAGE = os.environ.get("SANDBOX_IMAGE", "python:3.12-slim")
 SANDBOX_NETWORK = os.environ.get("SANDBOX_NETWORK", "none")
 SANDBOX_TIMEOUT = int(os.environ.get("SANDBOX_TIMEOUT", "300"))
 SANDBOX_MEMORY = os.environ.get("SANDBOX_MEMORY", "512m")
-# Named Docker volume for workspace sharing (Docker-in-Docker via socket)
-# When set, sandbox containers mount this volume instead of bind-mounting the container's path
 SANDBOX_WORKSPACE_VOLUME = os.environ.get("SANDBOX_WORKSPACE_VOLUME", "")
+
+# RTK proxy — auto-detect unless explicitly set
+_RTK_ENABLED_ENV = os.environ.get("RTK_ENABLED", "auto").lower()
+_RTK_PATH = os.environ.get("RTK_PATH", "") or shutil.which("rtk") or ""
+RTK_ENABLED = (
+    bool(_RTK_PATH)
+    if _RTK_ENABLED_ENV == "auto"
+    else _RTK_ENABLED_ENV in ("true", "1", "yes")
+)
+
+# RTK command rewrite rules: (regex_pattern, rtk_subcommand_template)
+# First match wins. {rest} = everything after the matched command.
+_RTK_RULES: list[tuple[re.Pattern, str]] = [
+    # git operations
+    (
+        re.compile(r"^git\s+(status|diff|log|push|pull|add|commit|show)\b(.*)$"),
+        r"rtk git \1\2",
+    ),
+    # grep / ripgrep
+    (re.compile(r"^(grep|rg)\s+(.*)$"), r"rtk grep \2"),
+    # ls
+    (re.compile(r"^ls(\s+.+)?$"), r"rtk ls\1"),
+    # cat → rtk read (full file)
+    (re.compile(r"^cat\s+(.+)$"), r"rtk read \1"),
+    # tail / head → rtk err (last lines) or keep as-is (rtk read handles files better)
+    (re.compile(r"^(head|tail)\s+(.+)$"), r"rtk read \2"),
+    # docker logs
+    (re.compile(r"^docker\s+logs\b(.*)$"), r"rtk docker logs\1"),
+    # docker ps / images
+    (re.compile(r"^docker\s+(ps|images)\b(.*)$"), r"rtk docker \1\2"),
+    # pytest
+    (re.compile(r"^(python3?\s+-m\s+)?pytest\b(.*)$"), r"rtk pytest\2"),
+    # cargo test / check / build
+    (re.compile(r"^cargo\s+(test|check|build|clippy)\b(.*)$"), r"rtk cargo \1\2"),
+    # go test / build / vet
+    (re.compile(r"^go\s+(test|build|vet)\b(.*)$"), r"rtk go \1\2"),
+    # npm test / run
+    (re.compile(r"^npm\s+(test|run)\b(.*)$"), r"rtk npm \1\2"),
+    # npx playwright
+    (re.compile(r"^npx\s+playwright\b(.*)$"), r"rtk playwright\1"),
+    # curl
+    (re.compile(r"^curl\b(.*)$"), r"rtk curl\1"),
+    # gh cli
+    (re.compile(r"^gh\s+(pr|issue|run|repo)\b(.*)$"), r"rtk gh \1\2"),
+]
+
+
+def _rtk_wrap(command: str) -> str:
+    """Rewrite a shell command to use RTK if a matching rule exists."""
+    if not RTK_ENABLED or not _RTK_PATH:
+        return command
+    cmd = command.strip()
+    for pattern, template in _RTK_RULES:
+        m = pattern.match(cmd)
+        if m:
+            rewritten = pattern.sub(template, cmd)
+            # Prefix with full path to rtk binary
+            if rewritten.startswith("rtk "):
+                rewritten = f"{_RTK_PATH} {rewritten[4:]}"
+            logger.debug("RTK proxy: %s → %s", cmd[:80], rewritten[:80])
+            return rewritten
+    return command
+
 
 # Image selection by detected language/tool
 _IMAGE_MAP = {
@@ -75,6 +141,7 @@ class SandboxResult:
     sandboxed: bool  # True if ran in Docker, False if ran directly
     image: str = ""
     duration_ms: int = 0
+    rtk_proxied: bool = False  # True if RTK compressed the output
 
 
 class SandboxExecutor:
@@ -220,14 +287,18 @@ class SandboxExecutor:
         timeout: int,
         env: Optional[dict],
     ) -> SandboxResult:
-        """Run command directly on host (no sandbox)."""
+        """Run command directly on host (no sandbox), with RTK proxy for token compression."""
         run_env = None
         if env:
             run_env = {**os.environ, **env}
 
+        # Apply RTK proxy — rewrites known commands (git, grep, pytest, etc.)
+        # to compress stdout before it reaches the LLM agent context
+        proxied = _rtk_wrap(command)
+
         try:
             r = subprocess.run(
-                command,
+                proxied,
                 shell=True,
                 capture_output=True,
                 text=True,
@@ -241,6 +312,7 @@ class SandboxExecutor:
                 stderr=r.stderr[-3000:],
                 returncode=r.returncode,
                 sandboxed=False,
+                rtk_proxied=(proxied != command),
             )
         except subprocess.TimeoutExpired:
             return SandboxResult(

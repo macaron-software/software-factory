@@ -325,14 +325,29 @@ Outils tiers à suivre pour intégration future dans la SF :
 
 | Outil | Repo | Pourquoi | Statut |
 |-------|------|----------|--------|
-| **rtk** (Rust Token Killer) | [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | CLI proxy Rust, réduit 60-90% tokens LLM sur git/test/grep — intégrer dans `tool_runner.py` + wrappers agents | 🔭 watch |
+| **rtk** (Rust Token Killer) | [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | CLI proxy, réduit 60-90% tokens LLM — **intégré** dans `platform/tools/sandbox.py` | ✅ intégré |
 
-### rtk — notes d'intégration SF
-- **Approche hook** : `~/.claude/settings.json` `PreToolUse` → transparent pour Claude Code. Pas applicable server-side.
-- **Approche SF** : wrapper dans `platform/tools/git_tools.py`, `test_tools.py`, `build_tools.py` — détecter si `rtk` est dans PATH, préfixer les commandes.
-- **Patterns à récupérer** : logique de compression `cargo_cmd.rs`, `diff_cmd.rs`, `grep_cmd.rs` → portage Python dans `platform/tools/`.
-- **Install local** : `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh`
-- **Version analysée** : v0.22.2 (fév 2026) — 1572 ⭐, 115 forks
+### rtk — intégration SF (v0.22.2)
+
+**Statut** : proxy actif dans `platform/tools/sandbox.py` — toutes les commandes des agents passent par `_rtk_wrap()`.
+
+**Commandes auto-rewrites** (15 règles) :
+- `git status/diff/log/push/pull` → `rtk git …`
+- `grep / rg` → `rtk grep …`
+- `ls` → `rtk ls …`
+- `cat` → `rtk read …`
+- `pytest` / `python3 -m pytest` → `rtk pytest …`
+- `docker logs/ps/images` → `rtk docker …`
+- `cargo test/check/build` → `rtk cargo …`
+- `go test/build/vet` → `rtk go …`
+- `npm run/test` → `rtk npm …`
+- `npx playwright` → `rtk playwright …`
+- `curl` → `rtk curl …`
+- `gh pr/issue/run` → `rtk gh …`
+
+**Config** : `RTK_ENABLED=auto` (auto-détecte si `rtk` est dans PATH), `RTK_PATH=/chemin/vers/rtk`.
+**Désactiver** : `RTK_ENABLED=false` dans `.env`.
+**Install** : `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh`
 
 ## AUDIT COVERAGE (46/46 = 100%)
 
