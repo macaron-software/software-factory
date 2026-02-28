@@ -43,6 +43,8 @@ _STAGGER_WATCHDOG = 15.0
 _MAX_STARTUP_BATCH = 1    # only 1 mission at startup (safe default)
 # Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
 _CLEANUP_EVERY_N_CYCLES = 12
+# GA health: P1 if all proposals pending > 1h with no approved
+_GA_STALL_THRESHOLD_SECS = 3600  # 1h
 
 # Auto-launch new runs
 _LAUNCH_PER_CYCLE = 2   # max new launches per watchdog cycle
@@ -159,6 +161,11 @@ async def auto_resume_missions() -> None:
                 await _enforce_container_ttl_and_slots()
             except Exception as e_ttl:
                 logger.warning("auto_resume: container TTL error: %s", e_ttl)
+            # Every cycle: GA health P1 check (stall > 1h → auto-approve bootstrap)
+            try:
+                await check_ga_health()
+            except Exception as e_ga:
+                logger.warning("auto_resume: GA health check error: %s", e_ga)
             first_pass = False
         except Exception as e:
             logger.error("auto_resume watchdog error: %s", e)
@@ -790,6 +797,65 @@ async def _launch_new_run(
     get_mission_run_store().create(run)
     await _launch_run(run_id)
     return run_id
+
+
+async def check_ga_health() -> None:
+    """P1 watchdog: if all GA proposals are pending for > 1h with none approved,
+    auto-approve the best per workflow (bootstrap) and log a P1 warning.
+    Runs every watchdog cycle (~5 min) but only acts once per stall episode."""
+    from ..db.migrations import get_db
+    import time as _time
+
+    db = get_db()
+    try:
+        # Count pending proposals older than threshold
+        stall_row = db.execute(
+            """SELECT COUNT(*) FROM evolution_proposals
+               WHERE status = 'pending'
+               AND (strftime('%s','now') - strftime('%s', created_at)) > ?""",
+            (_GA_STALL_THRESHOLD_SECS,),
+        ).fetchone()
+        stalled_count = stall_row[0] if stall_row else 0
+        if stalled_count == 0:
+            return
+
+        # Check if any approved exist (would mean GA is healthy)
+        approved_row = db.execute(
+            "SELECT COUNT(*) FROM evolution_proposals WHERE status = 'approved'"
+        ).fetchone()
+        approved_count = approved_row[0] if approved_row else 0
+
+        if approved_count > 0:
+            return  # GA has approved proposals — not stalled
+
+        # P1: GA fully stalled — auto-approve best per workflow to bootstrap
+        logger.warning(
+            "P1 GA STALL: %d proposals pending >1h, 0 approved — auto-approving best per workflow",
+            stalled_count,
+        )
+        db.execute(
+            """UPDATE evolution_proposals
+               SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP
+               WHERE id IN (
+                   SELECT id FROM evolution_proposals ep1
+                   WHERE status = 'pending' AND fitness > 0
+                   AND NOT EXISTS (
+                       SELECT 1 FROM evolution_proposals ep2
+                       WHERE ep2.base_wf_id = ep1.base_wf_id
+                         AND ep2.fitness > ep1.fitness
+                         AND ep2.status = 'pending'
+                   )
+               )"""
+        )
+        db.commit()
+        approved_now = db.execute(
+            "SELECT COUNT(*) FROM evolution_proposals WHERE status = 'approved'"
+        ).fetchone()[0]
+        logger.warning("P1 GA STALL resolved: %d proposals auto-approved", approved_now)
+    except Exception as e:
+        logger.error("check_ga_health error: %s", e)
+    finally:
+        db.close()
 
 
 async def _cleanup_disk() -> None:
