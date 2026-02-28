@@ -155,20 +155,6 @@ def _migrate(conn):
             conn.execute(
                 "ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''"
             )
-        if mr_cols and "llm_cost_usd" not in mr_cols:
-            conn.execute(
-                "ALTER TABLE mission_runs ADD COLUMN llm_cost_usd REAL DEFAULT 0.0"
-            )
-        if mr_cols and "resume_attempts" not in mr_cols:
-            conn.execute(
-                "ALTER TABLE mission_runs ADD COLUMN resume_attempts INTEGER DEFAULT 0"
-            )
-        if mr_cols and "human_input_required" not in mr_cols:
-            conn.execute(
-                "ALTER TABLE mission_runs ADD COLUMN human_input_required INTEGER DEFAULT 0"
-            )
-        if mr_cols and "last_resume_at" not in mr_cols:
-            conn.execute("ALTER TABLE mission_runs ADD COLUMN last_resume_at TEXT")
     except Exception:
         pass
 
@@ -1287,103 +1273,6 @@ def _migrate(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Knowledge Intelligence columns — memory_pattern
-    try:
-        mpt_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(memory_pattern)").fetchall()
-        }
-        if mpt_cols:
-            for col, ddl in [
-                (
-                    "access_count",
-                    "ALTER TABLE memory_pattern ADD COLUMN access_count INTEGER DEFAULT 0",
-                ),
-                (
-                    "last_read_at",
-                    "ALTER TABLE memory_pattern ADD COLUMN last_read_at TEXT DEFAULT NULL",
-                ),
-                (
-                    "relevance_score",
-                    "ALTER TABLE memory_pattern ADD COLUMN relevance_score REAL DEFAULT 0.5",
-                ),
-                (
-                    "tags_json",
-                    "ALTER TABLE memory_pattern ADD COLUMN tags_json TEXT DEFAULT '[]'",
-                ),
-            ]:
-                if col not in mpt_cols:
-                    conn.execute(ddl)
-    except Exception:
-        pass
-
-    # Agent role column in memory_project (cross-session role-scoped memory)
-    try:
-        mp_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
-        }
-        if mp_cols and "agent_role" not in mp_cols:
-            conn.execute(
-                "ALTER TABLE memory_project ADD COLUMN agent_role TEXT DEFAULT ''"
-            )
-    except Exception:
-        pass
-
-    # Knowledge Intelligence columns — access tracking + relevance scoring
-    try:
-        mp_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
-        }
-        if mp_cols:
-            for col, ddl in [
-                (
-                    "access_count",
-                    "ALTER TABLE memory_project ADD COLUMN access_count INTEGER DEFAULT 0",
-                ),
-                (
-                    "last_read_at",
-                    "ALTER TABLE memory_project ADD COLUMN last_read_at TEXT DEFAULT NULL",
-                ),
-                (
-                    "relevance_score",
-                    "ALTER TABLE memory_project ADD COLUMN relevance_score REAL DEFAULT 0.5",
-                ),
-                (
-                    "tags_json",
-                    "ALTER TABLE memory_project ADD COLUMN tags_json TEXT DEFAULT '[]'",
-                ),
-            ]:
-                if col not in mp_cols:
-                    conn.execute(ddl)
-    except Exception:
-        pass
-    try:
-        mg_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(memory_global)").fetchall()
-        }
-        if mg_cols:
-            for col, ddl in [
-                (
-                    "access_count",
-                    "ALTER TABLE memory_global ADD COLUMN access_count INTEGER DEFAULT 0",
-                ),
-                (
-                    "last_read_at",
-                    "ALTER TABLE memory_global ADD COLUMN last_read_at TEXT DEFAULT NULL",
-                ),
-                (
-                    "relevance_score",
-                    "ALTER TABLE memory_global ADD COLUMN relevance_score REAL DEFAULT 0.5",
-                ),
-                (
-                    "tags_json",
-                    "ALTER TABLE memory_global ADD COLUMN tags_json TEXT DEFAULT '[]'",
-                ),
-            ]:
-                if col not in mg_cols:
-                    conn.execute(ddl)
-    except Exception:
-        pass
-
     _ensure_sqlite_tables(conn)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
@@ -1415,8 +1304,6 @@ def _ensure_sqlite_tables(conn) -> None:
             prompt TEXT,
             status TEXT DEFAULT 'running',
             result_json TEXT DEFAULT '{}',
-            mission_id TEXT,
-            project_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -1430,89 +1317,62 @@ def _ensure_sqlite_tables(conn) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
-    # Admin audit log
+    # Eval framework tables
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS admin_audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-            actor TEXT NOT NULL DEFAULT 'system',
-            action TEXT NOT NULL,
-            resource_type TEXT,
-            resource_id TEXT,
-            detail TEXT,
-            ip TEXT,
-            user_agent TEXT
+        CREATE TABLE IF NOT EXISTS eval_datasets (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            description TEXT,
+            agent_id TEXT,
+            created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
-    # Platform settings (rate limits, budget config, etc.)
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS platform_settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        CREATE TABLE IF NOT EXISTS eval_cases (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT,
+            prompt TEXT NOT NULL,
+            expected_output TEXT,
+            tags TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    # ── Multi-tenant Workspaces (added 2026-06) ──────────────────────────────
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS workspaces (
+        CREATE TABLE IF NOT EXISTS eval_runs (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT,
+            agent_id TEXT,
+            status TEXT DEFAULT 'pending',
+            score_avg REAL,
+            created_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_results (
+            id TEXT PRIMARY KEY,
+            run_id TEXT,
+            case_id TEXT,
+            actual_output TEXT,
+            score REAL,
+            judge_feedback TEXT,
+            latency_ms INTEGER,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    # Custom tools table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS custom_tools (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
-            slug TEXT UNIQUE NOT NULL,
-            description TEXT DEFAULT '',
-            color TEXT DEFAULT '#6366f1',
-            owner TEXT DEFAULT 'admin',
+            description TEXT,
+            type TEXT NOT NULL,
+            config TEXT NOT NULL DEFAULT '{}',
+            enabled INTEGER DEFAULT 1,
             created_at TEXT DEFAULT (datetime('now')),
-            settings TEXT DEFAULT '{}'
+            updated_at TEXT DEFAULT (datetime('now'))
         )
     """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS workspace_members (
-            workspace_id TEXT,
-            user_id TEXT,
-            role TEXT DEFAULT 'member',
-            PRIMARY KEY (workspace_id, user_id)
-        )
-    """)
-    conn.execute(
-        "INSERT OR IGNORE INTO workspaces (id, name, slug, description) VALUES ('default', 'Default', 'default', 'Workspace par défaut')"
-    )
-    for table in ["sessions", "missions", "projects"]:
-        try:
-            existing_cols = {
-                r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()
-            }
-            if "workspace_id" not in existing_cols:
-                conn.execute(
-                    f"ALTER TABLE {table} ADD COLUMN workspace_id TEXT DEFAULT 'default'"
-                )
-        except Exception:
-            pass
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS api_key_scopes (
-            key_id TEXT NOT NULL,
-            scope TEXT NOT NULL,
-            PRIMARY KEY (key_id, scope)
-        )
-    """)
-    # Group ideation sessions (added 2026-06)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
-            id TEXT PRIMARY KEY,
-            group_id TEXT NOT NULL,
-            title TEXT,
-            prompt TEXT,
-            status TEXT DEFAULT 'active',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
-    )
     conn.commit()
 
 
@@ -1558,20 +1418,6 @@ def _migrate_pg(conn):
     """)
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_mkt_ideation_findings_session ON mkt_ideation_findings(session_id)"
-    )
-    # Group ideation sessions table (added 2026-06)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
-            id TEXT PRIMARY KEY,
-            group_id TEXT NOT NULL,
-            title TEXT,
-            prompt TEXT,
-            status TEXT DEFAULT 'active',
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
     )
     # MCP server registry (added 2026-02)
     conn.execute("""
@@ -1650,20 +1496,12 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
     )
-    # Ensure all columns exist (migrate old schema that may be missing some)
-    for _col, _type, _default in [
-        ("complexity_tier", "TEXT", "'simple'"),
-        ("mission_id", "TEXT", "''"),
-        ("agent_ids_json", "TEXT", "''"),
-        ("rejection_count", "INTEGER", "0"),
-        ("duration_secs", "REAL", "0.0"),
-    ]:
-        try:
-            conn.execute(
-                f"ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS {_col} {_type} DEFAULT {_default}"
-            )
-        except Exception:
-            pass
+    try:
+        conn.execute(
+            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS complexity_tier TEXT DEFAULT 'simple'"
+        )
+    except Exception:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_pair_scores (
             id SERIAL PRIMARY KEY,
@@ -1679,62 +1517,6 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
     )
-    # Eval framework (added 2026-02)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS eval_datasets (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            agent_id TEXT DEFAULT '',
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS eval_cases (
-            id TEXT PRIMARY KEY,
-            dataset_id TEXT NOT NULL,
-            prompt TEXT NOT NULL,
-            expected_output TEXT DEFAULT '',
-            tags TEXT DEFAULT '[]',
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS eval_runs (
-            id TEXT PRIMARY KEY,
-            dataset_id TEXT NOT NULL,
-            agent_id TEXT DEFAULT '',
-            status TEXT DEFAULT 'pending',
-            score_avg REAL,
-            created_at TEXT DEFAULT (datetime('now')),
-            completed_at TEXT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS eval_results (
-            id TEXT PRIMARY KEY,
-            run_id TEXT NOT NULL,
-            case_id TEXT NOT NULL,
-            actual_output TEXT DEFAULT '',
-            score REAL,
-            judge_feedback TEXT DEFAULT '',
-            latency_ms INTEGER DEFAULT 0,
-            created_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
-    # Tool Builder (added 2026-02)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS custom_tools (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            description TEXT DEFAULT '',
-            type TEXT NOT NULL,
-            config TEXT DEFAULT '{}',
-            enabled INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    """)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
@@ -1880,82 +1662,19 @@ def _ensure_darwin_tables(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
     )
 
-    # Agent role column in memory_project (cross-session role-scoped memory)
-    conn.execute("""
-        ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS agent_role TEXT DEFAULT ''
-    """)
-
-    # Knowledge Intelligence columns — access tracking + relevance scoring
-    conn.execute(
-        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0"""
-    )
-    conn.execute(
-        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS last_read_at TEXT DEFAULT NULL"""
-    )
-    conn.execute(
-        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS relevance_score REAL DEFAULT 0.5"""
-    )
-    conn.execute(
-        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS tags_json TEXT DEFAULT '[]'"""
-    )
-
-    # Admin audit log
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS admin_audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-            actor TEXT NOT NULL DEFAULT 'system',
-            action TEXT NOT NULL,
-            resource_type TEXT,
-            resource_id TEXT,
-            detail TEXT,
-            ip TEXT,
-            user_agent TEXT
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
-
-    # Platform API keys
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS platform_api_keys (
-            id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            key_prefix TEXT NOT NULL,
-            key_hash TEXT NOT NULL UNIQUE,
-            workspace TEXT DEFAULT 'default',
-            permissions TEXT DEFAULT '["read","write"]',
-            rate_limit INTEGER DEFAULT 1000,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-            last_used_at TEXT,
-            expires_at TEXT
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS api_key_scopes (
-            key_id TEXT NOT NULL,
-            scope TEXT NOT NULL,
-            PRIMARY KEY (key_id, scope)
-        )
-    """)
-
-    # Webhook configs
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS webhook_configs (
-            id TEXT PRIMARY KEY,
-            source TEXT NOT NULL,
-            event_filter TEXT DEFAULT '*',
-            workflow_id TEXT NOT NULL,
-            project_id TEXT,
-            is_active INTEGER DEFAULT 1,
-            secret_env TEXT DEFAULT '',
-            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-            description TEXT DEFAULT ''
-        )
-    """)
+    # Migrations: category + active_phases on missions
+    try:
+        m_cols3 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
+        if m_cols3 and "category" not in m_cols3:
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN category TEXT DEFAULT 'functional'"
+            )
+        if m_cols3 and "active_phases_json" not in m_cols3:
+            conn.execute(
+                "ALTER TABLE missions ADD COLUMN active_phases_json TEXT DEFAULT '[]'"
+            )
+    except Exception:
+        pass
 
     conn.commit()
 
@@ -1977,6 +1696,4 @@ def get_db(db_path: Path = DB_PATH):
         conn.execute("SELECT COUNT(*) FROM team_fitness")
     except Exception:
         _ensure_darwin_tables(conn)
-    # Ensure all SQLite-only tables exist on existing DBs (idempotent)
-    _ensure_sqlite_tables(conn)
     return conn

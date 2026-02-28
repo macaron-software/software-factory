@@ -20,7 +20,7 @@ Handles:
 import os
 import re
 import sqlite3
-from typing import Any, Sequence
+from typing import Any, Optional, Sequence
 
 try:
     import psycopg
@@ -40,14 +40,12 @@ def _get_pg_pool():
     """Get or create the PostgreSQL connection pool (lazy, thread-safe)."""
     global _pg_pool, _pg_pool_lock
     import threading
-
     if _pg_pool_lock is None:
         _pg_pool_lock = threading.Lock()
     if _pg_pool is None:
         with _pg_pool_lock:
             if _pg_pool is None:
                 from psycopg_pool import ConnectionPool
-
                 conninfo = _PG_URL
                 if "connect_timeout" not in conninfo:
                     sep = "&" if "?" in conninfo else "?"
@@ -55,9 +53,8 @@ def _get_pg_pool():
                 _pg_pool = ConnectionPool(
                     conninfo=conninfo,
                     min_size=2,
-                    max_size=50,
-                    max_idle=120,  # 2 min idle timeout — reclaim faster
-                    timeout=5,  # fail fast if pool exhausted (default was 30s)
+                    max_size=20,
+                    max_idle=300,  # 5 min idle timeout
                     open=True,
                 )
     return _pg_pool
@@ -80,19 +77,16 @@ _DATETIME_RE = re.compile(
     re.IGNORECASE,
 )
 
-
 def _translate_datetime(sql: str) -> str:
     """Convert SQLite datetime('now', '-N unit') → PostgreSQL NOW() - INTERVAL 'N unit'."""
-
     def _replace(m: re.Match) -> str:
-        offset = m.group(1)  # e.g. "-10" or "+7"
-        unit = m.group(2).lower()  # e.g. "minute", "day"
+        offset = m.group(1)          # e.g. "-10" or "+7"
+        unit   = m.group(2).lower()  # e.g. "minute", "day"
         # Use abs value with sign for INTERVAL direction
         n = int(offset)
         if n < 0:
             return f"(NOW() - INTERVAL '{-n} {unit}s')"
         return f"(NOW() + INTERVAL '{n} {unit}s')"
-
     return _DATETIME_RE.sub(_replace, sql)
 
 
@@ -137,15 +131,6 @@ def _translate_upsert(sql: str) -> str:
         "org_team_members": ["team_id", "agent_id"],
         "confluence_pages": ["mission_id", "tab"],
         "feature_deps": ["feature_id", "depends_on"],
-        "team_fitness_history": [
-            "agent_id",
-            "pattern_id",
-            "technology",
-            "phase_type",
-            "snapshot_date",
-        ],
-        "user_project_roles": ["user_id", "project_id"],
-        "todo_deps": ["todo_id", "depends_on"],
     }
 
     pk_cols = _COMPOSITE_PKS.get(table, [cols[0]])
@@ -154,9 +139,7 @@ def _translate_upsert(sql: str) -> str:
     updates = [f"{c} = EXCLUDED.{c}" for c in cols if c not in pk_cols]
 
     # Replace "INSERT OR REPLACE INTO" with "INSERT INTO"
-    new_sql = re.sub(
-        r"INSERT\s+OR\s+REPLACE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE
-    )
+    new_sql = re.sub(r"INSERT\s+OR\s+REPLACE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
 
     pk_str = ", ".join(pk_cols)
     if updates:
@@ -171,9 +154,7 @@ def _translate_insert_ignore(sql: str) -> str:
     """Convert INSERT OR IGNORE INTO to INSERT INTO ... ON CONFLICT DO NOTHING."""
     if not _INSERT_OR_IGNORE_RE.search(sql):
         return sql
-    new_sql = re.sub(
-        r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE
-    )
+    new_sql = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE)
     # Add ON CONFLICT DO NOTHING at end (before any trailing semicolon)
     new_sql = new_sql.rstrip().rstrip(";")
     new_sql += " ON CONFLICT DO NOTHING"
@@ -181,7 +162,6 @@ def _translate_insert_ignore(sql: str) -> str:
 
 
 # ── Row wrapper ──────────────────────────────────────────────────────────────
-
 
 class DictRow:
     """Dict-like row compatible with sqlite3.Row access patterns.
@@ -224,7 +204,6 @@ class DictRow:
 
 
 # ── Cursor wrapper ───────────────────────────────────────────────────────────
-
 
 class PgCursorWrapper:
     """Wraps psycopg cursor to return DictRow objects like sqlite3.Row."""
@@ -282,7 +261,6 @@ class PgCursorWrapper:
 
 # ── Connection wrapper ───────────────────────────────────────────────────────
 
-
 class PgConnectionWrapper:
     """Wraps psycopg connection to match sqlite3.Connection API.
 
@@ -295,23 +273,14 @@ class PgConnectionWrapper:
 
     def __init__(self, conn):
         self._conn = conn
-        self._returned = False  # guard against double-return to pool
-
-    def __del__(self):
-        """Auto-return to pool on GC — safety net for callers that omit close()."""
-        if not self._returned:
-            self.close()
 
     def execute(self, sql: str, params: tuple = ()) -> PgCursorWrapper:
         # Translate PRAGMA table_info(table) → information_schema query
         stripped = sql.strip()
         stripped_up = stripped.upper()
-        if stripped_up.startswith("PRAGMA TABLE_INFO(") or stripped_up.startswith(
-            "PRAGMA TABLE_INFO ("
-        ):
+        if stripped_up.startswith("PRAGMA TABLE_INFO(") or stripped_up.startswith("PRAGMA TABLE_INFO ("):
             # Extract table name from PRAGMA table_info(tablename)
             import re as _re
-
             m = _re.search(r"TABLE_INFO\s*\(\s*(\w+)\s*\)", stripped, _re.IGNORECASE)
             if m:
                 table = m.group(1).lower()
@@ -386,7 +355,6 @@ class PgConnectionWrapper:
         (needed for idempotent schema init where some objects may already exist).
         """
         import logging as _log
-
         _logger = _log.getLogger(__name__)
 
         # Filter out SQLite-specific statements
@@ -394,9 +362,7 @@ class PgConnectionWrapper:
         skip = False
         for line in sql.split("\n"):
             up = line.strip().upper()
-            if "USING FTS5" in up or (
-                "CREATE TRIGGER" in up and "_fts" in line.lower()
-            ):
+            if "USING FTS5" in up or ("CREATE TRIGGER" in up and "_fts" in line.lower()):
                 skip = True
             if skip:
                 if ";" in line:
@@ -438,23 +404,11 @@ class PgConnectionWrapper:
 
     def close(self):
         """Return connection to pool instead of closing."""
-        if self._returned:
-            return
-        self._returned = True
         try:
-            # Rollback any open transaction before returning to pool to avoid
-            # psycopg "rolling back returned connection" warnings.
-            try:
-                self._conn.rollback()
-            except Exception:
-                pass
             pool = _get_pg_pool()
             pool.putconn(self._conn)
         except (psycopg.OperationalError, OSError):
-            try:
-                self._conn.close()
-            except Exception:
-                pass
+            self._conn.close()
 
     @property
     def row_factory(self):
@@ -473,7 +427,6 @@ class PgConnectionWrapper:
 
 class _NullCursor:
     """No-op cursor for skipped statements (PRAGMAs, FTS5)."""
-
     description = None
     lastrowid = None
     rowcount = 0
@@ -496,7 +449,6 @@ class _NullCursor:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
-
 def is_postgresql() -> bool:
     """Check if using PostgreSQL backend."""
     return _USE_PG
@@ -514,8 +466,8 @@ def get_connection(db_path=None) -> Any:
         return PgConnectionWrapper(conn)
     else:
         # SQLite path — same as original get_db()
+        from pathlib import Path
         from ..config import DB_PATH
-
         path = db_path or DB_PATH
         conn = sqlite3.connect(str(path))
         conn.row_factory = sqlite3.Row

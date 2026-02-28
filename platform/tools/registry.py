@@ -68,3 +68,56 @@ class ToolRegistry:
             }
             for t in self._tools.values()
         ]
+
+
+_registry: ToolRegistry | None = None
+
+
+def get_registry() -> ToolRegistry:
+    """Return the global tool registry singleton, loading custom tools from DB."""
+    global _registry
+    if _registry is None:
+        _registry = ToolRegistry()
+        _load_custom_tools(_registry)
+    return _registry
+
+
+def _load_custom_tools(registry: ToolRegistry) -> None:
+    """Load enabled custom tools from the database into the registry."""
+    try:
+        from ..db.migrations import get_db
+        db = get_db()
+        rows = db.execute("SELECT * FROM custom_tools WHERE enabled = 1").fetchall()
+        for row in rows:
+            _register_custom_tool(registry, dict(row))
+    except Exception as e:
+        logger.debug("Custom tools not loaded (DB may not be ready): %s", e)
+
+
+def _register_custom_tool(registry: ToolRegistry, tool_data: dict) -> None:
+    """Register a single custom tool from DB data into the registry."""
+    import json as _json
+
+    try:
+        config = _json.loads(tool_data["config"]) if isinstance(tool_data["config"], str) else tool_data["config"]
+    except Exception:
+        config = {}
+
+    tool_name = f"custom.{tool_data['name']}"
+    tool_desc = tool_data.get("description", "")
+    tool_type = tool_data["type"]
+    _cfg = config
+    _tt = tool_type
+
+    class _CustomTool(BaseTool):
+        name = tool_name
+        description = tool_desc
+        category = "custom"
+
+        async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+            return _json.dumps({"type": _tt, "config": _cfg, "params": params})
+
+    try:
+        registry.register(_CustomTool())
+    except Exception as e:
+        logger.warning("Failed to register custom tool %s: %s", tool_name, e)

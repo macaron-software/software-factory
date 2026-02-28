@@ -264,33 +264,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to start evolution scheduler: %s", e)
 
-    # Start memory compactor (nightly at 03:00 UTC)
-    try:
-        from .memory.compactor import memory_compactor_loop as _mem_compact
-
-        _asyncio.create_task(_mem_compact())
-        logger.info("Memory compactor scheduled (nightly 03:00 UTC)")
-    except Exception as e:
-        logger.warning("Failed to start memory compactor: %s", e)
-
-    # Start knowledge scheduler (nightly at 04:00 UTC)
-    try:
-        from .ops.knowledge_scheduler import knowledge_scheduler_loop as _know_sched
-
-        _asyncio.create_task(_know_sched())
-        logger.info("Knowledge scheduler started (nightly 04:00 UTC)")
-    except Exception as e:
-        logger.warning("Failed to start knowledge scheduler: %s", e)
-
-    # Start zombie mission cleanup watchdog (every 10 minutes)
-    try:
-        from .ops.zombie_cleanup import start_zombie_watchdog as _zombie_wd
-
-        _asyncio.create_task(_zombie_wd())
-        logger.info("Zombie cleanup watchdog started (every 10 min)")
-    except Exception as e:
-        logger.warning("Failed to start zombie cleanup watchdog: %s", e)
-
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init
@@ -517,14 +490,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
-    # Load persisted browser push subscriptions and ensure VAPID keys exist
-    try:
-        from .services.push import ensure_vapid_keys
-
-        ensure_vapid_keys()
-    except Exception as exc:
-        logger.warning("VAPID key init failed: %s", exc)
-
+    # Load persisted browser push subscriptions
     try:
         from .web.routes.api.push import _get_db_subscriptions
         from .services.notification_service import get_notification_service as _get_ns
@@ -605,17 +571,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # ── Rate limiting via slowapi ───────────────────────────────────────────
-    try:
-        from slowapi import _rate_limit_exceeded_handler
-        from slowapi.errors import RateLimitExceeded
-        from .rate_limit import limiter
-
-        app.state.limiter = limiter
-        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    except Exception:
-        pass  # slowapi not installed — fall back to middleware-only limiting
-
     # ── Security: Auth middleware (API key) ────────────────────────────────
     from .security import AuthMiddleware
 
@@ -647,11 +602,6 @@ def create_app() -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = (
-            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
-            "accelerometer=(), gyroscope=()"
-        )
-        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
 
         path = request.url.path
         # Workspace pages need iframes (preview, dbgate, portainer)
@@ -670,39 +620,26 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
-                "connect-src 'self' wss: ws:; "
+                "connect-src 'self'; "
                 "frame-ancestors 'none'"
             )
-        # HSTS: also set on HTTP to pre-empt before HTTPS upgrade
-        response.headers["Strict-Transport-Security"] = (
-            "max-age=31536000; includeSubDomains"
-        )
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = (
+                "max-age=31536000; includeSubDomains"
+            )
         return response
 
-    # ── Rate limiting (API endpoints, 120 req/min per IP) ───────────────
+    # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
     import time as _rl_time
     from collections import defaultdict as _dd
 
     _rate_buckets: dict[str, list[float]] = _dd(list)
     _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
     _RATE_WINDOW = 60.0
-    # Tighter limit for LLM-consuming endpoints (mission create, ideation)
-    _LLM_BUCKETS: dict[str, list[float]] = _dd(list)
-    _LLM_RATE_LIMIT = int(os.environ.get("LLM_RATE_LIMIT", "20"))  # per minute
-    _LLM_PATHS = {
-        "/api/missions",
-        "/api/ideation/start",
-        "/api/projects/chat",
-        "/api/ideation",
-        "/api/group/",
-    }
-    # Strict limit for API key management (10/min)
-    _APIKEY_BUCKETS: dict[str, list[float]] = _dd(list)
-    _APIKEY_RATE_LIMIT = 10  # per minute
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
@@ -712,114 +649,18 @@ def create_app() -> FastAPI:
         ):
             client_ip = request.client.host if request.client else "unknown"
             now = _rl_time.time()
-
-            # API key management: 10/min
-            if request.method == "POST" and request.url.path == "/api/api-keys":
-                ak_bucket = _APIKEY_BUCKETS[client_ip]
-                ak_bucket[:] = [t for t in ak_bucket if now - t < _RATE_WINDOW]
-                if len(ak_bucket) >= _APIKEY_RATE_LIMIT:
-                    from starlette.responses import JSONResponse as _JR
-
-                    remaining = max(0, _APIKEY_RATE_LIMIT - len(ak_bucket))
-                    resp = _JR(
-                        {
-                            "error": "rate_limit_exceeded",
-                            "retry_after": 60,
-                            "type": "api-keys",
-                        },
-                        status_code=429,
-                    )
-                    resp.headers["X-RateLimit-Limit"] = str(_APIKEY_RATE_LIMIT)
-                    resp.headers["X-RateLimit-Remaining"] = "0"
-                    resp.headers["X-RateLimit-Window"] = "60"
-                    return resp
-                ak_bucket.append(now)
-
-            # Strict LLM rate limit on POST to LLM-consuming endpoints
-            if request.method == "POST" and any(
-                request.url.path.startswith(p) for p in _LLM_PATHS
-            ):
-                llm_bucket = _LLM_BUCKETS[client_ip]
-                llm_bucket[:] = [t for t in llm_bucket if now - t < _RATE_WINDOW]
-                if len(llm_bucket) >= _LLM_RATE_LIMIT:
-                    from starlette.responses import JSONResponse as _JR
-
-                    resp = _JR(
-                        {
-                            "error": "rate_limit_exceeded",
-                            "retry_after": 60,
-                            "type": "llm",
-                        },
-                        status_code=429,
-                    )
-                    resp.headers["X-RateLimit-Limit"] = str(_LLM_RATE_LIMIT)
-                    resp.headers["X-RateLimit-Remaining"] = "0"
-                    resp.headers["X-RateLimit-Window"] = "60"
-                    return resp
-                llm_bucket.append(now)
-            # General rate limit
             bucket = _rate_buckets[client_ip]
             bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
             if len(bucket) >= _RATE_LIMIT:
                 from starlette.responses import JSONResponse as _JR
 
-                resp = _JR(
+                return _JR(
                     {"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429
                 )
-                resp.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
-                resp.headers["X-RateLimit-Remaining"] = "0"
-                resp.headers["X-RateLimit-Window"] = "60"
-                return resp
             bucket.append(now)
-            response = await call_next(request)
-            remaining = max(0, _RATE_LIMIT - len(bucket))
-            response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
-            response.headers["X-RateLimit-Remaining"] = str(remaining)
-            response.headers["X-RateLimit-Window"] = "60"
-            return response
         return await call_next(request)
 
     # ── Trace ID middleware ─────────────────────────────────────────────
-    @app.middleware("http")
-    async def audit_middleware(request, call_next):
-        response = await call_next(request)
-        method = request.method
-        path = request.url.path
-        audit_paths = (
-            "/api/agents",
-            "/api/projects",
-            "/api/missions",
-            "/api/settings",
-            "/api/patterns",
-            "/api/teams",
-        )
-        if method in ("POST", "PUT", "PATCH", "DELETE") and any(
-            path.startswith(p) for p in audit_paths
-        ):
-            try:
-                from .security.audit import audit_log
-
-                actor = getattr(request.state, "user", "anonymous")
-                if hasattr(actor, "email"):
-                    actor = actor.email
-                actor = actor or "anonymous"
-                ip = request.client.host if request.client else ""
-                ua = request.headers.get("user-agent", "")[:100]
-                parts = path.strip("/").split("/")
-                rtype = parts[1] if len(parts) > 1 else ""
-                rid = parts[2] if len(parts) > 2 else ""
-                audit_log(
-                    f"{method} {path}",
-                    rtype,
-                    rid,
-                    actor=str(actor),
-                    ip=ip,
-                    user_agent=ua,
-                )
-            except Exception:
-                pass
-        return response
-
     @app.middleware("http")
     async def trace_id_middleware(request, call_next):
         import uuid as _uuid
@@ -873,8 +714,8 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
-        # NOTE: auth bypass removed — is_public_path() handles /api/health
-        # /api/analytics/* requires auth (contains cost/agent data)
+        if path.startswith("/api/analytics") or path.startswith("/api/health"):
+            return await call_next(request)
 
         # Skip auth in test mode
         if os.environ.get("PLATFORM_ENV") == "test":
@@ -1257,11 +1098,6 @@ def create_app() -> FastAPI:
 
     app.add_middleware(I18nMiddleware)
 
-    # ── Workspace middleware ─────────────────────────────────────────────────
-    from .web.middleware.workspace import WorkspaceMiddleware
-
-    app.add_middleware(WorkspaceMiddleware)
-
     # ── OpenTelemetry ASGI middleware (last = runs first) ────────────────────
     if _otel_provider is not None:
         try:
@@ -1295,10 +1131,6 @@ def create_app() -> FastAPI:
         ("push", ".web.routes.api.push", {}),
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
-        ("guidelines", ".web.routes.api.guidelines", {}),
-        ("knowledge", ".web.routes.api.knowledge", {}),
-        ("api-keys", ".web.routes.api.api_keys", {}),
-        ("webhooks", ".web.routes.api.webhooks", {}),
     ]
 
     for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:
