@@ -917,3 +917,33 @@ async def cost_analytics(request: Request, period: str = "7d"):
         )
     finally:
         db.close()
+
+
+@router.get("/api/domains")
+async def list_domains_api():
+    """List all configured domains with their key settings."""
+    try:
+        from ....projects.domains import list_domains
+
+        domains = list_domains()
+        return JSONResponse(
+            {
+                "domains": [
+                    {
+                        "id": d.id,
+                        "name": d.name,
+                        "env": d.env,
+                        "description": d.description,
+                        "compliance_blocking": d.compliance_blocking,
+                        "default_pattern": d.default_pattern,
+                        "default_agents": d.default_agents,
+                        "compliance_agents": d.compliance_agents,
+                        "color": d.color,
+                    }
+                    for d in domains
+                ]
+            }
+        )
+    except Exception as e:
+        logger.warning("list_domains_api error: %s", e)
+        return JSONResponse({"domains": []})

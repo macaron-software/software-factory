@@ -1415,6 +1415,8 @@ def _ensure_sqlite_tables(conn) -> None:
             prompt TEXT,
             status TEXT DEFAULT 'running',
             result_json TEXT DEFAULT '{}',
+            mission_id TEXT,
+            project_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -1497,6 +1499,20 @@ def _ensure_sqlite_tables(conn) -> None:
             PRIMARY KEY (key_id, scope)
         )
     """)
+    # Group ideation sessions (added 2026-06)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS group_ideation_sessions (
+            id TEXT PRIMARY KEY,
+            group_id TEXT NOT NULL,
+            title TEXT,
+            prompt TEXT,
+            status TEXT DEFAULT 'active',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_group_ideation_sessions_group ON group_ideation_sessions(group_id)"
+    )
     conn.commit()
 
 
