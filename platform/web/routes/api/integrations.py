@@ -26,27 +26,26 @@ async def list_integrations():
 
 
 @router.patch("/api/integrations/{integ_id}")
-async def update_integration(integ_id: str, request: Request):
+async def update_integration(integ_id: str, body: "IntegrationUpdate"):
     """Toggle or update integration config."""
+    import json as _json
     from ....db.migrations import get_db
+    from .input_models import IntegrationUpdate as _M  # noqa: F401
 
-    data = await request.json()
     db = get_db()
     try:
-        if "enabled" in data:
+        if body.enabled is not None:
             db.execute(
                 "UPDATE integrations SET enabled=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                (1 if data["enabled"] else 0, integ_id),
+                (1 if body.enabled else 0, integ_id),
             )
-        if "config" in data:
+        if body.config is not None:
             existing = db.execute(
                 "SELECT config_json FROM integrations WHERE id=?", (integ_id,)
             ).fetchone()
             if existing:
-                import json as _json
-
                 cfg = _json.loads(existing["config_json"] or "{}")
-                cfg.update(data["config"])
+                cfg.update(body.config)
                 db.execute(
                     "UPDATE integrations SET config_json=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
                     (_json.dumps(cfg), integ_id),

@@ -349,16 +349,20 @@ async def update_okr(okr_id: int, request: Request):
     """Update OKR target or current value."""
     try:
         body = await request.json()
+        if not isinstance(body, dict):
+            return JSONResponse({"ok": False, "error": "invalid body"}, status_code=422)
         db = _db()
         if "kpi_current" in body:
+            val = float(body["kpi_current"])  # raises if not numeric
             db.execute(
                 "UPDATE team_okr SET kpi_current = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body["kpi_current"], okr_id),
+                (val, okr_id),
             )
         if "kpi_target" in body:
+            val = float(body["kpi_target"])
             db.execute(
                 "UPDATE team_okr SET kpi_target = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (body["kpi_target"], okr_id),
+                (val, okr_id),
             )
         db.commit()
         db.close()

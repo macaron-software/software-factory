@@ -167,6 +167,53 @@
         {% include 'partials/mc_tabs_default.html' %}
 
         {% endif %}{# end workflow_type conditional tabs #}
+
+        <!-- Tab: Timeline (all workflows) -->
+        <div class="mc-tab-panel" data-tab="timeline">
+            <div style="padding:0.75rem 0 0.25rem">
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                    Durée et statut de chaque phase · {% if mission.llm_cost_usd %}<span style="color:var(--yellow)">${{ "%.4f"|format(mission.llm_cost_usd) }}</span> LLM cost{% endif %}
+                </div>
+                {% if mission.phases %}
+                {% set completed_phases = mission.phases|selectattr('completed_at')|list %}
+                {% set started_phases = mission.phases|selectattr('started_at')|list %}
+                {% set t_start = (mission.phases|selectattr('started_at')|map(attribute='started_at')|list|sort|first) if started_phases else mission.created_at %}
+                <div class="mc-timeline-grid">
+                    {% for phase in mission.phases %}
+                    <div class="mc-tl-row">
+                        <div class="mc-tl-label" title="{{ phase.phase_id }}">
+                            {{ phase.phase_name or phase.phase_id }}
+                        </div>
+                        <div class="mc-tl-bar-wrap">
+                            {% if phase.started_at %}
+                            {% set offset_s = (phase.started_at - t_start).total_seconds() if t_start else 0 %}
+                            {% set dur_s = ((phase.completed_at - phase.started_at).total_seconds() if phase.completed_at else 0) %}
+                            {% set total_s = ((mission.completed_at or mission.updated_at) - t_start).total_seconds() if t_start else 1 %}
+                            {% set pct_start = [(offset_s / total_s * 100)|round(1)|float, 0]|max %}
+                            {% set pct_width = [(dur_s / total_s * 100)|round(1)|float, 2]|max if dur_s > 0 else 2 %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}"
+                                 style="margin-left:{{ pct_start }}%;width:{{ [pct_width, 100 - pct_start]|min }}%"
+                                 title="{{ phase.phase_name }}: {{ dur_s|int }}s">
+                                {% if dur_s > 10 %}<span class="mc-tl-dur">{{ dur_s|int }}s</span>{% endif %}
+                            </div>
+                            {% else %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}" style="width:4px;opacity:0.3"></div>
+                            {% endif %}
+                        </div>
+                        <div class="mc-tl-status">
+                            <span class="mc-tl-dot mc-tl-dot--{{ phase.status.value }}"></span>
+                            {% if phase.quality_score is not none %}
+                            <span class="mc-tl-quality" title="Quality score">Q{{ phase.quality_score }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="color:var(--text-secondary);font-size:0.82rem;padding:2rem;text-align:center">Aucune phase</div>
+                {% endif %}
+            </div>
+        </div>{# end tab: timeline #}
     </div>
 
     <!-- ====== RIGHT SIDEBAR ====== -->

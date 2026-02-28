@@ -72,16 +72,12 @@ async def list_incidents(request: Request):
 
 
 @router.post("/api/incidents", responses={200: {"model": OkResponse}})
-async def create_incident(request: Request):
+async def create_incident(body: "IncidentCreate"):
     """Create a manual incident."""
     import uuid
-
     from ....db.migrations import get_db
+    from .input_models import IncidentCreate as _M  # noqa: F401
 
-    data = await request.json()
-    title = data.get("title", "")
-    if not title:
-        return JSONResponse({"error": "title required"}, status_code=400)
     inc_id = str(uuid.uuid4())[:12]
     db = get_db()
     try:
@@ -90,39 +86,39 @@ async def create_incident(request: Request):
             "VALUES (?, ?, ?, 'open', ?, ?, ?, ?, ?)",
             (
                 inc_id,
-                title,
-                data.get("severity", "P3"),
-                data.get("source", "manual"),
-                data.get("error_type", ""),
-                data.get("error_detail", ""),
-                data.get("mission_id", ""),
-                data.get("agent_id", ""),
+                body.title,
+                body.severity,
+                body.source,
+                body.error_type,
+                body.error_detail,
+                body.mission_id,
+                body.agent_id,
             ),
         )
         db.commit()
-        return JSONResponse({"id": inc_id, "title": title})
+        return JSONResponse({"id": inc_id, "title": body.title})
     finally:
         db.close()
 
 
 @router.patch("/api/incidents/{incident_id}", responses={200: {"model": OkResponse}})
-async def update_incident(request: Request, incident_id: str):
+async def update_incident(incident_id: str, body: "IncidentUpdate"):
     """Update incident status (resolve, close)."""
     from ....db.migrations import get_db
+    from .input_models import IncidentUpdate as _M  # noqa: F401
 
-    data = await request.json()
     db = get_db()
     try:
         updates = []
         params = []
-        if "status" in data:
+        if body.status is not None:
             updates.append("status=?")
-            params.append(data["status"])
-            if data["status"] in ("resolved", "closed"):
+            params.append(body.status)
+            if body.status in ("resolved", "closed"):
                 updates.append("resolved_at=CURRENT_TIMESTAMP")
-        if "resolution" in data:
+        if body.resolution is not None:
             updates.append("resolution=?")
-            params.append(data["resolution"])
+            params.append(body.resolution)
         if not updates:
             return JSONResponse({"error": "nothing to update"}, status_code=400)
         params.append(incident_id)

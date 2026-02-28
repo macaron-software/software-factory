@@ -155,6 +155,10 @@ def _migrate(conn):
             conn.execute(
                 "ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''"
             )
+        if mr_cols and "llm_cost_usd" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN llm_cost_usd REAL DEFAULT 0.0"
+            )
     except Exception:
         pass
 

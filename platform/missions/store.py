@@ -782,6 +782,11 @@ def _row_to_mission_run(row) -> MissionRun:
         pmid = row["parent_mission_id"] or ""
     except (IndexError, KeyError):
         pass
+    cost = 0.0
+    try:
+        cost = float(row["llm_cost_usd"] or 0)
+    except (IndexError, KeyError, TypeError, ValueError):
+        pass
     return MissionRun(
         id=row["id"],
         workflow_id=row["workflow_id"],
@@ -795,6 +800,7 @@ def _row_to_mission_run(row) -> MissionRun:
         current_phase=row["current_phase"] or "",
         phases=phases,
         brief=row["brief"] or "",
+        llm_cost_usd=cost,
         created_at=row["created_at"]
         if isinstance(row["created_at"], datetime)
         else (
@@ -882,9 +888,20 @@ class MissionRunStore:
         run.updated_at = datetime.utcnow()
         db = get_db()
         try:
+            # Refresh cost from llm_traces at update time
+            try:
+                row = db.execute(
+                    "SELECT COALESCE(SUM(cost_usd),0) as total FROM llm_traces WHERE mission_id=?",
+                    (run.id,),
+                ).fetchone()
+                if row:
+                    run.llm_cost_usd = float(row["total"] or 0)
+            except Exception:
+                pass
             cur = db.execute(
                 """UPDATE mission_runs SET status=?, current_phase=?, phases_json=?,
-                   session_id=?, workspace_path=?, updated_at=?, completed_at=? WHERE id=?""",
+                   session_id=?, workspace_path=?, updated_at=?, completed_at=?,
+                   llm_cost_usd=? WHERE id=?""",
                 (
                     run.status.value,
                     run.current_phase,
@@ -893,6 +910,7 @@ class MissionRunStore:
                     run.workspace_path or "",
                     run.updated_at.isoformat(),
                     run.completed_at.isoformat() if run.completed_at else None,
+                    run.llm_cost_usd,
                     run.id,
                 ),
             )

@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 router = APIRouter()
@@ -107,20 +107,24 @@ async def clear_domain_guidelines(domain: str):
 
 
 @router.post("/api/guidelines/sync")
-async def sync_guidelines(request: Request, background_tasks: BackgroundTasks):
+async def sync_guidelines(
+    body: "GuidelineSyncRequest", background_tasks: BackgroundTasks
+):
     """Trigger a guidelines sync from Confluence or manual seed."""
-    data = await request.json()
-    source = data.get("source", "manual")  # "confluence" | "manual"
-    domain = data.get("domain", "").strip()
+    from .input_models import GuidelineSyncRequest as _M  # noqa: F401
+
+    data = body
+    source = data.source
+    domain = data.domain
     if not domain:
         return JSONResponse({"error": "domain is required"}, status_code=400)
 
     project = f"domain:{domain}" if not domain.startswith("domain:") else domain
 
     if source == "confluence":
-        url = data.get("url", "").strip()
-        token = data.get("token", "").strip()
-        space = data.get("space", "").strip()
+        url = (data.url or "").strip()
+        token = (data.token or "").strip()
+        space = (data.space or "").strip()
         if not url or not token or not space:
             return JSONResponse(
                 {"error": "url, token and space are required for Confluence sync"},
@@ -158,7 +162,7 @@ async def sync_guidelines(request: Request, background_tasks: BackgroundTasks):
         return JSONResponse({"ok": True, "status": "sync_started", "project": project})
 
     # Manual items seed
-    items = data.get("items", [])
+    items = data.items or []
     if not items:
         return JSONResponse(
             {"error": "items required for manual source"}, status_code=400
@@ -200,9 +204,9 @@ async def sync_guidelines(request: Request, background_tasks: BackgroundTasks):
             (
                 page_id,
                 project,
-                item.get("category", "must_use"),
-                item.get("topic", ""),
-                item.get("constraint", ""),
+                item.category,
+                item.topic,
+                item.constraint,
             ),
         )
     conn.commit()

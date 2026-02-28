@@ -3139,3 +3139,22 @@
     flex-direction: column;
   }
 }
+
+/* ── Mission Timeline tab ── */
+.mc-timeline-grid { display:flex;flex-direction:column;gap:6px;padding:0.25rem 0 }
+.mc-tl-row { display:grid;grid-template-columns:160px 1fr 52px;align-items:center;gap:8px;min-height:24px }
+.mc-tl-label { font-size:0.72rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:right }
+.mc-tl-bar-wrap { position:relative;height:18px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden }
+.mc-tl-bar { position:absolute;top:2px;height:14px;border-radius:3px;display:flex;align-items:center;padding:0 4px;transition:width 0.3s }
+.mc-tl-bar--done,.mc-tl-bar--completed { background:var(--green);opacity:0.85 }
+.mc-tl-bar--running { background:var(--purple);opacity:0.9;animation:pulse 1.5s infinite }
+.mc-tl-bar--pending { background:var(--border);opacity:0.5 }
+.mc-tl-bar--failed { background:var(--red,#ef4444);opacity:0.85 }
+.mc-tl-dur { font-size:0.62rem;color:#fff;white-space:nowrap }
+.mc-tl-status { display:flex;align-items:center;gap:4px;font-size:0.65rem }
+.mc-tl-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0 }
+.mc-tl-dot--done,.mc-tl-dot--completed { background:var(--green) }
+.mc-tl-dot--running { background:var(--purple) }
+.mc-tl-dot--pending { background:var(--border) }
+.mc-tl-dot--failed { background:var(--red,#ef4444) }
+.mc-tl-quality { color:var(--text-secondary);font-size:0.62rem }

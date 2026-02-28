@@ -5,7 +5,7 @@ from __future__ import annotations
 import html as html_mod
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
@@ -33,7 +33,9 @@ async def vector_stats(scope_id: str = ""):
 
 
 @router.get("/api/memory/project/{project_id}")
-async def project_memory(project_id: str, q: str = "", category: str = "", role: str = ""):
+async def project_memory(
+    project_id: str, q: str = "", category: str = "", role: str = ""
+):
     """Get or search project memory, optionally filtered by agent role."""
     from ....memory.manager import get_memory_manager
 
@@ -41,7 +43,9 @@ async def project_memory(project_id: str, q: str = "", category: str = "", role:
     if q:
         entries = mem.project_search(project_id, q)
     else:
-        entries = mem.project_get(project_id, category=category or None, agent_role=role)
+        entries = mem.project_get(
+            project_id, category=category or None, agent_role=role
+        )
     return JSONResponse(entries)
 
 
@@ -75,18 +79,13 @@ async def global_memory(category: str = ""):
 
 
 @router.post("/api/memory/global")
-async def global_memory_store(request: Request):
+async def global_memory_store(body: "GlobalMemoryCreate"):
     """Store a global memory entry."""
     from ....memory.manager import get_memory_manager
+    from .input_models import GlobalMemoryCreate as _M  # noqa: F401
 
-    data = await request.json()
-    cat = data.get("category", "general")
-    key = data.get("key", "")
-    val = data.get("value", "")
-    if not key or not val:
-        return JSONResponse({"error": "key and value required"}, status_code=400)
     get_memory_manager().global_store(
-        key, val, category=cat, confidence=data.get("confidence", 0.8)
+        body.key, body.value, category=body.category, confidence=body.confidence
     )
     return JSONResponse({"ok": True})
 
@@ -142,13 +141,15 @@ async def memory_compact():
 
     loop = asyncio.get_event_loop()
     stats = await loop.run_in_executor(None, run_compaction)
-    return JSONResponse({
-        "ok": True,
-        "pattern_pruned": stats.pattern_pruned,
-        "project_pruned": stats.project_pruned,
-        "project_compressed": stats.project_compressed,
-        "global_deduped": stats.global_deduped,
-        "global_rescored": stats.global_rescored,
-        "errors": stats.errors,
-        "ran_at": stats.ran_at,
-    })
+    return JSONResponse(
+        {
+            "ok": True,
+            "pattern_pruned": stats.pattern_pruned,
+            "project_pruned": stats.project_pruned,
+            "project_compressed": stats.project_compressed,
+            "global_deduped": stats.global_deduped,
+            "global_rescored": stats.global_rescored,
+            "errors": stats.errors,
+            "ran_at": stats.ran_at,
+        }
+    )

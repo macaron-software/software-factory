@@ -2,20 +2,20 @@
   "cookies": [
     {
       "name": "refresh_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJzaWQiOiJhY2U5ZDIwYzU3ZjU0MGUzIiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzI4Mzg0NjIsImlhdCI6MTc3MjIzMzY2Mn0.GaxKqmeQ2_IzMqPLZXO2gvnwrpEiuYGapLPkRsL5MKI",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJzaWQiOiJkNjcxMWVjYjdiMjE0MGE0IiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzI4NzM2MDgsImlhdCI6MTc3MjI2ODgwOH0.fQJiaTRiehsWKsleP2itQ9M2NiZachy5OU5QQL28knI",
       "domain": "127.0.0.1",
       "path": "/api/auth",
-      "expires": 1772838462.836,
+      "expires": 1772873608.9,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "access_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzIyMzQ1NjIsImlhdCI6MTc3MjIzMzY2Mn0.lDDx_gVz04Z2ezdMpFvD425JW_C-doz1k3boVzpGSdw",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzIyNjk3MDgsImlhdCI6MTc3MjI2ODgwOH0.vuSQUmcnZaWs_ldvFkXRuWBiBPBPHcobp6gjx7ZqB6Y",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1772234562.835,
+      "expires": 1772269708.9,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
@@ -25,7 +25,7 @@
       "value": "en",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1803769662.844,
+      "expires": 1803804808.9,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"

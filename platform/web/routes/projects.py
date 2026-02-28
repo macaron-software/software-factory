@@ -2420,3 +2420,124 @@ async def docker_global_stats():
     except Exception:
         pass
     return JSONResponse({"total": 0, "running": 0})
+
+
+@router.get("/api/projects/{project_id}/export")
+async def project_export(project_id: str):
+    """Export a project as a ZIP archive (config + memories, no workspace files)."""
+    import io
+    import zipfile
+
+    from ...projects.store import get_project_store
+    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...db.migrations import get_db
+
+    project = get_project_store().get(project_id)
+    if not project:
+        return JSONResponse({"error": "Project not found"}, status_code=404)
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # Project config
+        proj_dict = (
+            project.model_dump() if hasattr(project, "model_dump") else vars(project)
+        )
+        zf.writestr("project.json", json.dumps(proj_dict, default=str, indent=2))
+
+        # Missions list
+        missions = get_mission_store().list_missions(project_id=project_id)
+        zf.writestr(
+            "missions.json",
+            json.dumps(
+                [
+                    m.model_dump() if hasattr(m, "model_dump") else vars(m)
+                    for m in missions
+                ],
+                default=str,
+                indent=2,
+            ),
+        )
+
+        # Mission runs
+        runs = get_mission_run_store().list_runs(project_id=project_id, limit=50)
+        zf.writestr(
+            "mission_runs.json",
+            json.dumps(
+                [r.model_dump() if hasattr(r, "model_dump") else vars(r) for r in runs],
+                default=str,
+                indent=2,
+            ),
+        )
+
+        # Memories (project scope)
+        try:
+            db = get_db()
+            rows = db.execute(
+                "SELECT key, value, scope, updated_at FROM memory_entries WHERE scope LIKE ?",
+                (f"project:{project_id}%",),
+            ).fetchall()
+            db.close()
+            zf.writestr(
+                "memories.json",
+                json.dumps([dict(r) for r in rows], default=str, indent=2),
+            )
+        except Exception:
+            pass
+
+    buf.seek(0)
+    filename = f"project-{project_id}-export.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/api/projects/import")
+async def project_import(request: Request):
+    """Import a project from a ZIP archive (previously exported)."""
+    import io
+    import zipfile
+
+    from ...projects.store import get_project_store
+
+    form = await request.form()
+    upload = form.get("file")
+    if not upload:
+        return JSONResponse({"error": "No file uploaded"}, status_code=400)
+
+    data = await upload.read()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+        names = zf.namelist()
+        if "project.json" not in names:
+            return JSONResponse(
+                {"error": "Invalid export: missing project.json"}, status_code=400
+            )
+
+        proj_data = json.loads(zf.read("project.json"))
+    except Exception as e:
+        return JSONResponse({"error": f"Invalid ZIP: {e}"}, status_code=400)
+
+    # Check for duplicates
+    store = get_project_store()
+    existing = store.get(proj_data.get("id", ""))
+    if existing:
+        # Generate new ID
+        import uuid
+
+        proj_data["id"] = uuid.uuid4().hex[:8]
+        proj_data["name"] = proj_data.get("name", "Imported") + " (import)"
+
+    try:
+        from ...projects.store import ProjectDef
+
+        project = ProjectDef(
+            **{k: v for k, v in proj_data.items() if k in ProjectDef.model_fields}
+        )
+        store.create(project)
+        return JSONResponse(
+            {"ok": True, "project_id": project.id, "name": project.name}
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
