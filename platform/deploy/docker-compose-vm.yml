@@ -83,9 +83,12 @@ services:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx-vm.conf:/etc/nginx/conf.d/default.conf:ro
       - /opt/macaron/.htpasswd:/etc/nginx/.htpasswd:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /opt/macaron/webroot:/var/www/certbot:ro
     depends_on:
       - platform
     restart: unless-stopped
