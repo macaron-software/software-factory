@@ -313,6 +313,46 @@ def _save_checkpoint(store, session_id: str, completed_phase: int):
         logger.debug("Checkpoint save failed for %s: %s", session_id, e)
 
 
+def _sync_phase_done_to_mission_run(session_id: str, phase_index: int):
+    """Mark phase at phase_index as 'done' in mission_runs.phases_json for this session.
+
+    Keeps phases_json in sync with the workflow engine's session-checkpoint so that
+    the orchestrator resume path can skip completed phases correctly.
+    """
+    try:
+        import json as _json
+
+        from ..db.migrations import get_db as _get_db
+
+        _db = _get_db()
+        try:
+            row = _db.execute(
+                "SELECT id, phases_json FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if not row:
+                return
+            phases = _json.loads(row[1] or "[]")
+            if phase_index < len(phases):
+                ph = phases[phase_index]
+                if ph.get("status") not in ("done", "done_with_issues", "skipped"):
+                    ph["status"] = "done"
+                    _db.execute(
+                        "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                        (_json.dumps(phases, default=str), row[0]),
+                    )
+                    _db.commit()
+        finally:
+            _db.close()
+    except Exception as e:
+        logger.debug(
+            "_sync_phase_done_to_mission_run failed for session %s idx %d: %s",
+            session_id,
+            phase_index,
+            e,
+        )
+
+
 def _is_transient_error(error_str: str) -> bool:
     """Check if an error is transient (rate limit, timeout, connection)."""
     return any(
@@ -691,6 +731,8 @@ async def run_workflow(
 
             # Checkpoint: save completed phase index for resume
             _save_checkpoint(store, session_id, i + 1)
+            # Also sync phases_json in mission_runs so orchestrator path sees correct state
+            _sync_phase_done_to_mission_run(session_id, i)
 
         except asyncio.TimeoutError:
             logger.error(
@@ -721,8 +763,8 @@ async def run_workflow(
                     project_id=project_id,
                 )
                 _save_checkpoint(store, session_id, i + 1)
+                _sync_phase_done_to_mission_run(session_id, i)
                 continue
-            # Critical phase timeout — stop
             run.status = "failed"
             run.error = error_str
             await _rte_facilitate(

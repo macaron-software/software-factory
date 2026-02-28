@@ -456,6 +456,57 @@ async def _launch_run(run_id: str) -> None:
         finally:
             _db.close()
 
+    # Sync workflow_checkpoint → phases_json so the orchestrator skips completed phases.
+    # Missions launched via the workflow engine store progress in sessions.config_json
+    # ("workflow_checkpoint" = last completed phase index) but never update phases_json.
+    # Without this sync the orchestrator would restart from phase 0 on every resume.
+    if mission.session_id:
+        try:
+            import json as _json
+
+            from ..db.migrations import get_db as _get_db2
+            from ..models import PhaseStatus as _PhaseStatus
+
+            _db2 = _get_db2()
+            try:
+                _scfg_row = _db2.execute(
+                    "SELECT config_json FROM sessions WHERE id=?", (mission.session_id,)
+                ).fetchone()
+                if _scfg_row:
+                    _scfg = _json.loads(_scfg_row[0] or "{}")
+                    _ckpt = _scfg.get("workflow_checkpoint")
+                    if (
+                        _ckpt
+                        and isinstance(_ckpt, int)
+                        and _ckpt > 0
+                        and mission.phases
+                    ):
+                        _updated = False
+                        for _i, _ph in enumerate(mission.phases):
+                            if _i < _ckpt and _ph.status not in (
+                                _PhaseStatus.DONE,
+                                _PhaseStatus.DONE_WITH_ISSUES,
+                                _PhaseStatus.SKIPPED,
+                            ):
+                                _ph.status = _PhaseStatus.DONE
+                                _ph.summary = (
+                                    _ph.summary or ""
+                                ) + " [resumed from checkpoint]"
+                                _updated = True
+                        if _updated:
+                            run_store.update(mission)
+                            logger.warning(
+                                "auto_resume: synced workflow_checkpoint=%d → phases_json for run=%s",
+                                _ckpt,
+                                run_id,
+                            )
+            finally:
+                _db2.close()
+        except Exception as _sync_err:
+            logger.debug(
+                "auto_resume: checkpoint sync failed for %s: %s", run_id, _sync_err
+            )
+
     agent_store = get_agent_store()
     orch_id = mission.cdp_agent_id or "chef_de_programme"
     orch_agent = agent_store.get(orch_id)
