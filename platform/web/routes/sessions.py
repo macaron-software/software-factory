@@ -1375,6 +1375,7 @@ async def session_checkpoints(request: Request, session_id: str):
     )
 
 
+@router.get("/api/sessions/{session_id}/sse")
 async def session_sse(request: Request, session_id: str):
     """SSE endpoint for real-time session updates."""
     from ...sessions.runner import add_sse_listener, remove_sse_listener
