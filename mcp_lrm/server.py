@@ -266,7 +266,7 @@ class MCPLRMServer:
             },
             {
                 "name": "component_gallery_list",
-                "description": "List all UI components documented in the Component Gallery knowledge base (accordion, button, tabs, etc.) with their descriptions",
+                "description": "List all 60 UI components from the Component Gallery knowledge base with descriptions. Cross-references 50+ Design Systems (Material, Carbon, Atlassian, Ant, etc.)",
                 "inputSchema": {
                     "type": "object",
                     "properties": {},
@@ -274,20 +274,53 @@ class MCPLRMServer:
             },
             {
                 "name": "component_gallery_get",
-                "description": "Get detailed documentation for a UI component: semantic HTML markup, ARIA patterns, CSS, accessibility guidelines, and usage notes. Source: component.gallery",
+                "description": "Get full documentation for a UI component: description, all aliases/names used across design systems, N implementations with DS name + URL + tech stack. Also includes static markup/ARIA/CSS doc when available.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "component": {
                             "type": "string",
-                            "description": "Component name (e.g. 'accordion', 'button', 'tabs', 'breadcrumbs', 'carousel', 'pagination', 'popover', 'rich-text-editor', 'tree-view')",
+                            "description": "Component slug (e.g. 'accordion', 'button', 'tabs', 'modal', 'toast', 'tooltip', 'skeleton')",
                         },
-                        "section": {
+                        "tech": {
                             "type": "string",
-                            "description": "Optional section filter: 'markup', 'interactivity', 'styling', 'usage' — returns full doc if omitted",
+                            "description": "Filter implementations by tech stack: React, Vue, Angular, CSS, Web Components, etc.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max implementations to return (default 20, max 200)",
+                            "default": 20,
                         },
                     },
                     "required": ["component"],
+                },
+            },
+            {
+                "name": "component_gallery_search",
+                "description": "Full-text search across all 60 UI components and their aliases. Use to find which components relate to a concept (e.g. 'loading', 'navigation', 'form')",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search terms (component name, concept, or alias)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "component_gallery_ds",
+                "description": "Show how a specific Design System names/implements its components. Useful to understand a DS vocabulary.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "ds_name": {
+                            "type": "string",
+                            "description": "Design system name (partial match ok), e.g. 'Material', 'Carbon', 'Atlassian', 'Ant Design', 'Spectrum'",
+                        },
+                    },
+                    "required": ["ds_name"],
                 },
             },
             {
@@ -325,6 +358,8 @@ class MCPLRMServer:
             "context": self._tool_context,
             "component_gallery_list": self._tool_component_gallery_list,
             "component_gallery_get": self._tool_component_gallery_get,
+            "component_gallery_search": self._tool_component_gallery_search,
+            "component_gallery_ds": self._tool_component_gallery_ds,
         }
 
         handler = handlers.get(name)
@@ -741,117 +776,192 @@ class MCPLRMServer:
             return {"error": str(e)}
 
     # -------------------------------------------------------------------------
-    # Component Gallery tools
+    # Component Gallery tools (SQLite DB — 60 components, 2600+ implementations)
     # -------------------------------------------------------------------------
-    _COMPONENT_GALLERY_DIR = (
+    _CG_DB_PATH = Path(__file__).parent.parent / "data" / "component_gallery.db"
+    _CG_MD_DIR = (
         Path(__file__).parent.parent
-        / "skills"
-        / "knowledge"
-        / "component-gallery"
-        / "src"
-        / "content"
-        / "componentContent"
+        / "skills" / "knowledge" / "component-gallery"
+        / "src" / "content" / "componentContent"
     )
 
+    def _cg_db(self):
+        """Open component gallery SQLite connection."""
+        import sqlite3
+        if not self._CG_DB_PATH.exists():
+            return None
+        conn = sqlite3.connect(str(self._CG_DB_PATH))
+        conn.row_factory = sqlite3.Row
+        return conn
+
     async def _tool_component_gallery_list(self, args: Dict) -> Dict:
-        """List all documented UI components with a one-line summary extracted from the first paragraph."""
-        cg_dir = self._COMPONENT_GALLERY_DIR
-        if not cg_dir.exists():
-            return {
-                "error": "Component Gallery submodule not found. Run: git submodule update --init skills/knowledge/component-gallery"
-            }
-
-        components = []
-        for md_file in sorted(cg_dir.glob("*.md")):
-            name = md_file.stem
-            # Extract first non-empty content line after frontmatter
-            lines = md_file.read_text(encoding="utf-8").splitlines()
-            summary = ""
-            in_frontmatter = False
-            past_frontmatter = False
-            for line in lines:
-                if line.strip() == "---":
-                    if not in_frontmatter and not past_frontmatter:
-                        in_frontmatter = True
-                        continue
-                    elif in_frontmatter:
-                        in_frontmatter = False
-                        past_frontmatter = True
-                        continue
-                if (
-                    past_frontmatter
-                    and not in_frontmatter
-                    and line.strip()
-                    and not line.startswith("#")
-                ):
-                    summary = line.strip()[:120]
-                    break
-            components.append({"name": name, "summary": summary})
-
+        """List all 60 components from DB."""
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+        rows = conn.execute(
+            "SELECT slug, name, description, aliases, "
+            "(SELECT COUNT(*) FROM implementations WHERE component_slug=slug) as impl_count "
+            "FROM components ORDER BY slug"
+        ).fetchall()
+        conn.close()
         return {
-            "count": len(components),
-            "components": components,
+            "count": len(rows),
             "source": "https://component.gallery",
-            "note": "Use component_gallery_get to retrieve full markup, ARIA patterns, CSS and usage guidelines for any component",
+            "components": [
+                {
+                    "slug": r["slug"],
+                    "name": r["name"],
+                    "description": r["description"][:120] + "..." if len(r["description"] or "") > 120 else r["description"],
+                    "aliases": r["aliases"],
+                    "implementations": r["impl_count"],
+                }
+                for r in rows
+            ],
         }
 
     async def _tool_component_gallery_get(self, args: Dict) -> Dict:
-        """Get full documentation for a UI component from Component Gallery."""
-        component = args.get("component", "").lower().strip()
-        section = args.get("section", "").lower().strip()
+        """Get full component data from DB + optional static MD doc."""
+        slug = args.get("component", "").lower().strip()
+        tech_filter = args.get("tech", "").strip()
+        limit = min(int(args.get("limit", 20)), 200)
 
-        cg_dir = self._COMPONENT_GALLERY_DIR
-        if not cg_dir.exists():
-            return {
-                "error": "Component Gallery submodule not found. Run: git submodule update --init skills/knowledge/component-gallery"
-            }
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
 
-        # Try exact match then fuzzy
-        md_file = cg_dir / f"{component}.md"
-        if not md_file.exists():
-            candidates = [f for f in cg_dir.glob("*.md") if component in f.stem]
-            if not candidates:
-                available = [f.stem for f in sorted(cg_dir.glob("*.md"))]
-                return {
-                    "error": f"Component '{component}' not found",
-                    "available": available,
+        # Fuzzy slug match
+        row = conn.execute("SELECT * FROM components WHERE slug = ?", (slug,)).fetchone()
+        if not row:
+            row = conn.execute(
+                "SELECT * FROM components WHERE slug LIKE ? OR name LIKE ? LIMIT 1",
+                (f"%{slug}%", f"%{slug}%")
+            ).fetchone()
+        if not row:
+            available = [r[0] for r in conn.execute("SELECT slug FROM components ORDER BY slug")]
+            conn.close()
+            return {"error": f"Component '{slug}' not found", "available": available}
+
+        real_slug = row["slug"]
+
+        # Get implementations
+        query = "SELECT component_name, ds_name, url, tech, features FROM implementations WHERE component_slug = ?"
+        params: list = [real_slug]
+        if tech_filter:
+            query += " AND tech LIKE ?"
+            params.append(f"%{tech_filter}%")
+        query += f" ORDER BY ds_name LIMIT {limit}"
+        impls = conn.execute(query, params).fetchall()
+        total_impls = conn.execute(
+            "SELECT COUNT(*) FROM implementations WHERE component_slug = ?", (real_slug,)
+        ).fetchone()[0]
+        conn.close()
+
+        result: Dict = {
+            "slug": real_slug,
+            "name": row["name"],
+            "description": row["description"],
+            "aliases": row["aliases"],
+            "source": f"https://component.gallery/components/{real_slug}/",
+            "total_implementations": total_impls,
+            "implementations_returned": len(impls),
+            "implementations": [
+                {
+                    "name_in_ds": i["component_name"],
+                    "design_system": i["ds_name"],
+                    "url": i["url"],
+                    "tech": i["tech"],
+                    "features": i["features"],
                 }
-            md_file = candidates[0]
+                for i in impls
+            ],
+        }
 
-        content = md_file.read_text(encoding="utf-8")
+        # Append static MD doc if available
+        md_file = self._CG_MD_DIR / f"{real_slug}.md"
+        if md_file.exists():
+            content = md_file.read_text(encoding="utf-8")
+            if content.startswith("---"):
+                end = content.find("---", 3)
+                if end != -1:
+                    content = content[end + 3:].strip()
+            result["docs"] = content
 
-        # Strip frontmatter
-        if content.startswith("---"):
-            end = content.find("---", 3)
-            if end != -1:
-                content = content[end + 3 :].strip()
+        return result
 
-        # Filter by section if requested
-        if section:
-            section_map = {
-                "markup": ["## Markup", "## HTML"],
-                "interactivity": ["## Interactivity", "## JavaScript", "## Behaviour"],
-                "styling": ["## Styling", "## CSS"],
-                "usage": ["## Usage", "## When to use", "## Guidelines"],
-            }
-            headers = section_map.get(section, [f"## {section.capitalize()}"])
-            # Find matching section block
-            extracted = []
-            lines = content.splitlines()
-            capturing = False
-            for line in lines:
-                if any(line.startswith(h) for h in headers):
-                    capturing = True
-                elif capturing and line.startswith("## "):
-                    break
-                if capturing:
-                    extracted.append(line)
-            content = "\n".join(extracted).strip() if extracted else content
+    async def _tool_component_gallery_search(self, args: Dict) -> Dict:
+        """Full-text search across components."""
+        query = args.get("query", "").strip()
+        if not query:
+            return {"error": "query is required"}
+
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+
+        try:
+            rows = conn.execute(
+                "SELECT slug, name, description, aliases FROM components_fts WHERE components_fts MATCH ? LIMIT 10",
+                (query,)
+            ).fetchall()
+        except Exception:
+            # Fallback to LIKE search
+            rows = conn.execute(
+                "SELECT slug, name, description, aliases FROM components "
+                "WHERE slug LIKE ? OR name LIKE ? OR aliases LIKE ? OR description LIKE ? LIMIT 10",
+                (f"%{query}%",) * 4
+            ).fetchall()
+        conn.close()
 
         return {
-            "component": md_file.stem,
-            "source": f"https://component.gallery/components/{md_file.stem}/",
-            "content": content,
+            "query": query,
+            "count": len(rows),
+            "results": [
+                {"slug": r["slug"], "name": r["name"], "aliases": r["aliases"],
+                 "description": (r["description"] or "")[:150]}
+                for r in rows
+            ],
+        }
+
+    async def _tool_component_gallery_ds(self, args: Dict) -> Dict:
+        """Get all components from a specific Design System."""
+        ds_name = args.get("ds_name", "").strip()
+        if not ds_name:
+            return {"error": "ds_name is required"}
+
+        conn = self._cg_db()
+        if not conn:
+            return {"error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"}
+
+        rows = conn.execute(
+            "SELECT component_slug, component_name, url, tech, features "
+            "FROM implementations WHERE ds_name LIKE ? ORDER BY component_slug",
+            (f"%{ds_name}%",)
+        ).fetchall()
+
+        if not rows:
+            # List available DS names
+            ds_list = [r[0] for r in conn.execute(
+                "SELECT DISTINCT ds_name FROM implementations ORDER BY ds_name"
+            ).fetchall()]
+            conn.close()
+            return {"error": f"Design system '{ds_name}' not found", "available_design_systems": ds_list}
+
+        # Get actual DS name from first result
+        actual_ds = conn.execute(
+            "SELECT DISTINCT ds_name FROM implementations WHERE ds_name LIKE ? LIMIT 1",
+            (f"%{ds_name}%",)
+        ).fetchone()[0]
+        conn.close()
+
+        return {
+            "design_system": actual_ds,
+            "component_count": len(rows),
+            "components": [
+                {"component": r["component_slug"], "called": r["component_name"],
+                 "url": r["url"], "tech": r["tech"]}
+                for r in rows
+            ],
         }
 
     async def run(self):
