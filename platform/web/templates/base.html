@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ request.state.lang|default('en') }}" data-theme="dark">
+<html lang="{{ request.state.lang|default('en') }}" dir="{{ 'rtl' if request.state.lang|default('en') == 'ar' else 'ltr' }}" data-theme="dark">
 <head>
     <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
     <meta charset="UTF-8">
@@ -159,14 +159,24 @@
                 <!-- Language selector -->
                 <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
                     <select id="langSelect" title="{{ _("tt_language") }}" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:2px 4px;font-size:0.7rem;width:100%;cursor:pointer;text-align:center">
-                        <option value="en" {% if request.state.lang|default('en') == 'en' %}selected{% endif %}>{{ _("en") }}</option>
-                        <option value="fr" {% if request.state.lang|default('en') == 'fr' %}selected{% endif %}>{{ _("fr") }}</option>
+                        <option value="en" {% if request.state.lang|default('en') == 'en' %}selected{% endif %}>EN</option>
+                        <option value="fr" {% if request.state.lang|default('en') == 'fr' %}selected{% endif %}>FR</option>
                         <option value="zh" {% if request.state.lang|default('en') == 'zh' %}selected{% endif %}>中文</option>
-                        <option value="es" {% if request.state.lang|default('en') == 'es' %}selected{% endif %}>{{ _("es") }}</option>
-                        <option value="ja" {% if request.state.lang|default('en') == 'ja' %}selected{% endif %}>日本</option>
-                        <option value="pt" {% if request.state.lang|default('en') == 'pt' %}selected{% endif %}>{{ _("pt") }}</option>
-                        <option value="de" {% if request.state.lang|default('en') == 'de' %}selected{% endif %}>{{ _("de") }}</option>
-                        <option value="ko" {% if request.state.lang|default('en') == 'ko' %}selected{% endif %}>한국</option>
+                        <option value="es" {% if request.state.lang|default('en') == 'es' %}selected{% endif %}>ES</option>
+                        <option value="ja" {% if request.state.lang|default('en') == 'ja' %}selected{% endif %}>日本語</option>
+                        <option value="pt" {% if request.state.lang|default('en') == 'pt' %}selected{% endif %}>PT</option>
+                        <option value="de" {% if request.state.lang|default('en') == 'de' %}selected{% endif %}>DE</option>
+                        <option value="ko" {% if request.state.lang|default('en') == 'ko' %}selected{% endif %}>한국어</option>
+                        <option value="hi" {% if request.state.lang|default('en') == 'hi' %}selected{% endif %}>हिन्दी</option>
+                        <option value="ru" {% if request.state.lang|default('en') == 'ru' %}selected{% endif %}>RU</option>
+                        <option value="ar" {% if request.state.lang|default('en') == 'ar' %}selected{% endif %}>العربية</option>
+                        <option value="id" {% if request.state.lang|default('en') == 'id' %}selected{% endif %}>ID</option>
+                        <option value="tr" {% if request.state.lang|default('en') == 'tr' %}selected{% endif %}>TR</option>
+                        <option value="it" {% if request.state.lang|default('en') == 'it' %}selected{% endif %}>IT</option>
+                        <option value="nl" {% if request.state.lang|default('en') == 'nl' %}selected{% endif %}>NL</option>
+                        <option value="vi" {% if request.state.lang|default('en') == 'vi' %}selected{% endif %}>VI</option>
+                        <option value="pl" {% if request.state.lang|default('en') == 'pl' %}selected{% endif %}>PL</option>
+                        <option value="sv" {% if request.state.lang|default('en') == 'sv' %}selected{% endif %}>SV</option>
                     </select>
                 </div>
                 <!-- Theme toggle -->

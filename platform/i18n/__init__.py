@@ -3,6 +3,7 @@
 Usage in Jinja2 templates:  {{ _('key') }}  or  {{ _('key', name='World') }}
 Usage in Python:            from platform.i18n import t; t('key', lang='en')
 """
+
 from __future__ import annotations
 
 import json
@@ -14,7 +15,26 @@ log = logging.getLogger(__name__)
 
 LOCALES_DIR = Path(__file__).parent / "locales"
 DEFAULT_LANG = "en"
-SUPPORTED_LANGS = ("en", "fr", "zh", "es", "ja", "pt", "de", "ko")
+SUPPORTED_LANGS = (
+    "en",
+    "fr",
+    "zh",
+    "es",
+    "ja",
+    "pt",
+    "de",
+    "ko",
+    "hi",
+    "ru",
+    "ar",
+    "id",
+    "tr",
+    "it",
+    "nl",
+    "vi",
+    "pl",
+    "sv",
+)
 
 # In-memory catalog: {"en": {"key": "value"}, "fr": {"key": "valeur"}}
 _catalog: dict[str, dict[str, str]] = {}
