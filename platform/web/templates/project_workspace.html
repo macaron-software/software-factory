@@ -358,9 +358,9 @@ html,body{height:100%;overflow:hidden}
             <span class="ws-empty-hint">Saisissez une URL ou lancez un serveur dans Output</span>
           </div>
           <iframe class="ws-preview-frame" id="wsPreviewFrame"
-            {% if preview_url %}src="{{ preview_url }}"{% endif %}
+            {% if preview_url %}src="/projects/{{ project.id }}/preview/"{% endif %}
             style="{{ '' if preview_url else 'display:none' }}"
-            sandbox="allow-scripts allow-forms allow-popups allow-same-origin"></iframe>
+            sandbox="allow-scripts allow-forms allow-popups allow-same-origin allow-modals"></iframe>
         </div>
       </div>
 

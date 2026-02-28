@@ -753,6 +753,8 @@ def create_app() -> FastAPI:
         skip = (
             path.startswith("/static")
             or path.startswith("/api/")
+            or path.startswith("/projects/")
+            and "/preview/" in path
             or path
             in (
                 "/login",
