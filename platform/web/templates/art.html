@@ -21,6 +21,7 @@
 .art-block{margin-bottom:1rem;padding:0.6rem 0.7rem;background:var(--bg-tertiary);border-radius:8px;border-left:3px solid var(--blue)}
 .art-block[data-type="security"]{border-left-color:var(--red)}
 .art-block[data-type="rse"]{border-left-color:var(--green)}
+.art-block[data-type="knowledge"]{border-left-color:var(--yellow)}
 .art-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
 .art-block-title{font-size:0.8rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
 .art-block-title svg{width:14px;height:14px}
@@ -147,12 +148,12 @@
         </div>
         <div class="art-section">
         {% for art in p.children %}
-            {% set art_type = 'security' if 'Security' in art.name else ('rse' if 'RSE' in art.name else 'default') %}
+            {% set art_type = 'security' if 'Security' in art.name else ('rse' if 'RSE' in art.name else ('knowledge' if 'Knowledge' in art.name else 'default')) %}
             <div class="art-block" data-type="{{ art_type }}">
                 <div class="art-block-header">
                     <div>
-                        <div class="art-block-title" style="color:{% if art_type=='security' %}var(--red){% elif art_type=='rse' %}var(--green){% else %}var(--blue){% endif %}">
-                            <svg class="icon-sm"><use href="#icon-{% if art_type=='security' %}shield{% elif art_type=='rse' %}heart{% else %}git-branch{% endif %}"/></svg>
+                        <div class="art-block-title" style="color:{% if art_type=='security' %}var(--red){% elif art_type=='rse' %}var(--green){% elif art_type=='knowledge' %}var(--yellow){% else %}var(--blue){% endif %}">
+                            <svg class="icon-sm"><use href="#icon-{% if art_type=='security' %}shield{% elif art_type=='rse' %}heart{% elif art_type=='knowledge' %}database{% else %}git-branch{% endif %}"/></svg>
                             {{ art.name }}
                         </div>
                         {% if art.lead %}<div class="art-block-lead">Lead: {{ art.lead }}</div>{% endif %}

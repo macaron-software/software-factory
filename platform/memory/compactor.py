@@ -22,8 +22,8 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 MAX_PATTERN_AGE_DAYS = 7
-MAX_VALUE_LEN = 800       # chars kept per entry value
-STALE_PROJECT_DAYS = 60   # days before low-confidence entries expire
+MAX_VALUE_LEN = 800  # chars kept per entry value
+STALE_PROJECT_DAYS = 60  # days before low-confidence entries expire
 LOW_CONF_THRESHOLD = 0.4
 
 
@@ -117,7 +117,9 @@ def run_compaction() -> CompactionStats:
                 all_projects: list[str] = []
                 for e in entries:
                     all_projects.extend(json.loads(e["projects_json"] or "[]"))
-                merged_projects = list(dict.fromkeys(all_projects))  # dedupe preserving order
+                merged_projects = list(
+                    dict.fromkeys(all_projects)
+                )  # dedupe preserving order
                 conn.execute(
                     "UPDATE memory_global SET projects_json=? WHERE id=?",
                     (json.dumps(merged_projects), best["id"]),
@@ -157,6 +159,58 @@ def run_compaction() -> CompactionStats:
         except Exception as e:
             stats.errors.append(f"global_rescore: {e}")
 
+        # ── 6. Recalculate relevance_score on all project + global entries ──
+        try:
+            from .manager import _compute_relevance
+
+            rows = conn.execute(
+                "SELECT id, confidence, updated_at, COALESCE(access_count,0) as ac FROM memory_project"
+            ).fetchall()
+            for row in rows:
+                new_rel = _compute_relevance(
+                    row["confidence"], row["updated_at"] or "", row["ac"]
+                )
+                conn.execute(
+                    "UPDATE memory_project SET relevance_score=? WHERE id=?",
+                    (new_rel, row["id"]),
+                )
+            if rows:
+                conn.commit()
+        except Exception as e:
+            stats.errors.append(f"project_relevance: {e}")
+
+        try:
+            from .manager import _compute_relevance
+
+            rows = conn.execute(
+                "SELECT id, confidence, updated_at, COALESCE(access_count,0) as ac FROM memory_global"
+            ).fetchall()
+            for row in rows:
+                new_rel = _compute_relevance(
+                    row["confidence"], row["updated_at"] or "", row["ac"]
+                )
+                conn.execute(
+                    "UPDATE memory_global SET relevance_score=? WHERE id=?",
+                    (new_rel, row["id"]),
+                )
+            if rows:
+                conn.commit()
+        except Exception as e:
+            stats.errors.append(f"global_relevance: {e}")
+
+        # ── 7. Prune very low-relevance project entries (< 0.15, never accessed) ──
+        try:
+            result = conn.execute(
+                "DELETE FROM memory_project WHERE COALESCE(relevance_score, confidence) < 0.15 "
+                "AND COALESCE(access_count, 0) = 0"
+            )
+            extra_pruned = result.rowcount
+            if extra_pruned:
+                conn.commit()
+                stats.project_pruned += extra_pruned
+        except Exception as e:
+            stats.errors.append(f"relevance_prune: {e}")
+
     finally:
         conn.close()
 
@@ -170,51 +224,98 @@ def get_memory_health() -> dict:
 
     conn = get_db()
     try:
+
         def q(sql, *params):
             row = conn.execute(sql, params).fetchone()
             return dict(row) if row else {}
 
-        project_total = (q("SELECT count(*) as n FROM memory_project") or {}).get("n", 0)
-        project_low_conf = (q(
-            f"SELECT count(*) as n FROM memory_project WHERE confidence < {LOW_CONF_THRESHOLD}"
-        ) or {}).get("n", 0)
-        project_stale = (q(
-            f"SELECT count(*) as n FROM memory_project WHERE "
-            f"julianday('now') - julianday(updated_at) > {STALE_PROJECT_DAYS}"
-        ) or {}).get("n", 0)
-        project_oversized = (q(
-            f"SELECT count(*) as n FROM memory_project WHERE length(value) > {MAX_VALUE_LEN}"
-        ) or {}).get("n", 0)
+        project_total = (q("SELECT count(*) as n FROM memory_project") or {}).get(
+            "n", 0
+        )
+        project_low_conf = (
+            q(
+                f"SELECT count(*) as n FROM memory_project WHERE confidence < {LOW_CONF_THRESHOLD}"
+            )
+            or {}
+        ).get("n", 0)
+        project_stale = (
+            q(
+                f"SELECT count(*) as n FROM memory_project WHERE "
+                f"julianday('now') - julianday(updated_at) > {STALE_PROJECT_DAYS}"
+            )
+            or {}
+        ).get("n", 0)
+        project_oversized = (
+            q(
+                f"SELECT count(*) as n FROM memory_project WHERE length(value) > {MAX_VALUE_LEN}"
+            )
+            or {}
+        ).get("n", 0)
+        try:
+            project_avg_rel = (
+                conn.execute(
+                    "SELECT round(avg(COALESCE(relevance_score,confidence)),3) as v FROM memory_project"
+                ).fetchone()
+                or {}
+            ).get("v", 0)
+            project_low_rel = (
+                conn.execute(
+                    "SELECT count(*) as n FROM memory_project WHERE COALESCE(relevance_score,confidence) < 0.15"
+                ).fetchone()
+                or {}
+            ).get("n", 0)
+            top_accessed = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT key, category, access_count, relevance_score FROM memory_project "
+                    "ORDER BY COALESCE(access_count,0) DESC LIMIT 5"
+                ).fetchall()
+            ]
+        except Exception:
+            project_avg_rel = 0
+            project_low_rel = 0
+            top_accessed = []
 
         # Category breakdown
         project_by_cat = [
-            dict(r) for r in conn.execute(
+            dict(r)
+            for r in conn.execute(
                 "SELECT category, count(*) as n, round(avg(confidence),2) as avg_conf "
                 "FROM memory_project GROUP BY category ORDER BY n DESC"
             ).fetchall()
         ]
 
         global_total = (q("SELECT count(*) as n FROM memory_global") or {}).get("n", 0)
-        global_dupes = (q(
-            "SELECT count(*) as n FROM (SELECT key FROM memory_global GROUP BY key HAVING count(*)>1)"
-        ) or {}).get("n", 0)
+        global_dupes = (
+            q(
+                "SELECT count(*) as n FROM (SELECT key FROM memory_global GROUP BY key HAVING count(*)>1)"
+            )
+            or {}
+        ).get("n", 0)
         global_by_cat = [
-            dict(r) for r in conn.execute(
+            dict(r)
+            for r in conn.execute(
                 "SELECT category, count(*) as n, round(avg(confidence),2) as avg_conf, "
                 "round(avg(occurrences),1) as avg_occ "
                 "FROM memory_global GROUP BY category ORDER BY n DESC"
             ).fetchall()
         ]
 
-        pattern_total = (q("SELECT count(*) as n FROM memory_pattern") or {}).get("n", 0)
-        pattern_old = (q(
-            f"SELECT count(*) as n FROM memory_pattern WHERE "
-            f"julianday('now') - julianday(created_at) > {MAX_PATTERN_AGE_DAYS}"
-        ) or {}).get("n", 0)
+        pattern_total = (q("SELECT count(*) as n FROM memory_pattern") or {}).get(
+            "n", 0
+        )
+        pattern_old = (
+            q(
+                f"SELECT count(*) as n FROM memory_pattern WHERE "
+                f"julianday('now') - julianday(created_at) > {MAX_PATTERN_AGE_DAYS}"
+            )
+            or {}
+        ).get("n", 0)
 
         # Role-scoped entries
         role_stats = [
-            dict(r) for r in conn.execute(
+            dict(r)
+            for r in conn.execute(
                 "SELECT COALESCE(agent_role,'') as role, count(*) as n "
                 "FROM memory_project GROUP BY agent_role ORDER BY n DESC"
             ).fetchall()
@@ -229,6 +330,9 @@ def get_memory_health() -> dict:
             "low_confidence": project_low_conf,
             "stale": project_stale,
             "oversized": project_oversized,
+            "avg_relevance": project_avg_rel,
+            "low_relevance": project_low_rel,
+            "top_accessed": top_accessed,
             "by_category": project_by_cat,
             "by_role": role_stats,
         },
@@ -252,7 +356,6 @@ def get_memory_health() -> dict:
 
 async def memory_compactor_loop() -> None:
     """Background task: run compaction nightly at 03:00 UTC."""
-    import asyncio
     from datetime import timedelta
 
     logger.info("Memory compactor loop started (nightly at 03:00 UTC)")

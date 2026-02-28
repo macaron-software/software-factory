@@ -273,6 +273,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to start memory compactor: %s", e)
 
+    # Start knowledge scheduler (nightly at 04:00 UTC)
+    try:
+        from .ops.knowledge_scheduler import knowledge_scheduler_loop as _know_sched
+
+        _asyncio.create_task(_know_sched())
+        logger.info("Knowledge scheduler started (nightly 04:00 UTC)")
+    except Exception as e:
+        logger.warning("Failed to start knowledge scheduler: %s", e)
+
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init
@@ -1164,6 +1173,7 @@ def create_app() -> FastAPI:
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
         ("guidelines", ".web.routes.api.guidelines", {}),
+        ("knowledge", ".web.routes.api.knowledge", {}),
     ]
 
     for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:

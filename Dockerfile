@@ -1,46 +1,62 @@
-FROM python:3.12-slim
+# Multi-stage Node.js Dockerfile (multi-arch friendly)
+# - Base image: node:lts-slim (official tag)
+# - Builder stage: installs dev deps (npm ci) and runs the build
+# - Final stage: copies only runtime artifacts, runs as non-root 'node' user
 
-WORKDIR /app
+ARG NODE_IMAGE=node:lts-slim
+FROM ${NODE_IMAGE} AS builder
 
-# System deps + Node.js 20 + Playwright browser
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl gnupg ripgrep && \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y --no-install-recommends nodejs && \
-    npm install -g @playwright/test @playwright/mcp && \
-    mkdir -p $PLAYWRIGHT_BROWSERS_PATH && \
-    npx playwright install --with-deps chromium && \
-    chmod -R 755 $PLAYWRIGHT_BROWSERS_PATH && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /root/.cache
+# Set working dir
+WORKDIR /usr/src/app
 
-# Python deps + SAST tools
-COPY platform/requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt \
-    bandit semgrep
+# Copy only package manifests first to leverage Docker cache for npm install
+COPY package*.json ./
 
-# Copy platform code
-COPY platform/ /app/platform/
-COPY cli/ /app/cli/
-COPY skills/ /app/skills/
-COPY mcp_lrm/ /app/mcp_lrm/
-COPY dashboard/ /app/dashboard/
-COPY projects/ /app/projects/
+# Install all dependencies (dev + prod) for the build step
+RUN npm ci --silent
 
-# Data + workspace dirs
-RUN mkdir -p /app/data /app/workspace
+# Copy source files
+COPY . .
 
-# Create non-root user
-RUN groupadd -r macaron && useradd -r -g macaron -d /app macaron \
-    && chown -R macaron:macaron /app \
-    && chown -R macaron:macaron $PLAYWRIGHT_BROWSERS_PATH
-USER macaron
+# Default build directory (can be overridden at build time)
+ARG BUILD_DIR=dist
+ENV BUILD_DIR=${BUILD_DIR}
 
-# Env
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
-ENV WORKSPACE_ROOT=/app/workspace
+# Run the project build if present. --if-present makes this step a no-op when
+# there's no build script defined in package.json (keeps image build stable).
+RUN npm run build --if-present
 
-EXPOSE 8099
+# Optionally run tests in builder stage (uncomment in CI when needed)
+# RUN npm test --if-present
 
-CMD ["uvicorn", "platform.server:app", "--host", "0.0.0.0", "--port", "8099", "--ws", "none"]
+# ---- Final image ----
+FROM ${NODE_IMAGE} AS runner
+
+WORKDIR /usr/src/app
+
+# Copy production runtime files from builder. Use --chown to ensure non-root user
+# will be able to read/write as needed.
+ARG BUILD_DIR=dist
+ENV BUILD_DIR=${BUILD_DIR}
+
+# Copy package files so metadata is available in final image
+COPY --from=builder --chown=node:node /usr/src/app/package*.json ./
+
+# Copy node_modules from builder to avoid reinstalling in the final image
+# (preserves exact installed artifacts from builder stage)
+COPY --from=builder --chown=node:node /usr/src/app/node_modules ./node_modules
+
+# Copy build output (default: dist) into image
+COPY --from=builder --chown=node:node /usr/src/app/${BUILD_DIR} ./${BUILD_DIR}
+
+# Set production env
+ENV NODE_ENV=production
+ENV PORT=3000
+EXPOSE ${PORT}
+
+# Use the official non-root 'node' user provided by the base image
+USER node
+
+# Default runtime command. Use shell form so environment expansion works for BUILD_DIR.
+# Adjust the path if your project emits a different entrypoint (e.g. server.js, index.mjs).
+CMD ["sh", "-c", "node ${BUILD_DIR}/index.js"]

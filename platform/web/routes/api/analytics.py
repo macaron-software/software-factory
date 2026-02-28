@@ -102,6 +102,34 @@ async def metrics_tab_pipeline(request: Request):
     )
 
 
+@router.get("/metrics/tab/knowledge", response_class=HTMLResponse)
+async def metrics_tab_knowledge(request: Request):
+    """Knowledge health tab partial."""
+    from ....memory.compactor import get_memory_health
+    from ....db.migrations import get_db
+
+    health = get_memory_health()
+    # Last knowledge-maintenance run
+    last_run = None
+    try:
+        conn = get_db()
+        row = conn.execute(
+            "SELECT mr.id, mr.status, mr.started_at, mr.completed_at, mr.llm_cost_usd "
+            "FROM mission_runs mr "
+            "JOIN missions m ON mr.mission_id = m.id "
+            "WHERE m.workflow_id = 'knowledge-maintenance' "
+            "ORDER BY mr.started_at DESC LIMIT 1"
+        ).fetchone()
+        conn.close()
+        last_run = dict(row) if row else None
+    except Exception:
+        pass
+    return _templates(request).TemplateResponse(
+        "_partial_knowledge.html",
+        {"request": request, "health": health, "last_run": last_run},
+    )
+
+
 @router.get("/metrics", response_class=HTMLResponse)
 async def dora_dashboard_page(request: Request):
     """Unified Metrics dashboard — DORA, Quality, Analytics, Monitoring, Pipeline."""

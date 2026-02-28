@@ -1,0 +1,125 @@
+<div class="partial-knowledge" style="padding:0">
+{% set proj = health.project %}
+{% set glob = health.global %}
+{% set pat = health.pattern %}
+
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.8rem;margin-bottom:1rem">
+    <!-- Total project memories -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-database"/></svg> Project Memories
+        </div>
+        <div style="font-size:1.6rem;font-weight:700;color:var(--blue)">{{ proj.total }}</div>
+        <div style="font-size:0.72rem;color:var(--text-secondary)">{{ glob.total }} global · {{ pat.total }} patterns</div>
+    </div>
+    <!-- Avg relevance -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-trending-up"/></svg> Avg Relevance
+        </div>
+        {% set rel = proj.avg_relevance|default(0)|float %}
+        <div style="font-size:1.6rem;font-weight:700;color:{% if rel >= 0.6 %}var(--green){% elif rel >= 0.3 %}var(--yellow){% else %}var(--red){% endif %}">
+            {{ "%.2f"|format(rel) }}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-secondary)">{{ proj.low_relevance|default(0) }} low-rel entries</div>
+    </div>
+    <!-- Stale entries -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-clock"/></svg> Stale Entries
+        </div>
+        <div style="font-size:1.6rem;font-weight:700;color:{% if proj.stale|default(0) > 20 %}var(--red){% elif proj.stale|default(0) > 5 %}var(--yellow){% else %}var(--green){% endif %}">
+            {{ proj.stale|default(0) }}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-secondary)">{{ proj.low_confidence|default(0) }} low-confidence</div>
+    </div>
+    <!-- Last run -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:0.3rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-play"/></svg> Last Maintenance
+        </div>
+        {% if last_run %}
+        <div style="font-size:0.85rem;font-weight:600;color:{% if last_run.status=='completed' %}var(--green){% elif last_run.status=='failed' %}var(--red){% else %}var(--yellow){% endif %}">
+            {{ last_run.status|upper }}
+        </div>
+        <div style="font-size:0.72rem;color:var(--text-secondary)">{{ (last_run.completed_at or last_run.started_at or '')[:16] }}</div>
+        {% else %}
+        <div style="font-size:0.85rem;color:var(--text-secondary)">Never run</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Refresh Now button -->
+<div style="margin-bottom:1rem;display:flex;align-items:center;gap:0.75rem">
+    <button hx-post="/api/knowledge/refresh" hx-target="#km-refresh-result" hx-swap="innerHTML"
+        style="background:var(--blue);color:#fff;border:none;border-radius:6px;padding:0.4rem 1rem;font-size:0.82rem;cursor:pointer;display:flex;align-items:center;gap:0.4rem">
+        <svg style="width:13px;height:13px"><use href="#icon-refresh-cw"/></svg>
+        Refresh Now
+    </button>
+    <span id="km-refresh-result" style="font-size:0.8rem;color:var(--text-secondary)"></span>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">
+    <!-- By category -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-tag"/></svg> By Category
+        </div>
+        {% if proj.by_category %}
+        <table style="width:100%;font-size:0.78rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:0.2rem 0.4rem">Category</th><th style="text-align:right;padding:0.2rem 0.4rem">Count</th><th style="text-align:right;padding:0.2rem 0.4rem">Avg Conf</th></tr></thead>
+            <tbody>
+            {% for cat in proj.by_category %}
+            <tr style="border-top:1px solid var(--border)">
+                <td style="padding:0.25rem 0.4rem">{{ cat.category or 'context' }}</td>
+                <td style="text-align:right;padding:0.25rem 0.4rem;font-weight:600">{{ cat.n }}</td>
+                <td style="text-align:right;padding:0.25rem 0.4rem;color:var(--text-secondary)">{{ cat.avg_conf }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="color:var(--text-secondary);font-size:0.78rem">No data</div>
+        {% endif %}
+    </div>
+
+    <!-- Top accessed entries -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem">
+        <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem">
+            <svg style="width:13px;height:13px"><use href="#icon-star"/></svg> Most Accessed
+        </div>
+        {% if proj.top_accessed %}
+        <table style="width:100%;font-size:0.78rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:0.2rem 0.4rem">Key</th><th style="text-align:right;padding:0.2rem 0.4rem">Reads</th><th style="text-align:right;padding:0.2rem 0.4rem">Relevance</th></tr></thead>
+            <tbody>
+            {% for e in proj.top_accessed %}
+            <tr style="border-top:1px solid var(--border)">
+                <td style="padding:0.25rem 0.4rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ e.key }}">{{ e.key }}</td>
+                <td style="text-align:right;padding:0.25rem 0.4rem;font-weight:600">{{ e.access_count or 0 }}</td>
+                <td style="text-align:right;padding:0.25rem 0.4rem;color:var(--text-secondary)">{{ "%.2f"|format((e.relevance_score or 0)|float) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="color:var(--text-secondary);font-size:0.78rem">No access data yet</div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Global memory by category -->
+{% if glob.by_category %}
+<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-top:0.8rem">
+    <div style="font-size:0.82rem;font-weight:600;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.4rem">
+        <svg style="width:13px;height:13px"><use href="#icon-globe"/></svg> Global Memory by Category
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:0.4rem">
+    {% for cat in glob.by_category %}
+    <span style="background:var(--bg-primary);border:1px solid var(--border);border-radius:12px;padding:0.2rem 0.6rem;font-size:0.75rem">
+        {{ cat.category }} <strong>{{ cat.n }}</strong> · conf {{ cat.avg_conf }}
+    </span>
+    {% endfor %}
+    </div>
+</div>
+{% endif %}
+</div>

@@ -1,0 +1,52 @@
+id: knowledge-maintenance
+name: Knowledge Maintenance
+description: 'Nightly knowledge management cycle: audit memory health, seed fresh facts, curate & prune, refresh wikis, consolidate.'
+icon: database
+is_builtin: true
+phases:
+- id: km-audit
+  pattern_id: solo
+  name: Memory Audit
+  description: Assess memory health — relevance histogram, stale entries, coverage gaps per project, last seeding date
+  gate: Memory health report produced with action list
+  config:
+    agents:
+    - knowledge-manager
+
+- id: km-deepsearch
+  pattern_id: parallel
+  name: Knowledge Discovery
+  description: Seed fresh knowledge from web (fetch/deepsearch), Confluence/Jira (lrm), and recent git commits/PRs
+  gate: New facts stored in project and global memory
+  config:
+    agents:
+    - knowledge-seeder
+    - knowledge-seeder
+
+- id: km-curate
+  pattern_id: sequential
+  name: Memory Curation
+  description: Prune low-relevance entries (score < 0.2), merge duplicates, re-score based on recency and access patterns
+  gate: Memory cleaned, duplicates merged, scores updated
+  config:
+    agents:
+    - knowledge-curator
+
+- id: km-refresh-docs
+  pattern_id: hierarchical
+  name: Wiki & Docs Refresh
+  description: Update stale wiki sections, README files, and architecture docs based on recent code changes and memory
+  gate: Stale documentation updated with current state
+  config:
+    agents:
+    - wiki-maintainer
+    - knowledge-seeder
+
+- id: km-index
+  pattern_id: solo
+  name: Knowledge Consolidation
+  description: Consolidate cross-project patterns into global memory, produce final health report, store KPIs
+  gate: Global knowledge updated, health report stored in memory
+  config:
+    agents:
+    - knowledge-manager

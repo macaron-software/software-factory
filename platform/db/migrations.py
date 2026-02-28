@@ -1289,6 +1289,62 @@ def _migrate(conn):
     except Exception:
         pass
 
+    # Knowledge Intelligence columns — access tracking + relevance scoring
+    try:
+        mp_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
+        }
+        if mp_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_project ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_project ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_project ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_project ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mp_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+    try:
+        mg_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_global)").fetchall()
+        }
+        if mg_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_global ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_global ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_global ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_global ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mg_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+
     _ensure_sqlite_tables(conn)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
