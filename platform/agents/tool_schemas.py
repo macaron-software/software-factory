@@ -789,6 +789,84 @@ def _mcp_schemas() -> list[dict]:
                 },
             },
         },
+        # ── MCP: Architecture Guidelines (Confluence / GitLab Wiki / Markdown) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_summary",
+                "description": "Get the architecture/tech guidelines summary for the current project: required tech stack, forbidden libs/patterns, standards. Always call before generating code to ensure compliance with DSI/org rules.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "Project ID (defaults to current project)",
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "Agent role: dev, architecture, security, frontend",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_search",
+                "description": "Search the org/project architecture guidelines wiki for rules, decisions, or guidance on a specific topic (e.g. 'auth', 'database choice', 'API standards', 'logging').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {"type": "string", "description": "Search terms"},
+                        "project": {"type": "string", "description": "Project ID"},
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results (default 5)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_get",
+                "description": "Get full content of a specific architecture guideline page by title.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (partial match ok)",
+                        },
+                        "project": {"type": "string", "description": "Project ID"},
+                        "page_id": {
+                            "type": "string",
+                            "description": "Exact page ID (alternative to title)",
+                        },
+                    },
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_guidelines_stack",
+                "description": "Get required tech stack for the project by topic (backend, frontend, database, auth, infra, security). Use before choosing technologies to ensure DSI compliance.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project ID"},
+                        "topic": {
+                            "type": "string",
+                            "description": "Filter by topic: backend, frontend, database, auth, infra, security, quality",
+                        },
+                    },
+                },
+            },
+        },
         # ── MCP: Figma (design system) ──
         {
             "type": "function",
@@ -2343,6 +2421,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_get",
+        "lrm_guidelines_stack",
     ],
     "ux": [
         "code_read",
@@ -2397,6 +2479,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_get",
+        "lrm_guidelines_stack",
     ],
     "qa": [
         "code_read",
@@ -2489,6 +2575,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "dependency_audit",
         "secrets_scan",
         "get_si_blueprint",
+        "lrm_guidelines_summary",
+        "lrm_guidelines_search",
+        "lrm_guidelines_stack",
     ],
     "cdp": [
         "memory_search",

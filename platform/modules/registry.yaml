@@ -295,3 +295,33 @@ modules:
     install: "# live API — set HF_TOKEN for private models"
     requires:
       - "HF_TOKEN (optional)"
+
+  - id: wiki-guidelines
+    name: "Architecture Guidelines (Wiki DSI)"
+    description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
+    category: knowledge
+    icon: "📐"
+    builtin: false
+    source_url: ""
+    license: "Internal — your org's wiki"
+    tools:
+      - lrm_guidelines_summary
+      - lrm_guidelines_search
+      - lrm_guidelines_get
+      - lrm_guidelines_stack
+    install: "python -m mcp_lrm.guidelines_scraper --source confluence --space BSCC --project bscc"
+    data_file: "data/guidelines.db"
+    config:
+      source: confluence
+      space: ""
+      confluence_url: ""
+      token_env: "CONFLUENCE_TOKEN"
+      auto_inject: true
+      roles:
+        - dev
+        - architecture
+        - security
+        - reviewer
+      scrape_frequency: weekly
+    requires:
+      - "CONFLUENCE_TOKEN or GITLAB_TOKEN"

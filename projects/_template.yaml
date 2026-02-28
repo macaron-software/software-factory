@@ -131,3 +131,15 @@ analyzers: []
   # - typescript
   # - playwright
   # - security
+
+# Architecture Guidelines (optional)
+# Scrape your org wiki to inject guidelines into agent system prompts.
+# Run: python -m mcp_lrm.guidelines_scraper --source confluence --space MYSPACE --project <project_id>
+# guidelines:
+#   enabled: true
+#   source: confluence          # confluence | gitlab | markdown
+#   space: MYSPACE              # Confluence space key
+#   confluence_url: ""          # e.g. https://confluence.myorg.com
+#   token_env: CONFLUENCE_TOKEN # env var with API token
+#   auto_inject: true           # inject in dev/arch/security agent prompts
+#   scrape_frequency: weekly

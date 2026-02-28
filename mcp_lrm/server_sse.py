@@ -31,11 +31,12 @@ import asyncio
 import json
 import os
 import re
+import sqlite3
 import sys
 import signal
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 from datetime import datetime
 
 # Add parent to path for imports
@@ -406,6 +407,82 @@ class MCPLRMServer:
                     "required": ["ds_name"],
                 },
             },
+            # ── Guidelines (Architecture wiki) ──
+            {
+                "name": "guidelines_summary",
+                "description": "Get the architecture/tech guidelines summary for a project. Returns compact constraints: tech stack required, forbidden libs/patterns, standards. Injected in agent system prompts automatically, but can also be queried explicitly.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project": {
+                            "type": "string",
+                            "description": "Project ID (e.g. 'bscc', 'greenfleet')",
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "Agent role for filtering: dev, architecture, security, frontend",
+                            "default": "dev",
+                        },
+                        "max_chars": {
+                            "type": "integer",
+                            "description": "Max chars to return",
+                            "default": 800,
+                        },
+                    },
+                },
+            },
+            {
+                "name": "guidelines_search",
+                "description": "Full-text search across org/project architecture guidelines wiki. Use to find specific rules, decisions, or guidance on a topic.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search terms (e.g. 'auth', 'database', 'API standards', 'frontend framework')",
+                        },
+                        "project": {"type": "string", "description": "Project ID"},
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max results",
+                            "default": 5,
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+            {
+                "name": "guidelines_get",
+                "description": "Get full content of a specific architecture guideline page (by title or page ID).",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (partial match ok)",
+                        },
+                        "project": {"type": "string", "description": "Project ID"},
+                        "page_id": {
+                            "type": "string",
+                            "description": "Exact page ID (alternative to title)",
+                        },
+                    },
+                },
+            },
+            {
+                "name": "guidelines_stack",
+                "description": "Get the required tech stack for a project (must_use items by topic: backend, frontend, database, auth, infra). Use before choosing technologies.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "project": {"type": "string", "description": "Project ID"},
+                        "topic": {
+                            "type": "string",
+                            "description": "Filter by topic: backend, frontend, database, auth, infra, security, quality",
+                        },
+                    },
+                },
+            },
         ]
 
     async def handle_tool_call(self, name: str, arguments: Dict) -> Any:
@@ -439,6 +516,14 @@ class MCPLRMServer:
                 return await self._tool_component_gallery_search(arguments)
             elif clean_name == "component_gallery_ds":
                 return await self._tool_component_gallery_ds(arguments)
+            elif clean_name == "guidelines_summary":
+                return await self._tool_guidelines_summary(arguments)
+            elif clean_name == "guidelines_search":
+                return await self._tool_guidelines_search(arguments)
+            elif clean_name == "guidelines_get":
+                return await self._tool_guidelines_get(arguments)
+            elif clean_name == "guidelines_stack":
+                return await self._tool_guidelines_stack(arguments)
             else:
                 return {"error": f"Unknown tool: {name} (cleaned: {clean_name})"}
         except Exception as e:
@@ -941,6 +1026,154 @@ class MCPLRMServer:
                 "source": "cache",
                 "error": str(e),
             }
+
+    # ── Architecture Guidelines ───────────────────────────────────────────────
+
+    _GL_DB_PATH = Path(__file__).parent.parent / "data" / "guidelines.db"
+
+    def _gl_db(self) -> Optional[sqlite3.Connection]:
+        if not self._GL_DB_PATH.exists():
+            return None
+        conn = sqlite3.connect(str(self._GL_DB_PATH))
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    async def _tool_guidelines_summary(self, args: Dict) -> Dict:
+        project = args.get("project", "default")
+        role = args.get("role", "dev")
+        max_chars = int(args.get("max_chars", 800))
+        from .guidelines_scraper import build_guidelines_summary
+
+        summary = build_guidelines_summary(project, role, max_chars)
+        if not summary:
+            return {
+                "note": f"No guidelines found for project '{project}'. Run: python -m mcp_lrm.guidelines_scraper --source confluence --space BSCC --project {project}"
+            }
+        return {"project": project, "summary": summary}
+
+    async def _tool_guidelines_search(self, args: Dict) -> Dict:
+        query = args.get("query", "").strip()
+        project = args.get("project", "default")
+        limit = int(args.get("limit", 5))
+        if not query:
+            return {"error": "query is required"}
+        conn = self._gl_db()
+        if not conn:
+            return {
+                "error": "Guidelines DB not found. Run: python -m mcp_lrm.guidelines_scraper --help"
+            }
+        try:
+            rows = conn.execute(
+                "SELECT id, title, url, category, summary FROM guideline_pages "
+                "WHERE project = ? AND (title LIKE ? OR content LIKE ? OR summary LIKE ?) LIMIT ?",
+                (project, f"%{query}%", f"%{query}%", f"%{query}%", limit),
+            ).fetchall()
+        except Exception:
+            rows = []
+        # Also try FTS
+        if not rows:
+            try:
+                rows = conn.execute(
+                    "SELECT p.id, p.title, p.url, p.category, p.summary "
+                    "FROM guideline_fts f JOIN guideline_pages p ON f.rowid = p.rowid "
+                    "WHERE f MATCH ? AND p.project = ? LIMIT ?",
+                    (query, project, limit),
+                ).fetchall()
+            except Exception:
+                pass
+        conn.close()
+        return {
+            "query": query,
+            "project": project,
+            "count": len(rows),
+            "results": [
+                {
+                    "id": r["id"],
+                    "title": r["title"],
+                    "category": r["category"],
+                    "url": r["url"],
+                    "summary": r["summary"],
+                }
+                for r in rows
+            ],
+        }
+
+    async def _tool_guidelines_get(self, args: Dict) -> Dict:
+        project = args.get("project", "default")
+        title = args.get("title", "").strip()
+        page_id = args.get("page_id", "").strip()
+        conn = self._gl_db()
+        if not conn:
+            return {"error": "Guidelines DB not found"}
+        if page_id:
+            row = conn.execute(
+                "SELECT * FROM guideline_pages WHERE id = ? AND project = ?",
+                (page_id, project),
+            ).fetchone()
+        elif title:
+            row = conn.execute(
+                "SELECT * FROM guideline_pages WHERE project = ? AND title LIKE ? LIMIT 1",
+                (project, f"%{title}%"),
+            ).fetchone()
+        else:
+            return {"error": "Provide title or page_id"}
+        if not row:
+            conn.close()
+            return {
+                "error": f"Page not found for title='{title}' page_id='{page_id}' project='{project}'"
+            }
+        items = conn.execute(
+            "SELECT category, topic, constraint_text FROM guideline_items WHERE source_page_id = ?",
+            (row["id"],),
+        ).fetchall()
+        conn.close()
+        return {
+            "id": row["id"],
+            "title": row["title"],
+            "category": row["category"],
+            "url": row["url"],
+            "summary": row["summary"],
+            "content": (row["content"] or "")[:3000],
+            "extracted_items": [
+                {
+                    "category": i["category"],
+                    "topic": i["topic"],
+                    "constraint": i["constraint_text"],
+                }
+                for i in items
+            ],
+        }
+
+    async def _tool_guidelines_stack(self, args: Dict) -> Dict:
+        project = args.get("project", "default")
+        topic_filter = args.get("topic", "").strip()
+        conn = self._gl_db()
+        if not conn:
+            return {"error": "Guidelines DB not found"}
+        q = "SELECT category, topic, constraint_text, source_title FROM guideline_items WHERE project = ? AND category IN ('must_use', 'forbidden', 'standard')"
+        params: list = [project]
+        if topic_filter:
+            q += " AND topic LIKE ?"
+            params.append(f"%{topic_filter}%")
+        q += " ORDER BY category, topic"
+        rows = conn.execute(q, params).fetchall()
+        conn.close()
+        by_cat: dict = {}
+        for r in rows:
+            cat = r["category"]
+            by_cat.setdefault(cat, []).append(
+                {
+                    "topic": r["topic"],
+                    "constraint": r["constraint_text"],
+                    "source": r["source_title"],
+                }
+            )
+        return {
+            "project": project,
+            "topic_filter": topic_filter or "all",
+            "items": by_cat,
+            "total": len(rows),
+        }
 
     # ── Component Gallery ──────────────────────────────────────────────────
 

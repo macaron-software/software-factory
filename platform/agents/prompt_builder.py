@@ -17,6 +17,72 @@ from .tool_schemas import (
 if TYPE_CHECKING:
     from .executor import ExecutionContext
 
+# Roles that benefit from architecture guidelines injection
+_GUIDELINES_ROLES = {
+    "dev",
+    "architecture",
+    "security",
+    "reviewer",
+    "qa",
+    "backend",
+    "frontend",
+}
+
+# Simple LRU-style cache to avoid DB hit on every message (project_id → (summary, timestamp))
+_guidelines_cache: dict[str, tuple[str, float]] = {}
+_GUIDELINES_CACHE_TTL = 300  # 5 minutes
+
+
+def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
+    """Load architecture guidelines from DB and return compact summary for system prompt injection.
+
+    Only injects for roles that need tech constraints (dev, architecture, security, ...).
+    Returns empty string if no guidelines configured for this project.
+    """
+    import time
+
+    if not ctx.project_id:
+        return ""
+
+    # Role filter — skip for product/marketing/ideation-only roles
+    role = _classify_agent_role(ctx.agent)
+    if role not in _GUIDELINES_ROLES:
+        return ""
+
+    # Check cache
+    cached = _guidelines_cache.get(ctx.project_id)
+    if cached:
+        summary, ts = cached
+        if time.time() - ts < _GUIDELINES_CACHE_TTL:
+            return summary
+
+    try:
+        from pathlib import Path
+
+        db_path = Path(__file__).parent.parent.parent / "data" / "guidelines.db"
+        if not db_path.exists():
+            return ""
+
+        import sqlite3
+
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        meta = conn.execute(
+            "SELECT page_count FROM guideline_meta WHERE project = ?", (ctx.project_id,)
+        ).fetchone()
+        if not meta or meta["page_count"] == 0:
+            conn.close()
+            return ""
+        conn.close()
+
+        from mcp_lrm.guidelines_scraper import build_guidelines_summary
+
+        summary = build_guidelines_summary(ctx.project_id, role, max_chars=600)
+        _guidelines_cache[ctx.project_id] = (summary, time.time())
+        return summary
+    except Exception:
+        return ""
+
 
 def _build_system_prompt(ctx: ExecutionContext) -> str:
     """Compose the full system prompt from agent config + skills + context."""
@@ -142,6 +208,11 @@ RULES:
 
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")
+
+    # Inject architecture/tech guidelines if available for this project
+    guidelines = _load_guidelines_for_prompt(ctx)
+    if guidelines:
+        parts.append(f"\n## Architecture & Tech Guidelines (DSI)\n{guidelines}")
 
     if ctx.capability_grade == "organizer":
         # Organizers: full project context (constitution, vision, memory files)
