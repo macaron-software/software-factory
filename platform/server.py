@@ -201,9 +201,16 @@ async def lifespan(app: FastAPI):
 
         _rdb = _gdb()
         _stale = _rdb.execute(
-            # Reset resume_attempts too — restart ≠ failure, don't burn backoff budget
-            "UPDATE mission_runs SET status='paused', resume_attempts=0 WHERE status='running'"
+            "UPDATE mission_runs SET status='paused' WHERE status='running'"
         ).rowcount
+        # Reset resume_attempts too — restart ≠ failure, don't burn backoff budget.
+        # Wrapped separately so older DBs without the column don't break the status reset.
+        try:
+            _rdb.execute(
+                "UPDATE mission_runs SET resume_attempts=0 WHERE status='paused' AND (resume_attempts IS NULL OR resume_attempts > 0)"
+            )
+        except Exception:
+            pass
         # Also fix phases stuck at "running" inside phases_json
         _stuck_phases = 0
         _rows = _rdb.execute(
