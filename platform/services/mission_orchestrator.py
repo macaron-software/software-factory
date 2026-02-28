@@ -14,6 +14,83 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 
+def _compute_quality_score(
+    session_id: str, agent_ids: list[str], phase_start_ts: float, db
+) -> float:
+    """Compute a composite quality_score from observable phase signals.
+
+    Formula (each capped at 1.0):
+      - 0.35 × tool_success_rate  (successful tool calls / total)
+      - 0.30 × commit_signal      (1.0 if ≥1 commit, 0.5 if any code_write, 0.0 otherwise)
+      - 0.25 × message_density    (log-scaled messages count: 1.0 at 20 messages)
+      - 0.10 × duration_signal    (1.0 if phase took 30–600s, less otherwise)
+    """
+    try:
+        from datetime import datetime as _dt
+
+        phase_start_iso = _dt.utcfromtimestamp(phase_start_ts).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Tool call success rate in this session during this phase
+        tc_row = db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok "
+            "FROM tool_calls WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        total_tc = int(tc_row[0] or 0)
+        ok_tc = int(tc_row[1] or 0)
+        tool_success_rate = (ok_tc / total_tc) if total_tc > 0 else 0.5
+
+        # Commit signal: did agents commit code?
+        commit_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name='git_commit' AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        code_write_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name IN ('code_write','code_edit','code_create') AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        commits = int(commit_row[0] or 0)
+        code_writes = int(code_write_row[0] or 0)
+        commit_signal = (
+            1.0
+            if commits >= 1
+            else (0.6 if code_writes >= 2 else (0.3 if code_writes >= 1 else 0.0))
+        )
+
+        # Message density: how many agent messages were exchanged
+        msg_row = db.execute(
+            "SELECT COUNT(*) FROM messages WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        msg_count = int(msg_row[0] or 0)
+        import math as _math
+
+        message_density = min(
+            1.0, _math.log(msg_count + 1) / _math.log(21)
+        )  # 1.0 at 20 messages
+
+        # Duration signal (healthy phase is 30s–600s)
+        duration = time.monotonic() - phase_start_ts
+        if 30 <= duration <= 600:
+            duration_signal = 1.0
+        elif duration < 30:
+            duration_signal = max(0.0, duration / 30)
+        else:
+            duration_signal = max(0.0, 1.0 - (duration - 600) / 1200)
+
+        score = (
+            0.35 * tool_success_rate
+            + 0.30 * commit_signal
+            + 0.25 * message_density
+            + 0.10 * duration_signal
+        )
+        return round(min(1.0, max(0.0, score)), 4)
+    except Exception:
+        return 0.0
+
+
 class MissionOrchestrator:
     """Drives mission execution: CDP orchestrates phases sequentially.
 
@@ -1026,16 +1103,10 @@ class MissionOrchestrator:
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
                     _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
                     _db = _get_db()
-                    # Quality = avg agent quality from agent_scores (global, not mission-scoped)
-                    _qual_val = 0.0
-                    if aids:
-                        _q_rows = _db.execute(
-                            "SELECT AVG(quality_score) as q FROM agent_scores WHERE agent_id IN ({}) AND iterations > 0".format(
-                                ",".join("?" * len(aids))
-                            ),
-                            tuple(aids),
-                        ).fetchone()
-                        _qual_val = float(_q_rows[0] or 0.0) if _q_rows else 0.0
+                    # Composite quality score from real phase signals
+                    _qual_val = _compute_quality_score(
+                        session_id, aids or [], _phase_start_time, _db
+                    )
                     _db.execute(
                         """INSERT INTO phase_outcomes
                            (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
@@ -1140,16 +1211,10 @@ class MissionOrchestrator:
                     _duration = time.monotonic() - _phase_start_time
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
                     _db = _get_db()
-                    # Quality from global agent_scores
-                    _qual_fail = 0.0
-                    if aids:
-                        _qf = _db.execute(
-                            "SELECT AVG(quality_score) as q FROM agent_scores WHERE agent_id IN ({}) AND iterations > 0".format(
-                                ",".join("?" * len(aids))
-                            ),
-                            tuple(aids),
-                        ).fetchone()
-                        _qual_fail = float(_qf[0] or 0.0) if _qf else 0.0
+                    # Composite quality score from real phase signals (even on failure)
+                    _qual_fail = _compute_quality_score(
+                        session_id, aids or [], _phase_start_time, _db
+                    )
                     _db.execute(
                         """INSERT INTO phase_outcomes
                            (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
@@ -1710,7 +1775,13 @@ def _promote_mission_to_global(mission) -> None:
     mem = get_memory_manager()
     # Pull high-confidence facts from this project
     entries = mem.project_get(project_id, limit=100)
-    promotable_categories = {"architecture", "stack", "convention", "decision", "pattern"}
+    promotable_categories = {
+        "architecture",
+        "stack",
+        "convention",
+        "decision",
+        "pattern",
+    }
     promoted = 0
     for entry in entries:
         cat = (entry.get("category") or "").lower()
@@ -1728,4 +1799,6 @@ def _promote_mission_to_global(mission) -> None:
                 )
                 promoted += 1
     if promoted:
-        logger.info("Promoted %d entries to global memory from project %s", promoted, project_id)
+        logger.info(
+            "Promoted %d entries to global memory from project %s", promoted, project_id
+        )

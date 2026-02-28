@@ -387,8 +387,16 @@ class AgentExecutor:
             )
 
             # Route provider: Darwin LLM Thompson Sampling + routing config
+            # cheap_mode: if allowed_tools are all cheap (memory/read), use MiniMax
+            from .routing import CHEAP_TOOLS as _CHEAP_TOOLS
+
+            _cheap_mode = bool(
+                ctx.allowed_tools
+                and ctx.tools_enabled
+                and all(t in _CHEAP_TOOLS for t in (ctx.allowed_tools or []))
+            )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id
+                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode
             )
 
             # Tool-calling loop
@@ -840,8 +848,15 @@ class AgentExecutor:
             )
 
             # Route provider: Darwin LLM Thompson Sampling + routing config
+            from .routing import CHEAP_TOOLS as _CHEAP_TOOLS_2
+
+            _cheap_mode_2 = bool(
+                ctx.allowed_tools
+                and ctx.tools_enabled
+                and all(t in _CHEAP_TOOLS_2 for t in (ctx.allowed_tools or []))
+            )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id
+                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode_2
             )
 
             for round_num in range(MAX_TOOL_ROUNDS):

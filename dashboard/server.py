@@ -809,6 +809,108 @@ async def tasks_page(
 
 
 # ============================================================================
+# LIVE ACTIVITY FEED
+# ============================================================================
+
+
+def _get_live_activity(since_ts: str | None = None) -> dict:
+    """Fetch recent platform activity from platform.db."""
+    db_path = DATA_DIR / "platform.db"
+    if not db_path.exists():
+        return {"tool_calls": [], "messages": [], "llm_cost": 0.0, "active_agents": []}
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        # Default: last 30 seconds
+        if not since_ts:
+            since_ts = (
+                __import__("datetime").datetime.utcnow()
+                - __import__("datetime").timedelta(seconds=30)
+            ).strftime("%Y-%m-%d %H:%M:%S")
+
+        tool_calls = conn.execute(
+            "SELECT agent_id, tool_name, success, timestamp FROM tool_calls "
+            "WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 50",
+            (since_ts,),
+        ).fetchall()
+
+        messages = conn.execute(
+            "SELECT from_agent, to_agent, substr(content,1,120) as preview, timestamp "
+            "FROM messages WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 30",
+            (since_ts,),
+        ).fetchall()
+
+        # Active agents (sessions active last 5 min)
+        active = conn.execute(
+            "SELECT DISTINCT from_agent as agent_id FROM messages "
+            "WHERE timestamp >= datetime('now','-5 minutes') LIMIT 20",
+        ).fetchall()
+
+        # LLM cost (last hour)
+        cost_row = conn.execute(
+            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= datetime('now','-1 hour')",
+        ).fetchone()
+        cost = float(cost_row[0] or 0.0)
+
+        # Commits (today)
+        commits = conn.execute(
+            "SELECT agent_id, tool_name, timestamp FROM tool_calls "
+            "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
+        ).fetchall()
+
+        conn.close()
+        return {
+            "tool_calls": [dict(r) for r in tool_calls],
+            "messages": [dict(r) for r in messages],
+            "commits": [dict(r) for r in commits],
+            "active_agents": [r["agent_id"] for r in active],
+            "llm_cost_last_hour": round(cost, 4),
+        }
+    except Exception as e:
+        return {"error": str(e), "tool_calls": [], "messages": [], "active_agents": []}
+
+
+@app.get("/api/live/stream")
+async def live_stream(since: str | None = None):
+    """SSE stream of live platform activity (tool calls, messages, commits)."""
+    import json as _json
+
+    async def generate():
+        _since = since
+        while True:
+            try:
+                data = await asyncio.to_thread(_get_live_activity, _since)
+                # Update cursor to now
+                _since = (
+                    __import__("datetime")
+                    .datetime.utcnow()
+                    .strftime("%Y-%m-%d %H:%M:%S")
+                )
+
+                if data.get("tool_calls") or data.get("messages"):
+                    yield f"event: activity\ndata: {_json.dumps(data)}\n\n"
+                else:
+                    yield ": ping\n\n"
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                yield f"event: error\ndata: {_json.dumps({'error': str(e)})}\n\n"
+            await asyncio.sleep(2)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/live", response_class=HTMLResponse)
+async def live_page(request: Request):
+    """Live activity feed page."""
+    return templates.TemplateResponse("live.html", {"request": request})
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 

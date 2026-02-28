@@ -1490,6 +1490,13 @@ def _ensure_sqlite_tables(conn) -> None:
                 )
         except Exception:
             pass
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_key_scopes (
+            key_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            PRIMARY KEY (key_id, scope)
+        )
+    """)
     conn.commit()
 
 
@@ -1656,6 +1663,62 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
     )
+    # Eval framework (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_datasets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            agent_id TEXT DEFAULT '',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_cases (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT NOT NULL,
+            prompt TEXT NOT NULL,
+            expected_output TEXT DEFAULT '',
+            tags TEXT DEFAULT '[]',
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_runs (
+            id TEXT PRIMARY KEY,
+            dataset_id TEXT NOT NULL,
+            agent_id TEXT DEFAULT '',
+            status TEXT DEFAULT 'pending',
+            score_avg REAL,
+            created_at TEXT DEFAULT (datetime('now')),
+            completed_at TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS eval_results (
+            id TEXT PRIMARY KEY,
+            run_id TEXT NOT NULL,
+            case_id TEXT NOT NULL,
+            actual_output TEXT DEFAULT '',
+            score REAL,
+            judge_feedback TEXT DEFAULT '',
+            latency_ms INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
+    # Tool Builder (added 2026-02)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS custom_tools (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            type TEXT NOT NULL,
+            config TEXT DEFAULT '{}',
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (datetime('now')),
+            updated_at TEXT DEFAULT (datetime('now'))
+        )
+    """)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
@@ -1805,6 +1868,20 @@ def _ensure_darwin_tables(conn) -> None:
     conn.execute("""
         ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS agent_role TEXT DEFAULT ''
     """)
+
+    # Knowledge Intelligence columns — access tracking + relevance scoring
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS last_read_at TEXT DEFAULT NULL"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS relevance_score REAL DEFAULT 0.5"""
+    )
+    conn.execute(
+        """ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS tags_json TEXT DEFAULT '[]'"""
+    )
 
     # Admin audit log
     conn.execute("""

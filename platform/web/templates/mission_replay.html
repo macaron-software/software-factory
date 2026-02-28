@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+/* ── Mission Replay ────────────────────────────── */
+.replay-layout{max-width:860px;margin:0 auto;padding:1rem 0}
+.replay-toolbar{display:flex;align-items:center;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.replay-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);flex:1}
+.replay-timeline{position:relative;padding-left:2.5rem}
+.replay-timeline::before{content:'';position:absolute;left:1rem;top:0;bottom:0;width:2px;background:var(--border)}
+.replay-step{position:relative;margin-bottom:1.1rem}
+.replay-step-dot{position:absolute;left:-1.55rem;top:0.85rem;width:14px;height:14px;border-radius:50%;border:2px solid var(--bg-primary);z-index:1;flex-shrink:0}
+.replay-step-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.1rem;transition:border-color .15s}
+.replay-step-card:hover{border-color:var(--purple)}
+.replay-step-header{display:flex;align-items:center;gap:0.6rem;margin-bottom:0.5rem;flex-wrap:wrap}
+.replay-agent-badge{font-size:0.72rem;font-weight:700;padding:0.2rem 0.6rem;border-radius:5px;text-transform:uppercase;letter-spacing:0.3px}
+.replay-status-icon{font-size:1rem;margin-left:auto}
+.replay-step-meta{display:flex;gap:1rem;font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.6rem;flex-wrap:wrap}
+.replay-prompt{font-size:0.8rem;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:6px;padding:0.55rem 0.75rem;margin-bottom:0.5rem;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow:hidden;transition:max-height .3s;cursor:pointer}
+.replay-prompt.expanded{max-height:600px}
+.replay-output{font-size:0.82rem;color:var(--text-primary);line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow:hidden;transition:max-height .3s;cursor:pointer}
+.replay-output.expanded{max-height:1200px}
+.replay-expand-hint{font-size:0.68rem;color:var(--purple);cursor:pointer;margin-top:0.25rem}
+.replay-debug-panel{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-top:1.5rem;display:none}
+.replay-debug-panel.open{display:block}
+.replay-debug-pre{font-family:monospace;font-size:0.72rem;color:var(--text-secondary);white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto}
+.replay-empty{text-align:center;padding:3rem;color:var(--text-secondary)}
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<div style="display:flex;gap:0.5rem;align-items:center">
+    <a href="/missions/{{ mission_id }}" class="btn btn-sm btn-ghost">← Mission</a>
+    <button class="btn btn-sm btn-primary" onclick="replayMission()">
+        <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Re-lancer
+    </button>
+    <button class="btn btn-sm btn-ghost" onclick="toggleDebug()">
+        <svg class="icon icon-sm"><use href="#icon-code"/></svg> Debug
+    </button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="replay-layout">
+    <div class="replay-toolbar">
+        <div class="replay-title">Replay — {{ mission_id }}</div>
+    </div>
+
+    <div class="replay-timeline" id="replayTimeline">
+        <div class="replay-empty">Chargement des steps…</div>
+    </div>
+
+    <div class="replay-debug-panel" id="debugPanel">
+        <div style="font-size:0.78rem;font-weight:700;margin-bottom:0.5rem;color:var(--text-secondary)">Debug raw data</div>
+        <pre class="replay-debug-pre" id="debugPre">Chargement…</pre>
+    </div>
+</div>
+
+<script>
+const MISSION_ID = '{{ mission_id }}';
+let _debugData = null;
+
+const AGENT_COLORS = [
+    '#6c63ff','#f78166','#34d399','#60a5fa','#f59e0b',
+    '#a78bfa','#fb7185','#38bdf8','#4ade80','#facc15',
+];
+const agentColorMap = {};
+let colorIdx = 0;
+
+function agentColor(name) {
+    if (!agentColorMap[name]) {
+        agentColorMap[name] = AGENT_COLORS[colorIdx++ % AGENT_COLORS.length];
+    }
+    return agentColorMap[name];
+}
+
+function statusIcon(status) {
+    if (!status) return '⏳';
+    const s = status.toLowerCase();
+    if (s === 'success' || s === 'completed' || s === 'done') return '✓';
+    if (s === 'error' || s === 'failed') return '✗';
+    if (s === 'running' || s === 'active') return '⏳';
+    return '·';
+}
+
+function statusDotColor(status) {
+    if (!status) return 'var(--yellow)';
+    const s = status.toLowerCase();
+    if (s === 'success' || s === 'completed' || s === 'done') return 'var(--green)';
+    if (s === 'error' || s === 'failed') return 'var(--red)';
+    return 'var(--yellow)';
+}
+
+function fmtDuration(ms) {
+    if (!ms && ms !== 0) return '';
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms/1000).toFixed(1)}s`;
+}
+
+function fmtCost(usd) {
+    if (!usd && usd !== 0) return '';
+    return `$${Number(usd).toFixed(4)}`;
+}
+
+function toggleText(el) {
+    el.classList.toggle('expanded');
+}
+
+async function loadReplay() {
+    const resp = await fetch(`/api/missions/${MISSION_ID}/debug`);
+    if (!resp.ok) {
+        document.getElementById('replayTimeline').innerHTML =
+            `<div class="replay-empty">Impossible de charger les données (${resp.status})</div>`;
+        return;
+    }
+    _debugData = await resp.json();
+    renderTimeline(_debugData);
+}
+
+function renderTimeline(data) {
+    const phases = data.phases || data.steps || [];
+    const traces = data.traces || data.llm_traces || [];
+
+    // Build steps from phases + traces
+    let steps = [];
+    if (phases.length) {
+        steps = phases.map(p => ({
+            agent: p.agent_id || p.agent || p.phase_name || 'Phase',
+            prompt: p.prompt || p.input || '',
+            output: p.output || p.result || '',
+            tokens: p.tokens_used || p.tokens || null,
+            duration_ms: p.duration_ms || null,
+            cost_usd: p.cost_usd || null,
+            status: p.status || '',
+        }));
+    } else if (traces.length) {
+        steps = traces.map(t => ({
+            agent: t.agent_id || t.model || 'Agent',
+            prompt: t.prompt || t.input || '',
+            output: t.response || t.output || '',
+            tokens: t.tokens_total || (t.prompt_tokens && t.completion_tokens ? t.prompt_tokens + t.completion_tokens : null),
+            duration_ms: t.latency_ms || null,
+            cost_usd: t.cost_usd || null,
+            status: t.status || 'success',
+        }));
+    }
+
+    const timeline = document.getElementById('replayTimeline');
+    if (!steps.length) {
+        timeline.innerHTML = '<div class="replay-empty">Aucune étape disponible pour ce run.</div>';
+        return;
+    }
+
+    timeline.innerHTML = steps.map((s, i) => {
+        const col = agentColor(s.agent);
+        const icon = statusIcon(s.status);
+        const dotColor = statusDotColor(s.status);
+        const stepId = `step-${i}`;
+        return `
+        <div class="replay-step">
+            <div class="replay-step-dot" style="background:${dotColor}"></div>
+            <div class="replay-step-card">
+                <div class="replay-step-header">
+                    <span class="replay-agent-badge" style="background:${col}20;color:${col}">${escHtml(s.agent)}</span>
+                    <span class="replay-status-icon" title="${escHtml(s.status)}">${icon}</span>
+                </div>
+                <div class="replay-step-meta">
+                    ${s.tokens != null ? `<span>🔤 ${s.tokens} tokens</span>` : ''}
+                    ${s.duration_ms != null ? `<span>⏱ ${fmtDuration(s.duration_ms)}</span>` : ''}
+                    ${s.cost_usd != null ? `<span>💲 ${fmtCost(s.cost_usd)}</span>` : ''}
+                </div>
+                ${s.prompt ? `
+                <div class="replay-prompt" id="prompt-${stepId}" onclick="toggleText(this)">${escHtml(s.prompt.substring(0, 500))}${s.prompt.length > 500 ? '…' : ''}</div>
+                <div class="replay-expand-hint" onclick="document.getElementById('prompt-${stepId}').classList.toggle('expanded')">prompt ▾</div>
+                ` : ''}
+                ${s.output ? `
+                <div class="replay-output" id="out-${stepId}" onclick="toggleText(this)">${escHtml(s.output.substring(0, 800))}${s.output.length > 800 ? '…' : ''}</div>
+                <div class="replay-expand-hint" onclick="document.getElementById('out-${stepId}').classList.toggle('expanded')">output ▾</div>
+                ` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function replayMission() {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Lancement…';
+    try {
+        const resp = await fetch(`/api/missions/${MISSION_ID}/replay`, {method: 'POST'});
+        if (resp.ok) {
+            const data = await resp.json();
+            const newId = data.run_id || data.id;
+            if (newId) { window.location.href = `/missions/${newId}/replay`; return; }
+        }
+        alert('Erreur lors du re-lancement');
+    } catch(e) { alert('Erreur: ' + e.message); }
+    btn.disabled = false;
+    btn.textContent = 'Re-lancer';
+}
+
+function toggleDebug() {
+    const panel = document.getElementById('debugPanel');
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open') && _debugData) {
+        document.getElementById('debugPre').textContent = JSON.stringify(_debugData, null, 2);
+    }
+}
+
+function escHtml(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+loadReplay();
+</script>
+{% endblock %}

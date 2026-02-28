@@ -1,0 +1,54 @@
+project:
+  name: supabase-lite
+  display_name: "Supabase Lite"
+  root_path: /Users/sylvain/_MACARON-SOFTWARE/workspaces/supabase-lite
+  vision_doc: Prompt.md
+  description: >
+    Open-source self-hosted Firebase/Supabase alternative.
+    Provides REST + Realtime API over PostgreSQL, Auth (JWT + OAuth),
+    Row-Level Security, Storage (S3-compatible), and a React dashboard.
+    Inspired by Supabase (github.com/supabase/supabase) — built from scratch
+    by our agent team as a long-horizon coding challenge.
+  tags: [oss, database, realtime, auth, storage, api]
+
+domains:
+  typescript:
+    paths: [api/, dashboard/src/]
+    extensions: [.ts, .tsx]
+    build_cmd: npm run build
+    test_cmd: npm run test
+    lint_cmd: npm run lint
+
+  sql:
+    paths: [db/]
+    extensions: [.sql]
+
+deploy:
+  strategy: validation-only
+  auto_prod: false
+  rollback_on_fail: true
+
+fractal:
+  max_files: 6
+  max_loc: 500
+  max_items: 12
+  max_depth: 3
+
+adversarial:
+  threshold: 5
+
+build_queue:
+  enabled: true
+  priority: 20
+  timeout: 600
+
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+  build:
+    enabled: true
+  e2e:
+    enabled: true
+
+analyzers: [typescript]

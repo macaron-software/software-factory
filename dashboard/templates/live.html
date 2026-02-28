@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Live Activity — Software Factory{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-xl font-bold">📡 Live Activity Feed</h1>
+  <div class="flex items-center gap-3">
+    <span id="live-badge" class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-gray-200 text-gray-600">
+      <span id="live-dot" class="inline-block w-2 h-2 rounded-full bg-gray-400"></span>
+      CONNECTING
+    </span>
+    <span class="text-xs text-gray-500">💰 LLM coût/h: <span id="llm-cost">—</span></span>
+    <span class="text-xs text-gray-500">👥 Agents: <span id="agent-count">—</span></span>
+    <button onclick="clearFeed()" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700">Vider</button>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="flex gap-2 mb-3">
+  <button onclick="setFilter('all')" class="filter-btn active text-xs px-3 py-1 rounded-full border" data-filter="all">Tout</button>
+  <button onclick="setFilter('tool_call')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="tool_call">⚡ Tool calls</button>
+  <button onclick="setFilter('message')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="message">💬 Messages</button>
+  <button onclick="setFilter('commit')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="commit">🔀 Commits</button>
+</div>
+
+<!-- Feed -->
+<div id="live-feed" class="space-y-1 font-mono text-xs overflow-y-auto" style="max-height:70vh;">
+  <div class="text-gray-400 italic">En attente d'événements...</div>
+</div>
+
+<style>
+.filter-btn.active { background: #4F46E5; color: white; border-color: #4F46E5; }
+.feed-row { display:flex; gap:8px; padding:3px 6px; border-radius:4px; animation:fadeIn .3s; }
+.feed-row:hover { background: rgba(79,70,229,.05); }
+.feed-ts { color:#9CA3AF; min-width:80px; }
+.feed-agent { color:#6366F1; min-width:110px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.feed-tool { color:#10B981; min-width:120px; }
+.feed-fail { color:#EF4444; }
+.feed-preview { color:#6B7280; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:400px; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+</style>
+
+<script>
+var _filter = 'all';
+var _feed = [];
+var _maxEvents = 300;
+var _es = null;
+var _atBottom = true;
+
+function setFilter(f) {
+  _filter = f;
+  document.querySelectorAll('.filter-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.filter === f);
+  });
+  renderFeed();
+}
+
+function clearFeed() { _feed = []; renderFeed(); }
+
+function renderFeed() {
+  var el = document.getElementById('live-feed');
+  var rows = _feed.filter(function(r) {
+    if (_filter === 'all') return true;
+    return r.type === _filter;
+  });
+  if (!rows.length) {
+    el.innerHTML = '<div class="text-gray-400 italic p-2">Aucun événement' + (_filter!=='all'?' (filtré)':'') + '</div>';
+    return;
+  }
+  el.innerHTML = rows.map(function(r) {
+    var ts = r.ts ? r.ts.substring(11,19) : '';
+    var icon = r.type==='tool_call' ? '⚡' : r.type==='commit' ? '🔀' : '💬';
+    var ok = r.success===false ? ' feed-fail' : '';
+    return '<div class="feed-row' + ok + '">'
+      + '<span class="feed-ts">' + ts + '</span>'
+      + '<span>' + icon + '</span>'
+      + '<span class="feed-agent" title="' + (r.agent||'') + '">' + (r.agent||'?') + '</span>'
+      + '<span class="feed-tool">' + (r.tool||r.to||'') + '</span>'
+      + '<span class="feed-preview">' + escHtml(r.preview||'') + '</span>'
+      + '</div>';
+  }).join('');
+  if (_atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function startStream() {
+  if (_es) { _es.close(); }
+  _es = new EventSource('/api/live/stream');
+  
+  _es.addEventListener('activity', function(e) {
+    var data = JSON.parse(e.data);
+    // Update stats
+    if (data.llm_cost_last_hour !== undefined) {
+      document.getElementById('llm-cost').textContent = '$' + data.llm_cost_last_hour.toFixed(4);
+    }
+    if (data.active_agents) {
+      document.getElementById('agent-count').textContent = data.active_agents.length;
+    }
+    // Add events
+    (data.tool_calls||[]).forEach(function(tc) {
+      _feed.unshift({type:'tool_call', agent:tc.agent_id, tool:tc.tool_name, success:tc.success!==0, ts:tc.timestamp, preview:''});
+    });
+    (data.messages||[]).forEach(function(m) {
+      _feed.unshift({type:'message', agent:m.from_agent, to:m.to_agent||'', preview:m.preview||'', ts:m.timestamp});
+    });
+    (data.commits||[]).forEach(function(c) {
+      _feed.unshift({type:'commit', agent:c.agent_id, tool:'git_commit', ts:c.timestamp, preview:''});
+    });
+    // Keep max
+    if (_feed.length > _maxEvents) _feed = _feed.slice(0, _maxEvents);
+    renderFeed();
+  });
+
+  _es.onerror = function() {
+    setBadge(false);
+    setTimeout(startStream, 5000);
+  };
+
+  _es.onopen = function() { setBadge(true); };
+}
+
+function setBadge(connected) {
+  var badge = document.getElementById('live-badge');
+  var dot = document.getElementById('live-dot');
+  if (connected) {
+    badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-green-100 text-green-700';
+    dot.className = 'inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse';
+    badge.childNodes[1].textContent = ' LIVE';
+  } else {
+    badge.className = 'inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-gray-200 text-gray-500';
+    dot.className = 'inline-block w-2 h-2 rounded-full bg-gray-400';
+    badge.childNodes[1].textContent = ' RECONNECTING';
+  }
+}
+
+// Track scroll position
+document.addEventListener('DOMContentLoaded', function() {
+  var feed = document.getElementById('live-feed');
+  feed.addEventListener('scroll', function() {
+    _atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 30;
+  });
+  startStream();
+});
+</script>
+{% endblock %}

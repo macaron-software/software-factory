@@ -106,6 +106,29 @@ def _agent_map_for_template(agents) -> dict:
     return m
 
 
+def get_workspace_context(request) -> dict:
+    """Return workspace_id, workspace_name, workspace_color for template context."""
+    ws_id = getattr(request.state, "workspace_id", "default")
+    name = "Default"
+    color = "#6366f1"
+    try:
+        from ...db.migrations import get_db
+
+        conn = get_db()
+        try:
+            row = conn.execute(
+                "SELECT name, color FROM workspaces WHERE id = ?", (ws_id,)
+            ).fetchone()
+            if row:
+                name = row[0] or name
+                color = row[1] or color
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return {"workspace_id": ws_id, "workspace_name": name, "workspace_color": color}
+
+
 async def serve_workspace_file(path: str):
     """Serve files from project workspaces (screenshots, artifacts)."""
     from ...config import FACTORY_ROOT

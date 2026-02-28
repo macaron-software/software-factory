@@ -67,6 +67,7 @@ class AgentLoop:
         project_path: str = "",
         think_timeout: float = 300.0,
         max_rounds: int = 10,
+        workspace_id: str = "default",
     ):
         from .store import AgentDef as _AD  # noqa: F811 — type hint only
 
@@ -76,6 +77,7 @@ class AgentLoop:
         self.project_path = project_path
         self.think_timeout = think_timeout
         self.max_rounds = max_rounds
+        self.workspace_id = workspace_id
         self.status: AgentStatus = AgentStatus.IDLE
 
         self.instance = AgentInstance(

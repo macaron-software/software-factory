@@ -30,6 +30,29 @@ _TOOL_PROVIDER = TOOL_PROVIDER
 _TOOL_MODEL = TOOL_MODEL
 _TOOL_CAPABLE_PROVIDERS = TOOL_CAPABLE_PROVIDERS
 
+# Cheap-mode: tools that don't require strong reasoning — can use MiniMax to save cost
+CHEAP_TOOLS = frozenset(
+    {
+        "memory_search",
+        "memory_store",
+        "memory_list",
+        "list_files",
+        "read_file",
+        "grep",
+        "find_files",
+        "git_log",
+        "git_status",
+        "git_diff",
+        "search_confluence",
+        "lrm_search",
+        "get_ticket",
+        "list_tickets",
+    }
+)
+# Provider/model to use for cheap (non-code) tasks
+CHEAP_PROVIDER = "minimax"
+CHEAP_MODEL = "MiniMax-M2.5"
+
 # Multi-model routing — roles/tags → (provider, model)
 _REASONING_ROLES = {
     "architect",
@@ -203,15 +226,23 @@ def _route_provider(
     phase_type: str = "generic",
     pattern_id: str = "",
     mission_id: str | None = None,
+    cheap_mode: bool = False,
 ) -> tuple[str, str]:
     """Route to the best provider+model using Darwin LLM Thompson Sampling + routing config.
 
     Priority:
-    1. Darwin LLM Thompson Sampling (same team, competing models)
-    2. DB routing config (Settings → LLM tab)
-    3. Hardcoded role/tag defaults (gpt-5.2 / gpt-5.1-codex / gpt-5-mini)
+    1. Cheap-mode: if last round only used cheap tools (memory_search, read_file…) → MiniMax
+    2. Darwin LLM Thompson Sampling (same team, competing models)
+    3. DB routing config (Settings → LLM tab)
+    4. Hardcoded role/tag defaults (gpt-5.2 / gpt-5.1-codex / gpt-5-mini)
     Overrides: tool-calling → must use _TOOL_CAPABLE_PROVIDERS; high rejection → escalate
     """
+    import os
+
+    # Cheap-mode: route simple info-retrieval rounds to MiniMax to save cost
+    if cheap_mode and os.environ.get("AZURE_DEPLOY", ""):
+        return CHEAP_PROVIDER, CHEAP_MODEL
+
     best_provider, best_model = _select_model_for_agent(
         agent,
         technology=technology,

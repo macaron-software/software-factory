@@ -666,13 +666,28 @@ class GAEngine:
 
             db = get_db()
 
-            # Auto-approve if fitness exceeds base by GA_AUTO_APPROVE_DELTA (default 10%)
-            delta_threshold = float(os.environ.get("GA_AUTO_APPROVE_DELTA", "0.10"))
+            # Auto-approve if fitness is within acceptable range of base or exceeds it
+            # delta_threshold: minimum improvement required (default 10% → now 3%)
+            delta_threshold = float(os.environ.get("GA_AUTO_APPROVE_DELTA", "0.03"))
+            # regression_tolerance: allow approval even if slightly below best (default 5%)
+            regression_tolerance = float(
+                os.environ.get("GA_REGRESSION_TOLERANCE", "0.05")
+            )
             base_fitness = self._get_base_fitness(base_wf_id, db)
             auto_approve = (
                 base_fitness is not None
-                and genome.fitness >= base_fitness * (1 + delta_threshold)
                 and genome.fitness > 0.5
+                and (
+                    # Improved over baseline
+                    genome.fitness >= base_fitness * (1 + delta_threshold)
+                    # OR within regression tolerance of baseline (no significant degradation)
+                    or (
+                        base_fitness > 0
+                        and genome.fitness >= base_fitness * (1 - regression_tolerance)
+                    )
+                    # OR bootstrap: base is 0, any positive fitness passes
+                    or base_fitness == 0.0
+                )
             )
             status = "approved" if auto_approve else "pending"
 
@@ -696,11 +711,11 @@ class GAEngine:
             db.close()
             if auto_approve:
                 log.info(
-                    f"GA proposal {proposal_id} AUTO-APPROVED fitness={genome.fitness:.4f} (base={base_fitness:.4f} +{delta_threshold * 100:.0f}%)"
+                    f"GA proposal {proposal_id} AUTO-APPROVED fitness={genome.fitness:.4f} (base={base_fitness:.4f})"
                 )
             else:
                 log.info(
-                    f"GA proposal saved: {proposal_id} fitness={genome.fitness:.4f} status={status}"
+                    f"GA proposal saved: {proposal_id} fitness={genome.fitness:.4f} base={base_fitness:.4f} status={status}"
                 )
         except Exception as e:
             log.warning(f"GA save_proposal: {e}")

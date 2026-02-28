@@ -1,21 +1,38 @@
-# Template for custom agent role definitions
-# Copy this file and customize for your needs
+# Agent definition template — copy and customize.
+# Supported fields (all optional except id, name, role):
 
 id: my_custom_agent
 name: "My Custom Agent"
 version: "1.0"
 
+# Visual identity (optional — fallback to role-level defaults)
+icon: bot           # lucide icon name
+color: "#6366f1"    # hex color for card/avatar
+avatar: "MC"        # 2-letter initials
+tagline: "Short punchy tagline"
+
+description: "One-line description shown in agent cards and marketplace."
+
 persona:
   description: >
-    Description of the agent's personality and expertise.
+    Longer description of personality, expertise and working style.
   traits:
     - Trait 1
     - Trait 2
+
+motivation: "What drives this agent."
 
 system_prompt: |
   You are [role description]. Your responsibilities:
   1. ...
   2. ...
+
+# LLM settings (optional — inherits platform defaults)
+llm:
+  provider: minimax   # optional override
+  model: MiniMax-M2.5  # optional override
+  temperature: 0.7
+  max_tokens: 4096
 
 skills:
   - tdd
@@ -23,28 +40,16 @@ skills:
 tools:
   - code_read
   - code_search
+  - memory_search
 
-llm:
-  model: MiniMax-M2.5
-  temperature: 0.7
-  max_tokens: 4096
-  fallback_model: MiniMax-M2.5
+mcps: []
 
 permissions:
   can_veto: false
   can_delegate: false
   can_approve: false
-  escalation_to: null
 
-communication:
-  responds_to: []
-  can_contact: []
-  broadcast_channels: []
+hierarchy_rank: 50   # 1-100, higher = more senior
 
-triggers: []
-
-constraints:
-  max_concurrent_tasks: 3
-  max_tokens_per_day: 200000
-
-tags: []
+tags: []  # use SAFe tags: portfolio, solution, art, team, transverse
+          # or domain tags: llm, ops, security, qa, frontend, etc.

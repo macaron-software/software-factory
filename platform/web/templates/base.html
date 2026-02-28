@@ -114,6 +114,9 @@
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
+                    <li><a href="/marketplace" data-tooltip="Marketplace" class="{% if page_title == 'Marketplace' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-grid"/></svg>
+                    </a></li>
                     <li><a href="/world" data-tooltip="World 3D" class="{% if page_title in ('Agent World', 'World') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-globe"/></svg>
                     </a></li>
@@ -164,7 +167,12 @@
                 </ul>
             </div>
 
-            <div class="sidebar-footer"></div>
+            <div class="sidebar-footer">
+                <div class="workspace-badge" onclick="location.href='/workspaces'" title="Changer de workspace" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin:4px 6px;border-radius:8px;cursor:pointer;background:var(--bg-secondary);border:1px solid var(--border);font-size:0.72rem;color:var(--text-secondary);overflow:hidden">
+                    <span class="ws-dot" style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:{{ request.state.workspace_color | default('#6366f1') }}"></span>
+                    <span class="ws-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ request.state.workspace_name | default('Default') }}</span>
+                </div>
+            </div>
         </nav>
 
         <!-- Main content -->
@@ -201,7 +209,7 @@
                          hx-trigger="load, every 30s"
                          hx-swap="innerHTML">
                     </div>
-                    <div class="notif-wrapper" id="notifWrapper">
+                     <div class="notif-wrapper" id="notifWrapper">
                         <button class="topbar-bell" id="notifBell" aria-label="Notifications">
                             <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
                             <span id="notifBadge"
@@ -214,6 +222,10 @@
                              hx-trigger="notif-open"
                              hx-swap="innerHTML"></div>
                     </div>
+                    <button id="sfPushBtn" class="topbar-bell" aria-label="Enable push notifications"
+                            title="Enable push notifications"
+                            onclick="sfRequestPush().then(ok=>{ if(ok) this.style.display='none'; })"
+                            style="display:none">🔔</button>
                     <div class="user-menu-wrapper" style="position:relative">
                         <button class="topbar-avatar" id="userMenuBtn" onclick="document.getElementById('userDropdown').classList.toggle('show')" title="{{ request.state.user.display_name if request.state.user else 'User' }}">
                             {{ (request.state.user.display_name[:1] if request.state.user else 'U') | upper }}
@@ -480,8 +492,10 @@ async function setPerspective(p) {
     // Check existing subscription
     const existing = await sw.pushManager.getSubscription();
     if (existing) return; // already subscribed
-    // Ask permission (non-blocking, only after first interaction)
+    // Show the "Enable notifications" button when permission not yet decided
     if (Notification.permission === 'default') {
+      const btn = document.getElementById('sfPushBtn');
+      if (btn) btn.style.display = '';
       window.__sfPushReady = async function() {
         const perm = await Notification.requestPermission();
         if (perm !== 'granted') return;

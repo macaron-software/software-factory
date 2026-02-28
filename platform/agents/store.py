@@ -2069,12 +2069,27 @@ class AgentStore:
                 self.create(agent)
 
     def _seed_from_yaml(self):
-        """Load agent definitions from YAML files in platform/skills/definitions/."""
+        """Load agent definitions from YAML files.
+
+        Loads from (in order, later overrides earlier):
+          1. platform/skills/definitions/*.yaml  (builtins)
+          2. projects/{slug}/agents/*.yaml        (project-level overrides)
+        """
         import yaml
 
+        sources: list[tuple[Path, bool]] = []
+
+        # 1. Built-in definitions
         defs_dir = Path(__file__).parent.parent / "skills" / "definitions"
-        if not defs_dir.exists():
-            return
+        if defs_dir.exists():
+            sources.append((defs_dir, True))
+
+        # 2. Project-level overrides
+        projects_root = Path(__file__).parent.parent.parent / "projects"
+        if projects_root.exists():
+            for proj_agents in sorted(projects_root.glob("*/agents")):
+                if proj_agents.is_dir():
+                    sources.append((proj_agents, False))
 
         # Icon/color mapping by SAFe level or role
         ROLE_STYLES = {
@@ -2085,75 +2100,111 @@ class AgentStore:
             "transverse": ("settings", "#f78166"),
         }
 
-        for path in sorted(defs_dir.glob("*.yaml")):
-            if path.stem.startswith("_"):
-                continue
-            try:
-                raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-                if not raw or not isinstance(raw, dict):
+        for defs_dir, is_builtin in sources:
+            for path in sorted(defs_dir.glob("*.yaml")):
+                if path.stem.startswith("_"):
                     continue
+                try:
+                    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+                    if not raw or not isinstance(raw, dict):
+                        continue
 
-                agent_id = raw.get("id", path.stem)
+                    agent_id = raw.get("id", path.stem)
+                    tags = raw.get("tags", [])
 
-                tags = raw.get("tags", [])
-                level = next((t for t in tags if t in ROLE_STYLES), "team")
-                icon, color = ROLE_STYLES.get(level, ("bot", "#f78166"))
+                    # Explicit color/icon override YAML fields, fallback to role-level mapping
+                    explicit_icon = raw.get("icon", "")
+                    explicit_color = raw.get("color", "")
+                    if not explicit_icon or not explicit_color:
+                        level = next((t for t in tags if t in ROLE_STYLES), "team")
+                        fallback_icon, fallback_color = ROLE_STYLES.get(
+                            level, ("bot", "#f78166")
+                        )
+                        explicit_icon = explicit_icon or fallback_icon
+                        explicit_color = explicit_color or fallback_color
 
-                perms = raw.get("permissions", {})
-                perm_dict = {}
-                if perms.get("can_veto"):
-                    perm_dict["can_veto"] = True
-                if perms.get("can_approve"):
-                    perm_dict["can_approve"] = True
-                if perms.get("can_delegate"):
-                    perm_dict["can_delegate"] = True
+                    perms = raw.get("permissions", {})
+                    perm_dict = {}
+                    if perms.get("can_veto"):
+                        perm_dict["can_veto"] = True
+                    if perms.get("can_approve"):
+                        perm_dict["can_approve"] = True
+                    if perms.get("can_delegate"):
+                        perm_dict["can_delegate"] = True
 
-                # Extract persona text from traits or top-level field
-                persona_obj = raw.get("persona", {})
-                persona_desc = ""
-                if isinstance(persona_obj, dict):
-                    persona_desc = persona_obj.get("description", "").strip()
-                    traits = persona_obj.get("traits", [])
-                    if traits:
-                        persona_desc += " " + ". ".join(str(t) for t in traits) + "."
+                    # Extract persona from dict or string
+                    persona_obj = raw.get("persona", {})
+                    persona_desc = ""
+                    if isinstance(persona_obj, dict):
+                        persona_desc = persona_obj.get("description", "").strip()
+                        traits = persona_obj.get("traits", [])
+                        if traits:
+                            persona_desc += (
+                                " " + ". ".join(str(t) for t in traits) + "."
+                            )
+                    elif isinstance(persona_obj, str):
+                        persona_desc = persona_obj.strip()
 
-                agent = AgentDef(
-                    id=agent_id,
-                    name=raw.get("name", agent_id),
-                    role=raw.get("role", raw.get("id", "worker")),
-                    description=persona_desc,
-                    system_prompt=raw.get("system_prompt", ""),
-                    provider=DEFAULT_PROVIDER,
-                    model=DEFAULT_MODEL,
-                    temperature=raw.get("llm", {}).get("temperature", 0.7)
-                    if isinstance(raw.get("llm"), dict)
-                    else 0.7,
-                    max_tokens=raw.get("llm", {}).get("max_tokens", 4096)
-                    if isinstance(raw.get("llm"), dict)
-                    else 4096,
-                    skills=raw.get("skills", []),
-                    tools=raw.get("tools", []),
-                    mcps=raw.get("mcps", []),
-                    permissions=perm_dict,
-                    tags=tags,
-                    icon=icon,
-                    color=color,
-                    avatar=raw.get("avatar", ""),
-                    tagline=raw.get("tagline", ""),
-                    persona=persona_desc,
-                    motivation=raw.get("motivation", "").strip()
-                    if raw.get("motivation")
-                    else "",
-                    hierarchy_rank=raw.get("hierarchy_rank", 50),
-                    is_builtin=True,
-                )
-                existing = self.get(agent_id)
-                if existing:
-                    self.update(agent)
-                else:
-                    self.create(agent)
-            except Exception:
-                pass
+                    # description fallback: top-level > persona
+                    description = raw.get("description", persona_desc).strip()
+
+                    llm_cfg = (
+                        raw.get("llm", {}) if isinstance(raw.get("llm"), dict) else {}
+                    )
+
+                    agent = AgentDef(
+                        id=agent_id,
+                        name=raw.get("name", agent_id),
+                        role=raw.get("role", raw.get("id", "worker")),
+                        description=description,
+                        system_prompt=raw.get("system_prompt", ""),
+                        provider=llm_cfg.get("provider", DEFAULT_PROVIDER),
+                        model=llm_cfg.get("model", DEFAULT_MODEL),
+                        temperature=llm_cfg.get("temperature", 0.7),
+                        max_tokens=llm_cfg.get("max_tokens", 4096),
+                        skills=raw.get("skills", []),
+                        tools=raw.get("tools", []),
+                        mcps=raw.get("mcps", []),
+                        permissions=perm_dict,
+                        tags=tags,
+                        icon=explicit_icon,
+                        color=explicit_color,
+                        avatar=raw.get("avatar", ""),
+                        tagline=raw.get("tagline", ""),
+                        persona=persona_desc,
+                        motivation=raw.get("motivation", "").strip()
+                        if raw.get("motivation")
+                        else "",
+                        hierarchy_rank=raw.get("hierarchy_rank", 50),
+                        is_builtin=is_builtin,
+                    )
+                    existing = self.get(agent_id)
+                    if existing:
+                        self.update(agent)
+                    else:
+                        self.create(agent)
+                except Exception:
+                    pass
+
+    def reload_yaml_agents(self) -> int:
+        """Hot-reload all YAML agent definitions. Returns count of processed files."""
+
+        sources = []
+        defs_dir = Path(__file__).parent.parent / "skills" / "definitions"
+        if defs_dir.exists():
+            sources.append(defs_dir)
+        projects_root = Path(__file__).parent.parent.parent / "projects"
+        if projects_root.exists():
+            for proj_agents in sorted(projects_root.glob("*/agents")):
+                if proj_agents.is_dir():
+                    sources.append(proj_agents)
+
+        count = 0
+        for d in sources:
+            count += sum(1 for p in d.glob("*.yaml") if not p.stem.startswith("_"))
+
+        self._seed_from_yaml()
+        return count
 
 
 _store: Optional[AgentStore] = None

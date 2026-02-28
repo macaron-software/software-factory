@@ -959,3 +959,19 @@ async def cleanup_phantom_runs():
         return JSONResponse({"status": "ok", "abandoned": count})
     except Exception as e:
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
+
+
+@router.post("/api/admin/reload-agents")
+async def reload_agents():
+    """Hot-reload YAML agent definitions without server restart."""
+    try:
+        from ....agents.store import get_agent_store
+
+        store = get_agent_store()
+        count = store.reload_yaml_agents()
+        total = len(store.list_all())
+        return JSONResponse(
+            {"status": "ok", "yaml_files": count, "total_agents": total}
+        )
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
