@@ -469,9 +469,11 @@ def get_connection(db_path=None) -> Any:
         from pathlib import Path
         from ..config import DB_PATH
         path = db_path or DB_PATH
-        conn = sqlite3.connect(str(path))
+        conn = sqlite3.connect(str(path), timeout=30)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=30000")
+        conn.execute("PRAGMA synchronous=NORMAL")
         conn.execute("PRAGMA foreign_keys=ON")
         return conn
 

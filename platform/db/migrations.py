@@ -73,9 +73,17 @@ def init_db(db_path: Path = DB_PATH):
         return conn
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA synchronous=NORMAL")
+
+    # Recover from stale WAL left by a crashed previous process
+    try:
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        pass
 
     schema = SCHEMA_PATH.read_text()
     conn.executescript(schema)
@@ -1687,9 +1695,11 @@ def get_db(db_path: Path = DB_PATH):
 
     if not db_path.exists():
         return init_db(db_path)
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(str(db_path), timeout=30)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=30000")
+    conn.execute("PRAGMA synchronous=NORMAL")
     conn.execute("PRAGMA foreign_keys=ON")
     # Ensure Darwin tables exist on existing DBs (idempotent)
     try:

@@ -82,6 +82,28 @@ if os.environ.get("OTEL_ENABLED"):
         logger.warning("OpenTelemetry packages not installed, tracing disabled")
 
 
+def _recover_db_lock():
+    """Checkpoint any stale WAL file left by a previously crashed process.
+
+    A container killed during a write leaves platform.db-wal / platform.db-shm
+    which cause 'database is locked' on the next startup. This runs *before*
+    init_db() so the migration never hits a lock.
+    """
+    import sqlite3 as _sqlite3
+    from .config import DB_PATH
+
+    if not DB_PATH.exists():
+        return
+    try:
+        conn = _sqlite3.connect(str(DB_PATH), timeout=5)
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.close()
+        logger.info("DB WAL checkpoint OK")
+    except Exception as exc:
+        logger.warning("DB WAL checkpoint failed (non-fatal): %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
@@ -91,6 +113,10 @@ async def lifespan(app: FastAPI):
 
     cfg = get_config()
     logger.info("Starting Software Factory on port %s", cfg.server.port)
+
+    # Recover from stale WAL/lock left by a previously crashed process
+    _recover_db_lock()
+
     init_db()
 
     # Seed built-in agents
@@ -461,7 +487,8 @@ async def lifespan(app: FastAPI):
         while True:
             await asyncio.sleep(30)
             try:
-                conn = sqlite3.connect(db_path)
+                conn = sqlite3.connect(db_path, timeout=30)
+                conn.execute("PRAGMA busy_timeout=30000")
                 conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
                 conn.close()
             except Exception:
@@ -546,7 +573,7 @@ def _record_incident(path: str, status_code: int, detail: str = ""):
     title = f"[Auto] {error_type} — {path}"
 
     try:
-        conn = sqlite3.connect(str(DB_PATH))
+        conn = sqlite3.connect(str(DB_PATH), timeout=30)
         # Deduplicate: skip if same error_type+error_detail in last 5 minutes
         dup = conn.execute(
             "SELECT 1 FROM platform_incidents "
