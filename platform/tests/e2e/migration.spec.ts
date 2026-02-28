@@ -108,7 +108,7 @@ test.describe("Migration Flow", () => {
     const sessionsLink = page.locator('nav.sidebar a[href="/sessions"]');
     if (await sessionsLink.isVisible()) {
       await sessionsLink.click();
-      await expect(page).toHaveTitle(/Session/i);
+      await expect(page).toHaveTitle(/Live/i);
     }
   });
 

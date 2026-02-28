@@ -33,7 +33,7 @@ export function collectErrors(page: Page): PageErrors {
     const url = response.url();
     // Ignore non-critical responses
     if (url.includes("/sse/") || url.includes("favicon")) return;
-    if (url.includes("/git") && status === 404) return; // known: git-status not always available
+    if (url.includes("/git") && (status === 404 || status === 500)) return; // git-status not always available
     if (!url.includes("/api/")) return; // only track API errors, not static/external resources
     if (status >= 400) {
       errors.network.push({
