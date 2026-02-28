@@ -339,6 +339,9 @@ class PhaseRun(BaseModel):
     iteration: int = 0
     sprint_count: int = 0
     quality_score: Optional[int] = None  # 0-100 adversarial guard score
+    output_schema: Optional[dict] = None   # expected JSON schema
+    output_validated: bool = False          # whether output matched schema
+    output_parse_errors: int = 0            # retry count
 
 
 class MissionStatus(str, Enum):

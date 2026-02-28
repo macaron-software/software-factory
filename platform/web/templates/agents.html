@@ -46,6 +46,9 @@
             {% endif %}
         </div>
         <div class="item-actions">
+            <a href="/agents/{{ agent.id }}/chat" class="btn btn-sm btn-ghost" title="Chat">
+                <svg class="icon icon-sm"><use href="#icon-message-square"/></svg>
+            </a>
             <a href="/agents/{{ agent.id }}/edit" class="btn btn-sm btn-ghost" title="{{ _("tt_edit") }}">
                 <svg class="icon icon-sm"><use href="#icon-edit"/></svg>
             </a>

@@ -89,6 +89,12 @@
         <button class="settings-tab" onclick="showSettingsTab('guidelines')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-book-open"/></svg> Guidelines
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('api-keys')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-key"/></svg> API Keys
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('audit')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-shield"/></svg> Audit
+        </button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -369,6 +375,56 @@
             </div>
         {% endfor %}
         </div>
+
+        <!-- Webhook Triggers -->
+        <section class="settings-section" style="margin-top:2rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.75rem">
+                <div>
+                    <h3 style="margin:0">Webhook Triggers</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Map incoming webhook events to workflow launches. Configure your external service to POST to these URLs.</p>
+                </div>
+                <button class="btn btn-sm" onclick="loadWebhookConfigs()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
+            </div>
+            <div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border-radius:6px;border:1px solid var(--border)">
+                <strong>Webhook URLs:</strong>
+                GitHub: <code>/api/webhooks/github</code> &nbsp;|&nbsp;
+                Jira: <code>/api/webhooks/jira</code> &nbsp;|&nbsp;
+                Monitoring: <code>/api/webhooks/monitoring</code> &nbsp;|&nbsp;
+                Generic: <code>/api/webhooks/generic?workflow_id=...</code>
+            </div>
+            <div id="webhook-configs-list" style="margin-bottom:1.2rem">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+            <div class="settings-card">
+                <h4 style="margin:0 0 0.75rem">Add Webhook Trigger</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Source</label>
+                        <select id="wh-source" class="form-input" style="width:140px">
+                            <option value="github">github</option>
+                            <option value="jira">jira</option>
+                            <option value="monitoring">monitoring</option>
+                            <option value="custom">custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Event filter</label>
+                        <input type="text" id="wh-event" class="form-input" placeholder="* or push" style="width:130px">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Workflow ID</label>
+                        <input type="text" id="wh-workflow" class="form-input" placeholder="tma-autoheal" style="width:160px">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Project ID</label>
+                        <input type="text" id="wh-project" class="form-input" placeholder="optional" style="width:130px">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="addWebhookConfig()">Add</button>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- ═══ Notifications ═══ -->
@@ -618,6 +674,64 @@
         </section>
     </div>
 
+    <!-- API Keys panel -->
+    <div class="settings-panel" id="panel-api-keys">
+        <section class="settings-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div>
+                    <h3 style="margin:0">Platform API Keys</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Generate keys to authenticate external tools and scripts against the platform API using the X-API-Key header.</p>
+                </div>
+                <button class="btn btn-sm" onclick="loadApiKeys()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
+            </div>
+            <div id="api-keys-list" style="margin-bottom:1.5rem">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+            <div class="settings-card">
+                <h4 style="margin:0 0 0.75rem">Generate New API Key</h4>
+                <div style="display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end">
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Name</label>
+                        <input type="text" id="apikey-name" class="form-input" placeholder="e.g. CI pipeline" style="width:180px">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Workspace</label>
+                        <input type="text" id="apikey-workspace" class="form-input" placeholder="default" style="width:140px">
+                    </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Rate limit (req/h)</label>
+                        <input type="number" id="apikey-rate" class="form-input" value="1000" style="width:120px">
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="generateApiKey()">Generate Key</button>
+                </div>
+                <div id="apikey-result" style="margin-top:0.75rem;display:none">
+                    <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:0.4rem">Copy this key now — it will not be shown again:</p>
+                    <code id="apikey-value" style="display:block;padding:0.5rem 0.75rem;background:var(--bg-secondary);border-radius:6px;font-size:0.82rem;word-break:break-all;border:1px solid var(--border)"></code>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Audit Log panel -->
+    <div class="settings-panel" id="panel-audit">
+        <section class="settings-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div>
+                    <h3 style="margin:0">Admin Audit Log</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Append-only log of all admin actions (create, update, delete) on agents, projects, missions, patterns.</p>
+                </div>
+                <button class="btn btn-sm" onclick="loadAuditLog()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
+            </div>
+            <div id="audit-log-container">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+
 </div>
 
 <!-- ═══ Modules Panel (injected after LLM panel) ═══ -->
@@ -765,6 +879,9 @@ function showSettingsTab(id) {
     if (id === 'orchestrator') refreshLoad();
     if (id === 'modules') loadModulesTab();
     if (id === 'guidelines') loadGuidelinesTab();
+    if (id === 'api-keys') loadApiKeys();
+    if (id === 'audit') loadAuditLog();
+    if (id === 'integrations') loadWebhookConfigs();
 }
 // Restore last tab
 try {
@@ -1287,6 +1404,150 @@ async function syncGuidelines() {
             status.textContent = d.error || 'Sync failed'; status.style.color='var(--red)';
         }
     } catch(e) { status.textContent = 'Error: ' + e.message; status.style.color='var(--red)'; }
+}
+</script>
+
+<script>
+// ── API Keys ────────────────────────────────────────────────────────────────
+async function loadApiKeys() {
+    const el = document.getElementById('api-keys-list');
+    if (!el) return;
+    try {
+        const r = await fetch('/api/api-keys');
+        const d = await r.json();
+        if (!d.keys || d.keys.length === 0) {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No API keys yet.</p>';
+            return;
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:1px solid var(--border)">'
+            + '<th style="text-align:left;padding:4px 8px">Name</th><th style="text-align:left;padding:4px 8px">Prefix</th>'
+            + '<th style="text-align:left;padding:4px 8px">Workspace</th><th style="text-align:left;padding:4px 8px">Created</th>'
+            + '<th style="text-align:left;padding:4px 8px">Last used</th><th style="text-align:left;padding:4px 8px">Status</th>'
+            + '<th style="padding:4px 8px"></th></tr></thead><tbody>';
+        for (const k of d.keys) {
+            const status = k.is_active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--text-secondary)">Revoked</span>';
+            html += `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:5px 8px;font-weight:600">${k.name}</td>
+                <td style="padding:5px 8px;font-family:monospace">${k.key_prefix}...</td>
+                <td style="padding:5px 8px">${k.workspace||'default'}</td>
+                <td style="padding:5px 8px;color:var(--text-secondary)">${(k.created_at||'').slice(0,10)}</td>
+                <td style="padding:5px 8px;color:var(--text-secondary)">${(k.last_used_at||'—').slice(0,16)}</td>
+                <td style="padding:5px 8px">${status}</td>
+                <td style="padding:5px 8px">${k.is_active ? `<button class="btn btn-ghost btn-sm" style="font-size:0.72rem;color:var(--red)" onclick="revokeApiKey('${k.id}')">Revoke</button>` : ''}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--red);font-size:0.85rem">Error: ${e.message}</p>`;
+    }
+}
+
+async function generateApiKey() {
+    const name = document.getElementById('apikey-name').value.trim();
+    if (!name) { alert('Name is required'); return; }
+    const workspace = document.getElementById('apikey-workspace').value.trim() || 'default';
+    const rate = document.getElementById('apikey-rate').value || '1000';
+    try {
+        const r = await fetch(`/api/api-keys?name=${encodeURIComponent(name)}&workspace=${encodeURIComponent(workspace)}&rate_limit=${rate}`, {method:'POST'});
+        const d = await r.json();
+        if (d.key) {
+            document.getElementById('apikey-value').textContent = d.key;
+            document.getElementById('apikey-result').style.display = 'block';
+            loadApiKeys();
+        }
+    } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function revokeApiKey(id) {
+    if (!confirm('Revoke this API key? This cannot be undone.')) return;
+    await fetch(`/api/api-keys/${id}`, {method:'DELETE'});
+    loadApiKeys();
+}
+
+// ── Audit Log ───────────────────────────────────────────────────────────────
+async function loadAuditLog() {
+    const el = document.getElementById('audit-log-container');
+    if (!el) return;
+    try {
+        const r = await fetch('/api/audit-log?limit=100');
+        const d = await r.json();
+        if (!d.entries || d.entries.length === 0) {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No audit entries yet.</p>';
+            return;
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:1px solid var(--border)">'
+            + '<th style="text-align:left;padding:4px 8px">Timestamp</th><th style="text-align:left;padding:4px 8px">Actor</th>'
+            + '<th style="text-align:left;padding:4px 8px">Action</th><th style="text-align:left;padding:4px 8px">Resource</th>'
+            + '</tr></thead><tbody>';
+        for (const e of d.entries) {
+            const res = [e.resource_type, e.resource_id].filter(Boolean).join('/');
+            html += `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:5px 8px;color:var(--text-secondary);white-space:nowrap">${(e.timestamp||'').slice(0,19).replace('T',' ')}</td>
+                <td style="padding:5px 8px;font-family:monospace">${e.actor||'system'}</td>
+                <td style="padding:5px 8px">${e.action||''}</td>
+                <td style="padding:5px 8px;color:var(--text-secondary)">${res}</td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--red);font-size:0.85rem">Error: ${e.message}</p>`;
+    }
+}
+
+// ── Webhook Configs ─────────────────────────────────────────────────────────
+async function loadWebhookConfigs() {
+    const el = document.getElementById('webhook-configs-list');
+    if (!el) return;
+    try {
+        const r = await fetch('/api/webhooks/configs');
+        const d = await r.json();
+        if (!d.configs || d.configs.length === 0) {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No webhook triggers configured yet.</p>';
+            return;
+        }
+        let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:1px solid var(--border)">'
+            + '<th style="text-align:left;padding:4px 8px">Source</th><th style="text-align:left;padding:4px 8px">Event</th>'
+            + '<th style="text-align:left;padding:4px 8px">Workflow</th><th style="text-align:left;padding:4px 8px">Project</th>'
+            + '<th style="text-align:left;padding:4px 8px">Status</th><th style="padding:4px 8px"></th></tr></thead><tbody>';
+        for (const c of d.configs) {
+            const active = c.is_active ? '<span style="color:var(--green)">Active</span>' : '<span style="color:var(--text-secondary)">Inactive</span>';
+            html += `<tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:5px 8px;font-weight:600">${c.source}</td>
+                <td style="padding:5px 8px;font-family:monospace">${c.event_filter||'*'}</td>
+                <td style="padding:5px 8px">${c.workflow_id}</td>
+                <td style="padding:5px 8px;color:var(--text-secondary)">${c.project_id||'—'}</td>
+                <td style="padding:5px 8px">${active}</td>
+                <td style="padding:5px 8px"><button class="btn btn-ghost btn-sm" style="font-size:0.72rem;color:var(--red)" onclick="deleteWebhookConfig('${c.id}')">Delete</button></td>
+            </tr>`;
+        }
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch(e) {
+        el.innerHTML = `<p style="color:var(--red);font-size:0.85rem">Error: ${e.message}</p>`;
+    }
+}
+
+async function addWebhookConfig() {
+    const source = document.getElementById('wh-source').value;
+    const event_filter = document.getElementById('wh-event').value.trim() || '*';
+    const workflow_id = document.getElementById('wh-workflow').value.trim();
+    const project_id = document.getElementById('wh-project').value.trim();
+    if (!workflow_id) { alert('Workflow ID is required'); return; }
+    const params = new URLSearchParams({source, event_filter, workflow_id, project_id});
+    try {
+        const r = await fetch('/api/webhooks/configs?' + params.toString(), {method:'POST'});
+        const d = await r.json();
+        if (d.ok) { loadWebhookConfigs(); }
+        else { alert('Error creating webhook config'); }
+    } catch(e) { alert('Error: ' + e.message); }
+}
+
+async function deleteWebhookConfig(id) {
+    if (!confirm('Delete this webhook trigger?')) return;
+    await fetch(`/api/webhooks/configs/${id}`, {method:'DELETE'});
+    loadWebhookConfigs();
 }
 </script>
 {% endblock %}

@@ -883,9 +883,7 @@ async def agent_world_page(request: Request):
 @router.get("/api/world/live")
 async def world_live_data(project: str = ""):
     """Live world data for periodic refresh — returns missions + agent sessions."""
-    import json as _json
     from fastapi.responses import JSONResponse
-    from ...agents.store import AgentStore
     from ...missions.store import MissionRunStore
     from ...sessions.store import SessionStore
 
@@ -904,18 +902,28 @@ async def world_live_data(project: str = ""):
             pid = mr.project_id or ""
             if pid and pid not in project_ids_seen:
                 project_ids_seen[pid] = pid.replace("-", " ").title()
-            phases_done = sum(1 for p in (mr.phases or []) if _s(p.status) in ("completed", "done"))
-            all_active.append({
-                "id": mr.id,
-                "name": mr.workflow_name or mr.workflow_id,
-                "brief": (mr.brief or "")[:100],
-                "status": st,
-                "session_id": mr.session_id,
-                "project_id": pid,
-                "phases_done": phases_done,
-                "phases_total": len(mr.phases or []),
-                "phases": [{"name": p.phase_name or f"Phase {i+1}", "status": _s(p.status)} for i, p in enumerate(mr.phases or [])],
-            })
+            phases_done = sum(
+                1 for p in (mr.phases or []) if _s(p.status) in ("completed", "done")
+            )
+            all_active.append(
+                {
+                    "id": mr.id,
+                    "name": mr.workflow_name or mr.workflow_id,
+                    "brief": (mr.brief or "")[:100],
+                    "status": st,
+                    "session_id": mr.session_id,
+                    "project_id": pid,
+                    "phases_done": phases_done,
+                    "phases_total": len(mr.phases or []),
+                    "phases": [
+                        {
+                            "name": p.phase_name or f"Phase {i + 1}",
+                            "status": _s(p.status),
+                        }
+                        for i, p in enumerate(mr.phases or [])
+                    ],
+                }
+            )
 
     if project:
         active_missions = [m for m in all_active if m["project_id"] == project]
@@ -933,15 +941,114 @@ async def world_live_data(project: str = ""):
                     agent_sessions[m.from_agent] = sid
                     content = (m.content or "")[:120]
                     if content and m.message_type not in ("system",):
-                        recent_messages.append({"from": m.from_agent, "to": m.to_agent or "", "content": content, "session_id": sid, "ts": m.timestamp or ""})
+                        recent_messages.append(
+                            {
+                                "from": m.from_agent,
+                                "to": m.to_agent or "",
+                                "content": content,
+                                "session_id": sid,
+                                "ts": m.timestamp or "",
+                            }
+                        )
         except Exception:
             pass
     recent_messages.sort(key=lambda x: x["ts"], reverse=True)
 
-    return JSONResponse({
-        "missions": active_missions,
-        "messages": recent_messages[:20],
-        "agent_sessions": agent_sessions,
-        "projects": [{"id": k, "name": v} for k, v in sorted(project_ids_seen.items())],
-        "total_missions": len(all_active),
-    })
+    return JSONResponse(
+        {
+            "missions": active_missions,
+            "messages": recent_messages[:20],
+            "agent_sessions": agent_sessions,
+            "projects": [
+                {"id": k, "name": v} for k, v in sorted(project_ids_seen.items())
+            ],
+            "total_missions": len(all_active),
+        }
+    )
+
+
+# ── Agent Direct Chat ─────────────────────────────────────────────
+
+
+@router.get("/agents/{agent_id}/chat", response_class=HTMLResponse)
+async def agent_chat_page(request: Request, agent_id: str, project_id: str = ""):
+    from ...agents.store import get_agent_store
+    from ...projects.manager import get_project_store
+
+    agent = get_agent_store().get(agent_id)
+    if not agent:
+        from fastapi import HTTPException
+
+        raise HTTPException(404, "Agent not found")
+    projects = get_project_store().list_all()
+    return _templates(request).TemplateResponse(
+        "agent_chat.html",
+        {
+            "request": request,
+            "agent": agent,
+            "project_id": project_id,
+            "projects": projects,
+            "page_title": f"Chat with {agent.name}",
+        },
+    )
+
+
+@router.post("/api/agents/{agent_id}/chat")
+async def agent_chat(request: Request, agent_id: str):
+    """Direct chat with an agent — SSE stream of tokens."""
+    import json
+    from fastapi import HTTPException
+    from fastapi.responses import StreamingResponse
+    from ...agents.store import get_agent_store
+    from ...llm.client import LLMClient, LLMMessage
+    from ...memory.manager import get_memory_manager
+
+    body = await request.json()
+    message = body.get("message", "").strip()
+    project_id = body.get("project_id", "")
+    conversation = body.get("conversation", [])
+
+    if not message:
+        return JSONResponse({"error": "message required"}, status_code=400)
+
+    agent = get_agent_store().get(agent_id)
+    if not agent:
+        raise HTTPException(404, "Agent not found")
+
+    memory_ctx = ""
+    if project_id:
+        try:
+            mm = get_memory_manager()
+            memories = mm.project_search(project_id, message, limit=5)
+            if memories:
+                memory_ctx = "\n\nRelevant project knowledge:\n" + "\n".join(
+                    f"- [{m.get('category', '?')}] {m.get('key', '?')}: {m.get('value', '')[:200]}"
+                    for m in memories
+                )
+        except Exception:
+            pass
+
+    system = agent.system_prompt or f"You are {agent.name}, {agent.role}."
+    if memory_ctx:
+        system += memory_ctx
+
+    messages: list[LLMMessage] = [LLMMessage(role="system", content=system)]
+    for turn in conversation[-10:]:
+        messages.append(LLMMessage(role=turn["role"], content=turn["content"]))
+    messages.append(LLMMessage(role="user", content=message))
+
+    async def generate():
+        client = LLMClient()
+        full = ""
+        try:
+            async for chunk in client.stream(messages, model=agent.model or ""):
+                if chunk.delta:
+                    full += chunk.delta
+                    yield f"data: {json.dumps({'token': chunk.delta})}\n\n"
+                if chunk.done:
+                    break
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+        yield f"data: {json.dumps({'done': True, 'full': full})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")

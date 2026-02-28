@@ -723,3 +723,16 @@ async def releases_data(project_id: str):
         )
     finally:
         db.close()
+
+
+@router.get("/api/audit-log")
+async def get_audit_log(limit: int = 100):
+    from ....db.migrations import get_db
+
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT * FROM admin_audit_log ORDER BY timestamp DESC LIMIT ?",
+        (min(limit, 500),),
+    ).fetchall()
+    conn.close()
+    return {"entries": [dict(r) for r in rows]}

@@ -40,7 +40,33 @@ _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
 # Max automatic repair rounds after a failed verification (lint/build)
 MAX_REPAIR_ROUNDS = 3
 
-# Routing cache globals re-exported for backward compat
+# Secrets detection patterns (block hardcoded credentials in code writes)
+import re as _re_secrets
+
+_SECRET_PATTERNS = [
+    _re_secrets.compile(
+        r'(?i)(api[_\-]?key|apikey|api[_\-]?secret)\s*[=:]\s*["\']?[A-Za-z0-9+/]{20,}'
+    ),
+    _re_secrets.compile(r'(?i)(password|passwd|pwd)\s*[=:]\s*["\'][^"\']{6,}["\']'),
+    _re_secrets.compile(r'(?i)(secret[_\-]?key|secret)\s*[=:]\s*["\'][^"\']{8,}["\']'),
+    _re_secrets.compile(
+        r'(?i)(aws_access_key_id|aws_secret)\s*[=:]\s*["\']?[A-Z0-9]{16,}'
+    ),
+    _re_secrets.compile(r"sk-[A-Za-z0-9\-]{20,}"),  # OpenAI-style key (sk- or sk-proj-)
+    _re_secrets.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub personal access token
+]
+
+
+def _scan_for_secrets(content: str) -> list[str]:
+    """Return list of secret pattern matches found in content."""
+    hits = []
+    for pat in _SECRET_PATTERNS:
+        m = pat.search(content)
+        if m:
+            hits.append(m.group(0)[:40] + "…")
+    return hits
+
+
 _routing_cache: dict | None = None
 _routing_cache_ts: float = 0.0
 
@@ -304,6 +330,26 @@ class AgentExecutor:
                         and not result.startswith("Error")
                         and ctx.project_path
                     ):
+                        # Secrets scan: block if hardcoded secrets detected
+                        _secret_content = str(tc.arguments.get("content", ""))
+                        _secrets_found = _scan_for_secrets(_secret_content)
+                        if _secrets_found:
+                            logger.warning(
+                                "Agent %s: SECRETS DETECTED in code_write: %s",
+                                agent.id,
+                                _secrets_found,
+                            )
+                            messages.append(
+                                LLMMessage(
+                                    role="system",
+                                    content=(
+                                        "🚨 SECURITY ALERT: Hardcoded secrets detected in your last code_write. "
+                                        f"Found: {_secrets_found[:3]}. "
+                                        "Remove ALL hardcoded credentials immediately. Use environment variables instead."
+                                    ),
+                                )
+                            )
+
                         for _repair_round in range(MAX_REPAIR_ROUNDS):
                             try:
                                 lint_tool = self._registry.get("lint")
@@ -734,6 +780,115 @@ class AgentExecutor:
                             name=tc.function_name,
                         )
                     )
+
+                    # ── Auto-verification (streaming): after code writes, run lint ──
+                    if (
+                        tc.function_name in _CODE_WRITE_TOOLS
+                        and not result.startswith("Error")
+                        and ctx.project_path
+                    ):
+                        # Secrets scan
+                        _ss_content = str(tc.arguments.get("content", ""))
+                        _ss_hits = _scan_for_secrets(_ss_content)
+                        if _ss_hits:
+                            logger.warning(
+                                "Agent %s (streaming): SECRETS DETECTED: %s",
+                                agent.id,
+                                _ss_hits,
+                            )
+                            messages.append(
+                                LLMMessage(
+                                    role="system",
+                                    content=(
+                                        "🚨 SECURITY ALERT: Hardcoded secrets detected in your last code_write. "
+                                        f"Found: {_ss_hits[:3]}. Use environment variables instead."
+                                    ),
+                                )
+                            )
+                        for _srep in range(MAX_REPAIR_ROUNDS):
+                            try:
+                                _slint = self._registry.get("lint")
+                                if _slint is None:
+                                    break
+                                _slint_res = await _slint.execute(
+                                    {"cwd": ctx.project_path, "fix": False}, agent
+                                )
+                                if ctx.on_tool_call:
+                                    try:
+                                        await ctx.on_tool_call(
+                                            "lint",
+                                            {"cwd": ctx.project_path},
+                                            _slint_res,
+                                        )
+                                    except Exception:
+                                        pass
+                                if (
+                                    "error" not in _slint_res.lower()
+                                    and "warning" not in _slint_res.lower()[:100]
+                                ):
+                                    break
+                                import uuid as _uuid_s
+
+                                _srid = f"auto_lint_{_uuid_s.uuid4().hex[:6]}"
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=f"[AUTO-LINT] {_slint_res[:1500]}",
+                                        tool_call_id=_srid,
+                                        name="lint",
+                                    )
+                                )
+                                messages.append(
+                                    LLMMessage(
+                                        role="system",
+                                        content=(
+                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
+                                            f"Fix all reported issues NOW. Repair round {_srep + 1}/{MAX_REPAIR_ROUNDS}."
+                                        ),
+                                    )
+                                )
+                                logger.info(
+                                    "Agent %s (streaming): lint failed, repair round %d",
+                                    agent.id,
+                                    _srep + 1,
+                                )
+                                _sfix = await self._llm.chat(
+                                    messages=messages,
+                                    provider=use_provider,
+                                    model=use_model,
+                                    temperature=agent.temperature,
+                                    max_tokens=agent.max_tokens,
+                                    system_prompt="",
+                                    tools=tools,
+                                )
+                                total_tokens_in += _sfix.tokens_in
+                                total_tokens_out += _sfix.tokens_out
+                                if not _sfix.tool_calls:
+                                    break
+                                for _stc in _sfix.tool_calls:
+                                    _sres = await _execute_tool(
+                                        _stc, ctx, self._registry, self._llm
+                                    )
+                                    all_tool_calls.append(
+                                        {
+                                            "name": _stc.function_name,
+                                            "args": _stc.arguments,
+                                            "result": _sres[:500],
+                                        }
+                                    )
+                                    messages.append(
+                                        LLMMessage(
+                                            role="tool",
+                                            content=_sres[:2000],
+                                            tool_call_id=_stc.id,
+                                            name=_stc.function_name,
+                                        )
+                                    )
+                            except Exception as _sve:
+                                logger.warning(
+                                    "Auto-verify (streaming) error: %s", _sve
+                                )
+                                break
 
                 # Limit message window to prevent OOM
                 if len(messages) > 20:

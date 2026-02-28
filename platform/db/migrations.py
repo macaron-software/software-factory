@@ -1720,6 +1720,57 @@ def _ensure_darwin_tables(conn) -> None:
         ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS agent_role TEXT DEFAULT ''
     """)
 
+    # Admin audit log
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            actor TEXT NOT NULL DEFAULT 'system',
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            detail TEXT,
+            ip TEXT,
+            user_agent TEXT
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
+
+    # Platform API keys
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_api_keys (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            key_prefix TEXT NOT NULL,
+            key_hash TEXT NOT NULL UNIQUE,
+            workspace TEXT DEFAULT 'default',
+            permissions TEXT DEFAULT '["read","write"]',
+            rate_limit INTEGER DEFAULT 1000,
+            is_active INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            last_used_at TEXT,
+            expires_at TEXT
+        )
+    """)
+
+    # Webhook configs
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS webhook_configs (
+            id TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            event_filter TEXT DEFAULT '*',
+            workflow_id TEXT NOT NULL,
+            project_id TEXT,
+            is_active INTEGER DEFAULT 1,
+            secret_env TEXT DEFAULT '',
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            description TEXT DEFAULT ''
+        )
+    """)
+
     conn.commit()
 
 

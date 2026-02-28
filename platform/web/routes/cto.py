@@ -665,6 +665,17 @@ def _resolve_mentions(content: str) -> tuple[str, str]:
                 if missions
                 else "  (aucune mission active)"
             )
+            # Load domain context if project has an arch_domain
+            domain_block = ""
+            try:
+                if getattr(match, "arch_domain", None):
+                    from ...projects.domains import load_domain as _ld_cto
+
+                    _dom_cto = _ld_cto(match.arch_domain)
+                    if _dom_cto:
+                        domain_block = f"Domaine technique: {_dom_cto.name}\n{_dom_cto.to_context_string()}\n"
+            except Exception:
+                pass
             blocks.append(
                 f"## Projet mentionné : {match.name}\n"
                 f"ID: {match.id}\n"
@@ -673,7 +684,8 @@ def _resolve_mentions(content: str) -> tuple[str, str]:
                 f"Description: {match.description or '(non renseignée)'}\n"
                 f"Vision: {match.vision[:500] + '...' if match.vision and len(match.vision) > 500 else (match.vision or '(non définie)')}\n"
                 f"Git: {match.git_url or '(non configuré)'}\n"
-                f"Missions:\n{m_lines}\n"
+                + (domain_block)
+                + f"Missions:\n{m_lines}\n"
             )
         ctx_block = (
             (

@@ -947,3 +947,15 @@ async def monitoring_live(request: Request, hours: int = 24):
     # Store in cache
     monitoring_live._cache = {"data": result, "hours": hours, "ts": _time.monotonic()}
     return JSONResponse(result)
+
+
+@router.post("/api/ops/cleanup-phantom-runs")
+async def cleanup_phantom_runs():
+    """Manually trigger phantom run cleanup (stale runs > 48h → abandoned)."""
+    try:
+        from ....ops.endurance_watchdog import _cleanup_phantom_runs
+
+        count = await _cleanup_phantom_runs()
+        return JSONResponse({"status": "ok", "abandoned": count})
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)

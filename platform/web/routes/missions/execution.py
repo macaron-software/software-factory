@@ -984,3 +984,113 @@ async def _run_milestone_pipeline_background(
         )
     except Exception as exc:
         logger.exception("MilestonePipeline error session=%s: %s", session_id, exc)
+
+
+# ── Mission Debug & Replay ────────────────────────────────────────
+
+
+@router.get("/api/missions/{run_id}/debug")
+async def mission_debug(run_id: str):
+    """Return debug info for a mission run: phases, llm_traces, cost breakdown."""
+    from ....db.migrations import get_db
+
+    conn = get_db()
+    try:
+        run = conn.execute(
+            "SELECT * FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+
+        phases = (
+            conn.execute(
+                "SELECT * FROM phase_runs WHERE run_id=? ORDER BY started_at ASC",
+                (run_id,),
+            ).fetchall()
+            if _table_exists(conn, "phase_runs")
+            else []
+        )
+
+        traces = (
+            conn.execute(
+                "SELECT * FROM llm_traces WHERE mission_id=? ORDER BY created_at ASC",
+                (run_id,),
+            ).fetchall()
+            if _table_exists(conn, "llm_traces")
+            else []
+        )
+
+        traces_list = [dict(t) for t in traces]
+        phases_list = [dict(p) for p in phases]
+
+        return JSONResponse(
+            {
+                "run": dict(run),
+                "phases": phases_list,
+                "traces": traces_list,
+                "total_traces": len(traces_list),
+                "total_cost": sum((t.get("cost_usd") or 0) for t in traces_list),
+                "total_tokens": sum((t.get("tokens_total") or 0) for t in traces_list),
+            }
+        )
+    finally:
+        conn.close()
+
+
+def _table_exists(conn, table: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone()
+    return bool(row)
+
+
+@router.post("/api/missions/{run_id}/replay")
+async def mission_replay(run_id: str, from_phase: int = 0):
+    """Create a new mission run as replay of an existing one."""
+    from ....db.migrations import get_db
+    from ....missions.store import get_mission_run_store
+    from ....models import MissionRun
+
+    conn = get_db()
+    try:
+        run = conn.execute(
+            "SELECT * FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+        run_dict = dict(run)
+    finally:
+        conn.close()
+
+    # Build a new MissionRun from the original
+    import json as _json
+    from ....models import PhaseRun
+
+    orig_phases_raw = _json.loads(run_dict.get("phases_json") or "[]")
+    new_phases = [
+        PhaseRun(
+            phase_id=p.get("phase_id", ""),
+            phase_name=p.get("phase_name", ""),
+            pattern_id=p.get("pattern_id", ""),
+        )
+        for p in orig_phases_raw
+    ]
+
+    new_run = MissionRun(
+        workflow_id=run_dict.get("workflow_id", ""),
+        workflow_name=run_dict.get("workflow_name", ""),
+        session_id=run_dict.get("session_id", ""),
+        cdp_agent_id=run_dict.get("cdp_agent_id", ""),
+        project_id=run_dict.get("project_id", ""),
+        workspace_path=run_dict.get("workspace_path", ""),
+        parent_mission_id=run_id,
+        brief=run_dict.get("brief", ""),
+        phases=new_phases,
+    )
+
+    mrs = get_mission_run_store()
+    mrs.create(new_run)
+
+    return JSONResponse(
+        {"ok": True, "new_run_id": new_run.id, "from_phase": from_phase}
+    )

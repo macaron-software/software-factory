@@ -1,4 +1,5 @@
 """Security package — prompt injection, command validation, path hardening, auth."""
+
 from __future__ import annotations
 
 import hashlib
@@ -10,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from .sanitize import sanitize_user_input, sanitize_agent_output, sanitize_command
 from .prompt_guard import PromptInjectionGuard, get_prompt_guard
+from .audit import audit_log
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +25,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """
 
     EXCLUDED_PREFIXES = (
-        "/health", "/static", "/docs", "/redoc", "/openapi.json",
-        "/sse", "/favicon", "/api/health", "/api/i18n/", "/api/auth",
+        "/health",
+        "/static",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/sse",
+        "/favicon",
+        "/api/health",
+        "/api/i18n/",
+        "/api/auth",
     )
     PUBLIC_GET_PATHS = (
-        "/api/projects", "/api/agents", "/api/missions",
-        "/api/integrations", "/api/metrics", "/api/workflows",
-        "/api/monitoring/live", "/api/notifications/status",
+        "/api/projects",
+        "/api/agents",
+        "/api/missions",
+        "/api/integrations",
+        "/api/metrics",
+        "/api/workflows",
+        "/api/monitoring/live",
+        "/api/notifications/status",
     )
 
     async def dispatch(self, request: Request, call_next):
@@ -52,7 +67,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
             request.state.authenticated = True
             return await call_next(request)
 
-        if request.method == "GET" and any(path.startswith(p) for p in self.PUBLIC_GET_PATHS):
+        if request.method == "GET" and any(
+            path.startswith(p) for p in self.PUBLIC_GET_PATHS
+        ):
             request.state.authenticated = False
             return await call_next(request)
 
@@ -60,7 +77,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if not token:
             token = request.query_params.get("token", "")
 
-        if not token or hashlib.sha256(token.encode()).hexdigest() != hashlib.sha256(api_key.encode()).hexdigest():
+        if (
+            not token
+            or hashlib.sha256(token.encode()).hexdigest()
+            != hashlib.sha256(api_key.encode()).hexdigest()
+        ):
             raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
         request.state.authenticated = True
@@ -74,4 +95,5 @@ __all__ = [
     "PromptInjectionGuard",
     "get_prompt_guard",
     "AuthMiddleware",
+    "audit_log",
 ]

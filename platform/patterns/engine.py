@@ -924,6 +924,25 @@ This is BLOCKING: developers cannot start without your design tokens."""
     state.result = result
     state.output = content
 
+    # Optional JSON schema validation (non-blocking — logs warnings only)
+    _phase_cfg = getattr(state, "phase_config", None) or {}
+    _output_schema = (
+        _phase_cfg.get("output_schema") if isinstance(_phase_cfg, dict) else None
+    )
+    if _output_schema and content:
+        try:
+            from ..security.output_validator import validate_output as _validate_output
+
+            _is_valid, _errors = _validate_output(content, _output_schema)
+            if not _is_valid:
+                logger.warning(
+                    "[Engine] Phase %s output validation failed: %s",
+                    getattr(state, "phase_id", "?"),
+                    _errors,
+                )
+        except Exception:
+            pass
+
     # Auto-persist backlog when PM produces epic/story decomposition
     role_lower = (agent.role or agent.id or "").lower()
     if ("product" in role_lower or "pm" in role_lower) and (

@@ -703,6 +703,46 @@ def create_app() -> FastAPI:
 
     # ── Trace ID middleware ─────────────────────────────────────────────
     @app.middleware("http")
+    async def audit_middleware(request, call_next):
+        response = await call_next(request)
+        method = request.method
+        path = request.url.path
+        audit_paths = (
+            "/api/agents",
+            "/api/projects",
+            "/api/missions",
+            "/api/settings",
+            "/api/patterns",
+            "/api/teams",
+        )
+        if method in ("POST", "PUT", "PATCH", "DELETE") and any(
+            path.startswith(p) for p in audit_paths
+        ):
+            try:
+                from .security.audit import audit_log
+
+                actor = getattr(request.state, "user", "anonymous")
+                if hasattr(actor, "email"):
+                    actor = actor.email
+                actor = actor or "anonymous"
+                ip = request.client.host if request.client else ""
+                ua = request.headers.get("user-agent", "")[:100]
+                parts = path.strip("/").split("/")
+                rtype = parts[1] if len(parts) > 1 else ""
+                rid = parts[2] if len(parts) > 2 else ""
+                audit_log(
+                    f"{method} {path}",
+                    rtype,
+                    rid,
+                    actor=str(actor),
+                    ip=ip,
+                    user_agent=ua,
+                )
+            except Exception:
+                pass
+        return response
+
+    @app.middleware("http")
     async def trace_id_middleware(request, call_next):
         import uuid as _uuid
 
@@ -1174,6 +1214,8 @@ def create_app() -> FastAPI:
         ("modules", ".web.routes.api.modules", {}),
         ("guidelines", ".web.routes.api.guidelines", {}),
         ("knowledge", ".web.routes.api.knowledge", {}),
+        ("api-keys", ".web.routes.api.api_keys", {}),
+        ("webhooks", ".web.routes.api.webhooks", {}),
     ]
 
     for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:
