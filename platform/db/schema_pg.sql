@@ -1026,14 +1026,18 @@ CREATE INDEX IF NOT EXISTS idx_rl_created            ON rl_experience(created_at
 -- phase_outcomes: real GA/RL execution data per phase
 CREATE TABLE IF NOT EXISTS phase_outcomes (
     id SERIAL PRIMARY KEY,
+    mission_id TEXT NOT NULL DEFAULT '',
     workflow_id TEXT NOT NULL,
     pattern_id TEXT NOT NULL,
     phase_id TEXT NOT NULL,
-    agent_ids TEXT NOT NULL,
+    agent_ids TEXT NOT NULL DEFAULT '[]',
+    agent_ids_json TEXT NOT NULL DEFAULT '[]',
     team_size INTEGER DEFAULT 1,
     success INTEGER DEFAULT 0,
     quality_score REAL DEFAULT 0.0,
+    rejection_count INTEGER DEFAULT 0,
     duration_s REAL DEFAULT 0.0,
+    duration_secs REAL DEFAULT 0.0,
     complexity_tier TEXT DEFAULT 'simple',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

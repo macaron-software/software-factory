@@ -1440,12 +1440,20 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
     )
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS complexity_tier TEXT DEFAULT 'simple'"
-        )
-    except Exception:
-        pass
+    # Ensure all columns exist (migrate old schema that may be missing some)
+    for _col, _type, _default in [
+        ("complexity_tier", "TEXT", "'simple'"),
+        ("mission_id", "TEXT", "''"),
+        ("agent_ids_json", "TEXT", "''"),
+        ("rejection_count", "INTEGER", "0"),
+        ("duration_secs", "REAL", "0.0"),
+    ]:
+        try:
+            conn.execute(
+                f"ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS {_col} {_type} DEFAULT {_default}"
+            )
+        except Exception:
+            pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_pair_scores (
             id SERIAL PRIMARY KEY,

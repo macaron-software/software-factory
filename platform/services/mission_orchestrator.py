@@ -1038,19 +1038,21 @@ class MissionOrchestrator:
                         _qual_val = float(_q_rows[0] or 0.0) if _q_rows else 0.0
                     _db.execute(
                         """INSERT INTO phase_outcomes
-                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
-                            team_size, success, quality_score, rejection_count, duration_secs, complexity_tier)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (
                             mission.id,
                             mission.workflow_id or "",
                             phase.phase_id,
                             pattern_type,
                             _json.dumps(aids),
+                            _json.dumps(aids),
                             len(aids),
                             1,
                             _qual_val,
                             int(_rej_val * max(1, len(aids))),
+                            round(_duration, 1),
                             round(_duration, 1),
                             _complexity,
                         ),
@@ -1150,14 +1152,15 @@ class MissionOrchestrator:
                         _qual_fail = float(_qf[0] or 0.0) if _qf else 0.0
                     _db.execute(
                         """INSERT INTO phase_outcomes
-                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
-                            team_size, success, quality_score, rejection_count, duration_secs, complexity_tier)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                         (
                             mission.id,
                             mission.workflow_id or "",
                             phase.phase_id,
                             pattern_type,
+                            _json.dumps(aids),
                             _json.dumps(aids),
                             len(aids),
                             0,
@@ -1166,6 +1169,7 @@ class MissionOrchestrator:
                                 (_rej_rate if "_rej_rate" in dir() else 1.0)
                                 * max(1, len(aids))
                             ),
+                            round(time.monotonic() - _phase_start_time, 1),
                             round(time.monotonic() - _phase_start_time, 1),
                             _complexity,
                         ),
