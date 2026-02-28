@@ -866,11 +866,14 @@ async def settings_page(request: Request):
     cfg = get_config()
     db = get_db()
     try:
-        rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
+        rows = db.execute(
+            "SELECT * FROM integrations ORDER BY category, name"
+        ).fetchall()
         integrations = []
         for r in rows:
             d = dict(r)
             d["config"] = _json.loads(d.get("config_json") or "{}")
+            d["agent_roles"] = _json.loads(d.get("agent_roles") or "[]")
             integrations.append(d)
     except Exception:
         integrations = []

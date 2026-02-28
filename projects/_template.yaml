@@ -7,6 +7,9 @@ project:
   display_name: "My Project"          # Human-readable name
   root_path: /path/to/project         # Absolute path to project root
   vision_doc: CLAUDE.md               # Vision document filename
+  # domain: bscc                      # Optional: org domain for shared architecture guidelines
+  #                                   # If set, agents will also load guidelines from domain:{domain}
+  #                                   # Scrape: python -m mcp_lrm.guidelines_scraper --project domain:bscc ...
 
 # Domain configurations
 # Define one or more domains with their paths, extensions, and commands

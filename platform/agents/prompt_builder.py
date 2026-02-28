@@ -33,9 +33,25 @@ _guidelines_cache: dict[str, tuple[str, float]] = {}
 _GUIDELINES_CACHE_TTL = 300  # 5 minutes
 
 
+def _get_project_domain(project_id: str) -> str:
+    """Read domain field from projects/{project_id}.yaml. Returns empty string if not set."""
+    try:
+        from pathlib import Path
+        import yaml as _yaml
+
+        p = Path(__file__).parent.parent.parent / "projects" / f"{project_id}.yaml"
+        if not p.exists():
+            return ""
+        data = _yaml.safe_load(p.read_text()) or {}
+        return data.get("domain", "") or ""
+    except Exception:
+        return ""
+
+
 def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
     """Load architecture guidelines from DB and return compact summary for system prompt injection.
 
+    Lookup order: project_id → domain:{project.domain}
     Only injects for roles that need tech constraints (dev, architecture, security, ...).
     Returns empty string if no guidelines configured for this project.
     """
@@ -49,12 +65,18 @@ def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
     if role not in _GUIDELINES_ROLES:
         return ""
 
-    # Check cache
-    cached = _guidelines_cache.get(ctx.project_id)
-    if cached:
-        summary, ts = cached
-        if time.time() - ts < _GUIDELINES_CACHE_TTL:
-            return summary
+    # Determine which project keys to try (project-level first, then domain-level)
+    keys_to_try = [ctx.project_id]
+    domain = _get_project_domain(ctx.project_id)
+    if domain:
+        keys_to_try.append(f"domain:{domain}")
+
+    for proj_key in keys_to_try:
+        cached = _guidelines_cache.get(proj_key)
+        if cached:
+            summary, ts = cached
+            if time.time() - ts < _GUIDELINES_CACHE_TTL:
+                return summary
 
     try:
         from pathlib import Path
@@ -67,19 +89,21 @@ def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
 
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
-        meta = conn.execute(
-            "SELECT page_count FROM guideline_meta WHERE project = ?", (ctx.project_id,)
-        ).fetchone()
-        if not meta or meta["page_count"] == 0:
-            conn.close()
-            return ""
-        conn.close()
 
         from mcp_lrm.guidelines_scraper import build_guidelines_summary
 
-        summary = build_guidelines_summary(ctx.project_id, role, max_chars=600)
-        _guidelines_cache[ctx.project_id] = (summary, time.time())
-        return summary
+        for proj_key in keys_to_try:
+            meta = conn.execute(
+                "SELECT page_count FROM guideline_meta WHERE project = ?", (proj_key,)
+            ).fetchone()
+            if meta and meta["page_count"] > 0:
+                conn.close()
+                summary = build_guidelines_summary(proj_key, role, max_chars=600)
+                _guidelines_cache[proj_key] = (summary, time.time())
+                return summary
+
+        conn.close()
+        return ""
     except Exception:
         return ""
 
