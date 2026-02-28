@@ -341,6 +341,15 @@ class AgentLoop:
                     len(actions),
                 )
 
+                # 7. Update PROGRESS.md in project workspace (Codex-style living status doc)
+                if self.project_path:
+                    try:
+                        _update_progress_md(
+                            self.project_path, self.agent, result, msg.content
+                        )
+                    except Exception:
+                        pass
+
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -708,6 +717,97 @@ class AgentLoop:
             "error_count": self.instance.error_count,
             "last_active": self.instance.last_active.isoformat(),
         }
+
+
+# ---------------------------------------------------------------------------
+# PROGRESS.md — living status document (Codex-style)
+# ---------------------------------------------------------------------------
+
+
+def _update_progress_md(
+    project_path: str, agent: "AgentInstance", result: object, user_message: str
+) -> None:
+    """Write/update PROGRESS.md in the project workspace after each agent cycle.
+
+    This mirrors Codex's Documentation.md: current milestone status, decisions,
+    last tool calls, and how to run the project.
+    """
+    import os
+    from datetime import datetime as _dt
+
+    progress_path = os.path.join(project_path, "PROGRESS.md")
+
+    # Read existing header/decisions section to preserve it
+    existing_decisions = ""
+    if os.path.exists(progress_path):
+        with open(progress_path) as f:
+            content = f.read()
+        # Preserve ## Décisions section if present
+        if "## Décisions" in content:
+            idx = content.index("## Décisions")
+            end = content.find("\n## ", idx + 1)
+            existing_decisions = content[
+                idx : end if end != -1 else len(content)
+            ].strip()
+
+    now = _dt.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    agent_name = getattr(agent, "name", getattr(agent, "id", "agent"))
+
+    # Summarize tool calls
+    tool_calls = getattr(result, "tool_calls", []) or []
+    tools_summary = ""
+    if tool_calls:
+        for tc in tool_calls[-5:]:  # last 5 tools
+            name = tc.get("name", "?")
+            args = tc.get("args", {})
+            path = args.get("path") or args.get("file") or args.get("cwd") or ""
+            tools_summary += f"  - `{name}`"
+            if path:
+                tools_summary += f" → `{path}`"
+            # Show lint/test status
+            res_snip = tc.get("result", "")[:80].replace("\n", " ")
+            if res_snip:
+                tools_summary += f" — {res_snip}"
+            tools_summary += "\n"
+    else:
+        tools_summary = "  _(aucun outil appelé)_\n"
+
+    # Truncate agent response for summary
+    response_summary = (getattr(result, "content", "") or "")[:300].replace("\n", " ")
+
+    # Tokens used
+    tok_in = getattr(result, "tokens_in", 0)
+    tok_out = getattr(result, "tokens_out", 0)
+
+    _decisions_fallback = "## Décisions\n\n_(à compléter)_"
+    progress = f"""# PROGRESS — {agent_name}
+
+> Mis à jour automatiquement après chaque cycle agent. Ne pas modifier manuellement.
+
+## Dernier cycle
+
+- **Agent** : {agent_name}
+- **Date** : {now}
+- **Tokens** : {tok_in} in / {tok_out} out
+- **Message** : {(user_message or "")[:120]}
+
+## Résumé
+
+{response_summary}{"..." if len(getattr(result, "content", "") or "") > 300 else ""}
+
+## Outils utilisés
+
+{tools_summary}
+## Statut
+
+- Erreur : {getattr(result, "error", None) or "Aucune"}
+- Durée : {getattr(result, "duration_ms", 0)} ms
+
+{existing_decisions if existing_decisions else _decisions_fallback}
+"""
+    os.makedirs(project_path, exist_ok=True)
+    with open(progress_path, "w") as f:
+        f.write(progress)
 
 
 # ---------------------------------------------------------------------------

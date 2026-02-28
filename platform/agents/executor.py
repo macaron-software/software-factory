@@ -35,6 +35,11 @@ logger = logging.getLogger(__name__)
 # Max tool-calling rounds to prevent infinite loops
 MAX_TOOL_ROUNDS = 8
 
+# Tools that produce code changes and should trigger auto-verification
+_CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
+# Max automatic repair rounds after a failed verification (lint/build)
+MAX_REPAIR_ROUNDS = 3
+
 # Routing cache globals re-exported for backward compat
 _routing_cache: dict | None = None
 _routing_cache_ts: float = 0.0
@@ -290,6 +295,99 @@ class AgentExecutor:
                             name=tc.function_name,
                         )
                     )
+
+                    # ── Auto-verification: after code writes, run lint and repair if needed ──
+                    if (
+                        tc.function_name in _CODE_WRITE_TOOLS
+                        and not result.startswith("Error")
+                        and ctx.project_path
+                    ):
+                        for _repair_round in range(MAX_REPAIR_ROUNDS):
+                            try:
+                                lint_tool = self._registry.get("lint")
+                                if lint_tool is None:
+                                    break
+                                lint_result = await lint_tool.execute(
+                                    {"cwd": ctx.project_path, "fix": False}, agent
+                                )
+                                if ctx.on_tool_call:
+                                    try:
+                                        await ctx.on_tool_call(
+                                            "lint",
+                                            {"cwd": ctx.project_path},
+                                            lint_result,
+                                        )
+                                    except Exception:
+                                        pass
+                                # No errors → stop repair loop
+                                if (
+                                    "error" not in lint_result.lower()
+                                    and "warning" not in lint_result.lower()[:100]
+                                ):
+                                    break
+                                # Lint found issues → inject repair instruction
+                                import uuid as _uuid
+
+                                repair_id = f"auto_lint_{_uuid.uuid4().hex[:6]}"
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=f"[AUTO-LINT] {lint_result[:1500]}",
+                                        tool_call_id=repair_id,
+                                        name="lint",
+                                    )
+                                )
+                                messages.append(
+                                    LLMMessage(
+                                        role="system",
+                                        content=(
+                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
+                                            "Fix all reported issues NOW before proceeding to the next step. "
+                                            f"Repair round {_repair_round + 1}/{MAX_REPAIR_ROUNDS}."
+                                        ),
+                                    )
+                                )
+                                logger.info(
+                                    "Agent %s: lint failed, repair round %d",
+                                    agent.id,
+                                    _repair_round + 1,
+                                )
+                                # Allow LLM to fix — fire one more tool round immediately
+                                fix_resp = await self._llm.chat(
+                                    messages=messages,
+                                    provider=use_provider,
+                                    model=use_model,
+                                    temperature=agent.temperature,
+                                    max_tokens=agent.max_tokens,
+                                    system_prompt="",
+                                    tools=tools,
+                                )
+                                total_tokens_in += fix_resp.tokens_in
+                                total_tokens_out += fix_resp.tokens_out
+                                if not fix_resp.tool_calls:
+                                    break
+                                for fix_tc in fix_resp.tool_calls:
+                                    fix_res = await _execute_tool(
+                                        fix_tc, ctx, self._registry, self._llm
+                                    )
+                                    all_tool_calls.append(
+                                        {
+                                            "name": fix_tc.function_name,
+                                            "args": fix_tc.arguments,
+                                            "result": fix_res[:500],
+                                        }
+                                    )
+                                    messages.append(
+                                        LLMMessage(
+                                            role="tool",
+                                            content=fix_res[:2000],
+                                            tool_call_id=fix_tc.id,
+                                            name=fix_tc.function_name,
+                                        )
+                                    )
+                            except Exception as _ve:
+                                logger.warning("Auto-verify error: %s", _ve)
+                                break
 
                 # After deep_search, disable tools to force synthesis
                 if deep_search_used:

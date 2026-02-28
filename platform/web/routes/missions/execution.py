@@ -154,7 +154,27 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
     )
 
-    return JSONResponse({"session_id": session.id, "workflow_id": wf_id})
+    # If mission config has milestones, also launch the milestone pipeline in parallel
+    milestones = (mission.config or {}).get("milestones")
+    if milestones and isinstance(milestones, list) and len(milestones) > 0:
+        asyncio.create_task(
+            _run_milestone_pipeline_background(
+                milestones=milestones,
+                session_id=session.id,
+                mission_name=mission.name,
+                project_path=str(workspace_root),
+                lead_agent_id=mission.created_by or "brain",
+                project_id=mission.project_id or "",
+            )
+        )
+
+    return JSONResponse(
+        {
+            "session_id": session.id,
+            "workflow_id": wf_id,
+            "milestones": len(milestones) if milestones else 0,
+        }
+    )
 
 
 @router.post("/api/missions/start")
@@ -353,18 +373,21 @@ async def api_mission_start(request: Request):
     dispatched = None
     try:
         from .dispatch import maybe_dispatch
+
         dispatched = await maybe_dispatch(mission_id, brief, project_id, workflow_id)
     except Exception as _de:
         logger.debug("Dispatch check failed (running locally): %s", _de)
 
     if dispatched:
         # Worker node took over — return coordinator response with remote info
-        return JSONResponse({
-            "mission_id": mission_id,
-            "session_id": session_id,
-            "redirect": f"/missions/{mission_id}/control",
-            "_dispatched_to": dispatched.get("_dispatched_to", ""),
-        })
+        return JSONResponse(
+            {
+                "mission_id": mission_id,
+                "session_id": session_id,
+                "redirect": f"/missions/{mission_id}/control",
+                "_dispatched_to": dispatched.get("_dispatched_to", ""),
+            }
+        )
 
     try:
         await _launch_orchestrator(mission_id)
@@ -997,3 +1020,54 @@ async def api_mission_run(request: Request, mission_id: str):
 
     await _launch_orchestrator(mission_id)
     return JSONResponse({"status": "running", "mission_id": mission_id})
+
+
+async def _run_milestone_pipeline_background(
+    *,
+    milestones: list[dict],
+    session_id: str,
+    mission_name: str,
+    project_path: str,
+    lead_agent_id: str,
+    project_id: str,
+) -> None:
+    """Launch the MilestoneRunner pipeline as a background task."""
+    from ....agents.milestone_runner import run_milestone_pipeline
+    from ....agents.executor import AgentExecutor, ExecutionContext
+    from ....agents.store import get_agent_store
+
+    try:
+        agent_def = get_agent_store().get(lead_agent_id)
+        if agent_def is None:
+            agent_def = get_agent_store().get("brain")
+        if agent_def is None:
+            logger.warning(
+                "MilestonePipeline: no agent found, skipping. session=%s", session_id
+            )
+            return
+
+        executor = AgentExecutor()
+        ctx = ExecutionContext(
+            agent=agent_def,
+            session_id=session_id,
+            project_id=project_id,
+            project_path=project_path,
+            tools_enabled=True,
+        )
+        results = await run_milestone_pipeline(
+            milestones,
+            executor=executor,
+            ctx=ctx,
+            session_id=session_id,
+            mission_name=mission_name,
+            project_path=project_path,
+        )
+        done = sum(1 for r in results if r.success)
+        logger.info(
+            "MilestonePipeline done: %d/%d milestones passed session=%s",
+            done,
+            len(milestones),
+            session_id,
+        )
+    except Exception as exc:
+        logger.exception("MilestonePipeline error session=%s: %s", session_id, exc)
