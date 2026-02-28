@@ -70,6 +70,9 @@ class Project:
     status: str = "active"  # active | paused | archived
     git_url: str = ""  # GitHub/GitLab remote URL for PR creation
     current_phase: str = ""  # ex: "discovery", "mvp", "v1", "run", "maintenance"
+    arch_domain: str = (
+        ""  # Architectural domain (e.g. "bscc") — loads domain-level guidelines
+    )
     phases: list[dict] = field(
         default_factory=list
     )  # [{id, name, icon, mission_types_active[]}]
@@ -1380,8 +1383,19 @@ class ProjectStore:
 
     def _row_to_project(self, row) -> Project:
         keys = row.keys() if hasattr(row, "keys") else []
+        proj_id = row["id"]
+        # Load arch_domain from YAML registry (not stored in DB to avoid migration)
+        arch_domain = ""
+        try:
+            from ..projects.registry import get_project_registry
+
+            info = get_project_registry().get(proj_id)
+            if info:
+                arch_domain = info.arch_domain or ""
+        except Exception:
+            pass
         return Project(
-            id=row["id"],
+            id=proj_id,
             name=row["name"],
             path=row["path"],
             description=row["description"] or "",
@@ -1403,6 +1417,7 @@ class ProjectStore:
             or [],
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
+            arch_domain=arch_domain,
         )
 
 

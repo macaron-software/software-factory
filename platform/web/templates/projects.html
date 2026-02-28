@@ -78,6 +78,9 @@
             {% if not proj.has_workspace %}
             <span class="ghost-badge">fantôme</span>
             {% endif %}
+            {% if proj.info.arch_domain %}
+            <span class="item-badge" style="background:rgba(0,101,255,.12);color:#0065ff;border:1px solid rgba(0,101,255,.25);font-weight:600">{{ proj.info.arch_domain | upper }}</span>
+            {% endif %}
             <span hx-get="/api/dashboard/quality-badge?project_id={{ proj.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
             {% if proj.info.has_git %}
             <span class="item-badge" hx-get="/api/projects/{{ proj.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>

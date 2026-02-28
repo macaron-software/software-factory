@@ -1039,6 +1039,30 @@ class LLMClient:
 
         return await asyncio.to_thread(_query)
 
+    def _demo_response(self, messages: list["LLMMessage"]) -> "LLMResponse":
+        """Return a deterministic mock response for demo/test mode."""
+        last = messages[-1].content.lower() if messages else ""
+        if any(w in last for w in ("bug", "fix", "error", "crash", "issue", "broken")):
+            content = "I've analyzed the issue and identified the root cause. The fix involves correcting the logic in the affected module to handle edge cases properly."
+        elif any(
+            w in last
+            for w in ("deploy", "deployment", "staging", "production", "release")
+        ):
+            content = "Deployment pipeline initiated. Running pre-deploy checks, building Docker image, and pushing to the target environment."
+        elif any(w in last for w in ("test", "spec", "coverage", "unit", "e2e")):
+            content = "Test suite analyzed. Writing unit tests with proper assertions and edge case coverage."
+        elif any(w in last for w in ("refactor", "clean", "optimize", "improve")):
+            content = "Refactoring the code to improve readability and maintainability while preserving existing behavior."
+        else:
+            content = "I understand the task. Analyzing the requirements and preparing a comprehensive solution."
+        return LLMResponse(
+            content=content,
+            model="demo",
+            provider="demo",
+            tokens_in=len(last) // 4,
+            tokens_out=len(content) // 4,
+        )
+
     @property
     def stats(self) -> dict:
         s = dict(self._stats)

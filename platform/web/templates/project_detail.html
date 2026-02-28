@@ -205,6 +205,12 @@
                 {% for d in project.domains %}
                 <span class="item-tag">{{ d }}</span>
                 {% endfor %}
+                {% if project.arch_domain %}
+                <span class="item-tag" style="background:rgba(0,101,255,.12);color:#0065ff;border-color:rgba(0,101,255,.3);font-weight:600">
+                    <svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-book-open"/></svg>
+                    DSI: {{ project.arch_domain | upper }}
+                </span>
+                {% endif %}
             </div>
         </div>
 

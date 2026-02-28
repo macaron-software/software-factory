@@ -620,11 +620,11 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
-                "connect-src 'self'; "
+                "connect-src 'self' wss: ws:; "
                 "frame-ancestors 'none'"
             )
         if request.url.scheme == "https":
@@ -633,13 +633,17 @@ def create_app() -> FastAPI:
             )
         return response
 
-    # ── Rate limiting (API endpoints, 60 req/min per IP) ───────────────
+    # ── Rate limiting (API endpoints, 120 req/min per IP) ───────────────
     import time as _rl_time
     from collections import defaultdict as _dd
 
     _rate_buckets: dict[str, list[float]] = _dd(list)
     _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
     _RATE_WINDOW = 60.0
+    # Tighter limit for LLM-consuming endpoints (mission create, ideation)
+    _LLM_BUCKETS: dict[str, list[float]] = _dd(list)
+    _LLM_RATE_LIMIT = int(os.environ.get("LLM_RATE_LIMIT", "20"))  # per minute
+    _LLM_PATHS = {"/api/missions", "/api/ideation/start", "/api/projects/chat"}
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
@@ -649,6 +653,25 @@ def create_app() -> FastAPI:
         ):
             client_ip = request.client.host if request.client else "unknown"
             now = _rl_time.time()
+            # Strict LLM rate limit on POST to LLM-consuming endpoints
+            if request.method == "POST" and any(
+                request.url.path.startswith(p) for p in _LLM_PATHS
+            ):
+                llm_bucket = _LLM_BUCKETS[client_ip]
+                llm_bucket[:] = [t for t in llm_bucket if now - t < _RATE_WINDOW]
+                if len(llm_bucket) >= _LLM_RATE_LIMIT:
+                    from starlette.responses import JSONResponse as _JR
+
+                    return _JR(
+                        {
+                            "error": "rate_limit_exceeded",
+                            "retry_after": 60,
+                            "type": "llm",
+                        },
+                        status_code=429,
+                    )
+                llm_bucket.append(now)
+            # General rate limit
             bucket = _rate_buckets[client_ip]
             bucket[:] = [t for t in bucket if now - t < _RATE_WINDOW]
             if len(bucket) >= _RATE_LIMIT:
@@ -1131,6 +1154,7 @@ def create_app() -> FastAPI:
         ("push", ".web.routes.api.push", {}),
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
+        ("guidelines", ".web.routes.api.guidelines", {}),
     ]
 
     for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:

@@ -1395,6 +1395,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 value=summary,
                 category=cat,
                 source=agent.id,
+                agent_role=agent.role or "",
             )
 
             # Also store in pattern memory (session-level, for agents in same session)

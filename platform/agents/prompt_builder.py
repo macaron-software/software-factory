@@ -255,6 +255,24 @@ RULES:
             parts.append(
                 f"\n## Task Context (relevant memory)\n{ctx.project_context[:800]}"
             )
+        # Inject role-scoped project memory (last 10 facts relevant to this role)
+        if ctx.project_id:
+            try:
+                from ..memory.manager import get_memory_manager
+
+                role = _classify_agent_role(ctx.agent)
+                mem = get_memory_manager()
+                entries = mem.project_get(ctx.project_id, agent_role=role, limit=10)
+                if entries:
+                    mem_lines = "\n".join(
+                        f"- [{e.get('category', 'ctx')}] {e['key']}: {str(e['value'])[:200]}"
+                        for e in entries
+                    )
+                    parts.append(
+                        f"\n## Learned Project Knowledge ({role})\n{mem_lines}"
+                    )
+            except Exception:
+                pass
 
     if ctx.project_path:
         parts.append(f"\n## Project Path\n{ctx.project_path}")

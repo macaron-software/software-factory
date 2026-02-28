@@ -1273,6 +1273,18 @@ def _migrate(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Agent role column in memory_project (cross-session role-scoped memory)
+    try:
+        mp_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_project)").fetchall()
+        }
+        if mp_cols and "agent_role" not in mp_cols:
+            conn.execute(
+                "ALTER TABLE memory_project ADD COLUMN agent_role TEXT DEFAULT ''"
+            )
+    except Exception:
+        pass
+
     _ensure_sqlite_tables(conn)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
@@ -1614,19 +1626,10 @@ def _ensure_darwin_tables(conn) -> None:
         "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
     )
 
-    # Migrations: category + active_phases on missions
-    try:
-        m_cols3 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
-        if m_cols3 and "category" not in m_cols3:
-            conn.execute(
-                "ALTER TABLE missions ADD COLUMN category TEXT DEFAULT 'functional'"
-            )
-        if m_cols3 and "active_phases_json" not in m_cols3:
-            conn.execute(
-                "ALTER TABLE missions ADD COLUMN active_phases_json TEXT DEFAULT '[]'"
-            )
-    except Exception:
-        pass
+    # Agent role column in memory_project (cross-session role-scoped memory)
+    conn.execute("""
+        ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS agent_role TEXT DEFAULT ''
+    """)
 
     conn.commit()
 

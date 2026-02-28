@@ -86,6 +86,9 @@
         <button class="settings-tab" onclick="showSettingsTab('modules')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('guidelines')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-book-open"/></svg> Guidelines
+        </button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -536,7 +539,48 @@
 
     </div>
 
-    <!-- ═══ Modules ═══ -->
+    <!-- ═══ Guidelines ═══ -->
+    <div class="settings-panel" id="panel-guidelines">
+        <section class="settings-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div>
+                    <h3 style="margin:0">Architecture Guidelines</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Domain-level technical constraints auto-injected into agent system prompts. Sync from Confluence or seed manually.</p>
+                </div>
+                <button class="btn btn-sm" onclick="loadGuidelinesTab()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
+            </div>
+            <!-- Domains overview -->
+            <div id="gl-domains-list" style="margin-bottom:1.5rem">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading domains...</p>
+            </div>
+            <!-- Sync form -->
+            <div class="settings-card" style="margin-top:1rem">
+                <h4 style="margin:0 0 0.75rem">Sync from Confluence</h4>
+                <div class="form-group" style="margin-bottom:0.6rem">
+                    <label class="form-label">Domain</label>
+                    <input type="text" id="gl-sync-domain" class="form-input" placeholder="bscc" style="max-width:200px">
+                </div>
+                <div class="form-group" style="margin-bottom:0.6rem">
+                    <label class="form-label">Confluence URL</label>
+                    <input type="text" id="gl-sync-url" class="form-input" placeholder="https://confluence.example.com">
+                </div>
+                <div class="form-group" style="margin-bottom:0.6rem">
+                    <label class="form-label">Space Key</label>
+                    <input type="text" id="gl-sync-space" class="form-input" placeholder="BSCC" style="max-width:200px">
+                </div>
+                <div class="form-group" style="margin-bottom:0.8rem">
+                    <label class="form-label">Token</label>
+                    <input type="password" id="gl-sync-token" class="form-input" placeholder="Personal Access Token">
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="syncGuidelines()">
+                    <svg class="icon icon-sm"><use href="#icon-download"/></svg> Sync from Confluence
+                </button>
+                <span id="gl-sync-status" style="margin-left:0.75rem;font-size:0.82rem;color:var(--text-secondary)"></span>
+            </div>
+        </section>
+    </div>
     <div class="settings-panel" id="panel-modules">
         <section class="settings-section">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
@@ -700,6 +744,7 @@ function showSettingsTab(id) {
     if (id === 'llm') loadLLMTab();
     if (id === 'orchestrator') refreshLoad();
     if (id === 'modules') loadModulesTab();
+    if (id === 'guidelines') loadGuidelinesTab();
 }
 // Restore last tab
 try {
@@ -1137,6 +1182,91 @@ async function loadLLMABTests() {
             </div>`;
         }).join('');
     } catch(e) { console.error(e); }
+}
+</script>
+<script>
+async function loadGuidelinesTab() {
+    const list = document.getElementById('gl-domains-list');
+    list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>';
+    try {
+        const r = await fetch('/api/guidelines/domains');
+        const d = await r.json();
+        const domains = d.domains || [];
+        if (!domains.length) {
+            list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No domains configured yet. Use the sync form below or seed via CLI.</p>';
+            return;
+        }
+        list.innerHTML = domains.map(dom => {
+            const domainSlug = dom.project.replace('domain:', '');
+            const lastSync = dom.last_sync ? new Date(dom.last_sync).toLocaleDateString() : 'never';
+            return `<div class="settings-card" style="margin-bottom:0.75rem;padding:1rem">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <div>
+                        <strong style="font-size:0.95rem">${domainSlug}</strong>
+                        <span style="font-size:0.75rem;color:var(--text-secondary);margin-left:0.5rem">${dom.items} constraints · ${dom.pages} pages · synced ${lastSync}</span>
+                    </div>
+                    <div style="display:flex;gap:0.5rem">
+                        <button class="btn btn-sm" onclick="viewDomain('${domainSlug}')">
+                            <svg class="icon icon-sm"><use href="#icon-eye"/></svg> View
+                        </button>
+                        <button class="btn btn-sm" style="color:var(--red)" onclick="clearDomain('${domainSlug}')">
+                            <svg class="icon icon-sm"><use href="#icon-trash-2"/></svg>
+                        </button>
+                    </div>
+                </div>
+                <div id="gl-detail-${domainSlug}" style="display:none;margin-top:0.75rem;font-size:0.8rem;color:var(--text-secondary)"></div>
+            </div>`;
+        }).join('');
+    } catch(e) { list.innerHTML = '<p style="color:var(--red);font-size:0.85rem">Error loading domains: ' + e.message + '</p>'; }
+}
+
+async function viewDomain(domain) {
+    const detail = document.getElementById('gl-detail-' + domain);
+    if (detail.style.display !== 'none') { detail.style.display = 'none'; return; }
+    detail.style.display = 'block';
+    detail.innerHTML = 'Loading...';
+    try {
+        const r = await fetch('/api/guidelines/domain/' + domain);
+        const d = await r.json();
+        const cats = d.items_by_category || {};
+        let html = '';
+        const colors = {must_use:'var(--green)',forbidden:'var(--red)',standard:'var(--blue)',adr:'var(--purple)'};
+        for (const [cat, items] of Object.entries(cats)) {
+            html += `<div style="margin-bottom:0.5rem"><strong style="color:${colors[cat]||'var(--text-primary)'}">${cat.toUpperCase()} (${items.length})</strong><ul style="margin:0.25rem 0 0 1rem;padding:0">`;
+            items.slice(0, 8).forEach(i => { html += `<li><b>${i.topic}</b>: ${i.constraint.substring(0,100)}${i.constraint.length>100?'…':''}</li>`; });
+            if (items.length > 8) html += `<li style="color:var(--text-secondary)">… and ${items.length-8} more</li>`;
+            html += '</ul></div>';
+        }
+        detail.innerHTML = html || 'No items found.';
+    } catch(e) { detail.innerHTML = 'Error: ' + e.message; }
+}
+
+async function clearDomain(domain) {
+    if (!confirm('Clear all guidelines for domain "' + domain + '"?')) return;
+    const r = await fetch('/api/guidelines/domain/' + domain, {method:'DELETE'});
+    const d = await r.json();
+    if (d.ok) { loadGuidelinesTab(); }
+}
+
+async function syncGuidelines() {
+    const domain = document.getElementById('gl-sync-domain').value.trim();
+    const url = document.getElementById('gl-sync-url').value.trim();
+    const space = document.getElementById('gl-sync-space').value.trim();
+    const token = document.getElementById('gl-sync-token').value.trim();
+    const status = document.getElementById('gl-sync-status');
+    if (!domain) { status.textContent = 'Domain is required'; status.style.color='var(--red)'; return; }
+    status.textContent = 'Syncing...'; status.style.color='var(--text-secondary)';
+    try {
+        const body = {source: 'confluence', domain, url, space, token};
+        const r = await fetch('/api/guidelines/sync', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        const d = await r.json();
+        if (d.ok) {
+            status.textContent = 'Sync started in background'; status.style.color='var(--green)';
+            setTimeout(loadGuidelinesTab, 3000);
+        } else {
+            status.textContent = d.error || 'Sync failed'; status.style.color='var(--red)';
+        }
+    } catch(e) { status.textContent = 'Error: ' + e.message; status.style.color='var(--red)'; }
 }
 </script>
 {% endblock %}

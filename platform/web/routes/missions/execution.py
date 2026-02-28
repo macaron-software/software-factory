@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from ....i18n import t
 from ...schemas import ErrorResponse, OkResponse
 from ..helpers import _active_mission_tasks, get_mission_semaphore, _parse_body
+from .execution_helpers import build_mission_context, get_role_instruction
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -150,9 +151,13 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     except Exception:
         pass
 
-    asyncio.create_task(
+    from ..helpers import _active_mission_tasks
+
+    _wf_task = asyncio.create_task(
         _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
     )
+    _active_mission_tasks[session.id] = _wf_task
+    _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
 
     # If mission config has milestones, also launch the milestone pipeline in parallel
     milestones = (mission.config or {}).get("milestones")
@@ -409,7 +414,6 @@ async def mission_chat_stream(request: Request, mission_id: str):
     """Stream a conversation with the CDP agent in mission context."""
     from ....agents.executor import get_executor
     from ....agents.store import get_agent_store
-    from ....memory.manager import get_memory_manager
     from ....missions.store import get_mission_run_store
     from ....sessions.runner import _build_context
     from ....sessions.store import MessageDef, get_session_store
@@ -452,100 +456,9 @@ async def mission_chat_stream(request: Request, mission_id: str):
         )
     )
 
-    # Build mission-specific context summary
-    phase_summary = []
-    if mission.phases:
-        for p in mission.phases:
-            phase_summary.append(
-                f"- {p.phase_id}: {p.status.value if hasattr(p.status, 'value') else p.status}"
-            )
-    phases_str = "\n".join(phase_summary) if phase_summary else "No phases yet"
-
-    # Gather memory
-    mem_ctx = ""
-    try:
-        mem = get_memory_manager()
-        entries = mem.project_get(mission_id, limit=20)
-        if entries:
-            mem_ctx = "\n".join(
-                f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries
-            )
-    except Exception:
-        pass
-
-    # Gather recent agent messages from this session
-    recent = sess_store.get_messages(session_id, limit=30)
-    agent_msgs = []
-    for m in recent:
-        if m.from_agent not in ("user", "system") and m.content:
-            agent_msgs.append(f"[{m.from_agent}] {m.content[:300]}")
-    agent_conv = (
-        "\n".join(agent_msgs[-10:]) if agent_msgs else "No agent conversations yet"
-    )
-
-    mission_context = f"""MISSION BRIEF: {mission.brief or "N/A"}
-MISSION STATUS: {mission.status.value if hasattr(mission.status, "value") else mission.status}
-WORKSPACE: {mission.workspace_path or "N/A"}
-
-PHASES STATUS:
-{phases_str}
-
-PROJECT MEMORY (knowledge from agents):
-{mem_ctx or "No memory entries yet"}
-
-RECENT AGENT CONVERSATIONS (last 10):
-{agent_conv}
-
-Answer the user's question about this mission with concrete data.
-If they ask about PRs, features, sprints, git — use the appropriate tools to search.
-Answer in the same language as the user. Be precise and data-driven."""
-
-    # Role-specific tool instructions per agent type
-    _role_instructions = {
-        "lead_dev": "\n\nTu es le Lead Dev. Tu peux LIRE et MODIFIER le code du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour les modifier, et git_commit pour committer tes changements. Quand l'utilisateur te demande de modifier quelque chose, fais-le directement avec les outils.",
-        "dev_backend": "\n\nTu es développeur backend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
-        "dev_frontend": "\n\nTu es développeur frontend. Tu peux LIRE et MODIFIER le code. Utilise code_read, code_write, code_edit, git_commit.",
-        "architecte": "\n\nTu es l'Architecte Solution. Tu peux LIRE et MODIFIER l'architecture du projet. Utilise code_read pour examiner les fichiers, code_write/code_edit pour modifier Architecture.md ou d'autres docs d'architecture, et git_commit pour committer. Quand l'utilisateur te demande de mettre à jour l'architecture, fais-le directement.",
-        "qa_lead": "\n\nTu es le QA Lead. Tu peux LIRE et MODIFIER les tests du projet. Utilise code_read pour examiner les tests, code_write/code_edit pour créer ou modifier des fichiers de test, et git_commit pour committer.",
-        "test_manager": "\n\nTu es le Test Manager. Tu peux LIRE et MODIFIER les tests. Utilise code_read, code_write, code_edit, git_commit.",
-        "test_automation": "\n\nTu es l'ingénieur test automation. Tu peux LIRE et ÉCRIRE des tests automatisés. Utilise code_read, code_write, code_edit, git_commit.",
-        "tech_writer": "\n\nTu es le Technical Writer. Tu peux LIRE et MODIFIER la documentation du projet (README.md, docs/, wiki). Utilise code_read pour examiner les docs, code_write/code_edit pour les mettre à jour, memory_store pour sauvegarder des connaissances, et git_commit pour committer.",
-        "product_owner": "\n\nTu es le Product Owner. Tu peux consulter le code, les features et la mémoire projet. Utilise memory_store pour sauvegarder des décisions produit.",
-        "product_manager": "\n\nTu es le Product Manager. Tu peux consulter le backlog, les features et la mémoire. Utilise memory_store pour les décisions.",
-        "chef_de_programme": """
-
-Tu es le Chef de Programme (CDP). Tu ORCHESTRE activement le projet.
-
-RÈGLE FONDAMENTALE: Quand l'utilisateur te demande d'agir (lancer, relancer, fixer, itérer), tu DOIS utiliser tes outils. Ne te contente JAMAIS de décrire ce que tu ferais — FAIS-LE.
-
-Tes outils d'orchestration:
-- run_phase(phase_id, brief): Lance une phase du pipeline (idéation, dev-sprint, qa-campaign, etc.)
-- get_phase_status(phase_id): Vérifie le statut d'une phase
-- list_phases(): Liste toutes les phases et leur statut
-- request_validation(phase_id, decision): Demande GO/NOGO
-
-Tes outils d'investigation:
-- code_read(path): Lire un fichier du projet
-- code_search(query, path): Chercher dans le code
-- git_log(cwd): View git history
-- git_diff(cwd): View changes
-- memory_search(query): Chercher dans la mémoire projet
-- platform_missions(): État des missions
-- platform_agents(): Liste des agents
-
-WORKFLOW: Quand on te dit "go" ou "lance":
-1. D'abord list_phases() pour voir l'état
-2. Identifie la prochaine phase à lancer
-3. Appelle run_phase(phase_id="...", brief="...") pour la lancer
-4. Rapporte le résultat
-
-N'écris JAMAIS [TOOL_CALL] en texte — utilise le vrai mécanisme de function calling.""",
-    }
-    role_instruction = _role_instructions.get(
-        agent_id,
-        "\n\nTu peux LIRE et MODIFIER les fichiers du projet avec code_read, code_write, code_edit, git_commit, et sauvegarder des connaissances avec memory_store.",
-    )
-    mission_context += role_instruction
+    # Build mission-specific context summary and role instruction
+    mission_context = build_mission_context(mission, session_id, sess_store)
+    mission_context += get_role_instruction(agent_id)
 
     async def event_generator():
         import markdown as md_lib
