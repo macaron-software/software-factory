@@ -116,6 +116,26 @@
             </div>
             <hr style="border-color:var(--border);margin:1.2rem 0">
         </section>
+
+        <!-- ── Knowledge Health badge ── -->
+        <section class="settings-section">
+            <h3 style="display:flex;align-items:center;gap:0.5rem">
+                <svg style="width:14px;height:14px"><use href="#icon-database"/></svg>
+                Knowledge Health
+            </h3>
+            <div id="km-health-badge"
+                 hx-get="/api/knowledge/health"
+                 hx-trigger="load"
+                 hx-swap="innerHTML"
+                 style="min-height:60px;display:flex;align-items:center;gap:0.5rem;color:var(--text-secondary);font-size:0.82rem">
+                <svg style="width:13px;height:13px;animation:spin 1s linear infinite"><use href="#icon-loader"/></svg> Loading…
+            </div>
+            <button onclick="fetch('/api/knowledge/refresh',{method:'POST'}).then(r=>r.json()).then(d=>{ const el=document.getElementById('km-refresh-msg'); el.textContent=d.status==='started'?'✓ Maintenance started':'No active projects'; el.style.color=d.status==='started'?'var(--green)':'var(--yellow)'; })"
+                style="margin-top:0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.8rem;font-size:0.78rem;cursor:pointer;display:flex;align-items:center;gap:0.35rem;color:var(--text-primary)">
+                <svg style="width:12px;height:12px"><use href="#icon-refresh-cw"/></svg> Refresh Now
+            </button>
+            <span id="km-refresh-msg" style="font-size:0.78rem;margin-left:0.5rem"></span>
+        </section>
     </div>
 
     <!-- ═══ Orchestrator ═══ -->
