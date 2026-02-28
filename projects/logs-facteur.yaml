@@ -1,0 +1,20 @@
+# Logs Facteur — Support N1 La Poste
+# ====================================
+
+project:
+  id: logs-facteur
+  name: logs-facteur
+  display_name: "Logs Facteur - Support N1 La Poste"
+  root_path: ""
+  domain: la-poste
+  description: >
+    Outil de support N1 pour les facteurs La Poste.
+    Gestion des tournées, incidents, remontées terrain.
+
+domains:
+  rust:
+    paths: [src/]
+    extensions: [.rs]
+  typescript:
+    paths: [web/]
+    extensions: [.ts]

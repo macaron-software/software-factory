@@ -70,6 +70,11 @@ def _scan_for_secrets(content: str) -> list[str]:
 _routing_cache: dict | None = None
 _routing_cache_ts: float = 0.0
 
+# Workspace file write lock: maps (project_id, normalized_path) → agent_id
+# Prevents concurrent agents from clobbering the same file
+_file_write_locks: dict[tuple[str, str], str] = {}
+_file_write_lock_meta: dict = {}  # (project_id, path) → {"agent": str, "ts": float}
+
 
 @dataclass
 class ExecutionContext:
@@ -117,6 +122,168 @@ class ExecutionResult:
     tool_calls: list[dict] = field(default_factory=list)
     delegations: list[dict] = field(default_factory=list)
     error: str | None = None
+
+
+class BudgetExceededError(RuntimeError):
+    """Raised when a session exceeds its configured USD budget."""
+
+
+# ── Settings cache (refreshed every 60 s) ────────────────────────────────────
+_settings_cache: dict[str, str] = {}
+_settings_cache_ts: float = 0.0
+_SETTINGS_TTL = 60.0
+
+
+def _get_rate_limit_setting(key: str, default: str) -> str:
+    """Return a rate-limit setting from platform_settings, with 60 s cache."""
+    global _settings_cache, _settings_cache_ts
+    now = time.monotonic()
+    if now - _settings_cache_ts > _SETTINGS_TTL:
+        try:
+            from ..db.migrations import get_db
+
+            db = get_db()
+            rows = db.execute(
+                "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
+            ).fetchall()
+            db.close()
+            _settings_cache = {r[0]: r[1] for r in rows}
+            _settings_cache_ts = now
+        except Exception:
+            pass
+    return _settings_cache.get(key, default)
+
+
+def _check_session_budget(session_id: str) -> None:
+    """Raise BudgetExceededError if the session has exceeded its per-session USD cap."""
+    try:
+        enabled = _get_rate_limit_setting("rate_limit_enabled", "true")
+        if enabled.lower() not in ("true", "1", "yes"):
+            return
+        cap_str = _get_rate_limit_setting("rate_limit_usd_per_session", "2.00")
+        cap = float(cap_str)
+        if cap <= 0:
+            return
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?",
+            (session_id,),
+        ).fetchone()
+        db.close()
+        spent = float(row[0]) if row else 0.0
+        if spent >= cap:
+            logger.warning(
+                "Session %s exceeded budget cap $%.2f (spent $%.4f)",
+                session_id,
+                cap,
+                spent,
+            )
+            raise BudgetExceededError(
+                f"Session budget cap of ${cap:.2f} exceeded (spent ${spent:.4f})"
+            )
+    except BudgetExceededError:
+        raise
+    except Exception:
+        pass  # never block on DB errors
+
+
+def _write_llm_usage(
+    provider: str,
+    model: str,
+    tokens_in: int,
+    tokens_out: int,
+    project_id: str | None,
+    agent_id: str,
+    session_id: str,
+) -> None:
+    """Insert one row into llm_usage. Never raises."""
+    try:
+        from ..db.migrations import get_db
+        from ..llm.observability import _estimate_cost
+
+        cost = _estimate_cost(model, tokens_in, tokens_out)
+        db = get_db()
+        db.execute(
+            "INSERT INTO llm_usage (provider, model, tokens_in, tokens_out,"
+            " cost_estimate, project_id, agent_id, session_id) VALUES (?,?,?,?,?,?,?,?)",
+            (
+                provider,
+                model,
+                tokens_in,
+                tokens_out,
+                cost,
+                project_id or "",
+                agent_id,
+                session_id,
+            ),
+        )
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
+def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -> None:
+    """Debit project wallet for LLM cost. Never raises."""
+    if not cost_usd or cost_usd <= 0 or not project_id:
+        return
+    try:
+        import uuid as _uuid_w
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT balance FROM project_wallets WHERE project_id=?", (project_id,)
+        ).fetchone()
+        if not row:
+            db.execute(
+                "INSERT INTO project_wallets (project_id, balance, total_earned, total_spent)"
+                " VALUES (?,100.0,100.0,0)",
+                (project_id,),
+            )
+        db.execute(
+            "UPDATE project_wallets SET balance=balance-?, total_spent=total_spent+?,"
+            " updated_at=datetime('now') WHERE project_id=?",
+            (cost_usd, cost_usd, project_id),
+        )
+        db.execute(
+            "INSERT INTO token_transactions (id, project_id, amount, reason, reference_id)"
+            " VALUES (?,?,?,?,?)",
+            (str(_uuid_w.uuid4()), project_id, -cost_usd, "llm_usage", reference_id),
+        )
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+
+
+def _update_mission_cost(session_id: str, mission_run_id: str | None) -> None:
+    """Update mission_runs.llm_cost_usd from llm_traces. Never raises."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        mid = mission_run_id
+        if not mid and session_id:
+            row = db.execute(
+                "SELECT id FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if row:
+                mid = row[0]
+        if mid:
+            db.execute(
+                "UPDATE mission_runs SET llm_cost_usd="
+                "(SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?)"
+                " WHERE id=?",
+                (session_id, mid),
+            )
+            db.commit()
+        db.close()
+    except Exception:
+        pass
 
 
 class AgentExecutor:
@@ -239,6 +406,44 @@ class AgentExecutor:
 
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
+                _write_llm_usage(
+                    llm_resp.provider,
+                    llm_resp.model,
+                    llm_resp.tokens_in,
+                    llm_resp.tokens_out,
+                    ctx.project_id,
+                    agent.id,
+                    ctx.session_id,
+                )
+                _check_session_budget(ctx.session_id)
+
+                # Push live cost/token update via SSE (workspace live feed)
+                if ctx.session_id:
+                    try:
+                        from ..llm.observability import _estimate_cost
+                        import asyncio as _asyncio
+
+                        _running_cost = _estimate_cost(
+                            llm_resp.model, total_tokens_in, total_tokens_out
+                        )
+                        _asyncio.ensure_future(
+                            self._push_mission_sse(
+                                ctx.session_id,
+                                {
+                                    "type": "token_usage",
+                                    "agent_id": agent.id,
+                                    "tokens_in": total_tokens_in,
+                                    "tokens_out": total_tokens_out,
+                                    "tokens_total": total_tokens_in + total_tokens_out,
+                                    "cost_usd": round(_running_cost, 6),
+                                    "model": llm_resp.model,
+                                    "runaway": (total_tokens_in + total_tokens_out)
+                                    > 100_000,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
 
                 # Parse XML tool calls from content (MiniMax sometimes returns these)
                 if not llm_resp.tool_calls and llm_resp.content:
@@ -283,6 +488,29 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
+                    # ── Workspace conflict guard: warn if another agent is writing this file ──
+                    if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
+                        import time as _time
+
+                        _fp = str(tc.arguments.get("path", "")).strip("/")
+                        _lock_key = (ctx.project_id, _fp)
+                        _existing = _file_write_locks.get(_lock_key)
+                        if _existing and _existing != ctx.session_id:
+                            _meta = _file_write_lock_meta.get(_lock_key, {})
+                            _age = _time.time() - _meta.get("ts", 0)
+                            if _age < 30:  # warn only if recent (< 30s)
+                                logger.warning(
+                                    "File conflict: %s already being written by agent %s (session %s) — %s proceeding",
+                                    _fp,
+                                    _meta.get("agent", "?"),
+                                    _existing,
+                                    agent.id,
+                                )
+                        _file_write_locks[_lock_key] = ctx.session_id
+                        _file_write_lock_meta[_lock_key] = {
+                            "agent": agent.id,
+                            "ts": _time.time(),
+                        }
                     result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     all_tool_calls.append(
                         {
@@ -495,7 +723,8 @@ class AgentExecutor:
                 content = content[: content.index("<think>")].strip()
             delegations = self._parse_delegations(content)
 
-            return ExecutionResult(
+            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
+            result = ExecutionResult(
                 content=content,
                 agent_id=agent.id,
                 model=llm_resp.model,
@@ -506,9 +735,28 @@ class AgentExecutor:
                 tool_calls=all_tool_calls,
                 delegations=delegations,
             )
+            # Debit project wallet for LLM cost
+            try:
+                from ..llm.observability import _estimate_cost
+
+                _cost = _estimate_cost(
+                    llm_resp.model, total_tokens_in, total_tokens_out
+                )
+                _debit_project_wallet(ctx.project_id, _cost, ctx.session_id)
+            except Exception:
+                pass
+            return result
 
         except Exception as exc:
             err_str = str(exc)
+            if isinstance(exc, BudgetExceededError):
+                elapsed = int((time.monotonic() - t0) * 1000)
+                return ExecutionResult(
+                    content=f"Session budget exceeded: {exc}",
+                    agent_id=agent.id,
+                    duration_ms=elapsed,
+                    error="budget_exceeded",
+                )
             is_llm_error = (
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
@@ -646,6 +894,16 @@ class AgentExecutor:
 
                 total_tokens_in += llm_resp.tokens_in
                 total_tokens_out += llm_resp.tokens_out
+                _write_llm_usage(
+                    llm_resp.provider,
+                    llm_resp.model,
+                    llm_resp.tokens_in,
+                    llm_resp.tokens_out,
+                    ctx.project_id,
+                    agent.id,
+                    ctx.session_id,
+                )
+                _check_session_budget(ctx.session_id)
                 logger.warning(
                     "TOOL_DBG agent=%s round=%d tc=%d clen=%d fin=%s",
                     agent.id,
@@ -843,7 +1101,8 @@ class AgentExecutor:
                                         role="system",
                                         content=(
                                             "⚠️ Lint/verification failed (see AUTO-LINT above). "
-                                            f"Fix all reported issues NOW. Repair round {_srep + 1}/{MAX_REPAIR_ROUNDS}."
+                                            "Fix all reported issues NOW before proceeding to the next step. "
+                                            f"Repair round {_srep + 1}/{MAX_REPAIR_ROUNDS}."
                                         ),
                                     )
                                 )
@@ -963,6 +1222,7 @@ class AgentExecutor:
             final_content = _strip_raw_tokens(final_content)
             delegations = self._parse_delegations(final_content)
 
+            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
             yield (
                 "result",
                 ExecutionResult(

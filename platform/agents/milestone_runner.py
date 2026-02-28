@@ -65,6 +65,7 @@ async def run_milestone_pipeline(
     project_path: str = "",
     on_progress=None,  # async callable(milestone_result) for SSE
     compliance_agents: list[str] | None = None,  # domain-specific critic agent ids
+    compliance_blocking: bool = False,  # if True, FAIL verdict stops the pipeline
 ) -> list[MilestoneResult]:
     """Run a list of milestones sequentially, with retries and PROGRESS.md updates.
 
@@ -216,7 +217,7 @@ async def run_milestone_pipeline(
 
         # Run domain compliance critics after each successful milestone
         if m_result.success and compliance_agents:
-            await _run_compliance_checks(
+            compliance_ok = await _run_compliance_checks(
                 compliance_agents=compliance_agents,
                 executor=executor,
                 ctx=ctx,
@@ -225,7 +226,24 @@ async def run_milestone_pipeline(
                 goal=goal,
                 project_path=project_path,
                 mission_name=mission_name,
+                compliance_blocking=compliance_blocking,
             )
+            if not compliance_ok:
+                logger.warning(
+                    "MilestoneRunner: compliance BLOCKING FAIL at milestone %s — stopping pipeline. session=%s",
+                    m_id,
+                    session_id,
+                )
+                await _push_sse_safe(
+                    session_id,
+                    {
+                        "type": "pipeline_aborted",
+                        "reason": f"Compliance blocking fail at milestone {m_id}",
+                        "completed": idx + 1,
+                        "total": total,
+                    },
+                )
+                break
 
         # Stop on 3 consecutive failures
         if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
@@ -400,17 +418,19 @@ async def _run_compliance_checks(
     goal: str,
     project_path: str,
     mission_name: str,
-) -> None:
+    compliance_blocking: bool = False,
+) -> bool:
     """Run domain-specific compliance critic agents after a successful milestone.
 
-    Each compliance agent gets a focused prompt listing the milestone that just
-    completed, then reviews the workspace for domain constraint violations.
-    Results are appended to PROGRESS.md and pushed as SSE events (non-blocking).
+    Returns True if all checks passed (or blocking is off), False if a blocking
+    FAIL was detected and the caller should pause the mission.
     """
     from ..agents.store import get_agent_store
     from dataclasses import replace
 
     store = get_agent_store()
+    any_blocking_fail = False
+
     for agent_id in compliance_agents:
         agent_def = store.get(agent_id)
         if not agent_def:
@@ -432,28 +452,65 @@ async def _run_compliance_checks(
             },
         )
 
+        blocking_note = (
+            (
+                "\n\nIMPORTANT: compliance_blocking=true for this domain. "
+                "If you find BLOCKING violations, output a line: `BLOCKING VIOLATIONS FOUND`."
+            )
+            if compliance_blocking
+            else ""
+        )
+
+        # Load compliance history for this project (last 5 verdicts from same agent)
+        history_note = _load_compliance_history(ctx.project_id, agent_id)
+
         compliance_prompt = (
             f"## Compliance Review — Milestone « {goal} »\n\n"
+            f"{history_note}"
             f"The milestone `{milestone_id}` just completed successfully as part of "
             f"mission « {mission_name} ».\n\n"
             f"Review the code produced in this milestone for domain compliance violations.\n"
             f"Focus on changes introduced in this milestone — check files in the workspace.\n\n"
             f"List all violations with file + line. Provide a PASS/FAIL verdict."
+            f"{blocking_note}"
         )
 
         compliance_ctx = replace(ctx, agent=agent_def)
         try:
             result = await executor.run(compliance_ctx, compliance_prompt)
             verdict = "PASS" if not result.error else "ERROR"
-            if result.content and "FAIL" in result.content.upper():
+            content_upper = (result.content or "").upper()
+            if "FAIL" in content_upper:
                 verdict = "FAIL"
 
+            # Detect blocking violations
+            is_blocking_fail = (
+                compliance_blocking
+                and verdict == "FAIL"
+                and "BLOCKING VIOLATIONS FOUND" in content_upper
+            )
+            if is_blocking_fail:
+                any_blocking_fail = True
+
             logger.info(
-                "ComplianceCheck: %s verdict=%s milestone=%s",
+                "ComplianceCheck: %s verdict=%s blocking=%s milestone=%s",
                 agent_id,
                 verdict,
+                is_blocking_fail,
                 milestone_id,
             )
+
+            # Persist verdict to DB
+            _persist_compliance_verdict(
+                session_id=session_id,
+                milestone_id=milestone_id,
+                agent_id=agent_id,
+                goal=goal,
+                verdict=verdict,
+                content=result.content or "",
+                is_blocking=is_blocking_fail,
+            )
+
             await _push_sse_safe(
                 session_id,
                 {
@@ -461,6 +518,7 @@ async def _run_compliance_checks(
                     "agent_id": agent_id,
                     "milestone_id": milestone_id,
                     "verdict": verdict,
+                    "blocking": is_blocking_fail,
                     "preview": (result.content or "")[:300],
                 },
             )
@@ -470,6 +528,23 @@ async def _run_compliance_checks(
                 _append_compliance_to_progress(
                     project_path, agent_id, milestone_id, verdict, result.content or ""
                 )
+
+            if is_blocking_fail:
+                await _push_sse_safe(
+                    session_id,
+                    {
+                        "type": "compliance_blocking_fail",
+                        "agent_id": agent_id,
+                        "milestone_id": milestone_id,
+                        "message": (
+                            f"Mission paused: {agent_id} found BLOCKING violations in "
+                            f"milestone {milestone_id}. Fix violations before continuing."
+                        ),
+                    },
+                )
+                # Stop checking further agents — mission will be paused by caller
+                break
+
         except Exception as exc:
             logger.warning(
                 "ComplianceCheck: %s failed with %s — milestone=%s",
@@ -477,6 +552,42 @@ async def _run_compliance_checks(
                 exc,
                 milestone_id,
             )
+
+    return not any_blocking_fail
+
+
+def _load_compliance_history(project_id: str, agent_id: str) -> str:
+    """Load the last 5 compliance verdicts for this project+agent to inject as history context."""
+    if not project_id:
+        return ""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        rows = db.execute(
+            """SELECT cv.verdict, cv.milestone_id, cv.goal, cv.created_at,
+                      substr(cv.content, 1, 300) as preview
+               FROM compliance_verdicts cv
+               JOIN mission_runs mr ON cv.session_id = mr.session_id
+               WHERE mr.project_id = ? AND cv.agent_id = ?
+               ORDER BY cv.created_at DESC LIMIT 5""",
+            (project_id, agent_id),
+        ).fetchall()
+        if not rows:
+            return ""
+        lines = ["### 📋 Historique compliance précédent (ce projet)\n"]
+        for r in reversed(rows):
+            icon = "✅" if r["verdict"] == "PASS" else "❌"
+            lines.append(
+                f"- {icon} **{r['verdict']}** — {r['goal'] or r['milestone_id']} "
+                f"({r['created_at'][:10]}): {r['preview'][:150]}\n"
+            )
+        lines.append(
+            "\nTiens compte de ces violations précédentes si elles sont récurrentes.\n\n"
+        )
+        return "".join(lines)
+    except Exception:
+        return ""
 
 
 def _append_compliance_to_progress(
@@ -496,3 +607,52 @@ def _append_compliance_to_progress(
     )
     with open(path, "a") as f:
         f.write(section)
+
+
+def _persist_compliance_verdict(
+    *,
+    session_id: str,
+    milestone_id: str,
+    agent_id: str,
+    goal: str,
+    verdict: str,
+    content: str,
+    is_blocking: bool,
+) -> None:
+    """Persist compliance verdict to DB for dashboard queries."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        # Ensure table exists
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS compliance_verdicts (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                milestone_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                goal TEXT,
+                verdict TEXT NOT NULL,
+                is_blocking INTEGER DEFAULT 0,
+                content TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        db.execute(
+            """INSERT OR REPLACE INTO compliance_verdicts
+               (id, session_id, milestone_id, agent_id, goal, verdict, is_blocking, content)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (
+                f"{session_id}-{milestone_id}-{agent_id}",
+                session_id,
+                milestone_id,
+                agent_id,
+                goal,
+                verdict,
+                1 if is_blocking else 0,
+                content[:4000],
+            ),
+        )
+        db.commit()
+    except Exception as exc:
+        logger.debug("ComplianceCheck: could not persist verdict: %s", exc)

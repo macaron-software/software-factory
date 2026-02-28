@@ -53,3 +53,11 @@ conventions: |
 
 compliance_agents:
   - solaris-compliance-critic
+
+compliance_blocking: true
+
+default_pattern: adversarial-cascade
+
+default_agents:
+  - lead-dev
+  - solaris-compliance-critic

@@ -1,0 +1,20 @@
+# Macaron-Software PSY Platform
+# ================================
+
+project:
+  id: psy
+  name: psy
+  display_name: "Macaron-Software PSY Platform"
+  root_path: ""
+  domain: healthtech
+  description: >
+    Plateforme de consultation psychologique en ligne.
+    Prise de RDV, séances vidéo sécurisées, suivi patient.
+
+domains:
+  rust:
+    paths: [backend/]
+    extensions: [.rs]
+  svelte:
+    paths: [web/]
+    extensions: [.svelte, .ts]

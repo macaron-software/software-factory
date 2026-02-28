@@ -1,0 +1,26 @@
+# Popinz — Event Discovery SaaS
+# ================================
+
+project:
+  id: popinz
+  name: popinz
+  display_name: "Popinz SaaS"
+  root_path: ""
+  domain: saas
+  description: >
+    Plateforme SaaS de gestion d'événements et billetterie.
+    Multi-tenant, API partenaires, analytics temps réel.
+
+domains:
+  rust:
+    paths: [backend/]
+    extensions: [.rs]
+  svelte:
+    paths: [web/]
+    extensions: [.svelte, .ts]
+  swift:
+    paths: [ios/]
+    extensions: [.swift]
+  kotlin:
+    paths: [android/]
+    extensions: [.kt]

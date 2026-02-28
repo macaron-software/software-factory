@@ -49,3 +49,12 @@ conventions: |
 compliance_agents:
   - bscc-compliance-critic
   - solaris-compliance-critic
+
+compliance_blocking: true
+
+default_pattern: adversarial-cascade
+
+default_agents:
+  - lead-dev
+  - bscc-compliance-critic
+  - solaris-compliance-critic

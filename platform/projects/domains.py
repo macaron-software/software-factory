@@ -53,6 +53,13 @@ class Domain:
     compliance_agents: list[str] = field(
         default_factory=list
     )  # domain-specific critic agents
+    compliance_blocking: bool = False  # if True, FAIL verdict pauses the mission
+    default_pattern: str = (
+        ""  # e.g. "adversarial-cascade" — auto-selected for new missions
+    )
+    default_agents: list[str] = field(
+        default_factory=list
+    )  # lead agent pool for this domain
     conventions: str = ""  # free-text injected verbatim into agent system prompt
     color: str = "#6B7280"  # UI badge color (hex)
     extends: str = ""  # parent domain id to inherit from
@@ -253,6 +260,13 @@ def load_domain(domain_id: str) -> Optional[Domain]:
         compliance_agents=raw.get(
             "compliance_agents", base.compliance_agents if base else []
         ),
+        compliance_blocking=raw.get(
+            "compliance_blocking", base.compliance_blocking if base else False
+        ),
+        default_pattern=raw.get(
+            "default_pattern", base.default_pattern if base else ""
+        ),
+        default_agents=raw.get("default_agents", base.default_agents if base else []),
     )
 
     _cache[domain_id] = domain

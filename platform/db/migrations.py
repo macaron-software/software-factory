@@ -159,6 +159,16 @@ def _migrate(conn):
             conn.execute(
                 "ALTER TABLE mission_runs ADD COLUMN llm_cost_usd REAL DEFAULT 0.0"
             )
+        if mr_cols and "resume_attempts" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN resume_attempts INTEGER DEFAULT 0"
+            )
+        if mr_cols and "human_input_required" not in mr_cols:
+            conn.execute(
+                "ALTER TABLE mission_runs ADD COLUMN human_input_required INTEGER DEFAULT 0"
+            )
+        if mr_cols and "last_resume_at" not in mr_cols:
+            conn.execute("ALTER TABLE mission_runs ADD COLUMN last_resume_at TEXT")
     except Exception:
         pass
 
@@ -1418,6 +1428,68 @@ def _ensure_sqlite_tables(conn) -> None:
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Admin audit log
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+            actor TEXT NOT NULL DEFAULT 'system',
+            action TEXT NOT NULL,
+            resource_type TEXT,
+            resource_id TEXT,
+            detail TEXT,
+            ip TEXT,
+            user_agent TEXT
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp DESC)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_actor ON admin_audit_log(actor)")
+    # Platform settings (rate limits, budget config, etc.)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        )
+    """)
+    # ── Multi-tenant Workspaces (added 2026-06) ──────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workspaces (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            slug TEXT UNIQUE NOT NULL,
+            description TEXT DEFAULT '',
+            color TEXT DEFAULT '#6366f1',
+            owner TEXT DEFAULT 'admin',
+            created_at TEXT DEFAULT (datetime('now')),
+            settings TEXT DEFAULT '{}'
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workspace_members (
+            workspace_id TEXT,
+            user_id TEXT,
+            role TEXT DEFAULT 'member',
+            PRIMARY KEY (workspace_id, user_id)
+        )
+    """)
+    conn.execute(
+        "INSERT OR IGNORE INTO workspaces (id, name, slug, description) VALUES ('default', 'Default', 'default', 'Workspace par défaut')"
+    )
+    for table in ["sessions", "missions", "projects"]:
+        try:
+            existing_cols = {
+                r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()
+            }
+            if "workspace_id" not in existing_cols:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN workspace_id TEXT DEFAULT 'default'"
+                )
+        except Exception:
+            pass
     conn.commit()
 
 
@@ -1769,6 +1841,13 @@ def _ensure_darwin_tables(conn) -> None:
             expires_at TEXT
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS api_key_scopes (
+            key_id TEXT NOT NULL,
+            scope TEXT NOT NULL,
+            PRIMARY KEY (key_id, scope)
+        )
+    """)
 
     # Webhook configs
     conn.execute("""
@@ -1805,4 +1884,6 @@ def get_db(db_path: Path = DB_PATH):
         conn.execute("SELECT COUNT(*) FROM team_fitness")
     except Exception:
         _ensure_darwin_tables(conn)
+    # Ensure all SQLite-only tables exist on existing DBs (idempotent)
+    _ensure_sqlite_tables(conn)
     return conn

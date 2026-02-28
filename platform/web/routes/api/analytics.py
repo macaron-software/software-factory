@@ -549,6 +549,33 @@ async def llm_costs():
             LIMIT 10
         """).fetchall()
 
+        # Per-project breakdown (join with mission_runs)
+        by_project = db.execute("""
+            SELECT mr.project_id,
+                   COUNT(DISTINCT mr.id) as missions,
+                   COUNT(t.id) as llm_calls,
+                   COALESCE(SUM(t.tokens_in), 0) as tokens_in,
+                   COALESCE(SUM(t.tokens_out), 0) as tokens_out,
+                   COALESCE(SUM(t.cost_usd), 0) as cost_usd,
+                   SUM(CASE WHEN mr.status='completed' THEN 1 ELSE 0 END) as completed,
+                   SUM(CASE WHEN mr.status='paused' THEN 1 ELSE 0 END) as paused
+            FROM mission_runs mr
+            LEFT JOIN llm_traces t ON t.mission_id = mr.id
+            GROUP BY mr.project_id
+            ORDER BY cost_usd DESC
+            LIMIT 20
+        """).fetchall()
+
+        # Paused missions stats with resume attempts
+        paused_stats = db.execute("""
+            SELECT
+                COUNT(*) as total_paused,
+                COALESCE(AVG(COALESCE(resume_attempts,0)),0) as avg_attempts,
+                SUM(CASE WHEN COALESCE(human_input_required,0)=1 THEN 1 ELSE 0 END) as human_input_needed,
+                SUM(CASE WHEN COALESCE(resume_attempts,0)>=3 THEN 1 ELSE 0 END) as exhausted
+            FROM mission_runs WHERE status='paused'
+        """).fetchone()
+
         by_agent = db.execute("""
             SELECT agent_id,
                    COUNT(*) as calls,
@@ -593,6 +620,34 @@ async def llm_costs():
                     }
                     for r in by_mission
                 ],
+                "by_project": [
+                    {
+                        "project_id": r["project_id"],
+                        "missions": r["missions"],
+                        "llm_calls": r["llm_calls"],
+                        "tokens_in": r["tokens_in"],
+                        "tokens_out": r["tokens_out"],
+                        "cost_usd": round(r["cost_usd"], 6),
+                        "completed": r["completed"],
+                        "paused": r["paused"],
+                        "success_rate": round(r["completed"] / r["missions"], 2)
+                        if r["missions"]
+                        else 0,
+                    }
+                    for r in by_project
+                ],
+                "paused_stats": {
+                    "total": paused_stats["total_paused"] if paused_stats else 0,
+                    "avg_resume_attempts": round(paused_stats["avg_attempts"] or 0, 1)
+                    if paused_stats
+                    else 0,
+                    "human_input_needed": paused_stats["human_input_needed"]
+                    if paused_stats
+                    else 0,
+                    "exhausted_retries": paused_stats["exhausted"]
+                    if paused_stats
+                    else 0,
+                },
                 "by_agent": [
                     {
                         "agent_id": r["agent_id"],

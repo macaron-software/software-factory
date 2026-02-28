@@ -1,0 +1,22 @@
+# Sharelook — Video Collaboration Platform
+# ==========================================
+
+project:
+  id: sharelook
+  name: sharelook
+  display_name: "Sharelook Platform"
+  root_path: ""
+  domain: ""
+  description: >
+    Plateforme de collaboration vidéo pour la formation professionnelle.
+    Streaming live, replay, annotations collaboratives.
+
+domains:
+  java:
+    paths: [backend/]
+    extensions: [.java]
+    build_cmd: mvn package -q
+    test_cmd: mvn test -q
+  angular:
+    paths: [frontend/]
+    extensions: [.ts, .html]

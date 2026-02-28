@@ -41,6 +41,11 @@
       <button class="session-tab" data-tab="chat"><svg class="icon icon-xs"><use href="#icon-send"/></svg> Chat</button>
       <button class="session-tab" data-tab="graph"><svg class="icon icon-xs"><use href="#icon-share"/></svg> Graph</button>
     </div>
+    <div id="liveTokenBar" style="display:none;align-items:center;gap:8px;font-size:11px;color:var(--text-muted);margin-left:12px;">
+      <span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 1.5s infinite"></span>
+      <span id="liveTokenCount" style="font-family:monospace">0 tokens</span>
+      <span id="liveTokenCost" style="color:var(--yellow)">$0.000000</span>
+    </div>
   </div>
 
   <!-- Content area -->
@@ -459,6 +464,8 @@ const _streamBuffers = {}; // agent_id → {div, content}
 es.addEventListener('message', e=>{
   try{
     const data = JSON.parse(e.data);
+    if(data.type === 'token_usage') { handleTokenUsage(data); return; }
+    if(data.type === 'compliance_blocking_fail') { appendComplianceAlert(data); return; }
     if(data.type === 'stream_start') { handleStreamStart(data); return; }
     if(data.type === 'stream_delta') { handleStreamDelta(data); return; }
     if(data.type === 'stream_end')   { handleStreamEnd(data); return; }
@@ -469,6 +476,29 @@ es.addEventListener('message', e=>{
   }catch(err){ console.error('SSE parse error', err); }
 });
 es.addEventListener('error', ()=>{ console.warn('SSE connection lost, will retry...'); });
+
+function handleTokenUsage(data){
+  const bar = document.getElementById('liveTokenBar');
+  if(bar) bar.style.display = 'flex';
+  const tc = document.getElementById('liveTokenCount');
+  const cost = document.getElementById('liveTokenCost');
+  if(tc) tc.textContent = (data.tokens_total || 0).toLocaleString() + ' tokens';
+  if(cost) cost.textContent = '$' + (data.cost_usd || 0).toFixed(6);
+  if(data.runaway) {
+    if(cost) cost.style.color = 'var(--red)';
+    cost.title = '⚠ Runaway token usage (>100k tokens)';
+  }
+}
+function appendComplianceAlert(data){
+  const feed = document.getElementById('threadFeed');
+  if(!feed) return;
+  const div = document.createElement('div');
+  div.className = 'mu mu--system';
+  div.style.cssText = 'border-left:3px solid var(--red);padding:8px 12px;background:rgba(255,60,60,.08);margin:4px 0;border-radius:4px;';
+  div.innerHTML = `<strong style="color:var(--red)">🚫 Compliance Blocking</strong> — milestone ${data.milestone_id||''} stopped by ${data.agent_id||'compliance agent'}`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
 
 /* ── Streaming handlers ── */
 function handleStreamStart(data){

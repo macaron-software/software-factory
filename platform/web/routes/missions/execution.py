@@ -216,6 +216,31 @@ async def api_mission_start(request: Request):
     if not brief:
         return JSONResponse({"error": "Brief is required"}, status_code=400)
 
+    # Auto-inject domain default_pattern into workflow phases when applicable
+    try:
+        from ....projects.registry import get_project_registry
+        from ....projects.domains import load_domain
+
+        _proj = get_project_registry().get(project_id) if project_id else None
+        if _proj and getattr(_proj, "arch_domain", ""):
+            _dom = load_domain(_proj.arch_domain)
+            if _dom and _dom.default_pattern:
+                # Override pattern_id on all phases that use a generic pattern
+                for wp in wf.phases:
+                    if not wp.pattern_id or wp.pattern_id in (
+                        "solo-chat",
+                        "sequential",
+                    ):
+                        wp.pattern_id = _dom.default_pattern
+                logger.info(
+                    "MissionCreate: domain '%s' default_pattern='%s' applied to workflow '%s'",
+                    _proj.arch_domain,
+                    _dom.default_pattern,
+                    workflow_id,
+                )
+    except Exception as _de:
+        logger.debug("MissionCreate: could not apply domain default_pattern: %s", _de)
+
     # Build phase runs from workflow
     phases = []
     for wp in wf.phases:
@@ -876,6 +901,35 @@ async def _launch_orchestrator(mission_id: str):
                 )
                 await orchestrator.run_phases()
                 logger.warning("ORCH mission=%s completed normally", mission_id)
+                project_path = getattr(mission, "workspace_path", None)
+                if project_path:
+                    asyncio.create_task(
+                        _run_quality_scan_background(
+                            mission_id,
+                            getattr(mission, "project_id", "") or "",
+                            project_path,
+                            session_id,
+                        )
+                    )
+                # Push browser notification on completion
+                try:
+                    from ....services.push import send_push_to_project
+
+                    _pid = getattr(mission, "project_id", "") or ""
+                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _wname = getattr(wf, "name", "") or ""
+                    asyncio.create_task(
+                        send_push_to_project(
+                            _pid,
+                            f"✅ Mission completed: {_mname}",
+                            f"Workflow: {_wname}"
+                            if _wname
+                            else "Mission finished successfully",
+                            url=f"/projects/{_pid}/workspace" if _pid else "/",
+                        )
+                    )
+                except Exception:
+                    pass
         except Exception as exc:
             import traceback
 
@@ -900,6 +954,25 @@ async def _launch_orchestrator(mission_id: str):
                         "msg_type": "text",
                     },
                 )
+                # Push browser notification on failure
+                try:
+                    from ....services.push import send_push_to_project
+
+                    _pid = getattr(mission, "project_id", "") or ""
+                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _wname = getattr(wf, "name", "") or ""
+                    asyncio.create_task(
+                        send_push_to_project(
+                            _pid,
+                            f"❌ Mission failed: {_mname}",
+                            f"Workflow: {_wname}"
+                            if _wname
+                            else "Mission encountered an error",
+                            url=f"/projects/{_pid}/workspace" if _pid else "/",
+                        )
+                    )
+                except Exception:
+                    pass
             except Exception:
                 pass
 
@@ -963,16 +1036,19 @@ async def _run_milestone_pipeline_background(
 
         # Resolve domain compliance agents
         compliance_agents: list[str] = []
+        compliance_blocking: bool = False
         try:
             proj = get_project_registry().get(project_id)
             if proj and proj.arch_domain:
                 domain = load_domain(proj.arch_domain)
                 if domain and domain.compliance_agents:
                     compliance_agents = domain.compliance_agents
+                    compliance_blocking = domain.compliance_blocking
                     logger.info(
-                        "MilestonePipeline: domain '%s' compliance_agents=%s session=%s",
+                        "MilestonePipeline: domain '%s' compliance_agents=%s blocking=%s session=%s",
                         proj.arch_domain,
                         compliance_agents,
+                        compliance_blocking,
                         session_id,
                     )
         except Exception as _e:
@@ -996,6 +1072,7 @@ async def _run_milestone_pipeline_background(
             mission_name=mission_name,
             project_path=project_path,
             compliance_agents=compliance_agents or None,
+            compliance_blocking=compliance_blocking,
         )
         done = sum(1 for r in results if r.success)
         logger.info(
@@ -1006,6 +1083,90 @@ async def _run_milestone_pipeline_background(
         )
     except Exception as exc:
         logger.exception("MilestonePipeline error session=%s: %s", session_id, exc)
+
+
+# ── Quality Scan ─────────────────────────────────────────────────
+
+
+async def _run_quality_scan_background(
+    mission_id: str,
+    project_id: str,
+    project_path: str,
+    session_id: str,
+) -> None:
+    """Run code-critic quality scan after mission completion (non-blocking)."""
+    import re
+    from ....agents.executor import AgentExecutor, ExecutionContext
+    from ....agents.store import get_agent_store
+    from ....db.migrations import get_db
+
+    try:
+        agent_store = get_agent_store()
+        critic = agent_store.get("code-critic") or agent_store.get("code_critic")
+        if critic is None:
+            logger.info(
+                "QualityScan: no code-critic agent found, skipping mission=%s",
+                mission_id,
+            )
+            return
+
+        executor = AgentExecutor()
+        ctx = ExecutionContext(
+            agent=critic,
+            session_id=session_id,
+            project_id=project_id,
+            project_path=project_path,
+            tools_enabled=True,
+        )
+        prompt = (
+            "Review the code produced in the recent mission. "
+            "Check for: SLOP, dead code, missing tests, security issues. "
+            "Provide a quality score 0-100 and list of findings."
+        )
+        result = await executor.run(ctx, prompt)
+
+        # Parse quality score from result
+        score: int | None = None
+        if result and result.content:
+            m = re.search(r"\b(\d{1,3})\s*/\s*100\b", result.content)
+            if not m:
+                m = re.search(r"[Ss]core[:\s]+(\d{1,3})", result.content)
+            if m:
+                score = int(m.group(1))
+
+        # Write to quality_reports table
+        try:
+            conn = get_db()
+            conn.execute(
+                """INSERT INTO quality_reports
+                   (project_id, mission_id, session_id, phase_name, dimension, score, details_json, tool_used, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                (
+                    project_id,
+                    mission_id,
+                    session_id,
+                    "mission_completion",
+                    "overall",
+                    score,
+                    json.dumps({"content": result.content if result else ""})
+                    if result
+                    else "{}",
+                    "code-critic",
+                ),
+            )
+            conn.commit()
+        except Exception as db_err:
+            logger.warning(
+                "QualityScan: DB write failed mission=%s: %s", mission_id, db_err
+            )
+
+        logger.info(
+            "QualityScan: mission=%s score=%s",
+            mission_id,
+            score if score is not None else "n/a",
+        )
+    except Exception as exc:
+        logger.warning("QualityScan: failed mission=%s: %s", mission_id, exc)
 
 
 # ── Mission Debug & Replay ────────────────────────────────────────
@@ -1116,3 +1277,135 @@ async def mission_replay(run_id: str, from_phase: int = 0):
     return JSONResponse(
         {"ok": True, "new_run_id": new_run.id, "from_phase": from_phase}
     )
+
+
+# ── Compliance Reports ────────────────────────────────────────────────
+
+
+@router.get("/api/missions/{run_id}/compliance-reports")
+async def get_compliance_reports(run_id: str):
+    """Get all compliance verdicts for a mission run."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        # Ensure table exists
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS compliance_verdicts (
+                id TEXT PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                milestone_id TEXT NOT NULL,
+                agent_id TEXT NOT NULL,
+                goal TEXT,
+                verdict TEXT NOT NULL,
+                is_blocking INTEGER DEFAULT 0,
+                content TEXT,
+                created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        # Get session_id for this run
+        run = db.execute(
+            "SELECT session_id FROM mission_runs WHERE id=?", (run_id,)
+        ).fetchone()
+        if not run:
+            return JSONResponse({"error": "Run not found"}, status_code=404)
+
+        verdicts = db.execute(
+            """SELECT * FROM compliance_verdicts WHERE session_id=?
+               ORDER BY created_at ASC""",
+            (run["session_id"],),
+        ).fetchall()
+
+        total = len(verdicts)
+        passed = sum(1 for v in verdicts if v["verdict"] == "PASS")
+        failed = sum(1 for v in verdicts if v["verdict"] == "FAIL")
+
+        return JSONResponse(
+            {
+                "run_id": run_id,
+                "summary": {"total": total, "passed": passed, "failed": failed},
+                "verdicts": [
+                    {
+                        "id": v["id"],
+                        "milestone_id": v["milestone_id"],
+                        "agent_id": v["agent_id"],
+                        "goal": v["goal"],
+                        "verdict": v["verdict"],
+                        "is_blocking": bool(v["is_blocking"]),
+                        "preview": (v["content"] or "")[:500],
+                        "created_at": v["created_at"],
+                    }
+                    for v in verdicts
+                ],
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+
+@router.get("/api/compliance/project/{project_id}")
+async def get_project_compliance_summary(project_id: str):
+    """Get compliance history for a project across all missions."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS compliance_verdicts (
+                id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
+                milestone_id TEXT NOT NULL, agent_id TEXT NOT NULL,
+                goal TEXT, verdict TEXT NOT NULL, is_blocking INTEGER DEFAULT 0,
+                content TEXT, created_at TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        rows = db.execute(
+            """SELECT cv.agent_id, cv.verdict, cv.milestone_id, cv.goal,
+                      cv.is_blocking, cv.created_at
+               FROM compliance_verdicts cv
+               JOIN mission_runs mr ON cv.session_id = mr.session_id
+               WHERE mr.project_id = ?
+               ORDER BY cv.created_at DESC
+               LIMIT 100""",
+            (project_id,),
+        ).fetchall()
+
+        by_agent: dict = {}
+        for r in rows:
+            aid = r["agent_id"]
+            if aid not in by_agent:
+                by_agent[aid] = {
+                    "agent_id": aid,
+                    "pass": 0,
+                    "fail": 0,
+                    "last_verdict": None,
+                }
+            if r["verdict"] == "PASS":
+                by_agent[aid]["pass"] += 1
+            elif r["verdict"] == "FAIL":
+                by_agent[aid]["fail"] += 1
+            if not by_agent[aid]["last_verdict"]:
+                by_agent[aid]["last_verdict"] = r["verdict"]
+
+        return JSONResponse(
+            {
+                "project_id": project_id,
+                "by_agent": list(by_agent.values()),
+                "recent": [
+                    {
+                        "agent_id": r["agent_id"],
+                        "verdict": r["verdict"],
+                        "milestone_id": r["milestone_id"],
+                        "goal": r["goal"],
+                        "is_blocking": bool(r["is_blocking"]),
+                        "created_at": r["created_at"],
+                    }
+                    for r in rows[:20]
+                ],
+            }
+        )
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        db.close()
