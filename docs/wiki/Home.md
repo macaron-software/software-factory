@@ -1,8 +1,8 @@
 # Software Factory — Wiki
 
-**Macaron Software Factory** is an AI-powered agent orchestration platform for software engineering teams. It coordinates 181 specialized agents through 42 workflows using SAFe methodology.
+**Macaron Software Factory** is an AI-powered agent orchestration platform for software engineering teams. It coordinates 191 specialized agents through 42 workflows using SAFe methodology.
 
-> **Latest release: [v2.7.0](https://github.com/macaron-software/software-factory/releases/tag/v2.7.0)** — Knowledge Management + Memory Intelligence + Mission Timeline + LLM Cost Tracking
+> **Latest release: [v3.0.0](https://github.com/macaron-software/software-factory/releases/tag/v3.0.0)** — Knowledge Management + Memory Intelligence + Mission Timeline + LLM Cost Tracking
 
 ## Navigation
 
@@ -21,7 +21,7 @@
 
 ## Translations
 
-🇫🇷 [Français](Home‐FR) · 🇪🇸 [Español](Home‐ES) · 🇩🇪 [Deutsch](Home‐DE) · 🇮🇹 [Italiano](Home‐IT) · 🇧🇷 [Português](Home‐PT) · 🇨🇳 [中文](Home‐ZH) · 🇯🇵 [日本語](Home‐JA)
+[Français](Home-FR) · [Español](Home-ES) · [Deutsch](Home-DE) · [Italiano](Home-IT) · [Português](Home-PT) · [中文](Home-ZH) · [日本語](Home-JA) · [한국어](Home-KO) · [हिन्दी](Home-HI) · [Русский](Home-RU) · [العربية](Home-AR) · [Bahasa](Home-ID) · [Türkçe](Home-TR) · [Nederlands](Home-NL) · [Tiếng Việt](Home-VI) · [Polski](Home-PL) · [Svenska](Home-SV)
 
 ## Quick Start
 

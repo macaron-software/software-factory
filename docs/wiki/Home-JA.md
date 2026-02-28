@@ -17,7 +17,7 @@
 
 ## 翻訳
 
-🇬🇧 [English](Home) · 🇫🇷 [Français](Home‐FR) · 🇪🇸 [Español](Home‐ES) · 🇩🇪 [Deutsch](Home‐DE) · 🇮🇹 [Italiano](Home‐IT) · 🇧🇷 [Português](Home‐PT) · 🇨🇳 [中文](Home‐ZH)
+[English](Home) · [Français](Home-FR) · [Español](Home-ES) · [Deutsch](Home-DE) · [Italiano](Home-IT) · [Português](Home-PT) · [中文](Home-ZH) · [日本語](Home-JA) · [한국어](Home-KO) · [हिन्दी](Home-HI) · [Русский](Home-RU) · [العربية](Home-AR) · [Bahasa](Home-ID) · [Türkçe](Home-TR) · [Nederlands](Home-NL) · [Tiếng Việt](Home-VI) · [Polski](Home-PL) · [Svenska](Home-SV)
 
 ## クイックスタート
 

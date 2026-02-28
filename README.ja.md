@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[Live Demo: sf.macaron-software.com](https://sf.macaron-software.com)** — 「Skip (Demo)」をクリックして探索
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [Features](#features) · [Quick Start](#quick-start) · [Screenshots](#screenshots) · [Architecture](#architecture) · [Contributing](#contributing)
 
@@ -31,12 +41,12 @@
 
 Software Factory は**自律型マルチエージェントプラットフォーム**で、専門AIエージェントが連携して、アイデア出しからデプロイまでのソフトウェア開発ライフサイクル全体を統括します。
 
-181のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
+191のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
 
 ### 主な特徴
 
-- **181の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
-- **42の組み込みワークフロー** — SAFeセレモニー、品質ゲート、夜間メンテナンス、セキュリティ、ナレッジ管理
+- **191の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
+- **36の組み込みワークフロー** — SAFeセレモニー、品質ゲート、夜間メンテナンス、セキュリティ、ナレッジ管理
 - **ナレッジ管理** — 4つの専用エージェント、ARTナレッジチーム、夜間`knowledge-maintenance`ワークフロー
 - **メモリインテリジェンス** — 関連性スコアリング、アクセス追跡、古いエントリの自動削除
 - **LLMコスト追跡** — ミッションタイムラインタブヘッダーにミッションごとのコスト表示
@@ -185,17 +195,13 @@ Then restart: `make run` (Docker) or `make dev` (local)
 
 インストール後、アイデアから実働プロジェクトへの手順：
 
-### パス A: アイデアから始める（アイデアワークショップ）
+### パス A: CTO Jarvis に聞く（最速）
 
-1. **Open the Ideation page** — go to `/ideation` (or click "Ideation" in the sidebar)
-2. **Describe your idea** — e.g. *"Enterprise carpooling app with real-time matching"*
-3. **Watch agents discuss** — 5 specialized agents (Product Manager, Business Analyst, Architect, UX Designer, Security) analyze your idea in real-time via SSE streaming
-4. **Create a project from the result** — click **"Create an Epic from this idea"**. The platform will:
-   - Create a new **project** with generated `VISION.md` and CI/CD scaffolding
-   - Create an **epic** with features and user stories broken down by the PO agent
-   - Auto-provision **TMA** (maintenance), **Security**, and **Tech Debt** missions
+1. **ホームページを開く** (`/`) — プラットフォームは CTO Jarvis タブから起動します
+2. **プロジェクトのアイデアを入力** — 例: *"React と Python を使ったエンタープライズ向けカープール アプリの新しいプロジェクトを作成して"*
+3. **Jarvis (Gabriel Mercier、戦略的オーケストレーター)** がリクエストを分析し、プロジェクトを作成し、SAFe バックログをプロビジョニングして最初のミッションを開始します — すべて一つの会話で完結
 
-You now have a full SAFe backlog ready to execute.
+これは新しいプロジェクトの**推奨エントリーポイント**です。
 
 ### パス B: プロジェクトを手動で作成
 
@@ -235,7 +241,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## 機能
 
-### 181の専門AIエージェント
+### 191の専門AIエージェント
 
 エージェントは実際のソフトウェア組織を反映したチームに編成されています：
 
@@ -434,7 +440,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 181 agents
+sf agents list                         # 191 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -499,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 181 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -605,34 +611,9 @@ Mission Created
 ### デプロイ
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (推奨) → http://localhost:8090
+ローカル (開発) → http://localhost:8090
+本番環境        → 独自のインフラ
 ```
 
 ## プロジェクト設定
@@ -966,63 +947,46 @@ Every project automatically gets 4 operational missions:
 ### ブラウザプッシュ通知
 - **Web Push API (VAPID)** — ミッションイベントのネイティブブラウザプッシュ通知
 
-## v2.3.0 の新機能 (2026年2月)
+## v3.0.0 の新機能 (2026年)
 
-### ナビゲーションの再構成 — ホーム + ダッシュボード
-- **ホームページ** (`/`) — 3つのタブ: CTO Jarvis · ビジネスアイデア · プロジェクトアイデア
-- **ダッシュボード** (`/portfolio`) — 3つのタブ: 概要 · CTO · ビジネス
-- **シンプルなサイドバー** — 2つのエントリのみ: ホームとダッシュボード
-- **Feather SVGアイコン** — 絵文字を一貫したベクターアイコンに置き換え
+### エージェント・マーケットプレイス
+- **191エージェントをカタログ化** — `/marketplace` でフルテキスト検索、ART/ロール/スキルでフィルタリング
+- **エージェントプロファイル** — ツール、スキル、最近のセッション履歴の詳細ビュー
+- **ワンクリック起動** — プロファイルページから任意のエージェントとの直接セッションを開始
 
-### CTO Jarvis — 戦略的AIアドバイザー
+### ミッション・リプレイUI
+- **ステップバイステップのリプレイ** — `/missions/{id}/replay` で各エージェントターンとツール呼び出しを再現
+- **ステップごとのコストとトークン** — エージェントごとの詳細なLLM支出内訳
+- **エクスポート可能な履歴** — デバッグと監査のためにリプレイをJSONとしてダウンロード
 
-![CTO Jarvis](docs/screenshots/en/jarvis.png)
-- **永続的チャットパネル** — ホームページ専用タブ
-- **永続的メモリ** — 技術的な決定とセッションコンテキストを会話間で保持
-- **CTOレベルのアドバイザー** — アーキテクチャの意思決定、技術選択のサポート
-- **プラットフォーム認識** — ポートフォリオ、プロジェクト、エージェントチームの現状を把握
+### LLMメトリクス・ダッシュボード
+- **コスト/レイテンシ/プロバイダーのリアルタイム監視** — `/metrics`
+- **エージェントとミッションごとの支出** — コストの高いエージェントを特定して最適化
+- **プロバイダー比較** — プロバイダー間でP50/P95レイテンシとコストを並べて比較
 
-**ツール**: コード（読み取り・検索・編集・書き込み・一覧表示）· Git（commit、diff、log、status、issues/PRs/search）· ビルド/デプロイ（build、lint、test、deploy、Docker、run_command、infra）· セキュリティ（SAST、シークレットスキャン、依存関係）· MCP（Webフェッチ、ナレッジグラフ、Playwright、GitHub）· プロジェクト（Jira、Confluence、SAFeフェーズ、LRMコンテキスト）· メモリ（ナレッジグラフ読み書き）
+### RBAC + レート制限
+- **ワークスペース単位のRBAC** — プラットフォーム全体ではなく、ワークスペースごとのロール割り当て
+- **ユーザーごとのレート制限** — ロールごとに設定可能なトークン/リクエストのクォータ
+- **監査トレイル** — すべてのRBAC変更をアクター、タイムスタンプ、変更詳細とともに記録
 
-**クイックアクションチップ**: `ポートフォリオ統計` · `実行中ミッション` · `チーム編成` · `GitHub` · `AO Veligo` · `Angular 16→17 移行` · `技術負債・セキュリティ・a11y・GDPR` · `Git commit & PR` · `E2E + スクリーンショット` · `Jira同期` · `Wiki更新`
+### エージェント評価フレームワーク
+- **LLM-as-judge採点** — `/evals` でゴールデンデータセットに対する自動評価
+- **エージェントごとのベンチマーク** — 時系列での品質追跡と回帰検出
+- **設定可能なジャッジ** — 任意の設定済みLLMプロバイダーを評価ジャッジとして使用
 
-**質問の例**
+### ツール・ビルダー
+- **ノーコードのツール作成** — `/tool-builder` でHTTP、SQL、シェルツール
+- **即時アクティベーション** — 保存後すぐにエージェントがツールを利用可能
+- **パラメータテンプレート** — 型とバリデーションを含む入力スキーマを定義
 
-> *「ポートフォリオ全体の健全性はどうですか？遅れているプロジェクトはありますか？」*
+### マルチテナント・ワークスペース
+- **分離された名前空間** — `/workspaces` でワークスペースごとに分離されたデータ、エージェント、メモリ
+- **クライアントごとのデプロイ** — 相互汚染なしに複数クライアントをオンボード
+- **ワークスペースごとのRBAC** — 名前空間ごとの詳細なロール割り当て
 
-> *「VeligoプロジェクトのSAST监査を実行し、優先対応すべき重大CVE上位3件を教えてください。」*
-
-> *「APIをRESTからGraphQLへ移行したい — どのエージェントチームを推奨しますか？」*
-
-> *「feature/authブランチの最新5コミットのdiffを表示し、変更内容を要約してください。」*
-
-> *「循環的複雑度が15を超えるファイルを下げるためのリファクタリングミッションを作成してください。」*
-
-> *「現在の技術的負債は何ですか？影響/工数で優先順位を付けてください。」*
-
-> *「Azure AD SSOログイン機能のユーザーストーリーを作成し、Jiraチケットを開いてください。」*
-
-> *「PlaywrightのE2Eテストを実行し、重要なページのスクリーンショットを撮ってください。」*
-
-> *「今月と先月のDORAメトリクスを比較してください — どこで後退していますか？」*
-
-> *「PostgreSQLへの移行に関する最新の決定でアーキテクチャwikiを更新してください。」*
-
-
-### ビジネスアイデア — 6エージェント・マーケティングチーム
-
-![Business Ideation](docs/screenshots/en/mkt_ideation.png)
-
-- **ルート** `/mkt-ideation` — ホームページのビジネスアイデアタブからアクセス可能
-- **CMO Sophie Laurent** — 5名の専門マーケティングエキスパートを率いるチームリーダー
-- **完全なマーケティングプランJSON** — SWOT、TAM/SAM/SOM、ブランド戦略、GTM、KPI、予算
-- **エージェントグラフ** — アバター写真、コラボレーションエッジ、詳細ポップオーバーのig-nodeビジュアライゼーション
-
-### PostgreSQL移行 + 40インデックス
-- **SQLite → PostgreSQL移行** — スキーマとデータの完全な移行スクリプト
-- **ネイティブPostgreSQL FTS** — `tsvector/tsquery`がFTS5を置き換え、より高性能でスケーラブル
-- **40以上のPGインデックス** — すべてのホットクエリパスの包括的なカバレッジ
-- **Darwin Teams** — コンテキスト（技術+フェーズ）ごとのエージェントチーム選択のThompsonサンプリング
+### YAMLエージェントのホットリロード
+- **ライブエージェント更新** — エージェントYAMLファイルを編集し、プラットフォームを再起動せずにリロード
+- **ダウンタイムなし** — 進行中のミッションは以前のエージェント定義で継続
 
 ## 貢献
 
@@ -1034,6 +998,6 @@ Every project automatically gets 4 operational missions:
 
 ## サポート
 
-- Live Demo: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Discussions: https://github.com/macaron-software/software-factory/discussions

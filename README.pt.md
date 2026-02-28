@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[Demo ao Vivo: sf.macaron-software.com](https://sf.macaron-software.com)** — clique em "Skip (Demo)" para explorar
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [Funcionalidades](#funcionalidades) · [Início Rápido](#início-rápido) · [Capturas de Tela](#capturas-de-tela) · [Arquitetura](#arquitetura) · [Contribuindo](#contribuindo)
 
@@ -31,12 +41,12 @@
 
 Software Factory é uma **plataforma autônoma multi-agente** que orquestra todo o ciclo de vida de desenvolvimento de software — da ideação ao deploy — usando agentes de IA especializados trabalhando juntos.
 
-Pense nela como uma **fábrica de software virtual** onde 181 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
+Pense nela como uma **fábrica de software virtual** onde 191 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
 
 ### Destaques Principais
 
-- **181 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
-- **42 workflows integrados** — cerimônias SAFe, quality gates, manutenção noturna, segurança, gestão do conhecimento
+- **191 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
+- **36 workflows integrados** — cerimônias SAFe, quality gates, manutenção noturna, segurança, gestão do conhecimento
 - **Gestão do Conhecimento** — 4 agentes dedicados, equipe ART Knowledge, workflow noturno `knowledge-maintenance`
 - **Inteligência de Memória** — pontuação de relevância, rastreamento de acessos, remoção automática de entradas obsoletas
 - **Rastreamento de Custo LLM** — custo por missão no cabeçalho da aba de timeline
@@ -185,17 +195,13 @@ Você também pode configurar provedores pela página de **Configurações** no 
 
 Após a instalação, veja como ir de uma ideia a um projeto funcional:
 
-### Caminho A: Começar a partir de uma Ideia (Workshop de Ideação)
+### Caminho A: Perguntar ao CTO Jarvis (Mais rápido)
 
-1. **Abra a página de Ideação** — vá para `/ideation` (ou clique em "Ideation" na barra lateral)
-2. **Descreva sua ideia** — ex: *"App de carona corporativa com matching em tempo real"*
-3. **Veja os agentes discutindo** — 5 agentes especializados (Product Manager, Business Analyst, Arquiteto, UX Designer, Segurança) analisam sua ideia em tempo real via streaming SSE
-4. **Crie um projeto a partir do resultado** — clique em **"Create an Epic from this idea"**. A plataforma irá:
-   - Criar um novo **projeto** com `VISION.md` gerado e scaffolding de CI/CD
-   - Criar um **epic** com features e user stories detalhadas pelo agente PO
-   - Provisionar automaticamente missões de **TMA** (manutenção), **Segurança** e **Dívida Técnica**
+1. **Abra a página inicial** (`/`) — a plataforma inicia na aba CTO Jarvis
+2. **Digite sua ideia ou pergunta** — ex: *"Cria um novo projeto para um app de carona corporativa com React e Python"*
+3. **Jarvis (Gabriel Mercier, Orquestrador Estratégico)** analisa o pedido, cria o projeto, provisiona o backlog SAFe e inicia a primeira missão — tudo em uma conversa
 
-Agora você tem um backlog SAFe completo pronto para execução.
+Este é o **ponto de entrada recomendado** para qualquer novo projeto.
 
 ### Caminho B: Criar um Projeto Manualmente
 
@@ -235,7 +241,7 @@ Todas as quatro são criadas com o projeto. TMA, Segurança e Self-Healing come�
 
 ## Funcionalidades
 
-### 181 Agentes de IA Especializados
+### 191 Agentes de IA Especializados
 
 Os agentes são organizados em equipes que espelham organizações de software reais:
 
@@ -434,7 +440,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 181 agents
+sf agents list                         # 191 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -499,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 181 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -605,34 +611,9 @@ Mission Created
 ### Deploy
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker (recomendado) → http://localhost:8090
+Local (desenvolvimento) → http://localhost:8090
+Produção             → sua própria infraestrutura
 ```
 
 ## Configuração do Projeto
@@ -966,63 +947,46 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 ### Notificações Push do Navegador
 - **Web Push API (VAPID)** — notificações push nativas do navegador para eventos de missão
 
-## Novidades na v2.3.0 (Fev 2026)
+## Novidades na v3.0.0 (2026)
 
-### Navegação Reestruturada — Home + Dashboard
-- **Página inicial** (`/`) — três abas: CTO Jarvis · Ideação de Negócios · Ideação de Projeto
-- **Dashboard** (`/portfolio`) — três abas: Visão geral · CTO · Business
-- **Sidebar simplificada** — apenas duas entradas: Home e Dashboard
-- **Ícones SVG Feather** — emojis substituídos por ícones vetoriais consistentes
+### Mercado de Agentes
+- **191 agentes catalogados** — pesquisa de texto completo, filtro por ART/função/habilidades em `/marketplace`
+- **Perfis de agentes** — visualização detalhada com ferramentas, habilidades e histórico de sessões recentes
+- **Início com um clique** — inicie uma sessão direta com qualquer agente a partir da sua página de perfil
 
-### CTO Jarvis — Consultor IA Estratégico
+### Repetição de Missão
+- **Repetição passo a passo** — cada turno de agente e chamada de ferramenta reproduzida em `/missions/{id}/replay`
+- **Custo e tokens por etapa** — detalhamento granular dos gastos LLM por agente
+- **Histórico exportável** — baixe a repetição como JSON para depuração e auditoria
 
-![CTO Jarvis](docs/screenshots/en/jarvis.png)
-- **Painel de chat persistente** — aba dedicada na página inicial
-- **Memória persistente** — decisões técnicas e contexto de sessão preservados entre conversas
-- **Consultor de nível CTO** — auxílio em decisões de arquitetura, escolha de tecnologia
-- **Consciência da plataforma** — conhece o estado atual do portfólio, projetos e equipes de agentes
+### Painel de Métricas LLM
+- **Monitoramento em tempo real de custo/latência/provedor** em `/metrics`
+- **Gastos por agente e por missão** — identifique agentes caros e otimize
+- **Comparação de provedores** — latência P50/P95 e custos lado a lado entre provedores
 
-**Ferramentas**: Código (ler/buscar/editar/escrever/listar) · Git (commit, diff, log, status, issues/PRs/search) · Build/Deploy (build, lint, test, deploy, Docker, run_command, infra) · Segurança (SAST, scan de segredos, dependências) · MCPs (Web fetch, Knowledge graph, Playwright, GitHub) · Projeto (Jira, Confluence, fases SAFe, contexto LRM) · Memória (leitura + escrita Knowledge graph)
+### RBAC + Limitação de Taxa
+- **RBAC por workspace** — atribuições de funções por workspace, não apenas por plataforma
+- **Limitação de taxa por usuário** — cotas configuráveis de tokens/solicitações por função
+- **Trilha de auditoria** — todas as alterações de RBAC registradas com ator, timestamp e detalhe da alteração
 
-**Chips de acesso rápido**: `Stats do portfolio` · `Missões em andamento` · `Montar equipe` · `GitHub` · `AO Veligo` · `Migração Angular 16→17` · `Dívida técnica · segurança · a11y · LGPD` · `Git commit & PR` · `E2E + Screenshots` · `Sync Jira` · `Atualizar Wiki`
+### Framework de Avaliação de Agentes
+- **Pontuação LLM-como-juiz** — avaliação automatizada contra conjuntos de dados dourados em `/evals`
+- **Benchmarks por agente** — acompanhe a qualidade ao longo do tempo e detecte regressões
+- **Juízes configuráveis** — use qualquer provedor LLM configurado como juiz de avaliação
 
-**Exemplos de perguntas**
+### Construtor de Ferramentas
+- **Criação de ferramentas sem código** em `/tool-builder` — ferramentas HTTP, SQL e shell
+- **Ativação instantânea** — ferramentas disponíveis para agentes imediatamente após salvar
+- **Modelos de parâmetros** — defina esquemas de entrada com tipos e validação
 
-> *«Qual é o estado geral do portfólio? Quais projetos estão atrasados?»*
+### Workspaces Multi-Tenant
+- **Namespaces isolados** em `/workspaces` — dados, agentes e memória separados por workspace
+- **Implantação por cliente** — integre múltiplos clientes sem contaminação cruzada
+- **RBAC por workspace** — atribuições de funções granulares por namespace
 
-> *«Execute uma auditoria SAST no projeto Veligo e diga-me os 3 CVEs críticos a tratar primeiro.»*
-
-> *«Precisamos migrar a API de REST para GraphQL — qual equipe de agentes você recomenda?»*
-
-> *«Mostre-me o diff dos últimos 5 commits na branch feature/auth e resuma as mudanças.»*
-
-> *«Crie uma missão de refactoring para reduzir a complexidade ciclomática em arquivos acima de 15.»*
-
-> *«Qual é a nossa dívida técnica atual? Priorize os itens por impacto/esforço.»*
-
-> *«Escreva user stories para a funcionalidade de login SSO Azure AD e abra os tickets no Jira.»*
-
-> *«Execute os testes E2E do Playwright e capture screenshots das páginas críticas.»*
-
-> *«Compare nossas métricas DORA deste mês com o mês anterior — onde estamos regredindo?»*
-
-> *«Atualize o wiki de arquitetura com as últimas decisões sobre a migração para PostgreSQL.»*
-
-
-### Ideação de Negócios — Equipe de Marketing 6 Agentes
-
-![Business Ideation](docs/screenshots/en/mkt_ideation.png)
-
-- **Rota** `/mkt-ideation` — acessível pela aba Ideação de Negócios na página inicial
-- **CMO Sophie Laurent** — líder de equipe com 5 especialistas de marketing
-- **Plano de marketing JSON completo** — SWOT, TAM/SAM/SOM, estratégia de marca, go-to-market, KPIs, orçamento
-- **Grafo de agentes** — visualização ig-node com fotos de avatar, arestas de colaboração, popovers de detalhe
-
-### Migração PostgreSQL + 40 Índices
-- **Migração SQLite → PostgreSQL** — scripts completos de migração de esquema e dados
-- **FTS nativo PostgreSQL** — `tsvector/tsquery` substitui FTS5, mais eficiente e escalável
-- **40+ índices PG** — cobertura abrangente de todos os caminhos de consulta frequentes
-- **Darwin Teams** — Thompson Sampling para seleção de equipes de agentes por contexto (tecnologia + fase)
+### Recarga Automática de Agentes YAML
+- **Atualizações de agentes ao vivo** — edite arquivos YAML de agentes e recarregue sem reiniciar a plataforma
+- **Sem tempo de inatividade** — missões em andamento continuam com a definição anterior do agente
 
 ## Contribuindo
 
@@ -1034,6 +998,6 @@ Este projeto é licenciado sob a Licença AGPL v3 - veja o arquivo [LICENSE](LIC
 
 ## Suporte
 
-- Demo ao Vivo: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - Issues: https://github.com/macaron-software/software-factory/issues
 - Discussões: https://github.com/macaron-software/software-factory/discussions

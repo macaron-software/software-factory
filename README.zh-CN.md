@@ -6,7 +6,17 @@
   <a href="README.ja.md">日本語</a> |
   <a href="README.pt.md">Português</a> |
   <a href="README.de.md">Deutsch</a> |
-  <a href="README.ko.md">한국어</a>
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
 </p>
 
 <div align="center">
@@ -19,7 +29,7 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
 
-**[在线演示: sf.macaron-software.com](https://sf.macaron-software.com)** — 点击 "Skip (Demo)" 即可探索
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
 
 [功能特性](#功能特性) · [快速开始](#快速开始) · [截图预览](#截图预览) · [架构设计](#架构设计) · [参与贡献](#参与贡献)
 
@@ -31,12 +41,12 @@
 
 Software Factory 是一个**自主多智能体平台**，它编排整个软件开发生命周期 — 从构思到部署 — 使用专业化 AI 智能体协同工作。
 
-可以将其视为一个**虚拟软件工厂**，其中 181 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
+可以将其视为一个**虚拟软件工厂**，其中 191 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
 
 ### 核心亮点
 
-- **181 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
-- **42 个内置工作流** — SAFe 仪式、质量门控、夜间维护、安全、知识管理
+- **191 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **36 个内置工作流** — SAFe 仪式、质量门控、夜间维护、安全、知识管理
 - **知识管理** — 4 个专用智能体、ART 知识团队、夜间 `knowledge-maintenance` 工作流
 - **内存智能** — 相关性评分、访问追踪、自动清除过期条目
 - **LLM 成本追踪** — 任务时间线标签页标题中显示每个任务的成本
@@ -185,17 +195,13 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 安装完成后，以下是从创意到可用项目的流程：
 
-### 路径 A：从创意开始（创意工坊）
+### 路径 A：询问 CTO Jarvis（最快）
 
-1. **打开创意页面** — 前往 `/ideation`（或点击侧边栏中的 "Ideation"）
-2. **描述您的创意** — 例如 *"具有实时匹配功能的企业拼车应用"*
-3. **观察智能体讨论** — 5 个专业智能体（产品经理、业务分析师、架构师、UX 设计师、安全专家）通过 SSE 流式传输实时分析您的创意
-4. **从结果创建项目** — 点击 **"Create an Epic from this idea"**。平台将：
-   - 创建一个新**项目**，包含生成的 `VISION.md` 和 CI/CD 脚手架
-   - 创建一个**史诗**，由 PO 智能体分解为功能特性和用户故事
-   - 自动配置 **TMA**（运维）、**安全** 和 **技术债务** 任务
+1. **打开首页** (`/`) — 平台从 CTO Jarvis 标签启动
+2. **输入您的项目想法** — 例如 *"用 React 和 Python 创建一个企业拼车应用的新项目"*
+3. **Jarvis（Gabriel Mercier，战略编排者）** 分析请求、创建项目、配置 SAFe 待办事项列表并启动首个任务 — 全在一次对话中完成
 
-现在您已拥有一个完整的 SAFe 待办事项列表，可以开始执行了。
+这是所有新项目的**推荐入口**。
 
 ### 路径 B：手动创建项目
 
@@ -235,7 +241,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## 功能特性
 
-### 181 个专业 AI 智能体
+### 191 个专业 AI 智能体
 
 智能体按团队组织，镜像真实软件组织结构：
 
@@ -434,7 +440,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 181 agents
+sf agents list                         # 191 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -499,8 +505,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 181 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
+          │ 191 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -605,34 +611,9 @@ Mission Created
 ### 部署架构
 
 ```
-                          Internet
-                     ┌───────┴────────┐
-                     │                │
-          ┌──────────▼─────┐  ┌───────▼────────┐
-          │ Azure VM (Prod)│  │ OVH VPS (Demo) │
-          │ sf.macaron-software.com   │  │ demo.macaron-software.com  │
-          │                │  │                │
-          │ Nginx :443     │  │ Nginx :443     │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Platform :8090 │  │ Platform :8090 │
-          │ GPT-5-mini     │  │ MiniMax-M2.5   │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ Jaeger :16686  │  │ Jaeger :16686  │
-          │   │            │  │   │            │
-          │   ▼            │  │   ▼            │
-          │ SQLite DB      │  │ SQLite DB      │
-          │ /patches (ro)  │  │                │
-          └────────────────┘  └────────────────┘
-                     │                │
-                     └───────┬────────┘
-                             │
-                    ┌────────▼────────┐
-                    │ GitHub          │
-                    │ macaron-software│
-                    │ /software-factory│
-                    └─────────────────┘
+Docker（推荐）→ http://localhost:8090
+本地（开发） → http://localhost:8090
+生产环境      → 您自己的基础设施
 ```
 
 ## 项目配置
@@ -966,63 +947,46 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ### 浏览器推送通知
 - **Web Push API (VAPID)** — 任务事件的原生浏览器推送通知
 
-## v2.3.0 新特性（2026 年 2 月）
+## v3.0.0 新功能（2026 年）
 
-### 重构导航 — 首页 + 控制台
-- **首页** (`/`) — 三个标签页：CTO Jarvis · 业务创意 · 项目创意
-- **控制台** (`/portfolio`) — 三个标签页：概览 · CTO · 业务
-- **精简侧边栏** — 仅两个入口：首页和控制台
-- **Feather SVG 图标** — 使用一致的矢量图标替换表情符号
+### 智能体市场
+- **191 个智能体已编目** — `/marketplace` 支持全文搜索，按 ART/角色/技能筛选
+- **智能体档案** — 包含工具、技能和近期会话历史的详细视图
+- **一键启动** — 从档案页面直接与任意智能体发起会话
 
-### CTO Jarvis — 战略AI顾问
+### 任务回放界面
+- **逐步回放** — 在 `/missions/{id}/replay` 重放每个智能体轮次和工具调用
+- **每步成本和令牌** — 按智能体细分的 LLM 花费明细
+- **可导出历史** — 以 JSON 格式下载回放用于调试和审计
 
-![CTO Jarvis](docs/screenshots/en/jarvis.png)
-- **持久聊天面板** — 首页专属标签页
-- **持久记忆** — 跨对话保留技术决策和会话上下文
-- **CTO 级顾问** — 协助架构决策、技术选型
-- **平台感知** — 了解当前投资组合、项目和智能体团队状态
+### LLM 指标仪表盘
+- **成本/延迟/提供商实时监控** (`/metrics`)
+- **按智能体和任务的花费** — 识别高成本智能体并优化
+- **提供商对比** — 各提供商 P50/P95 延迟和成本并排比较
 
-**工具能力**: 代码（读取/搜索/编辑/写入/列出文件）· Git（commit、diff、log、status、issues/PRs/search）· 构建/部署（build、lint、test、deploy、Docker、run_command、infra）· 安全（SAST、密钥扫描、依赖审计）· MCP（Web fetch、知识图谱、Playwright、GitHub）· 项目（Jira、Confluence、SAFe 阶段、LRM 上下文）· 记忆（知识图谱读写）
+### RBAC + 速率限制
+- **工作区范围的 RBAC** — 按工作区（而非仅按平台）分配角色
+- **按用户速率限制** — 按角色配置可调的令牌/请求配额
+- **审计跟踪** — 所有 RBAC 变更均记录行为者、时间戳和变更详情
 
-**快捷操作芯片**: `投资组合统计` · `进行中任务` · `组建团队` · `GitHub` · `AO Veligo` · `Angular 16→17 迁移` · `技术债务 · 安全 · a11y · GDPR` · `Git commit & PR` · `E2E + 截图` · `同步 Jira` · `更新 Wiki`
+### 智能体评估框架
+- **LLM 即评判者评分** — 在 `/evals` 对黄金数据集进行自动评估
+- **按智能体基准** — 追踪随时间变化的质量并检测回归
+- **可配置评判者** — 使用任意已配置的 LLM 提供商作为评估评判者
 
-**示例问题**
+### 工具构建器
+- **无代码工具创建** (`/tool-builder`) — HTTP、SQL 和 Shell 工具
+- **即时激活** — 工具保存后立即对智能体可用
+- **参数模板** — 定义带类型和验证的输入架构
 
-> *「整个投资组合的健康状况如何？哪些项目进度落后？」*
+### 多租户工作区
+- **隔离命名空间** (`/workspaces`) — 每个工作区拥有独立的数据、智能体和记忆
+- **按客户部署** — 无交叉污染地接入多个客户
+- **按工作区的 RBAC** — 每个命名空间的细粒度角色分配
 
-> *「对 Veligo 项目运行 SAST 审计，告诉我优先处理的 3 个严重 CVE。」*
-
-> *「我们需要将 API 从 REST 迁移到 GraphQL — 你推荐哪个智能体团队，从哪里开始？」*
-
-> *「显示 feature/auth 分支最近 5 次提交的 diff 并总结变更内容。」*
-
-> *「创建一个重构任务，将循环复杂度超过 15 的文件降下来。」*
-
-> *「我们目前的技术债务是什么？按影响/工作量优先排序。」*
-
-> *「为 Azure AD SSO 登录功能编写用户故事，并在 Jira 中创建工单。」*
-
-> *「运行 Playwright E2E 测试并截取关键页面的截图。」*
-
-> *「对比本月和上月的 DORA 指标 — 哪些地方在退步？」*
-
-> *「用最新的 PostgreSQL 迁移决策更新架构 wiki。」*
-
-
-### 业务创意 — 6智能体营销团队
-
-![Business Ideation](docs/screenshots/en/mkt_ideation.png)
-
-- **路由** `/mkt-ideation` — 通过首页业务创意标签页访问
-- **CMO Sophie Laurent** — 带领 5 位专业营销专家的团队负责人
-- **完整营销计划 JSON** — SWOT、TAM/SAM/SOM、品牌策略、GTM、KPI、预算
-- **智能体图谱** — ig-node 可视化，含头像照片、协作边、详情弹窗
-
-### PostgreSQL 迁移 + 40 索引
-- **SQLite → PostgreSQL 迁移** — 完整的模式和数据迁移脚本
-- **原生 PostgreSQL FTS** — `tsvector/tsquery` 替代 FTS5，性能更强、可扩展性更好
-- **40+ PG 索引** — 全面覆盖所有热点查询路径
-- **Darwin Teams** — 基于上下文（技术+阶段）的智能体团队选择 Thompson 采样
+### YAML 智能体热重载
+- **实时智能体更新** — 编辑智能体 YAML 文件并在不重启平台的情况下重新加载
+- **零停机** — 进行中的任务继续使用先前的智能体定义
 
 ## 参与贡献
 
@@ -1034,6 +998,6 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 
 ## 支持
 
-- 在线演示: https://sf.macaron-software.com
+- Live: https://sf.macaron-software.com
 - 问题反馈: https://github.com/macaron-software/software-factory/issues
 - 讨论区: https://github.com/macaron-software/software-factory/discussions
