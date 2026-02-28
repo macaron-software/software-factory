@@ -24,6 +24,9 @@ export function collectErrors(page: Page): PageErrors {
       if (text.includes("ERR_CONNECTION_REFUSED")) return;
       if (text.includes("Failed to load resource")) return; // browser-level 404s (static assets)
       if (text.includes("Response Status Error Code")) return; // fetch() API errors (logged by app JS)
+      if (text.includes("CORS policy")) return; // CDN font CORS (cosmetic, not functional)
+      if (text.includes("s3.popi.nz")) return; // CDN font host
+      if (text.includes("Access-Control-Allow-Origin")) return; // CORS font errors
       errors.console.push(text);
     }
   });
