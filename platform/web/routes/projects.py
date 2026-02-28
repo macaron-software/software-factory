@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import select
+import pty
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import (
     HTMLResponse,
     JSONResponse,
@@ -2994,3 +2997,320 @@ async def project_wallet(project_id: str):
         )
     finally:
         db.close()
+
+
+# ── Package Manager ──────────────────────────────────────────────────────────
+
+_PKG_MANAGERS = {
+    "package.json": {
+        "type": "npm",
+        "list_cmd": ["npm", "list", "--depth=0", "--json"],
+        "install_cmd": ["npm", "install"],
+        "install_pkg_cmd": ["npm", "install"],
+    },
+    "requirements.txt": {
+        "type": "pip",
+        "list_cmd": ["pip", "list", "--format=json"],
+        "install_cmd": ["pip", "install", "-r", "requirements.txt"],
+        "install_pkg_cmd": ["pip", "install"],
+    },
+    "pyproject.toml": {
+        "type": "pip",
+        "list_cmd": ["pip", "list", "--format=json"],
+        "install_cmd": ["pip", "install", "-e", "."],
+        "install_pkg_cmd": ["pip", "install"],
+    },
+    "Cargo.toml": {
+        "type": "cargo",
+        "list_cmd": ["cargo", "tree", "--depth=1"],
+        "install_cmd": ["cargo", "build"],
+        "install_pkg_cmd": ["cargo", "add"],
+    },
+    "pom.xml": {
+        "type": "maven",
+        "list_cmd": ["mvn", "dependency:list", "-q"],
+        "install_cmd": ["mvn", "install", "-q"],
+        "install_pkg_cmd": None,
+    },
+    "build.gradle": {
+        "type": "gradle",
+        "list_cmd": [
+            "gradle",
+            "dependencies",
+            "--configuration=runtimeClasspath",
+            "-q",
+        ],
+        "install_cmd": ["gradle", "build", "-q"],
+        "install_pkg_cmd": None,
+    },
+}
+
+
+def _detect_pkg_manager(project_path: str) -> tuple[str, dict] | tuple[None, None]:
+    """Return (manifest_file, manager_info) or (None, None)."""
+    p = Path(project_path)
+    for manifest, info in _PKG_MANAGERS.items():
+        if (p / manifest).exists():
+            return manifest, info
+    return None, None
+
+
+async def _run_cmd_safe(cmd: list[str], cwd: str, timeout: int = 30) -> str:
+    """Run a command and return stdout+stderr as string. Never raises."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=cwd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+        return out.decode(errors="replace")
+    except asyncio.TimeoutError:
+        return f"[timeout after {timeout}s]"
+    except FileNotFoundError:
+        return f"[command not found: {cmd[0]}]"
+    except Exception as exc:
+        return f"[error: {exc}]"
+
+
+def _parse_npm_list(raw: str) -> list[dict]:
+    """Parse npm list --json output into [{name, version, dev}]."""
+    try:
+        data = json.loads(raw)
+        deps = data.get("dependencies", {})
+        result = []
+        for name, info in deps.items():
+            result.append(
+                {
+                    "name": name,
+                    "version": info.get("version", "?"),
+                    "dev": False,
+                }
+            )
+        return sorted(result, key=lambda x: x["name"])
+    except Exception:
+        return []
+
+
+def _parse_pip_list(raw: str) -> list[dict]:
+    """Parse pip list --format=json output."""
+    try:
+        pkgs = json.loads(raw)
+        return [
+            {"name": p["name"], "version": p["version"], "dev": False} for p in pkgs
+        ]
+    except Exception:
+        return []
+
+
+def _parse_generic_list(raw: str, pkg_type: str) -> list[dict]:
+    """Parse cargo tree / maven / gradle output as raw lines."""
+    lines = [
+        ln.strip() for ln in raw.splitlines() if ln.strip() and not ln.startswith("[")
+    ]
+    return [
+        {"name": ln[:80], "version": "", "dev": False, "raw": True} for ln in lines[:50]
+    ]
+
+
+@router.get("/api/projects/{project_id}/workspace/packages")
+async def ws_packages(project_id: str, request: Request):
+    """List installed packages for the project."""
+    from ..auth_middleware import require_auth
+
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+    from ..projects.registry import get_project_registry
+
+    proj = get_project_registry().get(project_id)
+    if not proj or not proj.path or not Path(proj.path).is_dir():
+        return JSONResponse({"manifest": None, "type": None, "packages": []})
+
+    manifest, info = _detect_pkg_manager(proj.path)
+    if not manifest:
+        return JSONResponse({"manifest": None, "type": None, "packages": []})
+
+    raw = await _run_cmd_safe(info["list_cmd"], proj.path, timeout=20)
+    pkg_type = info["type"]
+
+    if pkg_type == "npm":
+        packages = _parse_npm_list(raw)
+    elif pkg_type == "pip":
+        packages = _parse_pip_list(raw)
+    else:
+        packages = _parse_generic_list(raw, pkg_type)
+
+    # Also read manifest for declared deps
+    manifest_content = ""
+    try:
+        manifest_content = (Path(proj.path) / manifest).read_text(errors="replace")[
+            :3000
+        ]
+    except Exception:
+        pass
+
+    return JSONResponse(
+        {
+            "manifest": manifest,
+            "type": pkg_type,
+            "packages": packages,
+            "manifest_preview": manifest_content[:500],
+            "count": len(packages),
+        }
+    )
+
+
+@router.post("/api/projects/{project_id}/workspace/packages/install")
+async def ws_packages_install(project_id: str, request: Request):
+    """Install a package or run the full install command. Returns SSE stream."""
+    from ..auth_middleware import require_auth
+
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"detail": "Authentication required"}, status_code=401)
+
+    body = await _parse_body(request)
+    package_name = (body.get("package") or "").strip()
+
+    from ..projects.registry import get_project_registry
+
+    proj = get_project_registry().get(project_id)
+    if not proj or not proj.path or not Path(proj.path).is_dir():
+        return JSONResponse({"ok": False, "error": "Project path not found"})
+
+    manifest, info = _detect_pkg_manager(proj.path)
+    if not manifest:
+        return JSONResponse({"ok": False, "error": "No package manager detected"})
+
+    if package_name and info["install_pkg_cmd"]:
+        cmd = info["install_pkg_cmd"] + [package_name]
+    else:
+        cmd = info["install_cmd"]
+
+    async def _stream():
+        yield f"data: $ {' '.join(cmd)}\n\n"
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                cwd=proj.path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            async for line in proc.stdout:
+                text = line.decode(errors="replace").rstrip()
+                yield f"data: {text}\n\n"
+            await asyncio.wait_for(proc.wait(), timeout=120)
+            code = proc.returncode
+            yield f"data: [exit {code}]\n\n"
+            yield "data: [DONE]\n\n"
+        except asyncio.TimeoutError:
+            yield "data: [timeout after 120s]\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as exc:
+            yield f"data: [error: {exc}]\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(_stream(), media_type="text/event-stream")
+
+
+# ── PTY WebSocket Terminal ─────────────────────────────────────────────────────
+
+
+@router.websocket("/api/projects/{project_id}/workspace/terminal")
+async def ws_terminal(websocket: WebSocket, project_id: str):
+    """True PTY terminal over WebSocket. Client sends bytes; server streams PTY output."""
+    await websocket.accept()
+
+    from ..projects.registry import get_project_registry
+
+    proj = get_project_registry().get(project_id)
+    cwd = proj.path if proj and proj.path and Path(proj.path).is_dir() else "/tmp"
+
+    master_fd, slave_fd = pty.openpty()
+
+    proc = await asyncio.create_subprocess_exec(
+        "bash",
+        "--login",
+        stdin=slave_fd,
+        stdout=slave_fd,
+        stderr=slave_fd,
+        cwd=cwd,
+        env={**os.environ, "TERM": "xterm-256color", "COLUMNS": "220", "LINES": "50"},
+        close_fds=True,
+    )
+    os.close(slave_fd)
+
+    loop = asyncio.get_event_loop()
+    alive = True
+
+    async def _read_pty():
+        nonlocal alive
+        try:
+            while alive and proc.returncode is None:
+                ready, _, _ = await loop.run_in_executor(
+                    None, lambda: select.select([master_fd], [], [], 0.05)
+                )
+                if ready:
+                    try:
+                        data = os.read(master_fd, 4096)
+                    except OSError:
+                        break
+                    if data:
+                        await websocket.send_bytes(data)
+        except Exception:
+            pass
+        finally:
+            alive = False
+
+    async def _read_ws():
+        nonlocal alive
+        try:
+            while alive:
+                msg = await websocket.receive()
+                if msg["type"] == "websocket.disconnect":
+                    break
+                raw = msg.get("bytes") or (msg.get("text") or "").encode()
+                if not raw:
+                    continue
+                # Handle resize JSON: {"type":"resize","cols":N,"rows":N}
+                try:
+                    jmsg = json.loads(raw)
+                    if jmsg.get("type") == "resize":
+                        import struct
+                        import fcntl
+                        import termios
+
+                        cols, rows = (
+                            int(jmsg.get("cols", 80)),
+                            int(jmsg.get("rows", 24)),
+                        )
+                        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+                        fcntl.ioctl(master_fd, termios.TIOCSWINSZ, winsize)
+                        continue
+                except Exception:
+                    pass
+                os.write(master_fd, raw)
+        except (WebSocketDisconnect, Exception):
+            pass
+        finally:
+            alive = False
+
+    try:
+        await asyncio.gather(_read_pty(), _read_ws())
+    finally:
+        alive = False
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+        try:
+            os.close(master_fd)
+        except Exception:
+            pass
+        try:
+            await websocket.close()
+        except Exception:
+            pass
