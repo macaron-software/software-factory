@@ -3,7 +3,7 @@ name: Deploy → Azure Prod
 on:
   push:
     branches: [main]
-  workflow_dispatch:  # allow manual trigger + GitLab CI dispatch
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -17,26 +17,47 @@ jobs:
           echo "${{ secrets.AZURE_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          echo -e "Host *\n  StrictHostKeyChecking no\n  ConnectTimeout 15" >> ~/.ssh/config
+          echo -e "Host *\n  StrictHostKeyChecking no\n  ConnectTimeout 20\n  ServerAliveInterval 10" >> ~/.ssh/config
 
-      - name: Rsync to Azure VM
+      - name: Rsync platform code to VM
         run: |
           rsync -az --delete \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude 'data/' \
             --exclude 'workspaces/' \
-            platform cli skills dashboard mcp_lrm \
-            azureadmin@${{ secrets.AZURE_IP }}:/home/azureadmin/macaron_update/
+            platform/ \
+            azureadmin@${{ secrets.AZURE_IP }}:/home/azureadmin/macaron_update/platform/
 
-      - name: Deploy into container
+      - name: Deploy into container + restart
         run: |
           ssh azureadmin@${{ secrets.AZURE_IP }} '
-            CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "platform-platform" | head -1)
-            [ -z "$CONTAINER" ] && echo "ERROR: no container" && exit 1
-            docker cp /home/azureadmin/macaron_update/platform/. $CONTAINER:/app/macaron_platform/
-            docker exec $CONTAINER find /app/macaron_platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-            docker stop $CONTAINER && sleep 3 && docker start $CONTAINER
-            sleep 8
-            docker exec $CONTAINER curl -sf http://localhost:8099/api/health && echo "OK" || echo "WARN: health check failed"
+            set -e
+
+            # Target container: always deploy-platform-1
+            CONTAINER="deploy-platform-1"
+
+            # Ensure old parallel containers are stopped and wont restart
+            for OLD in platform-platform-1; do
+              if docker ps -q --filter name="^/${OLD}$" | grep -q .; then
+                echo "Stopping old container: $OLD"
+                docker stop "$OLD" 2>/dev/null || true
+              fi
+              docker update --restart=no "$OLD" 2>/dev/null || true
+            done
+
+            # Full copy of platform code into container
+            docker cp /home/azureadmin/macaron_update/platform/. "$CONTAINER":/app/macaron_platform/
+
+            # Clear pyc cache
+            docker exec "$CONTAINER" find /app/macaron_platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+            # Graceful restart
+            docker restart "$CONTAINER"
+            sleep 20
+
+            # Health check (port 8090 internal)
+            HTTP=$(docker exec "$CONTAINER" curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo "000")
+            echo "Container health: $HTTP"
+            [ "$HTTP" = "200" ] && echo "Deploy OK" || { echo "WARN: health=$HTTP — checking logs"; docker logs --tail=20 "$CONTAINER" 2>&1 | tail -10; }
           '
