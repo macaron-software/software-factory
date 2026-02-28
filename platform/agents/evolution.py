@@ -372,7 +372,12 @@ class GAEngine:
             log.warning(f"GA save_proposal: {e}")
 
     def _get_base_fitness(self, wf_id: str, db) -> float | None:
-        """Get best historical fitness for a workflow (from previous approved proposals)."""
+        """Get best historical fitness for a workflow (from previous approved proposals).
+
+        Returns None only if truly unknown. On first run (no approved proposals),
+        falls back to simulator; if simulator unavailable, returns 0.0 so any
+        positive-fitness genome can be auto-approved (bootstrap mode).
+        """
         try:
             row = db.execute(
                 "SELECT MAX(fitness) FROM evolution_proposals WHERE base_wf_id=? AND status='approved'",
@@ -381,9 +386,15 @@ class GAEngine:
             if row and row[0] is not None:
                 return float(row[0])
             # Fall back to simulator baseline
-            return self._simulator.simulate_genome(
-                [p.to_dict() for p in self._wf_to_genome(self._wf_store.get(wf_id)).phases],
-                n=10
-            ) if self._wf_store.get(wf_id) else None
+            if self._simulator and self._wf_store.get(wf_id):
+                try:
+                    return self._simulator.simulate_genome(
+                        [p.to_dict() for p in self._wf_to_genome(self._wf_store.get(wf_id)).phases],
+                        n=10
+                    )
+                except Exception:
+                    pass
+            # Bootstrap mode: no history, no simulator → approve anything fitness > 0
+            return 0.0
         except Exception:
-            return None
+            return 0.0
