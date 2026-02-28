@@ -43,7 +43,7 @@ def _get_project_domain(project_id: str) -> str:
         if not p.exists():
             return ""
         data = _yaml.safe_load(p.read_text()) or {}
-        return data.get("domain", "") or ""
+        return data.get("project", {}).get("domain", "") or data.get("domain", "") or ""
     except Exception:
         return ""
 

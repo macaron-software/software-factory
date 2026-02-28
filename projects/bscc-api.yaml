@@ -1,0 +1,41 @@
+# BSCC — API Backend Services
+# ============================
+# Projet domaine bscc — guidelines DSI + Solaris obligatoire
+
+project:
+  name: bscc-api
+  display_name: "BSCC API Backend"
+  root_path: /app/workspace/bscc-api
+  vision_doc: CLAUDE.md
+  domain: bscc
+  description: >
+    API REST backend des services BSCC.
+    Contraintes DSI : Java 17, Spring Boot, PostgreSQL, OpenAPI.
+
+domains:
+  java:
+    paths: [src/]
+    extensions: [.java]
+    build_cmd: mvn package -q
+    test_cmd: mvn test -q
+    lint_cmd: mvn checkstyle:check
+
+deploy:
+  strategy: canary
+  auto_prod: false
+  rollback_on_fail: true
+
+fractal:
+  enabled: true
+  max_files: 5
+  max_loc: 400
+  max_depth: 3
+
+adversarial:
+  threshold: 5
+  core_patterns: true
+  security_check: true
+
+analyzers:
+  - java
+  - security
