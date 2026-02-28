@@ -67,6 +67,19 @@
 .world-legend{position:absolute;right:12px;bottom:12px;display:flex;gap:10px;background:rgba(15,13,26,0.85);padding:6px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.15)}
 .wl-item{display:flex;align-items:center;gap:4px;font-size:0.62rem;color:var(--text-secondary)}
 .wl-diamond{width:8px;height:8px;transform:rotate(45deg);border-radius:1px}
+
+/* ── GPU Settings Panel ── */
+.world-gpu-btn{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(15,13,26,0.85);border:1px solid rgba(124,58,237,0.3);border-radius:8px;padding:4px 8px;color:var(--purple-light);font-size:0.65rem;cursor:pointer;display:flex;align-items:center;gap:4px;transition:all .15s}
+.world-gpu-btn:hover{background:rgba(124,58,237,0.15)}
+.world-gpu-panel{position:absolute;left:12px;top:50%;transform:translateY(-50%);background:rgba(15,13,26,0.95);backdrop-filter:blur(12px);border:1px solid rgba(124,58,237,0.3);border-radius:10px;padding:12px 14px;display:none;z-index:20;min-width:190px}
+.world-gpu-panel.open{display:block}
+.wgp-title{font-size:0.7rem;color:var(--purple-light);font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+.wgp-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;font-size:0.68rem;color:var(--text-secondary)}
+.wgp-row select{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:2px 4px;font-size:0.65rem;cursor:pointer}
+.wgp-badge{font-size:0.6rem;padding:1px 5px;border-radius:4px;font-weight:600}
+.wgp-badge.webgpu{background:rgba(34,197,94,0.2);color:#22c55e}
+.wgp-badge.webgl{background:rgba(59,130,246,0.2);color:#3b82f6}
+.wgp-fps{font-size:0.65rem;color:var(--text-muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--border)}
 </style>
 
 <div class="world-wrap">
@@ -113,6 +126,43 @@
             <div class="wl-item"><div class="wl-diamond" style="background:#a855f7"></div> Waiting</div>
             <div class="wl-item"><div class="wl-diamond" style="background:#ef4444"></div> Error</div>
         </div>
+
+        <!-- GPU Settings -->
+        <button class="world-gpu-btn" id="gpu-settings-btn" onclick="document.getElementById('gpu-panel').classList.toggle('open');this.style.display='none'">⚡ GPU</button>
+        <div class="world-gpu-panel" id="gpu-panel">
+            <div class="wgp-title">
+                GPU Settings
+                <button onclick="document.getElementById('gpu-panel').classList.remove('open');document.getElementById('gpu-settings-btn').style.display=''" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:0.9rem">✕</button>
+            </div>
+            <div class="wgp-row">
+                Renderer <span class="wgp-badge webgl" id="gpu-badge">WebGL</span>
+            </div>
+            <div class="wgp-row">
+                Shadows
+                <select id="opt-shadows" onchange="applyGpuOpt()">
+                    <option value="basic">Basic</option>
+                    <option value="soft" selected>Soft (PCF)</option>
+                    <option value="off">Off</option>
+                </select>
+            </div>
+            <div class="wgp-row">
+                Pixel Ratio
+                <select id="opt-dpr" onchange="applyGpuOpt()">
+                    <option value="1">1× (fast)</option>
+                    <option value="1.5" selected>1.5×</option>
+                    <option value="2">2× (sharp)</option>
+                </select>
+            </div>
+            <div class="wgp-row">
+                FPS cap
+                <select id="opt-fps" onchange="applyGpuOpt()">
+                    <option value="60" selected>60 fps</option>
+                    <option value="30">30 fps</option>
+                    <option value="0">Unlimited</option>
+                </select>
+            </div>
+            <div class="wgp-fps" id="fps-counter">— fps</div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -129,6 +179,16 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// WebGPU renderer — try to import, fall back gracefully
+let WebGPURenderer = null;
+let WebGPU = null;
+try {
+    const wgpuMod = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
+    const capsMod = await import('three/addons/capabilities/WebGPU.js');
+    WebGPURenderer = wgpuMod.default;
+    WebGPU = capsMod.default;
+} catch (_) { /* WebGPU module not available — use WebGL */ }
 
 // ═══════════════════════════════════════════════════════════════
 // MACARON WORLD — 3D Sims-like Agent Visualization
@@ -208,6 +268,12 @@ let agents = {};  // id → { mesh, data, target, status, walkPhase, ... }
 let raycaster, mouse;
 let selectedAgent = null;
 let particleSystems = [];
+// Performance: cached animated objects (avoids scene.traverse every frame)
+let pulseObjects = [];   // isPulse meshes
+let conveyorCubes = [];  // moving belt cubes
+// GPU perf settings
+let gpuOpts = { fpsCap: 60, lastFrame: 0 };
+let fpsFrames = 0, fpsTime = 0, fpsLast = 0;
 // Day/Night scene references
 let sceneRefs = { ambient: null, dir: null, fill: null, hemi: null, floor: null, grid: null, zoneMeshes: [], trees: [], skyDome: null, fountain: null, stars: null };
 
@@ -219,7 +285,7 @@ function setLoadProgress(pct) { loadBar.style.width = pct + '%'; }
 // ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
-function init() {
+async function init() {
     setLoadProgress(10);
     const canvas = document.getElementById('world-canvas');
 
@@ -233,12 +299,24 @@ function init() {
     camera.position.set(40, 35, 40);
     camera.lookAt(0, 0, 0);
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    // Renderer — try WebGPU first, fall back to WebGL
+    let useWebGPU = false;
+    if (WebGPU && WebGPURenderer && WebGPU.isAvailable()) {
+        try {
+            renderer = new WebGPURenderer({ canvas, antialias: true });
+            await renderer.init();
+            useWebGPU = true;
+            const badge = document.getElementById('gpu-badge');
+            if (badge) { badge.textContent = 'WebGPU'; badge.className = 'wgp-badge webgpu'; }
+        } catch (_) { renderer = null; }
+    }
+    if (!renderer) {
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    }
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.BasicShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.4;
 
@@ -317,7 +395,7 @@ function buildLighting() {
     const dir = new THREE.DirectionalLight(t.dirColor, t.dirI);
     dir.position.set(20, 30, 15);
     dir.castShadow = true;
-    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.mapSize.set(1024, 1024);
     dir.shadow.camera.left = -40; dir.shadow.camera.right = 40;
     dir.shadow.camera.top = 40; dir.shadow.camera.bottom = -40;
     dir.shadow.camera.near = 1; dir.shadow.camera.far = 80;
@@ -396,7 +474,6 @@ function buildZones() {
 // ═══════════════════════════════════════════════════════
 // MISSION BUILDINGS — walls + conveyors + phase stations
 // ═══════════════════════════════════════════════════════
-let conveyorCubes = []; // animated cubes on belts
 
 function buildMissionBuildings() {
     const wallMat = new THREE.MeshStandardMaterial({
@@ -479,6 +556,7 @@ function buildMissionBuildings() {
                 pulse.position.set(px, 0.8, mz.z);
                 pulse.userData.isPulse = true;
                 scene.add(pulse);
+                pulseObjects.push(pulse);
             }
 
             // Done checkmark
@@ -1002,8 +1080,30 @@ function buildAmbientParticles() {
 // ═══════════════════════════════════════════════════════
 function animate() {
     requestAnimationFrame(animate);
+
+    // Pause when tab not visible
+    if (document.hidden) return;
+
+    // FPS cap
+    if (gpuOpts.fpsCap > 0) {
+        const now = performance.now();
+        const interval = 1000 / gpuOpts.fpsCap;
+        if (now - gpuOpts.lastFrame < interval - 0.5) return;
+        gpuOpts.lastFrame = now;
+    }
+
     const dt = Math.min(clock.getDelta(), 0.05);
     const elapsed = clock.getElapsedTime();
+
+    // FPS counter (update every second)
+    fpsFrames++;
+    fpsTime += dt;
+    if (fpsTime >= 1.0) {
+        fpsLast = Math.round(fpsFrames / fpsTime);
+        fpsFrames = 0; fpsTime = 0;
+        const el = document.getElementById('fps-counter');
+        if (el) el.textContent = fpsLast + ' fps';
+    }
 
     controls.update();
 
@@ -1013,20 +1113,12 @@ function animate() {
         animateAgent(ag, dt, elapsed);
     }
 
-    // Blink server LEDs
-    scene.traverse(obj => {
-        if (obj.userData.isLED) {
-            const v = Math.sin(elapsed * obj.userData.blinkSpeed + obj.userData.blinkOffset);
-            obj.material.opacity = 0.3 + v * 0.7;
-            obj.visible = v > -0.3;
-        }
-        // Pulse running phase indicators
-        if (obj.userData.isPulse) {
-            const s = 0.8 + Math.sin(elapsed * 3) * 0.3;
-            obj.scale.setScalar(s);
-            obj.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 4) * 0.4;
-        }
-    });
+    // Pulse running phase indicators (cached array — no scene.traverse)
+    for (const obj of pulseObjects) {
+        const s = 0.8 + Math.sin(elapsed * 3) * 0.3;
+        obj.scale.setScalar(s);
+        obj.material.emissiveIntensity = 0.5 + Math.sin(elapsed * 4) * 0.4;
+    }
 
     // Conveyor cubes — ping-pong animation
     for (const cc of conveyorCubes) {
@@ -1582,6 +1674,29 @@ function onResize() {
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
 }
+
+// ═══════════════════════════════════════════════════════
+// GPU SETTINGS
+// ═══════════════════════════════════════════════════════
+window.applyGpuOpt = function() {
+    const shadows = document.getElementById('opt-shadows')?.value || 'basic';
+    const dpr = parseFloat(document.getElementById('opt-dpr')?.value || '1.5');
+    const fpsCap = parseInt(document.getElementById('opt-fps')?.value || '60', 10);
+
+    if (renderer.shadowMap) {
+        if (shadows === 'off') {
+            renderer.shadowMap.enabled = false;
+        } else {
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = shadows === 'soft' ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
+        }
+        // Force shadow map refresh
+        scene.traverse(o => { if (o.isMesh) o.material.needsUpdate = true; });
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, dpr));
+    gpuOpts.fpsCap = fpsCap;
+    gpuOpts.lastFrame = 0;
+};
 
 // ═══════════════════════════════════════════════════════
 // BOOTSTRAP
