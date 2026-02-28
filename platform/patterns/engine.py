@@ -274,7 +274,9 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     fail_lines = []
     for line in results.split("\n"):
         line_lower = line.lower()
-        if any(kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")):
+        if any(
+            kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")
+        ):
             if "npm install: OK" not in line and "0 failures" not in line_lower:
                 fail_lines.append(line.strip())
 
@@ -287,7 +289,11 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
         db = get_db()
         for i, fail in enumerate(fail_lines[:5]):  # max 5 tickets per run
             tid = str(uuid.uuid4())[:8]
-            title = fail[:120] if len(fail) > 10 else f"Auto-detected {source} failure #{i + 1}"
+            title = (
+                fail[:120]
+                if len(fail) > 10
+                else f"Auto-detected {source} failure #{i + 1}"
+            )
             severity = "high" if "error" in fail.lower() else "medium"
             db.execute(
                 "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
@@ -304,7 +310,9 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
             )
         db.commit()
         db.close()
-        logger.info("Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source)
+        logger.info(
+            "Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source
+        )
     except Exception as e:
         logger.warning("Failed to auto-create tickets: %s", e)
 
@@ -373,7 +381,13 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
             db.execute(
                 "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, created_at) "
                 "VALUES (?, ?, ?, ?, ?, 'backlog', datetime('now'))",
-                (fid, mission_id, name_clean, "Auto-extracted from PM decomposition", priority),
+                (
+                    fid,
+                    mission_id,
+                    name_clean,
+                    "Auto-extracted from PM decomposition",
+                    priority,
+                ),
             )
             feature_ids[f"E{i + 1}"] = fid
 
@@ -464,7 +478,10 @@ def _auto_extract_requirements(description: str, mission_id: str):
                 sub_id = f"REQ-{prefix}-{num.zfill(2)}.{j}"
                 # Clean up sub-item: remove leading articles, trailing whitespace
                 sub_clean = re.sub(
-                    r"^(le |la |les |l\'|un |une |des |du )", "", sub.strip(), flags=re.IGNORECASE
+                    r"^(le |la |les |l\'|un |une |des |du )",
+                    "",
+                    sub.strip(),
+                    flags=re.IGNORECASE,
                 ).strip()
                 if len(sub_clean) < 3:
                     continue
@@ -488,22 +505,35 @@ def _auto_extract_requirements(description: str, mission_id: str):
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
-    """Build team awareness: who's on the team, what's the communication flow."""
+    """Build team awareness: who's on the team, what completed peers have produced."""
     parts = []
     current = run.nodes.get(current_node)
     if not current or not current.agent:
         return ""
 
-    # List team members
-    team = []
+    # List team members + inject completed peer outputs (truncated)
+    team_pending = []
+    team_completed = []
     for nid, ns in run.nodes.items():
         if ns.agent and nid != current_node:
-            status = ""
             if ns.status == NodeStatus.COMPLETED and ns.output:
-                status = " (has already contributed)"
-            team.append(f"  - {ns.agent.name} ({ns.agent.role}){status}")
-    if team:
-        parts.append("[Your team]:\n" + "\n".join(team))
+                # Inject a trimmed version so this agent can build on it
+                preview = (ns.output or "").strip()[:600]
+                if len(ns.output) > 600:
+                    preview += "…"
+                team_completed.append(
+                    f"  - {ns.agent.name} ({ns.agent.role}) — already contributed:\n"
+                    f"    > {preview}"
+                )
+            else:
+                team_pending.append(f"  - {ns.agent.name} ({ns.agent.role})")
+
+    if team_completed:
+        parts.append(
+            "[Team — completed contributions]:\n" + "\n\n".join(team_completed)
+        )
+    if team_pending:
+        parts.append("[Team — also working on this]:\n" + "\n".join(team_pending))
 
     # Who are you addressing?
     if to_agent_id and to_agent_id not in ("all", "session"):
@@ -549,7 +579,10 @@ async def run_pattern(
             if agent is None:
                 try:
                     from ..agents.selection import select_agent_for_role
-                    agent = select_agent_for_role(agent_id, task_domain=_task_domain, project_id=project_id or "")
+
+                    agent = select_agent_for_role(
+                        agent_id, task_domain=_task_domain, project_id=project_id or ""
+                    )
                 except Exception:
                     pass
         run.nodes[nid] = NodeState(node_id=nid, agent_id=agent_id, agent=agent)
@@ -612,7 +645,8 @@ async def run_pattern(
         run.finished = True
         has_vetoes = any(n.status == NodeStatus.VETOED for n in run.nodes.values())
         all_ok = all(
-            n.status in (NodeStatus.COMPLETED, NodeStatus.PENDING) for n in run.nodes.values()
+            n.status in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+            for n in run.nodes.values()
         )
         run.success = all_ok and not has_vetoes
     except Exception as e:
@@ -728,7 +762,9 @@ async def _execute_node(
                     from ..agents.tool_runner import _tool_run_e2e_tests
 
                     e2e_result = await _tool_run_e2e_tests({}, ctx)
-                    full_task += f"\n\n## E2E Test Results (auto-executed)\n{e2e_result}"
+                    full_task += (
+                        f"\n\n## E2E Test Results (auto-executed)\n{e2e_result}"
+                    )
                     # Auto-create TMA tickets for failures found
                     _auto_create_tickets_from_results(e2e_result, ctx, "qa")
                 except Exception as e:
@@ -754,9 +790,7 @@ Create these files:
 
 This is BLOCKING: developers cannot start without your design tokens."""
                     else:
-                        full_task += (
-                            "\n\n## Design System Status: EXISTS — review and improve if needed."
-                        )
+                        full_task += "\n\n## Design System Status: EXISTS — review and improve if needed."
                 except Exception:
                     pass
         elif "lead" in role_lower or "architect" in role_lower:
@@ -845,7 +879,10 @@ This is BLOCKING: developers cannot start without your design tokens."""
             elif kind == "result":
                 result = value
         logger.warning(
-            "STREAM_DONE agent=%s deltas=%d think=%d", agent.id, delta_count, think_chunks
+            "STREAM_DONE agent=%s deltas=%d think=%d",
+            agent.id,
+            delta_count,
+            think_chunks,
         )
     except Exception as exc:
         logger.error("Streaming failed for %s, falling back: %s", agent.id, exc)
@@ -857,12 +894,19 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # Strip <think> and tool-call artifacts from final content
     content = result.content or ""
     if "<think>" in content:
-        content = _re.sub(r"<think>.*?</think>\s*", "", content, flags=_re.DOTALL).strip()
+        content = _re.sub(
+            r"<think>.*?</think>\s*", "", content, flags=_re.DOTALL
+        ).strip()
     if "<minimax:tool_call>" in content or "<tool_call>" in content:
         content = _re.sub(
-            r"<minimax:tool_call>.*?</minimax:tool_call>\s*", "", content, flags=_re.DOTALL
+            r"<minimax:tool_call>.*?</minimax:tool_call>\s*",
+            "",
+            content,
+            flags=_re.DOTALL,
         ).strip()
-        content = _re.sub(r"<tool_call>.*?</tool_call>\s*", "", content, flags=_re.DOTALL).strip()
+        content = _re.sub(
+            r"<tool_call>.*?</tool_call>\s*", "", content, flags=_re.DOTALL
+        ).strip()
     if content != (result.content or ""):
         result = ExecutionResult(
             content=content,
@@ -1046,9 +1090,15 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     # Strip think/tool artifacts
                     if "<think>" in retry_content:
                         retry_content = _re.sub(
-                            r"<think>.*?</think>\s*", "", retry_content, flags=_re.DOTALL
+                            r"<think>.*?</think>\s*",
+                            "",
+                            retry_content,
+                            flags=_re.DOTALL,
                         ).strip()
-                    if "<minimax:tool_call>" in retry_content or "<tool_call>" in retry_content:
+                    if (
+                        "<minimax:tool_call>" in retry_content
+                        or "<tool_call>" in retry_content
+                    ):
                         retry_content = _re.sub(
                             r"<minimax:tool_call>.*?</minimax:tool_call>\s*",
                             "",
@@ -1056,7 +1106,10 @@ This is BLOCKING: developers cannot start without your design tokens."""
                             flags=_re.DOTALL,
                         ).strip()
                         retry_content = _re.sub(
-                            r"<tool_call>.*?</tool_call>\s*", "", retry_content, flags=_re.DOTALL
+                            r"<tool_call>.*?</tool_call>\s*",
+                            "",
+                            retry_content,
+                            flags=_re.DOTALL,
                         ).strip()
                     # Use retry output
                     result = retry_result
@@ -1071,7 +1124,9 @@ This is BLOCKING: developers cannot start without your design tokens."""
                         _adv_attempt + 2,
                     )
                 except Exception as retry_err:
-                    logger.error("Adversarial retry failed for %s: %s", agent.id, retry_err)
+                    logger.error(
+                        "Adversarial retry failed for %s: %s", agent.id, retry_err
+                    )
                     break
             else:
                 # No retries — pass with rejection warning (forward progress > perfection)
@@ -1087,7 +1142,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # Track rejection in agent scores + update quality_score
                 try:
                     from ..db.migrations import get_db
-                    import time as _time
 
                     db = get_db()
                     db.execute(
@@ -1136,7 +1190,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
                         _db.commit()
                         logger.info(
                             "Auto-closed %d open quality_rejection incidents for %s (Thompson escalation active)",
-                            open_count, agent.id,
+                            open_count,
+                            agent.id,
                         )
                     else:
                         create_platform_incident(
@@ -1242,15 +1297,21 @@ This is BLOCKING: developers cannot start without your design tokens."""
             import re as _re2
 
             # Strip tool call artifacts, JSON blobs, and filler
-            clean = _re2.sub(r'\{["\'](?:path|name|command|args)["\'].*?\}', "", content)
-            clean = _re2.sub(r"\[TOOL_CALL\].*?\[/TOOL_CALL\]", "", clean, flags=_re2.DOTALL)
+            clean = _re2.sub(
+                r'\{["\'](?:path|name|command|args)["\'].*?\}', "", content
+            )
+            clean = _re2.sub(
+                r"\[TOOL_CALL\].*?\[/TOOL_CALL\]", "", clean, flags=_re2.DOTALL
+            )
             clean = _re2.sub(
                 r"(?:Now |)(?:Calling|Searching|Looking|Reading|Inspecting)\s+\w+.*?(?:\n|\.\.\.)",
                 "",
                 clean,
             )
             clean = _re2.sub(
-                r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n", "", clean
+                r"(?:J'examine|Je vais|Let me|I'll inspect|I'll check|I will now).*?\n",
+                "",
+                clean,
             )
             clean = clean.strip()
 
@@ -1297,7 +1358,9 @@ This is BLOCKING: developers cannot start without your design tokens."""
             if facts:
                 summary = "\n".join(facts[:8])
             else:
-                paragraphs = [p.strip() for p in clean.split("\n\n") if len(p.strip()) > 40]
+                paragraphs = [
+                    p.strip() for p in clean.split("\n\n") if len(p.strip()) > 40
+                ]
                 summary = paragraphs[0][:300] if paragraphs else clean[:300]
 
             # Use semantic category based on agent role
@@ -1310,9 +1373,17 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 cat = "development"
             elif "secu" in role_lower:
                 cat = "security"
-            elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
+            elif (
+                "devops" in role_lower
+                or "sre" in role_lower
+                or "pipeline" in role_lower
+            ):
                 cat = "infrastructure"
-            elif "product" in role_lower or "business" in role_lower or "po" in role_lower:
+            elif (
+                "product" in role_lower
+                or "business" in role_lower
+                or "po" in role_lower
+            ):
                 cat = "product"
             elif "ux" in role_lower or "design" in role_lower:
                 cat = "design"
@@ -1356,9 +1427,13 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     (
                         agent.id,
                         run.session_id,
-                        json.dumps({"key": f"{agent.name}:{cat}", "category": cat, "auto": True})[
-                            :1000
-                        ],
+                        json.dumps(
+                            {
+                                "key": f"{agent.name}:{cat}",
+                                "category": cat,
+                                "auto": True,
+                            }
+                        )[:1000],
                         f"Auto-stored: {summary[:200]}",
                     ),
                 )
@@ -1403,7 +1478,11 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     store = get_session_store()
     history = store.get_messages(run.session_id, limit=30)
     history_dicts = [
-        {"from_agent": m.from_agent, "content": m.content, "message_type": m.message_type}
+        {
+            "from_agent": m.from_agent,
+            "content": m.content,
+            "message_type": m.message_type,
+        }
         for m in history
     ]
 
@@ -1455,7 +1534,8 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                         seen_ids.add(eid)
                 if entries:
                     project_context = "\n".join(
-                        f"[{e['category']}] {e['key']}: {e['value'][:200]}" for e in entries[:15]
+                        f"[{e['category']}] {e['key']}: {e['value'][:200]}"
+                        for e in entries[:15]
                     )
         except Exception:
             pass
@@ -1466,7 +1546,9 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         pattern_entries = mem.pattern_get(run.session_id, limit=15)
         if pattern_entries:
             # Only include entries from OTHER agents (not self)
-            other_entries = [e for e in pattern_entries if e.get("author_agent") != agent.id]
+            other_entries = [
+                e for e in pattern_entries if e.get("author_agent") != agent.id
+            ]
             if other_entries:
                 session_mem = "\n".join(
                     f"[{e.get('type', 'ctx')}] {e['key']}: {e['value'][:200]}"
@@ -1510,7 +1592,8 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             if lesson_lines:
                 lessons_prompt = (
                     "\n## Lessons from past epics\n"
-                    "Apply these learnings from previous projects:\n" + "\n".join(lesson_lines[:10])
+                    "Apply these learnings from previous projects:\n"
+                    + "\n".join(lesson_lines[:10])
                 )
     except Exception:
         pass
@@ -1537,13 +1620,13 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
                         f"CI/CD: {bp.get('cicd', {}).get('provider', '?')}\n"
                     )
                     if bp.get("databases"):
-                        si_prompt += (
-                            f"Databases: {', '.join(d.get('type', '') for d in bp['databases'])}\n"
-                        )
+                        si_prompt += f"Databases: {', '.join(d.get('type', '') for d in bp['databases'])}\n"
                     if bp.get("conventions"):
                         si_prompt += f"Deploy: {bp['conventions'].get('deploy', '?')}, Secrets: {bp['conventions'].get('secrets', '?')}\n"
                     if bp.get("constraints"):
-                        si_prompt += "Constraints: " + " | ".join(bp["constraints"][:5]) + "\n"
+                        si_prompt += (
+                            "Constraints: " + " | ".join(bp["constraints"][:5]) + "\n"
+                        )
                     if bp.get("existing_services"):
                         si_prompt += "Existing services:\n"
                         for svc in bp["existing_services"][:5]:
@@ -1721,7 +1804,9 @@ def _compress_output(text: str, max_chars: int = COMPRESSED_OUTPUT_SIZE) -> str:
     return result
 
 
-def _build_compressed_context(accumulated: list[str], budget: int = CONTEXT_BUDGET) -> str:
+def _build_compressed_context(
+    accumulated: list[str], budget: int = CONTEXT_BUDGET
+) -> str:
     """Build context string with compression for older outputs.
 
     Last agent's output stays full. Earlier outputs are compressed

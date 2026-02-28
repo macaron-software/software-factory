@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import traceback
 from datetime import datetime
 
@@ -291,6 +292,7 @@ class MissionOrchestrator:
 
             _ss_pre = _get_ss()
             _pre_phase_msg_count = len(_ss_pre.get_messages(session_id, limit=1000))
+            _phase_start_time = time.monotonic()
 
             # Update phase status
             phase.status = PhaseStatus.RUNNING
@@ -365,7 +367,9 @@ class MissionOrchestrator:
                     state_dict={
                         "workflow_id": mission.workflow_id or "",
                         "phase_idx": i,
-                        "phase_count": len(workflow.phases),
+                        "phase_count": len(self.wf.phases)
+                        if hasattr(self, "wf") and self.wf
+                        else len(mission.phases),
                         "rejection_pct": _rej_rate,
                         "quality_score": _qual,
                     },
@@ -994,18 +998,71 @@ class MissionOrchestrator:
                 # RL: record experience (phase succeeded → positive reward)
                 try:
                     from ..agents.rl_policy import get_rl_policy as _get_rl
+
                     _get_rl().record_experience(
                         mission_id=mission.id,
                         state_dict={
                             "workflow_id": mission.workflow_id or "",
                             "phase_idx": i,
-                            "phase_count": len(workflow.phases),
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
                             "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
                             "quality_score": _qual if "_qual" in dir() else 0.0,
                         },
                         action=pattern_type,
                         reward=1.0,
                     )
+                except Exception:
+                    pass
+
+                # Record real execution outcome for GA empirical fitness + chemistry
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _qual_val = _qual if "_qual" in dir() else 0.0
+                    _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
+                    _db = _get_db()
+                    _db.execute(
+                        """INSERT INTO phase_outcomes
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
+                            team_size, success, quality_score, rejection_count, duration_secs, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            mission.id,
+                            mission.workflow_id or "",
+                            phase.phase_id,
+                            pattern_type,
+                            _json.dumps(aids),
+                            len(aids),
+                            1,
+                            _qual_val,
+                            int(_rej_val * max(1, len(aids))),
+                            round(_duration, 1),
+                            _complexity,
+                        ),
+                    )
+                    if len(aids) >= 2:
+                        from itertools import combinations as _combos
+
+                        for _ag_a, _ag_b in _combos(sorted(aids), 2):
+                            _db.execute(
+                                """INSERT INTO agent_pair_scores
+                                   (agent_a, agent_b, co_appearances, joint_successes, joint_quality_sum, last_seen)
+                                   VALUES (?,?,1,1,?,datetime('now'))
+                                   ON CONFLICT(agent_a, agent_b) DO UPDATE SET
+                                       co_appearances = co_appearances + 1,
+                                       joint_successes = joint_successes + 1,
+                                       joint_quality_sum = joint_quality_sum + excluded.joint_quality_sum,
+                                       last_seen = excluded.last_seen""",
+                                (_ag_a, _ag_b, _qual_val),
+                            )
+                    _db.commit()
+                    _db.close()
                 except Exception:
                     pass
 
@@ -1046,18 +1103,56 @@ class MissionOrchestrator:
                 # RL: record negative experience (phase failed)
                 try:
                     from ..agents.rl_policy import get_rl_policy as _get_rl
+
                     _get_rl().record_experience(
                         mission_id=mission.id,
                         state_dict={
                             "workflow_id": mission.workflow_id or "",
                             "phase_idx": i,
-                            "phase_count": len(workflow.phases),
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
                             "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
                             "quality_score": _qual if "_qual" in dir() else 0.0,
                         },
                         action=pattern_type,
                         reward=-1.0,
                     )
+                except Exception:
+                    pass
+                # Record failed phase outcome (success=0)
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _db = _get_db()
+                    _db.execute(
+                        """INSERT INTO phase_outcomes
+                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json,
+                            team_size, success, quality_score, rejection_count, duration_secs, complexity_tier)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                        (
+                            mission.id,
+                            mission.workflow_id or "",
+                            phase.phase_id,
+                            pattern_type,
+                            _json.dumps(aids),
+                            len(aids),
+                            0,
+                            _qual if "_qual" in dir() else 0.0,
+                            int(
+                                (_rej_rate if "_rej_rate" in dir() else 1.0)
+                                * max(1, len(aids))
+                            ),
+                            round(time.monotonic() - _phase_start_time, 1),
+                            _complexity,
+                        ),
+                    )
+                    _db.commit()
+                    _db.close()
                 except Exception:
                     pass
             run_store.update(mission)

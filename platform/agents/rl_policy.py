@@ -10,14 +10,12 @@ Usage:
     rec = policy.recommend(mission_id, phase_id, state_dict)
     # rec = {"action": "keep" | "switch_parallel" | ..., "confidence": 0.0-1.0, "q_value": float}
 """
+
 from __future__ import annotations
 
-import json
 import math
-import random
 import logging
 from typing import Any
-from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -30,14 +28,18 @@ ACTIONS = [
     "switch_debate",
     "add_agent",
     "remove_agent",
+    # Team management actions (new)
+    "reduce_team",  # remove the lowest-scoring agent from current phase
+    "specialize_task",  # inject domain-specific task hints per agent
+    "add_critic",  # add an adversarial/review agent to next phase
 ]
 
 # ── Hyperparameters ───────────────────────────────────────────────────────────
 LEARNING_RATE = 0.1
 DISCOUNT_FACTOR = 0.9
-EPSILON = 0.1          # exploration rate
+EPSILON = 0.1  # exploration rate
 CONFIDENCE_THRESHOLD = 0.70  # min confidence to fire recommendation
-MIN_VISITS = 3         # min state visits before trusting Q-values
+MIN_VISITS = 3  # min state visits before trusting Q-values
 
 
 def _bucket(value: float, buckets: int = 5) -> int:
@@ -51,16 +53,25 @@ def _encode_state(
     rejection_pct: float,
     quality_score: float,
     phase_count: int = 5,
+    team_size: int = 1,
+    complexity: str = "simple",
 ) -> str:
-    """Encode mission state as a hashable string key."""
-    # Normalize phase position to [0,1]
+    """Encode mission state as a hashable string key.
+    Includes team_size and complexity tier for team management actions.
+    """
     phase_pos = phase_idx / max(1, phase_count - 1)
     rej_bucket = _bucket(min(1.0, rejection_pct / 100.0))
     qual_bucket = _bucket(quality_score)
     phase_bucket = _bucket(phase_pos)
-    # Hash wf_id to reduce cardinality
+    # Team size bucket: 1, 2, 3, 4+
+    team_bucket = min(3, max(0, team_size - 1))
+    # Complexity: trivial=0, simple=1, medium=2, complex=3
+    cx_map = {"trivial": 0, "simple": 1, "medium": 2, "complex": 3}
+    cx_bucket = cx_map.get(complexity, 1)
     wf_hash = abs(hash(wf_id)) % 100
-    return f"{wf_hash}:{phase_bucket}:{rej_bucket}:{qual_bucket}"
+    return (
+        f"{wf_hash}:{phase_bucket}:{rej_bucket}:{qual_bucket}:{team_bucket}:{cx_bucket}"
+    )
 
 
 class RLPolicy:
@@ -97,8 +108,18 @@ class RLPolicy:
         rejection_pct = state_dict.get("rejection_pct", 0.0)
         quality_score = state_dict.get("quality_score", CONFIDENCE_THRESHOLD)
         phase_count = state_dict.get("phase_count", 5)
+        team_size = state_dict.get("team_size", 1)
+        complexity = state_dict.get("complexity", "simple")
 
-        state_key = _encode_state(wf_id, phase_idx, rejection_pct, quality_score, phase_count)
+        state_key = _encode_state(
+            wf_id,
+            phase_idx,
+            rejection_pct,
+            quality_score,
+            phase_count,
+            team_size,
+            complexity,
+        )
         q_row = self._q.get(state_key, {})
         visit_row = self._visits.get(state_key, {})
         total_visits = sum(visit_row.values())
@@ -107,8 +128,21 @@ class RLPolicy:
         if total_visits < MIN_VISITS:
             return {"action": "keep", "confidence": 0.0, "q_value": 0.0, "fired": False}
 
-        # Best action by Q-value
-        best_action = max(ACTIONS, key=lambda a: q_row.get(a, 0.0))
+        # Filter available actions by context:
+        # - trivial/simple workflows: team management actions only relevant if team_size > 1
+        available = list(ACTIONS)
+        if team_size <= 1:
+            available = [
+                a for a in available if a not in ("reduce_team", "remove_agent")
+            ]
+        if complexity in ("trivial", "simple"):
+            available = [
+                a
+                for a in available
+                if a not in ("switch_parallel", "add_agent", "add_critic")
+            ]
+
+        best_action = max(available, key=lambda a: q_row.get(a, 0.0))
         best_q = q_row.get(best_action, 0.0)
 
         # Confidence: sigmoid of Q-value advantage over "keep"
@@ -120,7 +154,9 @@ class RLPolicy:
 
         if fired:
             self._total_decisions += 1
-            self._log_decision(mission_id, phase_id, state_key, best_action, best_q, confidence)
+            self._log_decision(
+                mission_id, phase_id, state_key, best_action, best_q, confidence
+            )
 
         return {
             "action": best_action,
@@ -135,20 +171,28 @@ class RLPolicy:
         state_dict: dict[str, Any],
         action: str,
         reward: float,
-        next_state_dict: dict[str, Any],
+        next_state_dict: dict[str, Any] | None = None,
     ) -> None:
         """Store a transition (s, a, r, s') in the DB for nightly retraining."""
+        if next_state_dict is None:
+            next_state_dict = {}
         try:
             from ..db.migrations import get_db
+
             db = get_db()
             wf_id = state_dict.get("workflow_id", "")
             phase_idx = state_dict.get("phase_idx", 0)
             phase_count = state_dict.get("phase_count", 5)
+            team_size = state_dict.get("team_size", 1)
+            complexity = state_dict.get("complexity", "simple")
             state_key = _encode_state(
-                wf_id, phase_idx,
+                wf_id,
+                phase_idx,
                 state_dict.get("rejection_pct", 0.0),
                 state_dict.get("quality_score", 0.5),
                 phase_count,
+                team_size,
+                complexity,
             )
             next_state_key = _encode_state(
                 next_state_dict.get("workflow_id", wf_id),
@@ -156,11 +200,16 @@ class RLPolicy:
                 next_state_dict.get("rejection_pct", 0.0),
                 next_state_dict.get("quality_score", 0.5),
                 phase_count,
+                next_state_dict.get("team_size", team_size),
+                next_state_dict.get("complexity", complexity),
             )
-            db.execute("""
+            db.execute(
+                """
                 INSERT INTO rl_experience (state_json, action, reward, next_state_json, mission_id)
                 VALUES (?, ?, ?, ?, ?)
-            """, (state_key, action, reward, next_state_key, mission_id))
+            """,
+                (state_key, action, reward, next_state_key, mission_id),
+            )
             db.commit()
             db.close()
         except Exception as e:
@@ -173,6 +222,7 @@ class RLPolicy:
         """
         try:
             from ..db.migrations import get_db
+
             db = get_db()
             rows = db.execute(
                 "SELECT state_json, action, reward, next_state_json FROM rl_experience ORDER BY id DESC LIMIT ?",
@@ -197,7 +247,9 @@ class RLPolicy:
             # Q-learning update
             max_next_q = max(self._q.get(next_key, {a: 0.0 for a in ACTIONS}).values())
             current_q = self._q[state_key].get(action, 0.0)
-            new_q = current_q + LEARNING_RATE * (reward + DISCOUNT_FACTOR * max_next_q - current_q)
+            new_q = current_q + LEARNING_RATE * (
+                reward + DISCOUNT_FACTOR * max_next_q - current_q
+            )
             self._q[state_key][action] = new_q
             self._visits[state_key][action] = self._visits[state_key].get(action, 0) + 1
             updates += 1
@@ -212,9 +264,7 @@ class RLPolicy:
 
     def stats(self) -> dict[str, Any]:
         """Return stats for /api/rl/policy/stats endpoint."""
-        total_visits = sum(
-            sum(v.values()) for v in self._visits.values()
-        )
+        total_visits = sum(sum(v.values()) for v in self._visits.values())
         state_count = len(self._q)
         avg_confidence = 0.0
         if self._q:

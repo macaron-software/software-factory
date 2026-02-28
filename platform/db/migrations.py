@@ -764,6 +764,49 @@ def _migrate(conn):
             (provider, model, inp, out),
         )
 
+    # ── Real execution analytics ──────────────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT NOT NULL,
+            workflow_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL DEFAULT 'sequential',
+            agent_ids_json TEXT NOT NULL DEFAULT '[]',
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            rejection_count INTEGER DEFAULT 0,
+            duration_secs REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
+
     # Add cost_usd to llm_traces if not present
     try:
         conn.execute("ALTER TABLE llm_traces ADD COLUMN cost_usd REAL DEFAULT 0.0")
@@ -1081,6 +1124,63 @@ def _ensure_darwin_tables(conn) -> None:
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Real execution data: phase_outcomes for empirical GA fitness
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS phase_outcomes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            mission_id TEXT NOT NULL,
+            workflow_id TEXT NOT NULL,
+            phase_id TEXT NOT NULL,
+            pattern_id TEXT NOT NULL DEFAULT 'sequential',
+            agent_ids_json TEXT NOT NULL DEFAULT '[]',
+            team_size INTEGER DEFAULT 1,
+            success INTEGER DEFAULT 0,
+            quality_score REAL DEFAULT 0.0,
+            rejection_count INTEGER DEFAULT 0,
+            duration_secs REAL DEFAULT 0.0,
+            complexity_tier TEXT DEFAULT 'simple',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_workflow ON phase_outcomes(workflow_id, pattern_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_phase ON phase_outcomes(phase_id, success)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_po_complexity ON phase_outcomes(complexity_tier, pattern_id)"
+    )
+
+    # Migrate existing phase_outcomes: add complexity_tier if missing
+    try:
+        po_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(phase_outcomes)").fetchall()
+        }
+        if po_cols and "complexity_tier" not in po_cols:
+            conn.execute(
+                "ALTER TABLE phase_outcomes ADD COLUMN complexity_tier TEXT DEFAULT 'simple'"
+            )
+    except Exception:
+        pass
+
+    # Agent pair chemistry: how well each pair of agents works together
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS agent_pair_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_a TEXT NOT NULL,
+            agent_b TEXT NOT NULL,
+            co_appearances INTEGER DEFAULT 0,
+            joint_successes INTEGER DEFAULT 0,
+            joint_quality_sum REAL DEFAULT 0.0,
+            last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(agent_a, agent_b)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
 
     # Migrations: category + active_phases on missions
     try:
