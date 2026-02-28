@@ -55,6 +55,10 @@
             hx-get="/metrics/tab/llm" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
         <svg class="icon"><use href="#icon-cpu"/></svg> LLM
     </button>
+    <button class="metrics-tab" data-tab="tests"
+            hx-get="/metrics/tab/tests" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-check-circle"/></svg> Tests
+    </button>
 </div>
 
 <div id="metrics-content">
