@@ -254,6 +254,18 @@ Every component must handle these states:
 - Test IDs: [list]
 ```
 
+## Component Gallery Knowledge Base
+
+Use the MCP tools `component_gallery_list` and `component_gallery_get` to access reference implementations from the Component Gallery (50+ Design Systems cross-referenced).
+
+When building a component, call `component_gallery_get("<name>")` first to get:
+- Canonical HTML structure (semantic markup)
+- Required ARIA attributes
+- CSS state selectors (aria-expanded, aria-selected, etc.)
+- Multi-design-system naming variants
+
+Available: accordion, breadcrumbs, button, button-group, carousel, pagination, popover, quote, rating, rich-text-editor, tabs, tree-view.
+
 ## Anti-patterns
 
 - **NEVER** use hardcoded values (px, hex colors) — always use tokens

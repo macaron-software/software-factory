@@ -35,12 +35,13 @@ from typing import Any, Dict, List, Optional
 # Add parent to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from mcp_lrm.exclusions import should_exclude_path, filter_paths, get_included_extensions
+from mcp_lrm.exclusions import should_exclude_path, get_included_extensions
 
 
 # ============================================================================
 # MCP PROTOCOL HELPERS
 # ============================================================================
+
 
 async def read_message() -> Optional[Dict]:
     """Read a JSON-RPC message from stdin"""
@@ -74,6 +75,7 @@ def make_error(id: Any, code: int, message: str) -> Dict:
 # MCP LRM SERVER
 # ============================================================================
 
+
 class MCPLRMServer:
     """
     MCP server for LRM project context access.
@@ -91,6 +93,7 @@ class MCPLRMServer:
         """Load project configuration"""
         try:
             from core.project_registry import get_project
+
             self.project_config = get_project(self.project_name)
             self.project_root = self.project_config.root_path
         except Exception as e:
@@ -100,6 +103,7 @@ class MCPLRMServer:
 
         try:
             from core.task_store import TaskStore
+
             self.task_store = TaskStore()
         except Exception as e:
             print(f"Warning: Could not initialize task store: {e}", file=sys.stderr)
@@ -261,6 +265,32 @@ class MCPLRMServer:
                 },
             },
             {
+                "name": "component_gallery_list",
+                "description": "List all UI components documented in the Component Gallery knowledge base (accordion, button, tabs, etc.) with their descriptions",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "component_gallery_get",
+                "description": "Get detailed documentation for a UI component: semantic HTML markup, ARIA patterns, CSS, accessibility guidelines, and usage notes. Source: component.gallery",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "component": {
+                            "type": "string",
+                            "description": "Component name (e.g. 'accordion', 'button', 'tabs', 'breadcrumbs', 'carousel', 'pagination', 'popover', 'rich-text-editor', 'tree-view')",
+                        },
+                        "section": {
+                            "type": "string",
+                            "description": "Optional section filter: 'markup', 'interactivity', 'styling', 'usage' — returns full doc if omitted",
+                        },
+                    },
+                    "required": ["component"],
+                },
+            },
+            {
                 "name": "context",
                 "description": "Get project context from RAG (vision, architecture, requirements, conventions)",
                 "inputSchema": {
@@ -293,6 +323,8 @@ class MCPLRMServer:
             "subtask_create": self._tool_subtask_create,
             "build": self._tool_build,
             "context": self._tool_context,
+            "component_gallery_list": self._tool_component_gallery_list,
+            "component_gallery_get": self._tool_component_gallery_get,
         }
 
         handler = handlers.get(name)
@@ -359,7 +391,9 @@ class MCPLRMServer:
                             try:
                                 content = path.read_text(errors="ignore")
                                 if query.lower() in content.lower():
-                                    results.append(str(path.relative_to(self.project_root)))
+                                    results.append(
+                                        str(path.relative_to(self.project_root))
+                                    )
                                     if len(results) >= limit:
                                         break
                             except Exception:
@@ -387,17 +421,35 @@ class MCPLRMServer:
                 lines = content.split("\n")
 
                 # Extract key information
-                imports = [l for l in lines[:50] if l.strip().startswith(("import ", "use ", "from "))]
-                functions = [l for l in lines if l.strip().startswith(("fn ", "def ", "function ", "async ", "pub fn"))]
-                classes = [l for l in lines if l.strip().startswith(("class ", "struct ", "enum ", "interface "))]
+                imports = [
+                    l
+                    for l in lines[:50]
+                    if l.strip().startswith(("import ", "use ", "from "))
+                ]
+                functions = [
+                    l
+                    for l in lines
+                    if l.strip().startswith(
+                        ("fn ", "def ", "function ", "async ", "pub fn")
+                    )
+                ]
+                classes = [
+                    l
+                    for l in lines
+                    if l.strip().startswith(
+                        ("class ", "struct ", "enum ", "interface ")
+                    )
+                ]
 
-                summaries.append({
-                    "file": file_path,
-                    "lines": len(lines),
-                    "imports": imports[:10],
-                    "functions": [f.strip()[:80] for f in functions[:10]],
-                    "classes": [c.strip()[:80] for c in classes[:10]],
-                })
+                summaries.append(
+                    {
+                        "file": file_path,
+                        "lines": len(lines),
+                        "imports": imports[:10],
+                        "functions": [f.strip()[:80] for f in functions[:10]],
+                        "classes": [c.strip()[:80] for c in classes[:10]],
+                    }
+                )
             except Exception as e:
                 summaries.append({"file": file_path, "error": str(e)})
 
@@ -443,7 +495,9 @@ class MCPLRMServer:
 
             # Add framework-specific conventions (e.g., axum 0.7 rules)
             if "conventions" in domain_config:
-                domain_conventions["framework_conventions"] = domain_config["conventions"]
+                domain_conventions["framework_conventions"] = domain_config[
+                    "conventions"
+                ]
 
         return {"domain": domain, "conventions": domain_conventions}
 
@@ -480,10 +534,12 @@ class MCPLRMServer:
                 content = path.read_text()
                 # Get first 100 lines as example
                 lines = content.split("\n")[:100]
-                examples.append({
-                    "file": str(path.relative_to(self.project_root)),
-                    "content": "\n".join(lines),
-                })
+                examples.append(
+                    {
+                        "file": str(path.relative_to(self.project_root)),
+                        "content": "\n".join(lines),
+                    }
+                )
                 if len(examples) >= 3:
                     break
             except Exception:
@@ -577,6 +633,7 @@ class MCPLRMServer:
         # Use global build queue to prevent CPU saturation (1 build at a time)
         try:
             from core.build_queue import GlobalBuildQueue
+
             queue = GlobalBuildQueue.instance()
 
             # Enqueue and wait for completion
@@ -590,6 +647,7 @@ class MCPLRMServer:
 
             # Wait for job completion (async)
             import asyncio
+
             job = await queue.wait_for(job_id)
 
             return {
@@ -600,7 +658,7 @@ class MCPLRMServer:
                 "queued": True,
                 "job_id": job_id,
             }
-        except (ImportError, Exception) as e:
+        except (ImportError, Exception):
             # Fallback if build_queue not available - direct execution
             try:
                 proc = subprocess.run(
@@ -637,6 +695,7 @@ class MCPLRMServer:
 
         try:
             from core.project_context import ProjectContext
+
             ctx = ProjectContext(self.project_name)
 
             # Refresh if stale
@@ -649,8 +708,16 @@ class MCPLRMServer:
                 return {
                     "project": self.project_name,
                     "context": summary,
-                    "categories": ["vision", "architecture", "data_model", "api_surface",
-                                   "conventions", "state", "history", "domain"],
+                    "categories": [
+                        "vision",
+                        "architecture",
+                        "data_model",
+                        "api_surface",
+                        "conventions",
+                        "state",
+                        "history",
+                        "domain",
+                    ],
                 }
             else:
                 # Return specific category
@@ -659,8 +726,12 @@ class MCPLRMServer:
                     return {
                         "project": self.project_name,
                         "category": category,
-                        "content": cat_data.content[:max_chars] if hasattr(cat_data, 'content') else str(cat_data)[:max_chars],
-                        "keywords": cat_data.keywords if hasattr(cat_data, 'keywords') else [],
+                        "content": cat_data.content[:max_chars]
+                        if hasattr(cat_data, "content")
+                        else str(cat_data)[:max_chars],
+                        "keywords": cat_data.keywords
+                        if hasattr(cat_data, "keywords")
+                        else [],
                     }
                 else:
                     return {"error": f"Category '{category}' not found"}
@@ -669,9 +740,125 @@ class MCPLRMServer:
         except Exception as e:
             return {"error": str(e)}
 
+    # -------------------------------------------------------------------------
+    # Component Gallery tools
+    # -------------------------------------------------------------------------
+    _COMPONENT_GALLERY_DIR = (
+        Path(__file__).parent.parent
+        / "skills"
+        / "knowledge"
+        / "component-gallery"
+        / "src"
+        / "content"
+        / "componentContent"
+    )
+
+    async def _tool_component_gallery_list(self, args: Dict) -> Dict:
+        """List all documented UI components with a one-line summary extracted from the first paragraph."""
+        cg_dir = self._COMPONENT_GALLERY_DIR
+        if not cg_dir.exists():
+            return {
+                "error": "Component Gallery submodule not found. Run: git submodule update --init skills/knowledge/component-gallery"
+            }
+
+        components = []
+        for md_file in sorted(cg_dir.glob("*.md")):
+            name = md_file.stem
+            # Extract first non-empty content line after frontmatter
+            lines = md_file.read_text(encoding="utf-8").splitlines()
+            summary = ""
+            in_frontmatter = False
+            past_frontmatter = False
+            for line in lines:
+                if line.strip() == "---":
+                    if not in_frontmatter and not past_frontmatter:
+                        in_frontmatter = True
+                        continue
+                    elif in_frontmatter:
+                        in_frontmatter = False
+                        past_frontmatter = True
+                        continue
+                if (
+                    past_frontmatter
+                    and not in_frontmatter
+                    and line.strip()
+                    and not line.startswith("#")
+                ):
+                    summary = line.strip()[:120]
+                    break
+            components.append({"name": name, "summary": summary})
+
+        return {
+            "count": len(components),
+            "components": components,
+            "source": "https://component.gallery",
+            "note": "Use component_gallery_get to retrieve full markup, ARIA patterns, CSS and usage guidelines for any component",
+        }
+
+    async def _tool_component_gallery_get(self, args: Dict) -> Dict:
+        """Get full documentation for a UI component from Component Gallery."""
+        component = args.get("component", "").lower().strip()
+        section = args.get("section", "").lower().strip()
+
+        cg_dir = self._COMPONENT_GALLERY_DIR
+        if not cg_dir.exists():
+            return {
+                "error": "Component Gallery submodule not found. Run: git submodule update --init skills/knowledge/component-gallery"
+            }
+
+        # Try exact match then fuzzy
+        md_file = cg_dir / f"{component}.md"
+        if not md_file.exists():
+            candidates = [f for f in cg_dir.glob("*.md") if component in f.stem]
+            if not candidates:
+                available = [f.stem for f in sorted(cg_dir.glob("*.md"))]
+                return {
+                    "error": f"Component '{component}' not found",
+                    "available": available,
+                }
+            md_file = candidates[0]
+
+        content = md_file.read_text(encoding="utf-8")
+
+        # Strip frontmatter
+        if content.startswith("---"):
+            end = content.find("---", 3)
+            if end != -1:
+                content = content[end + 3 :].strip()
+
+        # Filter by section if requested
+        if section:
+            section_map = {
+                "markup": ["## Markup", "## HTML"],
+                "interactivity": ["## Interactivity", "## JavaScript", "## Behaviour"],
+                "styling": ["## Styling", "## CSS"],
+                "usage": ["## Usage", "## When to use", "## Guidelines"],
+            }
+            headers = section_map.get(section, [f"## {section.capitalize()}"])
+            # Find matching section block
+            extracted = []
+            lines = content.splitlines()
+            capturing = False
+            for line in lines:
+                if any(line.startswith(h) for h in headers):
+                    capturing = True
+                elif capturing and line.startswith("## "):
+                    break
+                if capturing:
+                    extracted.append(line)
+            content = "\n".join(extracted).strip() if extracted else content
+
+        return {
+            "component": md_file.stem,
+            "source": f"https://component.gallery/components/{md_file.stem}/",
+            "content": content,
+        }
+
     async def run(self):
         """Run MCP server (stdio)"""
-        print(f"MCP LRM Server starting (project: {self.project_name})", file=sys.stderr)
+        print(
+            f"MCP LRM Server starting (project: {self.project_name})", file=sys.stderr
+        )
 
         while True:
             msg = await read_message()
@@ -683,11 +870,16 @@ class MCPLRMServer:
             params = msg.get("params", {})
 
             if method == "initialize":
-                write_message(make_response(msg_id, {
-                    "protocolVersion": "2024-11-05",
-                    "serverInfo": {"name": "mcp-lrm", "version": "1.0.0"},
-                    "capabilities": {"tools": {}},
-                }))
+                write_message(
+                    make_response(
+                        msg_id,
+                        {
+                            "protocolVersion": "2024-11-05",
+                            "serverInfo": {"name": "mcp-lrm", "version": "1.0.0"},
+                            "capabilities": {"tools": {}},
+                        },
+                    )
+                )
 
             elif method == "tools/list":
                 write_message(make_response(msg_id, {"tools": self.get_tools()}))
@@ -696,19 +888,27 @@ class MCPLRMServer:
                 name = params.get("name")
                 arguments = params.get("arguments", {})
                 result = await self.handle_tool_call(name, arguments)
-                write_message(make_response(msg_id, {"content": [{"type": "text", "text": json.dumps(result)}]}))
+                write_message(
+                    make_response(
+                        msg_id,
+                        {"content": [{"type": "text", "text": json.dumps(result)}]},
+                    )
+                )
 
             elif method == "notifications/initialized":
                 pass  # No response needed
 
             else:
                 if msg_id:
-                    write_message(make_error(msg_id, -32601, f"Method not found: {method}"))
+                    write_message(
+                        make_error(msg_id, -32601, f"Method not found: {method}")
+                    )
 
 
 # ============================================================================
 # MAIN
 # ============================================================================
+
 
 def main():
     """Main entry point"""

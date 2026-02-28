@@ -312,6 +312,21 @@ For each UX pattern implemented:
 - Microcopy: [button labels, messages]
 ```
 
+## Component Gallery Knowledge Base
+
+Use the MCP tools `component_gallery_list` and `component_gallery_get` to access battle-tested UI component patterns from 50+ Design Systems (Material, Carbon, Atlassian, Ant, etc.).
+
+Available components: accordion, breadcrumbs, button, button-group, carousel, pagination, popover, quote, rating, rich-text-editor, tabs, tree-view.
+
+Each component doc includes:
+- Semantic HTML markup (2+ approaches)
+- ARIA attributes and keyboard interactions
+- CSS state hooks (aria-expanded, etc.)
+- Usage guidelines and when NOT to use
+- Accessibility footnotes
+
+Example: `component_gallery_get("accordion")` → full markup + ARIA + CSS + usage notes
+
 ## Anti-patterns
 
 - **NEVER** show a blank screen during loading — always show skeleton or spinner
