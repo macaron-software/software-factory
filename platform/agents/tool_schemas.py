@@ -721,6 +721,74 @@ def _mcp_schemas() -> list[dict]:
                 },
             },
         },
+        # ── MCP: Component Gallery (60 UI components, 2600+ DS implementations) ──
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_list",
+                "description": "List all 60 UI components from The Component Gallery: accordion, alert, avatar, badge, button, card, carousel, checkbox, combobox, datepicker, drawer, modal, pagination, select, skeleton, spinner, table, tabs, toast, tooltip, tree-view... each cross-referenced across 50+ Design Systems.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_get",
+                "description": "Get full documentation for a UI component: description, all aliases used across design systems, N implementations with DS name + URL + tech stack. Also includes semantic HTML markup, ARIA patterns, CSS when available. Use before implementing any UI component.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "component": {
+                            "type": "string",
+                            "description": "Component slug: accordion, alert, avatar, badge, button, card, carousel, checkbox, combobox, datepicker, drawer, dropdown-menu, empty-state, footer, form, header, icon, modal, navigation, pagination, popover, progress-bar, radio-button, rating, search-input, select, separator, skeleton, slider, spinner, stepper, table, tabs, text-input, textarea, toast, toggle, tooltip, tree-view, visually-hidden...",
+                        },
+                        "tech": {
+                            "type": "string",
+                            "description": "Filter by tech: React, Vue, Angular, CSS, Web Components, Svelte, etc.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Max implementations (default 20)",
+                        },
+                    },
+                    "required": ["component"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_search",
+                "description": "Full-text search across all 60 UI components and their aliases. Use to discover which components relate to a concept (e.g. 'loading', 'navigation', 'error', 'notification').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Search terms (component name, concept, alias)",
+                        },
+                    },
+                    "required": ["query"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "lrm_component_gallery_ds",
+                "description": "Get all components from a specific Design System and how they name them. Useful to align with a target DS vocabulary (e.g. Material Design, Carbon, Atlassian, Ant Design, Spectrum, Primer, Fluent).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "ds_name": {
+                            "type": "string",
+                            "description": "Design system name (partial ok): Material, Carbon, Atlassian, Ant Design, Spectrum, Primer, Fluent, Chakra, MUI, Radix, shadcn...",
+                        },
+                    },
+                    "required": ["ds_name"],
+                },
+            },
+        },
         # ── MCP: Figma (design system) ──
         {
             "type": "function",
@@ -2242,6 +2310,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
         "mcp_memory_create_relations",
+        "lrm_component_gallery_list",
+        "lrm_component_gallery_get",
+        "lrm_component_gallery_search",
+        "lrm_component_gallery_ds",
     ],
     "architecture": [
         "code_read",
@@ -2286,6 +2358,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "figma_get_styles",
         "solaris_wcag",
         "solaris_component",
+        "lrm_component_gallery_list",
+        "lrm_component_gallery_get",
+        "lrm_component_gallery_search",
+        "lrm_component_gallery_ds",
     ],
     "dev": [
         "code_read",
