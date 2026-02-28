@@ -54,16 +54,24 @@ jobs:
             echo "Disk available after cleanup: $AVAIL"
           ' || true
 
-      - name: Deploy (hotpatch)
+      - name: Deploy (hotpatch or full start)
         run: |
           ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} '
+            set -e
             CONTAINER=$(docker ps --format "{{.Names}}" | grep -i platform | head -1)
-            docker cp /opt/software-factory/platform/. $CONTAINER:/app/platform/
-            docker exec $CONTAINER find /app/platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-            # Install any new requirements (PYTHONPATH cleared to avoid platform/ module conflict)
-            docker exec -e PYTHONPATH= -w /tmp $CONTAINER pip install -r /app/platform/requirements.txt -q 2>/dev/null || true
-            docker stop $CONTAINER && sleep 2 && docker start $CONTAINER
-            sleep 10
+            if [ -z "$CONTAINER" ]; then
+              echo "No running platform container — starting via docker compose..."
+              cd /opt/software-factory && docker compose up -d --build platform
+              sleep 15
+            else
+              docker cp /opt/software-factory/platform/. $CONTAINER:/app/platform/
+              docker exec $CONTAINER find /app/platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+              # Install any new requirements (PYTHONPATH cleared to avoid platform/ module conflict)
+              docker exec -e PYTHONPATH= -w /tmp $CONTAINER pip install -r /app/platform/requirements.txt -q 2>/dev/null || true
+              docker stop $CONTAINER && sleep 2 && docker start $CONTAINER
+              sleep 10
+            fi
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/ 2>/dev/null || echo 000)
             echo "Health: $STATUS"
-          ' || true
+            [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || { echo "UNHEALTHY: $STATUS"; exit 1; }
+          '
