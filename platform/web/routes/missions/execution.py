@@ -77,14 +77,10 @@ async def launch_mission_workflow(request: Request, mission_id: str):
 
     # Create workspace directory for agent tools (code, git, docker)
     import subprocess
-    from pathlib import Path
 
-    workspace_root = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "data"
-        / "workspaces"
-        / session.id
-    )
+    from ....config import DATA_DIR
+
+    workspace_root = DATA_DIR / "workspaces" / session.id
     workspace_root.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
@@ -268,14 +264,10 @@ async def api_mission_start(request: Request):
 
     # Create workspace directory for agent tools (code, git, docker)
     import subprocess
-    from pathlib import Path
 
-    workspace_root = (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "data"
-        / "workspaces"
-        / mission_id
-    )
+    from ....config import DATA_DIR
+
+    workspace_root = DATA_DIR / "workspaces" / mission_id
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
