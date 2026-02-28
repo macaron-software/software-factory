@@ -1277,6 +1277,35 @@ def _migrate(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Knowledge Intelligence columns — memory_pattern
+    try:
+        mpt_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(memory_pattern)").fetchall()
+        }
+        if mpt_cols:
+            for col, ddl in [
+                (
+                    "access_count",
+                    "ALTER TABLE memory_pattern ADD COLUMN access_count INTEGER DEFAULT 0",
+                ),
+                (
+                    "last_read_at",
+                    "ALTER TABLE memory_pattern ADD COLUMN last_read_at TEXT DEFAULT NULL",
+                ),
+                (
+                    "relevance_score",
+                    "ALTER TABLE memory_pattern ADD COLUMN relevance_score REAL DEFAULT 0.5",
+                ),
+                (
+                    "tags_json",
+                    "ALTER TABLE memory_pattern ADD COLUMN tags_json TEXT DEFAULT '[]'",
+                ),
+            ]:
+                if col not in mpt_cols:
+                    conn.execute(ddl)
+    except Exception:
+        pass
+
     # Agent role column in memory_project (cross-session role-scoped memory)
     try:
         mp_cols = {
