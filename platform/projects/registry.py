@@ -193,6 +193,9 @@ class ProjectRegistry:
             return
 
         root = project_section.get("root_path", data.get("root_path", ""))
+        # Safe path normalization: expand user (~) and normalize separators, never empty → ""
+        if root:
+            root = os.path.normpath(os.path.expanduser(root))
         domains_cfg = data.get("domains", {})
         domain_list = list(domains_cfg.keys()) if isinstance(domains_cfg, dict) else []
         display = project_section.get("display_name") or pid.replace("-", " ").title()

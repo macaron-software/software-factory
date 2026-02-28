@@ -216,7 +216,7 @@ async def api_mission_start(request: Request):
     if not brief:
         return JSONResponse({"error": "Brief is required"}, status_code=400)
 
-    # Auto-inject domain default_pattern into workflow phases when applicable
+    # Auto-inject domain default_pattern + default_agents into workflow phases when applicable
     try:
         from ....projects.registry import get_project_registry
         from ....projects.domains import load_domain
@@ -238,8 +238,19 @@ async def api_mission_start(request: Request):
                     _dom.default_pattern,
                     workflow_id,
                 )
+            if _dom and _dom.default_agents:
+                # Inject domain default agents into phase agent_ids if not already set
+                for wp in wf.phases:
+                    if not getattr(wp, "agent_ids", None):
+                        wp.agent_ids = list(_dom.default_agents)
+                logger.info(
+                    "MissionCreate: domain '%s' default_agents=%s applied to workflow '%s'",
+                    _proj.arch_domain,
+                    _dom.default_agents,
+                    workflow_id,
+                )
     except Exception as _de:
-        logger.debug("MissionCreate: could not apply domain default_pattern: %s", _de)
+        logger.debug("MissionCreate: could not apply domain defaults: %s", _de)
 
     # Build phase runs from workflow
     phases = []

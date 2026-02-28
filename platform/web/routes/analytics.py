@@ -1036,3 +1036,95 @@ async def get_agent_scores() -> dict[str, Any]:
         logger.exception("Agent scores error")
         return {"success": False, "error": str(e)}
 
+
+@router.get("/api/analytics/cost")
+async def get_cost_analytics() -> dict[str, Any]:
+    """Cost & token analytics — breakdown by project/domain/agent from llm_traces."""
+    try:
+        from ...db.migrations import get_db
+
+        db = get_db()
+        db.row_factory = __import__("sqlite3").Row
+
+        # Per-project breakdown (join via mission_runs.session_id → llm_traces.session_id)
+        project_rows = db.execute("""
+            SELECT
+                COALESCE(mr.project_id, 'unknown') as project_id,
+                COUNT(DISTINCT t.session_id) as sessions,
+                SUM(t.tokens_in + t.tokens_out) as tokens_total,
+                SUM(t.tokens_in) as tokens_in,
+                SUM(t.tokens_out) as tokens_out,
+                ROUND(SUM(t.cost_usd), 4) as cost_usd,
+                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as success_rate,
+                ROUND(AVG(t.duration_ms)) as avg_duration_ms
+            FROM llm_traces t
+            LEFT JOIN mission_runs mr ON mr.session_id = t.session_id
+            WHERE t.created_at >= datetime('now', '-30 days')
+            GROUP BY COALESCE(mr.project_id, 'unknown')
+            ORDER BY cost_usd DESC
+            LIMIT 30
+        """).fetchall()
+
+        # Per-agent breakdown
+        agent_rows = db.execute("""
+            SELECT
+                t.agent_id,
+                COALESCE(a.name, t.agent_id) as agent_name,
+                t.model,
+                COUNT(*) as calls,
+                SUM(t.tokens_in + t.tokens_out) as tokens_total,
+                ROUND(SUM(t.cost_usd), 6) as cost_usd,
+                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as success_rate
+            FROM llm_traces t
+            LEFT JOIN agents a ON a.id = t.agent_id
+            WHERE t.created_at >= datetime('now', '-30 days')
+              AND t.agent_id != ''
+            GROUP BY t.agent_id, t.model
+            ORDER BY cost_usd DESC
+            LIMIT 20
+        """).fetchall()
+
+        # Daily cost trend (last 14 days)
+        daily_rows = db.execute("""
+            SELECT
+                DATE(t.created_at) as day,
+                SUM(t.tokens_in + t.tokens_out) as tokens_total,
+                ROUND(SUM(t.cost_usd), 6) as cost_usd,
+                COUNT(*) as calls
+            FROM llm_traces t
+            WHERE t.created_at >= datetime('now', '-14 days')
+            GROUP BY DATE(t.created_at)
+            ORDER BY day ASC
+        """).fetchall()
+
+        # Summary totals
+        totals = db.execute("""
+            SELECT
+                SUM(t.tokens_in + t.tokens_out) as tokens_total,
+                SUM(t.tokens_in) as tokens_in,
+                SUM(t.tokens_out) as tokens_out,
+                ROUND(SUM(t.cost_usd), 4) as cost_usd,
+                COUNT(*) as calls,
+                COUNT(DISTINCT t.session_id) as sessions,
+                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
+                    (COUNT(*) + 0.001), 1) as success_rate,
+                ROUND(AVG(t.duration_ms)) as avg_duration_ms
+            FROM llm_traces t
+            WHERE t.created_at >= datetime('now', '-30 days')
+        """).fetchone()
+
+        db.close()
+
+        return {
+            "success": True,
+            "period": "last_30_days",
+            "summary": dict(totals) if totals else {},
+            "by_project": [dict(r) for r in project_rows],
+            "by_agent": [dict(r) for r in agent_rows],
+            "daily_trend": [dict(r) for r in daily_rows],
+        }
+    except Exception as e:
+        logger.exception("Cost analytics error")
+        return {"success": False, "error": str(e)}

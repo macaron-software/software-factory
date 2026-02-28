@@ -58,3 +58,12 @@ conventions: |
   - Pas de secrets dans le code — utiliser Azure Key Vault
   - Internationalisation : fr-FR par défaut, support i18n prévu
   - Logs structurés JSON (pas de System.out.println)
+
+# Auto-selected pattern for new missions in this domain
+default_pattern: "adversarial-cascade"
+
+# Default lead agents for La Poste domain projects
+default_agents:
+  - chef_de_programme
+  - lead-dev
+  - solaris-compliance-critic

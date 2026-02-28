@@ -38,23 +38,23 @@ _CONTINUOUS_KEYWORDS = (
 # Watchdog loop interval (seconds)
 _WATCHDOG_INTERVAL = 300
 # Stagger between each resume — defaults, overridden by config at runtime
-_STAGGER_STARTUP = 60.0   # 60s between each launch on first pass
+_STAGGER_STARTUP = 60.0  # 60s between each launch on first pass
 _STAGGER_WATCHDOG = 15.0
-_MAX_STARTUP_BATCH = 1    # only 1 mission at startup (safe default)
+_MAX_STARTUP_BATCH = 1  # only 1 mission at startup (safe default)
 # Disk cleanup: run every N watchdog cycles (300s × 12 = 1h)
 _CLEANUP_EVERY_N_CYCLES = 12
 # GA health: P1 if all proposals pending > 1h with no approved
 _GA_STALL_THRESHOLD_SECS = 3600  # 1h
 
 # Auto-launch new runs
-_LAUNCH_PER_CYCLE = 2   # max new launches per watchdog cycle
-_LAUNCH_STAGGER = 5.0   # seconds between each new launch
+_LAUNCH_PER_CYCLE = 2  # max new launches per watchdog cycle
+_LAUNCH_STAGGER = 5.0  # seconds between each new launch
 
 # CPU/RAM backpressure thresholds
 _CPU_GREEN = 40.0  # below → launch freely
 _CPU_YELLOW = 65.0  # 40-65 → slow down (2× stagger)
-_CPU_RED = 80.0    # above → skip launch this cycle
-_RAM_RED = 75.0    # RAM % above → skip launch (was 85 — too permissive)
+_CPU_RED = 80.0  # above → skip launch this cycle
+_RAM_RED = 75.0  # RAM % above → skip launch (was 85 — too permissive)
 
 
 def _get_system_load() -> tuple[float, float]:
@@ -180,13 +180,16 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     db = get_db()
     try:
-        # All paused runs with workflow
+        # All paused runs with workflow — exclude human_input_required and > 48h old
         paused_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
-                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
+                   COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active'),
+                   COALESCE(mr.resume_attempts, 0)
             FROM mission_runs mr
             LEFT JOIN missions m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
+              AND COALESCE(mr.human_input_required, 0) = 0
+              AND mr.updated_at >= datetime('now', '-48 hours')
             ORDER BY mr.created_at DESC
             LIMIT 500
         """).fetchall()
@@ -230,9 +233,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         db.close()
 
     continuous_paused, others_paused, continuous_failed, stuck_pending = [], [], [], []
-    for run_id, wf_id, mname, mtype, mstatus in paused_rows:
+    # Map run_id → resume_attempts for backoff filtering
+    _attempts: dict[str, int] = {}
+    for run_id, wf_id, mname, mtype, mstatus, attempts in paused_rows:
         if mstatus not in ("active", None, ""):
             continue
+        _attempts[run_id] = attempts
         if _is_continuous(mname, mtype):
             continuous_paused.append(run_id)
         else:
@@ -246,7 +252,28 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         if _is_continuous(mname, mtype):
             continuous_failed.append(run_id)
 
-    to_resume = continuous_paused + others_paused + stuck_pending + continuous_failed
+    # Apply exponential backoff: skip missions with too many recent attempts
+    # Attempt 0-2: always retry; attempt 3: skip 50% chance (use mod); attempt 4+: skip unless low load
+    import time as _time
+
+    _now_minute = int(_time.time() // 60)
+
+    def _backoff_ok(run_id: str) -> bool:
+        attempts = _attempts.get(run_id, 0)
+        if attempts <= 2:
+            return True
+        if attempts <= 5:
+            # Retry every (2^attempts) minutes — skip if not on the right minute
+            interval = 2 ** (attempts - 2)  # 2, 4, 8, 16, 32 min
+            return (_now_minute % interval) == 0
+        return False  # > 5 attempts → wait for manual review or human_input_required
+
+    candidates = [
+        r
+        for r in (continuous_paused + others_paused + stuck_pending + continuous_failed)
+        if _backoff_ok(r)
+    ]
+    to_resume = candidates
 
     # On startup (large stagger), cap batch to avoid CPU saturation
     stagger_startup, _, batch_max = _get_resume_config()
@@ -804,7 +831,6 @@ async def check_ga_health() -> None:
     auto-approve the best per workflow (bootstrap) and log a P1 warning.
     Runs every watchdog cycle (~5 min) but only acts once per stall episode."""
     from ..db.migrations import get_db
-    import time as _time
 
     db = get_db()
     try:
@@ -919,7 +945,9 @@ async def _cleanup_workspace_containers() -> None:
     try:
         result = subprocess.run(
             ["docker", "ps", "-a", "--format", "{{.Names}}\t{{.Status}}"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except Exception:
         return
@@ -935,13 +963,19 @@ async def _cleanup_workspace_containers() -> None:
             "Exited" in status or "Created" in status
         ):
             try:
-                subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=10)
+                subprocess.run(
+                    ["docker", "rm", "-f", name], capture_output=True, timeout=10
+                )
                 killed.append(name)
             except Exception:
                 pass
 
     if killed:
-        logger.warning("auto_resume: cleaned up %d stale workspace containers: %s", len(killed), killed[:5])
+        logger.warning(
+            "auto_resume: cleaned up %d stale workspace containers: %s",
+            len(killed),
+            killed[:5],
+        )
 
 
 async def _enforce_container_ttl_and_slots() -> None:
@@ -956,8 +990,9 @@ async def _enforce_container_ttl_and_slots() -> None:
 
     try:
         from ..config import get_config
+
         oc = get_config().orchestrator
-        max_slots = oc.max_active_projects       # 0 = unlimited
+        max_slots = oc.max_active_projects  # 0 = unlimited
         ttl_hours = oc.deployed_container_ttl_hours  # 0 = no TTL
     except Exception:
         max_slots = 3
@@ -969,7 +1004,9 @@ async def _enforce_container_ttl_and_slots() -> None:
     try:
         result = subprocess.run(
             ["docker", "ps", "--format", "{{.Names}}\t{{.CreatedAt}}"],
-            capture_output=True, text=True, timeout=10
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except Exception:
         return
@@ -986,8 +1023,10 @@ async def _enforce_container_ttl_and_slots() -> None:
             continue
         try:
             # Docker format: "2026-01-15 10:23:45 +0000 UTC" or "2026-01-15T10:23:45Z"
-            created_str = re.sub(r'\s+UTC$', '', created_str.strip())
-            dt = datetime.fromisoformat(created_str.replace(' ', 'T').replace(' +0000', '+00:00'))
+            created_str = re.sub(r"\s+UTC$", "", created_str.strip())
+            dt = datetime.fromisoformat(
+                created_str.replace(" ", "T").replace(" +0000", "+00:00")
+            )
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=timezone.utc)
             app_containers.append((name, dt))
@@ -1008,7 +1047,7 @@ async def _enforce_container_ttl_and_slots() -> None:
 
     # Enforce slot limit: stop oldest beyond max_slots
     if max_slots > 0 and len(app_containers) > max_slots:
-        over = app_containers[:len(app_containers) - max_slots]
+        over = app_containers[: len(app_containers) - max_slots]
         for name, created in over:
             if name not in [n for n, _ in to_stop]:
                 to_stop.append((name, f"slots={len(app_containers)} > max={max_slots}"))
@@ -1017,6 +1056,8 @@ async def _enforce_container_ttl_and_slots() -> None:
         try:
             subprocess.run(["docker", "stop", name], capture_output=True, timeout=15)
             subprocess.run(["docker", "rm", name], capture_output=True, timeout=10)
-            logger.warning("auto_resume: stopped deployed container %s (%s)", name, reason)
+            logger.warning(
+                "auto_resume: stopped deployed container %s (%s)", name, reason
+            )
         except Exception as e:
             logger.warning("auto_resume: failed to stop %s: %s", name, e)
