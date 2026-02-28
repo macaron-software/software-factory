@@ -63,6 +63,8 @@
         });
     })();
     </script>
+    <!-- Umami Analytics -->
+    <script async src="https://analytics.macaron-software.com/script.js" data-website-id="fddc91d3-a7fe-4544-85df-46b16597e143"></script>
 </head>
 <body>
     {% include "partials/svg_sprites.html" %}
@@ -113,6 +115,9 @@
                     {% if p in _full + ('developer', 'architect') %}
                     <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System', 'Wiki') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-plug"/></svg>
+                    </a></li>
+                    <li><a href="/tool-builder" data-tooltip="Tool Builder" class="{% if page_title == 'Tool Builder' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-zap"/></svg>
                     </a></li>
                     {% endif %}
                     <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title == 'Metrics' %}active{% endif %}">
