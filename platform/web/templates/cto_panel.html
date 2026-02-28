@@ -534,6 +534,11 @@
   function _ctoConfirmCancel(){
     var overlay = document.getElementById('cto-confirm-overlay');
     if(overlay) overlay.classList.remove('active');
+    // Restore original user message to input
+    if(_pendingDispatch){
+      var inp = document.getElementById('cto-input');
+      if(inp && !inp.value) inp.value = _pendingDispatch.displayMsg || '';
+    }
     _pendingDispatch = null;
   }
 

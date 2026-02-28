@@ -325,10 +325,9 @@ class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
         "Create a new project on the platform with full setup: workspace dir, git init, Dockerfile, docker-compose, "
-        "README, and standard missions (TMA/MCO, Security, Tech Debt + Legal). "
+        "README, docs/spec.md, docs/security.md, and standard missions (TMA/MCO, Security, Tech Debt + Legal). "
         "Params: name (required), description, vision, stack (tech stack string), "
-        "factory_type ('software'|'data'|'security'|'standalone'), "
-        "skip_missions (bool, default false). "
+        "factory_type ('software'|'data'|'security'|'standalone'). "
         "Returns the created project id, name, workspace path, scaffold actions, and mission ids."
     )
     category = "platform"
@@ -354,22 +353,30 @@ class PlatformCreateProjectTool(BaseTool):
         )
         proj = store.create(proj)
 
-        # Scaffold workspace: git init + Dockerfile + docker-compose + README + src/
+        # Scaffold workspace: git init + Dockerfile + docker-compose + README + docs/spec.md + src/
         scaffold_result = {}
         try:
             scaffold_result = scaffold_project(proj)
         except Exception as _e:
             scaffold_result = {"error": str(_e)}
 
-        # Create standard missions unless explicitly skipped
+        # List missions provisioned by store.create() → heal_missions()
         missions_created = []
-        if not params.get("skip_missions", False):
-            try:
-                missions_created = await _bootstrap_standard_missions(
-                    proj.id, proj.name
-                )
-            except Exception as _e:
-                missions_created = [{"error": str(_e)}]
+        try:
+            from ..missions.store import get_mission_store
+
+            m_store = get_mission_store()
+            missions_created = [
+                {
+                    "mission_id": m.id,
+                    "name": m.name,
+                    "workflow": m.workflow_id,
+                    "status": m.status,
+                }
+                for m in m_store.list_missions(project_id=proj.id, limit=20)
+            ]
+        except Exception:
+            pass
 
         return json.dumps(
             {
@@ -384,7 +391,10 @@ class PlatformCreateProjectTool(BaseTool):
 
 
 async def _bootstrap_standard_missions(project_id: str, project_name: str) -> list:
-    """Create the 3 standard missions for every new project: TMA, Security, Tech Debt + Legal."""
+    """Create the 3 standard missions for every new project: TMA, Security, Tech Debt + Legal.
+
+    Idempotent: skips any mission whose workflow_id already exists for this project.
+    """
     from ..missions.store import get_mission_store, MissionDef, get_mission_run_store
     from ..models import MissionRun, MissionStatus
     import uuid
@@ -392,6 +402,12 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
     m_store = get_mission_store()
     run_store = get_mission_run_store()
     created = []
+
+    # Idempotency: collect already-existing workflow_ids for this project
+    existing_workflows = {
+        getattr(m, "workflow_id", "")
+        for m in m_store.list_missions(project_id=project_id, limit=50)
+    }
 
     standard = [
         {
@@ -415,6 +431,8 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
     ]
 
     for m_def in standard:
+        if m_def["workflow_id"] in existing_workflows:
+            continue  # Already exists — skip
         try:
             mission = MissionDef(
                 name=m_def["name"],
@@ -446,12 +464,76 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
     return created
 
 
+async def _ensure_project_for_mission(
+    mission_name: str, description: str
+) -> tuple[str, str]:
+    """Auto-create a project for a mission that has no project_id.
+
+    Derives project name from mission name by stripping common prefixes.
+    Returns (project_id, project_name). Reuses existing project if name matches.
+    """
+    import re
+    import uuid
+    import datetime
+    from ..projects.manager import get_project_store, Project, scaffold_project
+
+    # Derive project name: strip common mission type prefixes
+    proj_name = re.sub(
+        r"^(TMA/MCO|TMA|MCO|Sécu(?:rité)?|Security|Hacking|"
+        r"Dette\s+Tech(?:nique)?|Tech\s+Debt|Debt|Dev(?:eloppement)?|"
+        r"Développement|Refactoring|Refacto|Deploy(?:ment)?|"
+        r"Déploiement|Migration|Audit)\s*[—\-–:]\s*",
+        "",
+        mission_name,
+        flags=re.IGNORECASE,
+    ).strip()
+    if not proj_name:
+        proj_name = mission_name
+
+    store = get_project_store()
+
+    # Reuse existing project if name matches (case-insensitive)
+    for p in store.list_all():
+        if p.name.lower().strip() == proj_name.lower().strip():
+            return p.id, p.name
+
+    # Create a new project with full scaffold
+    proj = Project(
+        id=str(uuid.uuid4())[:8],
+        name=proj_name,
+        path="",  # store.create() auto-assigns workspace path
+        description=description or f"Projet auto-créé pour la mission : {mission_name}",
+        vision=description or "",
+        factory_type="software",
+        created_at=datetime.datetime.utcnow().isoformat(),
+    )
+    proj = store.create(proj)
+
+    # Full scaffold: workspace, git init, README, docs/spec.md, Dockerfile, docker-compose
+    # NOTE: store.create() already calls heal_missions() which provisions standard missions.
+    try:
+        scaffold_project(proj)
+    except Exception as _e:
+        logger.warning("scaffold failed for auto-project %s: %s", proj.id, _e)
+
+    logger.info(
+        "Auto-created project '%s' (%s) for orphan mission '%s'",
+        proj.name,
+        proj.id,
+        mission_name,
+    )
+    return proj.id, proj.name
+
+
 class PlatformCreateMissionTool(BaseTool):
     name = "create_mission"
     description = (
         "Create a new mission (epic) on the platform and launch it. "
+        "If project_id is omitted, a project is auto-created with full scaffold "
+        "(workspace, git, README, docs/spec.md, Dockerfile, docker-compose) "
+        "and standard missions (TMA/MCO, Security, Tech Debt). "
         "Params: name (required), goal/description, project_id, workflow_id (optional). "
-        "Returns the mission id."
+        "Returns the mission id and auto-created project_id if applicable."
     )
     category = "platform"
 
@@ -461,12 +543,25 @@ class PlatformCreateMissionTool(BaseTool):
         name = params.get("name", "").strip()
         if not name:
             return json.dumps({"error": "name is required"})
+
+        project_id = params.get("project_id", "").strip()
+        auto_project: dict = {}
+
+        # Rule: mission without project → auto-create project + scaffold
+        if not project_id:
+            description = params.get("description", params.get("goal", ""))
+            project_id, proj_name = await _ensure_project_for_mission(name, description)
+            auto_project = {
+                "auto_created_project_id": project_id,
+                "auto_created_project_name": proj_name,
+            }
+
         store = get_mission_store()
         mission = MissionDef(
             name=name,
             description=params.get("description", params.get("goal", "")),
             goal=params.get("goal", params.get("description", name)),
-            project_id=params.get("project_id", ""),
+            project_id=project_id,
             workflow_id=params.get("workflow_id", ""),
             status="active",
         )
@@ -505,7 +600,13 @@ class PlatformCreateMissionTool(BaseTool):
             run_info = {"launch_warning": str(_e)}
 
         return json.dumps(
-            {"ok": True, "mission_id": mission.id, "name": mission.name, **run_info}
+            {
+                "ok": True,
+                "mission_id": mission.id,
+                "name": mission.name,
+                **auto_project,
+                **run_info,
+            }
         )
 
 

@@ -432,6 +432,36 @@ def scaffold_project(p: "Project") -> dict:
         )
         actions.append("created README.md")
 
+    # 3b. SPECS.md at root — functional & technical specifications
+    specs = root / "SPECS.md"
+    if not specs.exists():
+        specs.write_text(
+            f"# {p.name} — Specifications\n\n"
+            "> **Status:** 🚧 À compléter (phase Discovery)\n\n"
+            "## Vision & Objectif\n\n"
+            f"{p.vision or p.description or '*À définir*'}\n\n"
+            "## Périmètre fonctionnel\n\n"
+            "- [ ] Fonctionnalité 1\n"
+            "- [ ] Fonctionnalité 2\n\n"
+            "## Stack technique\n\n"
+            "- **Backend:** *À définir*\n"
+            "- **Frontend:** *À définir*\n"
+            "- **Base de données:** *À définir*\n"
+            "- **Infra:** Docker / docker-compose\n\n"
+            "## Contraintes & Non-Functional Requirements\n\n"
+            "- Sécurité : OWASP Top 10, aucune CVE critique\n"
+            "- Légalité : RGPD, licences open-source conformes\n"
+            "- Performance : *À définir*\n\n"
+            "## Critères d'acceptation (Definition of Done)\n\n"
+            "- [ ] Tests unitaires ≥ 80% couverture\n"
+            "- [ ] Lint / type-check passant\n"
+            "- [ ] Docker build + run OK\n"
+            "- [ ] Audit sécurité validé\n\n"
+            "---\n*Généré par Software Factory — à compléter par l'agent architecte*\n",
+            encoding="utf-8",
+        )
+        actions.append("created SPECS.md")
+
     # 4. Dockerfile
     if not (root / "Dockerfile").exists():
         (root / "Dockerfile").write_text(_DOCKERFILE_TEMPLATE, encoding="utf-8")
@@ -763,10 +793,20 @@ class ProjectStore:
         return proj
 
     def auto_provision(self, project_id: str, project_name: str):
-        """Auto-create TMA, Security, and Tech Debt missions for a new project."""
+        """Auto-create TMA, Security, and Tech Debt missions for a new project.
+
+        Idempotent: skips workflow_ids already present for this project.
+        """
         from ..missions.store import MissionDef, get_mission_store
 
         ms = get_mission_store()
+
+        # Idempotency: skip workflow_ids already present for this project
+        existing_workflows = {
+            getattr(m, "workflow_id", "")
+            for m in ms.list_missions(project_id=project_id, limit=50)
+        }
+
         provisions = [
             MissionDef(
                 name=f"TMA — {project_name}",
@@ -819,6 +859,8 @@ class ProjectStore:
         ]
         created = []
         for m in provisions:
+            if getattr(m, "workflow_id", "") in existing_workflows:
+                continue  # Already exists — skip
             try:
                 created.append(ms.create_mission(m))
                 logger.warning("Auto-provisioned %s for project %s", m.type, project_id)
