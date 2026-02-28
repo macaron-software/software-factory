@@ -13,13 +13,12 @@ Can run as:
   - In-process asyncio task (server lifespan)
   - Standalone cron: python3 -m platform.ops.auto_heal --once
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
-import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -44,6 +43,7 @@ TMA_PROJECT_ID = "macaron-platform"
 @dataclass
 class IncidentGroup:
     """A group of related incidents to heal as one epic."""
+
     error_type: str
     error_detail_sample: str
     incident_ids: list[str]
@@ -56,11 +56,13 @@ def _get_db():
     """Get DB connection (works both in-process and standalone)."""
     try:
         from ..db.migrations import get_db
+
         return get_db()
     except (ImportError, ValueError):
         # Standalone mode — direct SQLite
         import sqlite3
         from pathlib import Path
+
         db_path = Path(__file__).parent.parent.parent / "data" / "platform.db"
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
@@ -128,8 +130,11 @@ def create_heal_epic(group: IncidentGroup) -> str:
             mission_id = existing["id"]
             # Link new incidents to existing mission
             _link_incidents_to_mission(db, group.incident_ids, mission_id)
-            logger.info("Auto-heal: linked %d incidents to existing mission %s",
-                       group.count, mission_id)
+            logger.info(
+                "Auto-heal: linked %d incidents to existing mission %s",
+                group.count,
+                mission_id,
+            )
             return mission_id
     finally:
         db.close()
@@ -172,15 +177,23 @@ def create_heal_epic(group: IncidentGroup) -> str:
     finally:
         db.close()
 
-    logger.warning("Auto-heal: created TMA epic %s for %d incidents (%s)",
-                  mission.id, group.count, group.error_type)
+    logger.warning(
+        "Auto-heal: created TMA epic %s for %d incidents (%s)",
+        mission.id,
+        group.count,
+        group.error_type,
+    )
     try:
         from ..services.notifications import emit_notification
+
         emit_notification(
             f"Auto-heal: TMA epic created for {group.count} incidents",
-            type="autoheal", message=f"Error type: {group.error_type}. Mission {mission.id[:8]} launched.",
-            url=f"/missions/{mission.id}", severity="warning",
-            source="autoheal", ref_id=mission.id,
+            type="autoheal",
+            message=f"Error type: {group.error_type}. Mission {mission.id[:8]} launched.",
+            url=f"/missions/{mission.id}",
+            severity="warning",
+            source="autoheal",
+            ref_id=mission.id,
         )
     except Exception:
         pass
@@ -235,16 +248,21 @@ async def launch_tma_workflow(mission_id: str) -> Optional[str]:
                 (f"%{mission_id}%",),
             ).fetchone()
         if existing:
-            logger.info("Auto-heal: session %s already active for mission %s, skipping",
-                       existing["id"], mission_id)
+            logger.info(
+                "Auto-heal: session %s already active for mission %s, skipping",
+                existing["id"],
+                mission_id,
+            )
             return existing["id"]
     finally:
         db.close()
 
     wf = wf_store.get(TMA_WORKFLOW_ID)
     if not wf:
-        logger.warning("Auto-heal: TMA workflow '%s' not found, using sf-pipeline fallback",
-                      TMA_WORKFLOW_ID)
+        logger.warning(
+            "Auto-heal: TMA workflow '%s' not found, using sf-pipeline fallback",
+            TMA_WORKFLOW_ID,
+        )
         wf = wf_store.get("sf-pipeline")
         if not wf:
             logger.error("Auto-heal: no workflow available for TMA")
@@ -261,12 +279,21 @@ async def launch_tma_workflow(mission_id: str) -> Optional[str]:
 
     # Launch workflow in background
     from ..web.routes.workflows import _run_workflow_background
-    asyncio.create_task(_run_workflow_background(
-        wf, session.id, mission.goal, mission.project_id or "",
-    ))
 
-    logger.warning("Auto-heal: launched TMA workflow session=%s for mission=%s",
-                  session.id, mission_id)
+    asyncio.create_task(
+        _run_workflow_background(
+            wf,
+            session.id,
+            mission.goal,
+            mission.project_id or "",
+        )
+    )
+
+    logger.warning(
+        "Auto-heal: launched TMA workflow session=%s for mission=%s",
+        session.id,
+        mission_id,
+    )
     return session.id
 
 
@@ -288,26 +315,42 @@ async def resolve_completed_missions():
 
         for r in rows:
             new_status = "resolved" if r["status"] == "completed" else "open"
-            resolution = "Auto-healed by TMA workflow" if new_status == "resolved" else ""
+            resolution = (
+                "Auto-healed by TMA workflow" if new_status == "resolved" else ""
+            )
             db.execute(
                 """UPDATE platform_incidents
                    SET status = ?, resolution = ?, resolved_at = ?
                    WHERE mission_id = ? AND status = 'investigating'""",
-                (new_status, resolution, datetime.now(timezone.utc).isoformat(),
-                 r["mission_id"]),
+                (
+                    new_status,
+                    resolution,
+                    datetime.now(timezone.utc).isoformat(),
+                    r["mission_id"],
+                ),
             )
         if rows:
             db.commit()
-            logger.info("Auto-heal: resolved incidents for %d completed missions", len(rows))
+            logger.info(
+                "Auto-heal: resolved incidents for %d completed missions", len(rows)
+            )
             try:
                 from ..services.notifications import emit_notification
+
                 for r in rows:
-                    status_label = "resolved" if r["status"] == "completed" else "re-opened (failed)"
+                    status_label = (
+                        "resolved"
+                        if r["status"] == "completed"
+                        else "re-opened (failed)"
+                    )
                     emit_notification(
                         f"TMA incidents {status_label}",
-                        type="autoheal", message=f"Mission {r['mission_id'][:8]} {r['status']}.",
-                        url=f"/missions/{r['mission_id']}", severity="info",
-                        source="autoheal", ref_id=r["mission_id"],
+                        type="autoheal",
+                        message=f"Mission {r['mission_id'][:8]} {r['status']}.",
+                        url=f"/missions/{r['mission_id']}",
+                        severity="info",
+                        source="autoheal",
+                        ref_id=r["mission_id"],
                     )
             except Exception:
                 pass
@@ -347,18 +390,24 @@ async def heal_cycle():
     if not groups:
         return
 
-    logger.info("Auto-heal: found %d incident groups (%d active heals)",
-               len(groups), len(_active_heals))
+    logger.info(
+        "Auto-heal: found %d incident groups (%d active heals)",
+        len(groups),
+        len(_active_heals),
+    )
 
     # Notify about new incident groups
     try:
         from ..services.notifications import emit_notification
+
         for g in groups:
             emit_notification(
                 f"Auto-heal: {g.count} new {g.error_type} incident(s)",
-                type="autoheal", message=g.error_detail_sample[:100],
+                type="autoheal",
+                message=g.error_detail_sample[:100],
                 severity="warning" if g.severity in ("P0", "P1") else "info",
-                source="autoheal", ref_id=g.error_type,
+                source="autoheal",
+                ref_id=g.error_type,
             )
     except Exception:
         pass
@@ -366,8 +415,10 @@ async def heal_cycle():
     # 5. Create epics and launch workflows (respect concurrency limit)
     for group in sorted(groups, key=lambda g: _SEV_ORDER.get(g.severity, 3)):
         if len(_active_heals) >= MAX_CONCURRENT_HEALS:
-            logger.info("Auto-heal: max concurrent heals reached (%d), deferring",
-                       MAX_CONCURRENT_HEALS)
+            logger.info(
+                "Auto-heal: max concurrent heals reached (%d), deferring",
+                MAX_CONCURRENT_HEALS,
+            )
             break
 
         mission_id = create_heal_epic(group)
@@ -380,59 +431,71 @@ async def heal_cycle():
 
 async def _recover_interrupted_heals():
     """Detect interrupted/stuck auto-heal sessions and re-launch them."""
-    db = _get_db()
+    # Phase 1: all DB work — read + update, then release connection before awaiting
+    to_relaunch = []
     try:
-        # Find active auto-heal missions whose sessions are interrupted/failed
-        stuck = db.execute(
-            """SELECT DISTINCT m.id as mission_id, m.name
-               FROM missions m
-               WHERE m.created_by = 'auto-heal' AND m.status = 'active'
-                 AND NOT EXISTS (
-                     SELECT 1 FROM sessions s
-                     WHERE (s.name LIKE '%' || substr(m.id, 1, 8) || '%'
-                            OR s.config_json LIKE '%' || m.id || '%')
-                       AND s.status IN ('planning', 'active')
-                 )""",
-        ).fetchall()
-
-        for row in stuck:
-            mid = row["mission_id"]
-            # Mark old sessions as failed
-            db.execute(
-                """UPDATE sessions SET status = 'failed'
-                   WHERE (name LIKE ? OR config_json LIKE ?)
-                     AND status = 'interrupted'""",
-                (f"%{mid[:8]}%", f"%{mid}%"),
-            )
-            db.commit()
-
-            logger.warning("Auto-heal: recovering stuck mission %s (%s)",
-                          mid[:8], row["name"][:40])
-
-            # Re-launch
-            session_id = await launch_tma_workflow(mid)
-            if session_id:
-                try:
-                    from ..services.notifications import emit_notification
-                    emit_notification(
-                        f"Auto-heal: re-launched TMA for {mid[:8]}",
-                        type="autoheal", message=f"Recovered interrupted session. Mission: {row['name'][:60]}",
-                        url=f"/missions/{mid}", severity="warning",
-                        source="autoheal", ref_id=mid,
-                    )
-                except Exception:
-                    pass
+        db = _get_db()
+        try:
+            stuck = db.execute(
+                """SELECT DISTINCT m.id as mission_id, m.name
+                   FROM missions m
+                   WHERE m.created_by = 'auto-heal' AND m.status = 'active'
+                     AND NOT EXISTS (
+                         SELECT 1 FROM sessions s
+                         WHERE (s.name LIKE '%' || substr(m.id, 1, 8) || '%'
+                                OR s.config_json LIKE '%' || m.id || '%')
+                           AND s.status IN ('planning', 'active')
+                     )""",
+            ).fetchall()
+            for row in stuck:
+                mid = row["mission_id"]
+                db.execute(
+                    """UPDATE sessions SET status = 'failed'
+                       WHERE (name LIKE ? OR config_json LIKE ?)
+                         AND status = 'interrupted'""",
+                    (f"%{mid[:8]}%", f"%{mid}%"),
+                )
+                to_relaunch.append((mid, row["name"]))
+            if to_relaunch:
+                db.commit()
+        finally:
+            db.close()  # Release connection before any await
     except Exception as e:
         logger.error("Auto-heal recovery error: %s", e)
-    finally:
-        db.close()
+        return
+
+    # Phase 2: async re-launch, no DB connection held
+    for mid, name in to_relaunch:
+        logger.warning(
+            "Auto-heal: recovering stuck mission %s (%s)", mid[:8], name[:40]
+        )
+        session_id = await launch_tma_workflow(mid)
+        if session_id:
+            try:
+                from ..services.notifications import emit_notification
+
+                emit_notification(
+                    f"Auto-heal: re-launched TMA for {mid[:8]}",
+                    type="autoheal",
+                    message=f"Recovered interrupted session. Mission: {name[:60]}",
+                    url=f"/missions/{mid}",
+                    severity="warning",
+                    source="autoheal",
+                    ref_id=mid,
+                )
+            except Exception:
+                pass
 
 
 async def auto_heal_loop():
     """Background loop: scan incidents → create epics → launch TMA workflows."""
     global _last_cycle_ok, _last_cycle_error
-    logger.info("Auto-heal loop started (interval=%ds, severity≥%s, max_concurrent=%d)",
-               SCAN_INTERVAL, SEVERITY_THRESHOLD, MAX_CONCURRENT_HEALS)
+    logger.info(
+        "Auto-heal loop started (interval=%ds, severity≥%s, max_concurrent=%d)",
+        SCAN_INTERVAL,
+        SEVERITY_THRESHOLD,
+        MAX_CONCURRENT_HEALS,
+    )
     while True:
         await asyncio.sleep(SCAN_INTERVAL)
         if not ENABLED:
@@ -447,6 +510,7 @@ async def auto_heal_loop():
 
 
 # ── Stats ─────────────────────────────────────────────────────────────
+
 
 def get_autoheal_stats() -> dict:
     """Return auto-heal statistics."""
@@ -475,6 +539,7 @@ def get_autoheal_stats() -> dict:
         ).fetchone()["n"]
         # Heartbeat: last cycle within 2× interval = alive
         import time
+
         now = time.time()
         if _last_cycle_ok == 0:
             heartbeat = "starting"
@@ -488,8 +553,17 @@ def get_autoheal_stats() -> dict:
             "interval_s": SCAN_INTERVAL,
             "severity_threshold": SEVERITY_THRESHOLD,
             "max_concurrent": MAX_CONCURRENT_HEALS,
-            "missions": {"total": total, "active": active, "completed": completed, "failed": failed},
-            "incidents": {"open": open_incidents, "investigating": investigating, "resolved": resolved},
+            "missions": {
+                "total": total,
+                "active": active,
+                "completed": completed,
+                "failed": failed,
+            },
+            "incidents": {
+                "open": open_incidents,
+                "investigating": investigating,
+                "resolved": resolved,
+            },
             "active_heals": len(_active_heals),
             "heartbeat": heartbeat,
             "last_cycle_ts": _last_cycle_ok,
@@ -504,6 +578,7 @@ def get_autoheal_stats() -> dict:
 if __name__ == "__main__":
     import argparse
     import sys
+
     sys.path.insert(0, str(__import__("pathlib").Path(__file__).parent.parent.parent))
 
     parser = argparse.ArgumentParser(description="Auto-Heal Engine")
@@ -513,6 +588,7 @@ if __name__ == "__main__":
 
     if args.stats:
         import pprint
+
         pprint.pprint(get_autoheal_stats())
     elif args.once:
         asyncio.run(heal_cycle())

@@ -280,165 +280,165 @@ async def _auto_resume_paused() -> int:
     BACKOFF_MINUTES = [0, 5, 15, 30, 60]  # wait between retries
 
     resumed = 0
+
+    # ── Phase 1: all DB reads + pre-resume writes, then close connection ──
+    eligible = []
+    no_wf_ids = []
+    new_attempts_map = {}
+    now_iso = ""
     try:
-        db = _get_db()
-        # Check how many are already running (avoid overload)
-        running = db.execute(
-            "SELECT COUNT(*) as c FROM mission_runs WHERE status='running'"
-        ).fetchone()["c"]
-
-        if running >= MAX_CONCURRENT_RUNS:
-            logger.info(
-                "WATCHDOG: %d runs already active (max=%d), skipping resume",
-                running,
-                MAX_CONCURRENT_RUNS,
-            )
-            db.close()
-            return 0
-
-        slots = min(RESUME_BATCH_SIZE, MAX_CONCURRENT_RUNS - running)
-
-        # Find paused runs eligible for auto-resume:
-        # - not requiring human input
-        # - not exceeded max attempts
-        # - backoff elapsed since last attempt
-        paused = db.execute(
-            """
-            SELECT mr.session_id, mr.id, s.config_json, mr.workflow_id,
-                   COALESCE(mr.resume_attempts, 0) as attempts,
-                   mr.last_resume_at, mr.project_id, mr.brief
-            FROM mission_runs mr
-            JOIN sessions s ON mr.session_id = s.id
-            WHERE mr.status = 'paused'
-            AND s.status IN ('interrupted', 'paused')
-            AND COALESCE(mr.human_input_required, 0) = 0
-            AND COALESCE(mr.resume_attempts, 0) < ?
-            ORDER BY mr.updated_at ASC
-            LIMIT ?
-        """,
-            (MAX_RESUME_ATTEMPTS, slots * 3),  # fetch more, filter by backoff below
-        ).fetchall()
-
-        if not paused:
-            db.close()
-            return 0
-
         from datetime import datetime, timedelta
+        import json as _json
 
-        now = datetime.utcnow()
-        eligible = []
-        for row in paused:
-            attempts = row["attempts"]
-            last_at = row["last_resume_at"]
-            if last_at:
-                try:
-                    last_dt = datetime.fromisoformat(last_at.replace("Z", ""))
-                    wait_min = BACKOFF_MINUTES[min(attempts, len(BACKOFF_MINUTES) - 1)]
-                    if now - last_dt < timedelta(minutes=wait_min):
-                        continue  # still in backoff window
-                except Exception:
-                    pass
-            eligible.append(row)
-            if len(eligible) >= slots:
-                break
+        db = _get_db()
+        try:
+            running = db.execute(
+                "SELECT COUNT(*) as c FROM mission_runs WHERE status='running'"
+            ).fetchone()["c"]
 
-        if not eligible:
-            db.close()
-            return 0
+            if running >= MAX_CONCURRENT_RUNS:
+                logger.info(
+                    "WATCHDOG: %d runs already active (max=%d), skipping resume",
+                    running,
+                    MAX_CONCURRENT_RUNS,
+                )
+                return 0
 
-        # Log root cause analysis for missions with multiple failures
-        stalled = [r for r in eligible if r["attempts"] >= 2]
-        if stalled:
+            slots = min(RESUME_BATCH_SIZE, MAX_CONCURRENT_RUNS - running)
+            paused = db.execute(
+                """
+                SELECT mr.session_id, mr.id, s.config_json, mr.workflow_id,
+                       COALESCE(mr.resume_attempts, 0) as attempts,
+                       mr.last_resume_at, mr.project_id, mr.brief
+                FROM mission_runs mr
+                JOIN sessions s ON mr.session_id = s.id
+                WHERE mr.status = 'paused'
+                AND s.status IN ('interrupted', 'paused')
+                AND COALESCE(mr.human_input_required, 0) = 0
+                AND COALESCE(mr.resume_attempts, 0) < ?
+                ORDER BY mr.updated_at ASC
+                LIMIT ?
+                """,
+                (MAX_RESUME_ATTEMPTS, slots * 3),
+            ).fetchall()
+
+            if not paused:
+                return 0
+
+            now = datetime.utcnow()
+            now_iso = now.isoformat()
+            for row in paused:
+                last_at = row["last_resume_at"]
+                if last_at:
+                    try:
+                        last_dt = datetime.fromisoformat(last_at.replace("Z", ""))
+                        wait_min = BACKOFF_MINUTES[
+                            min(row["attempts"], len(BACKOFF_MINUTES) - 1)
+                        ]
+                        if now - last_dt < timedelta(minutes=wait_min):
+                            continue
+                    except Exception:
+                        pass
+                eligible.append(dict(row))
+                if len(eligible) >= slots:
+                    break
+
+            if not eligible:
+                return 0
+
+            stalled = [r for r in eligible if r["attempts"] >= 2]
+            if stalled:
+                logger.warning(
+                    "WATCHDOG: %d missions with %d+ failed resumes: %s",
+                    len(stalled),
+                    2,
+                    [r["id"][:8] for r in stalled],
+                )
             logger.warning(
-                "WATCHDOG: %d missions with %d+ failed resumes (possible loop/block): %s",
-                len(stalled),
-                2,
-                [r["id"][:8] for r in stalled],
+                "WATCHDOG: auto-resuming %d/%d paused runs (running=%d, slots=%d)",
+                len(eligible),
+                len(paused),
+                running,
+                slots,
             )
 
-        logger.warning(
-            "WATCHDOG: auto-resuming %d/%d paused runs (running=%d, slots=%d)",
-            len(eligible),
-            len(paused),
-            running,
-            slots,
-        )
-
-        for row in eligible:
-            try:
-                import json as _json
-
+            # Write pre-resume status updates while we still hold the connection
+            for row in eligible:
                 config = _json.loads(row["config_json"]) if row["config_json"] else {}
                 wf_id = config.get("workflow_id", row["workflow_id"] or "")
                 if not wf_id:
-                    # No workflow — mark as human_input_required to skip future attempts
+                    no_wf_ids.append(row["id"])
                     db.execute(
                         "UPDATE mission_runs SET human_input_required=1 WHERE id=?",
                         (row["id"],),
                     )
-                    db.commit()
                     continue
-
-                sid = row["session_id"]
                 new_attempts = row["attempts"] + 1
-
-                # Update statuses + increment resume counter
-                db.execute("UPDATE sessions SET status='active' WHERE id=?", (sid,))
+                new_attempts_map[row["id"]] = new_attempts
                 db.execute(
-                    """UPDATE mission_runs SET status='running',
-                       resume_attempts=?, last_resume_at=?
-                       WHERE id=?""",
-                    (new_attempts, now.isoformat(), row["id"]),
+                    "UPDATE sessions SET status='active' WHERE id=?",
+                    (row["session_id"],),
                 )
-                db.commit()
-
-                # Trigger one-shot batch resume (avoid calling the infinite loop)
-                try:
-                    from ..services.auto_resume import _resume_batch
-
-                    resumed = await _resume_batch(stagger=5.0)
-                    _log_metric(
-                        "auto_resume",
-                        resumed,
-                        f"batch via _resume_batch (attempt {new_attempts})",
-                    )
-                    logger.warning(
-                        "WATCHDOG: auto-resumed %d runs (attempt %d)",
-                        resumed,
-                        new_attempts,
-                    )
-                except Exception as _re:
-                    _log_metric("auto_resume_fail", 0, str(_re))
-                    # Revert to paused on failure
-                    db.execute(
-                        "UPDATE mission_runs SET status='paused' WHERE id=?",
-                        (row["id"],),
-                    )
-                    db.commit()
-
-                # Don't loop per-session — resume-all handles the batch
-                break
-            except Exception as e:
-                logger.warning("WATCHDOG: resume failed for %s: %s", row["id"][:8], e)
-
-        # Auto-abandon missions that have exhausted retries
-        abandoned = db.execute(
-            """UPDATE mission_runs SET status='abandoned', updated_at=datetime('now')
-               WHERE status='paused'
-               AND COALESCE(resume_attempts, 0) >= ?
-               AND COALESCE(human_input_required, 0) = 0""",
-            (MAX_RESUME_ATTEMPTS,),
-        ).rowcount
-        if abandoned:
+                db.execute(
+                    "UPDATE mission_runs SET status='running', resume_attempts=?, last_resume_at=? WHERE id=?",
+                    (new_attempts, now_iso, row["id"]),
+                )
             db.commit()
-            logger.warning(
-                "WATCHDOG: abandoned %d missions that exhausted resume retries",
-                abandoned,
-            )
 
-        db.close()
+            # Auto-abandon exhausted missions
+            abandoned = db.execute(
+                """UPDATE mission_runs SET status='abandoned', updated_at=datetime('now')
+                   WHERE status='paused'
+                   AND COALESCE(resume_attempts, 0) >= ?
+                   AND COALESCE(human_input_required, 0) = 0""",
+                (MAX_RESUME_ATTEMPTS,),
+            ).rowcount
+            if abandoned:
+                db.commit()
+                logger.warning(
+                    "WATCHDOG: abandoned %d missions that exhausted resume retries",
+                    abandoned,
+                )
+        finally:
+            db.close()  # Release before any await
     except Exception as e:
         logger.warning("WATCHDOG: auto-resume error: %s", e)
+        return resumed
+
+    # Filter to only rows that have a workflow
+    to_resume = [
+        r for r in eligible if r["id"] not in no_wf_ids and r["id"] in new_attempts_map
+    ]
+    if not to_resume:
+        return resumed
+
+    # ── Phase 2: async resume, no DB connection held ──
+    row = to_resume[0]  # batch handles the rest
+    new_attempts = new_attempts_map[row["id"]]
+    try:
+        from ..services.auto_resume import _resume_batch
+
+        resumed = await _resume_batch(stagger=5.0)
+        _log_metric(
+            "auto_resume", resumed, f"batch via _resume_batch (attempt {new_attempts})"
+        )
+        logger.warning(
+            "WATCHDOG: auto-resumed %d runs (attempt %d)", resumed, new_attempts
+        )
+    except Exception as _re:
+        _log_metric("auto_resume_fail", 0, str(_re))
+        # Revert to paused on failure
+        try:
+            db2 = _get_db()
+            try:
+                db2.execute(
+                    "UPDATE mission_runs SET status='paused' WHERE id=?", (row["id"],)
+                )
+                db2.commit()
+            finally:
+                db2.close()
+        except Exception:
+            pass
 
     return resumed
 
