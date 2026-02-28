@@ -46,6 +46,8 @@ async def list_proposals(status: str = "", limit: int = 50) -> JSONResponse:
             params + [limit],
         ).fetchall()
         db.close()
+        from datetime import datetime as _dt
+
         proposals = []
         for r in rows:
             p = dict(r)
@@ -53,6 +55,9 @@ async def list_proposals(status: str = "", limit: int = 50) -> JSONResponse:
                 p["genome"] = json.loads(p.pop("genome_json", "{}"))
             except Exception:
                 p["genome"] = {}
+            for k, v in p.items():
+                if isinstance(v, _dt):
+                    p[k] = v.isoformat()
             proposals.append(p)
         return JSONResponse({"proposals": proposals, "total": len(proposals)})
     except Exception as e:
@@ -140,6 +145,8 @@ async def list_runs(wf_id: str = "", limit: int = 20) -> JSONResponse:
             params + [limit],
         ).fetchall()
         db.close()
+        from datetime import datetime as _dt
+
         runs = []
         for r in rows:
             run = dict(r)
@@ -149,6 +156,9 @@ async def list_runs(wf_id: str = "", limit: int = 20) -> JSONResponse:
                 )
             except Exception:
                 run["fitness_history"] = []
+            for k, v in run.items():
+                if isinstance(v, _dt):
+                    run[k] = v.isoformat()
             runs.append(run)
         return JSONResponse({"runs": runs, "total": len(runs)})
     except Exception as e:

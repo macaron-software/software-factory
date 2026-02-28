@@ -534,16 +534,24 @@ async def workflows_evolution(request: Request):
         ).fetchall()
     ]
     db.close()
+    from datetime import datetime as _datetime_type
+
     for p in proposals:
         try:
             p["genome"] = _json.loads(p.pop("genome_json", "{}"))
         except Exception:
             p["genome"] = {}
+        for k, v in p.items():
+            if isinstance(v, _datetime_type):
+                p[k] = v.isoformat()
     for r in runs:
         try:
             r["fitness_history"] = _json.loads(r.pop("fitness_history_json", "[]"))
         except Exception:
             r["fitness_history"] = []
+        for k, v in r.items():
+            if isinstance(v, _datetime_type):
+                r[k] = v.isoformat()
     # RL stats
     rl_stats = {}
     try:
