@@ -6,6 +6,7 @@ import asyncio
 import json
 import time
 import uuid
+from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -14,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from ...db.migrations import get_db
 
 router = APIRouter()
-templates = Jinja2Templates(directory="platform/web/templates")
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 # ── Pages ────────────────────────────────────────────────────────────────────

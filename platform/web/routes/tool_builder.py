@@ -6,6 +6,7 @@ import json
 import sqlite3
 import subprocess
 import uuid
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Request
@@ -15,7 +16,7 @@ from fastapi.templating import Jinja2Templates
 from ...db.migrations import get_db
 
 router = APIRouter()
-templates = Jinja2Templates(directory="platform/web/templates")
+templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 # ── Pages ────────────────────────────────────────────────────────────────────
