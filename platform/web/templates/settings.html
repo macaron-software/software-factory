@@ -77,6 +77,9 @@
         <button class="settings-tab" onclick="showSettingsTab('notifications')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-bell"/></svg> Notifications
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('modules')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
+        </button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -541,7 +544,160 @@
         </section>
 
     </div>
+
+    <!-- ═══ Modules ═══ -->
+    <div class="settings-panel" id="panel-modules">
+        <section class="settings-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <div>
+                    <h3 style="margin:0">Optional Modules</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
+                </div>
+                <button class="btn btn-sm" onclick="document.getElementById('modules-container').dataset.loaded='';loadModulesTab()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
+            </div>
+            <div id="modules-container">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+
 </div>
+
+<!-- ═══ Modules Panel (injected after LLM panel) ═══ -->
+<style>
+.module-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;display:flex;flex-direction:column;gap:0.5rem;transition:border-color .15s}
+.module-card.enabled{border-color:var(--purple);background:var(--bg-highlight,rgba(139,92,246,.04))}
+.module-card-header{display:flex;align-items:flex-start;gap:0.75rem}
+.module-icon{font-size:1.5rem;line-height:1;flex-shrink:0;margin-top:2px}
+.module-info{flex:1;min-width:0}
+.module-name{font-weight:600;font-size:0.88rem;color:var(--text-primary)}
+.module-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;line-height:1.4}
+.module-meta{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.3rem}
+.module-cat-badge{font-size:0.68rem;padding:2px 7px;border-radius:4px;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+.module-tools{font-size:0.72rem;color:var(--text-secondary);font-family:monospace;margin-top:0.3rem}
+.module-actions{display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.6rem}
+.module-toggle{display:flex;align-items:center;gap:0.5rem;cursor:pointer}
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;margin-top:1rem}
+.modules-cat-section{margin-bottom:2rem}
+.modules-cat-title{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.75rem;border-bottom:1px solid var(--border);padding-bottom:0.4rem}
+</style>
+
+<script>
+const _CAT_LABELS = {
+  'ux-design':'🎨 UX / Design','development':'💻 Development','security':'🔒 Security',
+  'legal':'⚖️ Legal / Compliance','marketing-seo':'📣 Marketing / SEO','data':'🗄️ Data','ai-llm':'🤖 AI / LLM'
+};
+
+async function loadModulesTab() {
+    const container = document.getElementById('modules-container');
+    if (!container || container.dataset.loaded) return;
+    container.dataset.loaded = '1';
+    try {
+        const r = await fetch('/api/modules');
+        const modules = await r.json();
+        renderModules(modules);
+    } catch(e) {
+        container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
+    }
+}
+
+function renderModules(modules) {
+    const container = document.getElementById('modules-container');
+    // Group by category
+    const byCat = {};
+    modules.forEach(m => {
+        const c = m.category || 'other';
+        if (!byCat[c]) byCat[c] = [];
+        byCat[c].push(m);
+    });
+
+    const catOrder = ['ux-design','development','security','legal','marketing-seo','data','ai-llm','other'];
+    let html = '';
+    catOrder.filter(c => byCat[c]).forEach(cat => {
+        const label = _CAT_LABELS[cat] || cat;
+        html += `<div class="modules-cat-section">
+            <div class="modules-cat-title">${label}</div>
+            <div class="modules-grid">`;
+        byCat[cat].forEach(m => { html += moduleCard(m); });
+        html += `</div></div>`;
+    });
+    container.innerHTML = html;
+}
+
+function moduleCard(m) {
+    const tools = (m.tools || []).map(t => `<code>${t}</code>`).join(' ');
+    const needsInstall = m.data_file && !m.installed;
+    const installBtn = needsInstall
+        ? `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`
+        : (m.installed && m.data_file ? `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>` : `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`);
+    const repoLink = m.repo_url ? `<a href="${m.repo_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">GitHub ↗</a>` : '';
+    const srcLink = m.source_url ? `<a href="${m.source_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">${m.name} ↗</a>` : '';
+    return `
+    <div class="module-card ${m.enabled?'enabled':''}" id="module-card-${m.id}">
+        <div class="module-card-header">
+            <span class="module-icon">${m.icon||'🔧'}</span>
+            <div class="module-info">
+                <div class="module-name">${m.name}</div>
+                <div class="module-desc">${m.description}</div>
+                <div class="module-meta">
+                    <span class="module-cat-badge">${m.category||'other'}</span>
+                    ${m.license?`<span class="module-cat-badge" style="border-style:dashed">${m.license}</span>`:''}
+                    ${m.builtin?`<span class="module-cat-badge" style="background:rgba(139,92,246,.1);color:var(--purple);border-color:var(--purple)">built-in</span>`:''}
+                </div>
+                ${tools?`<div class="module-tools">Tools: ${tools}</div>`:''}
+            </div>
+            <label style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
+                <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${m.enabled?'var(--purple)':'var(--border)'};transition:background .2s" id="mod-track-${m.id}">
+                    <span style="position:absolute;top:2px;left:${m.enabled?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mod-thumb-${m.id}"></span>
+                </span>
+            </label>
+        </div>
+        <div class="module-actions">
+            ${installBtn}
+            <div style="flex:1"></div>
+            ${srcLink}
+            ${repoLink}
+        </div>
+    </div>`;
+}
+
+async function toggleModule(event, id) {
+    event.preventDefault();
+    const track = document.getElementById('mod-track-'+id);
+    const thumb = document.getElementById('mod-thumb-'+id);
+    const card  = document.getElementById('module-card-'+id);
+    try {
+        const r = await fetch('/api/modules/'+id+'/toggle', {method:'POST'});
+        const d = await r.json();
+        if (!d.ok) return;
+        track.style.background = d.enabled ? 'var(--purple)' : 'var(--border)';
+        thumb.style.left = d.enabled ? '16px' : '2px';
+        card.classList.toggle('enabled', d.enabled);
+    } catch(e) { console.error(e); }
+}
+
+async function installModule(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Installing...';
+    try {
+        const r = await fetch('/api/modules/'+id+'/install', {method:'POST'});
+        const d = await r.json();
+        if (d.ok) {
+            btn.textContent = '✓ Done';
+            btn.style.color = 'var(--green)';
+            // Reload to refresh installed status
+            setTimeout(() => { document.getElementById('modules-container').dataset.loaded=''; loadModulesTab(); }, 1000);
+        } else {
+            btn.textContent = '✗ Failed';
+            btn.style.color = 'var(--red)';
+            alert('Install failed:\n' + (d.error || d.stderr || ''));
+            btn.disabled = false;
+        }
+    } catch(e) { btn.textContent = '✗ Error'; btn.disabled = false; }
+}
+</script>
 
 <script>
 function showSettingsTab(id) {
@@ -552,6 +708,7 @@ function showSettingsTab(id) {
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
     if (id === 'orchestrator') refreshLoad();
+    if (id === 'modules') loadModulesTab();
 }
 // Restore last tab
 try {
