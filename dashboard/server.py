@@ -328,11 +328,14 @@ def get_all_projects() -> List[Dict]:
         arch_domain_color = "#6B7280"
         if arch_domain_id:
             try:
-                import sys, os
+                import sys
+                import os
+
                 _sf_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
                 if _sf_root not in sys.path:
                     sys.path.insert(0, _sf_root)
                 from platform.projects.domains import load_domain
+
                 d = load_domain(arch_domain_id)
                 if d:
                     arch_domain_label = d.name
@@ -722,12 +725,34 @@ async def home(request: Request):
     )
     # Load Azure / OVH deploy status (non-blocking, cached)
     deploy_status = await asyncio.to_thread(_get_deploy_status)
+
+    # Group projects by domain
+    domain_groups: dict[str, dict] = {}
+    for p in projects:
+        key = p.get("arch_domain") or "_none"
+        label = p.get("arch_domain_label") or "Sans domaine"
+        color = p.get("arch_domain_color") or "#6B7280"
+        if key not in domain_groups:
+            domain_groups[key] = {
+                "id": key,
+                "label": label,
+                "color": color,
+                "projects": [],
+            }
+        domain_groups[key]["projects"].append(p)
+    # Sort groups: known domains first (alphabetically), then _none last
+    sorted_groups = sorted(
+        domain_groups.values(),
+        key=lambda g: ("z" if g["id"] == "_none" else g["label"]),
+    )
+
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "stats": stats,
             "projects": projects,
+            "domain_groups": sorted_groups,
             "deploy_status": deploy_status,
         },
     )

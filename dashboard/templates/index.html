@@ -94,11 +94,19 @@
     </div>
 </div>
 
-<!-- Projects Grid -->
+<!-- Projects Grid (grouped by domain) -->
 <h2 class="text-xl font-bold mb-4">Projects</h2>
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-    {% for project in projects %}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
+{% if domain_groups %}
+  {% for group in domain_groups %}
+  <div class="mb-6">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="w-3 h-3 rounded-full inline-block" style="background-color: {{ group.color }};"></span>
+      <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300">{{ group.label }}</h3>
+      <span class="text-xs text-gray-400">({{ group.projects|length }})</span>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for project in group.projects %}
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
         <div class="p-4">
             <!-- Header -->
             <div class="flex items-center justify-between mb-3">
@@ -188,9 +196,24 @@
                 </div>
             </div>
         </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+    {% for project in projects %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow">
+        <div class="p-4">
+            <div class="flex items-center justify-between mb-3">
+                <a href="/project/{{ project.id }}" class="font-semibold text-lg hover:text-blue-600">{{ project.display_name }}</a>
+            </div>
+        </div>
     </div>
     {% endfor %}
 </div>
+{% endif %}
 
 <!-- Team of Rivals Metrics -->
 <h2 class="text-xl font-bold mb-4">Team of Rivals - Quality Metrics</h2>
