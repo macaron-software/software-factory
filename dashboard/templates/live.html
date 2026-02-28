@@ -14,7 +14,7 @@
     <span class="text-xs text-gray-500 hidden sm:inline" title="RTK proxy — token compression on agent bash commands">
       🗜️ RTK: <span id="rtk-pct" class="font-semibold text-green-600 dark:text-green-400">—</span>%
       <span class="text-gray-400">(<span id="rtk-proxied">—</span>/<span id="rtk-total">—</span> cmds,
-      ~<span id="rtk-saved">—</span> KB saved)</span>
+      <span id="rtk-tokens" class="text-green-500">—</span> tokens saved)</span>
     </span>
     <button onclick="clearFeed()" class="text-xs px-2 py-1 rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-700">Vider</button>
   </div>
@@ -105,11 +105,12 @@ function startStream() {
       document.getElementById('agent-count').textContent = data.active_agents.length;
     }
     if (data.rtk && data.rtk.cmds_total > 0) {
-      document.getElementById('rtk-pct').textContent = data.rtk.proxied_pct;
+      document.getElementById('rtk-pct').textContent = data.rtk.savings_pct !== undefined ? data.rtk.savings_pct : data.rtk.proxied_pct;
       document.getElementById('rtk-proxied').textContent = data.rtk.cmds_proxied;
       document.getElementById('rtk-total').textContent = data.rtk.cmds_total;
-      document.getElementById('rtk-saved').textContent = Math.round(data.rtk.bytes_saved_est / 1024);
-      document.querySelector('.hidden.sm\\:inline') && document.querySelector('[title^="RTK"]').classList.remove('hidden');
+      var saved = data.rtk.tokens_saved || 0;
+      document.getElementById('rtk-tokens').textContent = saved >= 1000 ? (saved/1000).toFixed(1)+'K' : saved;
+      document.querySelector('[title^="RTK"]').classList.remove('hidden');
     }
     // Add events
     (data.tool_calls||[]).forEach(function(tc) {

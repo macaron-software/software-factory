@@ -16,6 +16,7 @@ Opens at http://localhost:8080
 import asyncio
 import json
 import os
+import platform
 import sqlite3
 import subprocess
 import sys
@@ -36,6 +37,15 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = BASE_DIR / "data"
 PROJECTS_DIR = BASE_DIR / "projects"
 PID_DIR = Path("/tmp/factory")
+
+# RTK history DB (per-command token savings tracked by rtk itself)
+_RTK_HISTORY_DB: Path | None = None
+_rtk_home = {
+    "Darwin": Path.home() / "Library" / "Application Support" / "rtk" / "history.db",
+    "Linux": Path.home() / ".local" / "share" / "rtk" / "history.db",
+}.get(platform.system())
+if _rtk_home and _rtk_home.exists():
+    _RTK_HISTORY_DB = _rtk_home
 
 # Load .env if present (for AZURE_PLATFORM_URL, OVH_PLATFORM_URL, etc.)
 _env_file = BASE_DIR / ".env"
@@ -858,20 +868,35 @@ def _get_live_activity(since_ts: str | None = None) -> dict:
             "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
         ).fetchall()
 
-        # RTK proxy stats
+        # RTK proxy stats — sandbox cmd counts from platform.db
         rtk_row = conn.execute(
-            "SELECT cmds_total, cmds_proxied, bytes_saved_est FROM rtk_stats WHERE id=1",
+            "SELECT cmds_total, cmds_proxied FROM rtk_stats WHERE id=1",
         ).fetchone()
-        rtk = (
-            dict(rtk_row)
-            if rtk_row
-            else {"cmds_total": 0, "cmds_proxied": 0, "bytes_saved_est": 0}
-        )
+        rtk = dict(rtk_row) if rtk_row else {"cmds_total": 0, "cmds_proxied": 0}
         rtk["proxied_pct"] = (
             round(100 * rtk["cmds_proxied"] / rtk["cmds_total"], 1)
             if rtk["cmds_total"]
             else 0
         )
+        # Real token savings from RTK's own history DB
+        rtk["tokens_saved"] = 0
+        rtk["tokens_input"] = 0
+        if _RTK_HISTORY_DB:
+            try:
+                rconn = sqlite3.connect(str(_RTK_HISTORY_DB))
+                row = rconn.execute(
+                    "SELECT SUM(saved_tokens), SUM(input_tokens) FROM commands"
+                ).fetchone()
+                rtk["tokens_saved"] = int(row[0] or 0)
+                rtk["tokens_input"] = int(row[1] or 0)
+                rtk["savings_pct"] = (
+                    round(100 * rtk["tokens_saved"] / rtk["tokens_input"], 1)
+                    if rtk["tokens_input"]
+                    else 0
+                )
+                rconn.close()
+            except Exception:
+                pass
 
         conn.close()
         return {
