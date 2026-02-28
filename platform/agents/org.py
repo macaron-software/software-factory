@@ -669,9 +669,6 @@ class OrgStore:
                     name="ART Knowledge Management",
                     portfolio_id="portfolio-dsi",
                     description="Knowledge curation, documentation, memory intelligence, wiki maintenance.",
-                    capacity=8,
-                    wip_limit=3,
-                    objective="Keep institutional knowledge fresh, relevant and accessible across all teams.",
                 )
             )
 

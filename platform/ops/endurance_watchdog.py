@@ -338,16 +338,15 @@ async def _auto_resume_paused() -> int:
                 )
                 db.commit()
 
-                # Trigger resume directly via service (same process, no HTTP auth needed)
+                # Trigger one-shot batch resume (avoid calling the infinite loop)
                 try:
-                    from ..services.auto_resume import auto_resume_missions
+                    from ..services.auto_resume import _resume_batch
 
-                    await auto_resume_missions()
-                    resumed = slots
-                    _log_metric("auto_resume", slots, "batch via auto_resume_missions")
+                    resumed = await _resume_batch(stagger=5.0)
+                    _log_metric("auto_resume", resumed, "batch via _resume_batch")
                     logger.warning(
                         "WATCHDOG: auto-resuming %d paused runs (running=%d, slots=%d)",
-                        len(paused),
+                        resumed,
                         running,
                         slots,
                     )

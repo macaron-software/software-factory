@@ -377,6 +377,21 @@ async def _run_workflow_background(
     from ...sessions.store import get_session_store, MessageDef
     from .helpers import _active_mission_tasks
 
+    # Mark mission_run as running at task start — overrides any 'paused' set by
+    # startup cleanup that raced with asyncio task scheduling.
+    try:
+        from ...db.migrations import get_db as _gdb_start
+
+        _db_start = _gdb_start()
+        _db_start.execute(
+            "UPDATE mission_runs SET status='running' WHERE session_id=?",
+            (session_id,),
+        )
+        _db_start.commit()
+        _db_start.close()
+    except Exception:
+        pass
+
     try:
         result = await run_workflow(
             wf, session_id, task, project_id, resume_from=resume_from
@@ -462,7 +477,7 @@ async def _run_workflow_background(
 
             _db = _gdb()
             _db.execute(
-                "UPDATE mission_runs SET status=? WHERE session_id=? AND status='running'",
+                "UPDATE mission_runs SET status=? WHERE session_id=? AND status IN ('running','paused')",
                 ("completed", session_id),
             )
             _db.commit()
