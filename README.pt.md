@@ -31,11 +31,16 @@
 
 Software Factory é uma **plataforma autônoma multi-agente** que orquestra todo o ciclo de vida de desenvolvimento de software — da ideação ao deploy — usando agentes de IA especializados trabalhando juntos.
 
-Pense nela como uma **fábrica de software virtual** onde 161 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
+Pense nela como uma **fábrica de software virtual** onde 181 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
 
 ### Destaques Principais
 
-- **161 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
+- **181 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
+- **42 workflows integrados** — cerimônias SAFe, quality gates, manutenção noturna, segurança, gestão do conhecimento
+- **Gestão do Conhecimento** — 4 agentes dedicados, equipe ART Knowledge, workflow noturno `knowledge-maintenance`
+- **Inteligência de Memória** — pontuação de relevância, rastreamento de acessos, remoção automática de entradas obsoletas
+- **Rastreamento de Custo LLM** — custo por missão no cabeçalho da aba de timeline
+- **Timeline de Missão** — aba de timeline em raias mostrando durações de fases no Mission Control
 - **10 padrões de orquestração** — solo, sequencial, paralelo, hierárquico, rede, loop, roteador, agregador, onda, human-in-the-loop
 - **Ciclo de vida alinhado ao SAFe** — Portfolio → Epic → Feature → Story com cadência de PI
 - **Auto-correção** — detecção autônoma de incidentes, triagem e auto-reparo
@@ -230,7 +235,7 @@ Todas as quatro são criadas com o projeto. TMA, Segurança e Self-Healing come�
 
 ## Funcionalidades
 
-### 161 Agentes de IA Especializados
+### 181 Agentes de IA Especializados
 
 Os agentes são organizados em equipes que espelham organizações de software reais:
 
@@ -429,7 +434,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -920,6 +925,46 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 - **Grade de provedores** — status ativo/inativo com dicas sobre chaves API ausentes
 - **Matriz de roteamento** — pesado/leve por categoria (Raciocínio, Produção/Código, Tarefas, Redação)
 - **Seção Darwin LLM A/B** — visualização em tempo real de experimentos de modelos em andamento
+
+## Novidades na v2.7.0 (2026)
+
+### Sistema de Gestão do Conhecimento
+- **4 novos agentes** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **Equipe ART Knowledge** — Agile Release Train dedicado a operações de conhecimento
+- **Workflow noturno `knowledge-maintenance`** — curadoria automática, deduplicação, pontuação de frescor
+- **Dashboard de Saúde da Memória** — métricas de saúde do conhecimento na aba Métricas
+- **Badge de Saúde do Conhecimento** — visível na página de Configurações
+
+### Inteligência de Memória
+- **Pontuação de relevância** — fórmula `confiança × recência × boost_acesso` para recuperação classificada
+- **Rastreamento de acessos** — campos `access_count` e `last_read_at` em cada entrada de memória
+- **Remoção automática** — entradas obsoletas removidas a cada execução noturna
+
+### Rastreamento de Custo LLM
+- **Custo por missão** — exibido no cabeçalho da aba de timeline de missão
+- **Auto-somado** — agregado da tabela `llm_traces`
+
+### Timeline de Missão
+- **Aba de timeline em raias** — no Mission Control, mostra fases de agente como raias horizontais
+- **Durações de fases** — representação visual do tempo por fase
+
+### Pontuação de Qualidade
+- **Campo `quality_score` no PhaseRun** — preenchido pelo guarda adversarial após cada fase
+
+### Exportação/Importação de Projeto
+- **Arquivo ZIP** — contém `project.json` + todas as missões + execuções + memórias
+
+### Validação de Entrada
+- **Modelos Pydantic** — todas as rotas POST/PATCH validadas com esquemas estritos
+
+### Diretrizes de Domínio BSCC
+- **Diretrizes de arquitetura por domínio** — Confluence/Solaris aplicadas por domínio de projeto
+
+### Hub de Integrações de Configurações
+- **Integrações de ferramentas configuráveis** — Jira, Confluence, SonarQube disponíveis para todos os agentes
+
+### Notificações Push do Navegador
+- **Web Push API (VAPID)** — notificações push nativas do navegador para eventos de missão
 
 ## Novidades na v2.3.0 (Fev 2026)
 

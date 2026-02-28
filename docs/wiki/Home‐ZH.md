@@ -1,6 +1,6 @@
-# 🏭 Software Factory — Wiki
+# Software Factory — Wiki
 
-**Macaron Software Factory** 是一个面向软件开发团队的AI代理编排平台。它通过SAFe方法论协调156个专业代理，执行36个工作流。
+**Macaron Software Factory** 是一个面向软件开发团队的AI代理编排平台。它通过SAFe方法论协调181个专业代理，执行36个工作流。
 
 ## 导航
 

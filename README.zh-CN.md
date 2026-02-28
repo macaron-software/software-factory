@@ -31,11 +31,16 @@
 
 Software Factory 是一个**自主多智能体平台**，它编排整个软件开发生命周期 — 从构思到部署 — 使用专业化 AI 智能体协同工作。
 
-可以将其视为一个**虚拟软件工厂**，其中 161 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
+可以将其视为一个**虚拟软件工厂**，其中 181 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
 
 ### 核心亮点
 
-- **161 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **181 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **42 个内置工作流** — SAFe 仪式、质量门控、夜间维护、安全、知识管理
+- **知识管理** — 4 个专用智能体、ART 知识团队、夜间 `knowledge-maintenance` 工作流
+- **内存智能** — 相关性评分、访问追踪、自动清除过期条目
+- **LLM 成本追踪** — 任务时间线标签页标题中显示每个任务的成本
+- **任务时间线** — Mission Control 中以泳道方式显示阶段持续时间的时间线标签页
 - **10 种编排模式** — 单智能体、顺序、并行、层级、网络、循环、路由、聚合、波次、人机协作
 - **SAFe 对齐生命周期** — Portfolio → Epic → Feature → Story，PI 节奏驱动
 - **自动修复** — 自主事件检测、分类和自修复
@@ -230,7 +235,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## 功能特性
 
-### 161 个专业 AI 智能体
+### 181 个专业 AI 智能体
 
 智能体按团队组织，镜像真实软件组织结构：
 
@@ -429,7 +434,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -920,6 +925,46 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **提供商网格** — 显示启用/禁用状态及缺少 API 密钥的提示
 - **路由矩阵** — 按类别（推理、生产/代码、任务、撰写）配置重/轻模型
 - **Darwin LLM A/B 区域** — 正在进行的模型实验的实时视图
+
+## v2.7.0 新功能（2026 年）
+
+### 知识管理系统
+- **4 个新智能体** — `knowledge-manager`、`knowledge-curator`、`knowledge-seeder`、`wiki-maintainer`
+- **ART 知识团队** — 专注知识运营的敏捷发布火车
+- **夜间 `knowledge-maintenance` 工作流** — 自动整理、去重、新鲜度评分
+- **内存健康仪表盘** — 指标标签页中的知识健康指标面板
+- **知识健康徽章** — 在设置页面可见
+
+### 内存智能
+- **相关性评分** — `置信度 × 新近度 × 访问增益` 公式实现排序检索
+- **访问追踪** — 每个内存条目的 `access_count` 和 `last_read_at` 字段
+- **自动清除** — 每次夜间运行时删除低于阈值的过期条目
+
+### LLM 成本追踪
+- **每任务成本** — 显示在任务时间线标签页标题中
+- **自动汇总** — 从 `llm_traces` 表聚合
+
+### 任务时间线
+- **泳道时间线标签页** — 在 Mission Control 中以水平泳道展示智能体阶段
+- **阶段持续时间** — 每个阶段耗时的可视化展示
+
+### 质量评分
+- **PhaseRun 的 `quality_score` 字段** — 每个阶段后由对抗守卫填充
+
+### 项目导出/导入
+- **ZIP 压缩包** — 包含 `project.json` + 所有任务 + 运行 + 记忆
+
+### 输入验证
+- **Pydantic 模型** — 所有 POST/PATCH 路由使用严格的输入模式验证
+
+### BSCC 领域指南
+- **领域架构指南** — 按项目领域强制执行 Confluence/Solaris 指南
+
+### 设置集成中心
+- **可配置工具集成** — Jira、Confluence、SonarQube 可供所有智能体使用
+
+### 浏览器推送通知
+- **Web Push API (VAPID)** — 任务事件的原生浏览器推送通知
 
 ## v2.3.0 新特性（2026 年 2 月）
 

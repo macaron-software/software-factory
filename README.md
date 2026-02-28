@@ -31,11 +31,16 @@
 
 Software Factory is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-Think of it as a **virtual software factory** where 161 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
+Think of it as a **virtual software factory** where 181 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
 ### Key Highlights
 
-- **161 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **181 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **42 built-in workflows** — SAFe ceremonies, quality gates, nightly maintenance, security, knowledge management
+- **Knowledge Management** — 4 dedicated agents, ART Knowledge team, nightly knowledge-maintenance workflow
+- **Memory Intelligence** — relevance scoring, access tracking, automatic pruning of stale entries
+- **LLM Cost Tracking** — per-mission cost display auto-summed from LLM traces
+- **Mission Timeline** — swimlane timeline showing phase durations in Mission Control
 - **10 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
@@ -230,7 +235,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## Features
 
-### 161 Specialized AI Agents
+### 181 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 
@@ -404,6 +409,29 @@ Automatic documentation generation throughout the lifecycle:
 - **Confluence sync** — bidirectional sync with Confluence wiki pages for enterprise documentation
 - **Swagger auto-docs** — 94 REST endpoints auto-documented at `/docs` with OpenAPI schema
 
+### Knowledge Management System
+
+A dedicated subsystem for organizational knowledge, introduced in v2.7.0:
+
+- **4 specialized agents** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART Knowledge team** — dedicated Agile Release Train team for knowledge operations
+- **Nightly `knowledge-maintenance` workflow** — automatic curation, deduplication, and freshness scoring
+- **Memory Health dashboard** — knowledge health metrics in the Metrics tab
+- **Knowledge Health badge** — visible in the Settings page
+- **Relevance scoring formula** — `confidence × recency × access_boost` for intelligent retrieval ranking
+- **Access tracking** — `access_count` and `last_read_at` fields on every memory entry
+- **Automatic pruning** — stale entries below threshold removed on each nightly run
+
+### Settings Integrations Hub
+
+Configurable tool integrations available to all agents:
+
+- **Supported tools** — Jira, Confluence, SonarQube, and more
+- **Domain-level BSCC guidelines** — architecture guidelines (Confluence/Solaris) enforced per project domain
+- **Project Export/Import** — ZIP archive containing `project.json` + missions + mission runs + memories
+- **Browser Push Notifications** — native browser push via Web Push API (VAPID)
+- **Input Validation** — Pydantic models on all POST/PATCH routes
+
 ## Four Interfaces
 
 ### 1. Web Dashboard (HTMX + SSE)
@@ -429,7 +457,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -494,8 +522,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -967,6 +995,48 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 - **Routing matrix** — configure heavy/light model per category (Reasoning, Production/Code, Tasks, Redaction) with dropdowns
 - **Darwin LLM A/B section** — live view of ongoing model experiments from the Settings page
 - **Save & invalidate** — one-click save pushes config to DB and flushes the executor cache
+
+## What's New in v2.7.0 (2026)
+
+### Knowledge Management System
+- **4 new agents** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART Knowledge team** — dedicated Agile Release Train for knowledge operations
+- **Nightly `knowledge-maintenance` workflow** — automatic curation, deduplication, freshness scoring
+- **Memory Health dashboard** — knowledge health metrics panel in the Metrics tab
+- **Knowledge Health badge** — visible in the Settings page
+
+### Memory Intelligence
+- **Relevance scoring** — `confidence × recency × access_boost` formula for ranked retrieval
+- **Access tracking** — `access_count` and `last_read_at` fields on every memory entry
+- **Automatic pruning** — stale entries below threshold removed on each nightly run
+
+### LLM Cost Tracking
+- **Per-mission cost** — displayed in the mission timeline tab header
+- **Auto-summed** — aggregated from `llm_traces` table, no manual tracking needed
+
+### Mission Timeline
+- **Swimlane timeline tab** — in Mission Control, shows agent phases as horizontal swim lanes
+- **Phase durations** — visual representation of how long each phase took
+
+### Quality Scoring
+- **PhaseRun `quality_score` field** — populated by the adversarial guard after each phase
+
+### Project Export/Import
+- **ZIP archive** — contains `project.json` + all missions + mission runs + memories
+- **Portable projects** — export from one instance, import into another
+
+### Input Validation
+- **Pydantic models** — all POST/PATCH routes now validated with strict input schemas
+
+### BSCC Domain Guidelines
+- **Domain-level architecture guidelines** — Confluence/Solaris guidelines enforced per project domain
+- **Configurable per project** in Settings
+
+### Settings Integrations Hub
+- **Configurable tool integrations** — Jira, Confluence, SonarQube available to all agents from a single Settings panel
+
+### Browser Push Notifications
+- **Web Push API (VAPID)** — native browser push notifications for mission events and alerts
 
 ## What's New in v2.3.0 (Feb 2026)
 

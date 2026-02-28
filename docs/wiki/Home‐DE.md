@@ -1,6 +1,6 @@
-# 🏭 Software Factory — Wiki
+# Software Factory — Wiki
 
-**Macaron Software Factory** ist eine KI-Agenten-Orchestrierungsplattform für Software-Entwicklungsteams. Sie koordiniert 156 spezialisierte Agenten über 36 Workflows mit SAFe-Methodik.
+**Macaron Software Factory** ist eine KI-Agenten-Orchestrierungsplattform für Software-Entwicklungsteams. Sie koordiniert 181 spezialisierte Agenten über 36 Workflows mit SAFe-Methodik.
 
 ## Navigation
 
@@ -9,8 +9,8 @@
 | [Architektur](Architecture) | Plattform-Architektur, Komponenten, Datenfluss |
 | [Deployment-Leitfaden](Deployment-Guide) | 3 Umgebungen: Azure, OVH, Lokal |
 | [API-Referenz](API-Reference) | REST-Endpunkte, Authentifizierung |
-| [Agenten](Agents) | 156 Agenten in 9 Domänen |
-| [Workflows](Workflows) | 36 integrierte Workflows |
+| [Agenten](Agents) | 181 Agenten in 9 Domänen |
+| [Workflows](Workflows) | 42 integrierte Workflows |
 | [Muster](Patterns) | 15 Orchestrierungsmuster |
 | [Sicherheit](Security) | Auth, adversariale Validierung, Geheimnisse |
 | [LLM-Konfiguration](LLM-Configuration) | Multi-Provider LLM-Setup |

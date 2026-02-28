@@ -31,11 +31,16 @@
 
 Software Factory es una **plataforma multi-agente autonoma** que orquesta todo el ciclo de desarrollo de software — desde la ideacion hasta el despliegue — usando agentes IA especializados trabajando juntos.
 
-Piensa en ello como una **fabrica de software virtual** donde 161 agentes IA colaboran a traves de flujos de trabajo estructurados, siguiendo la metodologia SAFe, practicas TDD y puertas de calidad automatizadas.
+Piensa en ello como una **fabrica de software virtual** donde 181 agentes IA colaboran a traves de flujos de trabajo estructurados, siguiendo la metodologia SAFe, practicas TDD y puertas de calidad automatizadas.
 
 ### Puntos clave
 
-- **161 agentes especializados** — arquitectos, desarrolladores, testers, SREs, analistas de seguridad, product owners
+- **181 agentes especializados** — arquitectos, desarrolladores, testers, SREs, analistas de seguridad, product owners
+- **42 workflows integrados** — ceremonias SAFe, quality gates, mantenimiento nocturno, seguridad, gestión del conocimiento
+- **Gestión del Conocimiento** — 4 agentes dedicados, equipo ART Knowledge, workflow nocturno `knowledge-maintenance`
+- **Inteligencia de Memoria** — puntuación de relevancia, seguimiento de accesos, poda automática de entradas obsoletas
+- **Seguimiento de Coste LLM** — coste por misión en la cabecera del tab de timeline
+- **Timeline de Misión** — tab de timeline en carriles mostrando duraciones de fases en Mission Control
 - **10 patrones de orquestacion** — solo, secuencial, paralelo, jerarquico, red, bucle, enrutador, agregador, ola, human-in-the-loop
 - **Ciclo de vida alineado con SAFe** — Portfolio → Epic → Feature → Story con cadencia PI
 - **Auto-reparacion** — deteccion autonoma de incidentes, triaje y auto-reparacion
@@ -230,7 +235,7 @@ Las cuatro se crean con el proyecto. TMA, Seguridad y Self-Healing inician como 
 
 ## Caracteristicas
 
-### 161 Agentes IA Especializados
+### 181 Agentes IA Especializados
 
 Los agentes estan organizados en equipos que reflejan organizaciones de software reales:
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -920,6 +925,46 @@ Cada proyecto obtiene automaticamente 4 misiones operativas:
 - **Cuadrícula de proveedores** — estado activo/inactivo con pistas sobre claves API faltantes
 - **Matriz de enrutamiento** — pesado/ligero por categoría (Razonamiento, Producción/Código, Tareas, Redacción)
 - **Sección Darwin LLM A/B** — vista en vivo de experimentos de modelos en curso
+
+## Novedades en v2.7.0 (2026)
+
+### Sistema de Gestión del Conocimiento
+- **4 nuevos agentes** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **Equipo ART Knowledge** — Agile Release Train dedicado a operaciones de conocimiento
+- **Workflow nocturno `knowledge-maintenance`** — curación automática, deduplicación, scoring de frescura
+- **Dashboard de Salud de Memoria** — métricas de salud del conocimiento en el tab Métricas
+- **Badge de Salud del Conocimiento** — visible en la página de Configuración
+
+### Inteligencia de Memoria
+- **Puntuación de relevancia** — fórmula `confianza × recencia × boost_acceso` para recuperación clasificada
+- **Seguimiento de accesos** — campos `access_count` y `last_read_at` en cada entrada de memoria
+- **Poda automática** — entradas obsoletas eliminadas en cada ejecución nocturna
+
+### Seguimiento de Coste LLM
+- **Coste por misión** — mostrado en la cabecera del tab de timeline de misión
+- **Auto-sumado** — agregado desde la tabla `llm_traces`
+
+### Timeline de Misión
+- **Tab de timeline en carriles** — en Mission Control, muestra fases de agente como carriles horizontales
+- **Duraciones de fases** — representación visual del tiempo por fase
+
+### Puntuación de Calidad
+- **Campo `quality_score` en PhaseRun** — rellenado por el guardia adversarial tras cada fase
+
+### Exportación/Importación de Proyecto
+- **Archivo ZIP** — contiene `project.json` + todas las misiones + runs + memorias
+
+### Validación de Entrada
+- **Modelos Pydantic** — todas las rutas POST/PATCH validadas con esquemas estrictos
+
+### Directrices de Dominio BSCC
+- **Directrices de arquitectura por dominio** — Confluence/Solaris aplicadas por dominio de proyecto
+
+### Hub de Integraciones de Configuración
+- **Integraciones de herramientas configurables** — Jira, Confluence, SonarQube disponibles para todos los agentes
+
+### Notificaciones Push del Navegador
+- **Web Push API (VAPID)** — notificaciones push nativas del navegador para eventos de misión
 
 ## Novedades en v2.3.0 (feb 2026)
 

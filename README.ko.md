@@ -31,11 +31,16 @@
 
 Software Factory는 아이디어 구상부터 배포까지 전체 소프트웨어 개발 라이프사이클을 오케스트레이션하는 **자율 멀티 에이전트 플랫폼**입니다. 전문화된 AI 에이전트들이 협업하여 작업을 수행합니다.
 
-**가상 소프트웨어 공장**으로 생각하면 됩니다. 161개의 AI 에이전트가 구조화된 워크플로우를 통해 협업하며, SAFe 방법론, TDD 실천, 자동화된 품질 게이트를 따릅니다.
+**가상 소프트웨어 공장**으로 생각하면 됩니다. 181개의 AI 에이전트가 구조화된 워크플로우를 통해 협업하며, SAFe 방법론, TDD 실천, 자동화된 품질 게이트를 따릅니다.
 
 ### 주요 특징
 
-- **161개 전문 에이전트** — 아키텍트, 개발자, 테스터, SRE, 보안 분석가, 프로덕트 오너
+- **181개 전문 에이전트** — 아키텍트, 개발자, 테스터, SRE, 보안 분석가, 프로덕트 오너
+- **42개 내장 워크플로우** — SAFe 세리머니, 품질 게이트, 야간 유지보수, 보안, 지식 관리
+- **지식 관리** — 4개 전용 에이전트, ART 지식 팀, 야간 `knowledge-maintenance` 워크플로우
+- **메모리 인텔리전스** — 관련성 점수, 접근 추적, 오래된 항목 자동 삭제
+- **LLM 비용 추적** — 미션 타임라인 탭 헤더에 미션별 비용 표시
+- **미션 타임라인** — Mission Control의 수영 레인 타임라인 탭으로 단계 지속 시간 표시
 - **10가지 오케스트레이션 패턴** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe 정렬 라이프사이클** — Portfolio → Epic → Feature → Story (PI 주기 포함)
 - **자동 복구** — 자율적 인시던트 감지, 분류 및 자가 수리
@@ -230,7 +235,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## 기능
 
-### 161개 전문 AI 에이전트
+### 181개 전문 AI 에이전트
 
 에이전트는 실제 소프트웨어 조직을 반영하는 팀으로 구성됩니다:
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -785,6 +790,46 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - 설정에서 프로젝트별 OKR 재정의 가능
 
 ---
+
+## v2.7.0의 새로운 기능 (2026년)
+
+### 지식 관리 시스템
+- **4개의 새 에이전트** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART 지식 팀** — 지식 운영 전용 Agile Release Train
+- **야간 `knowledge-maintenance` 워크플로우** — 자동 큐레이션, 중복 제거, 신선도 점수 매기기
+- **메모리 건강 대시보드** — 메트릭 탭의 지식 건강 메트릭 패널
+- **지식 건강 배지** — 설정 페이지에 표시
+
+### 메모리 인텔리전스
+- **관련성 점수** — `신뢰도 × 최신성 × 접근 부스트` 공식으로 순위 검색
+- **접근 추적** — 각 메모리 항목의 `access_count` 및 `last_read_at` 필드
+- **자동 삭제** — 야간 실행마다 임계값 미만의 오래된 항목 제거
+
+### LLM 비용 추적
+- **미션별 비용** — 미션 타임라인 탭 헤더에 표시
+- **자동 합산** — `llm_traces` 테이블에서 집계
+
+### 미션 타임라인
+- **수영 레인 타임라인 탭** — Mission Control에서 에이전트 단계를 수평 수영 레인으로 표시
+- **단계 지속 시간** — 각 단계에 소요된 시간의 시각적 표현
+
+### 품질 점수
+- **PhaseRun의 `quality_score` 필드** — 각 단계 후 적대적 가드가 채움
+
+### 프로젝트 내보내기/가져오기
+- **ZIP 아카이브** — `project.json` + 모든 미션 + 실행 + 메모리 포함
+
+### 입력 유효성 검사
+- **Pydantic 모델** — 모든 POST/PATCH 라우트에 엄격한 입력 스키마 적용
+
+### BSCC 도메인 가이드라인
+- **도메인 아키텍처 가이드라인** — 프로젝트 도메인별로 Confluence/Solaris 가이드라인 적용
+
+### 설정 통합 허브
+- **설정 가능한 도구 통합** — Jira, Confluence, SonarQube를 모든 에이전트에서 사용 가능
+
+### 브라우저 푸시 알림
+- **Web Push API (VAPID)** — 미션 이벤트를 위한 네이티브 브라우저 푸시 알림
 
 ## v2.1.0의 새로운 기능 (2026년 2월)
 

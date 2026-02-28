@@ -31,11 +31,16 @@
 
 Software Factory est une **plateforme multi-agents autonome** qui orchestre l'intégralité du cycle de développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés travaillant ensemble.
 
-Imaginez une **usine logicielle virtuelle** où 161 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
+Imaginez une **usine logicielle virtuelle** où 181 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
 
 ### Points clés
 
-- **161 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **181 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **42 workflows intégrés** — cérémonies SAFe, quality gates, maintenance nocturne, sécurité, gestion des connaissances
+- **Gestion des Connaissances** — 4 agents dédiés, équipe ART Knowledge, workflow `knowledge-maintenance` nocturne
+- **Intelligence Mémoire** — score de pertinence, suivi des accès, élagage automatique des entrées obsolètes
+- **Suivi Coût LLM** — coût par mission affiché dans l'en-tête de l'onglet timeline
+- **Timeline Mission** — onglet timeline en couloirs montrant les durées de phases dans Mission Control
 - **10 patterns d'orchestration** — solo, séquentiel, parallèle, hiérarchique, réseau, boucle, routeur, agrégateur, vague, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Résilience LLM** — fallback multi-provider, retry avec jitter, gestion rate-limit, config modèle par env
@@ -216,7 +221,7 @@ Apres l'installation, voici comment passer d'une idee a un projet fonctionnel :
 
 ## Fonctionnalités
 
-### 🤖 145 Agents IA Spécialisés
+### 181 Agents IA Spécialisés
 
 Les agents sont organisés en équipes reflétant de vraies organisations logicielles :
 
@@ -243,7 +248,7 @@ Les agents sont organisés en équipes reflétant de vraies organisations logici
 - **Vague** — parallèle au sein des vagues, séquentiel entre vagues
 - **Human-in-the-loop** — agent propose, humain valide
 
-### 📊 Cycle de Vie Aligné SAFe
+### Cycle de Vie Aligné SAFe
 
 Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 
@@ -252,7 +257,7 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 - **Team Backlog** — user stories, tâches, critères d'acceptation
 - **Sprint Execution** — daily standups, sprint reviews, rétrospectives
 
-### 🛡️ Sécurité & Conformité
+### Sécurité & Conformité
 
 - **Authentification** — auth JWT avec RBAC
 - **Garde injection prompt** — détection et blocage prompts malveillants
@@ -261,7 +266,7 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 - **Rate limiting** — quotas API par utilisateur
 - **Audit logging** — logs d'activité complets
 
-### 📈 Métriques DORA & Monitoring
+### Métriques DORA & Monitoring
 
 - **Deployment frequency** — fréquence du code en production
 - **Lead time** — durée commit vers déploiement
@@ -270,7 +275,7 @@ Hiérarchie complète Portfolio → Epic → Feature → Story avec :
 - **Dashboards temps réel** — visualisations Chart.js
 - **Métriques Prometheus** — endpoint /metrics
 
-### 📊 Métriques Qualité — Monitoring Industriel
+### Métriques Qualité — Monitoring Industriel
 
 Scan qualité déterministe (sans LLM) avec 10 dimensions, comme une chaîne de production :
 
@@ -299,7 +304,7 @@ Scan qualité déterministe (sans LLM) avec 10 dimensions, comme une chaîne de 
 **Dashboard qualité** sur `/quality` — scorecard global, scores par projet, snapshots tendances.
 Badges qualité visibles sur les missions, projets, workflows et le dashboard principal.
 
-### 🔄 4 Missions Auto-Provisionnées par Projet
+### 4 Missions Auto-Provisionnées par Projet
 
 Chaque projet reçoit automatiquement 4 missions opérationnelles :
 
@@ -310,7 +315,7 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 | **Dette Technique** | Réduction | Mensuelle | Audit complexité, priorisation WSJF, sprints refactoring |
 | **Self-Healing** | Programme | Continue | Pipeline autonome : détection 5xx → mission TMA → diagnostic agent → correctif code → validation |
 
-### 🔃 Amélioration Continue
+### Amélioration Continue
 
 Trois workflows intégrés pour l'auto-amélioration :
 
@@ -322,7 +327,7 @@ Trois workflows intégrés pour l'auto-amélioration :
 
 Ces workflows créent une **boucle de feedback** : métriques → analyse → amélioration → re-scan → suivi progrès.
 
-### 🔧 Outils Intégrés des Agents
+### Outils Intégrés des Agents
 
 L'image Docker inclut tout le nécessaire pour que les agents travaillent en autonomie :
 
@@ -337,7 +342,7 @@ L'image Docker inclut tout le nécessaire pour que les agents travaillent en aut
 | **Deploy** | `docker_deploy`, `github_actions` | Déploiement conteneur et statut CI/CD |
 | **Mémoire** | `memory_store`, `memory_search`, `deep_search` | Mémoire projet persistante entre sessions |
 
-### 🔄 Auto-Réparation & Self-Healing (TMA)
+### Auto-Réparation & Self-Healing (TMA)
 
 Cycle autonome de détection, triage et réparation d'incidents :
 
@@ -349,7 +354,7 @@ Cycle autonome de détection, triage et réparation d'incidents :
 - **Escalade** — P0/P1 déclenche notifications Slack/Email à l'équipe d'astreinte
 - **Boucle rétrospective** — apprentissages post-incident stockés en mémoire, injectés dans les sprints futurs
 
-### 🎭 Perspectives SAFe & Onboarding
+### Perspectives SAFe & Onboarding
 
 Interface adaptative par rôle SAFe :
 
@@ -359,7 +364,7 @@ Interface adaptative par rôle SAFe :
 - **Sélecteur de perspective** — changer de rôle SAFe depuis la topbar
 - **Sidebar dynamique** — navigation filtrée selon la perspective courante
 
-### 🧠 Mémoire 4 Couches & RLM Deep Search
+### Mémoire 4 Couches & RLM Deep Search
 
 Connaissance persistante inter-sessions avec recherche intelligente :
 
@@ -370,7 +375,7 @@ Connaissance persistante inter-sessions avec recherche intelligente :
 - **Fichiers projet auto-chargés** — CLAUDE.md, SPECS.md, VISION.md injectés dans chaque prompt LLM (max 8K)
 - **RLM Deep Search** — boucle itérative WRITE-EXECUTE-OBSERVE-DECIDE (jusqu'à 10 itérations)
 
-### 🛒 Mercato Agents (Marché des Transferts)
+### Mercato Agents (Marché des Transferts)
 
 Place de marché à tokens pour la composition d'équipes :
 
@@ -380,7 +385,7 @@ Place de marché à tokens pour la composition d'équipes :
 - **Valorisation marché** — valorisation automatique basée sur skills et performance
 - **Système de wallets** — portefeuilles tokens par projet avec historique
 
-### 🛡️ Garde Qualité Adversariale
+### Garde Qualité Adversariale
 
 Porte de qualité double couche bloquant le code fake/placeholder :
 
@@ -388,7 +393,7 @@ Porte de qualité double couche bloquant le code fake/placeholder :
 - **L1 Sémantique LLM** — revue qualité par LLM séparé sur les sorties d'exécution
 - **Rejet forcé** — hallucinations et erreurs de stack toujours bloquées
 
-### 📝 Auto-Documentation & Wiki
+### Auto-Documentation & Wiki
 
 Génération automatique de documentation tout au long du cycle :
 
@@ -396,6 +401,29 @@ Génération automatique de documentation tout au long du cycle :
 - **Résumés de phases** — documentation automatique des décisions et résultats de chaque phase mission
 - **Sync Confluence** — synchronisation bidirectionnelle avec les pages wiki Confluence
 - **Swagger auto-docs** — 94 endpoints REST auto-documentés sur `/docs`
+
+### Système de Gestion des Connaissances
+
+Sous-système dédié à la connaissance organisationnelle, introduit en v2.7.0 :
+
+- **4 agents spécialisés** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **Équipe ART Knowledge** — Agile Release Train dédié aux opérations de connaissance
+- **Workflow nocturne `knowledge-maintenance`** — curation automatique, déduplication, score de fraîcheur
+- **Dashboard Santé Mémoire** — métriques de santé des connaissances dans l'onglet Métriques
+- **Badge Santé des Connaissances** — visible dans la page Paramètres
+- **Formule de score de pertinence** — `confiance × récence × boost_accès` pour le classement intelligent
+- **Suivi des accès** — champs `access_count` et `last_read_at` sur chaque entrée mémoire
+- **Élagage automatique** — entrées obsolètes supprimées à chaque exécution nocturne
+
+### Hub d'Intégrations Paramètres
+
+Intégrations d'outils configurables disponibles pour tous les agents :
+
+- **Outils supportés** — Jira, Confluence, SonarQube et plus
+- **Directives domaine BSCC** — directives d'architecture (Confluence/Solaris) appliquées par domaine de projet
+- **Export/Import Projet** — archive ZIP contenant `project.json` + missions + exécutions + mémoires
+- **Notifications Push Navigateur** — notifications push natives via Web Push API (VAPID)
+- **Validation des Entrées** — modèles Pydantic sur toutes les routes POST/PATCH
 
 ## Quatre Interfaces
 
@@ -422,7 +450,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Santé plateforme
 sf projects list                       # Tous les projets
 sf missions list                       # Missions avec scores WSJF
-sf agents list                         # 161 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Features d'un epic
 sf stories list --feature <id>         # User stories
 
@@ -488,7 +516,7 @@ python3 -m platform.mcp_platform.server
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Moteur       │   │ Moteur   │   │   Couche     │
           │  Agents      │   │ Workflow │   │   Missions   │
-          │ 161 agents   │   │ 39 defs  │   │ Cycle SAFe   │
+          │ 181 agents   │   │ 42 defs  │   │ Cycle SAFe   │
           │ executeur    │   │ 10 ptrns │   │ Portfolio    │
           │ boucle+retry │   │ phases   │   │ Epic/Feature │
           └──────┬───────┘   │ retry    │   │ Story/Sprint │
@@ -834,6 +862,46 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Grille providers** — statut actif/inactif avec indices de clé manquante
 - **Matrice de routage** — lourd/léger par catégorie (Raisonnement, Production/Code, Tâches, Rédaction)
 - **Section Darwin LLM A/B** — vue live des expériences de modèles en cours
+
+## Nouveautés v2.7.0 (2026)
+
+### Système de Gestion des Connaissances
+- **4 nouveaux agents** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **Équipe ART Knowledge** — Agile Release Train dédié aux opérations de connaissance
+- **Workflow nocturne `knowledge-maintenance`** — curation automatique, déduplication, score de fraîcheur
+- **Dashboard Santé Mémoire** — panel de métriques dans l'onglet Métriques
+- **Badge Santé des Connaissances** — visible dans la page Paramètres
+
+### Intelligence Mémoire
+- **Score de pertinence** — formule `confiance × récence × boost_accès` pour la récupération classée
+- **Suivi des accès** — champs `access_count` et `last_read_at` sur chaque entrée mémoire
+- **Élagage automatique** — entrées obsolètes supprimées à chaque exécution nocturne
+
+### Suivi Coût LLM
+- **Coût par mission** — affiché dans l'en-tête de l'onglet timeline de mission
+- **Agrégation automatique** — calculé depuis la table `llm_traces`, aucun suivi manuel nécessaire
+
+### Timeline Mission
+- **Onglet timeline en couloirs** — dans Mission Control, affiche les phases agent en couloirs horizontaux
+- **Durées de phases** — représentation visuelle du temps passé dans chaque phase
+
+### Score Qualité
+- **Champ `quality_score` sur PhaseRun** — renseigné par la garde adversariale après chaque phase
+
+### Export/Import Projet
+- **Archive ZIP** — contient `project.json` + toutes les missions + exécutions + mémoires
+
+### Validation des Entrées
+- **Modèles Pydantic** — toutes les routes POST/PATCH validées avec des schémas stricts
+
+### Directives Domaine BSCC
+- **Directives d'architecture par domaine** — Confluence/Solaris appliquées par domaine de projet
+
+### Hub d'Intégrations Paramètres
+- **Intégrations configurables** — Jira, Confluence, SonarQube disponibles pour tous les agents depuis un panel unique
+
+### Notifications Push Navigateur
+- **Web Push API (VAPID)** — notifications push natives pour les événements de mission et alertes
 
 ## Nouveautés v2.3.0 (fév 2026)
 

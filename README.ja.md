@@ -31,11 +31,16 @@
 
 Software Factory は**自律型マルチエージェントプラットフォーム**で、専門AIエージェントが連携して、アイデア出しからデプロイまでのソフトウェア開発ライフサイクル全体を統括します。
 
-161のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
+181のAIエージェントが構造化されたワークフローを通じて協働する**仮想ソフトウェアファクトリー**と考えてください。SAFe方法論、TDDプラクティス、自動品質ゲートに従います。
 
 ### 主な特徴
 
-- **161の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
+- **181の専門エージェント** — アーキテクト、開発者、テスター、SRE、セキュリティアナリスト、プロダクトオーナー
+- **42の組み込みワークフロー** — SAFeセレモニー、品質ゲート、夜間メンテナンス、セキュリティ、ナレッジ管理
+- **ナレッジ管理** — 4つの専用エージェント、ARTナレッジチーム、夜間`knowledge-maintenance`ワークフロー
+- **メモリインテリジェンス** — 関連性スコアリング、アクセス追跡、古いエントリの自動削除
+- **LLMコスト追跡** — ミッションタイムラインタブヘッダーにミッションごとのコスト表示
+- **ミッションタイムライン** — Mission Controlにスイムレーンタイムラインタブでフェーズ期間を表示
 - **10のオーケストレーションパターン** — ソロ、シーケンシャル、パラレル、階層、ネットワーク、ループ、ルーター、アグリゲーター、ウェーブ、ヒューマン・イン・ザ・ループ
 - **SAFe準拠のライフサイクル** — Portfolio → Epic → Feature → Story（PIケイデンス付き）
 - **自動修復** — 自律的なインシデント検出、トリアージ、セルフリペア
@@ -230,7 +235,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## 機能
 
-### 161の専門AIエージェント
+### 181の専門AIエージェント
 
 エージェントは実際のソフトウェア組織を反映したチームに編成されています：
 
@@ -429,7 +434,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 145 agents
+sf agents list                         # 181 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -920,6 +925,46 @@ Every project automatically gets 4 operational missions:
 - **プロバイダーグリッド** — アクティブ/非アクティブ状態と API キー欠落のヒント表示
 - **ルーティングマトリックス** — カテゴリ別（推論・本番/コード・タスク・文書作成）の重い/軽いモデル設定
 - **Darwin LLM A/B セクション** — 進行中のモデル実験のライブビュー
+
+## v2.7.0 の新機能 (2026年)
+
+### ナレッジ管理システム
+- **4つの新しいエージェント** — `knowledge-manager`、`knowledge-curator`、`knowledge-seeder`、`wiki-maintainer`
+- **ARTナレッジチーム** — ナレッジ運用専用のAgile Release Train
+- **夜間`knowledge-maintenance`ワークフロー** — 自動キュレーション、重複排除、鮮度スコアリング
+- **メモリヘルスダッシュボード** — メトリクスタブのナレッジ健全性メトリクスパネル
+- **ナレッジヘルスバッジ** — 設定ページに表示
+
+### メモリインテリジェンス
+- **関連性スコアリング** — `信頼度 × 最新性 × アクセスブースト`の式によるランク付き取得
+- **アクセス追跡** — 各メモリエントリの`access_count`と`last_read_at`フィールド
+- **自動削除** — 夜間実行ごとに閾値以下の古いエントリを削除
+
+### LLMコスト追跡
+- **ミッションごとのコスト** — ミッションタイムラインタブヘッダーに表示
+- **自動集計** — `llm_traces`テーブルから集計
+
+### ミッションタイムライン
+- **スイムレーンタイムラインタブ** — Mission Controlでエージェントフェーズを横方向スイムレーンとして表示
+- **フェーズ期間** — 各フェーズの所要時間の視覚的表示
+
+### 品質スコアリング
+- **PhaseRunの`quality_score`フィールド** — 各フェーズ後にアドバーサリアルガードが設定
+
+### プロジェクトのエクスポート/インポート
+- **ZIPアーカイブ** — `project.json` + 全ミッション + 実行 + メモリを含む
+
+### 入力バリデーション
+- **Pydanticモデル** — 全POSTおよびPATCHルートの厳密なスキーマバリデーション
+
+### BSSCドメインガイドライン
+- **ドメインアーキテクチャガイドライン** — プロジェクトドメインごとにConfluence/Solarisガイドラインを適用
+
+### 設定インテグレーションハブ
+- **設定可能なツールインテグレーション** — Jira、Confluence、SonarQubeが全エージェントで利用可能
+
+### ブラウザプッシュ通知
+- **Web Push API (VAPID)** — ミッションイベントのネイティブブラウザプッシュ通知
 
 ## v2.3.0 の新機能 (2026年2月)
 

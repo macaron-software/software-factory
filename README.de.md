@@ -31,11 +31,16 @@
 
 Software Factory ist eine **autonome Multi-Agenten-Plattform**, die den gesamten Software-Entwicklungszyklus orchestriert — von der Ideenfindung bis zur Bereitstellung — mithilfe spezialisierter KI-Agenten, die zusammenarbeiten.
 
-Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 161 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
+Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 181 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
 
 ### Hauptmerkmale
 
-- **161 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **181 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **42 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
+- **Wissensmanagement** — 4 dedizierte Agenten, ART-Knowledge-Team, naechlicher `knowledge-maintenance`-Workflow
+- **Memory Intelligence** — Relevanzbewertung, Zugriffsverfolgung, automatisches Bereinigen veralteter Eintraege
+- **LLM-Kostenverfolgung** — Kosten pro Mission im Timeline-Tab-Header angezeigt
+- **Mission-Timeline** — Swimlane-Timeline-Tab zeigt Phasendauern in Mission Control
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
@@ -230,7 +235,7 @@ Alle vier werden mit dem Projekt erstellt. TMA, Sicherheit und Selbstheilung sta
 
 ## Funktionen
 
-### 161 spezialisierte KI-Agenten
+### 181 spezialisierte KI-Agenten
 
 Agenten sind in Teams organisiert, die echte Software-Organisationen widerspiegeln:
 
@@ -494,8 +499,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 161 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 39 defs  │   │ SAFe cycle   │
+          │ 181 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 42 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -920,6 +925,46 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Provider-Raster** — Aktiv/Inaktiv-Status mit Hinweisen auf fehlende API-Keys
 - **Routing-Matrix** — schwer/leicht pro Kategorie (Reasoning, Produktion/Code, Aufgaben, Redaktion)
 - **Darwin LLM A/B-Bereich** — Live-Ansicht laufender Modellexperimente
+
+## Neuheiten in v2.7.0 (2026)
+
+### Wissensmanagement-System
+- **4 neue Agenten** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART-Knowledge-Team** — dediziertes Agile Release Train fuer Wissensoperationen
+- **Naechlicher `knowledge-maintenance`-Workflow** — automatische Kuratierung, Deduplizierung, Frische-Scoring
+- **Memory-Health-Dashboard** — Wissens-Gesundheitsmetriken im Metriken-Tab
+- **Knowledge-Health-Badge** — sichtbar auf der Einstellungsseite
+
+### Memory Intelligence
+- **Relevanzbewertung** — `Konfidenz × Aktualitaet × Zugriffs-Boost`-Formel fuer gewichtetes Retrieval
+- **Zugriffsverfolgung** — `access_count`- und `last_read_at`-Felder fuer jeden Speichereintrag
+- **Automatisches Bereinigen** — veraltete Eintraege werden bei jedem naechlichen Lauf entfernt
+
+### LLM-Kostenverfolgung
+- **Kosten pro Mission** — im Mission-Timeline-Tab-Header angezeigt
+- **Automatisch summiert** — aus `llm_traces`-Tabelle aggregiert
+
+### Mission-Timeline
+- **Swimlane-Timeline-Tab** — in Mission Control, zeigt Agentenphasen als horizontale Spuren
+- **Phasendauern** — visuelle Darstellung der Zeit pro Phase
+
+### Qualitaets-Scoring
+- **`quality_score`-Feld auf PhaseRun** — vom adversarialen Guard nach jeder Phase befuellt
+
+### Projekt-Export/Import
+- **ZIP-Archiv** — enthaelt `project.json` + alle Missionen + Runs + Speicher
+
+### Eingabevalidierung
+- **Pydantic-Modelle** — alle POST/PATCH-Routen mit strikten Schemata validiert
+
+### BSCC-Domain-Richtlinien
+- **Domain-Architekturrichtlinien** — Confluence/Solaris pro Projektdomaene durchgesetzt
+
+### Einstellungs-Integrations-Hub
+- **Konfigurierbare Tool-Integrationen** — Jira, Confluence, SonarQube fuer alle Agenten verfuegbar
+
+### Browser-Push-Benachrichtigungen
+- **Web Push API (VAPID)** — native Browser-Push-Benachrichtigungen fuer Missions-Ereignisse
 
 ## Neuheiten in v2.3.0 (Feb 2026)
 
