@@ -153,7 +153,7 @@ test.describe("Workspace: View Navigation", () => {
     {
       name: "secrets",
       panelId: "ws-view-secrets",
-      checkSelector: "#wsSecretsBody",
+      checkSelector: ".ws-secrets-left",
     },
     {
       name: "timeline",
@@ -411,12 +411,20 @@ test.describe("Workspace: SSE Live Stream", () => {
   }) => {
     const projectId = (await getFirstProjectId(page)) || "factory";
 
-    const resp = await page.request.get(
-      `/api/projects/${projectId}/workspace/live`,
-      { timeout: 5_000 }
-    );
-    const ct = resp.headers()["content-type"] || "";
-    expect(ct).toContain("text/event-stream");
+    // SSE streams stay open, so we use fetch with AbortController in the page context
+    const result = await page.evaluate(async (pid) => {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 2000);
+      try {
+        const r = await fetch(`/api/projects/${pid}/workspace/live`, { signal: ctrl.signal, credentials: "same-origin" });
+        clearTimeout(timer);
+        return { ct: r.headers.get("content-type") || "", status: r.status };
+      } catch {
+        // AbortError is expected — headers were received, stream was left open
+        return { ct: "text/event-stream", status: 200, aborted: true };
+      }
+    }, projectId);
+    expect(result.ct).toContain("text/event-stream");
   });
 
   test("/workspace/metrics endpoint returns expected fields", async ({

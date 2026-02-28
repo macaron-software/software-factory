@@ -1713,7 +1713,7 @@ function wsRunSearch() {
     .then(function(r){ return r.json(); })
     .then(function(d) {
       var matches = d.matches || [];
-      if (!matches.length) { res.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.3rem">Aucun résultat.</div>'; return; }
+      if (!matches.length) { if (cnt) cnt.textContent = '0 résultats'; res.innerHTML = '<div style="color:var(--text-secondary);font-size:.75rem;padding:.3rem">Aucun résultat.</div>'; return; }
       if (cnt) cnt.textContent = d.total_matches + ' résultats dans ' + matches.length + ' fichiers';
       var html = '';
       matches.forEach(function(f) {

@@ -146,6 +146,20 @@ async def workflow_edit(request: Request, wf_id: str):
     )
 
 
+@router.get("/api/workflows")
+async def list_workflows_api(request: Request):
+    """List all workflows as JSON."""
+    from ...workflows.store import get_workflow_store
+
+    workflows = get_workflow_store().list_all()
+    return {
+        "workflows": [
+            {"id": w.id, "name": w.name, "description": getattr(w, "description", "")}
+            for w in workflows
+        ]
+    }
+
+
 @router.post("/api/workflows")
 async def create_workflow(request: Request):
     """Create or update a workflow."""

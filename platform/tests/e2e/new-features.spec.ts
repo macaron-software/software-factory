@@ -320,7 +320,12 @@ test.describe("Page: Workspace — new views", () => {
     await page.waitForTimeout(500);
 
     const launchBtn = page.locator("button", { hasText: "Mission" });
-    await launchBtn.first().click();
+    // Button may be in a scrollable container outside viewport — use JS click
+    await page.evaluate(() => {
+      const btns = Array.from(document.querySelectorAll("button"));
+      const btn = btns.find(b => b.textContent?.includes("Mission"));
+      if (btn) (btn as HTMLElement).click();
+    });
     await page.waitForTimeout(500);
 
     const panel = page.locator("#wsLaunchMissionPanel");
