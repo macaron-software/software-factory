@@ -92,6 +92,9 @@ html,body{height:100%;overflow:hidden}
     <button class="ws-activity-btn" data-view="backlog" onclick="wsSetView('backlog')" title="Backlog">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2m-3 7h3m-3 4h3m-7-4h.01M9 16h.01"/></svg>
     </button>
+    <button class="ws-activity-btn" data-view="compliance" onclick="wsSetView('compliance')" title="Compliance">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </button>
     <button class="ws-activity-btn" data-view="db" onclick="wsSetView('db')" title="Database">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
     </button>
@@ -170,6 +173,8 @@ html,body{height:100%;overflow:hidden}
       </span>
       <span class="ws-metric-sep">·</span>
       <span class="ws-metric-item" id="wsMetricWallet" title="Project budget">💰 <span id="wsWalletBalance">—</span></span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item" id="wsLiveCost" title="Tokens cumulés (1h)">💰 –</span>
     </div>
 
     <!-- ── View Container ─────────────────────────────────────── -->
@@ -380,6 +385,18 @@ html,body{height:100%;overflow:hidden}
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg>
             <span>Chargement…</span>
           </div>
+        </div>
+      </div>
+
+      <!-- ── VIEW: Compliance ──────────────────────────────────── -->
+      <div class="ws-view-panel" id="ws-view-compliance" style="flex-direction:column;overflow-y:auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0">
+          <span style="font-size:.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.05em">🛡 Compliance</span>
+          <button class="ws-term-run" style="padding:.2rem .5rem;font-size:.7rem" onclick="wsLoadCompliance()">↻ Refresh</button>
+        </div>
+        <div id="wsComplianceSummary" style="display:flex;gap:.75rem;padding:.5rem .9rem;border-bottom:1px solid var(--border);flex-shrink:0;font-size:.72rem;color:var(--text-secondary)"></div>
+        <div id="wsComplianceBody" style="flex:1;overflow-y:auto;padding:.5rem .75rem">
+          <div class="ws-empty-state"><span>Chargement…</span></div>
         </div>
       </div>
 
@@ -682,6 +699,7 @@ function wsSetView(name) {
   if (name === 'secrets') { wsLoadSecrets(); }
   if (name === 'timeline') { wsLoadTimeline(); }
   if (name === 'search') { setTimeout(function(){ var q=document.getElementById('wsSearchQuery'); if(q)q.focus(); },50); }
+  if (name === 'compliance') { wsLoadCompliance(); }
   if (name === 'live') { wsLiveRenderAll(); }
   if (name === 'packages') { wsPkgLoad(); }
   if (name === 'terminal') { wsInitTerminal(); }
@@ -1204,6 +1222,43 @@ function wsLoadBacklog() {
         }
         html += '</div>';
       });
+      body.innerHTML = html;
+    }).catch(function(){ body.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>'; });
+}
+
+// ── Compliance ───────────────────────────────────────────────────
+function wsLoadCompliance() {
+  var body = document.getElementById('wsComplianceBody');
+  var summary = document.getElementById('wsComplianceSummary');
+  if (!body) return;
+  body.innerHTML = '<div class="ws-empty-state"><span>Chargement…</span></div>';
+  wsFetch('/api/compliance/project/' + encodeURIComponent(_wsProjectId))
+    .then(function(r){ return r.json(); })
+    .then(function(data) {
+      var recent = data.recent || [];
+      if (summary) {
+        var by = data.by_agent || [];
+        var totalPass = by.reduce(function(s,a){return s+a.pass;},0);
+        var totalFail = by.reduce(function(s,a){return s+a.fail;},0);
+        summary.innerHTML = '<span>✅ <strong>'+totalPass+'</strong> PASS</span><span style="margin-left:.5rem">❌ <strong>'+totalFail+'</strong> FAIL</span><span style="margin-left:.5rem;opacity:.6">'+by.length+' agents</span>';
+      }
+      if (!recent.length) {
+        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'une mission avec des agents de conformité</span></div>';
+        return;
+      }
+      var html = '<table class="ws-table"><thead><tr><th>Milestone</th><th>Agent</th><th>Verdict</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
+      recent.forEach(function(v) {
+        var bc = v.verdict==='PASS'?'ws-badge-ok':v.verdict==='FAIL'?'ws-badge-err':'ws-badge-idle';
+        var block = v.is_blocking?'<span class="ws-badge ws-badge-err" style="font-size:.6rem;margin-left:.3rem">BLOCKING</span>':'';
+        html += '<tr class="ws-table-row">';
+        html += '<td style="font-size:.72rem;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+wsEsc(v.milestone_id||'')+'">'+wsEsc((v.milestone_id||'—').substring(0,40))+'</td>';
+        html += '<td style="font-size:.7rem;color:var(--text-secondary)">'+wsEsc(v.agent_id||'')+'</td>';
+        html += '<td><span class="ws-badge '+bc+'" style="font-size:.68rem">'+wsEsc(v.verdict||'')+'</span>'+block+'</td>';
+        html += '<td style="font-size:.7rem;color:var(--text-secondary);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+wsEsc(v.goal||'')+'">'+wsEsc((v.goal||'').substring(0,80))+'</td>';
+        html += '<td style="font-size:.68rem;color:var(--text-secondary);white-space:nowrap">'+wsEsc((v.created_at||'').substring(0,16))+'</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table>';
       body.innerHTML = html;
     }).catch(function(){ body.innerHTML = '<div class="ws-empty-state"><span>Erreur de chargement</span></div>'; });
 }
@@ -1762,6 +1817,10 @@ function wsStartLiveStream() {
         if (type === 'mission_phase') {
           wsNotifAdd('agents');
         }
+        if (type === 'compliance_done') {
+          wsNotifAdd('compliance');
+          if (_wsCurrentView === 'compliance') wsLoadCompliance();
+        }
       } catch(ex) {}
     };
   }
@@ -1772,6 +1831,25 @@ function wsStartLiveStream() {
   _wsLiveEs.addEventListener('git_commit', handleEv('git_commit'));
   _wsLiveEs.addEventListener('message', handleEv('message'));
   _wsLiveEs.addEventListener('mission_phase', handleEv('mission_phase'));
+  _wsLiveEs.addEventListener('cost_update', function(e) {
+    try {
+      var d = JSON.parse(e.data);
+      var el = document.getElementById('wsLiveCost');
+      if (!el) return;
+      var totalTok = (d.tokens_in || 0) + (d.tokens_out || 0);
+      var tokStr = totalTok >= 1000 ? Math.round(totalTok / 1000) + 'k' : totalTok;
+      var costStr = '$' + (d.cost_usd || 0).toFixed(4);
+      el.textContent = '💰 ' + costStr + ' | ' + tokStr + ' tok';
+      el.classList.toggle('ws-cost-warning', (d.cost_usd || 0) > 1.00);
+      if (totalTok > 100000) {
+        el.classList.add('ws-cost-runaway');
+        el.title = '⚠️ Runaway détecté: ' + tokStr + ' tokens en 1h';
+      } else {
+        el.classList.remove('ws-cost-runaway');
+        el.title = 'Tokens cumulés (1h)';
+      }
+    } catch(ex) {}
+  });
 
   _wsLiveEs.onerror = function() {
     document.getElementById('wsLiveBadge').classList.remove('connected');

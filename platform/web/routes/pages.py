@@ -1339,7 +1339,6 @@ async def product_line_page(request: Request):
         milestones = []
         if proj_missions:
             completed = sum(1 for e in epics_data if e["status"] == "completed")
-            running = sum(1 for e in epics_data if e["status"] == "running")
             total_ep = len(epics_data)
 
             milestones.append(
@@ -1582,161 +1581,6 @@ async def product_page(request: Request):
     )
 
 
-@router.get("/ops", response_class=HTMLResponse)
-async def ops_page(request: Request):
-    """Ops observability dashboard — system health, logs, TMA, RL/GA status."""
-    from ...db.migrations import get_db
-
-    db = get_db()
-
-    # LLM usage last 24h per provider
-    llm_providers = []
-    try:
-        rows = db.execute("""
-            SELECT provider, model,
-                COUNT(*) as total_calls,
-                SUM(CASE WHEN error THEN 1 ELSE 0 END) as errors,
-                AVG(CASE WHEN NOT error THEN tokens_in + tokens_out ELSE NULL END) as avg_tokens,
-                MAX(created_at) as last_call
-            FROM llm_usage
-            WHERE created_at >= datetime('now', '-24 hours')
-            GROUP BY provider, model
-            ORDER BY total_calls DESC
-        """).fetchall()
-        llm_providers = [dict(r) for r in rows]
-    except Exception:
-        pass
-
-    # Active missions
-    active_missions = []
-    try:
-        from ...missions.store import get_mission_run_store
-
-        runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [
-            r for r in runs if getattr(r, "status", "") in ("active", "running")
-        ]
-    except Exception:
-        pass
-
-    # Top errors last 24h
-    top_errors = []
-    try:
-        rows = db.execute("""
-            SELECT error_type, COUNT(*) as cnt, MAX(created_at) as last_seen
-            FROM incidents
-            WHERE created_at >= datetime('now', '-24 hours')
-            GROUP BY error_type
-            ORDER BY cnt DESC
-            LIMIT 10
-        """).fetchall()
-        top_errors = [dict(r) for r in rows]
-    except Exception:
-        pass
-
-    # RL + GA summary
-    rl_stats = {}
-    try:
-        from ...agents.rl_policy import get_rl_policy
-
-        rl_stats = get_rl_policy().stats()
-    except Exception:
-        pass
-
-    ga_summary = {}
-    try:
-        rows2 = db.execute(
-            "SELECT COUNT(*) as total, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending, "
-            "MAX(fitness) as best_fitness FROM evolution_proposals"
-        ).fetchone()
-        ga_summary = dict(rows2) if rows2 else {}
-    except Exception:
-        pass
-
-    # System health
-    db_size_kb = 0
-    try:
-        from ...config import DB_PATH
-
-        db_size_kb = DB_PATH.stat().st_size // 1024
-    except Exception:
-        pass
-
-    nb_agents = 0
-    try:
-        from ...agents.store import get_agent_store
-
-        nb_agents = len(get_agent_store().list_all())
-    except Exception:
-        pass
-
-    # Recent error logs from server log file
-    recent_logs: list[str] = []
-    try:
-        from ...config import FACTORY_ROOT
-
-        for log_name in ("server_8099.log", "server.log"):
-            log_path = FACTORY_ROOT / log_name
-            if log_path.exists():
-                lines = log_path.read_text(errors="replace").splitlines()
-                recent_logs = [
-                    l
-                    for l in lines
-                    if "ERROR" in l or "WARNING" in l or "CRITICAL" in l
-                ][-20:]
-                break
-    except Exception:
-        pass
-
-    # TMA heartbeat stats
-    tma_stats: dict = {}
-    try:
-        from ...ops.auto_heal import get_autoheal_stats
-
-        tma_stats = get_autoheal_stats()
-    except Exception:
-        pass
-
-    # DB table sizes
-    table_sizes: dict[str, int] = {}
-    _tables = (
-        "missions",
-        "mission_runs",
-        "llm_usage",
-        "memory_global",
-        "evolution_proposals",
-        "rl_experience",
-        "agent_scores",
-        "incidents",
-    )
-    for tbl in _tables:
-        try:
-            row = db.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
-            table_sizes[tbl] = row[0] if row else 0
-        except Exception:
-            pass
-
-    db.close()
-
-    return _templates(request).TemplateResponse(
-        "ops.html",
-        {
-            "request": request,
-            "page_title": "Ops",
-            "llm_providers": llm_providers,
-            "active_missions": active_missions,
-            "top_errors": top_errors,
-            "rl_stats": rl_stats,
-            "ga_summary": ga_summary,
-            "db_size_kb": db_size_kb,
-            "nb_agents": nb_agents,
-            "recent_logs": recent_logs,
-            "tma_stats": tma_stats,
-            "table_sizes": table_sizes,
-        },
-    )
-
-
 @router.get("/manifest.json")
 async def manifest_json():
     """Serve PWA manifest."""
@@ -1749,7 +1593,10 @@ async def manifest_json():
 
 @router.get("/analytics", response_class=HTMLResponse)
 async def analytics_page(request: Request):
-    """Analytics dashboard — redirects to unified Metrics page."""
-    from starlette.responses import RedirectResponse
+    """Analytics dashboard — cost & token analytics."""
+    from ..helpers import _templates
 
-    return RedirectResponse("/metrics?tab=analytics", status_code=302)
+    return _templates(request).TemplateResponse(
+        "analytics.html",
+        {"request": request, "page_title": "Analytics"},
+    )

@@ -1469,12 +1469,46 @@ async def ws_tool_calls(project_id: str):
     return JSONResponse({"items": items})
 
 
+_BLOCKED_CMDS = (
+    "rm -rf /",
+    "mkfs",
+    "dd if=",
+    "> /dev/",
+    ":(){:|:&};:",
+    "/etc/passwd",
+    "/etc/shadow",
+    "base64 -d",
+    "curl.*|.*sh",
+    "wget.*|.*sh",
+)
+
+
 @router.get("/api/projects/{project_id}/workspace/run")
 async def ws_run_command(project_id: str, cmd: str, request: Request):
     """SSE endpoint — runs a shell command in project root and streams output."""
-    import asyncio
     import shlex
+    from ..auth_middleware import require_auth
     from ...projects.manager import get_project_store
+
+    user = await require_auth(request)
+    if not user:
+
+        async def _deny():
+            yield "data: ERROR: Authentication required\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(_deny(), media_type="text/event-stream")
+
+    import re as _re
+
+    for pattern in _BLOCKED_CMDS:
+        if _re.search(pattern, cmd, _re.IGNORECASE):
+
+            async def _blocked():
+                yield "data: ERROR: Command blocked by security policy\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(_blocked(), media_type="text/event-stream")
 
     proj = get_project_store().get(project_id)
     cwd = proj.path if proj else "."
@@ -1523,6 +1557,7 @@ async def ws_live_stream(project_id: str, since: str = "", request: Request = No
         nonlocal cursor
         deadline = _time.monotonic() + 300  # 5 min max
         last_keepalive = _time.monotonic()
+        _loop_n = 0
 
         while _time.monotonic() < deadline:
             # Check client disconnect
@@ -1646,7 +1681,7 @@ async def ws_live_stream(project_id: str, since: str = "", request: Request = No
                 except Exception:
                     pass
 
-                # 4. Mission run phase changes
+                # 4. Mission run phase changes (keep existing numbering)
                 try:
                     run_rows = db.execute(
                         """
@@ -1673,6 +1708,32 @@ async def ws_live_stream(project_id: str, since: str = "", request: Request = No
                 except Exception:
                     pass
 
+                # 5. Cost update every 10 iterations (~20s)
+                if _loop_n % 10 == 0:
+                    try:
+                        from datetime import timedelta as _td
+
+                        cost_since = (datetime.utcnow() - _td(hours=1)).strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+                        crow = db.execute(
+                            """
+                            SELECT SUM(lu.tokens_in), SUM(lu.tokens_out), SUM(lu.cost_usd)
+                            FROM llm_usage lu
+                            JOIN mission_runs mr ON lu.mission_run_id = mr.id
+                            WHERE mr.project_id = ? AND lu.created_at > ?
+                            """,
+                            (project_id, cost_since),
+                        ).fetchone()
+                        ti = int(crow[0] or 0)
+                        to_ = int(crow[1] or 0)
+                        cost = float(crow[2] or 0.0)
+                        yield (
+                            f"event: cost_update\ndata: {json.dumps({'type': 'cost_update', 'tokens_in': ti, 'tokens_out': to_, 'cost_usd': cost, 'ts': datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')})}\n\n"
+                        )
+                    except Exception:
+                        pass
+
                 # Advance cursor to latest ts seen
                 if batch:
                     latest = max(
@@ -1696,6 +1757,7 @@ async def ws_live_stream(project_id: str, since: str = "", request: Request = No
                 last_keepalive = now
 
             await asyncio.sleep(2)
+            _loop_n += 1
 
         yield "event: close\ndata: {}\n\n"
 

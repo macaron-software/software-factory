@@ -657,6 +657,12 @@ async def api_mission_exec(request: Request, mission_id: str):
     import os as _os
     import subprocess as _sp
 
+    from ....web.routes.auth_middleware import require_auth as _require_auth
+
+    user = await _require_auth(request)
+    if not user:
+        return JSONResponse({"error": "Authentication required"}, status_code=401)
+
     from ....missions.store import get_mission_run_store
 
     store = get_mission_run_store()

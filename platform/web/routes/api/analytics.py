@@ -791,3 +791,129 @@ async def get_audit_log(limit: int = 100):
     ).fetchall()
     conn.close()
     return {"entries": [dict(r) for r in rows]}
+
+
+@router.get("/api/analytics/cost")
+async def cost_analytics(request: Request, period: str = "7d"):
+    """Cost & token analytics from llm_usage table. period: 1d|7d|30d"""
+    from datetime import datetime, timedelta
+
+    from ....db.migrations import get_db
+
+    _days = {"1d": 1, "7d": 7, "30d": 30}
+    days = _days.get(period, 7)
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+
+    db = get_db()
+    try:
+        totals = db.execute(
+            """SELECT COALESCE(SUM(cost_usd),0) as cost,
+                      COALESCE(SUM(tokens_in),0) as tokens_in,
+                      COALESCE(SUM(tokens_out),0) as tokens_out,
+                      COUNT(*) as calls
+               FROM llm_usage WHERE created_at >= ?""",
+            (cutoff,),
+        ).fetchone()
+
+        by_model = db.execute(
+            """SELECT model,
+                      COALESCE(SUM(cost_usd),0) as cost,
+                      COUNT(*) as calls,
+                      COALESCE(SUM(tokens_in),0) as tokens_in,
+                      COALESCE(SUM(tokens_out),0) as tokens_out
+               FROM llm_usage WHERE created_at >= ?
+               GROUP BY model ORDER BY cost DESC LIMIT 20""",
+            (cutoff,),
+        ).fetchall()
+
+        by_project = db.execute(
+            """SELECT mr.project_id,
+                      COALESCE(SUM(u.cost_usd),0) as cost,
+                      COALESCE(SUM(u.tokens_in)+SUM(u.tokens_out),0) as tokens,
+                      COUNT(DISTINCT u.mission_run_id) as missions
+               FROM llm_usage u
+               JOIN mission_runs mr ON mr.id = u.mission_run_id
+               WHERE u.created_at >= ?
+               GROUP BY mr.project_id ORDER BY cost DESC LIMIT 20""",
+            (cutoff,),
+        ).fetchall()
+
+        by_day = db.execute(
+            """SELECT substr(created_at,1,10) as date,
+                      COALESCE(SUM(cost_usd),0) as cost,
+                      COALESCE(SUM(tokens_in)+SUM(tokens_out),0) as tokens
+               FROM llm_usage WHERE created_at >= ?
+               GROUP BY date ORDER BY date""",
+            (cutoff,),
+        ).fetchall()
+
+        mission_stats = db.execute(
+            """SELECT COUNT(*) as total,
+                      SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed
+               FROM mission_runs WHERE created_at >= ?""",
+            (cutoff,),
+        ).fetchone()
+
+        total_cost = totals["cost"] or 0.0
+        total_missions = mission_stats["total"] or 0
+        completed = mission_stats["completed"] or 0
+        success_rate = round(completed / total_missions, 4) if total_missions else 0.0
+        avg_cost = round(total_cost / total_missions, 6) if total_missions else 0.0
+
+        return JSONResponse(
+            {
+                "period": period,
+                "total_cost_usd": round(total_cost, 6),
+                "total_tokens_in": totals["tokens_in"] or 0,
+                "total_tokens_out": totals["tokens_out"] or 0,
+                "total_calls": totals["calls"] or 0,
+                "by_project": [
+                    {
+                        "project_id": r["project_id"] or "unknown",
+                        "name": r["project_id"] or "unknown",
+                        "cost": round(r["cost"], 6),
+                        "tokens": r["tokens"] or 0,
+                        "missions": r["missions"] or 0,
+                    }
+                    for r in by_project
+                ],
+                "by_model": [
+                    {
+                        "model": r["model"] or "unknown",
+                        "cost": round(r["cost"], 6),
+                        "calls": r["calls"] or 0,
+                        "tokens_in": r["tokens_in"] or 0,
+                        "tokens_out": r["tokens_out"] or 0,
+                    }
+                    for r in by_model
+                ],
+                "by_day": [
+                    {
+                        "date": r["date"],
+                        "cost": round(r["cost"], 6),
+                        "tokens": r["tokens"] or 0,
+                    }
+                    for r in by_day
+                ],
+                "success_rate": success_rate,
+                "avg_cost_per_mission": avg_cost,
+            }
+        )
+    except Exception as e:
+        logger.warning("cost_analytics error: %s", e)
+        return JSONResponse(
+            {
+                "period": period,
+                "total_cost_usd": 0.0,
+                "total_tokens_in": 0,
+                "total_tokens_out": 0,
+                "total_calls": 0,
+                "by_project": [],
+                "by_model": [],
+                "by_day": [],
+                "success_rate": 0.0,
+                "avg_cost_per_mission": 0.0,
+            }
+        )
+    finally:
+        db.close()
