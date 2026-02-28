@@ -156,6 +156,8 @@ html,body{height:100%;overflow:hidden}
       <span class="ws-metric-item" id="wsMetricCommit" style="display:none">
         🔀 <strong id="wsMetricCommitHash"></strong> <span id="wsMetricCommitMsg" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:bottom"></span>
       </span>
+      <span class="ws-metric-sep">·</span>
+      <span class="ws-metric-item" id="wsMetricWallet" title="Project budget">💰 <span id="wsWalletBalance">—</span></span>
     </div>
 
     <!-- ── View Container ─────────────────────────────────────── -->
@@ -216,6 +218,7 @@ html,body{height:100%;overflow:hidden}
             <button class="ws-tab" onclick="wsGitMainTab(this,'diff')" data-tab="diff">
               Diff
             </button>
+            <button class="ws-btn ws-btn-sm" onclick="wsShowDiff()" style="margin-left:auto">⊕ Diff</button>
           </div>
           <div class="ws-pane-content">
             <div class="ws-tab-content active" id="ws-git-log">
@@ -226,6 +229,17 @@ html,body{height:100%;overflow:hidden}
             <div class="ws-tab-content" id="ws-git-diff">
               <div class="ws-git-diff-area" id="wsGitDiffArea">Sélectionnez un fichier modifié pour voir le diff</div>
             </div>
+          </div>
+          <div id="wsDiffPanel" style="display:none;padding:8px;overflow:auto">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+              <select id="wsDiffRef" onchange="wsShowDiff()">
+                <option value="HEAD~1">vs HEAD~1</option>
+                <option value="HEAD~3">vs HEAD~3</option>
+                <option value="HEAD~10">vs HEAD~10</option>
+              </select>
+              <button class="ws-btn ws-btn-sm" onclick="document.getElementById('wsDiffPanel').style.display='none'">✕</button>
+            </div>
+            <div id="wsDiffContent" style="font-family:monospace;font-size:12px;overflow:auto;max-height:500px"></div>
           </div>
         </div>
       </div>
@@ -1372,6 +1386,34 @@ function wsSecretsNewFile() {
 function wsSetStatus(text, state) { var el=document.getElementById('wsStatus'); if(!el)return; el.textContent=text; el.className='ws-badge ws-badge-status ws-badge-'+state; }
 function wsEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+function wsShowDiff() {
+  var ref = document.getElementById('wsDiffRef')?.value || 'HEAD~1';
+  document.getElementById('wsDiffPanel').style.display = 'block';
+  document.getElementById('wsDiffContent').innerHTML = '<div style="color:#888">Loading diff…</div>';
+  fetch('/api/projects/'+_wsProjectId+'/workspace/diff?ref='+encodeURIComponent(ref), {credentials:'include'})
+    .then(function(r){return r.json();}).then(function(data){wsRenderDiff(data);})
+    .catch(function(e){ document.getElementById('wsDiffContent').innerHTML='<div style="color:red">Error: '+e+'</div>'; });
+}
+function wsRenderDiff(data) {
+  var html = '';
+  (data.files||[]).forEach(function(f) {
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-weight:bold;padding:4px 8px;background:#1e2a3a;color:#58a6ff">'+wsEsc(f.path)+'</div>';
+    html += '<div style="background:#0d1117">';
+    (f.hunks||[]).forEach(function(h) {
+      html += '<div style="color:#8b949e;padding:2px 8px;background:#161b22">'+wsEsc(h.header)+'</div>';
+      (h.lines||[]).forEach(function(l) {
+        var bg = l.type==='add'?'rgba(46,160,67,0.15)':l.type==='del'?'rgba(248,81,73,0.15)':'transparent';
+        var color = l.type==='add'?'#3fb950':l.type==='del'?'#f85149':'#c9d1d9';
+        var prefix = l.type==='add'?'+':l.type==='del'?'-':' ';
+        html += '<div style="padding:0 8px;background:'+bg+';color:'+color+'"><span style="user-select:none;opacity:.5;margin-right:8px">'+prefix+'</span>'+wsEsc(l.content)+'</div>';
+      });
+    });
+    html += '</div></div>';
+  });
+  document.getElementById('wsDiffContent').innerHTML = html || '<div style="color:#888">No changes</div>';
+}
+
 // ── File icons by extension ────────────────────────────────────────
 var _wsIconMap = {
   js:'js',jsx:'js',mjs:'js', ts:'ts',tsx:'ts',
@@ -1481,6 +1523,14 @@ function wsLoadMetrics() {
         el('wsMetricCommitMsg').textContent = d.last_commit_msg || '';
       }
     }).catch(function(){});
+}
+
+function wsLoadWallet() {
+  fetch('/api/projects/'+_wsProjectId+'/wallet', {credentials:'include'})
+    .then(r=>r.json()).then(d=>{
+      if(d.balance !== undefined)
+        document.getElementById('wsWalletBalance').textContent = '$'+d.balance.toFixed(2);
+    }).catch(()=>{});
 }
 
 // ── PROGRESS.md ─────────────────────────────────────────────────
@@ -1699,6 +1749,8 @@ function wsFileTreeHighlight(path) {
   // Load metrics
   wsLoadMetrics();
   setInterval(wsLoadMetrics, 30000);
+  wsLoadWallet();
+  setInterval(wsLoadWallet, 60000);
   // Restore bottom collapse
   if (localStorage.getItem('ws_bottom_collapsed')) {
     document.getElementById('wsBottomPanel').classList.add('ws-collapsed');

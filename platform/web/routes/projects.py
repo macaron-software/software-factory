@@ -1951,6 +1951,66 @@ async def ws_save_file(project_id: str, request: Request):
     return JSONResponse({"ok": True})
 
 
+@router.get("/api/projects/{project_id}/workspace/diff")
+async def ws_diff(project_id: str, ref: str = "HEAD~1", request: Request = None):
+    """Return git diff as structured data for inline display."""
+    import subprocess
+    from ...projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "project not found"}, status_code=404)
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", ref],
+            cwd=str(proj.path),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        raw = result.stdout
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"error": "git diff timed out"}, status_code=500)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    files = []
+    current_file = None
+    current_hunk = None
+    for line in raw.splitlines():
+        if line.startswith("+++ "):
+            path = line[4:].lstrip("b/")
+            if current_file is not None:
+                files.append(current_file)
+            current_file = {"path": path, "additions": 0, "deletions": 0, "hunks": []}
+            current_hunk = None
+        elif line.startswith("--- "):
+            pass
+        elif line.startswith("@@ "):
+            if current_file is None:
+                current_file = {"path": "", "additions": 0, "deletions": 0, "hunks": []}
+            header = line.split("@@")[1].strip() if "@@" in line[2:] else line
+            header = "@@ " + line[3:].split("@@")[0].strip() + " @@"
+            current_hunk = {"header": header, "lines": []}
+            current_file["hunks"].append(current_hunk)
+        elif current_hunk is not None:
+            if line.startswith("+"):
+                current_hunk["lines"].append({"type": "add", "content": line[1:]})
+                current_file["additions"] += 1
+            elif line.startswith("-"):
+                current_hunk["lines"].append({"type": "del", "content": line[1:]})
+                current_file["deletions"] += 1
+            else:
+                current_hunk["lines"].append(
+                    {"type": "context", "content": line[1:] if line else ""}
+                )
+    if current_file is not None:
+        files.append(current_file)
+
+    return JSONResponse({"ref": ref, "files": files})
+
+
 @router.get("/api/projects/{project_id}/workspace/docker")
 async def ws_docker_status(project_id: str):
     """Return docker container status for this project."""
@@ -2897,3 +2957,40 @@ async def project_import(request: Request):
         )
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@router.get("/api/projects/{project_id}/wallet")
+async def project_wallet(project_id: str):
+    """Return wallet balance and last 10 transactions for a project."""
+    from ...db.migrations import get_db
+
+    db = get_db()
+    try:
+        row = db.execute(
+            "SELECT balance, total_earned, total_spent FROM project_wallets WHERE project_id=?",
+            (project_id,),
+        ).fetchone()
+        if not row:
+            return JSONResponse(
+                {
+                    "balance": 100.0,
+                    "total_earned": 100.0,
+                    "total_spent": 0.0,
+                    "transactions": [],
+                }
+            )
+        txns = db.execute(
+            "SELECT id, amount, reason, reference_id, created_at FROM token_transactions"
+            " WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
+            (project_id,),
+        ).fetchall()
+        return JSONResponse(
+            {
+                "balance": round(row["balance"], 6),
+                "total_earned": round(row["total_earned"], 6),
+                "total_spent": round(row["total_spent"], 6),
+                "transactions": [dict(t) for t in txns],
+            }
+        )
+    finally:
+        db.close()

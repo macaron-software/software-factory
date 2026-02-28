@@ -1,4 +1,5 @@
 """Browser Web Push API — subscribe/unsubscribe and VAPID public key."""
+
 import json
 import logging
 import os
@@ -12,19 +13,33 @@ from ....db.migrations import get_db
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+_CREATE_TABLE = """CREATE TABLE IF NOT EXISTS push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    subscription_json TEXT NOT NULL,
+    project_id TEXT DEFAULT '',
+    created_at TEXT DEFAULT (datetime('now'))
+)"""
+
+
+def _ensure_table(db) -> None:
+    """Create push_subscriptions table and add project_id column if missing."""
+    db.execute(_CREATE_TABLE)
+    # Migrate: add project_id column if the table existed without it
+    cols = [
+        r[1] for r in db.execute("PRAGMA table_info(push_subscriptions)").fetchall()
+    ]
+    if "project_id" not in cols:
+        db.execute(
+            "ALTER TABLE push_subscriptions ADD COLUMN project_id TEXT DEFAULT ''"
+        )
+    db.commit()
+
 
 def _get_db_subscriptions() -> list[dict]:
     """Load all push subscriptions from SQLite."""
     db = get_db()
     try:
-        db.execute(
-            """CREATE TABLE IF NOT EXISTS push_subscriptions (
-                endpoint TEXT PRIMARY KEY,
-                subscription_json TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            )"""
-        )
-        db.commit()
+        _ensure_table(db)
         rows = db.execute("SELECT subscription_json FROM push_subscriptions").fetchall()
         return [json.loads(r["subscription_json"]) for r in rows]
     except Exception as e:
@@ -34,19 +49,13 @@ def _get_db_subscriptions() -> list[dict]:
         db.close()
 
 
-def _save_subscription(sub: dict) -> None:
+def _save_subscription(sub: dict, project_id: str = "") -> None:
     db = get_db()
     try:
+        _ensure_table(db)
         db.execute(
-            """CREATE TABLE IF NOT EXISTS push_subscriptions (
-                endpoint TEXT PRIMARY KEY,
-                subscription_json TEXT NOT NULL,
-                created_at TEXT DEFAULT (datetime('now'))
-            )"""
-        )
-        db.execute(
-            "INSERT OR REPLACE INTO push_subscriptions (endpoint, subscription_json) VALUES (?,?)",
-            (sub["endpoint"], json.dumps(sub)),
+            "INSERT OR REPLACE INTO push_subscriptions (endpoint, subscription_json, project_id) VALUES (?,?,?)",
+            (sub["endpoint"], json.dumps(sub), project_id),
         )
         db.commit()
     except Exception as e:
@@ -68,21 +77,36 @@ def _delete_subscription(endpoint: str) -> None:
 
 @router.get("/api/push/vapid-public-key")
 async def get_vapid_public_key():
-    """Return VAPID public key for browser push subscription."""
-    key = os.environ.get("NOTIFY_VAPID_PUBLIC_KEY", "")
-    return {"publicKey": key, "enabled": bool(key)}
+    """Return VAPID public key for browser push subscription.
+
+    Key is loaded from env or auto-generated and stored in platform_settings.
+    """
+    try:
+        from ....services.push import get_vapid_public_key as _get_key
+
+        key = _get_key()
+    except Exception:
+        key = os.environ.get("NOTIFY_VAPID_PUBLIC_KEY", "")
+    return {"publicKey": key, "key": key, "enabled": bool(key)}
 
 
 @router.post("/api/push/subscribe")
 async def subscribe_push(request: Request):
-    """Register a browser push subscription."""
+    """Register a browser push subscription.
+
+    Accepts the standard PushSubscription JSON plus an optional ``project_id``
+    field so notifications can be scoped per project.
+    """
     try:
-        sub = await request.json()
+        body = await request.json()
+        # project_id is our custom field; strip before storing the browser sub
+        project_id = str(body.pop("project_id", "") or "")
+        sub = body
         if not sub.get("endpoint"):
             return JSONResponse({"error": "missing endpoint"}, status_code=400)
         svc = get_notification_service()
         svc.add_push_subscription(sub)
-        _save_subscription(sub)
+        _save_subscription(sub, project_id=project_id)
         return {"ok": True, "subscriptions": len(svc._push_subscriptions)}
     except Exception as e:
         logger.error("push subscribe error: %s", e)
@@ -114,5 +138,7 @@ async def push_status():
         "email": svc.has_email,
         "webhook": svc.has_webhook,
         "push_subscriptions": len(svc._push_subscriptions),
-        "vapid_public": os.environ.get("NOTIFY_VAPID_PUBLIC_KEY", "")[:20] + "…" if svc.has_browser_push else "",
+        "vapid_public": os.environ.get("NOTIFY_VAPID_PUBLIC_KEY", "")[:20] + "…"
+        if svc.has_browser_push
+        else "",
     }

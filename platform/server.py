@@ -282,6 +282,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to start knowledge scheduler: %s", e)
 
+    # Start zombie mission cleanup watchdog (every 10 minutes)
+    try:
+        from .ops.zombie_cleanup import start_zombie_watchdog as _zombie_wd
+
+        _asyncio.create_task(_zombie_wd())
+        logger.info("Zombie cleanup watchdog started (every 10 min)")
+    except Exception as e:
+        logger.warning("Failed to start zombie cleanup watchdog: %s", e)
+
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init
@@ -508,7 +517,14 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Mission check failed: %s", exc)
 
-    # Load persisted browser push subscriptions
+    # Load persisted browser push subscriptions and ensure VAPID keys exist
+    try:
+        from .services.push import ensure_vapid_keys
+
+        ensure_vapid_keys()
+    except Exception as exc:
+        logger.warning("VAPID key init failed: %s", exc)
+
     try:
         from .web.routes.api.push import _get_db_subscriptions
         from .services.notification_service import get_notification_service as _get_ns
@@ -589,6 +605,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # ── Rate limiting via slowapi ───────────────────────────────────────────
+    try:
+        from slowapi import _rate_limit_exceeded_handler
+        from slowapi.errors import RateLimitExceeded
+        from .rate_limit import limiter
+
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    except Exception:
+        pass  # slowapi not installed — fall back to middleware-only limiting
+
     # ── Security: Auth middleware (API key) ────────────────────────────────
     from .security import AuthMiddleware
 
@@ -661,7 +688,16 @@ def create_app() -> FastAPI:
     # Tighter limit for LLM-consuming endpoints (mission create, ideation)
     _LLM_BUCKETS: dict[str, list[float]] = _dd(list)
     _LLM_RATE_LIMIT = int(os.environ.get("LLM_RATE_LIMIT", "20"))  # per minute
-    _LLM_PATHS = {"/api/missions", "/api/ideation/start", "/api/projects/chat"}
+    _LLM_PATHS = {
+        "/api/missions",
+        "/api/ideation/start",
+        "/api/projects/chat",
+        "/api/ideation",
+        "/api/group/",
+    }
+    # Strict limit for API key management (10/min)
+    _APIKEY_BUCKETS: dict[str, list[float]] = _dd(list)
+    _APIKEY_RATE_LIMIT = 10  # per minute
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
@@ -671,6 +707,29 @@ def create_app() -> FastAPI:
         ):
             client_ip = request.client.host if request.client else "unknown"
             now = _rl_time.time()
+
+            # API key management: 10/min
+            if request.method == "POST" and request.url.path == "/api/api-keys":
+                ak_bucket = _APIKEY_BUCKETS[client_ip]
+                ak_bucket[:] = [t for t in ak_bucket if now - t < _RATE_WINDOW]
+                if len(ak_bucket) >= _APIKEY_RATE_LIMIT:
+                    from starlette.responses import JSONResponse as _JR
+
+                    remaining = max(0, _APIKEY_RATE_LIMIT - len(ak_bucket))
+                    resp = _JR(
+                        {
+                            "error": "rate_limit_exceeded",
+                            "retry_after": 60,
+                            "type": "api-keys",
+                        },
+                        status_code=429,
+                    )
+                    resp.headers["X-RateLimit-Limit"] = str(_APIKEY_RATE_LIMIT)
+                    resp.headers["X-RateLimit-Remaining"] = "0"
+                    resp.headers["X-RateLimit-Window"] = "60"
+                    return resp
+                ak_bucket.append(now)
+
             # Strict LLM rate limit on POST to LLM-consuming endpoints
             if request.method == "POST" and any(
                 request.url.path.startswith(p) for p in _LLM_PATHS
@@ -680,7 +739,7 @@ def create_app() -> FastAPI:
                 if len(llm_bucket) >= _LLM_RATE_LIMIT:
                     from starlette.responses import JSONResponse as _JR
 
-                    return _JR(
+                    resp = _JR(
                         {
                             "error": "rate_limit_exceeded",
                             "retry_after": 60,
@@ -688,6 +747,10 @@ def create_app() -> FastAPI:
                         },
                         status_code=429,
                     )
+                    resp.headers["X-RateLimit-Limit"] = str(_LLM_RATE_LIMIT)
+                    resp.headers["X-RateLimit-Remaining"] = "0"
+                    resp.headers["X-RateLimit-Window"] = "60"
+                    return resp
                 llm_bucket.append(now)
             # General rate limit
             bucket = _rate_buckets[client_ip]
@@ -695,10 +758,20 @@ def create_app() -> FastAPI:
             if len(bucket) >= _RATE_LIMIT:
                 from starlette.responses import JSONResponse as _JR
 
-                return _JR(
+                resp = _JR(
                     {"error": "rate_limit_exceeded", "retry_after": 60}, status_code=429
                 )
+                resp.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+                resp.headers["X-RateLimit-Remaining"] = "0"
+                resp.headers["X-RateLimit-Window"] = "60"
+                return resp
             bucket.append(now)
+            response = await call_next(request)
+            remaining = max(0, _RATE_LIMIT - len(bucket))
+            response.headers["X-RateLimit-Limit"] = str(_RATE_LIMIT)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            response.headers["X-RateLimit-Window"] = "60"
+            return response
         return await call_next(request)
 
     # ── Trace ID middleware ─────────────────────────────────────────────
@@ -1178,6 +1251,11 @@ def create_app() -> FastAPI:
             return response
 
     app.add_middleware(I18nMiddleware)
+
+    # ── Workspace middleware ─────────────────────────────────────────────────
+    from .web.middleware.workspace import WorkspaceMiddleware
+
+    app.add_middleware(WorkspaceMiddleware)
 
     # ── OpenTelemetry ASGI middleware (last = runs first) ────────────────────
     if _otel_provider is not None:

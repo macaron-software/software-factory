@@ -95,6 +95,9 @@
         <button class="settings-tab" onclick="showSettingsTab('audit')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-shield"/></svg> Audit
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('rate-limits'); loadRateLimits()">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-zap"/></svg> Rate Limits
+        </button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -704,6 +707,14 @@
                         <label class="form-label">Rate limit (req/h)</label>
                         <input type="number" id="apikey-rate" class="form-input" value="1000" style="width:120px">
                     </div>
+                    <div class="form-group" style="margin:0">
+                        <label class="form-label">Scopes</label>
+                        <select id="apikey-scopes" class="form-input" style="width:160px">
+                            <option value='["read","write"]'>read + write</option>
+                            <option value='["read"]'>read only</option>
+                            <option value='["read","write","admin"]'>read + write + admin</option>
+                        </select>
+                    </div>
                     <button class="btn btn-primary btn-sm" onclick="generateApiKey()">Generate Key</button>
                 </div>
                 <div id="apikey-result" style="margin-top:0.75rem;display:none">
@@ -732,6 +743,21 @@
         </section>
     </div>
 
+</div>
+
+<!-- ═══ Rate Limits panel ═══ -->
+<div class="settings-panel" id="panel-rate-limits">
+    <section class="settings-section">
+        <h3>Rate Limits &amp; Budget Caps</h3>
+        <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1.2rem">Control LLM spend per session and platform-wide per hour. Changes apply within 60 seconds.</p>
+        <div id="rate-limits-form" style="display:grid;gap:1rem;max-width:520px">
+            <p style="color:var(--text-secondary);font-size:0.82rem">Loading…</p>
+        </div>
+        <div style="margin-top:1.2rem;display:flex;gap:0.75rem;align-items:center">
+            <button class="btn btn-sm btn-primary" onclick="saveRateLimits()">Save</button>
+            <span id="rate-limits-status" style="font-size:0.8rem;color:var(--text-secondary)"></span>
+        </div>
+    </section>
 </div>
 
 <!-- ═══ Modules Panel (injected after LLM panel) ═══ -->
@@ -1421,7 +1447,8 @@ async function loadApiKeys() {
         }
         let html = '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:1px solid var(--border)">'
             + '<th style="text-align:left;padding:4px 8px">Name</th><th style="text-align:left;padding:4px 8px">Prefix</th>'
-            + '<th style="text-align:left;padding:4px 8px">Workspace</th><th style="text-align:left;padding:4px 8px">Created</th>'
+            + '<th style="text-align:left;padding:4px 8px">Workspace</th><th style="text-align:left;padding:4px 8px">Scopes</th>'
+            + '<th style="text-align:left;padding:4px 8px">Usage</th><th style="text-align:left;padding:4px 8px">Created</th>'
             + '<th style="text-align:left;padding:4px 8px">Last used</th><th style="text-align:left;padding:4px 8px">Status</th>'
             + '<th style="padding:4px 8px"></th></tr></thead><tbody>';
         for (const k of d.keys) {
@@ -1430,6 +1457,8 @@ async function loadApiKeys() {
                 <td style="padding:5px 8px;font-weight:600">${k.name}</td>
                 <td style="padding:5px 8px;font-family:monospace">${k.key_prefix}...</td>
                 <td style="padding:5px 8px">${k.workspace||'default'}</td>
+                <td style="padding:5px 8px">${(k.scopes||[]).map(s=>`<span style="font-size:0.68rem;padding:1px 5px;border-radius:3px;background:var(--bg-secondary);border:1px solid var(--border)">${s}</span>`).join(' ')}</td>
+                <td style="padding:5px 8px;color:var(--text-secondary)">${k.usage_count||0}</td>
                 <td style="padding:5px 8px;color:var(--text-secondary)">${(k.created_at||'').slice(0,10)}</td>
                 <td style="padding:5px 8px;color:var(--text-secondary)">${(k.last_used_at||'—').slice(0,16)}</td>
                 <td style="padding:5px 8px">${status}</td>
@@ -1448,8 +1477,9 @@ async function generateApiKey() {
     if (!name) { alert('Name is required'); return; }
     const workspace = document.getElementById('apikey-workspace').value.trim() || 'default';
     const rate = document.getElementById('apikey-rate').value || '1000';
+    const scopes = encodeURIComponent(document.getElementById('apikey-scopes')?.value || '["read","write"]');
     try {
-        const r = await fetch(`/api/api-keys?name=${encodeURIComponent(name)}&workspace=${encodeURIComponent(workspace)}&rate_limit=${rate}`, {method:'POST'});
+        const r = await fetch(`/api/api-keys?name=${encodeURIComponent(name)}&workspace=${encodeURIComponent(workspace)}&rate_limit=${rate}&scopes=${scopes}`, {method:'POST'});
         const d = await r.json();
         if (d.key) {
             document.getElementById('apikey-value').textContent = d.key;
@@ -1548,6 +1578,71 @@ async function deleteWebhookConfig(id) {
     if (!confirm('Delete this webhook trigger?')) return;
     await fetch(`/api/webhooks/configs/${id}`, {method:'DELETE'});
     loadWebhookConfigs();
+}
+
+// ── Rate Limits ──────────────────────────────────────────────────────────────
+const _RL_LABELS = {
+    rate_limit_enabled:           {label:'Rate Limiting Enabled', type:'checkbox', desc:'Master toggle for all rate limits'},
+    rate_limit_usd_per_session:   {label:'Max USD per Session ($)', type:'number', step:'0.01', min:'0', desc:'Max spend per agent session before it is halted'},
+    rate_limit_usd_per_hour:      {label:'Max USD per Hour ($)', type:'number', step:'0.01', min:'0', desc:'Platform-wide hourly spend cap'},
+    rate_limit_calls_per_min:     {label:'Max LLM Calls per Minute', type:'number', step:'1', min:'0', desc:'Max LLM calls per minute platform-wide'},
+};
+let _rlSettings = {};
+
+async function loadRateLimits() {
+    const form = document.getElementById('rate-limits-form');
+    if (!form) return;
+    try {
+        const r = await fetch('/api/settings/rate-limits');
+        const d = await r.json();
+        _rlSettings = {};
+        for (const s of (d.settings || [])) _rlSettings[s.key] = s.value;
+        let html = '';
+        for (const [key, meta] of Object.entries(_RL_LABELS)) {
+            const val = _rlSettings[key] ?? '';
+            if (meta.type === 'checkbox') {
+                const checked = ['true','1','yes'].includes((val||'true').toLowerCase()) ? 'checked' : '';
+                html += `<label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer">
+                    <input type="checkbox" id="rl-${key}" ${checked} style="width:16px;height:16px">
+                    <span style="font-weight:600;font-size:0.85rem">${meta.label}</span>
+                    <span style="color:var(--text-secondary);font-size:0.78rem">— ${meta.desc}</span></label>`;
+            } else {
+                html += `<label style="display:flex;flex-direction:column;gap:3px">
+                    <span style="font-weight:600;font-size:0.85rem">${meta.label}</span>
+                    <span style="color:var(--text-secondary);font-size:0.75rem">${meta.desc}</span>
+                    <input type="${meta.type}" id="rl-${key}" value="${val}" step="${meta.step||'any'}" min="${meta.min||'0'}"
+                        style="padding:0.35rem 0.6rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-input,var(--bg-card));color:var(--text-primary);font-size:0.85rem;width:180px"></label>`;
+            }
+        }
+        form.innerHTML = html;
+    } catch(e) {
+        form.innerHTML = `<p style="color:var(--red);font-size:0.82rem">Error loading settings: ${e.message}</p>`;
+    }
+}
+
+async function saveRateLimits() {
+    const status = document.getElementById('rate-limits-status');
+    const body = {};
+    for (const key of Object.keys(_RL_LABELS)) {
+        const el = document.getElementById(`rl-${key}`);
+        if (!el) continue;
+        body[key] = el.type === 'checkbox' ? String(el.checked) : el.value;
+    }
+    try {
+        const r = await fetch('/api/settings/rate-limits', {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+        const d = await r.json();
+        if (d.ok) {
+            status.textContent = '✓ Saved';
+            status.style.color = 'var(--green)';
+        } else {
+            status.textContent = '✗ ' + (d.error || 'Save failed');
+            status.style.color = 'var(--red)';
+        }
+        setTimeout(() => { status.textContent = ''; }, 3000);
+    } catch(e) {
+        status.textContent = '✗ ' + e.message;
+        status.style.color = 'var(--red)';
+    }
 }
 </script>
 {% endblock %}
