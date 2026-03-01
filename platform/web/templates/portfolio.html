@@ -195,7 +195,11 @@
                 <img class="strat-photo" src="{{ a.avatar_url }}" alt="{{ a.name }}">
                 {% else %}
                 <div class="strat-avatar" style="background:{{ a.color }}20;border:2px solid {{ a.color }}">
-                    <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar }}"/></svg>
+                    {% if a.avatar and a.avatar == a.avatar | upper and a.avatar | length <= 3 %}
+                    <span style="color:{{ a.color }};font-size:0.6rem;font-weight:700;letter-spacing:0">{{ a.avatar }}</span>
+                    {% else %}
+                    <svg style="color:{{ a.color }}"><use href="#icon-{{ a.avatar or 'bot' }}"/></svg>
+                    {% endif %}
                 </div>
                 {% endif %}
                 <div class="strat-info">
@@ -314,7 +318,12 @@
                 <div class="pmc-team">
                     {% for avatar in p.team_avatars[:6] %}
                     <span class="pmc-team-agent" title="{{ avatar.name }}">
-                        <svg><use href="#icon-{{ avatar.icon or 'bot' }}"/></svg>
+                        {% set av_icon = avatar.icon or 'bot' %}
+                        {% if av_icon == av_icon | upper and av_icon | length <= 3 %}
+                        <span style="font-size:0.5rem;font-weight:700;line-height:1">{{ av_icon }}</span>
+                        {% else %}
+                        <svg><use href="#icon-{{ av_icon }}"/></svg>
+                        {% endif %}
                     </span>
                     {% endfor %}
                     {% if p.team_avatars|length > 6 %}
@@ -441,9 +450,13 @@ function togglePopover(card, idx){
     card.classList.add('active');
 
     const a = agents[idx];
-    const photo = a.avatar_url
+    const av = a.avatar || 'bot';
+    const avHtml = a.avatar_url
         ? `<img class="ap-photo" src="${a.avatar_url}" alt="${esc(a.name)}">`
-        : `<div class="strat-avatar" style="background:${a.color}20;border:2px solid ${a.color}"><svg style="color:${a.color};width:20px;height:20px"><use href="#icon-${a.avatar}"/></svg></div>`;
+        : (av === av.toUpperCase() && av.length <= 3)
+            ? `<div class="strat-avatar" style="background:${a.color}20;border:2px solid ${a.color}"><span style="color:${a.color};font-size:0.6rem;font-weight:700">${esc(av)}</span></div>`
+            : `<div class="strat-avatar" style="background:${a.color}20;border:2px solid ${a.color}"><svg style="color:${a.color};width:20px;height:20px"><use href="#icon-${av}"/></svg></div>`;
+    const photo = avHtml;
 
     let skillsHtml = '';
     if(a.skills && a.skills.length){
@@ -555,7 +568,7 @@ function renderStratGraph(){
     const defs = document.createElementNS(NS, 'defs');
     defs.innerHTML = '<marker id="arrowS" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,3.5 L0,7z" fill="#888" opacity="0.6"/></marker>';
     nodes.forEach(n => {
-        if(n.avatar_url){
+        if(n.avatar_url && n.avatar_url.startsWith('/')){
             const clip = document.createElementNS(NS, 'clipPath');
             clip.setAttribute('id', 'clip-'+n.id);
             const cc = document.createElementNS(NS, 'circle');
@@ -610,7 +623,7 @@ function renderStratGraph(){
         ring.setAttribute('stroke-width', '2.5');
         g.appendChild(ring);
         // Avatar photo or fallback circle
-        if(n.avatar_url){
+        if(n.avatar_url && n.avatar_url.startsWith('/')){
             const img = document.createElementNS(NS, 'image');
             img.setAttribute('href', n.avatar_url);
             img.setAttribute('x', n._cx - (NR-2)); img.setAttribute('y', n._cy - (NR-2));

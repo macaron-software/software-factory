@@ -646,7 +646,7 @@ def create_app() -> FastAPI:
         if path.startswith("/projects/") and path.endswith("/workspace"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline'; "
                 "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
@@ -658,7 +658,7 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
