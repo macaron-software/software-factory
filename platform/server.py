@@ -1174,6 +1174,8 @@ def create_app() -> FastAPI:
         ("push", ".web.routes.api.push", {}),
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
+        ("mkt_ideation", ".web.routes.mkt_ideation", {}),
+        ("group_ideation", ".web.routes.group_ideation", {}),
     ]
 
     for _mod_name, _mod_path, _kwargs in _OPTIONAL_ROUTERS:
