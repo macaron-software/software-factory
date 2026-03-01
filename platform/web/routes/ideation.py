@@ -69,11 +69,14 @@ async def ideation_page(request: Request):
         a = db_map.get(ia["id"])
         jpg = avatar_dir / f"{ia['id']}.jpg"
         svg_f = avatar_dir / f"{ia['id']}.svg"
-        avatar_url = (
-            f"/static/avatars/{ia['id']}.jpg"
-            if jpg.exists()
-            else (f"/static/avatars/{ia['id']}.svg" if svg_f.exists() else "")
-        )
+        # Use local jpg only if it's a real photo (>10KB); tiny files are DiceBear SVG conversions
+        if jpg.exists() and jpg.stat().st_size > 10_000:
+            avatar_url = f"/static/avatars/{ia['id']}.jpg"
+        elif svg_f.exists() and svg_f.stat().st_size > 10_000:
+            avatar_url = f"/static/avatars/{ia['id']}.svg"
+        else:
+            # Photorealistic avatar via pravatar.cc (consistent per agent id)
+            avatar_url = f"https://i.pravatar.cc/150?u={ia['id']}"
         enriched.append(
             {
                 **ia,

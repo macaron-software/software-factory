@@ -325,13 +325,12 @@ async def group_ideation_page(request: Request, group_id: str):
         a = db_map.get(ag["id"])
         jpg = avatar_dir / f"{ag['id']}.jpg"
         svg_f = avatar_dir / f"{ag['id']}.svg"
-        avatar_url = (
-            f"/static/avatars/{ag['id']}.jpg"
-            if jpg.exists()
-            else f"/static/avatars/{ag['id']}.svg"
-            if svg_f.exists()
-            else ""
-        )
+        if jpg.exists() and jpg.stat().st_size > 10_000:
+            avatar_url = f"/static/avatars/{ag['id']}.jpg"
+        elif svg_f.exists() and svg_f.stat().st_size > 10_000:
+            avatar_url = f"/static/avatars/{ag['id']}.svg"
+        else:
+            avatar_url = f"https://i.pravatar.cc/150?u={ag['id']}"
         enriched_agents.append(
             {
                 **ag,
