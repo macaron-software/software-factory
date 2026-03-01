@@ -623,11 +623,15 @@ async def project_board_page(request: Request, project_id: str):
 
 
 @router.get("/api/projects", responses={200: {"model": list[ProjectOut]}})
-async def api_projects():
-    """List all projects (JSON)."""
+async def api_projects(request: Request):
+    """List projects — filtered by owner for non-admin users."""
     from ...projects.manager import get_project_store
+    from ...auth.middleware import get_current_user
 
+    user = await get_current_user(request)
     store = get_project_store()
+    # Admins see all projects; authenticated users see only their own space
+    owner_filter = "" if (user and user.role == "admin") else (user.id if user else "")
     return JSONResponse(
         [
             {
@@ -641,7 +645,7 @@ async def api_projects():
                 "has_vision": bool(p.vision),
                 "values": p.values,
             }
-            for p in store.list_all()
+            for p in store.list_all(owner_id=owner_filter)
         ]
     )
 
@@ -650,8 +654,10 @@ async def api_projects():
 async def create_project(request: Request):
     """Create a new project."""
     from ...projects.manager import get_project_store, Project
+    from ...auth.middleware import get_current_user
 
     form = await _parse_body(request)
+    user = await get_current_user(request)
     store = get_project_store()
     p = Project(
         id=str(form.get("id", "")),
@@ -660,6 +666,7 @@ async def create_project(request: Request):
         description=str(form.get("description", "")),
         factory_type=str(form.get("factory_type", "standalone")),
         lead_agent_id=str(form.get("lead_agent_id", "brain")),
+        owner_id=user.id if user else "",
         values=[
             v.strip()
             for v in str(form.get("values", "quality,feedback")).split(",")

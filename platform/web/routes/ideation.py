@@ -175,14 +175,21 @@ async def ideation_submit(request: Request):
 
     # Persist to ideation_sessions table so /api/ideation/sessions can find it
     from ...db.adapter import get_connection as _gdb_i
+    from ...auth.middleware import get_current_user as _get_user
 
     _db_i = _gdb_i()
+    _user_id = ""
+    try:
+        _u = await _get_user(request)
+        _user_id = _u.id if _u else ""
+    except Exception:
+        pass
     try:
         title = prompt[:80]
         _db_i.execute(
-            "INSERT INTO ideation_sessions (id, title, prompt, status) VALUES (?, ?, ?, 'active')"
+            "INSERT INTO ideation_sessions (id, title, prompt, status, user_id) VALUES (?, ?, ?, 'active', ?)"
             " ON CONFLICT (id) DO NOTHING",
-            (session_id, title, prompt),
+            (session_id, title, prompt, _user_id),
         )
         _db_i.commit()
     except Exception as _e:
@@ -872,15 +879,23 @@ async def ideation_create_epic(request: Request):
 
 
 @router.get("/api/ideation/sessions")
-async def ideation_sessions_list():
-    """List all ideation sessions (most recent first)."""
+async def ideation_sessions_list(request: Request):
+    """List ideation sessions for the current user (most recent first)."""
     from ...db.adapter import get_connection as get_db
+    from ...auth.middleware import get_current_user
 
+    user = await get_current_user(request)
     db = get_db()
     try:
-        rows = db.execute(
-            "SELECT * FROM ideation_sessions ORDER BY created_at DESC LIMIT 50"
-        ).fetchall()
+        if user and user.role != "admin":
+            rows = db.execute(
+                "SELECT * FROM ideation_sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 50",
+                (user.id,),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                "SELECT * FROM ideation_sessions ORDER BY created_at DESC LIMIT 50"
+            ).fetchall()
         return JSONResponse(
             [
                 {

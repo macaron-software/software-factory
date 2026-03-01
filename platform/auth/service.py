@@ -151,6 +151,32 @@ def user_count() -> int:
         return 0
 
 
+def _ensure_personal_space(user: "User") -> None:
+    """Create a personal space project for a new OAuth user (idempotent)."""
+    try:
+        from ..projects.manager import get_project_store, Project
+
+        store = get_project_store()
+        space_id = f"space-{user.id}"
+        existing = store.get(space_id)
+        if existing:
+            return
+        p = Project(
+            id=space_id,
+            name=f"{user.display_name}'s Space",
+            description=f"Personal workspace for {user.display_name}",
+            factory_type="standalone",
+            lead_agent_id="brain",
+            owner_id=user.id,
+            values=["quality", "feedback"],
+        )
+        store.create(p)
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).warning("_ensure_personal_space failed: %s", e)
+
+
 def register(
     email: str,
     password: str,
@@ -250,6 +276,11 @@ def oauth_login_or_create(
         now_ts = datetime.now(timezone.utc).isoformat()
         db.execute("UPDATE users SET last_login=? WHERE id=?", (now_ts, user.id))
         db.commit()
+
+    # Auto-create personal space on first OAuth login (if not already existing)
+    if not row:
+        _ensure_personal_space(user)
+
     access = _create_access_token(user)
     refresh = _create_refresh_token(user, ip=ip, ua=ua)
     return {
@@ -424,7 +455,8 @@ def login(email: str, password: str, ip: str = "", ua: str = "") -> dict:
     """Authenticate user, return access + refresh tokens."""
     with get_db() as db:
         row = db.execute(
-            "SELECT * FROM users WHERE email=? AND is_active=1", (email.strip().lower(),)
+            "SELECT * FROM users WHERE email=? AND is_active=1",
+            (email.strip().lower(),),
         ).fetchone()
     if not row:
         raise AuthError("Invalid credentials", "invalid_credentials")

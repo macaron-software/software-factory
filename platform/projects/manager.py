@@ -76,6 +76,7 @@ class Project:
     phases: list[dict] = field(
         default_factory=list
     )  # [{id, name, icon, mission_types_active[]}]
+    owner_id: str = ""  # User ID of the owner (empty = shared/admin-only)
     created_at: str = ""
     updated_at: str = ""
 
@@ -582,6 +583,7 @@ class ProjectStore:
             ("git_url", "''"),
             ("current_phase", "''"),
             ("phases_json", "'[]'"),
+            ("owner_id", "''"),
         ]:
             if col not in cols:
                 try:
@@ -593,21 +595,27 @@ class ProjectStore:
         conn.commit()
         conn.close()
 
-    def list_all(self) -> list[Project]:
+    def list_all(self, owner_id: str = "") -> list[Project]:
         from ..cache import get as cache_get, put as cache_put
 
-        cached = cache_get("projects:all")
+        cache_key = f"projects:all:{owner_id or 'admin'}"
+        cached = cache_get(cache_key)
         if cached is not None:
             return cached
         conn = get_db()
-        rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
+        if owner_id:
+            rows = conn.execute(
+                "SELECT * FROM projects WHERE owner_id=? ORDER BY name", (owner_id,)
+            ).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM projects ORDER BY name").fetchall()
         conn.close()
         projects = [self._row_to_project(r) for r in rows]
-        if os.environ.get("AZURE_DEPLOY", ""):
+        if os.environ.get("AZURE_DEPLOY", "") and not owner_id:
             from .registry import _PERSONAL_IDS
 
             projects = [p for p in projects if p.id not in _PERSONAL_IDS]
-        cache_put("projects:all", projects, ttl=60)
+        cache_put(cache_key, projects, ttl=60)
         return projects
 
     def search(
@@ -692,8 +700,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -711,6 +719,7 @@ class ProjectStore:
                 p.git_url or "",
                 p.current_phase or "",
                 json.dumps(p.phases),
+                p.owner_id or "",
             ),
         )
         conn.commit()
@@ -1415,6 +1424,7 @@ class ProjectStore:
             current_phase=row["current_phase"] if "current_phase" in keys else "",
             phases=json.loads(row["phases_json"] if "phases_json" in keys else "[]")
             or [],
+            owner_id=row["owner_id"] if "owner_id" in keys else "",
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
             arch_domain=arch_domain,

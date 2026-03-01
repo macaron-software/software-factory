@@ -1771,6 +1771,19 @@ def _ensure_darwin_tables(conn) -> None:
     except Exception:
         pass
 
+    # Migration: add user_id to ideation_sessions for per-user space isolation
+    try:
+        is_cols = {
+            r[1]
+            for r in conn.execute("PRAGMA table_info(ideation_sessions)").fetchall()
+        }
+        if is_cols and "user_id" not in is_cols:
+            conn.execute(
+                "ALTER TABLE ideation_sessions ADD COLUMN user_id TEXT DEFAULT ''"
+            )
+    except Exception:
+        pass
+
     conn.commit()
 
 
