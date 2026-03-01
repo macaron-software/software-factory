@@ -63,6 +63,15 @@ class MemoryEntry:
 class MemoryManager:
     """Unified interface for all memory layers."""
 
+    @staticmethod
+    def _row(r) -> dict:
+        """Convert a DB row to a JSON-serializable dict (datetime → ISO str)."""
+        d = dict(r)
+        for k, v in d.items():
+            if hasattr(v, "isoformat"):
+                d[k] = v.isoformat()
+        return d
+
     # ── Pattern Memory (Layer 2) ────────────────────────────────
 
     def pattern_store(
@@ -103,7 +112,7 @@ class MemoryManager:
         params.append(limit)
         rows = conn.execute(q, params).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     def pattern_search(
         self, session_id: str, query: str, limit: int = 20
@@ -115,7 +124,7 @@ class MemoryManager:
             (session_id, f"%{query}%", f"%{query}%", limit),
         ).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     # ── Project Memory (Layer 3) ────────────────────────────────
 
@@ -196,7 +205,7 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     def project_search(
         self, project_id: str, query: str, limit: int = 20
@@ -243,7 +252,7 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     # ── Global Memory (Layer 4) ──────────────────────────────────
 
@@ -299,7 +308,7 @@ class MemoryManager:
                 (limit,),
             ).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     def global_search(self, query: str, limit: int = 20) -> list[dict]:
         from ..db.adapter import is_postgresql
@@ -332,7 +341,7 @@ class MemoryManager:
                 (f"%{query}%", f"%{query}%", limit),
             ).fetchall()
         conn.close()
-        return [dict(r) for r in rows]
+        return [self._row(r) for r in rows]
 
     # ── Vector Search (semantic, embedding-based) ──────────────────
 
