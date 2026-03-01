@@ -118,12 +118,17 @@ async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpda
         if payload.status:
             try:
                 from ...services.notifications import emit_notification
+
                 emit_notification(
                     f"TMA ticket {payload.status}: {ticket_id[:8]}",
-                    type="tma", message=payload.name or "",
+                    type="tma",
+                    message=payload.name or "",
                     url=f"/tma/tickets/{ticket_id}",
-                    severity="warning" if payload.status in ("open", "in_progress") else "info",
-                    source="tma", ref_id=ticket_id,
+                    severity="warning"
+                    if payload.status in ("open", "in_progress")
+                    else "info",
+                    source="tma",
+                    ref_id=ticket_id,
                 )
             except Exception:
                 pass
@@ -247,6 +252,7 @@ async def list_tickets(
 
 class JSErrorReport(BaseModel):
     """Browser JS error report."""
+
     message: str = ""
     source: str = ""
     line: int = 0
@@ -274,14 +280,19 @@ async def report_js_error(request: Request, report: JSErrorReport):
     )
     try:
         db = get_db()
-        # Deduplicate: skip if same title exists and is still open
-        existing = db.execute(
-            "SELECT id FROM support_tickets WHERE title=? AND status='open' LIMIT 1",
-            (title,),
+        # Deduplicate on platform_incidents (count-based, same as server errors)
+        existing_inc = db.execute(
+            "SELECT id FROM platform_incidents WHERE error_detail=? AND status='open' LIMIT 1",
+            (desc,),
         ).fetchone()
-        if existing:
+        if existing_inc:
+            db.execute(
+                "UPDATE platform_incidents SET count=count+1, last_seen_at=CURRENT_TIMESTAMP WHERE id=?",
+                (existing_inc[0],),
+            )
+            db.commit()
             db.close()
-            return {"status": "duplicate", "ticket_id": existing[0]}
+            return {"status": "duplicate", "incident_id": existing_inc[0]}
         db.execute(
             "INSERT INTO support_tickets (id, mission_id, title, description, severity, category, reporter, status) "
             "VALUES (?, '', ?, ?, 'medium', 'js-error', 'browser', 'open')",
@@ -289,8 +300,8 @@ async def report_js_error(request: Request, report: JSErrorReport):
         )
         # Bridge to platform_incidents so auto-heal picks it up
         db.execute(
-            "INSERT OR IGNORE INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, created_at) "
-            "VALUES (?, ?, 'P3', 'open', 'js-error', 'js-error', ?, datetime('now'))",
+            "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, count, last_seen_at) "
+            "VALUES (?, ?, 'P3', 'open', 'js-error', 'js-error', ?, 1, CURRENT_TIMESTAMP)",
             (f"js-{tid}", title, desc),
         )
         db.commit()
@@ -298,9 +309,14 @@ async def report_js_error(request: Request, report: JSErrorReport):
         # In-app notification
         try:
             from ...services.notifications import emit_notification
+
             emit_notification(
-                title, type="tma", message=report.source or report.url,
-                severity="warning", source="js-error", ref_id=tid,
+                title,
+                type="tma",
+                message=report.source or report.url,
+                severity="warning",
+                source="js-error",
+                ref_id=tid,
             )
         except Exception:
             pass

@@ -64,6 +64,24 @@
                 });
             } catch(_) {}
         });
+
+        // Intercept console.error → TMA
+        const _origConsoleError = console.error.bind(console);
+        console.error = function(...args) {
+            _origConsoleError(...args);
+            try {
+                const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ').slice(0, 200);
+                const sig = 'console:' + msg;
+                if (_reported.has(sig)) return;
+                _reported.add(sig);
+                setTimeout(() => _reported.delete(sig), _throttle);
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: '[console.error] ' + msg, source: 'console', url: location.href })
+                });
+            } catch(_) {}
+        };
     })();
     </script>
 </head>
