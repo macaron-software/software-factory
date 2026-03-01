@@ -399,6 +399,10 @@ def scaffold_project(p: "Project") -> dict:
     root = Path(p.path)
     actions: list[str] = []
 
+    # Skip scaffold if root exists but is not writable (e.g. read-only bind-mount)
+    if root.exists() and not os.access(str(root), os.W_OK):
+        return {"project_id": p.id, "actions": []}
+
     # 1. Workspace directory
     if not root.exists():
         root.mkdir(parents=True, exist_ok=True)
