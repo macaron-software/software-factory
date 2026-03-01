@@ -69,7 +69,15 @@ def live_session(live_url):
     """httpx.Client pointed at the live server."""
     import httpx
 
-    with httpx.Client(base_url=live_url, timeout=30.0) as session:
+    # Pass MACARON_API_KEY as Bearer token for both nginx and platform API authentication
+    api_key = os.environ.get("MACARON_API_KEY", "")
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+
+    # Fallback: nginx basic auth if no API key configured
+    azure_pass = os.environ.get("AZURE_PASS", "")
+    auth = ("macaron", azure_pass) if azure_pass and not api_key else None
+
+    with httpx.Client(base_url=live_url, timeout=30.0, auth=auth, headers=headers) as session:
         yield session
 
 
