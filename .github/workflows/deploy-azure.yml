@@ -34,6 +34,18 @@ jobs:
           ssh azureadmin@${{ secrets.AZURE_IP }} << 'ENDSSH'
           set -e
 
+          # ── Sync config files to VM (compose + nginx, via bind-mounted container) ──
+          CONF_CTR=$(docker ps -a --format "{{.Names}}" | grep "^deploy-platform-" | head -1 || echo "")
+          if [ -n "$CONF_CTR" ]; then
+            docker cp /home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml \
+              "$CONF_CTR":/app/macaron_platform/deploy/docker-compose-vm.yml
+            docker cp /home/azureadmin/macaron_update/platform/deploy/nginx-vm.conf \
+              "$CONF_CTR":/app/macaron_platform/deploy/nginx-vm.conf
+            echo "Config files updated via $CONF_CTR"
+          else
+            echo "WARN: no deploy-platform-* container found — config sync skipped"
+          fi
+
           # ── Migrate old single-container setup if needed ─────────────────────
           docker stop deploy-platform-1 2>/dev/null || true
 
