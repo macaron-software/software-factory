@@ -167,9 +167,31 @@ async def mission_detail_page(request: Request, mission_id: str):
 @router.post("/api/missions", responses={200: {"model": OkResponse}})
 async def create_mission(request: Request):
     """Create a new mission."""
+    from fastapi import HTTPException
+
     from ....missions.store import MissionDef, get_mission_store
 
     data = await _parse_body(request)
+    if not isinstance(data, dict):
+        raise HTTPException(
+            status_code=422, detail="Request body must be a JSON object"
+        )
+
+    # Validate field lengths to prevent abuse
+    _MAX = 10_000
+    for field in ("name", "title", "description", "goal"):
+        val = data.get(field)
+        if isinstance(val, str) and len(val) > _MAX:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{field}' exceeds maximum length of {_MAX}",
+            )
+
+    try:
+        wsjf = float(data.get("wsjf_score", 0))
+    except (TypeError, ValueError):
+        wsjf = 0.0
+
     m = MissionDef(
         project_id=data.get("project_id", ""),
         name=data.get(
@@ -179,7 +201,7 @@ async def create_mission(request: Request):
         goal=data.get("goal", ""),
         type=data.get("type", "feature"),
         workflow_id=data.get("workflow_id", ""),
-        wsjf_score=float(data.get("wsjf_score", 0)),
+        wsjf_score=wsjf,
         created_by="user",
     )
     mission_store = get_mission_store()

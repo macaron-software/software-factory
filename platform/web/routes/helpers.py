@@ -14,9 +14,18 @@ logger = logging.getLogger(__name__)
 
 async def _parse_body(request: Request) -> dict:
     """Parse request body as JSON or form data, whichever the client sends."""
+    from fastapi import HTTPException
+    import json as _json
+
     ct = request.headers.get("content-type", "")
     if "application/json" in ct:
-        return await request.json()
+        try:
+            body = await request.body()
+            if not body:
+                return {}
+            return _json.loads(body)
+        except (_json.JSONDecodeError, UnicodeDecodeError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid JSON body: {e}")
     return dict(await request.form())
 
 
