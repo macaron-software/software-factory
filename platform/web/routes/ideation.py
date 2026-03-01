@@ -91,7 +91,7 @@ async def ideation_page(request: Request):
         )
 
     # Load past ideation sessions for sidebar
-    from ...db.migrations import get_db as _gdb
+    from ...db.adapter import get_connection as _gdb
 
     _db = _gdb()
     try:
@@ -171,7 +171,7 @@ async def ideation_submit(request: Request):
         session = existing
 
     # Persist to ideation_sessions table so /api/ideation/sessions can find it
-    from ...db.migrations import get_db as _gdb_i
+    from ...db.adapter import get_connection as _gdb_i
 
     _db_i = _gdb_i()
     try:
@@ -230,7 +230,7 @@ async def ideation_submit(request: Request):
             await run_pattern(pattern, session_id, prompt)
             # Persist agent messages to ideation_messages + ideation_findings
             _msgs = session_store.get_messages(session_id)
-            from ...db.migrations import get_db as _gdb_m
+            from ...db.adapter import get_connection as _gdb_m
 
             _db_m = _gdb_m()
             try:
@@ -379,7 +379,7 @@ async def ideation_create_epic(request: Request):
     # If session_id provided, try to load idea + findings from session store / DB
     session_id_in = data.get("session_id", "").strip()
     if session_id_in and not (idea and findings):
-        from ...db.migrations import get_db as _gdb_epic
+        from ...db.adapter import get_connection as _gdb_epic
 
         _db_epic = _gdb_epic()
         try:
@@ -693,7 +693,7 @@ async def ideation_create_epic(request: Request):
     # ── Step 6: Link ideation session → epic ──
     ideation_sid = data.get("session_id", "")
     if ideation_sid:
-        from ...db.migrations import get_db as _get_db
+        from ...db.adapter import get_connection as _get_db
 
         db = _get_db()
         try:
@@ -765,7 +765,7 @@ async def ideation_create_epic(request: Request):
                 confidence=0.85,
             )
         if ideation_sid:
-            from ...db.migrations import get_db as _gdb2
+            from ...db.adapter import get_connection as _gdb2
 
             _db2 = _gdb2()
             try:
@@ -871,7 +871,7 @@ async def ideation_create_epic(request: Request):
 @router.get("/api/ideation/sessions")
 async def ideation_sessions_list():
     """List all ideation sessions (most recent first)."""
-    from ...db.migrations import get_db
+    from ...db.adapter import get_connection as get_db
 
     db = get_db()
     try:
@@ -899,7 +899,7 @@ async def ideation_sessions_list():
 @router.get("/api/ideation/sessions/{session_id}")
 async def ideation_session_detail(session_id: str):
     """Get full ideation session with messages and findings."""
-    from ...db.migrations import get_db
+    from ...db.adapter import get_connection as get_db
 
     db = get_db()
     try:
@@ -948,7 +948,7 @@ async def ideation_session_detail(session_id: str):
 @router.get("/ideation/history", response_class=HTMLResponse)
 async def ideation_history_page(request: Request):
     """Dedicated ideation history page."""
-    from ...db.migrations import get_db
+    from ...db.adapter import get_connection as get_db
 
     db = get_db()
     try:
