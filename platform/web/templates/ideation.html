@@ -183,6 +183,7 @@
 </div>
 
 <script>
+(function(){
 /* ── Ideation Graph Data ── */
 var igAgents = {{ agents | tojson }};
 var IG_NW = 130, IG_NH = 56;
@@ -938,5 +939,13 @@ var resumeSession = urlParams.get('session');
 if (resumeSession) {
     loadPastSession(resumeSession);
 }
+/* ── Expose onclick functions to global scope ── */
+window.toggleIdeaGraph = toggleIdeaGraph;
+window.closeIgPopover = closeIgPopover;
+window.setPrompt = setPrompt;
+window.sendIdea = sendIdea;
+window.toggleSidebar = toggleSidebar;
+window.loadPastSession = loadPastSession;
+})();
 </script>
 {% endblock %}

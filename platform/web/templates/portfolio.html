@@ -438,7 +438,8 @@ let activeCard = null;
 function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
 function closePopover(){
-    document.getElementById('agentPopover').classList.remove('visible');
+    const _pop = document.getElementById('agentPopover');
+    if(_pop) _pop.classList.remove('visible');
     if(activeCard){ activeCard.classList.remove('active'); activeCard=null; }
 }
 
