@@ -60,7 +60,8 @@ jobs:
           COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
 
           # ── Ensure factory slot dir exists ────────────────────────────────
-          mkdir -p /opt/macaron/slots/factory
+          sudo mkdir -p /opt/macaron/slots/factory
+          sudo chown azureadmin:azureadmin /opt/macaron/slots/factory
 
           # ── Start factory container if not running ────────────────────────
           docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
@@ -73,8 +74,13 @@ jobs:
             docker cp /home/azureadmin/macaron_update/platform/. \
               "${FACTORY_CONTAINER}:/app/macaron_platform/"
           else
-            # First deploy: copy to slot dir
-            cp -r /home/azureadmin/macaron_update/platform/. /opt/macaron/slots/factory/
+            # First deploy: start container then copy code in
+            docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
+              up -d --no-deps platform-factory 2>/dev/null || true
+            sleep 5
+            FACTORY_CONTAINER=$(docker ps -q --filter "name=deploy-platform-factory" | head -1)
+            [ -n "$FACTORY_CONTAINER" ] && docker cp /home/azureadmin/macaron_update/platform/. \
+              "${FACTORY_CONTAINER}:/app/macaron_platform/"
           fi
 
           # ── Restart factory (drains gracefully, < 5s for headless) ──────
