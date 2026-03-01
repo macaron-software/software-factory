@@ -1,7 +1,14 @@
 """Mission, Sprint & Task store — drives the production pipeline.
 
-A Mission is a high-level objective (from VISION.md) executed as PI → Sprints → Tasks.
-Replaces the old chat-centric 'sessions' for production workloads.
+SAFe hierarchy:
+  Project (projects table)
+  └─ Epic  = MissionDef  (this table — type = work category)
+     └─ Feature = FeatureDef  (features table, epic_id → missions.id)
+        └─ Story = UserStoryDef  (user_stories table, feature_id → features.id)
+
+A Mission IS an Epic: a large objective spanning multiple sprints, executed
+by an AI agent workflow. The `type` field is a work CATEGORY (bug/debt/
+security/architecture/tma…), NOT a SAFe hierarchy level.
 """
 
 from __future__ import annotations
@@ -29,7 +36,7 @@ class MissionDef:
     description: str = ""
     goal: str = ""  # acceptance criteria
     status: str = "planning"  # planning|active|completed|failed|blocked
-    type: str = "feature"  # feature|epic|bug|debt|migration|security|hacking|program
+    type: str = "improvement"  # work category (NOT SAFe level): improvement|initiative|bug|debt|migration|security|architecture|program|review|tma
     workflow_id: Optional[str] = None  # safe-veligo, safe-ppz...
     parent_mission_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0

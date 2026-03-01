@@ -144,11 +144,20 @@ async def mission_detail_page(request: Request, mission_id: str):
         if a.id.startswith(prefix + "-") or a.id.startswith(mission.project_id + "-")
     ]
 
+    # Features linked to this epic (SAFe: Epic → Features → Stories)
+    from ....missions.product import ProductBacklog
+
+    backlog = ProductBacklog()
+    epic_features = backlog.list_features(mission_id)
+    epic_stories = {}
+    for feat in epic_features:
+        epic_stories[feat.id] = backlog.list_stories(feat.id)
+
     return _templates(request).TemplateResponse(
         "mission_detail.html",
         {
             "request": request,
-            "page_title": "PI",
+            "page_title": "Epic",
             "mission": mission,
             "project": project,
             "sprints": sprints,
@@ -160,6 +169,8 @@ async def mission_detail_page(request: Request, mission_id: str):
             "total_velocity": total_velocity,
             "total_planned": total_planned,
             "avg_velocity": avg_velocity,
+            "epic_features": epic_features,
+            "epic_stories": epic_stories,
         },
     )
 

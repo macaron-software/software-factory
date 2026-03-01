@@ -128,6 +128,44 @@
             </div>
         </div>
 
+        <!-- SAFe hierarchy: Features linked to this Epic -->
+        {% if epic_features %}
+        <div style="margin-bottom:1.25rem">
+            <details open>
+                <summary style="cursor:pointer;font-size:0.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;padding:0.4rem 0;list-style:none;display:flex;align-items:center;gap:0.5rem">
+                    <svg class="icon icon-xs" style="width:14px;height:14px"><use href="#icon-layers"/></svg>
+                    Features ({{ epic_features|length }})
+                </summary>
+                <div style="margin-top:0.5rem;display:flex;flex-direction:column;gap:0.4rem">
+                    {% for feat in epic_features %}
+                    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.75rem">
+                        <div style="display:flex;align-items:center;gap:0.5rem">
+                            <span style="width:8px;height:8px;border-radius:50%;flex-shrink:0;background:{% if feat.status=='done' %}var(--green){% elif feat.status=='in_progress' %}var(--purple){% else %}var(--text-secondary){% endif %}"></span>
+                            <span style="font-size:0.83rem;font-weight:600;color:var(--text-primary);flex:1">{{ feat.name }}</span>
+                            {% if feat.story_points %}<span style="font-size:0.68rem;background:var(--bg-tertiary);padding:0.1rem 0.35rem;border-radius:3px;color:var(--text-secondary)">{{ feat.story_points }} SP</span>{% endif %}
+                            <span style="font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:4px;font-weight:600;text-transform:uppercase;background:{% if feat.status=='done' %}rgba(34,197,94,.12){% elif feat.status=='in_progress' %}rgba(124,58,237,.12){% else %}var(--bg-tertiary){% endif %};color:{% if feat.status=='done' %}var(--green){% elif feat.status=='in_progress' %}var(--purple){% else %}var(--text-secondary){% endif %}">{{ feat.status }}</span>
+                        </div>
+                        {% if feat.description %}<div style="font-size:0.75rem;color:var(--text-secondary);margin-top:0.3rem;padding-left:1.3rem">{{ feat.description[:120] }}{% if feat.description|length > 120 %}…{% endif %}</div>{% endif %}
+                        <!-- Stories -->
+                        {% set stories = epic_stories.get(feat.id, []) %}
+                        {% if stories %}
+                        <div style="padding-left:1.3rem;margin-top:0.4rem;display:flex;flex-direction:column;gap:0.2rem">
+                            {% for story in stories %}
+                            <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.75rem;color:var(--text-secondary)">
+                                <span style="width:5px;height:5px;border-radius:50%;flex-shrink:0;background:{% if story.status=='done' %}var(--green){% elif story.status=='in_progress' %}var(--blue){% else %}var(--yellow){% endif %}"></span>
+                                <span style="flex:1">{{ story.title }}</span>
+                                {% if story.story_points %}<span style="font-size:0.65rem;background:var(--bg-tertiary);padding:0.05rem 0.25rem;border-radius:3px">{{ story.story_points }}sp</span>{% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </details>
+        </div>
+        {% endif %}
+
         <!-- Sprint timeline -->
         {% if sprints %}
         <div class="sprint-timeline">

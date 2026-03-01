@@ -222,7 +222,7 @@
                         <th onclick="sortTable('cost-project-table',0)">Project</th>
                         <th onclick="sortTable('cost-project-table',1)" style="text-align:right">Cost (USD)</th>
                         <th onclick="sortTable('cost-project-table',2)" style="text-align:right">Tokens</th>
-                        <th onclick="sortTable('cost-project-table',3)" style="text-align:right">Missions</th>
+                        <th onclick="sortTable('cost-project-table',3)" style="text-align:right">Epics</th>
                     </tr></thead>
                     <tbody id="cost-project-body"><tr><td colspan="4" style="color:var(--text-tertiary);text-align:center;padding:1.5rem">Loading…</td></tr></tbody>
                 </table>
@@ -245,7 +245,7 @@
     <!-- Key Metrics -->
     <div class="stats-grid">
         <div class="stat-card">
-            <h3>Total Missions</h3>
+            <h3>Total Epics</h3>
             <div class="stat-value" id="stat-missions">—</div>
             <div class="stat-label">Active missions tracked</div>
         </div>
@@ -269,7 +269,7 @@
     <!-- Charts -->
     <div class="charts-grid">
         <div class="chart-card">
-            <h2>Missions by Status</h2>
+            <h2>Epics by Status</h2>
             <div class="chart-container">
                 <canvas id="chart-missions"></canvas>
             </div>
@@ -490,7 +490,7 @@ function renderCharts(data) {
             data: {
                 labels: top10.map(a => a.agent_name || a.name),
                 datasets: [{
-                    label: 'Missions',
+                    label: 'Epics',
                     data: top10.map(a => a.missions_count || 0),
                     backgroundColor: '#06b6d4'
                 }]

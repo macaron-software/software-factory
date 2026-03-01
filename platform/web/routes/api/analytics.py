@@ -755,7 +755,7 @@ async def llm_costs():
         """).fetchall()
 
         daily = db.execute("""
-            SELECT substr(created_at, 1, 10) as date,
+            SELECT DATE(created_at) as date,
                    COUNT(*) as calls,
                    COALESCE(SUM(cost_usd), 0) as cost_usd
             FROM llm_traces
@@ -1005,7 +1005,7 @@ async def cost_analytics(request: Request, period: str = "7d"):
         ).fetchall()
 
         by_day = db.execute(
-            """SELECT substr(created_at,1,10) as date,
+            """SELECT DATE(created_at) as date,
                       COALESCE(SUM(cost_usd),0) as cost,
                       COALESCE(SUM(tokens_in)+SUM(tokens_out),0) as tokens
                FROM llm_usage WHERE created_at >= ?

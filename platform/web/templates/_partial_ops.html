@@ -45,7 +45,7 @@
       <div class="ops-sub">registered</div>
     </div>
     <div class="ops-card">
-      <h3><svg class="icon"><use href="#icon-rocket"/></svg> Active Missions</h3>
+      <h3><svg class="icon"><use href="#icon-rocket"/></svg> Active Epics</h3>
       <div class="ops-val">{{ active_missions | length }}</div>
       <div class="ops-sub">running / active</div>
     </div>
@@ -103,7 +103,7 @@
         <div class="val" style="color:{% if tma_stats.get('active_heals',0) > 0 %}#f59e0b{% else %}var(--text-primary){% endif %}">{{ tma_stats.get('active_heals', 0) }}</div>
       </div>
       <div class="ops-tma-item">
-        <div class="label">Missions Total</div>
+        <div class="label">Epics Total</div>
         <div class="val">{{ tma_stats.get('missions', {}).get('total', 0) }}</div>
       </div>
       <div class="ops-tma-item">
