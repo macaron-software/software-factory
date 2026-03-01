@@ -92,7 +92,7 @@ class WorkflowPaused(Exception):
     def __init__(self, phase_index: int = 0, checkpoint_msg: str = ""):
         self.phase_index = phase_index
         self.checkpoint_msg = checkpoint_msg
-        super().__init__(f"Workflow paused at checkpoint")
+        super().__init__("Workflow paused at checkpoint")
 
 
 async def _sse(run: PatternRun, event: dict):
@@ -285,12 +285,26 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
 
     # Detect failures in results
     fail_lines = []
+    # Patterns that indicate env/infra issues, not real QA failures
+    _env_noise = (
+        "executable doesn't exist",
+        "no such file or directory",
+        "not installed",
+        "command not found",
+        "permission denied",
+        "cannot find module",
+        "no test specified",
+        "no tests found",
+    )
     for line in results.split("\n"):
         line_lower = line.lower()
         if any(
             kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")
         ):
             if "npm install: OK" not in line and "0 failures" not in line_lower:
+                # Skip environment/infra noise that would create false-positive tickets
+                if any(noise in line_lower for noise in _env_noise):
+                    continue
                 fail_lines.append(line.strip())
 
     if not fail_lines:
