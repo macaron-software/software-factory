@@ -1,0 +1,403 @@
+{% extends "base.html" %}
+
+{% block title %}Cockpit — Software Factory{% endblock %}
+
+{% block content %}
+<style>
+/* ── Cockpit Layout ─────────────────────────────────────────────── */
+.cockpit{display:flex;flex-direction:column;gap:1rem;padding:0.25rem 0}
+
+/* Pipeline */
+.pipeline-bar{display:flex;align-items:stretch;gap:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.pipeline-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.85rem 0.5rem;border-right:1px solid var(--border);position:relative;cursor:default;transition:background .15s}
+.pipeline-stage:last-child{border-right:none}
+.pipeline-stage:hover{background:var(--bg-tertiary)}
+.pipeline-stage .ps-icon{font-size:1.4rem;line-height:1}
+.pipeline-stage .ps-value{font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1.1;margin-top:0.2rem}
+.pipeline-stage .ps-label{font-size:0.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-top:0.15rem}
+.pipeline-stage .ps-sub{font-size:0.68rem;color:var(--purple);font-weight:600;margin-top:0.1rem}
+.pipeline-arrow{display:flex;align-items:center;color:var(--text-secondary);font-size:0.9rem;padding:0 0.1rem;flex-shrink:0;background:var(--bg-secondary)}
+
+/* Three-column grid */
+.cockpit-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem}
+@media(max-width:900px){.cockpit-grid{grid-template-columns:1fr 1fr}}
+
+/* Card */
+.ck-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.85rem 1rem}
+.ck-card-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:0.65rem;display:flex;align-items:center;gap:0.4rem}
+.ck-card-title .live-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Env / Daemon / LLM rows */
+.ck-row{display:flex;align-items:center;justify-content:space-between;padding:0.3rem 0;border-bottom:1px solid var(--border)}
+.ck-row:last-child{border-bottom:none}
+.ck-row-left{display:flex;flex-direction:column;gap:0.1rem}
+.ck-row-name{font-size:0.8rem;font-weight:600;color:var(--text-primary)}
+.ck-row-sub{font-size:0.65rem;color:var(--text-secondary)}
+.ck-badge{display:inline-flex;align-items:center;gap:0.25rem;padding:0.15rem 0.5rem;border-radius:999px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.badge-ok{background:rgba(34,197,94,.15);color:#22c55e}
+.badge-warn{background:rgba(234,179,8,.15);color:#eab308}
+.badge-err{background:rgba(239,68,68,.15);color:#ef4444}
+.badge-off{background:rgba(107,114,128,.15);color:#6b7280}
+.badge-disabled{background:rgba(107,114,128,.1);color:#9ca3af}
+
+/* Projects */
+.proj-list{display:flex;flex-direction:column;gap:0.5rem}
+.proj-item{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;padding:0.6rem 0.75rem;cursor:pointer;transition:border-color .15s}
+.proj-item:hover{border-color:var(--purple)}
+.proj-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.35rem}
+.proj-name{font-size:0.83rem;font-weight:700;color:var(--text-primary)}
+.proj-meta{font-size:0.65rem;color:var(--text-secondary)}
+.prog-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:var(--purple);border-radius:2px;transition:width .4s ease}
+.prog-active{background:#22c55e}
+
+/* Activity feed */
+.activity-feed{display:flex;flex-direction:column;gap:0}
+.af-item{display:flex;align-items:flex-start;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--border);min-width:0}
+.af-item:last-child{border-bottom:none}
+.af-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);flex-shrink:0;margin-top:0.35rem}
+.af-body{flex:1;min-width:0}
+.af-agent{font-size:0.72rem;font-weight:700;color:var(--purple)}
+.af-text{font-size:0.7rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.af-project{font-size:0.62rem;color:var(--text-secondary)}
+.af-time{font-size:0.6rem;color:var(--text-secondary);flex-shrink:0;margin-top:0.1rem}
+.af-empty{font-size:0.75rem;color:var(--text-secondary);padding:0.5rem 0;font-style:italic}
+
+/* Footer KPIs */
+.kpi-bar{display:flex;gap:1rem;flex-wrap:wrap}
+.kpi-item{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 1rem;flex:1;min-width:120px;display:flex;flex-direction:column;gap:0.1rem}
+.kpi-label{font-size:0.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary)}
+.kpi-value{font-size:1.35rem;font-weight:800;color:var(--text-primary)}
+.kpi-sub{font-size:0.65rem;color:var(--text-secondary)}
+
+/* Refresh indicator */
+.refresh-hint{display:flex;align-items:center;gap:0.4rem;font-size:0.65rem;color:var(--text-secondary)}
+.refresh-spinner{width:8px;height:8px;border:1.5px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin 1s linear infinite;display:none}
+.refresh-spinner.active{display:block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
+.section-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary)}
+</style>
+
+<div class="cockpit" id="cockpit">
+
+  <!-- Header row -->
+  <div class="section-header" style="margin-bottom:0">
+    <span></span>
+    <div class="refresh-hint">
+      <div class="refresh-spinner" id="refreshSpinner"></div>
+      <span id="refreshTs">—</span>
+    </div>
+  </div>
+
+  <!-- 1. Pipeline Value Stream -->
+  <div class="pipeline-bar" id="pipeline">
+    <div class="pipeline-stage">
+      <span class="ps-icon">💡</span>
+      <span class="ps-value" id="ps-ideation">—</span>
+      <span class="ps-label">Idéation</span>
+      <span class="ps-sub">en cours</span>
+    </div>
+    <div class="pipeline-arrow">›</div>
+    <div class="pipeline-stage">
+      <span class="ps-icon">📋</span>
+      <span class="ps-value" id="ps-planning">—</span>
+      <span class="ps-label">Planifiées</span>
+      <span class="ps-sub">missions</span>
+    </div>
+    <div class="pipeline-arrow">›</div>
+    <div class="pipeline-stage">
+      <span class="ps-icon">⚙️</span>
+      <span class="ps-value" id="ps-active">—</span>
+      <span class="ps-label">En cours</span>
+      <span class="ps-sub">actives</span>
+    </div>
+    <div class="pipeline-arrow">›</div>
+    <div class="pipeline-stage">
+      <span class="ps-icon">✅</span>
+      <span class="ps-value" id="ps-done">—</span>
+      <span class="ps-label">Complétées</span>
+      <span class="ps-sub">total</span>
+    </div>
+    <div class="pipeline-arrow">›</div>
+    <div class="pipeline-stage">
+      <span class="ps-icon">🚀</span>
+      <span class="ps-value" id="ps-deploys">—</span>
+      <span class="ps-label">Déployées</span>
+      <span class="ps-sub">aujourd'hui</span>
+    </div>
+  </div>
+
+  <!-- 2. Infrastructure 3 cols -->
+  <div class="cockpit-grid">
+
+    <!-- Environments -->
+    <div class="ck-card">
+      <div class="ck-card-title">
+        <svg class="icon icon-xs"><use href="#icon-globe"/></svg>
+        Environnements
+      </div>
+      <div id="envList">
+        <div class="ck-row"><span class="ck-row-name" style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">Chargement…</span></div>
+      </div>
+    </div>
+
+    <!-- Daemons -->
+    <div class="ck-card">
+      <div class="ck-card-title">
+        <div class="live-dot"></div>
+        Daemons
+      </div>
+      <div id="daemonList">
+        <div class="ck-row"><span class="ck-row-name" style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">Chargement…</span></div>
+      </div>
+    </div>
+
+    <!-- LLM Providers -->
+    <div class="ck-card">
+      <div class="ck-card-title">
+        <svg class="icon icon-xs"><use href="#icon-chart"/></svg>
+        LLM Providers
+      </div>
+      <div id="llmList">
+        <div class="ck-row"><span class="ck-row-name" style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">Chargement…</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Projects + Activity side by side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+
+    <!-- Projects -->
+    <div class="ck-card" style="max-height:340px;overflow-y:auto">
+      <div class="ck-card-title">
+        <svg class="icon icon-xs"><use href="#icon-briefcase"/></svg>
+        Projets actifs
+      </div>
+      <div class="proj-list" id="projList">
+        <div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Activity feed -->
+    <div class="ck-card" style="max-height:340px;overflow-y:auto">
+      <div class="ck-card-title">
+        <svg class="icon icon-xs"><use href="#icon-activity"/></svg>
+        Activité récente
+        <div class="live-dot" style="margin-left:auto"></div>
+      </div>
+      <div class="activity-feed" id="activityFeed">
+        <div class="af-empty">Aucune activité récente</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Footer KPIs -->
+  <div class="kpi-bar" id="kpiBar">
+    <div class="kpi-item">
+      <span class="kpi-label">TMA Tickets</span>
+      <span class="kpi-value" id="kpi-tma">—</span>
+      <span class="kpi-sub" id="kpi-tma-sub">ouverts</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Incidents</span>
+      <span class="kpi-value" id="kpi-incidents">—</span>
+      <span class="kpi-sub" id="kpi-incidents-sub">ouverts</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Auto-Heal actif</span>
+      <span class="kpi-value" id="kpi-autoheal">—</span>
+      <span class="kpi-sub">missions en cours</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Lead Time (moy.)</span>
+      <span class="kpi-value" id="kpi-lt">—</span>
+      <span class="kpi-sub">heures</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Déploiements</span>
+      <span class="kpi-value" id="kpi-df">—</span>
+      <span class="kpi-sub">aujourd'hui</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Total missions</span>
+      <span class="kpi-value" id="kpi-total">—</span>
+      <span class="kpi-sub">dans la SF</span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const REFRESH_MS = 10000;
+  let _timer = null;
+
+  function badge(status){
+    const map = {
+      ok: 'ok', online: 'ok', running: 'ok', enabled: 'ok', scheduled: 'ok',
+      warn: 'warn', cooldown: 'warn', degraded: 'warn', idle: 'warn',
+      open: 'err', offline: 'err', error: 'err',
+      disabled: 'disabled', not_configured: 'disabled',
+    };
+    const cls = map[status] || 'off';
+    const labels = {
+      ok: '✓ OK', online: '● Online', running: '▶ Running', enabled: '● Actif',
+      scheduled: '⏱ Scheduled', cooldown: '⚠ Cooldown', open: '✗ CB Open',
+      offline: '✗ Offline', disabled: '— Désactivé', not_configured: '— N/A',
+      degraded: '⚠ Dégradé', idle: '○ Idle', error: '✗ Error',
+    };
+    return `<span class="ck-badge badge-${cls}">${labels[status] || status}</span>`;
+  }
+
+  function timeAgo(ts){
+    if(!ts) return '';
+    const d = new Date(ts);
+    if(isNaN(d)) return '';
+    const s = Math.floor((Date.now() - d) / 1000);
+    if(s < 60) return `${s}s`;
+    if(s < 3600) return `${Math.floor(s/60)}m`;
+    if(s < 86400) return `${Math.floor(s/3600)}h`;
+    return `${Math.floor(s/86400)}j`;
+  }
+
+  function render(data){
+    // Pipeline
+    const p = data.pipeline || {};
+    document.getElementById('ps-ideation').textContent = p.ideation_active ?? '—';
+    document.getElementById('ps-planning').textContent = p.missions_planning ?? '—';
+    document.getElementById('ps-active').textContent = p.missions_active ?? '—';
+    document.getElementById('ps-done').textContent = p.missions_completed ?? '—';
+    document.getElementById('ps-deploys').textContent = p.deploys_today ?? '—';
+
+    // Environments
+    const envs = data.environments || [];
+    document.getElementById('envList').innerHTML = envs.length
+      ? envs.map(e => `
+        <div class="ck-row">
+          <div class="ck-row-left">
+            <span class="ck-row-name">${e.name}</span>
+            ${e.url ? `<span class="ck-row-sub"><a href="${e.url}" target="_blank" style="color:var(--purple)">${e.url}</a></span>` : ''}
+            ${e.version ? `<span class="ck-row-sub">v${e.version.substring(0,8)}</span>` : ''}
+          </div>
+          ${badge(e.status)}
+        </div>`).join('')
+      : '<div class="ck-row"><span class="ck-row-name" style="color:var(--text-secondary);font-style:italic">Aucun env. configuré</span></div>';
+
+    // Daemons
+    const daemons = data.daemons || [];
+    document.getElementById('daemonList').innerHTML = daemons.length
+      ? daemons.map(d => `
+        <div class="ck-row">
+          <div class="ck-row-left">
+            <span class="ck-row-name">${d.label}</span>
+            <span class="ck-row-sub">${d.schedule}${d.last_run ? ' · ' + timeAgo(d.last_run) : ''}</span>
+          </div>
+          ${badge(d.status)}
+        </div>`).join('')
+      : '<div class="ck-row"><span style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">—</span></div>';
+
+    // LLM
+    const llm = data.llm || [];
+    document.getElementById('llmList').innerHTML = llm.length
+      ? llm.map(l => `
+        <div class="ck-row">
+          <div class="ck-row-left">
+            <span class="ck-row-name">${l.provider}</span>
+            ${l.recent_failures > 0 ? `<span class="ck-row-sub" style="color:#ef4444">${l.recent_failures} erreur(s) récente(s)</span>` : ''}
+          </div>
+          ${badge(l.status)}
+        </div>`).join('')
+      : '<div class="ck-row"><span style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">—</span></div>';
+
+    // Projects
+    const projs = data.projects || [];
+    document.getElementById('projList').innerHTML = projs.length
+      ? projs.map(proj => {
+        const pct = proj.progress || 0;
+        const barCls = proj.active_missions > 0 ? 'prog-active' : '';
+        return `
+        <div class="proj-item" onclick="location.href='/projects/${proj.id}'">
+          <div class="proj-header">
+            <span class="proj-name">${proj.name}</span>
+            <span class="proj-meta">${proj.active_missions} actives · ${proj.total_missions} total</span>
+          </div>
+          <div class="prog-bar"><div class="prog-fill ${barCls}" style="width:${pct}%"></div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:0.2rem">
+            <span class="proj-meta">${pct}% complété</span>
+            ${proj.last_activity ? `<span class="proj-meta">${timeAgo(proj.last_activity)}</span>` : ''}
+          </div>
+        </div>`;
+      }).join('')
+      : '<div style="font-size:0.75rem;color:var(--text-secondary);font-style:italic">Aucun projet</div>';
+
+    // Activity
+    const acts = data.activity || [];
+    document.getElementById('activityFeed').innerHTML = acts.length
+      ? acts.map(a => `
+        <div class="af-item">
+          <div class="af-dot"></div>
+          <div class="af-body">
+            <span class="af-agent">${a.agent}</span>
+            ${a.project_name ? `<span class="af-project"> · ${a.project_name}</span>` : ''}
+            <div class="af-text">${escHtml(a.label)}</div>
+          </div>
+          <span class="af-time">${timeAgo(a.ts)}</span>
+        </div>`).join('')
+      : '<div class="af-empty">Aucune activité récente</div>';
+
+    // KPIs
+    const tma = data.tma || {};
+    const inc = data.incidents || {};
+    const dora = data.dora || {};
+    const pipeline2 = data.pipeline || {};
+
+    document.getElementById('kpi-tma').textContent = tma.open ?? '—';
+    document.getElementById('kpi-tma-sub').textContent =
+      tma.critical > 0 ? `⚠ ${tma.critical} critique(s)` : 'ouverts';
+
+    document.getElementById('kpi-incidents').textContent = inc.open ?? '—';
+    document.getElementById('kpi-incidents-sub').textContent =
+      inc.investigating > 0 ? `${inc.investigating} en investigation` : 'ouverts';
+
+    document.getElementById('kpi-autoheal').textContent = inc.autoheal_active ?? '—';
+    document.getElementById('kpi-lt').textContent =
+      dora.lead_time_h != null ? dora.lead_time_h : '—';
+    document.getElementById('kpi-df').textContent = dora.deploys_today ?? '—';
+    document.getElementById('kpi-total').textContent = pipeline2.missions_total ?? '—';
+
+    // Timestamp
+    const d = new Date(data.ts * 1000);
+    document.getElementById('refreshTs').textContent =
+      `Mis à jour ${d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+  }
+
+  function escHtml(s){
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  async function refresh(){
+    const spinner = document.getElementById('refreshSpinner');
+    spinner.classList.add('active');
+    try {
+      const r = await fetch('/api/cockpit/summary');
+      if(!r.ok) return;
+      const data = await r.json();
+      render(data);
+    } catch(e){
+      console.warn('Cockpit refresh error:', e);
+    } finally {
+      spinner.classList.remove('active');
+    }
+  }
+
+  // Initial load + periodic refresh
+  refresh();
+  _timer = setInterval(refresh, REFRESH_MS);
+
+  // Cleanup on page leave
+  window.addEventListener('beforeunload', () => clearInterval(_timer));
+})();
+</script>
+{% endblock %}

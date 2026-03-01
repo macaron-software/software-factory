@@ -97,6 +97,9 @@
             {% set p = request.state.perspective|default('admin') %}
             <div class="sidebar-section">
                 <ul class="nav-links">
+                    <li><a href="/cockpit" data-tooltip="Cockpit" class="{% if page_title == 'Cockpit' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-activity"/></svg>
+                    </a></li>
                     <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
                         <svg class="icon"><use href="#icon-home"/></svg>
                     </a></li>

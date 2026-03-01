@@ -70,6 +70,15 @@ async def home_page(request: Request):
     )
 
 
+@router.get("/cockpit", response_class=HTMLResponse)
+async def cockpit_page(request: Request):
+    """Cockpit — vue synthétique de toute la Software Factory."""
+    return _templates(request).TemplateResponse(
+        "cockpit.html",
+        {"request": request, "page_title": "Cockpit"},
+    )
+
+
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """Dashboard redirect to portfolio (backward compat)."""
