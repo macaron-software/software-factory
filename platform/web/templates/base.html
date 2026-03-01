@@ -66,8 +66,6 @@
         });
     })();
     </script>
-    <!-- Umami Analytics -->
-    <script async src="https://analytics.macaron-software.com/script.js" data-website-id="218aebc5-f5b3-4761-93b5-badbc2089214"></script>
 </head>
 <body>
     {% include "partials/svg_sprites.html" %}
@@ -560,9 +558,15 @@ window.sfRequestPush = async function() {
 };
 </script>
 
-<!-- Umami Analytics -->
-<script async src="https://analytics.macaron-software.com/script.js"
-  data-website-id="218aebc5-f5b3-4761-93b5-badbc2089214"></script>
+<!-- Umami Analytics — hostname-aware website ID -->
+<script>(function(){
+  var _uids={'sf.macaron-software.com':'218aebc5-f5b3-4761-93b5-badbc2089214','4.233.64.30':'3a4d67fb-1d12-4095-ad29-c0d33cc8b7c7'};
+  var _uid=_uids[location.hostname]||'218aebc5-f5b3-4761-93b5-badbc2089214';
+  var s=document.createElement('script');s.defer=true;
+  s.src='https://analytics.macaron-software.com/script.js';
+  s.setAttribute('data-website-id',_uid);
+  document.head.appendChild(s);
+})();</script>
 
 <script>
 /* ── SF Analytics helper ──────────────────────────────────────────
@@ -638,6 +642,21 @@ document.addEventListener('DOMContentLoaded', function() {
     if (chip) {
       sfTrack('prompt_chip', { label: (chip.textContent||'').trim().slice(0, 60) });
     }
+  });
+
+  /* ── 5. HTMX POST tracking (mission start, runs, workflows) ──*/
+  document.addEventListener('htmx:beforeRequest', function(e) {
+    var path = (e.detail.requestConfig || {}).path || '';
+    var method = ((e.detail.requestConfig || {}).verb || '').toUpperCase();
+    if (method !== 'POST') return;
+    if (/\/missions\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
+    else if (/\/missions\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
+    else if (/\/sessions\/[^/]+\/run-pattern/.test(path)) sfTrack('run_pattern', {});
+    else if (/\/sessions\/[^/]+\/run-workflow/.test(path)) sfTrack('run_workflow', {});
+    else if (/\/api\/ideation/.test(path) || /\/mkt-ideation/.test(path)) sfTrack('ideation_submit', {});
+    else if (/\/api\/auth\/login/.test(path) || path === '/login') sfTrack('login', {});
+    else if (/\/api\/workflows/.test(path)) sfTrack('workflow_action', { path: path });
+    else if (/\/api\/agents/.test(path)) sfTrack('agent_action', { path: path });
   });
 
 });
