@@ -182,13 +182,23 @@ async def metrics_tab_ops(request: Request):
         pass
 
     active_missions = []
+    features_count = 0
+    tasks_count = 0
     try:
-        from ....missions.store import get_mission_run_store
-
-        runs = get_mission_run_store().list_runs(limit=50)
-        active_missions = [
-            r for r in runs if getattr(r, "status", "") in ("active", "running")
-        ]
+        rows = db.execute(
+            "SELECT id, name, status FROM missions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 50"
+        ).fetchall()
+        active_missions = [dict(r) for r in rows]
+    except Exception:
+        pass
+    try:
+        row = db.execute("SELECT COUNT(*) FROM features").fetchone()
+        features_count = row[0] if row else 0
+    except Exception:
+        pass
+    try:
+        row = db.execute("SELECT COUNT(*) FROM tasks").fetchone()
+        tasks_count = row[0] if row else 0
     except Exception:
         pass
 
@@ -287,6 +297,8 @@ async def metrics_tab_ops(request: Request):
             "request": request,
             "llm_providers": llm_providers,
             "active_missions": active_missions,
+            "features_count": features_count,
+            "tasks_count": tasks_count,
             "top_errors": top_errors,
             "rl_stats": rl_stats,
             "ga_summary": ga_summary,

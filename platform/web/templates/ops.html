@@ -52,6 +52,16 @@
       <div class="ops-sub">running / active</div>
     </div>
     <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-list"/></svg> Features</h3>
+      <div class="ops-val">{{ features_count | default(0) }}</div>
+      <div class="ops-sub">in backlog</div>
+    </div>
+    <div class="ops-card">
+      <h3><svg class="icon"><use href="#icon-check"/></svg> Tasks</h3>
+      <div class="ops-val">{{ tasks_count | default(0) }}</div>
+      <div class="ops-sub">in sprints</div>
+    </div>
+    <div class="ops-card">
       <h3><svg class="icon"><use href="#icon-chart"/></svg> RL Experiences</h3>
       <div class="ops-val">{% if rl_stats %}{{ rl_stats.get('experience_count', 0) }}{% else %}0{% endif %}</div>
       <div class="ops-sub">{% if rl_stats %}{{ rl_stats.get('state_count', 0) }} states{% endif %}</div>
