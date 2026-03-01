@@ -90,11 +90,11 @@
           {{ fi('clock', 12) }} En attente ({{ pending|length }})
         </button>
         <button onclick="filterProposals('approved',this)" class="prop-tab"
-          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;display:flex;align-items:center;gap:.3rem">
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;background:var(--bg-secondary);color:var(--text-primary);display:flex;align-items:center;gap:.3rem">
           {{ fi('check-circle', 12) }} Approuvées ({{ approved|length }})
         </button>
         <button onclick="filterProposals('rejected',this)" class="prop-tab"
-          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;display:flex;align-items:center;gap:.3rem">
+          style="padding:.25rem .65rem;border-radius:6px;border:1px solid var(--border,#ddd);cursor:pointer;font-size:.8rem;background:var(--bg-secondary);color:var(--text-primary);display:flex;align-items:center;gap:.3rem">
           {{ fi('x-circle', 12) }} Rejetées ({{ rejected|length }})
         </button>
       </div>
@@ -102,7 +102,7 @@
       <div id="proposals-list">
       {% for p in proposals %}
       <div class="proposal-card prop-{{ p.status }}"
-        style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.75rem;margin-bottom:.5rem;background:var(--card-bg,#fff)">
+        style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.75rem;margin-bottom:.5rem;background:var(--bg-secondary)">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
           <div style="display:flex;align-items:center;gap:.5rem">
             <code style="font-size:.78rem;color:var(--text-muted,#888)">{{ p.id }}</code>
@@ -111,7 +111,7 @@
           </div>
           <div style="display:flex;align-items:center;gap:.5rem">
             {# Fitness bar #}
-            <div style="width:80px;height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden">
+            <div style="width:80px;height:8px;background:var(--bg-tertiary,#e5e7eb);border-radius:4px;overflow:hidden">
               <div style="width:{{ (p.fitness * 100)|round|int }}%;height:100%;background:{% if p.fitness > 0.7 %}#22c55e{% elif p.fitness > 0.5 %}#f97316{% else %}#ef4444{% endif %};border-radius:4px"></div>
             </div>
             <span style="font-size:.78rem;font-weight:600;color:{% if p.fitness > 0.7 %}#16a34a{% elif p.fitness > 0.5 %}#ea580c{% else %}#dc2626{% endif %}">
@@ -138,8 +138,8 @@
         {% if phases %}
         <div style="display:flex;gap:.3rem;flex-wrap:wrap">
           {% for ph in phases %}
-          <span style="font-size:.72rem;padding:.1rem .4rem;background:#f3f4f6;border-radius:4px;color:#555">
-            {{ ph.get('name', ph.get('phase_id','?'))[:20] }}
+          <span style="font-size:.72rem;padding:.1rem .4rem;background:var(--bg-tertiary,#f3f4f6);border-radius:4px;color:var(--text-secondary,#555)">
+            {{ ph.get('name', ph.get('phase_id','?')) }}
             <span style="color:#6c63ff">· {{ ph.get('pattern_id','?') }}</span>
           </span>
           {% endfor %}
@@ -159,7 +159,7 @@
     <div style="display:flex;flex-direction:column;gap:1rem">
 
       {# RL Stats card #}
-      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--bg-secondary)">
         <h4 style="margin:0 0 .65rem;font-size:.9rem;display:flex;align-items:center;gap:.4rem">
           {{ fi('cpu', 14) }} RL Policy Stats
         </h4>
@@ -183,7 +183,7 @@
       </div>
 
       {# GA Run history #}
-      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--card-bg,#fff)">
+      <div style="border:1px solid var(--border,#ddd);border-radius:8px;padding:.85rem;background:var(--bg-secondary)">
         <h4 style="margin:0 0 .65rem;font-size:.9rem;display:flex;align-items:center;gap:.4rem">
           {{ fi('trending-up', 14) }} Runs GA récents
         </h4>
