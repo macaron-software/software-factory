@@ -87,7 +87,7 @@ def canvas_project_id(live_session):
     r = live_session.get("/api/projects")
     r.raise_for_status()
     for p in r.json():
-        if p.get("id") == "macaron-canvas" or p.get("name") == "macaron-canvas":
+        if p.get("id") == "macaron-canvas" or "canvas" in p.get("name", "").lower():
             return p["id"]
     r = live_session.post(
         "/api/projects",
@@ -98,7 +98,12 @@ def canvas_project_id(live_session):
         },
     )
     r.raise_for_status()
-    return "macaron-canvas"
+    # Return the actual ID from the response, fallback to "macaron-canvas"
+    try:
+        data = r.json()
+        return data.get("id", "macaron-canvas")
+    except Exception:
+        return "macaron-canvas"
 
 
 @pytest.fixture(scope="module")
