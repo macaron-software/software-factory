@@ -650,7 +650,7 @@ def create_app() -> FastAPI:
                 "style-src 'self' 'unsafe-inline'; "
                 "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
-                "connect-src 'self'; "
+                "connect-src 'self' https://analytics.macaron-software.com; "
                 "frame-src 'self' http://localhost:* http://127.0.0.1:* https:; "
                 "frame-ancestors 'none'"
             )
@@ -662,7 +662,7 @@ def create_app() -> FastAPI:
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
-                "connect-src 'self'; "
+                "connect-src 'self' https://analytics.macaron-software.com; "
                 "frame-ancestors 'none'"
             )
         if request.url.scheme == "https":
