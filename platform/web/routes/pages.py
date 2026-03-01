@@ -1103,6 +1103,7 @@ async def metier_page(request: Request):
             "lead_time_h": lead_time_h,
             "session_id": m.session_id or "",
             "workflow_id": wf_id,
+            "project_id": m.project_id or "",
         }
         if wf_id in _TMA_WF:
             tma_missions.append(entry)
@@ -1141,11 +1142,19 @@ async def metier_page(request: Request):
                     )
         except Exception:
             pass
+    avatar_dir = Path(__file__).parent.parent / "static" / "avatars"
     top_agents = sorted(agent_msg_counts.items(), key=lambda x: -x[1])[:8]
     max_msgs = top_agents[0][1] if top_agents else 1
     agent_velocity = []
     for aid, count in top_agents:
         a = agent_map.get(aid)
+        jpg = avatar_dir / f"{aid}.jpg"
+        svg_f = avatar_dir / f"{aid}.svg"
+        avatar_url = (
+            f"/static/avatars/{aid}.jpg"
+            if jpg.exists()
+            else (f"/static/avatars/{aid}.svg" if svg_f.exists() else "")
+        )
         agent_velocity.append(
             {
                 "id": aid,
@@ -1154,6 +1163,7 @@ async def metier_page(request: Request):
                 "count": count,
                 "pct": int(count / max_msgs * 100),
                 "avatar": a.avatar if a else "",
+                "avatar_url": avatar_url,
             }
         )
 

@@ -136,27 +136,39 @@
             </div>
             <div class="met-panel-body" style="padding:0.6rem">
                 {% if missions_list %}
+                {# Group by project #}
+                {% set seen_projects = namespace(ids=[]) %}
                 {% for epic in missions_list %}
-                <a href="/missions/{{ epic.id }}/control" style="text-decoration:none;color:inherit;display:block">
+                {% if epic.project_id not in seen_projects.ids %}
+                {% set _ = seen_projects.ids.append(epic.project_id) %}
+                {% set project_epics = missions_list | selectattr('project_id','equalto',epic.project_id) | list %}
+                <details open style="margin-bottom:0.6rem">
+                <summary style="cursor:pointer;font-size:0.72rem;font-weight:700;color:var(--text-primary);padding:0.3rem 0.2rem;list-style:none;display:flex;align-items:center;gap:0.4rem">
+                    <svg style="width:12px;height:12px;color:var(--purple-light)"><use href="#icon-folder"/></svg>
+                    <span>{{ epic.project_id or 'Sans projet' }}</span>
+                    <span style="font-size:0.6rem;color:var(--text-muted);font-weight:400;margin-left:auto">{{ project_epics|length }} run{{ 's' if project_epics|length != 1 else '' }}</span>
+                </summary>
+                {% for e in project_epics %}
+                <a href="/missions/{{ e.id }}/control" style="text-decoration:none;color:inherit;display:block">
                 <div class="met-epic">
                     <div class="met-epic-header">
-                        <div class="met-epic-name">{{ epic.name }}</div>
-                        {% if epic.lead_time_h is not none %}
+                        <div class="met-epic-name">{{ e.name }}</div>
+                        {% if e.lead_time_h is not none %}
                         <div class="met-lead-time">
-                            <svg><use href="#icon-clock"/></svg> {{ epic.lead_time_h }}h
+                            <svg><use href="#icon-clock"/></svg> {{ e.lead_time_h }}h
                         </div>
                         {% endif %}
-                        <div class="met-badge {{ epic.status }}">{{ epic.status }}</div>
+                        <div class="met-badge {{ e.status }}">{{ e.status }}</div>
                     </div>
-                    {% if epic.brief %}
-                    <div class="met-epic-brief">{{ epic.brief }}</div>
+                    {% if e.brief %}
+                    <div class="met-epic-brief">{{ e.brief }}</div>
                     {% endif %}
                     <div class="met-progress-bar">
-                        <div class="met-progress-fill" style="width:{{ epic.progress }}%"></div>
+                        <div class="met-progress-fill" style="width:{{ e.progress }}%"></div>
                     </div>
-                    {% if epic.phase_nodes %}
+                    {% if e.phase_nodes %}
                     <div class="met-phases" style="padding-top:0.5rem;padding-bottom:0.8rem">
-                        {% for phase in epic.phase_nodes %}
+                        {% for phase in e.phase_nodes %}
                         {% if not loop.first %}
                         <div class="met-phase-line {{ phase.status if phase.status in ('done','done_with_issues','running') else '' }}"></div>
                         {% endif %}
@@ -179,6 +191,9 @@
                     {% endif %}
                 </div>
                 </a>
+                {% endfor %}
+                </details>
+                {% endif %}
                 {% endfor %}
                 {% else %}
                 <div class="met-empty">
@@ -269,8 +284,8 @@
                     {% for agent in agent_velocity %}
                     <div class="met-vel-row">
                         <div class="met-vel-avatar">
-                            {% if agent.avatar %}
-                            <img src="{{ agent.avatar }}" alt="">
+                            {% if agent.avatar_url %}
+                            <img src="{{ agent.avatar_url }}" alt="">
                             {% else %}
                             {{ agent.name[:1] }}
                             {% endif %}
