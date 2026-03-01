@@ -38,10 +38,14 @@ make run      # starts platform on port 8090
 
 ## First Steps
 
+![Dashboard](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/home.png)
+
 1. **Complete onboarding** — The first screen guides you through initial setup
 2. **Create a project** — Go to Projects → New Project
 3. **Start a mission** — Open your project and type a message to the Agent Lead
 4. **Watch agents collaborate** — The session view shows real-time agent collaboration
+
+![Missions](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
 
 ## Environment Variables
 
@@ -61,6 +65,13 @@ make run      # starts platform on port 8090
 - **NEVER** `import platform` at top-level inside the package
 - **Always** run from the parent directory: `python -m uvicorn platform.server:app ...`
 - `--ws none` is mandatory (the platform uses SSE, not WebSockets)
+
+## Next Steps
+
+- [User Guide](user-guide) — walkthrough of every feature
+- [Settings Hub](settings-hub) — configure orchestration, LLM providers, integrations
+- [Mission Cockpit](mission-cockpit) — monitor and control running missions
+- [Core Concepts](concepts) — projects, agents, patterns, workflows
 """,
     },
     {
@@ -121,52 +132,213 @@ Program Increments, Features & Epics with WSJF prioritization, ART (Agile Releas
         "content": """\
 # User Guide
 
+A practical walkthrough of every major section in the Software Factory.
+
+---
+
 ## Dashboard
 
-Personalized by perspective: **DSI** (portfolio), **Product** (backlog), **Engineering** (sessions), **Scrum Master** (velocity).
+![Dashboard](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/home.png)
+
+The Dashboard is your starting point. It adapts to your **perspective**:
+
+| Perspective | What you see |
+|-------------|-------------|
+| **DSI** | Portfolio overview, project health, budget |
+| **Product** | Backlog priority, feature pipeline |
+| **Engineering** | Active sessions, agent activity, recent missions |
+| **Scrum Master** | Velocity, team fitness, sprint progress |
+
+**How to use it:**
+1. Select your perspective from the top-right switcher.
+2. Click any card to drill into that project or mission.
+3. Use the global search bar (top center) to jump to any page.
+
+---
 
 ## Projects
 
-1. Navigate to **Projects** → **New Project**
-2. Fill in name, description, select a color
-3. Choose Agent Lead, configure Git (optional)
-4. Use the chat to send missions
+![Projects](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/projects.png)
+
+A Project is the top-level workspace. It holds agents, missions, memory, and artifacts.
+
+**Create a project:**
+1. Click **Projects** → **+ New Project**.
+2. Enter a name, description, and pick a color/avatar.
+3. Choose your **Agent Lead** (the agent that receives your messages).
+4. Optionally connect a Git repository.
+5. Click **Create** — you land in the project chat.
+
+**Inside a project** you have tabs: Chat, Missions, Backlog, Sessions, Agents, Memory, Workflows, Settings.
+
+---
 
 ## Missions
 
-- **Status flow**: planning → active → review → completed
-- Each mission has runs (attempts) with phases (agent steps)
+![Missions Board](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
+
+A Mission is a unit of work: your prompt → agent collaboration → result.
+
+**Start a mission:**
+1. Open a project.
+2. Type your request in the chat (e.g. *"Add user authentication with JWT"*).
+3. The Agent Lead creates a mission and dispatches agents.
+
+**Status flow:** `planning → active → review → completed` (or `failed` / `interrupted`)
+
+Each mission has **runs** (attempts) and **phases** (agent steps within a run). You can re-run a failed mission from the mission card.
+
+---
+
+## Mission Cockpit
+
+![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
+
+The Cockpit gives you a real-time pipeline view of all running missions across the platform.
+
+- **Semaphore gauge** — shows how many missions run in parallel (configured in Settings → Orchestrator).
+- **Per-mission controls** — pause, stop, or inspect any running mission.
+- **Phase timeline** — each bar is an agent phase; hover for token cost and duration.
+
+Open it from the top nav **⚡ Cockpit** link or from any mission card.
+
+---
+
+## Backlog
+
+![Backlog](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/backlog.png)
+
+WSJF-prioritized feature backlog using SAFe methodology.
+
+**How to use it:**
+1. Click **Backlog** inside a project.
+2. Use **+ Add Feature** to create items.
+3. Set **User Value**, **Time Criticality**, and **Risk Reduction** — WSJF score is computed automatically.
+4. Drag items to reorder or set priority manually.
+5. Click a feature to start a mission from it directly.
+
+**Ideation mode** (multi-agent brainstorming): type a prompt in the Ideation tab, agents collaborate to generate and score feature ideas.
+
+---
 
 ## Sessions
 
-Live agent collaboration with real-time SSE streaming, color-coded by role.
+Live agent collaboration view. Each message is color-coded by agent role.
 
-## Backlog & Ideation
+**How to read a session:**
+- **Blue** = Agent Lead (coordinator)
+- **Green** = Developer agents
+- **Orange** = Reviewer / QA agents
+- **Purple** = Architect agents
 
-- **Backlog**: WSJF-prioritized features
-- **Ideation**: multi-agent brainstorming — type a prompt, agents collaborate
+Sessions stream in real-time via SSE. You can intervene with a message at any time — it goes to the Agent Lead.
+
+---
 
 ## Metrics
+
+![Metrics](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/metrics.png)
+
+Five tabs covering engineering performance:
 
 | Tab | Content |
 |-----|---------|
 | **DORA** | Deploy frequency, lead time, change failure rate, MTTR |
-| **Quality** | Code quality scores, test coverage, security |
-| **Analytics** | Mission stats, agent performance, system health |
+| **Quality** | Code quality scores, test coverage, security findings |
+| **Analytics** | Mission stats, agent performance, cost per run |
 | **Monitoring** | Real-time CPU, memory, request latency |
-| **Pipeline** | CI/CD pipeline performance |
+| **Pipeline** | CI/CD pipeline performance and trends |
+
+LLM cost per mission is shown in **Analytics** → *Cost* column. See [LLM Cost Tracking](llm-cost-tracking) for details.
+
+---
+
+## Settings Hub
+
+![Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings.png)
+
+Global platform configuration. Five tabs: **General**, **Orchestrator**, **LLM**, **Integrations**, **Notifications**.
+
+Key settings you'll use most:
+- **Orchestrator → Mission Semaphore** — max parallel missions.
+- **Orchestrator → Budget Cap** — max LLM cost per run (USD).
+- **Orchestrator → YOLO Mode** — agents proceed without approval gates.
+- **LLM → Provider Priority** — which LLM provider to use first.
+
+Full details in [Settings Hub](settings-hub).
+
+---
+
+## Agents
+
+![Agents](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/agents.png)
+
+The agent catalog. Each agent has a role, system prompt, skills, tools, and LLM model.
+
+**How to use it:**
+1. Go to **Toolbox → Agents** (or **Projects → Agents** tab).
+2. Click an agent to view/edit its system prompt and skills.
+3. Use **+ New Agent** to create a custom agent.
+4. Assign agents to a project via the project's **Agents** tab.
+
+---
+
+## Memory
+
+![Memory](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/memory.png)
+
+Persistent knowledge store for each project. Agents read from and write to memory automatically.
+
+**How to use it:**
+1. Open **Toolbox → Memory**.
+2. Search memory entries with the full-text search bar.
+3. Click an entry to view or edit it.
+4. Use **+ Add** to inject knowledge manually (e.g. architecture decisions, constraints).
+
+Memory entries are scoped per project. Agents reference them during planning phases.
+
+---
+
+## Workflows
+
+![Workflows](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/workflows.png)
+
+Workflows chain **Patterns** (agent assemblies) into multi-step pipelines.
+
+**How to use it:**
+1. Go to **Projects → Workflows** tab.
+2. Click **+ New Workflow**.
+3. Add steps — each step picks a Pattern and configuration.
+4. Save and trigger the workflow from the chat (`/workflow <name>`).
+
+Common built-in workflows: `full-dev` (plan → code → review → test), `quick-fix` (code → review).
+
+---
 
 ## Toolbox
 
-| Tab | Content |
-|-----|---------|
-| **Skills** | Agent skill library |
-| **Memory** | Persistent memory browser |
-| **MCPs** | MCP server management |
-| **API** | Swagger interactive docs |
-| **CLI** | Web terminal |
+The Toolbox collects platform-wide utilities:
+
+| Tab | Description |
+|-----|-------------|
+| **Skills** | Agent skill library — browse and assign skills |
+| **Memory** | Cross-project memory browser |
+| **MCPs** | MCP server connections — add/remove tool servers |
+| **Evals** | Run quality evaluations on agent outputs |
+| **API** | Interactive Swagger docs |
+| **CLI** | Web terminal for direct platform commands |
 | **Design System** | UI component reference |
 | **Wiki** | This documentation |
+
+---
+
+## Next Steps
+
+- [Mission Cockpit](mission-cockpit) — deep dive into the pipeline view
+- [Settings Hub](settings-hub) — configure orchestration, LLM, integrations
+- [LLM Cost Tracking](llm-cost-tracking) — understand and control costs
+- [Patterns Guide](patterns-guide) — orchestration patterns
+- [Workflows Guide](workflows-guide) — build pipelines
 """,
     },
     # ── Architecture ────────────────────────────────────────────
@@ -553,6 +725,8 @@ sf projects create "My Project" --description "..."
         "content": """\
 # Missions & SAFe
 
+![Missions Board](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
+
 ## Mission Lifecycle
 
 ```
@@ -560,6 +734,90 @@ User Prompt → Planning → Active → Review → Completed
                                       ↓
                                    Failed / Interrupted
 ```
+
+Each mission has **runs** (attempts) and **phases** (agent steps per run). Failed missions can be retried from the mission card.
+
+## Mission Cockpit
+
+![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
+
+The Cockpit shows all running missions in a pipeline view. Use it to monitor progress, inspect phases, and intervene if needed. See [Mission Cockpit](mission-cockpit) for details.
+
+## Mission Replay
+
+![Mission Replay](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/mission_replay.png)
+
+Step through a completed mission phase by phase. Useful for debugging unexpected results.
+
+**How to use it:**
+1. Open a completed or failed mission.
+2. Click the **Replay** button.
+3. Use ◀ ▶ to step through each agent phase.
+4. Each phase shows the agent, its prompt, and its output.
+
+---
+
+## Semaphore Control
+
+The **Mission Semaphore** limits how many missions run in parallel across the platform.
+
+- Default: `3` concurrent missions.
+- Higher values = more parallelism but more LLM API load.
+- Set it in **Settings → Orchestrator → Mission Semaphore**.
+
+**When to change it:**
+- Reduce to `1` when debugging a single mission and you want full resource focus.
+- Increase up to your LLM provider's rate limit to maximize throughput.
+
+---
+
+## YOLO Mode
+
+YOLO Mode lets agents proceed through all phases **without waiting for human approval gates**.
+
+- **Disabled (default)**: agents pause at review checkpoints and wait for your ✅.
+- **Enabled**: agents skip approval steps and run fully autonomously end-to-end.
+
+**When to use it:**
+- Rapid prototyping where speed matters more than oversight.
+- Batch processing of many small missions.
+- Fully trusted workflows with well-tested patterns.
+
+**How to enable it:**
+1. Go to **Settings → Orchestrator**.
+2. Toggle **YOLO Mode** on.
+3. Save. Takes effect immediately for new missions.
+
+> ⚠️ Use with caution on production-critical projects.
+
+---
+
+## Auto-Resume Watchdog
+
+The watchdog monitors stalled missions and resumes them automatically.
+
+- A mission is considered **stalled** if no agent has produced output for more than `N` minutes (configurable).
+- The watchdog re-dispatches the last active agent with the same context.
+- Prevents missions from hanging indefinitely due to LLM timeouts or transient errors.
+
+**Configure it** in **Settings → Orchestrator → Auto-Resume Watchdog** (enable/disable + timeout threshold).
+
+---
+
+## Budget Cap
+
+Limit the maximum LLM spend per mission run.
+
+- Set in **Settings → Orchestrator → Budget Cap (USD)**.
+- When a run's `llm_cost_usd` reaches the cap, the mission is paused and marked `budget_exceeded`.
+- You can raise the cap and resume, or close the mission.
+- Default: no cap (`0` = unlimited).
+
+**Example:** set cap to `$0.50` for exploratory missions to avoid runaway costs.
+
+See [LLM Cost Tracking](llm-cost-tracking) for how costs are measured.
+
+---
 
 ## SAFe Framework
 
@@ -3140,6 +3398,334 @@ Five tabs accessible at `/teams`:
 - [Agents System](agents) — agent catalog and roles
 - [Orchestration Patterns](patterns) — where `skill:` prefix activates Darwin
 - [Metrics Guide](metrics-guide) — DORA and quality metrics
+""",
+    },
+    # ── Settings Hub ─────────────────────────────────────────────
+    {
+        "slug": "settings-hub",
+        "title": "Settings Hub",
+        "category": "Guide",
+        "icon": "⚙️",
+        "sort_order": 56,
+        "content": """\
+# Settings Hub
+
+![Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings.png)
+
+The Settings Hub is the global configuration centre for the platform. Access it from **⚙️ Settings** in the top nav.
+
+Five tabs: **General**, **Orchestrator**, **LLM**, **Integrations**, **Notifications**.
+
+---
+
+## General Tab
+
+Basic platform identity and preferences:
+
+| Setting | Description |
+|---------|-------------|
+| **Platform Name** | Display name shown in the header and emails |
+| **Timezone** | Used for scheduling, metrics timestamps, and cron jobs |
+| **Theme** | Light / Dark / System |
+| **Default Perspective** | Which dashboard perspective loads on login |
+
+---
+
+## Orchestrator Tab
+
+![Orchestrator Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-orchestrator.png)
+
+Controls how missions run at the platform level.
+
+### Mission Semaphore
+
+Maximum number of missions that run **in parallel** across all projects.
+
+- **Default:** `3`
+- Increase for high-throughput batch work (up to your LLM rate limit).
+- Decrease to `1` when debugging to avoid interference between missions.
+- The Cockpit's semaphore gauge reflects this value in real time.
+
+### Budget Cap (USD)
+
+Maximum LLM cost allowed for a single mission run.
+
+- **Default:** `0` (unlimited)
+- When a run's cost reaches the cap, it pauses with status `budget_exceeded`.
+- You can raise the cap and resume without losing progress.
+- Set to `$0.50`–`$2.00` for exploratory missions to control spend.
+
+### YOLO Mode
+
+When **enabled**, agents skip human approval gates and run end-to-end autonomously.
+
+- **Disabled (default):** agents pause at review checkpoints and wait for ✅.
+- **Enabled:** full autonomy — no interruptions.
+- Best for: rapid prototyping, trusted pipelines, batch processing.
+- ⚠️ Disable on production-critical projects where oversight is required.
+
+### Auto-Resume Watchdog
+
+Automatically resumes missions that have stalled (no agent output for N minutes).
+
+- **Enable/Disable** toggle.
+- **Timeout threshold** — minutes of inactivity before auto-resume triggers (default: `10`).
+- The watchdog re-dispatches the last active phase with the same context.
+- Prevents missions from hanging due to transient LLM timeouts.
+
+---
+
+## LLM Tab
+
+![LLM Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-llm.png)
+
+Configure which LLM providers and models the platform uses.
+
+| Setting | Description |
+|---------|-------------|
+| **Provider Priority** | Ordered list of providers — first available wins |
+| **Default Model** | Model used when no agent-specific override is set |
+| **Fallback Model** | Used when the primary model returns a rate-limit error |
+| **Rate Limit Handling** | `retry` (back-off + retry) or `fallback` (switch provider) |
+| **Max Retries** | How many times to retry a rate-limited request before failing |
+| **Request Timeout** | Seconds before a single LLM request times out |
+
+**Provider setup:** each provider requires an API key, base URL, and optional deployment name. Keys are stored encrypted in the database (never in plaintext files).
+
+**Tips:**
+- Set MiniMax as primary and Azure OpenAI as fallback for cost/resilience balance.
+- Use `retry` mode for providers with burst limits; use `fallback` for strict quotas.
+
+---
+
+## Integrations Tab
+
+![Integrations Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-integrations.png)
+
+30+ connectors organized by category.
+
+| Category | Examples |
+|----------|---------|
+| **Source Control** | GitHub, GitLab, Bitbucket, Azure DevOps |
+| **CI/CD** | GitHub Actions, GitLab CI, Jenkins, CircleCI |
+| **Issue Tracking** | Jira, Linear, GitHub Issues, Trello |
+| **Cloud** | AWS, Azure, GCP (credentials for deployment agents) |
+| **Databases** | PostgreSQL, MySQL, MongoDB, Redis |
+| **Communication** | Slack, Microsoft Teams, Discord |
+| **Monitoring** | Datadog, Grafana, PagerDuty, Sentry |
+| **Secrets** | HashiCorp Vault, AWS Secrets Manager |
+
+**How to configure a connector:**
+1. Click the connector card.
+2. Enter the required credentials (token, URL, org/project IDs).
+3. Click **Test Connection** — a green ✅ confirms it works.
+4. Save. The connector is now available to agents as a tool.
+
+Connectors are used by agents automatically when their skill set includes the matching tool category.
+
+---
+
+## Notifications Tab
+
+![Notifications Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-notifications.png)
+
+Configure how and when the platform notifies you.
+
+| Channel | Configuration |
+|---------|--------------|
+| **Slack** | Webhook URL + channel name. Events: mission complete, failed, budget exceeded |
+| **Email** | SMTP settings + recipient list. Events: daily digest, critical failures |
+| **Webhook** | HTTP POST to any URL with JSON payload. Fully customizable event filter |
+
+**Event types you can subscribe to:**
+- `mission.completed` — mission finished successfully
+- `mission.failed` — mission failed after max retries
+- `mission.budget_exceeded` — run hit the budget cap
+- `mission.stalled` — watchdog triggered
+- `agent.error` — agent produced an error response
+- `platform.health` — system health alerts
+
+**How to configure Slack:**
+1. Create an incoming webhook in your Slack workspace.
+2. Paste the webhook URL in **Notifications → Slack → Webhook URL**.
+3. Set the channel (e.g. `#engineering-alerts`).
+4. Check the events you want.
+5. Click **Send Test** to verify.
+""",
+    },
+    # ── Mission Cockpit ──────────────────────────────────────────
+    {
+        "slug": "mission-cockpit",
+        "title": "Mission Cockpit",
+        "category": "Guide",
+        "icon": "🚀",
+        "sort_order": 57,
+        "content": """\
+# Mission Cockpit
+
+![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
+
+The Mission Cockpit is the real-time control panel for all running missions across the platform.
+
+Access it from **⚡ Cockpit** in the top navigation bar.
+
+---
+
+## What you see
+
+### Semaphore Gauge
+
+A circular gauge at the top showing:
+- **Running** — missions currently executing (green slice)
+- **Queued** — missions waiting for a semaphore slot (amber slice)
+- **Cap** — the configured maximum (set in Settings → Orchestrator)
+
+### Mission Pipeline View
+
+Each active mission is shown as a horizontal pipeline row:
+
+```
+[Mission Title]  [Project]  ████░░░░  Phase 3/7  ⏱ 2m 14s  💰 $0.12
+```
+
+Columns: title, project, progress bar, current phase, elapsed time, LLM cost so far.
+
+Click any mission row to open its full session view.
+
+### Per-Mission Controls
+
+Each row has action buttons:
+
+| Button | Action |
+|--------|--------|
+| **⏸ Pause** | Suspend the mission after the current phase completes |
+| **▶ Resume** | Resume a paused mission |
+| **⏹ Stop** | Terminate the mission immediately (marks as `interrupted`) |
+| **🔍 Inspect** | Open the live session transcript |
+| **🔁 Retry** | Re-run the last failed phase |
+
+---
+
+## How to use the Cockpit
+
+**Monitor a long-running mission:**
+1. Open Cockpit.
+2. Find your mission in the pipeline view.
+3. Watch the phase progress bar advance.
+4. If it stalls, click **🔍 Inspect** to see what the agent is doing.
+
+**Intervene in a running mission:**
+1. Click **⏸ Pause** to pause after the current phase.
+2. Open **🔍 Inspect** to review the transcript.
+3. Send a correction message in the session.
+4. Click **▶ Resume** to continue.
+
+**Handle a budget warning:**
+- When the cost indicator turns amber (>80% of budget cap), consider pausing and reviewing.
+- If the mission exceeds the cap it stops automatically — raise the cap in Settings and resume.
+
+---
+
+## Practical Tips
+
+- Keep the Cockpit open in a side monitor when running batch missions.
+- Use **Pause** rather than **Stop** — paused missions retain all progress.
+- The semaphore gauge tells you at a glance if you're hitting capacity limits.
+- Phase duration spikes often mean an LLM is slow or retrying — check the session transcript.
+- LLM cost shown is cumulative for the current run. See [LLM Cost Tracking](llm-cost-tracking) for full history.
+
+---
+
+## Related Pages
+
+- [Missions & SAFe](missions) — mission lifecycle and controls
+- [Settings Hub](settings-hub) — configure semaphore, budget cap, YOLO mode
+- [LLM Cost Tracking](llm-cost-tracking) — understand run costs
+""",
+    },
+    # ── LLM Cost Tracking ────────────────────────────────────────
+    {
+        "slug": "llm-cost-tracking",
+        "title": "LLM Cost Tracking",
+        "category": "Guide",
+        "icon": "💰",
+        "sort_order": 58,
+        "content": """\
+# LLM Cost Tracking
+
+The platform tracks LLM spend per mission run in the `llm_cost_usd` field.
+
+---
+
+## How costs are measured
+
+Every LLM call records:
+- **Input tokens** — prompt size (system prompt + context + history)
+- **Output tokens** — agent response size
+- **Cost** — `(input_tokens × input_price + output_tokens × output_price)` per provider pricing
+
+These are summed into `llm_cost_usd` on the run record. The Cockpit shows the running total in real time.
+
+---
+
+## Viewing costs in Metrics
+
+![Metrics](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/metrics.png)
+
+1. Go to **Metrics → Analytics**.
+2. The **Missions** table has a **Cost** column showing `llm_cost_usd` per run.
+3. Use the date filter to see costs over a time range.
+4. The **Cost by Provider** chart breaks down spend by LLM provider.
+5. The **Cost by Project** chart shows which projects consume the most budget.
+
+---
+
+## Budget Cap
+
+Prevent runaway spend by setting a per-run maximum:
+
+1. Go to **Settings → Orchestrator → Budget Cap (USD)**.
+2. Enter a value, e.g. `1.00`.
+3. Save. New runs will pause and set status `budget_exceeded` when the cap is reached.
+4. To resume: raise the cap (or set to `0` for unlimited) and click **▶ Resume** in the Cockpit.
+
+**Recommended caps by mission type:**
+
+| Mission type | Suggested cap |
+|-------------|--------------|
+| Quick bug fix | $0.25 |
+| Feature implementation | $1.00 |
+| Full module with tests | $3.00 |
+| Architecture review | $2.00 |
+| No cap (trusted pipeline) | $0 (unlimited) |
+
+---
+
+## Provider Comparison Tips
+
+Different providers have very different cost profiles:
+
+| Provider | Strength | Cost profile |
+|----------|----------|-------------|
+| **MiniMax M2.5** | Fast, cheap | Very low — good for high-volume missions |
+| **Azure OpenAI (GPT-4o)** | High quality | Medium — use for complex reasoning |
+| **Azure AI (DeepSeek)** | Long context | Low — good for large codebase analysis |
+
+**To minimize costs:**
+- Use MiniMax as primary provider for routine missions.
+- Reserve GPT-4o for review phases that need higher reasoning quality.
+- Set provider priority in **Settings → LLM → Provider Priority**.
+- Keep system prompts concise — input tokens are the biggest cost driver.
+- Use memory to avoid re-sending large context blocks on every turn.
+
+---
+
+## Related Pages
+
+- [Settings Hub](settings-hub) — set budget cap and provider priority
+- [Mission Cockpit](mission-cockpit) — real-time cost gauge
+- [Metrics Guide](metrics-guide) — full analytics reference
+- [LLM Providers Guide](llm-guide) — provider configuration
 """,
     },
 ]
