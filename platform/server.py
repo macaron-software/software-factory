@@ -168,9 +168,12 @@ async def lifespan(app: FastAPI):
     # Seed memory (global knowledge + project files)
     from .memory.seeder import seed_all as seed_memories
 
-    n_mem = seed_memories()
-    if n_mem:
-        logger.info("Seeded %d memories", n_mem)
+    try:
+        n_mem = seed_memories()
+        if n_mem:
+            logger.info("Seeded %d memories", n_mem)
+    except Exception as _e:
+        logger.warning("Memory seeding skipped: %s", _e)
 
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
