@@ -99,8 +99,11 @@ jobs:
           echo "platform-${INACTIVE} healthy ✓"
 
           # ── Swap nginx (zero-downtime) ───────────────────────────────────────
-          ACTIVE_PORT=$([ "$ACTIVE" = "blue" ] && echo "8090" || echo "8091")
-          sudo sed -i "s|localhost:${ACTIVE_PORT}|localhost:${INACTIVE_PORT}|g" \
+          # Deploy full nginx template (maintenance page, SSE config, timeouts)
+          # then set the active port via sed
+          sudo cp /opt/software-factory/platform/deploy/nginx-ovh.conf \
+            /etc/nginx/sites-enabled/software-factory
+          sudo sed -i "s|localhost:8090|localhost:${INACTIVE_PORT}|g" \
             /etc/nginx/sites-enabled/software-factory
           sudo nginx -t
           sudo nginx -s reload
