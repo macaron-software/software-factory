@@ -170,6 +170,23 @@ async def ideation_submit(request: Request):
     else:
         session = existing
 
+    # Persist to ideation_sessions table so /api/ideation/sessions can find it
+    from ...db.migrations import get_db as _gdb_i
+
+    _db_i = _gdb_i()
+    try:
+        title = prompt[:80]
+        _db_i.execute(
+            "INSERT INTO ideation_sessions (id, title, prompt, status) VALUES (?, ?, ?, 'active')"
+            " ON CONFLICT (id) DO NOTHING",
+            (session_id, title, prompt),
+        )
+        _db_i.commit()
+    except Exception as _e:
+        logger.warning("ideation_sessions insert: %s", _e)
+    finally:
+        _db_i.close()
+
     # Store user message
     session_store.add_message(
         MessageDef(
@@ -211,6 +228,60 @@ async def ideation_submit(request: Request):
         try:
             await asyncio.sleep(0.5)  # Let frontend SSE connect before first events
             await run_pattern(pattern, session_id, prompt)
+            # Persist agent messages to ideation_messages + ideation_findings
+            _msgs = session_store.get_messages(session_id)
+            from ...db.migrations import get_db as _gdb_m
+
+            _db_m = _gdb_m()
+            try:
+                for _m in _msgs:
+                    if getattr(_m, "from_agent", "") == "user":
+                        continue
+                    _agent_id = getattr(_m, "from_agent", "")
+                    _content = getattr(_m, "content", "")
+                    _agent_meta = next(
+                        (a for a in _IDEATION_AGENTS if a["id"] == _agent_id), {}
+                    )
+                    try:
+                        _db_m.execute(
+                            "INSERT INTO ideation_messages (session_id, agent_id, agent_name, role, content, color, avatar_url)"
+                            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                session_id,
+                                _agent_id,
+                                _agent_meta.get("name", _agent_id),
+                                _agent_meta.get("role", ""),
+                                _content,
+                                _agent_meta.get("color", "#666"),
+                                "",
+                            ),
+                        )
+                    except Exception:
+                        pass
+                # Save consolidated findings (product_manager's last message)
+                _po_msgs = [
+                    _m
+                    for _m in _msgs
+                    if getattr(_m, "from_agent", "") == "product_manager"
+                ]
+                if _po_msgs:
+                    _findings_text = getattr(_po_msgs[-1], "content", "")
+                    try:
+                        _db_m.execute(
+                            "INSERT INTO ideation_findings (session_id, type, text) VALUES (?, ?, ?)",
+                            (session_id, "synthesis", _findings_text),
+                        )
+                    except Exception:
+                        pass
+                _db_m.execute(
+                    "UPDATE ideation_sessions SET status='complete' WHERE id=?",
+                    (session_id,),
+                )
+                _db_m.commit()
+            except Exception as _e:
+                logger.warning("ideation persist messages: %s", _e)
+            finally:
+                _db_m.close()
         except Exception as e:
             logger.error("Ideation pattern failed: %s", e)
             session_store.add_message(
@@ -234,43 +305,31 @@ async def ideation_submit(request: Request):
 
 
 _PO_EPIC_SYSTEM = """Tu es Alexandre Faure, Product Owner senior.
-Tu reçois la synthèse d'un atelier d'idéation et tu dois structurer un projet complet.
+Tu reçois la synthèse d'un atelier d'idéation et tu dois structurer un projet complet avec ses missions.
 
 À partir de l'idée et des analyses des experts, produis un JSON avec:
 1. Le projet (nom, description, stack technique, factory_type)
-2. L'epic principal (nom, description, critères d'acceptation)
-3. 3 à 5 features découpées depuis l'epic
-4. 2 à 3 user stories par feature (format "En tant que... je veux... afin de...")
-5. L'équipe proposée (rôles nécessaires)
+2. Les missions distinctes par composant/domaine (une mission = un livrable autonome)
+3. L'équipe proposée (rôles nécessaires)
 
-Réponds UNIQUEMENT avec ce JSON:
+IMPORTANT: Si le projet comprend plusieurs composants (ex: app mobile + dashboard web + backend + libs communes), crée UNE MISSION PAR COMPOSANT. Minimum 1 mission, maximum 8.
+
+Réponds UNIQUEMENT avec ce JSON (sans commentaires, JSON valide strict):
 {
   "project": {
     "id": "slug-kebab-case",
     "name": "Nom du Projet",
     "description": "Description courte",
-    "stack": ["SvelteKit", "Rust", "PostgreSQL"],
+    "stack": ["React Native", "React", "Node.js", "PostgreSQL"],
     "factory_type": "sf"
   },
-  "epic": {
-    "name": "Nom de l'Epic",
-    "description": "Description détaillée de l'epic",
-    "goal": "Critères d'acceptation clairs et mesurables"
-  },
-  "features": [
+  "missions": [
     {
-      "name": "Nom Feature",
-      "description": "Description",
-      "acceptance_criteria": "Given/When/Then",
-      "story_points": 8,
-      "stories": [
-        {
-          "title": "En tant que [persona] je veux [action] afin de [bénéfice]",
-          "description": "Détails",
-          "acceptance_criteria": "Given/When/Then",
-          "story_points": 3
-        }
-      ]
+      "name": "Nom de la mission",
+      "description": "Description détaillée",
+      "goal": "Critères d'acceptation clairs et mesurables",
+      "stack": ["React Native", "Expo"],
+      "type": "epic"
     }
   ],
   "team": [
@@ -283,8 +342,7 @@ Réponds UNIQUEMENT avec ce JSON:
   ]
 }
 
-Sois pragmatique et concret. Les features doivent être actionnables.
-Réponds UNIQUEMENT avec le JSON, rien d'autre."""
+Sois pragmatique et concret. Réponds UNIQUEMENT avec le JSON valide, rien d'autre."""
 
 
 @router.post("/api/ideation/create-epic")
@@ -300,6 +358,62 @@ async def ideation_create_epic(request: Request):
     data = await request.json()
     idea = data.get("goal", "") or data.get("name", "")
     findings = data.get("description", "")
+
+    # If session_id provided, try to load idea + findings from session store / DB
+    session_id_in = data.get("session_id", "").strip()
+    if session_id_in and not (idea and findings):
+        from ...db.migrations import get_db as _gdb_epic
+
+        _db_epic = _gdb_epic()
+        try:
+            _sess_row = _db_epic.execute(
+                "SELECT prompt, title FROM ideation_sessions WHERE id=?",
+                (session_id_in,),
+            ).fetchone()
+            if _sess_row:
+                if not idea:
+                    idea = _sess_row["prompt"] or _sess_row["title"] or ""
+                if not findings:
+                    # Use only the last PM synthesis + one message per other agent (avoid token overflow)
+                    _pm_row = _db_epic.execute(
+                        "SELECT content FROM ideation_messages WHERE session_id=? AND agent_id='product_manager' ORDER BY created_at DESC LIMIT 1",
+                        (session_id_in,),
+                    ).fetchone()
+                    _other_rows = _db_epic.execute(
+                        "SELECT agent_name, content FROM ideation_messages WHERE session_id=? AND agent_id!='product_manager' AND agent_id!='system' ORDER BY created_at DESC LIMIT 4",
+                        (session_id_in,),
+                    ).fetchall()
+                    parts = []
+                    if _pm_row and _pm_row["content"]:
+                        parts.append(
+                            f"[Synthèse Product Manager]:\n{_pm_row['content']}"
+                        )
+                    for r in _other_rows:
+                        if r["content"]:
+                            parts.append(f"[{r['agent_name']}]:\n{r['content'][:800]}")
+                    findings = "\n\n---\n\n".join(parts)
+        except Exception as _ep:
+            logger.warning("create-epic session lookup: %s", _ep)
+        finally:
+            _db_epic.close()
+        # Fallback: read from in-memory session_store
+        if not findings:
+            from ...sessions.store import get_session_store as _gss
+
+            _ss = _gss()
+            _session = _ss.get(session_id_in)
+            if _session:
+                if not idea:
+                    idea = getattr(_session, "goal", "") or getattr(
+                        _session, "name", ""
+                    )
+                _msgs = _ss.get_messages(session_id_in)
+                findings = "\n\n".join(
+                    f"[{getattr(m, 'from_agent', '')}]: {getattr(m, 'content', '')}"
+                    for m in _msgs
+                    if getattr(m, "from_agent", "") not in ("user", "system")
+                    and getattr(m, "content", "")
+                )
 
     # ── Prompt injection guard ──
     from ...security.prompt_guard import get_prompt_guard
@@ -351,6 +465,8 @@ async def ideation_create_epic(request: Request):
 
     proj_data = plan.get("project", {})
     epic_data = plan.get("epic", {})
+    # Support both new "missions" array and legacy "features" array
+    missions_data = plan.get("missions", [])
     features_data = plan.get("features", [])
     team_data = plan.get("team", [])
 
@@ -379,14 +495,21 @@ async def ideation_create_epic(request: Request):
             stack = proj_data.get("stack", [])
             vision_content = f"# {proj_data.get('name', project_id)}\n\n"
             vision_content += f"## Vision\n\n{proj_data.get('description', '')}\n\n"
-            vision_content += f"## Epic: {epic_data.get('name', '')}\n\n{epic_data.get('description', '')}\n\n"
-            vision_content += f"## Objectifs\n\n{epic_data.get('goal', '')}\n\n"
-            if features_data:
-                vision_content += "## Features\n\n"
-                for f in features_data:
+            if missions_data:
+                vision_content += "## Missions\n\n"
+                for m in missions_data:
                     vision_content += (
-                        f"- **{f.get('name', '')}**: {f.get('description', '')}\n"
+                        f"- **{m.get('name', '')}**: {m.get('description', '')}\n"
                     )
+            elif epic_data:
+                vision_content += f"## Epic: {epic_data.get('name', '')}\n\n{epic_data.get('description', '')}\n\n"
+                vision_content += f"## Objectifs\n\n{epic_data.get('goal', '')}\n\n"
+                if features_data:
+                    vision_content += "## Features\n\n"
+                    for f in features_data:
+                        vision_content += (
+                            f"- **{f.get('name', '')}**: {f.get('description', '')}\n"
+                        )
             vision_content += f"\n## Stack technique\n\n{', '.join(stack)}\n"
             (proj_dir / "VISION.md").write_text(vision_content, encoding="utf-8")
 
@@ -435,7 +558,7 @@ async def ideation_create_epic(request: Request):
         project_store.auto_provision(project_id, project.name)
         project_name = project.name
 
-    # ── Step 4: Create epic (mission) with type & workflow routing ──
+    # ── Step 4: Create missions with type & workflow routing ──
     request_type = data.get("request_type", "new_project")
     type_map = {
         "new_project": "epic",
@@ -458,27 +581,63 @@ async def ideation_create_epic(request: Request):
     po = data.get("po_proposal", {})
 
     mission_store = get_mission_store()
-    mission = MissionDef(
-        name=epic_data.get("name", "Epic from ideation"),
-        description=epic_data.get("description", ""),
-        goal=epic_data.get("goal", ""),
-        status="planning",
-        type=mission_type,
-        project_id=project_id,
-        workflow_id=workflow_id,
-        wsjf_score=po.get("priority_wsjf", 0),
-        created_by="product_manager",
-        config={
-            "team": team_data,
-            "stack": stack,
-            "idea": idea,
-            "request_type": request_type,
-            "po_proposal": po,
-        },
-    )
-    mission = mission_store.create_mission(mission)
 
-    # ── Step 5: Create features + user stories ──
+    # Create one mission per component (new format) or fallback to single epic (legacy)
+    created_missions = []
+    if missions_data:
+        for md in missions_data:
+            m_stack = md.get("stack", stack)
+            m_type = md.get("type", mission_type)
+            m_wf = (
+                workflow_map.get(m_type, workflow_id)
+                if m_type in workflow_map
+                else workflow_id
+            )
+            m = MissionDef(
+                name=md.get("name", "Mission from ideation"),
+                description=md.get("description", ""),
+                goal=md.get("goal", ""),
+                status="planning",
+                type=m_type,
+                project_id=project_id,
+                workflow_id=m_wf,
+                wsjf_score=po.get("priority_wsjf", 0),
+                created_by="product_manager",
+                config={
+                    "team": team_data,
+                    "stack": m_stack,
+                    "idea": idea,
+                    "request_type": request_type,
+                    "po_proposal": po,
+                },
+            )
+            m = mission_store.create_mission(m)
+            created_missions.append(m)
+        mission = created_missions[0] if created_missions else None
+    else:
+        # Legacy: single epic mission
+        mission = MissionDef(
+            name=epic_data.get("name", idea[:100]) if epic_data else idea[:100],
+            description=epic_data.get("description", "") if epic_data else "",
+            goal=epic_data.get("goal", "") if epic_data else "",
+            status="planning",
+            type=mission_type,
+            project_id=project_id,
+            workflow_id=workflow_id,
+            wsjf_score=po.get("priority_wsjf", 0),
+            created_by="product_manager",
+            config={
+                "team": team_data,
+                "stack": stack,
+                "idea": idea,
+                "request_type": request_type,
+                "po_proposal": po,
+            },
+        )
+        mission = mission_store.create_mission(mission)
+        created_missions.append(mission)
+
+    # ── Step 5: Create features + user stories (legacy, for single epic) ──
     backlog = get_product_backlog()
     created_features = []
     for fd in features_data:
@@ -625,6 +784,7 @@ async def ideation_create_epic(request: Request):
     try:
         from ...sessions.store import get_session_store, SessionDef, MessageDef
         from ...workflows.store import get_workflow_store
+        from .workflows import _run_workflow_background
 
         wf_store = get_workflow_store()
         wf = wf_store.get(workflow_id)
@@ -671,8 +831,10 @@ async def ideation_create_epic(request: Request):
         {
             "project_id": project_id,
             "project_name": project_name,
-            "mission_id": mission.id,
-            "mission_name": mission.name,
+            "mission_id": created_missions[0].id if created_missions else None,
+            "mission_name": created_missions[0].name if created_missions else None,
+            "missions": [{"id": m.id, "name": m.name} for m in created_missions],
+            "missions_count": len(created_missions),
             "type": mission_type,
             "workflow_id": workflow_id,
             "features": created_features,

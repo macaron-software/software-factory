@@ -339,7 +339,7 @@ class APIBackend:
         return self._get("/api/ideation/sessions")
 
     def ideation_session_url(self, session_id: str) -> str:
-        return f"{self.base_url}/api/sessions/{session_id}/stream"
+        return f"{self.base_url}/api/sessions/{session_id}/sse"
 
     # ── Metrics ──
 
