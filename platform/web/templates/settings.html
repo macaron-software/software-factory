@@ -256,6 +256,15 @@
                 </div>
               </div>
 
+              <!-- Resume all paused workflows -->
+              <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:0.3rem">
+                <button type="button" onclick="resumeAllWorkflows()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:0.4rem">
+                  <svg class="icon icon-sm"><use href="#icon-play"/></svg> Reprendre tous les workflows pausés
+                </button>
+                <span id="resume-all-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
               <!-- Worker nodes -->
@@ -777,6 +786,29 @@ async function saveOrchSettings() {
     knob.style.left = on ? '20px' : '3px';
   });
 })();
+
+async function resumeAllWorkflows() {
+  const st = document.getElementById('resume-all-status');
+  st.style.color = 'var(--text-secondary)';
+  st.textContent = 'Reprise en cours…';
+  try {
+    const r = await fetch('/api/workflows/resume-all', { method: 'POST' });
+    const j = await r.json();
+    if (j.resumed !== undefined) {
+      st.style.color = 'var(--green,#4ade80)';
+      st.textContent = j.resumed > 0
+        ? `${j.resumed} workflow(s) repris`
+        : 'Aucun workflow pausé trouvé';
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Erreur: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Erreur: ' + e.message;
+  }
+  setTimeout(() => { st.textContent = ''; }, 5000);
+}
 
 async function refreshLoad() {
   try {
