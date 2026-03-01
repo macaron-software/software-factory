@@ -99,6 +99,11 @@ async def projects_page(request: Request):
             "request": request,
             "page_title": "Projects",
             "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
+            "total_pages": 1,
+            "page": 1,
+            "q": "",
+            "factory_type": "",
+            "has_workspace": "",
         },
     )
 
