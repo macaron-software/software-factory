@@ -6,17 +6,15 @@ import json
 import sqlite3
 import subprocess
 import uuid
-from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 
 from ...db.migrations import get_db
+from .helpers import _templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 # ── Pages ────────────────────────────────────────────────────────────────────
@@ -24,7 +22,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 
 @router.get("/tool-builder", response_class=HTMLResponse)
 async def tool_builder_page(request: Request):
-    return templates.TemplateResponse(
+    return _templates(request).TemplateResponse(
         request, "tool_builder.html", {"page_title": "Tool Builder"}
     )
 
