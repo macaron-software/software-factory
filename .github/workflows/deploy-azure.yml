@@ -37,6 +37,17 @@ jobs:
           # Staging compose file (always fresh from rsync — used for ALL compose cmds)
           COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
 
+          # ── Init nginx conf dir (writable by azureadmin, first run only) ────────
+          mkdir -p /home/azureadmin/macaron-nginx-conf
+          if [ ! -f /home/azureadmin/macaron-nginx-conf/default.conf ]; then
+            cp /home/azureadmin/macaron_update/platform/deploy/nginx-vm.conf \
+              /home/azureadmin/macaron-nginx-conf/default.conf
+            echo "nginx conf dir initialized"
+          fi
+          # Recreate nginx with new dir-mount if volume changed (one-time migration)
+          docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
+            up -d --no-deps nginx
+
           # ── Migrate old single-container setup if needed ─────────────────────
           docker stop deploy-platform-1 2>/dev/null || true
 
@@ -80,11 +91,9 @@ jobs:
           echo "platform-${INACTIVE} healthy ✓"
 
           # ── Swap nginx (zero-downtime) ───────────────────────────────────────
-          # Prepare swapped conf from staging (default=blue; sed if needed)
-          cp /home/azureadmin/macaron_update/platform/deploy/nginx-vm.conf /tmp/nginx-swap.conf
-          sed -i "s/platform-${ACTIVE}:8090/platform-${INACTIVE}:8090/g" /tmp/nginx-swap.conf
-          # docker cp bypasses :ro bind-mount → writes to host source file
-          docker cp /tmp/nginx-swap.conf deploy-nginx-1:/etc/nginx/conf.d/default.conf
+          # sed in-place on conf dir file (azureadmin-writable), then reload
+          sed -i "s/platform-${ACTIVE}:8090/platform-${INACTIVE}:8090/g" \
+            /home/azureadmin/macaron-nginx-conf/default.conf
           docker exec deploy-nginx-1 nginx -t
           docker exec deploy-nginx-1 nginx -s reload
           echo "nginx → $INACTIVE ✓"
