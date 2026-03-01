@@ -844,18 +844,13 @@ def create_app() -> FastAPI:
         """Detect and set user locale from Accept-Language header or cookie."""
         import re as _locale_re
 
-        # Priority: 1) Cookie 2) Accept-Language header 3) Default to 'en'
+        # Priority: 1) Accept-Language header 2) Cookie fallback 3) Default 'en'
+        # (Accept-Language always wins so the display follows the browser automatically)
         locale = None
 
-        # Check cookie first
-        cookie_lang = request.cookies.get("sf_lang")
-        if cookie_lang and cookie_lang in SUPPORTED_LOCALES:
-            locale = cookie_lang
-
-        # Parse Accept-Language header if no cookie
-        if not locale:
-            accept_lang = request.headers.get("Accept-Language", "")
-            # Parse: "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7"
+        # Parse Accept-Language header first
+        accept_lang = request.headers.get("Accept-Language", "")
+        if accept_lang:
             langs = []
             for part in accept_lang.split(","):
                 match = _locale_re.match(
@@ -865,15 +860,17 @@ def create_app() -> FastAPI:
                     lang_code = match.group(1)
                     quality = float(match.group(2) or "1.0")
                     langs.append((quality, lang_code))
-
-            # Sort by quality score (descending)
             langs.sort(reverse=True)
-
-            # Find first supported locale
             for _, lang_code in langs:
                 if lang_code in SUPPORTED_LOCALES:
                     locale = lang_code
                     break
+
+        # Fallback: cookie (explicit user override) if no browser lang matched
+        if not locale:
+            cookie_lang = request.cookies.get("sf_lang")
+            if cookie_lang and cookie_lang in SUPPORTED_LOCALES:
+                locale = cookie_lang
 
         # Fallback to English
         if not locale:
@@ -893,15 +890,8 @@ def create_app() -> FastAPI:
 
         response = await call_next(request)
 
-        # Set cookie if not present or different
-        if not cookie_lang or cookie_lang != locale:
-            response.set_cookie(
-                key="sf_lang",
-                value=locale,
-                max_age=31536000,  # 1 year
-                httponly=True,
-                samesite="lax",
-            )
+        # Don't persist cookie — browser language is the source of truth now.
+        # Cookie is only set by explicit user action via the language selector JS.
 
         return response
 

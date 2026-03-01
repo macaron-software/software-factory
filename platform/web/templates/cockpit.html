@@ -12,7 +12,7 @@
 .pipeline-stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0.85rem 0.5rem;border-right:1px solid var(--border);position:relative;cursor:default;transition:background .15s}
 .pipeline-stage:last-child{border-right:none}
 .pipeline-stage:hover{background:var(--bg-tertiary)}
-.pipeline-stage .ps-icon{font-size:1.4rem;line-height:1}
+.pipeline-stage .ps-icon{display:flex;align-items:center;justify-content:center;width:1.6rem;height:1.6rem}
 .pipeline-stage .ps-value{font-size:1.5rem;font-weight:800;color:var(--text-primary);line-height:1.1;margin-top:0.2rem}
 .pipeline-stage .ps-label{font-size:0.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;margin-top:0.15rem}
 .pipeline-stage .ps-sub{font-size:0.68rem;color:var(--purple);font-weight:600;margin-top:0.1rem}
@@ -95,35 +95,35 @@
   <!-- 1. Pipeline Value Stream -->
   <div class="pipeline-bar" id="pipeline">
     <div class="pipeline-stage">
-      <span class="ps-icon">💡</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:var(--purple)"><use href="#icon-zap"/></svg></span>
       <span class="ps-value" id="ps-ideation">—</span>
       <span class="ps-label">Idéation</span>
       <span class="ps-sub">en cours</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
-      <span class="ps-icon">📋</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#6b7280"><use href="#icon-clipboard"/></svg></span>
       <span class="ps-value" id="ps-planning">—</span>
       <span class="ps-label">Planifiées</span>
       <span class="ps-sub">missions</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
-      <span class="ps-icon">⚙️</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#3b82f6"><use href="#icon-settings"/></svg></span>
       <span class="ps-value" id="ps-active">—</span>
       <span class="ps-label">En cours</span>
       <span class="ps-sub">actives</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
-      <span class="ps-icon">✅</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#22c55e"><use href="#icon-check-circle"/></svg></span>
       <span class="ps-value" id="ps-done">—</span>
       <span class="ps-label">Complétées</span>
       <span class="ps-sub">total</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
-      <span class="ps-icon">🚀</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#f59e0b"><use href="#icon-rocket"/></svg></span>
       <span class="ps-value" id="ps-deploys">—</span>
       <span class="ps-label">Déployées</span>
       <span class="ps-sub">aujourd'hui</span>

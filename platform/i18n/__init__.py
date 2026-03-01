@@ -73,17 +73,21 @@ def t(key: str, lang: str = DEFAULT_LANG, **kwargs: Any) -> str:
 
 
 def get_lang(request) -> str:
-    """Detect language from request: cookie > Accept-Language > default."""
-    # 1. Cookie
-    cookie_lang = request.cookies.get("lang")
-    if cookie_lang in SUPPORTED_LANGS:
-        return cookie_lang
-    # 2. Accept-Language header
+    """Detect language from request: Accept-Language > cookie fallback > default.
+
+    Accept-Language always wins so the UI follows the browser automatically.
+    Cookie 'lang' is only used as fallback if no browser language matched.
+    """
+    # 1. Accept-Language header (source of truth)
     accept = request.headers.get("accept-language", "")
     for part in accept.split(","):
         code = part.strip().split(";")[0].strip()[:2].lower()
         if code in SUPPORTED_LANGS:
             return code
+    # 2. Cookie fallback (explicit override, e.g. from language selector)
+    cookie_lang = request.cookies.get("lang") or request.cookies.get("sf_lang")
+    if cookie_lang in SUPPORTED_LANGS:
+        return cookie_lang
     return DEFAULT_LANG
 
 
