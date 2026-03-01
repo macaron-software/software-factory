@@ -130,6 +130,147 @@ async def metrics_tab_knowledge(request: Request):
     )
 
 
+@router.get("/metrics/tab/ops", response_class=HTMLResponse)
+async def metrics_tab_ops(request: Request):
+    """Ops system health tab partial."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+
+    llm_providers = []
+    try:
+        rows = db.execute("""
+            SELECT provider, model,
+                COUNT(*) as total_calls,
+                SUM(CASE WHEN error THEN 1 ELSE 0 END) as errors,
+                AVG(CASE WHEN NOT error THEN tokens_in + tokens_out ELSE NULL END) as avg_tokens,
+                MAX(created_at) as last_call
+            FROM llm_usage
+            WHERE created_at >= datetime('now', '-24 hours')
+            GROUP BY provider, model ORDER BY total_calls DESC
+        """).fetchall()
+        llm_providers = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    active_missions = []
+    try:
+        from ....missions.store import get_mission_run_store
+
+        runs = get_mission_run_store().list_runs(limit=50)
+        active_missions = [
+            r for r in runs if getattr(r, "status", "") in ("active", "running")
+        ]
+    except Exception:
+        pass
+
+    top_errors = []
+    try:
+        rows = db.execute("""
+            SELECT error_type, COUNT(*) as cnt, MAX(created_at) as last_seen
+            FROM incidents WHERE created_at >= datetime('now', '-24 hours')
+            GROUP BY error_type ORDER BY cnt DESC LIMIT 10
+        """).fetchall()
+        top_errors = [dict(r) for r in rows]
+    except Exception:
+        pass
+
+    rl_stats = {}
+    try:
+        from ....agents.rl_policy import get_rl_policy
+
+        rl_stats = get_rl_policy().stats()
+    except Exception:
+        pass
+
+    ga_summary = {}
+    try:
+        row2 = db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending, "
+            "MAX(fitness) as best_fitness FROM evolution_proposals"
+        ).fetchone()
+        ga_summary = dict(row2) if row2 else {}
+    except Exception:
+        pass
+
+    db_size_kb = 0
+    try:
+        from ....config import DB_PATH
+
+        db_size_kb = DB_PATH.stat().st_size // 1024
+    except Exception:
+        pass
+
+    nb_agents = 0
+    try:
+        from ....agents.store import get_agent_store
+
+        nb_agents = len(get_agent_store().list_all())
+    except Exception:
+        pass
+
+    recent_logs: list[str] = []
+    try:
+        from ....config import FACTORY_ROOT
+
+        for log_name in ("server_8099.log", "server.log"):
+            log_path = FACTORY_ROOT / log_name
+            if log_path.exists():
+                lines = log_path.read_text(errors="replace").splitlines()
+                recent_logs = [
+                    ln
+                    for ln in lines
+                    if "ERROR" in ln or "WARNING" in ln or "CRITICAL" in ln
+                ][-20:]
+                break
+    except Exception:
+        pass
+
+    tma_stats: dict = {}
+    try:
+        from ....ops.auto_heal import get_autoheal_stats
+
+        tma_stats = get_autoheal_stats()
+    except Exception:
+        pass
+
+    table_sizes: dict[str, int] = {}
+    for tbl in (
+        "missions",
+        "mission_runs",
+        "llm_usage",
+        "memory_global",
+        "evolution_proposals",
+        "rl_experience",
+        "agent_scores",
+        "incidents",
+    ):
+        try:
+            row = db.execute(f"SELECT COUNT(*) FROM {tbl}").fetchone()
+            table_sizes[tbl] = row[0] if row else 0
+        except Exception:
+            pass
+
+    db.close()
+
+    return _templates(request).TemplateResponse(
+        "_partial_ops.html",
+        {
+            "request": request,
+            "llm_providers": llm_providers,
+            "active_missions": active_missions,
+            "top_errors": top_errors,
+            "rl_stats": rl_stats,
+            "ga_summary": ga_summary,
+            "db_size_kb": db_size_kb,
+            "nb_agents": nb_agents,
+            "recent_logs": recent_logs,
+            "tma_stats": tma_stats,
+            "table_sizes": table_sizes,
+        },
+    )
+
+
 @router.get("/metrics", response_class=HTMLResponse)
 async def dora_dashboard_page(request: Request):
     """Unified Metrics dashboard — DORA, Quality, Analytics, Monitoring, Pipeline."""
