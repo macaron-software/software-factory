@@ -101,7 +101,7 @@ jobs:
           # ── Swap nginx (zero-downtime) ───────────────────────────────────────
           # Deploy full nginx template (maintenance page, SSE config, timeouts)
           # then set the active port via sed
-          sudo cp /opt/software-factory/platform/deploy/nginx-ovh.conf \
+          sudo cp /opt/software-factory/slots/${INACTIVE}/deploy/nginx-ovh.conf \
             /etc/nginx/sites-enabled/software-factory
           sudo sed -i "s|localhost:8090|localhost:${INACTIVE_PORT}|g" \
             /etc/nginx/sites-enabled/software-factory
