@@ -37,12 +37,21 @@ jobs:
           # Staging compose file (always fresh from rsync — used for ALL compose cmds)
           COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
 
-          # ── Init nginx conf dir (writable by azureadmin, first run only) ────────
+          # ── Init/update nginx conf dir ────────────────────────────────────────
           mkdir -p /home/azureadmin/macaron-nginx-conf
           if [ ! -f /home/azureadmin/macaron-nginx-conf/default.conf ]; then
             cp /home/azureadmin/macaron_update/platform/deploy/nginx-vm.conf \
               /home/azureadmin/macaron-nginx-conf/default.conf
             echo "nginx conf dir initialized"
+          else
+            # Preserve current active slot, update everything else
+            CURRENT_SLOT=$(grep -oE 'platform-(blue|green)' \
+              /home/azureadmin/macaron-nginx-conf/default.conf | head -1 || echo "platform-blue")
+            cp /home/azureadmin/macaron_update/platform/deploy/nginx-vm.conf \
+              /home/azureadmin/macaron-nginx-conf/default.conf
+            sed -i "s/platform-blue:8090/${CURRENT_SLOT}:8090/g" \
+              /home/azureadmin/macaron-nginx-conf/default.conf
+            echo "nginx conf updated (slot preserved: ${CURRENT_SLOT})"
           fi
           # Recreate nginx with new dir-mount if volume changed (one-time migration)
           docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
