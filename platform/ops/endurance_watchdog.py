@@ -471,13 +471,18 @@ async def _recover_stale_sessions() -> int:
             if not last_msg:
                 continue
             try:
-                from datetime import datetime as dt
+                from datetime import datetime as dt, timezone as tz
 
-                msg_ts = (
-                    last_msg.timestamp()
-                    if hasattr(last_msg, "timestamp")
-                    else dt.fromisoformat(last_msg.replace("Z", "+00:00")).timestamp()
-                )
+                if hasattr(last_msg, "timestamp"):
+                    # Naive datetime from PG timestamp without time zone — stored as UTC
+                    if last_msg.tzinfo is None:
+                        msg_ts = last_msg.replace(tzinfo=tz.utc).timestamp()
+                    else:
+                        msg_ts = last_msg.timestamp()
+                else:
+                    msg_ts = dt.fromisoformat(
+                        last_msg.replace("Z", "+00:00")
+                    ).timestamp()
                 age = now - msg_ts
                 if age > SESSION_STALE_THRESHOLD:
                     # Mark as interrupted — will be picked up by auto-resume

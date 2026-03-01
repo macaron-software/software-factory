@@ -909,7 +909,7 @@ async def check_ga_health() -> None:
         stall_row = db.execute(
             """SELECT COUNT(*) FROM evolution_proposals
                WHERE status = 'pending'
-               AND (strftime('%s','now') - strftime('%s', created_at)) > ?""",
+               AND EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) > ?""",
             (_GA_STALL_THRESHOLD_SECS,),
         ).fetchone()
         stalled_count = stall_row[0] if stall_row else 0
