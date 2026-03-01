@@ -703,13 +703,21 @@ def create_app() -> FastAPI:
     from collections import defaultdict as _dd
 
     _rate_buckets: dict[str, list[float]] = _dd(list)
-    _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
+    _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "300"))  # per minute
     _RATE_WINDOW = 60.0
+    # Lightweight UI-polling endpoints exempt from rate limiting
+    _RATE_EXEMPT = {
+        "/api/notifications/badge",
+        "/api/autoheal/heartbeat",
+        "/api/cto/chips",
+        "/api/health",
+    }
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
         if (
             request.url.path.startswith("/api/")
+            and request.url.path not in _RATE_EXEMPT
             and os.environ.get("PLATFORM_ENV") != "test"
         ):
             client_ip = request.client.host if request.client else "unknown"
