@@ -133,7 +133,10 @@ async def metrics_tab_knowledge(request: Request):
     from ....memory.compactor import get_memory_health
     from ....db.migrations import get_db
 
-    health = get_memory_health()
+    try:
+        health = get_memory_health()
+    except Exception:
+        health = {}
     # Last knowledge-maintenance run
     last_run = None
     try:

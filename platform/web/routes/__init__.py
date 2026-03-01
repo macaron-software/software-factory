@@ -9,6 +9,7 @@ from .analytics import router as analytics_router
 from .cto import router as cto_router
 from .evals import router as evals_router
 from .marketplace import router as marketplace_router
+from .metrics import router as metrics_router
 from .tool_builder import router as tool_builder_router
 from .api import router as api_router
 from .cli import router as cli_router
@@ -45,6 +46,7 @@ router.include_router(analytics_router)
 router.include_router(cto_router)
 router.include_router(evals_router)
 router.include_router(marketplace_router)
+router.include_router(metrics_router)
 router.include_router(tool_builder_router)
 
 # Workspace file serving (needs to be on the main router)
