@@ -320,45 +320,58 @@ async def monitoring_live(request: Request, hours: int = 24):
         from ....db.migrations import get_db
 
         db = get_db()
-        tables = [
-            r[0]
-            for r in db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
-            ).fetchall()
-        ]
-        # Single query for all table counts via UNION ALL
-        if tables:
-            union = " UNION ALL ".join(
-                f"SELECT '{t}' as tbl, COUNT(*) as cnt FROM [{t}]" for t in tables
-            )
-            rows = db.execute(union).fetchall()
-            table_counts = {r[0]: r[1] for r in rows}
-            total_rows = sum(table_counts.values())
-        else:
-            table_counts = {}
-            total_rows = 0
-        # DB file size
-        db_path = (
-            str(db.execute("PRAGMA database_list").fetchone()[2])
-            if db.execute("PRAGMA database_list").fetchone()
-            else ""
-        )
-        db_size_mb = 0
-        if db_path:
-            import pathlib
+        from ....db.adapter import is_postgresql
 
-            p = pathlib.Path(db_path)
-            if p.exists():
-                db_size_mb = round(p.stat().st_size / 1024 / 1024, 2)
-                # Include WAL
-                wal = p.with_suffix(".db-wal")
-                if wal.exists():
-                    db_size_mb += round(wal.stat().st_size / 1024 / 1024, 2)
-        # Page stats
-        page_size = db.execute("PRAGMA page_size").fetchone()[0]
-        page_count = db.execute("PRAGMA page_count").fetchone()[0]
-        freelist = db.execute("PRAGMA freelist_count").fetchone()[0]
-        journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0]
+        if is_postgresql():
+            tables = [
+                r[0]
+                for r in db.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY table_name"
+                ).fetchall()
+            ]
+            table_counts: dict = {}
+            total_rows = 0
+            db_size_mb = 0
+            page_size = page_count = freelist = 0
+            journal_mode = "postgresql"
+        else:
+            tables = [
+                r[0]
+                for r in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                ).fetchall()
+            ]
+            # Single query for all table counts via UNION ALL
+            if tables:
+                union = " UNION ALL ".join(
+                    f"SELECT '{t}' as tbl, COUNT(*) as cnt FROM [{t}]" for t in tables
+                )
+                rows = db.execute(union).fetchall()
+                table_counts = {r[0]: r[1] for r in rows}
+                total_rows = sum(table_counts.values())
+            else:
+                table_counts = {}
+                total_rows = 0
+            # DB file size
+            db_path = (
+                str(db.execute("PRAGMA database_list").fetchone()[2])
+                if db.execute("PRAGMA database_list").fetchone()
+                else ""
+            )
+            db_size_mb = 0
+            if db_path:
+                import pathlib
+
+                p = pathlib.Path(db_path)
+                if p.exists():
+                    db_size_mb = round(p.stat().st_size / 1024 / 1024, 2)
+                    wal = p.with_suffix(".db-wal")
+                    if wal.exists():
+                        db_size_mb += round(wal.stat().st_size / 1024 / 1024, 2)
+            page_size = db.execute("PRAGMA page_size").fetchone()[0]
+            page_count = db.execute("PRAGMA page_count").fetchone()[0]
+            freelist = db.execute("PRAGMA freelist_count").fetchone()[0]
+            journal_mode = db.execute("PRAGMA journal_mode").fetchone()[0]
         db.close()
         from ....db.migrations import get_schema_version
 

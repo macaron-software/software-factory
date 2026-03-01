@@ -157,36 +157,23 @@ async def get_skills_heatmap() -> SkillsHeatmapResponse:
 
 @router.get("/api/analytics/skills/cache-stats")
 async def get_skills_cache_stats() -> dict[str, Any]:
-    """Get skills cache statistics."""
+    """Get LLM cache statistics (replaces skills_cache which is SQLite-only)."""
     try:
         from ...db.migrations import get_db
 
         db = get_db()
 
-        # Cache statistics
-        total_cache = db.execute("SELECT COUNT(*) FROM skills_cache").fetchone()[0]
+        total_cache = db.execute("SELECT COUNT(*) FROM llm_cache").fetchone()[0]
         total_hits = (
-            db.execute("SELECT SUM(hit_count) FROM skills_cache").fetchone()[0] or 0
-        )
-
-        # Avg skills per cache entry
-        avg_skills = (
-            db.execute(
-                """
-            SELECT AVG(json_array_length(matched_skills)) 
-            FROM skills_cache
-            WHERE matched_skills IS NOT NULL
-        """
-            ).fetchone()[0]
-            or 0
+            db.execute("SELECT SUM(hit_count) FROM llm_cache").fetchone()[0] or 0
         )
 
         return {
             "success": True,
             "data": {
                 "total_cached_contexts": total_cache,
-                "total_cache_hits": total_hits,
-                "avg_skills_per_context": round(avg_skills, 2),
+                "total_cache_hits": int(total_hits),
+                "avg_skills_per_context": 0,
                 "hit_rate": (
                     round(total_hits / total_cache * 100, 2) if total_cache > 0 else 0
                 ),
