@@ -244,6 +244,12 @@ async def dashboard_quality(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/dashboard/overview-quality", response_class=HTMLResponse)
+async def dashboard_overview_quality(request: Request):
+    """Alias for dashboard_quality — used by dsi.html panel."""
+    return await dashboard_quality(request)
+
+
 @router.get("/api/quality/{project_id}")
 async def api_quality_project(request: Request, project_id: str):
     """Get quality scorecard for a project."""
@@ -283,23 +289,36 @@ async def dashboard_quality_badge(request: Request, project_id: str = ""):
         try:
             from ....projects.manager import get_project_store
             from pathlib import Path as _P
+
             proj = get_project_store().get(project_id)
             if not proj:
                 return HTMLResponse("")
             badges = []
-            _st = 'display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-secondary)'
+            _st = "display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-secondary)"
             # Workspace
             if proj.exists:
-                badges.append(f'<span style="{_st}" title="{proj.path}">workspace</span>')
+                badges.append(
+                    f'<span style="{_st}" title="{proj.path}">workspace</span>'
+                )
             # Git
             if proj.has_git:
-                badges.append(f'<span style="{_st};color:#f59e0b;border-color:#f59e0b22">git</span>')
+                badges.append(
+                    f'<span style="{_st};color:#f59e0b;border-color:#f59e0b22">git</span>'
+                )
             # Docker
             p = _P(proj.path)
-            if (p / "Dockerfile").exists() or (p / "docker-compose.yml").exists() or (p / "docker-compose.yaml").exists():
-                badges.append(f'<span style="{_st};color:#3b82f6;border-color:#3b82f622">docker</span>')
+            if (
+                (p / "Dockerfile").exists()
+                or (p / "docker-compose.yml").exists()
+                or (p / "docker-compose.yaml").exists()
+            ):
+                badges.append(
+                    f'<span style="{_st};color:#3b82f6;border-color:#3b82f622">docker</span>'
+                )
             if badges:
-                return HTMLResponse(f'<span style="display:inline-flex;gap:4px;flex-wrap:wrap">{"".join(badges)}</span>')
+                return HTMLResponse(
+                    f'<span style="display:inline-flex;gap:4px;flex-wrap:wrap">{"".join(badges)}</span>'
+                )
         except Exception:
             pass
         return HTMLResponse("")

@@ -553,6 +553,7 @@
 </div>
 
 <script>
+(function() {
 let charts = {};
 
 async function loadAnalytics() {
@@ -1057,6 +1058,13 @@ async function updateCosts() {
     } catch(e) {}
 }
 updateCosts();
+window.refreshData = refreshData;
+window.loadFailures = loadFailures;
+window.resumeAll = resumeAll;
+window.triggerGARun = triggerGARun;
+window.approveProposal = approveProposal;
+window.rejectProposal = rejectProposal;
+})();
 
 </script>
 

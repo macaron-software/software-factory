@@ -414,6 +414,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
 </div>
 
 <script>
+(function() {
 const agents = {{ strategic_agents | tojson }};
 function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
@@ -451,5 +452,8 @@ function closeAgentPopover() {
     document.getElementById('agentOverlay').classList.remove('open');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAgentPopover(); });
+window.showAgentPopover = showAgentPopover;
+window.closeAgentPopover = closeAgentPopover;
+})();
 </script>
 {% endblock %}
