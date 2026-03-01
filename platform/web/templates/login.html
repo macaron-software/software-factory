@@ -21,6 +21,7 @@
         .btn-login:disabled { opacity: 0.5; cursor: wait; }
         .error-msg { color: #f85149; font-size: 0.8125rem; margin-top: 1rem; text-align: center; display: none; }
         .error-msg.show { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     </style>
     <script>(function(){var _uids={'sf.macaron-software.com':'218aebc5-f5b3-4761-93b5-badbc2089214','4.233.64.30':'3a4d67fb-1d12-4095-ad29-c0d33cc8b7c7'};var _uid=_uids[location.hostname]||'218aebc5-f5b3-4761-93b5-badbc2089214';var s=document.createElement('script');s.defer=true;s.src='https://analytics.macaron-software.com/script.js';s.setAttribute('data-website-id',_uid);document.head.appendChild(s);})();</script>
 </head>
@@ -43,7 +44,7 @@
             <div class="error-msg" id="errorMsg"></div>
         </form>
         <div style="margin-top:1rem;text-align:center">
-            <button onclick="demoLogin()" style="background:none;border:1px solid var(--border-primary,#30363d);color:var(--text-secondary,#8b949e);padding:0.5rem 1.25rem;border-radius:6px;cursor:pointer;font-size:0.8125rem">Skip (Demo)</button>
+            <button id="demoBtn" onclick="demoLogin()" style="background:none;border:1px solid var(--border-primary,#30363d);color:var(--text-secondary,#8b949e);padding:0.5rem 1.25rem;border-radius:6px;cursor:pointer;font-size:0.8125rem;min-width:100px">Skip (Demo)</button>
         </div>
         <div style="margin-top:1.5rem;border-top:1px solid var(--border-primary,#30363d);padding-top:1.25rem">
             <p style="text-align:center;font-size:0.8125rem;color:var(--text-secondary,#8b949e);margin:0 0 0.75rem">Or sign in with</p>
@@ -61,12 +62,15 @@
     </div>
     <script>
     async function demoLogin() {
+        const btn = document.getElementById('demoBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:spin .7s linear infinite;vertical-align:middle"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>';
         try {
             const resp = await fetch('/api/auth/demo', {method:'POST'});
             const data = await resp.json();
             if (data.ok) { location.href = new URLSearchParams(location.search).get('next') || '/'; }
-            else { document.getElementById('errorMsg').textContent = data.error; document.getElementById('errorMsg').classList.add('show'); }
-        } catch(ex) { document.getElementById('errorMsg').textContent = 'Network error'; document.getElementById('errorMsg').classList.add('show'); }
+            else { btn.disabled = false; btn.textContent = 'Skip (Demo)'; document.getElementById('errorMsg').textContent = data.error; document.getElementById('errorMsg').classList.add('show'); }
+        } catch(ex) { btn.disabled = false; btn.textContent = 'Skip (Demo)'; document.getElementById('errorMsg').textContent = 'Network error'; document.getElementById('errorMsg').classList.add('show'); }
     }
     async function handleLogin(e) {
         e.preventDefault();
