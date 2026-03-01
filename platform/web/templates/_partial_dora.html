@@ -353,6 +353,23 @@ const chartDefaults = {
 
 function weekLabels(n) { return Array.from({length: n}, (_, i) => `W-${n - i}`); }
 
+function safeChart(id, config) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return null;
+    try { const ex = Chart.getChart(canvas); if (ex) ex.destroy(); } catch(e) {}
+    return new Chart(canvas, config);
+}
+
+function showNoData(canvasId, msg) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    el.style.display = 'none';
+    const p = document.createElement('p');
+    p.style.cssText = 'color:var(--text-muted);font-size:0.75rem;text-align:center;padding:2rem 0';
+    p.textContent = msg;
+    el.parentElement.appendChild(p);
+}
+
 function renderSparkline(containerId, data, color) {
     const el = document.getElementById(containerId);
     if (!el || !data || data.length === 0) return;
@@ -369,8 +386,8 @@ renderSparkline('sparkFailure', trend.failure, '#dc2626');
 renderSparkline('sparkMTTR', trend.mttr, '#d29922');
 
 // Deployment + Lead Time dual-axis chart
-if (trend.deploy && trend.deploy.length > 0) {
-    new Chart(document.getElementById('chartTrend'), {
+if (trend.deploy && trend.deploy.some(v => v > 0) || trend.lead_time && trend.lead_time.some(v => v > 0)) {
+    safeChart('chartTrend', {
         type: 'bar',
         data: {
             labels: weekLabels(trend.deploy.length),
@@ -388,11 +405,13 @@ if (trend.deploy && trend.deploy.length > 0) {
             },
         },
     });
+} else {
+    showNoData('chartTrend', 'No deployment data yet');
 }
 
 // Failure Rate chart
-if (trend.failure && trend.failure.length > 0) {
-    new Chart(document.getElementById('chartFailure'), {
+if (trend.failure && trend.failure.some(v => v > 0)) {
+    safeChart('chartFailure', {
         type: 'line',
         data: {
             labels: weekLabels(trend.failure.length),
@@ -400,15 +419,18 @@ if (trend.failure && trend.failure.length > 0) {
         },
         options: chartDefaults,
     });
+} else {
+    showNoData('chartFailure', 'No incidents recorded');
 }
 
 // Velocity chart (fetch from API)
 fetch('/api/metrics/velocity').then(r => r.json()).then(sprints => {
-    if (!sprints || sprints.length === 0) return;
+    if (!sprints || sprints.length === 0) return showNoData('chartVelocity', 'No sprint data yet');
     const labels = sprints.slice(-12).map(s => s.name || s.id.slice(0, 6));
     const planned = sprints.slice(-12).map(s => s.planned_sp || 0);
     const actual = sprints.slice(-12).map(s => s.velocity || 0);
-    new Chart(document.getElementById('chartVelocity'), {
+    if (!actual.some(v => v > 0) && !planned.some(v => v > 0)) return showNoData('chartVelocity', 'No completed sprints yet');
+    safeChart('chartVelocity', {
         type: 'bar',
         data: {
             labels,
@@ -434,7 +456,7 @@ fetch(`/api/metrics/cycle-time?project_id=${project}`).then(r => r.json()).then(
         document.getElementById('chartCycleTime').style.display = 'none';
         return;
     }
-    new Chart(document.getElementById('chartCycleTime'), {
+    safeChart('chartCycleTime', {
         type: 'bar',
         data: {
             labels: hist.map(h => h.range + 'd'),
