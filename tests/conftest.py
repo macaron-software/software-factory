@@ -96,9 +96,11 @@ def canvas_project_id(live_session):
 @pytest.fixture(scope="module")
 def client():
     """TestClient for the FastAPI app (non-live / unit tests)."""
+    import os
     from fastapi.testclient import TestClient
     from platform.server import app
 
+    os.environ["PLATFORM_ENV"] = "test"
     with TestClient(app) as c:
         yield c
 
