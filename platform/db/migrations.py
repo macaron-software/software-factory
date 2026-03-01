@@ -328,6 +328,8 @@ def _migrate(conn):
             error_detail TEXT,
             mission_id TEXT,
             agent_id TEXT,
+            count INTEGER DEFAULT 1,
+            last_seen_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             resolved_at TIMESTAMP,
             resolution TEXT
@@ -1199,6 +1201,21 @@ def _migrate(conn):
     except Exception:
         pass
 
+    # Add deduplication fields to platform_incidents if not present
+    for col, typedef in [("count", "INTEGER"), ("last_seen_at", "TIMESTAMP")]:
+        try:
+            conn.execute(f"ALTER TABLE platform_incidents ADD COLUMN {col} {typedef}")
+        except Exception:
+            pass
+    # Backfill nulls after column addition
+    try:
+        conn.execute("UPDATE platform_incidents SET count=1 WHERE count IS NULL")
+        conn.execute(
+            "UPDATE platform_incidents SET last_seen_at=created_at WHERE last_seen_at IS NULL"
+        )
+    except Exception:
+        pass
+
     # ── Darwin / Thompson / GA / RL tables ───────────────────────────
     conn.execute("""
         CREATE TABLE IF NOT EXISTS team_fitness (
@@ -1568,6 +1585,17 @@ def _migrate_pg(conn):
         try:
             conn.execute(
                 f"ALTER TABLE mission_runs ADD COLUMN IF NOT EXISTS {col} {defn}"
+            )
+        except Exception:
+            pass
+    # platform_incidents: deduplication fields (added 2026-03)
+    for col, defn in [
+        ("count", "INTEGER DEFAULT 1"),
+        ("last_seen_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+    ]:
+        try:
+            conn.execute(
+                f"ALTER TABLE platform_incidents ADD COLUMN IF NOT EXISTS {col} {defn}"
             )
         except Exception:
             pass

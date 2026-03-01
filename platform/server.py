@@ -591,7 +591,7 @@ async def lifespan(app: FastAPI):
 
 
 def _record_incident(path: str, status_code: int, detail: str = ""):
-    """Record a platform incident with deduplication (5-minute window)."""
+    """Record a platform incident with deduplication: one open incident per (error_type, error_detail)."""
     import sqlite3
     import uuid
 
@@ -603,21 +603,22 @@ def _record_incident(path: str, status_code: int, detail: str = ""):
 
     try:
         conn = sqlite3.connect(str(DB_PATH), timeout=30)
-        # Deduplicate: skip if same error_type+error_detail in last 5 minutes
-        dup = conn.execute(
-            "SELECT 1 FROM platform_incidents "
-            "WHERE error_type=? AND error_detail=? "
-            "AND created_at > datetime('now', '-5 minutes')",
+        # Deduplicate: increment existing open incident instead of creating a new one
+        existing = conn.execute(
+            "SELECT id FROM platform_incidents WHERE error_type=? AND error_detail=? AND status='open' LIMIT 1",
             (error_type, error_detail),
         ).fetchone()
-        if dup:
-            conn.close()
-            return
-        conn.execute(
-            "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail) "
-            "VALUES (?, ?, 'P3', 'open', 'auto', ?, ?)",
-            (str(uuid.uuid4())[:12], title, error_type, error_detail),
-        )
+        if existing:
+            conn.execute(
+                "UPDATE platform_incidents SET count=count+1, last_seen_at=CURRENT_TIMESTAMP WHERE id=?",
+                (existing[0],),
+            )
+        else:
+            conn.execute(
+                "INSERT INTO platform_incidents (id, title, severity, status, source, error_type, error_detail, count, last_seen_at) "
+                "VALUES (?, ?, 'P3', 'open', 'auto', ?, ?, 1, CURRENT_TIMESTAMP)",
+                (str(uuid.uuid4())[:12], title, error_type, error_detail),
+            )
         conn.commit()
         conn.close()
     except Exception:
