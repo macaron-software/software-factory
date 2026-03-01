@@ -19,7 +19,7 @@ jobs:
           ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
           echo -e "Host *\n  StrictHostKeyChecking no\n  ConnectTimeout 20\n  ServerAliveInterval 10" >> ~/.ssh/config
 
-      - name: Rsync platform code to VM
+      - name: Rsync platform code to VM staging
         run: |
           rsync -az --delete \
             --exclude '__pycache__' \
@@ -29,35 +29,69 @@ jobs:
             platform/ \
             azureadmin@${{ secrets.AZURE_IP }}:/home/azureadmin/macaron_update/platform/
 
-      - name: Deploy into container + restart
+      - name: Blue-Green Deploy
         run: |
-          ssh azureadmin@${{ secrets.AZURE_IP }} '
-            set -e
+          ssh azureadmin@${{ secrets.AZURE_IP }} << 'ENDSSH'
+          set -e
 
-            # Target container: always deploy-platform-1
-            CONTAINER="deploy-platform-1"
+          # ── Migrate old single-container setup if needed ─────────────────────
+          docker stop deploy-platform-1 2>/dev/null || true
 
-            # Ensure old parallel containers are stopped and wont restart
-            for OLD in platform-platform-1; do
-              if docker ps -q --filter name="^/${OLD}$" | grep -q .; then
-                echo "Stopping old container: $OLD"
-                docker stop "$OLD" 2>/dev/null || true
-              fi
-              docker update --restart=no "$OLD" 2>/dev/null || true
-            done
+          # ── Determine active / inactive slot ────────────────────────────────
+          ACTIVE=$(cat /opt/macaron/active-slot 2>/dev/null || echo "blue")
+          INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+          echo "=== Blue-Green: $ACTIVE → $INACTIVE ==="
 
-            # Full copy of platform code into container
-            docker cp /home/azureadmin/macaron_update/platform/. "$CONTAINER":/app/macaron_platform/
+          # ── Start inactive container (compose creates bind-mount dir) ──────
+          cd /opt/macaron
+          docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml \
+            up -d --no-deps platform-${INACTIVE}
+          sleep 2
 
-            # Clear pyc cache
-            docker exec "$CONTAINER" find /app/macaron_platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+          # Prevent crash-loop while slot dir is empty, stop cleanly
+          docker update --restart=no deploy-platform-${INACTIVE}-1 2>/dev/null || true
+          docker stop deploy-platform-${INACTIVE}-1 2>/dev/null || true
 
-            # Graceful restart
-            docker restart "$CONTAINER"
-            sleep 20
+          # ── Push new code via docker cp (works on stopped containers) ────────
+          docker cp /home/azureadmin/macaron_update/platform/. \
+            deploy-platform-${INACTIVE}-1:/app/macaron_platform/
 
-            # Health check (port 8090 internal)
-            HTTP=$(docker exec "$CONTAINER" curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo "000")
-            echo "Container health: $HTTP"
-            [ "$HTTP" = "200" ] && echo "Deploy OK" || { echo "WARN: health=$HTTP — checking logs"; docker logs --tail=20 "$CONTAINER" 2>&1 | tail -10; }
-          '
+          # ── Start with new code ──────────────────────────────────────────────
+          docker update --restart=unless-stopped deploy-platform-${INACTIVE}-1
+          docker start deploy-platform-${INACTIVE}-1
+
+          # ── Health check (up to 60s) ─────────────────────────────────────────
+          echo "Waiting for platform-${INACTIVE}..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(docker exec deploy-platform-${INACTIVE}-1 \
+              curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] health=${HTTP}"
+            if [ "$HTTP" = "200" ]; then OK=1; break; fi
+          done
+          if [ "$OK" = "0" ]; then
+            echo "ABORT: platform-${INACTIVE} unhealthy — rolling back"
+            docker stop deploy-platform-${INACTIVE}-1 2>/dev/null || true
+            exit 1
+          fi
+          echo "platform-${INACTIVE} healthy ✓"
+
+          # ── Swap nginx (zero-downtime) ───────────────────────────────────────
+          sed -i "s/platform-${ACTIVE}:8090/platform-${INACTIVE}:8090/g" \
+            /opt/macaron/platform/deploy/nginx-vm.conf
+          docker exec deploy-nginx-1 nginx -t
+          docker exec deploy-nginx-1 nginx -s reload
+          echo "nginx → $INACTIVE ✓"
+
+          # ── Drain SSE connections (30s) ──────────────────────────────────────
+          sleep 30
+
+          # ── Stop old slot ────────────────────────────────────────────────────
+          docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml \
+            stop platform-${ACTIVE} 2>/dev/null || true
+
+          # ── Persist active slot ──────────────────────────────────────────────
+          echo "$INACTIVE" > /opt/macaron/active-slot
+          echo "=== Deploy complete: active=$INACTIVE ==="
+          ENDSSH

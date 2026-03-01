@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 5
 
-  platform:
+  platform-blue: &platform
     build:
       context: /opt/macaron
       dockerfile: platform/deploy/Dockerfile
@@ -35,7 +35,7 @@ services:
       - MF_ROOT=/app/mf_projects
       - ANDROID_BUILDER_CONTAINER=android-builder
       - AZURE_DEPLOY=1
-      - PLATFORM_AUTO_RESUME_ENABLED=${PLATFORM_AUTO_RESUME_ENABLED:-0}
+      - PLATFORM_AUTO_RESUME_ENABLED=${PLATFORM_AUTO_RESUME_ENABLED:-1}
       - SANDBOX_ENABLED=true
       - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
       - SANDBOX_NETWORK=bridge
@@ -51,8 +51,7 @@ services:
       - /opt/macaron/.factory-keys:/app/.config/factory:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/macaron/repos:/opt/macaron/repos
-      # Live code volumes — overrides baked image code; docker restart = code reload
-      - /opt/macaron/platform:/app/macaron_platform
+      - /opt/macaron/slots/blue:/app/macaron_platform
       - /opt/macaron/core:/app/core
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
@@ -67,6 +66,20 @@ services:
       timeout: 30s
       retries: 10
       start_period: 60s
+
+  platform-green:
+    <<: *platform
+    volumes:
+      - platform-data:/app/data
+      - workspace-data:/app/workspace
+      - /opt/macaron/.factory-keys:/app/.config/factory:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/macaron/repos:/opt/macaron/repos
+      - /opt/macaron/slots/green:/app/macaron_platform
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /opt/macaron/mcp_lrm:/app/mcp_lrm
 
   android-builder:
     build:
@@ -90,7 +103,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /opt/macaron/webroot:/var/www/certbot:ro
     depends_on:
-      - platform
+      - platform-blue
     restart: unless-stopped
 
 volumes:

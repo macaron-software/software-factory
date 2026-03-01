@@ -14,7 +14,7 @@ services:
       timeout: 5s
       retries: 5
 
-  platform:
+  platform-blue: &platform
     build:
       context: .
       dockerfile: platform/Dockerfile
@@ -31,12 +31,22 @@ services:
     volumes:
       - platform-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/blue:/app/platform
     group_add:
       - "989"
     depends_on:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+
+  platform-green:
+    <<: *platform
+    ports:
+      - "8091:8099"
+    volumes:
+      - platform-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/green:/app/platform
 
   portainer:
     image: portainer/portainer-ce:latest

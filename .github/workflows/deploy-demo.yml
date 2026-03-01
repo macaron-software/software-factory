@@ -30,48 +30,90 @@ jobs:
           SHA=$(git rev-parse --short HEAD)
           echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
 
-          # Sync each directory as a proper subdirectory (no trailing slash = preserve dir name)
+          # Sync platform code to staging area
           rsync -az --delete \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude 'data/' \
             --exclude 'workspace/' \
-            platform cli skills dashboard mcp_lrm \
+            platform/ \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/staging/platform/
+          # Sync other assets + root compose
+          rsync -az cli skills dashboard mcp_lrm \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
-          # Also sync root Dockerfile + docker-compose.yml
-          rsync -az Dockerfile docker-compose.yml debian@${{ secrets.OVH_IP }}:/opt/software-factory/
+          rsync -az Dockerfile docker-compose.yml \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/
 
       - name: Disk cleanup (Docker cache + old images)
         run: |
           ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} '
-            # Free build cache (safe, rebuilt on demand)
             docker builder prune --all --force 2>/dev/null || true
-            # Remove images older than 48h (keeps last 2 builds)
             docker image prune -a --force --filter "until=48h" 2>/dev/null || true
-            # Remove stopped containers
             docker container prune --force 2>/dev/null || true
             AVAIL=$(df -h / | awk "NR==2 {print \$4}")
             echo "Disk available after cleanup: $AVAIL"
           ' || true
 
-      - name: Deploy (hotpatch or full start)
+      - name: Blue-Green Deploy
         run: |
-          ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} '
-            set -e
-            CONTAINER=$(docker ps --format "{{.Names}}" | grep -i platform | head -1)
-            if [ -z "$CONTAINER" ]; then
-              echo "No running platform container — starting via docker compose..."
-              cd /opt/software-factory && docker compose up -d --build platform
-              sleep 15
-            else
-              docker cp /opt/software-factory/platform/. $CONTAINER:/app/platform/
-              docker exec $CONTAINER find /app/platform -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
-              # Install any new requirements (PYTHONPATH cleared to avoid platform/ module conflict)
-              docker exec -e PYTHONPATH= -w /tmp $CONTAINER pip install -r /app/platform/requirements.txt -q 2>/dev/null || true
-              docker stop $CONTAINER && sleep 2 && docker start $CONTAINER
-              sleep 10
-            fi
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8090/ 2>/dev/null || echo 000)
-            echo "Health: $STATUS"
-            [ "$STATUS" = "200" ] || [ "$STATUS" = "302" ] || { echo "UNHEALTHY: $STATUS"; exit 1; }
-          '
+          ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+
+          # ── Init slots dirs (first deploy) ──────────────────────────────────
+          mkdir -p /opt/software-factory/slots/blue /opt/software-factory/slots/green
+
+          # Remember old single-container (stop it AFTER nginx swap, not before)
+          OLD_CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "software-factory-platform-[0-9]+$" | head -1 || true)
+          [ -n "$OLD_CONTAINER" ] && echo "Legacy container detected: $OLD_CONTAINER (will stop after swap)"
+
+          # ── Determine active / inactive slot ────────────────────────────────
+          ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")
+          INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+          INACTIVE_PORT=$([ "$INACTIVE" = "blue" ] && echo "8090" || echo "8091")
+          echo "=== Blue-Green: $ACTIVE → $INACTIVE (port $INACTIVE_PORT) ==="
+
+          # ── Push new code to inactive slot ──────────────────────────────────
+          rsync -a --delete /opt/software-factory/staging/platform/ \
+            /opt/software-factory/slots/${INACTIVE}/
+          find /opt/software-factory/slots/${INACTIVE} -name "__pycache__" -type d \
+            -exec rm -rf {} + 2>/dev/null || true
+
+          # ── Start inactive container ─────────────────────────────────────────
+          cd /opt/software-factory
+          docker compose up -d --no-deps platform-${INACTIVE}
+
+          # ── Health check (up to 60s) ─────────────────────────────────────────
+          echo "Waiting for platform-${INACTIVE}..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:${INACTIVE_PORT}/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          if [ "$OK" = "0" ]; then
+            echo "ABORT: platform-${INACTIVE} unhealthy — rolling back"
+            docker compose stop platform-${INACTIVE} 2>/dev/null || true
+            exit 1
+          fi
+          echo "platform-${INACTIVE} healthy ✓"
+
+          # ── Swap nginx (zero-downtime) ───────────────────────────────────────
+          ACTIVE_PORT=$([ "$ACTIVE" = "blue" ] && echo "8090" || echo "8091")
+          sed -i "s|localhost:${ACTIVE_PORT}|localhost:${INACTIVE_PORT}|g" \
+            /etc/nginx/sites-enabled/software-factory
+          sudo nginx -t
+          sudo nginx -s reload
+          echo "nginx → $INACTIVE (port $INACTIVE_PORT) ✓"
+
+          # ── Drain SSE connections (30s) ──────────────────────────────────────
+          sleep 30
+
+          # ── Stop old slot + legacy container ─────────────────────────────────
+          docker compose stop platform-${ACTIVE} 2>/dev/null || true
+          [ -n "$OLD_CONTAINER" ] && docker stop "$OLD_CONTAINER" 2>/dev/null || true
+
+          # ── Persist active slot ──────────────────────────────────────────────
+          echo "$INACTIVE" > /opt/software-factory/active-slot
+          echo "=== Deploy complete: active=$INACTIVE ==="
+          ENDSSH
