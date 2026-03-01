@@ -276,6 +276,8 @@ MAX_CONCURRENT_RUNS = int(os.environ.get("WATCHDOG_MAX_CONCURRENT", "10"))
 
 async def _auto_resume_paused() -> int:
     """Resume paused mission runs in controlled batches with backoff. Returns count resumed."""
+    if os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
+        return 0
     MAX_RESUME_ATTEMPTS = 5  # abandon after 5 failed resumes
     BACKOFF_MINUTES = [0, 5, 15, 30, 60]  # wait between retries
 

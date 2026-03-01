@@ -176,6 +176,10 @@ async def auto_resume_missions() -> None:
 
 async def _resume_batch(stagger: float = 3.0) -> int:
     """Resume all paused runs + retry failed continuous missions. Returns count resumed."""
+    import os as _os
+
+    if _os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
+        return 0
     from ..db.migrations import get_db
 
     db = get_db()
