@@ -85,18 +85,18 @@ def get_target(name: str | None = None) -> DeployTarget:
 
 
 def list_targets() -> list[dict]:
-    """Return all targets from DB plus the builtin docker-local."""
-    targets = [
-        {
-            "id": "docker-local",
-            "name": "docker-local",
-            "driver": "docker_local",
-            "label": "Docker Local (builtin)",
-            "status": "ok",
-            "is_default": True,
-            "config_json": "{}",
-        }
-    ]
+    """Return all targets from DB plus the builtin docker-local (if not already in DB)."""
+    builtin = {
+        "id": "docker-local",
+        "name": "docker-local",
+        "driver": "docker_local",
+        "label": "Docker Local (builtin)",
+        "status": "ok",
+        "is_default": True,
+        "config_json": "{}",
+    }
+    targets = []
+    db_names = set()
     try:
         from ...db.adapter import get_connection
         conn = get_connection()
@@ -114,8 +114,13 @@ def list_targets() -> list[dict]:
                 "status": row[4],
                 "is_default": bool(row[5]),
             })
+            db_names.add(row[1])
     except Exception as e:
         logger.warning("Error listing deploy targets: %s", e)
+
+    # Add builtin only if not already registered in DB
+    if "docker-local" not in db_names:
+        targets.insert(0, builtin)
 
     return targets
 
