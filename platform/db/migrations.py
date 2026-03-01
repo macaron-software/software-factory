@@ -1855,7 +1855,11 @@ def _migrate_pg(conn):
     for tbl, col, typedef in [
         ("memory_project", "agent_role", "TEXT DEFAULT ''"),
         ("memory_project", "relevance_score", "REAL"),
+        ("memory_project", "access_count", "INTEGER DEFAULT 0"),
+        ("memory_project", "last_read_at", "TIMESTAMP"),
         ("memory_global", "relevance_score", "REAL"),
+        ("memory_global", "access_count", "INTEGER DEFAULT 0"),
+        ("memory_global", "last_read_at", "TIMESTAMP"),
     ]:
         conn.execute(
             f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {typedef}"

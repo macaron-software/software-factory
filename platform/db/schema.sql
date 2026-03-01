@@ -302,6 +302,8 @@ CREATE TABLE IF NOT EXISTS memory_project (
     source TEXT DEFAULT '',
     agent_role TEXT DEFAULT '',
     relevance_score REAL,
+    access_count INTEGER DEFAULT 0,
+    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -331,6 +333,8 @@ CREATE TABLE IF NOT EXISTS memory_global (
     occurrences INTEGER DEFAULT 1,
     projects_json TEXT DEFAULT '[]',
     relevance_score REAL,
+    access_count INTEGER DEFAULT 0,
+    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
