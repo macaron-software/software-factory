@@ -51,7 +51,7 @@ jobs:
           echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
 
           # Sync platform code to staging area
-          rsync -az --delete \
+          rsync -az --checksum --delete \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude 'data/' \
@@ -134,8 +134,8 @@ jobs:
           cd /opt/software-factory
           docker compose up -d --no-deps redis 2>/dev/null || true
 
-          # ── Start inactive container ─────────────────────────────────────────
-          docker compose up -d --no-deps platform-${INACTIVE}
+          # ── Start inactive container (--force-recreate picks up env changes) ──
+          docker compose up -d --no-deps --force-recreate platform-${INACTIVE}
 
           # ── Health check (up to 60s) ─────────────────────────────────────────
           echo "Waiting for platform-${INACTIVE}..."

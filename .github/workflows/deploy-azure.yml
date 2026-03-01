@@ -44,7 +44,7 @@ jobs:
 
       - name: Rsync platform code to VM staging
         run: |
-          rsync -az --delete \
+          rsync -az --checksum --delete \
             --exclude '__pycache__' \
             --exclude '*.pyc' \
             --exclude 'data/' \
@@ -152,9 +152,9 @@ jobs:
           INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
           echo "=== Blue-Green: $ACTIVE → $INACTIVE ==="
 
-          # ── Start inactive container (--no-deps = only this service) ─────────
+          # ── Start inactive container (--force-recreate picks up env changes) ──
           docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
-            up -d --no-deps platform-${INACTIVE}
+            up -d --no-deps --force-recreate platform-${INACTIVE}
           sleep 2
 
           # Prevent crash-loop while slot dir is empty, stop cleanly
