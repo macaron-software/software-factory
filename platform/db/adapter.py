@@ -424,6 +424,8 @@ class PgConnectionWrapper:
 
     def close(self):
         """Return connection to pool instead of closing."""
+        if self._conn is None:
+            return
         try:
             # Rollback any open transaction before returning to pool
             # (avoids psycopg_pool "rolling back returned connection" warnings)
@@ -433,6 +435,16 @@ class PgConnectionWrapper:
             pool.putconn(self._conn)
         except (psycopg.OperationalError, OSError):
             self._conn.close()
+        finally:
+            self._conn = None  # prevent double-return
+
+    def __del__(self):
+        """Safety net: return connection to pool on GC if close() was never called."""
+        if self._conn is not None:
+            try:
+                self.close()
+            except Exception:
+                pass
 
     @property
     def row_factory(self):

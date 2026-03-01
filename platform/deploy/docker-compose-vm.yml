@@ -60,7 +60,7 @@ services:
       - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
       - REDIS_URL=redis://redis:6379/0
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
-      - PG_POOL_MAX_SIZE=10
+      - PG_POOL_MAX_SIZE=20
     volumes:
       - platform-data:/app/data
       - workspace-data:/app/workspace

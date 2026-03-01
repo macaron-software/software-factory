@@ -1102,49 +1102,53 @@ class MissionOrchestrator:
                     _duration = time.monotonic() - _phase_start_time
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
                     _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
-                    _db = _get_db()
-                    # Composite quality score from real phase signals
-                    _qual_val = _compute_quality_score(
-                        session_id, aids or [], _phase_start_time, _db
-                    )
-                    _db.execute(
-                        """INSERT INTO phase_outcomes
-                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
-                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (
-                            mission.id,
-                            mission.workflow_id or "",
-                            phase.phase_id,
-                            pattern_type,
-                            _json.dumps(aids),
-                            _json.dumps(aids),
-                            len(aids),
-                            1,
-                            _qual_val,
-                            int(_rej_val * max(1, len(aids))),
-                            round(_duration, 1),
-                            round(_duration, 1),
-                            _complexity,
-                        ),
-                    )
-                    if len(aids) >= 2:
-                        from itertools import combinations as _combos
+                    _db = None
+                    try:
+                        _db = _get_db()
+                        # Composite quality score from real phase signals
+                        _qual_val = _compute_quality_score(
+                            session_id, aids or [], _phase_start_time, _db
+                        )
+                        _db.execute(
+                            """INSERT INTO phase_outcomes
+                               (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                                team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (
+                                mission.id,
+                                mission.workflow_id or "",
+                                phase.phase_id,
+                                pattern_type,
+                                _json.dumps(aids),
+                                _json.dumps(aids),
+                                len(aids),
+                                1,
+                                _qual_val,
+                                int(_rej_val * max(1, len(aids))),
+                                round(_duration, 1),
+                                round(_duration, 1),
+                                _complexity,
+                            ),
+                        )
+                        if len(aids) >= 2:
+                            from itertools import combinations as _combos
 
-                        for _ag_a, _ag_b in _combos(sorted(aids), 2):
-                            _db.execute(
-                                """INSERT INTO agent_pair_scores
-                                   (agent_a, agent_b, co_appearances, joint_successes, joint_quality_sum, last_seen)
-                                   VALUES (?,?,1,1,?,datetime('now'))
-                                   ON CONFLICT(agent_a, agent_b) DO UPDATE SET
-                                       co_appearances = co_appearances + 1,
-                                       joint_successes = joint_successes + 1,
-                                       joint_quality_sum = joint_quality_sum + excluded.joint_quality_sum,
-                                       last_seen = excluded.last_seen""",
-                                (_ag_a, _ag_b, _qual_val),
-                            )
-                    _db.commit()
-                    _db.close()
+                            for _ag_a, _ag_b in _combos(sorted(aids), 2):
+                                _db.execute(
+                                    """INSERT INTO agent_pair_scores
+                                       (agent_a, agent_b, co_appearances, joint_successes, joint_quality_sum, last_seen)
+                                       VALUES (?,?,1,1,?,datetime('now'))
+                                       ON CONFLICT(agent_a, agent_b) DO UPDATE SET
+                                           co_appearances = co_appearances + 1,
+                                           joint_successes = joint_successes + 1,
+                                           joint_quality_sum = joint_quality_sum + excluded.joint_quality_sum,
+                                           last_seen = excluded.last_seen""",
+                                    (_ag_a, _ag_b, _qual_val),
+                                )
+                        _db.commit()
+                    finally:
+                        if _db:
+                            _db.close()
                 except Exception:
                     pass
 
@@ -1210,37 +1214,41 @@ class MissionOrchestrator:
 
                     _duration = time.monotonic() - _phase_start_time
                     _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
-                    _db = _get_db()
-                    # Composite quality score from real phase signals (even on failure)
-                    _qual_fail = _compute_quality_score(
-                        session_id, aids or [], _phase_start_time, _db
-                    )
-                    _db.execute(
-                        """INSERT INTO phase_outcomes
-                           (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
-                            team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
-                           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (
-                            mission.id,
-                            mission.workflow_id or "",
-                            phase.phase_id,
-                            pattern_type,
-                            _json.dumps(aids),
-                            _json.dumps(aids),
-                            len(aids),
-                            0,
-                            _qual_fail,
-                            int(
-                                (_rej_rate if "_rej_rate" in dir() else 1.0)
-                                * max(1, len(aids))
+                    _db = None
+                    try:
+                        _db = _get_db()
+                        # Composite quality score from real phase signals (even on failure)
+                        _qual_fail = _compute_quality_score(
+                            session_id, aids or [], _phase_start_time, _db
+                        )
+                        _db.execute(
+                            """INSERT INTO phase_outcomes
+                               (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                                team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (
+                                mission.id,
+                                mission.workflow_id or "",
+                                phase.phase_id,
+                                pattern_type,
+                                _json.dumps(aids),
+                                _json.dumps(aids),
+                                len(aids),
+                                0,
+                                _qual_fail,
+                                int(
+                                    (_rej_rate if "_rej_rate" in dir() else 1.0)
+                                    * max(1, len(aids))
+                                ),
+                                round(time.monotonic() - _phase_start_time, 1),
+                                round(time.monotonic() - _phase_start_time, 1),
+                                _complexity,
                             ),
-                            round(time.monotonic() - _phase_start_time, 1),
-                            round(time.monotonic() - _phase_start_time, 1),
-                            _complexity,
-                        ),
-                    )
-                    _db.commit()
-                    _db.close()
+                        )
+                        _db.commit()
+                    finally:
+                        if _db:
+                            _db.close()
                 except Exception:
                     pass
             run_store.update(mission)

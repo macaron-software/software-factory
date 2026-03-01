@@ -285,6 +285,7 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
 
     mission_id = getattr(ctx, "mission_run_id", "") or ""
     agent_id = ctx.agent.id if ctx.agent else source
+    db = None
     try:
         db = get_db()
         for i, fail in enumerate(fail_lines[:5]):  # max 5 tickets per run
@@ -309,12 +310,14 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
                 ),
             )
         db.commit()
-        db.close()
         logger.info(
             "Auto-created %d TMA tickets from %s results", len(fail_lines[:5]), source
         )
     except Exception as e:
         logger.warning("Failed to auto-create tickets: %s", e)
+    finally:
+        if db:
+            db.close()
 
 
 def _auto_persist_backlog(result: str, ctx, mission_id: str):
@@ -350,6 +353,7 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     if not epics_found and not stories_found:
         return
 
+    db = None
     try:
         db = get_db()
         feature_ids = {}
@@ -404,7 +408,6 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
             )
 
         db.commit()
-        db.close()
         logger.info(
             "Auto-persisted backlog: %d features, %d stories for mission %s",
             len(epics_found),
@@ -413,6 +416,9 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
         )
     except Exception as e:
         logger.warning("Failed to auto-persist backlog: %s", e)
+    finally:
+        if db:
+            db.close()
 
 
 def _auto_extract_requirements(description: str, mission_id: str):
@@ -438,6 +444,7 @@ def _auto_extract_requirements(description: str, mission_id: str):
     if not reqs:
         return
 
+    db = None
     try:
         db = get_db()
         db.execute("""CREATE TABLE IF NOT EXISTS requirements (
@@ -493,7 +500,6 @@ def _auto_extract_requirements(description: str, mission_id: str):
                 total += 1
 
         db.commit()
-        db.close()
         logger.info(
             "Extracted %d AO requirements (%d top + sub) for mission %s",
             total,
@@ -502,6 +508,9 @@ def _auto_extract_requirements(description: str, mission_id: str):
         )
     except Exception as e:
         logger.warning("Failed to extract requirements: %s", e)
+    finally:
+        if db:
+            db.close()
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
@@ -1163,26 +1172,30 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 try:
                     from ..db.migrations import get_db
 
-                    db = get_db()
-                    db.execute(
-                        """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations, quality_score)
-                           VALUES (?, ?, 1, ?, 0.1)
-                           ON CONFLICT(agent_id, epic_id)
-                           DO UPDATE SET
-                             rejected = rejected + 1,
-                             iterations = iterations + ?,
-                             quality_score = ROUND(
-                               CAST(accepted AS REAL) / MAX(accepted + rejected + 1, 1), 3
-                             )""",
-                        (
-                            agent.id,
-                            run.project_id or "",
-                            MAX_ADVERSARIAL_RETRIES + 1,
-                            MAX_ADVERSARIAL_RETRIES + 1,
-                        ),
-                    )
-                    db.commit()
-                    db.close()
+                    db = None
+                    try:
+                        db = get_db()
+                        db.execute(
+                            """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations, quality_score)
+                               VALUES (?, ?, 1, ?, 0.1)
+                               ON CONFLICT(agent_id, epic_id)
+                               DO UPDATE SET
+                                 rejected = rejected + 1,
+                                 iterations = iterations + ?,
+                                 quality_score = ROUND(
+                                   CAST(accepted AS REAL) / MAX(accepted + rejected + 1, 1), 3
+                                 )""",
+                            (
+                                agent.id,
+                                run.project_id or "",
+                                MAX_ADVERSARIAL_RETRIES + 1,
+                                MAX_ADVERSARIAL_RETRIES + 1,
+                            ),
+                        )
+                        db.commit()
+                    finally:
+                        if db:
+                            db.close()
                 except Exception:
                     pass
                 # Create platform_incident for adversarial rejections (DORA tracking)
@@ -1191,40 +1204,44 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     from ..missions.feedback import create_platform_incident
                     from ..db.migrations import get_db as _get_db
 
-                    _db = _get_db()
-                    open_count = _db.execute(
-                        """SELECT COUNT(*) FROM platform_incidents
-                           WHERE agent_id=? AND error_type='quality_rejection' AND status='open'""",
-                        (agent.id,),
-                    ).fetchone()[0]
-                    if open_count >= 3:
-                        # Auto-close oldest batch — they won't be fixed individually
-                        _db.execute(
-                            """UPDATE platform_incidents
-                               SET status='auto_closed',
-                                   error_detail = error_detail || ' [auto-closed: Thompson escalation handles recurrence]'
-                               WHERE agent_id=? AND error_type='quality_rejection'
-                               AND status='open'""",
+                    _db = None
+                    try:
+                        _db = _get_db()
+                        open_count = _db.execute(
+                            """SELECT COUNT(*) FROM platform_incidents
+                               WHERE agent_id=? AND error_type='quality_rejection' AND status='open'""",
                             (agent.id,),
-                        )
-                        _db.commit()
-                        logger.info(
-                            "Auto-closed %d open quality_rejection incidents for %s (Thompson escalation active)",
-                            open_count,
-                            agent.id,
-                        )
-                    else:
-                        create_platform_incident(
-                            title=f"Adversarial rejection: {agent.name}",
-                            severity="P3",
-                            source="adversarial_guard",
-                            error_type="quality_rejection",
-                            error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
-                            f"Issues: {'; '.join(guard_result.issues[:5])}",
-                            mission_id=run.project_id or "",
-                            agent_id=agent.id,
-                        )
-                    _db.close()
+                        ).fetchone()[0]
+                        if open_count >= 3:
+                            # Auto-close oldest batch — they won't be fixed individually
+                            _db.execute(
+                                """UPDATE platform_incidents
+                                   SET status='auto_closed',
+                                       error_detail = error_detail || ' [auto-closed: Thompson escalation handles recurrence]'
+                                   WHERE agent_id=? AND error_type='quality_rejection'
+                                   AND status='open'""",
+                                (agent.id,),
+                            )
+                            _db.commit()
+                            logger.info(
+                                "Auto-closed %d open quality_rejection incidents for %s (Thompson escalation active)",
+                                open_count,
+                                agent.id,
+                            )
+                        else:
+                            create_platform_incident(
+                                title=f"Adversarial rejection: {agent.name}",
+                                severity="P3",
+                                source="adversarial_guard",
+                                error_type="quality_rejection",
+                                error_detail=f"Agent {agent.name} output rejected (score {guard_result.score}/10, {guard_result.level}). "
+                                f"Issues: {'; '.join(guard_result.issues[:5])}",
+                                mission_id=run.project_id or "",
+                                agent_id=agent.id,
+                            )
+                    finally:
+                        if _db:
+                            _db.close()
                 except Exception:
                     pass
 
@@ -1469,26 +1486,32 @@ This is BLOCKING: developers cannot start without your design tokens."""
     try:
         from ..db.migrations import get_db
 
-        db = get_db()
-        # Compute quality signals: output length, tools used
-        _output_len = len(content) if content else 0
-        _tools_used = len(cumulative_tool_calls) if cumulative_tool_calls else 0
-        # quality bonus: longer output + tools used = better score signal
-        _quality_bonus = min(0.1, _tools_used * 0.02 + min(_output_len / 5000, 0.05))
-        db.execute(
-            """INSERT INTO agent_scores (agent_id, epic_id, accepted, iterations, quality_score)
-               VALUES (?, ?, 1, 1, ?)
-               ON CONFLICT(agent_id, epic_id)
-               DO UPDATE SET
-                 accepted = accepted + 1,
-                 iterations = iterations + 1,
-                 quality_score = ROUND(MIN(1.0,
-                   CAST(accepted + 1 AS REAL) / MAX(accepted + rejected + 1, 1) + ?
-                 ), 3)""",
-            (agent.id, run.project_id, 0.5 + _quality_bonus, _quality_bonus),
-        )
-        db.commit()
-        db.close()
+        db = None
+        try:
+            db = get_db()
+            # Compute quality signals: output length, tools used
+            _output_len = len(content) if content else 0
+            _tools_used = len(cumulative_tool_calls) if cumulative_tool_calls else 0
+            # quality bonus: longer output + tools used = better score signal
+            _quality_bonus = min(
+                0.1, _tools_used * 0.02 + min(_output_len / 5000, 0.05)
+            )
+            db.execute(
+                """INSERT INTO agent_scores (agent_id, epic_id, accepted, iterations, quality_score)
+                   VALUES (?, ?, 1, 1, ?)
+                   ON CONFLICT(agent_id, epic_id)
+                   DO UPDATE SET
+                     accepted = accepted + 1,
+                     iterations = iterations + 1,
+                     quality_score = ROUND(MIN(1.0,
+                       CAST(accepted + 1 AS REAL) / MAX(accepted + rejected + 1, 1) + ?
+                     ), 3)""",
+                (agent.id, run.project_id, 0.5 + _quality_bonus, _quality_bonus),
+            )
+            db.commit()
+        finally:
+            if db:
+                db.close()
     except Exception:
         pass
 
