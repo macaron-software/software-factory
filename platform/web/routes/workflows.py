@@ -146,20 +146,6 @@ async def workflow_edit(request: Request, wf_id: str):
     )
 
 
-@router.get("/api/workflows")
-async def list_workflows_api(request: Request):
-    """List all workflows as JSON."""
-    from ...workflows.store import get_workflow_store
-
-    workflows = get_workflow_store().list_all()
-    return {
-        "workflows": [
-            {"id": w.id, "name": w.name, "description": getattr(w, "description", "")}
-            for w in workflows
-        ]
-    }
-
-
 @router.post("/api/workflows")
 async def create_workflow(request: Request):
     """Create or update a workflow."""
@@ -406,14 +392,17 @@ async def _run_workflow_background(
     except Exception:
         pass
 
+    _final_run_status = "completed"  # track for finally block
     try:
         result = await run_workflow(
             wf, session_id, task, project_id, resume_from=resume_from
         )
+        _final_run_status = result.status  # "completed", "paused", "failed", etc.
+
         # Update linked mission status if autoheal
         sess_store = get_session_store()
         sess = sess_store.get(session_id)
-        if sess and sess.config and sess.config.get("autoheal"):
+        if sess and sess.config and sess.config.get("autoheal") and result.status != "paused":
             mission_id = sess.config.get("mission_id")
             if mission_id:
                 from ...missions.store import get_mission_store
@@ -423,9 +412,9 @@ async def _run_workflow_background(
                 ms.update_mission_status(mission_id, final)
                 logger.info("Auto-heal mission %s → %s", mission_id, final)
 
-        # Workflow chaining: auto-launch next workflow on completion
+        # Workflow chaining: auto-launch next workflow on completion (not when paused)
         on_complete = wf.config.get("on_complete") if wf.config else None
-        if on_complete and isinstance(on_complete, dict):
+        if on_complete and isinstance(on_complete, dict) and result.status != "paused":
             condition = on_complete.get("condition", "completed")
             if condition == "always" or result.status == condition:
                 next_wf_id = on_complete.get("workflow_id")
@@ -486,13 +475,15 @@ async def _run_workflow_background(
             pass
     finally:
         # Update linked mission_run status so it doesn't stay 'running' on restart
+        # Use the actual final status: "paused" when awaiting human, "completed" otherwise
         try:
             from ...db.migrations import get_db as _gdb
 
             _db = _gdb()
+            mr_status = "paused" if _final_run_status == "paused" else "completed"
             _db.execute(
-                "UPDATE mission_runs SET status=? WHERE session_id=? AND status IN ('running','paused')",
-                ("completed", session_id),
+                "UPDATE mission_runs SET status=? WHERE session_id=? AND status='running'",
+                (mr_status, session_id),
             )
             _db.commit()
         except Exception:

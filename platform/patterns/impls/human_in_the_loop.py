@@ -6,9 +6,10 @@ async def run_human_in_the_loop(engine, run, task: str):
     """Human-in-the-loop: agents work, with human validation checkpoints.
 
     Checkpoint edges mark where human validation is required.
-    Inserts a system message and SSE event for the UI to show a validation prompt.
+    Inserts a system message and SSE event for the UI to show a validation prompt,
+    then raises WorkflowPaused to actually halt the workflow until the human resumes.
     """
-    from ..engine import _sse
+    from ..engine import _sse, WorkflowPaused
     from ...sessions.store import get_session_store, MessageDef
 
     nodes = engine._ordered_nodes(run.pattern)
@@ -38,15 +39,17 @@ async def run_human_in_the_loop(engine, run, task: str):
                 to_agent="user",
                 message_type="system",
                 content=f"**CHECKPOINT HUMAIN**\n\n{checkpoint_msg}\n\n"
-                        f"_Résumé du travail effectué :_\n{prev_output[:500]}",
+                        f"_Résumé du travail effectué :_\n{prev_output[:500]}\n\n"
+                        f"▶️ Utilisez **Reprendre** pour valider et continuer le workflow.",
             ))
             await _sse(run, {
                 "type": "checkpoint",
                 "content": checkpoint_msg,
                 "requires_input": True,
             })
-            run.flow_step = "Checkpoint humain"
-            continue
+            run.flow_step = "Checkpoint humain — en attente"
+            # Pause the workflow — the human must explicitly resume it
+            raise WorkflowPaused(checkpoint_msg=checkpoint_msg, phase_index=0)
 
         to_agent = "all"
         if i + 1 < len(nodes):
@@ -68,10 +71,13 @@ async def run_human_in_the_loop(engine, run, task: str):
                 message_type="system",
                 content=f"**VALIDATION REQUISE**\n\n"
                         f"L'agent a terminé son travail. Validez ou demandez des corrections.\n\n"
-                        f"_Résultat :_\n{output[:500]}",
+                        f"_Résultat :_\n{output[:500]}\n\n"
+                        f"▶️ Utilisez **Reprendre** pour valider et continuer le workflow.",
             ))
             await _sse(run, {
                 "type": "checkpoint",
                 "content": "Validation humaine requise",
                 "requires_input": True,
             })
+            # Pause the workflow — the human must explicitly resume it
+            raise WorkflowPaused(checkpoint_msg="Validation humaine requise", phase_index=0)

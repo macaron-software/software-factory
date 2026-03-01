@@ -13,12 +13,22 @@
         <svg class="icon icon-sm"><use href="#icon-stop"/></svg> Stop
     </button>
     {% elif session.status in ('completed', 'failed', 'interrupted') %}
+    {% if session.config and session.config.get('workflow_id') and session.status == 'interrupted' %}
+    <button class="btn btn-sm" style="background:var(--purple);color:#fff;"
+            hx-post="/api/workflow/{{ session.id }}/resume"
+            hx-swap="none"
+            hx-on::after-request="location.reload()"
+            title="Valider le checkpoint et continuer le workflow">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> Valider &amp; Reprendre
+    </button>
+    {% else %}
     <button class="btn btn-sm" style="background:var(--purple);color:#fff;"
             hx-post="/api/sessions/{{ session.id }}/resume"
             hx-swap="none"
             hx-on::after-request="location.reload()">
         <svg class="icon icon-sm"><use href="#icon-play"/></svg> Reprendre
     </button>
+    {% endif %}
     {% endif %}
 </div>
 {% endblock %}

@@ -82,6 +82,19 @@ class PatternRun:
 from ..sessions.runner import _push_sse
 
 
+class WorkflowPaused(Exception):
+    """Raised by human-in-the-loop pattern to pause the workflow at a checkpoint.
+
+    Propagates from pattern → engine → run_workflow, which saves the checkpoint
+    and sets the session to 'interrupted' (awaiting human resume).
+    """
+
+    def __init__(self, phase_index: int = 0, checkpoint_msg: str = ""):
+        self.phase_index = phase_index
+        self.checkpoint_msg = checkpoint_msg
+        super().__init__(f"Workflow paused at checkpoint")
+
+
 async def _sse(run: PatternRun, event: dict):
     """Push SSE event with automatic phase_id injection."""
     if run.phase_id and "phase_id" not in event:
@@ -285,9 +298,8 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
 
     mission_id = getattr(ctx, "mission_run_id", "") or ""
     agent_id = ctx.agent.id if ctx.agent else source
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         for i, fail in enumerate(fail_lines[:5]):  # max 5 tickets per run
             tid = str(uuid.uuid4())[:8]
             title = (
@@ -316,8 +328,7 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     except Exception as e:
         logger.warning("Failed to auto-create tickets: %s", e)
     finally:
-        if db:
-            db.close()
+        db.close()
 
 
 def _auto_persist_backlog(result: str, ctx, mission_id: str):
@@ -353,9 +364,8 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     if not epics_found and not stories_found:
         return
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         feature_ids = {}
 
         # Create features from epics
@@ -417,8 +427,7 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     except Exception as e:
         logger.warning("Failed to auto-persist backlog: %s", e)
     finally:
-        if db:
-            db.close()
+        db.close()
 
 
 def _auto_extract_requirements(description: str, mission_id: str):
@@ -444,9 +453,8 @@ def _auto_extract_requirements(description: str, mission_id: str):
     if not reqs:
         return
 
-    db = None
+    db = get_db()
     try:
-        db = get_db()
         db.execute("""CREATE TABLE IF NOT EXISTS requirements (
             id TEXT PRIMARY KEY,
             mission_id TEXT NOT NULL,
@@ -509,8 +517,7 @@ def _auto_extract_requirements(description: str, mission_id: str):
     except Exception as e:
         logger.warning("Failed to extract requirements: %s", e)
     finally:
-        if db:
-            db.close()
+        db.close()
 
 
 def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) -> str:
@@ -659,6 +666,8 @@ async def run_pattern(
         )
         run.success = all_ok and not has_vetoes
     except Exception as e:
+        if isinstance(e, WorkflowPaused):
+            raise  # let it propagate to run_workflow
         run.finished = True
         run.error = str(e)
         has_vetoes = False
@@ -1032,7 +1041,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     tool_calls=cumulative_tool_calls,
                     pattern_type=run.pattern.type,
                     enable_l1=not skip_l1,
-                    project_id=run.project_id or "",
                 )
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)
@@ -1172,9 +1180,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 try:
                     from ..db.migrations import get_db
 
-                    db = None
+                    db = get_db()
                     try:
-                        db = get_db()
                         db.execute(
                             """INSERT INTO agent_scores (agent_id, epic_id, rejected, iterations, quality_score)
                                VALUES (?, ?, 1, ?, 0.1)
@@ -1194,8 +1201,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                         )
                         db.commit()
                     finally:
-                        if db:
-                            db.close()
+                        db.close()
                 except Exception:
                     pass
                 # Create platform_incident for adversarial rejections (DORA tracking)
@@ -1204,9 +1210,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     from ..missions.feedback import create_platform_incident
                     from ..db.migrations import get_db as _get_db
 
-                    _db = None
+                    _db = _get_db()
                     try:
-                        _db = _get_db()
                         open_count = _db.execute(
                             """SELECT COUNT(*) FROM platform_incidents
                                WHERE agent_id=? AND error_type='quality_rejection' AND status='open'""",
@@ -1240,8 +1245,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                                 agent_id=agent.id,
                             )
                     finally:
-                        if _db:
-                            _db.close()
+                        _db.close()
                 except Exception:
                     pass
 
@@ -1486,16 +1490,13 @@ This is BLOCKING: developers cannot start without your design tokens."""
     try:
         from ..db.migrations import get_db
 
-        db = None
+        db = get_db()
+        # Compute quality signals: output length, tools used
+        _output_len = len(content) if content else 0
+        _tools_used = len(cumulative_tool_calls) if cumulative_tool_calls else 0
+        # quality bonus: longer output + tools used = better score signal
+        _quality_bonus = min(0.1, _tools_used * 0.02 + min(_output_len / 5000, 0.05))
         try:
-            db = get_db()
-            # Compute quality signals: output length, tools used
-            _output_len = len(content) if content else 0
-            _tools_used = len(cumulative_tool_calls) if cumulative_tool_calls else 0
-            # quality bonus: longer output + tools used = better score signal
-            _quality_bonus = min(
-                0.1, _tools_used * 0.02 + min(_output_len / 5000, 0.05)
-            )
             db.execute(
                 """INSERT INTO agent_scores (agent_id, epic_id, accepted, iterations, quality_score)
                    VALUES (?, ?, 1, 1, ?)
@@ -1510,8 +1511,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
             db.commit()
         finally:
-            if db:
-                db.close()
+            db.close()
     except Exception:
         pass
 

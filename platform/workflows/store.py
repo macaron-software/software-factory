@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..db.migrations import get_db
 from ..patterns.store import get_pattern_store
-from ..patterns.engine import run_pattern, _push_sse
+from ..patterns.engine import run_pattern, _push_sse, WorkflowPaused
 from ..sessions.store import get_session_store, MessageDef
 
 logger = logging.getLogger(__name__)
@@ -311,46 +311,6 @@ def _save_checkpoint(store, session_id: str, completed_phase: int):
             store.update_config(session_id, config)
     except Exception as e:
         logger.debug("Checkpoint save failed for %s: %s", session_id, e)
-
-
-def _sync_phase_done_to_mission_run(session_id: str, phase_index: int):
-    """Mark phase at phase_index as 'done' in mission_runs.phases_json for this session.
-
-    Keeps phases_json in sync with the workflow engine's session-checkpoint so that
-    the orchestrator resume path can skip completed phases correctly.
-    """
-    try:
-        import json as _json
-
-        from ..db.migrations import get_db as _get_db
-
-        _db = _get_db()
-        try:
-            row = _db.execute(
-                "SELECT id, phases_json FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
-                (session_id,),
-            ).fetchone()
-            if not row:
-                return
-            phases = _json.loads(row[1] or "[]")
-            if phase_index < len(phases):
-                ph = phases[phase_index]
-                if ph.get("status") not in ("done", "done_with_issues", "skipped"):
-                    ph["status"] = "done"
-                    _db.execute(
-                        "UPDATE mission_runs SET phases_json=? WHERE id=?",
-                        (_json.dumps(phases, default=str), row[0]),
-                    )
-                    _db.commit()
-        finally:
-            _db.close()
-    except Exception as e:
-        logger.debug(
-            "_sync_phase_done_to_mission_run failed for session %s idx %d: %s",
-            session_id,
-            phase_index,
-            e,
-        )
 
 
 def _is_transient_error(error_str: str) -> bool:
@@ -731,8 +691,16 @@ async def run_workflow(
 
             # Checkpoint: save completed phase index for resume
             _save_checkpoint(store, session_id, i + 1)
-            # Also sync phases_json in mission_runs so orchestrator path sees correct state
-            _sync_phase_done_to_mission_run(session_id, i)
+
+        except WorkflowPaused:
+            # Human-in-the-loop requested a pause — save checkpoint at current phase
+            _save_checkpoint(store, session_id, i)  # i not i+1: re-run this phase on resume
+            run.status = "paused"
+            run.phase_results.append(
+                {"phase": phase.name, "success": False, "paused": True, "error": "Awaiting human validation"}
+            )
+            logger.info("Workflow paused at phase %s (%d)", phase.name, i)
+            break
 
         except asyncio.TimeoutError:
             logger.error(
@@ -763,8 +731,8 @@ async def run_workflow(
                     project_id=project_id,
                 )
                 _save_checkpoint(store, session_id, i + 1)
-                _sync_phase_done_to_mission_run(session_id, i)
                 continue
+            # Critical phase timeout — stop
             run.status = "failed"
             run.error = error_str
             await _rte_facilitate(
@@ -887,13 +855,17 @@ async def run_workflow(
         "completed": "completed",
         "failed": "failed",
         "gated": "interrupted",
+        "paused": "interrupted",
     }.get(run.status, "completed")
     try:
         store.update_status(session_id, session_status)
     except Exception:
         pass
 
-    # RTE closes the workflow
+    # RTE closes the workflow (skip closing message when paused — workflow isn't done)
+    if run.status == "paused":
+        return run
+
     status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(
         run.status, "[DONE]"
     )
