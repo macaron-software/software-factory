@@ -113,7 +113,11 @@ async def portfolio_page(request: Request):
         avatar_url = (
             f"/static/avatars/{a.id}.jpg"
             if jpg.exists()
-            else (f"/static/avatars/{a.id}.svg" if svg.exists() else "")
+            else (
+                f"/static/avatars/{a.id}.svg"
+                if svg.exists()
+                else f"https://i.pravatar.cc/150?u={a.id}"
+            )
         )
         strategic.append(
             {
@@ -323,7 +327,11 @@ async def portfolio_page(request: Request):
                     av_url = (
                         f"/static/avatars/{aid}.jpg"
                         if jpg.exists()
-                        else (f"/static/avatars/{aid}.svg" if svg_f.exists() else "")
+                        else (
+                            f"/static/avatars/{aid}.svg"
+                            if svg_f.exists()
+                            else f"https://i.pravatar.cc/150?u={aid}"
+                        )
                     )
                     strat_graph["nodes"].append(
                         {
@@ -1064,7 +1072,11 @@ async def metier_page(request: Request):
         avatar_url = (
             f"/static/avatars/{aid}.jpg"
             if jpg.exists()
-            else (f"/static/avatars/{aid}.svg" if svg_f.exists() else "")
+            else (
+                f"/static/avatars/{aid}.svg"
+                if svg_f.exists()
+                else f"https://i.pravatar.cc/150?u={aid}"
+            )
         )
         agent_velocity.append(
             {

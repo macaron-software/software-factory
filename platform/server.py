@@ -661,7 +661,7 @@ def create_app() -> FastAPI:
                 "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
-                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com; "
+                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com https://i.pravatar.cc; "
                 "connect-src 'self' https://analytics.macaron-software.com; "
                 "frame-ancestors 'none'"
             )
@@ -794,6 +794,9 @@ def create_app() -> FastAPI:
                 "/favicon.ico",
                 "/manifest.json",
                 "/sw.js",
+                "/openapi.json",
+                "/docs",
+                "/redoc",
             )
         )
         if (

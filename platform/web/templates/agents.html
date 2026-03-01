@@ -12,7 +12,10 @@
     {% for agent in agents %}
     <div class="item-card" data-id="{{ agent.id }}">
         <div class="item-icon">
-            {% if agent.avatar %}
+            {% if agent.avatar_url %}
+            <img src="{{ agent.avatar_url }}" alt="{{ agent.name }}"
+                 style="width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid {{ agent.color }};flex-shrink:0">
+            {% elif agent.avatar %}
             <div class="agent-avatar-circle" style="background:{{ agent.color }}20;border-color:{{ agent.color }}">
                 <svg class="icon icon-sm" style="color:{{ agent.color }}"><use href="#icon-{{ agent.avatar }}"/></svg>
             </div>
