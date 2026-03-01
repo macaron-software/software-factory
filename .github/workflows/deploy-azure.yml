@@ -128,5 +128,11 @@ jobs:
 
           # ── Persist active slot (azureadmin-writable path) ──────────────────
           echo "$INACTIVE" > /home/azureadmin/macaron-active-slot
-          echo "=== Deploy complete: active=$INACTIVE ==="
+
+          # ── Docker cleanup (keep disk healthy) ───────────────────────────────
+          docker image prune -f --filter "until=72h" 2>/dev/null || true
+          docker builder prune -f 2>/dev/null || true
+          docker container prune -f 2>/dev/null || true
+          AVAIL=$(df -h / | awk 'NR==2 {print $4}')
+          echo "=== Deploy complete: active=$INACTIVE | disk free: $AVAIL ==="
           ENDSSH

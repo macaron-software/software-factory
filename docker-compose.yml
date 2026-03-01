@@ -28,6 +28,8 @@ services:
       - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
       - DBGATE_URL=http://dbgate:3000
       - DBGATE_PASSWORD=dbgate2024
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - PG_POOL_MAX_SIZE=10
     volumes:
       - platform-data:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -37,7 +39,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    restart: unless-stopped
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   platform-green:
     <<: *platform

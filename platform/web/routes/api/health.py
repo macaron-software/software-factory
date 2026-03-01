@@ -40,7 +40,10 @@ async def health_check():
 
     try:
         db = get_db()
-        db.execute("SELECT 1")
+        try:
+            db.execute("SELECT 1")
+        finally:
+            db.close()
         return JSONResponse({"status": "ok"})
     except Exception as e:
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)

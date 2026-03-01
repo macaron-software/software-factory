@@ -52,7 +52,7 @@ def _get_pg_pool():
                 if "connect_timeout" not in conninfo:
                     sep = "&" if "?" in conninfo else "?"
                     conninfo += f"{sep}connect_timeout=10"
-                _pool_max = int(os.environ.get("PG_POOL_MAX_SIZE", "50"))
+                _pool_max = int(os.environ.get("PG_POOL_MAX_SIZE", "10"))
                 _pg_pool = ConnectionPool(
                     conninfo=conninfo,
                     min_size=2,
