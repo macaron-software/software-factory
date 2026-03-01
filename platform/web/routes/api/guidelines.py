@@ -10,6 +10,8 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
+from .input_models import GuidelineSyncRequest
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -108,10 +110,9 @@ async def clear_domain_guidelines(domain: str):
 
 @router.post("/api/guidelines/sync")
 async def sync_guidelines(
-    body: "GuidelineSyncRequest", background_tasks: BackgroundTasks
+    body: GuidelineSyncRequest, background_tasks: BackgroundTasks
 ):
     """Trigger a guidelines sync from Confluence or manual seed."""
-    from .input_models import GuidelineSyncRequest as _M  # noqa: F401
 
     data = body
     source = data.source

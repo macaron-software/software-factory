@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import AutoHealStats, IncidentOut, IncidentStats, OkResponse
+from .input_models import IncidentCreate, IncidentUpdate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -72,11 +73,10 @@ async def list_incidents(request: Request):
 
 
 @router.post("/api/incidents", responses={200: {"model": OkResponse}})
-async def create_incident(body: "IncidentCreate"):
+async def create_incident(body: IncidentCreate):
     """Create a manual incident."""
     import uuid
     from ....db.migrations import get_db
-    from .input_models import IncidentCreate as _M  # noqa: F401
 
     inc_id = str(uuid.uuid4())[:12]
     db = get_db()
@@ -102,10 +102,9 @@ async def create_incident(body: "IncidentCreate"):
 
 
 @router.patch("/api/incidents/{incident_id}", responses={200: {"model": OkResponse}})
-async def update_incident(incident_id: str, body: "IncidentUpdate"):
+async def update_incident(incident_id: str, body: IncidentUpdate):
     """Update incident status (resolve, close)."""
     from ....db.migrations import get_db
-    from .input_models import IncidentUpdate as _M  # noqa: F401
 
     db = get_db()
     try:

@@ -8,6 +8,8 @@ import os
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
+from .input_models import IntegrationUpdate
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -26,11 +28,10 @@ async def list_integrations():
 
 
 @router.patch("/api/integrations/{integ_id}")
-async def update_integration(integ_id: str, body: "IntegrationUpdate"):
+async def update_integration(integ_id: str, body: IntegrationUpdate):
     """Toggle or update integration config."""
     import json as _json
     from ....db.migrations import get_db
-    from .input_models import IntegrationUpdate as _M  # noqa: F401
 
     db = get_db()
     try:

@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
+from .input_models import GlobalMemoryCreate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -79,10 +80,9 @@ async def global_memory(category: str = ""):
 
 
 @router.post("/api/memory/global")
-async def global_memory_store(body: "GlobalMemoryCreate"):
+async def global_memory_store(body: GlobalMemoryCreate):
     """Store a global memory entry."""
     from ....memory.manager import get_memory_manager
-    from .input_models import GlobalMemoryCreate as _M  # noqa: F401
 
     get_memory_manager().global_store(
         body.key, body.value, category=body.category, confidence=body.confidence
