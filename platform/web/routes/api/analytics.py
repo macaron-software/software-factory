@@ -162,19 +162,24 @@ async def metrics_tab_knowledge(request: Request):
 async def metrics_tab_ops(request: Request):
     """Ops system health tab partial."""
     from ....db.migrations import get_db
+    from ....db.adapter import is_postgresql
 
     db = get_db()
+    _pg = is_postgresql()
+    _since_24h = (
+        "NOW() - INTERVAL '24 hours'" if _pg else "datetime('now', '-24 hours')"
+    )
 
     llm_providers = []
     try:
-        rows = db.execute("""
+        rows = db.execute(f"""
             SELECT provider, model,
                 COUNT(*) as total_calls,
-                SUM(CASE WHEN error THEN 1 ELSE 0 END) as errors,
-                AVG(CASE WHEN NOT error THEN tokens_in + tokens_out ELSE NULL END) as avg_tokens,
+                SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) as errors,
+                AVG(tokens_in + tokens_out) as avg_tokens,
                 MAX(created_at) as last_call
-            FROM llm_usage
-            WHERE created_at >= datetime('now', '-24 hours')
+            FROM llm_traces
+            WHERE created_at >= {_since_24h}
             GROUP BY provider, model ORDER BY total_calls DESC
         """).fetchall()
         llm_providers = [dict(r) for r in rows]
@@ -204,9 +209,9 @@ async def metrics_tab_ops(request: Request):
 
     top_errors = []
     try:
-        rows = db.execute("""
+        rows = db.execute(f"""
             SELECT error_type, COUNT(*) as cnt, MAX(created_at) as last_seen
-            FROM incidents WHERE created_at >= datetime('now', '-24 hours')
+            FROM incidents WHERE created_at >= {_since_24h}
             GROUP BY error_type ORDER BY cnt DESC LIMIT 10
         """).fetchall()
         top_errors = [dict(r) for r in rows]
@@ -701,8 +706,14 @@ async def pipeline_metrics(mission_id: str):
 async def llm_costs():
     """LLM cost breakdown by provider, mission and agent."""
     from ....db.migrations import get_db
+    from ....db.adapter import is_postgresql
 
     db = get_db()
+    _since_30d = (
+        "NOW() - INTERVAL '30 days'"
+        if is_postgresql()
+        else "datetime('now', '-30 days')"
+    )
     try:
         total = db.execute(
             "SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces"
@@ -774,7 +785,7 @@ async def llm_costs():
                    COUNT(*) as calls,
                    COALESCE(SUM(cost_usd), 0) as cost_usd
             FROM llm_traces
-            WHERE created_at >= datetime('now', '-30 days')
+            WHERE created_at >= {_since_30d}
             GROUP BY date
             ORDER BY date
         """).fetchall()

@@ -221,6 +221,14 @@ def run_compaction() -> CompactionStats:
 def get_memory_health() -> dict:
     """Return a health snapshot of all memory layers."""
     from ..db.migrations import get_db
+    from ..db.adapter import is_postgresql
+
+    _pg = is_postgresql()
+
+    def _stale_clause(col: str, days: int) -> str:
+        if _pg:
+            return f"NOW() - {col} > INTERVAL '{days} days'"
+        return f"julianday('now') - julianday({col}) > {days}"
 
     conn = get_db()
     try:
@@ -241,7 +249,7 @@ def get_memory_health() -> dict:
         project_stale = (
             q(
                 f"SELECT count(*) as n FROM memory_project WHERE "
-                f"julianday('now') - julianday(updated_at) > {STALE_PROJECT_DAYS}"
+                f"{_stale_clause('updated_at', STALE_PROJECT_DAYS)}"
             )
             or {}
         ).get("n", 0)
@@ -307,7 +315,7 @@ def get_memory_health() -> dict:
         pattern_old = (
             q(
                 f"SELECT count(*) as n FROM memory_pattern WHERE "
-                f"julianday('now') - julianday(created_at) > {MAX_PATTERN_AGE_DAYS}"
+                f"{_stale_clause('created_at', MAX_PATTERN_AGE_DAYS)}"
             )
             or {}
         ).get("n", 0)

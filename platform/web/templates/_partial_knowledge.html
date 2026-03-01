@@ -1,7 +1,7 @@
 <div class="partial-knowledge" style="padding:0">
-{% set proj = health.project %}
-{% set glob = health.global %}
-{% set pat = health.pattern %}
+{% set proj = health.project or {} %}
+{% set glob = health.global or {} %}
+{% set pat = health.pattern or {} %}
 
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.8rem;margin-bottom:1rem">
     <!-- Total project memories -->

@@ -180,9 +180,15 @@ class LLMTracer:
 
     def stats(self, session_id: str = "", hours: int = 24) -> dict:
         """Get aggregated stats."""
+        from ..db.adapter import is_postgresql
+
         conn = get_db()
-        where = "WHERE created_at > datetime('now', ?)"
-        params: list = [f"-{hours} hours"]
+        if is_postgresql():
+            where = f"WHERE created_at > NOW() - INTERVAL '{hours} hours'"
+            params: list = []
+        else:
+            where = "WHERE created_at > datetime('now', ?)"
+            params = [f"-{hours} hours"]
         if session_id:
             where += " AND session_id = ?"
             params.append(session_id)
