@@ -1341,7 +1341,25 @@
   border-left: 1px solid var(--border);
   overflow-y: auto;
   z-index: 10;
-  transition: transform 0.2s;
+  transition: transform 0.25s ease;
+}
+.skill-preview-panel.collapsed {
+  transform: translateX(110%);
+  pointer-events: none;
+}
+.skill-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-secondary);
+  z-index: 1;
+}
+#skills-content-wrap {
+  transition: padding-right 0.25s ease;
 }
 
 .skill-detail-card {

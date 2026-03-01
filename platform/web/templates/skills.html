@@ -11,6 +11,7 @@
 {% endblock %}
 
 {% block content %}
+<div id="skills-content-wrap">
 <!-- GitHub Sources (collapsible) -->
 <details class="gh-sources-panel">
     <summary class="gh-sources-header">
@@ -75,12 +76,15 @@
 <div id="skills-grid">
     {% include "partials/skills_grid.html" %}
 </div>
+</div><!-- /skills-content-wrap -->
 
-<div id="skill-preview" class="skill-preview-panel">
-    <button class="skill-preview-toggle" onclick="toggleSkillPreview()" title="Collapse preview">
-        <svg class="icon icon-xs" id="skill-preview-chevron"><use href="#icon-chevron-down"/></svg>
-        <span id="skill-preview-toggle-label">Preview</span>
-    </button>
+<div id="skill-preview" class="skill-preview-panel collapsed">
+    <div class="skill-preview-header">
+        <span style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Skill Preview</span>
+        <button class="btn btn-sm btn-ghost" onclick="toggleSkillPreview(false)" title="Fermer" style="padding:4px 8px;min-width:0">
+            <svg class="icon icon-xs"><use href="#icon-x"/></svg>
+        </button>
+    </div>
     <div id="skill-preview-body">
         <p class="text-secondary" style="padding:24px;text-align:center;font-size:13px;">
             Click a skill to preview its content.
@@ -89,13 +93,14 @@
 </div>
 
 <script>
-function toggleSkillPreview() {
+function toggleSkillPreview(show) {
     const panel = document.getElementById('skill-preview');
-    const chevron = document.getElementById('skill-preview-chevron');
-    const label = document.getElementById('skill-preview-toggle-label');
-    const collapsed = panel.classList.toggle('collapsed');
-    chevron.style.transform = collapsed ? 'rotate(-90deg)' : '';
-    label.textContent = collapsed ? 'Show Preview' : 'Preview';
+    const wrap = document.getElementById('skills-content-wrap');
+    if (show === true) panel.classList.remove('collapsed');
+    else if (show === false) panel.classList.add('collapsed');
+    else panel.classList.toggle('collapsed');
+    const isCollapsed = panel.classList.contains('collapsed');
+    if (wrap) wrap.style.paddingRight = isCollapsed ? '0' : '420px';
 }
 </script>
 {% endblock %}
