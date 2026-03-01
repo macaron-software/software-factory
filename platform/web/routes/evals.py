@@ -6,16 +6,14 @@ import asyncio
 import json
 import time
 import uuid
-from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 
 from ...db.migrations import get_db
+from .helpers import _templates
 
 router = APIRouter()
-templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 
 
 # ── Pages ────────────────────────────────────────────────────────────────────
@@ -23,7 +21,7 @@ templates = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templa
 
 @router.get("/evals", response_class=HTMLResponse)
 async def evals_page(request: Request):
-    return templates.TemplateResponse(
+    return _templates(request).TemplateResponse(
         request, "evals.html", {"page_title": "Evaluations"}
     )
 
