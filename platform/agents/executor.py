@@ -159,7 +159,7 @@ def _check_session_budget(session_id: str) -> None:
         enabled = _get_rate_limit_setting("rate_limit_enabled", "true")
         if enabled.lower() not in ("true", "1", "yes"):
             return
-        cap_str = _get_rate_limit_setting("rate_limit_usd_per_session", "2.00")
+        cap_str = _get_rate_limit_setting("rate_limit_usd_per_session", "10.00")
         cap = float(cap_str)
         if cap <= 0:
             return
@@ -610,24 +610,15 @@ class AgentExecutor:
                                 ):
                                     break
                                 # Lint found issues → inject repair instruction
-                                import uuid as _uuid
-
-                                repair_id = f"auto_lint_{_uuid.uuid4().hex[:6]}"
+                                # Use role=user (not role=tool) to avoid requiring a
+                                # matching tool_calls assistant message (Azure OpenAI strict ordering)
                                 messages.append(
                                     LLMMessage(
-                                        role="tool",
-                                        content=f"[AUTO-LINT] {lint_result[:1500]}",
-                                        tool_call_id=repair_id,
-                                        name="lint",
-                                    )
-                                )
-                                messages.append(
-                                    LLMMessage(
-                                        role="system",
+                                        role="user",
                                         content=(
-                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
-                                            "Fix all reported issues NOW before proceeding to the next step. "
-                                            f"Repair round {_repair_round + 1}/{MAX_REPAIR_ROUNDS}."
+                                            f"[AUTO-LINT] Lint/verification failed (round {_repair_round + 1}/{MAX_REPAIR_ROUNDS}). "
+                                            "Fix all reported issues NOW before proceeding.\n\n"
+                                            f"{lint_result[:1500]}"
                                         ),
                                     )
                                 )
@@ -1100,24 +1091,15 @@ class AgentExecutor:
                                     and "warning" not in _slint_res.lower()[:100]
                                 ):
                                     break
-                                import uuid as _uuid_s
+                                import uuid as _uuid_s  # noqa: F401 (kept for compat)
 
-                                _srid = f"auto_lint_{_uuid_s.uuid4().hex[:6]}"
                                 messages.append(
                                     LLMMessage(
-                                        role="tool",
-                                        content=f"[AUTO-LINT] {_slint_res[:1500]}",
-                                        tool_call_id=_srid,
-                                        name="lint",
-                                    )
-                                )
-                                messages.append(
-                                    LLMMessage(
-                                        role="system",
+                                        role="user",
                                         content=(
-                                            "⚠️ Lint/verification failed (see AUTO-LINT above). "
-                                            "Fix all reported issues NOW before proceeding to the next step. "
-                                            f"Repair round {_srep + 1}/{MAX_REPAIR_ROUNDS}."
+                                            f"[AUTO-LINT] Lint/verification failed (round {_srep + 1}/{MAX_REPAIR_ROUNDS}). "
+                                            "Fix all reported issues NOW before proceeding.\n\n"
+                                            f"{_slint_res[:1500]}"
                                         ),
                                     )
                                 )
