@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+AXES = ("reuse", "quality", "efficiency")
+
 # ── Prompts for each analysis axis ───────────────────────────────────────────
 
 _SYSTEM = """You are a senior software engineer performing a focused code review.
@@ -58,7 +60,7 @@ _PROMPTS = {
 }
 
 
-async def _analyze_axis(diff: str, axis: str, project: str) -> list[dict]:
+async def _analyze_axis(diff: str, axis: str) -> list[dict]:
     """Run one analysis axis against the diff."""
     from ....llm.client import LLMMessage, get_llm_client
 
@@ -100,8 +102,7 @@ async def simplify_code(request: dict):
     Returns: {findings: [...], stats: {total, by_axis, by_severity}}
     """
     diff = request.get("diff", "").strip()
-    project = request.get("project", "")
-    focus = request.get("focus") or ["reuse", "quality", "efficiency"]
+    focus = request.get("focus") or list(AXES)
 
     if not diff:
         return JSONResponse({"error": "diff is required"}, status_code=400)
@@ -114,7 +115,7 @@ async def simplify_code(request: dict):
     if not axes:
         return JSONResponse({"error": "no valid focus axes"}, status_code=400)
 
-    results = await asyncio.gather(*[_analyze_axis(diff, ax, project) for ax in axes])
+    results = await asyncio.gather(*[_analyze_axis(diff, ax) for ax in axes])
 
     all_findings = []
     for findings in results:

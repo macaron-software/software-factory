@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import os
+import subprocess
 import sys
 
 # Ensure cli package is importable
@@ -26,6 +27,9 @@ if _sf_dir not in sys.path:
 from cli import _output as out  # noqa: E402
 
 DEFAULT_URL = os.environ.get("MACARON_URL", "http://localhost:8090")
+
+# Simplify axes — single source of truth used in cmd_simplify and build_parser
+_SIMPLIFY_AXES = ("reuse", "quality", "efficiency")
 
 
 # ── Backend selection ──
@@ -1033,8 +1037,6 @@ def _auth_headers(args) -> dict:
 
 def cmd_simplify(args):
     """Analyze code changes with 3 parallel agents (reuse, quality, efficiency)."""
-    import subprocess
-
     # ── Get the diff ──
     if getattr(args, "staged", False):
         diff_cmd = ["git", "diff", "--staged"]
@@ -1057,15 +1059,9 @@ def cmd_simplify(args):
     out.info(f"Analyzing {diff_label} ({lines} lines) with 3 parallel agents…")
 
     # ── Focus filter ──
-    focus = []
-    if getattr(args, "focus_reuse", False):
-        focus.append("reuse")
-    if getattr(args, "focus_quality", False):
-        focus.append("quality")
-    if getattr(args, "focus_efficiency", False):
-        focus.append("efficiency")
-    if not focus:
-        focus = ["reuse", "quality", "efficiency"]
+    focus = [a for a in _SIMPLIFY_AXES if getattr(args, f"focus_{a}", False)] or list(
+        _SIMPLIFY_AXES
+    )
 
     project = getattr(args, "project", "") or ""
 
@@ -1688,24 +1684,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply", action="store_true", help="Apply suggestions (experimental)"
     )
     simp.add_argument("--project", default="", help="Project context")
-    simp.add_argument(
-        "--reuse",
-        dest="focus_reuse",
-        action="store_true",
-        help="Focus on reuse axis only",
-    )
-    simp.add_argument(
-        "--quality",
-        dest="focus_quality",
-        action="store_true",
-        help="Focus on quality axis only",
-    )
-    simp.add_argument(
-        "--efficiency",
-        dest="focus_efficiency",
-        action="store_true",
-        help="Focus on efficiency axis only",
-    )
+    for _ax in _SIMPLIFY_AXES:
+        simp.add_argument(
+            f"--{_ax}",
+            dest=f"focus_{_ax}",
+            action="store_true",
+            help=f"Focus on {_ax} axis only",
+        )
     simp.set_defaults(func=cmd_simplify)
 
     return p
