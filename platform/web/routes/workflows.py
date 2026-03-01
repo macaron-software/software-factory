@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .helpers import _templates, _avatar_url
+from .helpers import _templates, _avatar_url, _parse_body
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -1230,7 +1230,15 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
         return HTMLResponse("Pas de phases", 400)
 
     phase1 = phases[0]
-    project_id = cfg.get("project_id", "")
+    # Allow project_id override from request query param or body
+    _req_project_id = str(request.query_params.get("project_id", "")).strip()
+    if not _req_project_id and request.method == "POST":
+        try:
+            _body = await _parse_body(request)
+            _req_project_id = str(_body.get("project_id", "")).strip()
+        except Exception:
+            pass
+    project_id = _req_project_id or cfg.get("project_id", "")
 
     # Create session
     session_store = get_session_store()
