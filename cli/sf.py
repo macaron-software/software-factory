@@ -1020,6 +1020,140 @@ def cmd_teams_unretire(args):
     output(args, r)
 
 
+# ── Simplify ──
+
+
+def _auth_headers(args) -> dict:
+    """Build auth headers from token or MACARON_TOKEN env var."""
+    token = getattr(args, "token", None) or os.environ.get("MACARON_TOKEN")
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}
+
+
+def cmd_simplify(args):
+    """Analyze code changes with 3 parallel agents (reuse, quality, efficiency)."""
+    import subprocess
+
+    # ── Get the diff ──
+    if getattr(args, "staged", False):
+        diff_cmd = ["git", "diff", "--staged"]
+        diff_label = "staged changes"
+    elif getattr(args, "last", False):
+        diff_cmd = ["git", "diff", "HEAD~1", "HEAD"]
+        diff_label = "last commit"
+    else:
+        diff_cmd = ["git", "diff", "HEAD"]
+        diff_label = "uncommitted changes"
+
+    result = subprocess.run(diff_cmd, capture_output=True, text=True)
+    diff = result.stdout.strip()
+
+    if not diff:
+        out.info(f"No {diff_label} to analyze.")
+        return
+
+    lines = diff.count("\n")
+    out.info(f"Analyzing {diff_label} ({lines} lines) with 3 parallel agents…")
+
+    # ── Focus filter ──
+    focus = []
+    if getattr(args, "focus_reuse", False):
+        focus.append("reuse")
+    if getattr(args, "focus_quality", False):
+        focus.append("quality")
+    if getattr(args, "focus_efficiency", False):
+        focus.append("efficiency")
+    if not focus:
+        focus = ["reuse", "quality", "efficiency"]
+
+    project = getattr(args, "project", "") or ""
+
+    # ── Call platform ──
+    import httpx
+
+    url = args.url.rstrip("/")
+    try:
+        with httpx.Client(timeout=60) as client:
+            resp = client.post(
+                f"{url}/api/simplify",
+                json={"diff": diff, "project": project, "focus": focus},
+                headers=_auth_headers(args),
+            )
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.ConnectError:
+        out.error(
+            "Platform not reachable. Start with: cd _SOFTWARE_FACTORY && python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none"
+        )
+        return
+    except Exception as e:
+        out.error(f"simplify request failed: {e}")
+        return
+
+    findings = data.get("findings", [])
+    stats = data.get("stats", {})
+
+    if getattr(args, "json_output", False):
+        out.out_json(data)
+        return
+
+    if not findings:
+        out.success("✅ Nothing to simplify — code looks clean!")
+        return
+
+    # ── Display ──
+    _AXIS_COLORS = {
+        "reuse": "\033[36m",  # cyan
+        "quality": "\033[33m",  # yellow
+        "efficiency": "\033[35m",  # magenta
+    }
+    _SEV_COLORS = {"high": "\033[31m", "medium": "\033[33m", "low": "\033[90m"}
+    RESET = "\033[0m"
+
+    current_file = None
+    for f in findings:
+        fname = f.get("file", "?")
+        if fname != current_file:
+            current_file = fname
+            print(f"\n\033[1m{fname}\033[0m")
+
+        axis = f.get("axis", "?")
+        sev = f.get("severity", "low")
+        cat = f.get("category", "?")
+        line = f.get("line", 0)
+        msg = f.get("message", "")
+        suggestion = f.get("suggestion", "")
+
+        axis_col = _AXIS_COLORS.get(axis, "")
+        sev_col = _SEV_COLORS.get(sev, "")
+
+        line_str = f":{line}" if line else ""
+        print(
+            f"  {sev_col}[{sev}]{RESET} {axis_col}[{axis}/{cat}]{RESET}{line_str}  {msg}"
+        )
+        if suggestion:
+            print(f"    \033[90m→ {suggestion}{RESET}")
+
+    # ── Summary ──
+    print()
+    total = stats.get("total", len(findings))
+    by_sev = stats.get("by_severity", {})
+    by_axis = stats.get("by_axis", {})
+    out.info(
+        f"Found {total} suggestion(s): "
+        f"{by_sev.get('high', 0)} high, {by_sev.get('medium', 0)} medium, {by_sev.get('low', 0)} low"
+    )
+    for ax, count in by_axis.items():
+        col = _AXIS_COLORS.get(ax, "")
+        print(f"  {col}● {ax}{RESET}: {count}")
+
+    if getattr(args, "apply", False):
+        out.warn(
+            "--apply mode: not yet implemented. Review suggestions and apply manually."
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="sf",
@@ -1542,6 +1676,37 @@ def build_parser() -> argparse.ArgumentParser:
     tunret.add_argument("--technology", "-t", default="generic")
     tunret.add_argument("--phase", dest="phase_type", default="generic")
     tunret.set_defaults(func=cmd_teams_unretire)
+
+    # ── simplify ──
+    simp = sub.add_parser(
+        "simplify",
+        help="Analyze code changes with 3 parallel agents (reuse, quality, efficiency)",
+    )
+    simp.add_argument("--staged", action="store_true", help="Analyze staged diff only")
+    simp.add_argument("--last", action="store_true", help="Analyze last commit diff")
+    simp.add_argument(
+        "--apply", action="store_true", help="Apply suggestions (experimental)"
+    )
+    simp.add_argument("--project", default="", help="Project context")
+    simp.add_argument(
+        "--reuse",
+        dest="focus_reuse",
+        action="store_true",
+        help="Focus on reuse axis only",
+    )
+    simp.add_argument(
+        "--quality",
+        dest="focus_quality",
+        action="store_true",
+        help="Focus on quality axis only",
+    )
+    simp.add_argument(
+        "--efficiency",
+        dest="focus_efficiency",
+        action="store_true",
+        help="Focus on efficiency axis only",
+    )
+    simp.set_defaults(func=cmd_simplify)
 
     return p
 
