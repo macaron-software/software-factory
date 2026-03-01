@@ -8,7 +8,7 @@
 
 {% block content %}
 <style>
-.mission-list{display:flex;flex-direction:column;gap:0.75rem}
+.mission-list{display:flex;flex-direction:column;gap:0.75rem;padding-bottom:2rem}
 .mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
 .mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
 .mission-card-wrap .mission-card{border-radius:10px 10px 0 0}
@@ -21,7 +21,7 @@
 
 .mission-body{min-width:0}
 .mission-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
-.mission-brief{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;margin-bottom:0.45rem}
+.mission-brief{font-size:0.8rem;color:var(--text-secondary);white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:0.45rem}
 
 .mission-progress-row{display:flex;align-items:center;gap:0.6rem}
 .mission-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
@@ -64,9 +64,10 @@
     {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
     {% set st = run.status.value %}
     {% set is_child = run.parent_mission_id %}
+    {% set is_paused = (st == 'paused' and run.session_id and run.workflow_id) %}
     <div class="mission-card-wrap {{ 'mission-child' if is_child else '' }}">
     <a href="/missions/{{ run.id }}/control" class="mission-card">
-        <div class="mission-status-icon {{ st }}">
+        <div class="mission-status-icon {{ st }}" {% if is_paused %}style="background:rgba(251,191,36,.12);color:#eab308"{% endif %}>
             {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
         </div>
         <div class="mission-body">
@@ -75,6 +76,7 @@
                 {% if is_child %}<span class="mission-child-badge">{{ _("feature") }}</span>{% endif %}
                 {{ epic_name }}
                 <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
+                {% if is_paused %}<span style="font-size:0.65rem;font-weight:600;color:#eab308;background:rgba(234,179,8,0.15);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">⏸ GO/NO GO</span>{% endif %}
             </div>
             <div class="mission-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
             <div class="mission-progress-row">
@@ -85,12 +87,29 @@
             </div>
         </div>
         <div class="mission-meta">
-            <span class="mission-badge {{ st }}">{{ st }}</span>
+            <span class="mission-badge {{ st }}" {% if is_paused %}style="background:rgba(234,179,8,.12);color:#eab308"{% endif %}>{{ st }}</span>
             <span class="mission-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
         </div>
     </a>
     <div class="mission-actions">
-        {% if st == 'running' and done_count < total %}
+        {% if is_paused %}
+        <button class="btn btn-sm" style="background:var(--green,#22c55e);color:#fff;border-color:var(--green,#22c55e)"
+                onclick="event.stopPropagation()"
+                hx-post="/api/workflow/{{ run.session_id }}/resume"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                title="Valider le checkpoint">
+            <svg class="icon icon-xs"><use href="#icon-check"/></svg> GO
+        </button>
+        <button class="btn btn-sm btn-danger"
+                onclick="event.stopPropagation();if(!confirm('Rejeter ce workflow ?')) return false;"
+                hx-post="/api/workflow/{{ run.session_id }}/nogo"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                title="Rejeter le checkpoint">
+            <svg class="icon icon-xs"><use href="#icon-x"/></svg> NO GO
+        </button>
+        {% elif st == 'running' and done_count < total %}
         <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="{{ _('launch_next_phase') }}">
             <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch_phase', n=done_count + 1) }}
         </button>
