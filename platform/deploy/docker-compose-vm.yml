@@ -99,6 +99,7 @@ services:
       - "443:443"
     volumes:
       - /home/azureadmin/macaron-nginx-conf:/etc/nginx/conf.d:ro
+      - /home/azureadmin/macaron-nginx-ssl:/etc/nginx/ssl:ro
       - /opt/macaron/.htpasswd:/etc/nginx/.htpasswd:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /opt/macaron/webroot:/var/www/certbot:ro

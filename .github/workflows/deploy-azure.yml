@@ -37,6 +37,16 @@ jobs:
           # Staging compose file (always fresh from rsync — used for ALL compose cmds)
           COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
 
+          # ── Self-signed cert for default 443 (HTTPS-by-IP → redirect) ─────────
+          mkdir -p /home/azureadmin/macaron-nginx-ssl
+          if [ ! -f /home/azureadmin/macaron-nginx-ssl/self-signed.crt ]; then
+            openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+              -keyout /home/azureadmin/macaron-nginx-ssl/self-signed.key \
+              -out /home/azureadmin/macaron-nginx-ssl/self-signed.crt \
+              -subj "/CN=4.233.64.30/O=MacaronSoftware" 2>/dev/null
+            echo "self-signed cert generated"
+          fi
+
           # ── Init/update nginx conf dir ────────────────────────────────────────
           mkdir -p /home/azureadmin/macaron-nginx-conf
           if [ ! -f /home/azureadmin/macaron-nginx-conf/default.conf ]; then
