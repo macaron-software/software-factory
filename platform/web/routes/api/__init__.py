@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from .analytics import router as analytics_router
 from .api_keys import router as api_keys_router
 from .dashboard import router as dashboard_router
+from .deploy_targets import router as deploy_targets_router
 from .events import router as events_router
 from .health import router as health_router
 from .incidents import router as incidents_router
@@ -28,6 +29,7 @@ router.include_router(memory_router)
 router.include_router(rbac_router)
 router.include_router(incidents_router)
 router.include_router(integrations_router)
+router.include_router(deploy_targets_router)
 router.include_router(dashboard_router)
 router.include_router(analytics_router)
 router.include_router(search_router)

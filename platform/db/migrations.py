@@ -1381,6 +1381,23 @@ def _ensure_sqlite_tables(conn) -> None:
             updated_at TEXT DEFAULT (datetime('now'))
         )
     """)
+    # Deploy targets registry
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS deploy_targets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            driver TEXT NOT NULL DEFAULT 'docker_local',
+            config_json TEXT DEFAULT '{}',
+            status TEXT DEFAULT 'unknown',
+            last_check TEXT,
+            is_default INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver)"
+    )
     conn.commit()
 
 
@@ -1524,6 +1541,23 @@ def _migrate_pg(conn):
     """)
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_aps_pair ON agent_pair_scores(agent_a, agent_b)"
+    )
+    # Deploy targets registry (PG)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS deploy_targets (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            driver TEXT NOT NULL DEFAULT 'docker_local',
+            config_json TEXT DEFAULT '{}',
+            status TEXT DEFAULT 'unknown',
+            last_check TEXT,
+            is_default INTEGER DEFAULT 0,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver)"
     )
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()

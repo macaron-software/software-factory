@@ -133,87 +133,23 @@ def _health_check(port: int, timeout: int = 30) -> tuple[bool, str]:
 class DockerDeployTool(BaseTool):
     name = "docker_deploy"
     description = (
-        "Build and run the workspace as a Docker container. "
-        "Auto-generates Dockerfile if missing, installs deps, builds, runs, health-checks. "
-        "Returns the live URL. Use this to ACTUALLY deploy generated code."
+        "Build and deploy the workspace. "
+        "Uses the project's configured deploy target (default: Docker local). "
+        "Auto-generates Dockerfile if missing. Returns the live URL."
     )
     category = "deploy"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        import asyncio
+        from .deploy.registry import get_target as _get_target
+        deploy_target_name = params.get("deploy_target") or None
+        target = _get_target(deploy_target_name)
+
         cwd = params.get("cwd", ".")
-        if not os.path.isdir(cwd):
-            return f"[FAIL] Workspace not found: {cwd}"
-
         mission_id = params.get("mission_id", os.path.basename(os.path.abspath(cwd)))
-        container_name = f"macaron-app-{mission_id[:12]}"
+        env = params.get("env", "staging")
 
-        steps = []
-
-        # Stop existing container
-        subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, timeout=10)
-
-        # Generate Dockerfile
-        try:
-            _generate_dockerfile(cwd)
-            steps.append("Dockerfile ready")
-        except Exception as e:
-            return f"[FAIL] Dockerfile generation: {e}"
-
-        # Find free port
-        try:
-            port = _find_free_port()
-        except RuntimeError as e:
-            return f"[FAIL] {e}"
-
-        # Docker build
-        logger.info("Building image %s from %s", container_name, cwd)
-        build_r = subprocess.run(
-            ["docker", "build", "-t", container_name, "--network", "host", "."],
-            cwd=cwd, capture_output=True, text=True, timeout=300,
-        )
-        if build_r.returncode != 0:
-            return f"[FAIL] Docker build failed:\n{build_r.stderr[-2000:] or build_r.stdout[-2000:]}"
-        steps.append("Docker build OK")
-
-        # Docker run
-        logger.info("Starting %s on port %d", container_name, port)
-        run_r = subprocess.run(
-            ["docker", "run", "-d", "--name", container_name,
-             "-p", f"{port}:3000",
-             "--memory", "256m", "--cpus", "1",
-             "--restart", "unless-stopped",
-             container_name],
-            capture_output=True, text=True, timeout=30,
-        )
-        if run_r.returncode != 0:
-            return f"[FAIL] Docker run failed:\n{run_r.stderr[-500:]}"
-        steps.append(f"Container started on port {port}")
-
-        # Health check
-        await asyncio.sleep(3)
-        healthy, detail = _health_check(port, timeout=30)
-
-        url = f"http://127.0.0.1:{port}"
-        _running[mission_id] = {
-            "container": container_name,
-            "port": port,
-            "url": url,
-        }
-
-        if healthy:
-            steps.append(f"Health OK: {detail[:80]}")
-            return f"[OK] DEPLOYED\nURL: {url}\nContainer: {container_name}\n" + " → ".join(steps)
-        else:
-            logs = subprocess.run(
-                ["docker", "logs", "--tail", "20", container_name],
-                capture_output=True, text=True, timeout=10,
-            )
-            return (
-                f"[WARN] Started but health check failed\nURL: {url}\n"
-                f"Container: {container_name}\nHealth: {detail}\n"
-                f"Logs:\n{logs.stdout[-800:]}{logs.stderr[-400:]}"
-            )
+        result = await target.deploy(workspace=cwd, mission_id=mission_id, env=env)
+        return str(result)
 
 
 class DockerStopTool(BaseTool):
