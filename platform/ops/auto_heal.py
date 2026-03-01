@@ -78,7 +78,11 @@ def scan_open_incidents() -> list[IncidentGroup]:
             """SELECT id, error_type, error_detail, severity, source
                FROM platform_incidents
                WHERE status = 'open'
-                 AND (mission_id IS NULL OR mission_id = '')
+                 AND NOT EXISTS (
+                   SELECT 1 FROM missions m
+                   WHERE m.id = platform_incidents.mission_id
+                     AND m.created_by = 'auto-heal'
+                 )
                ORDER BY created_at DESC
                LIMIT 100""",
         ).fetchall()
