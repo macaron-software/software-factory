@@ -100,7 +100,7 @@ jobs:
 
           # ── Swap nginx (zero-downtime) ───────────────────────────────────────
           ACTIVE_PORT=$([ "$ACTIVE" = "blue" ] && echo "8090" || echo "8091")
-          sed -i "s|localhost:${ACTIVE_PORT}|localhost:${INACTIVE_PORT}|g" \
+          sudo sed -i "s|localhost:${ACTIVE_PORT}|localhost:${INACTIVE_PORT}|g" \
             /etc/nginx/sites-enabled/software-factory
           sudo nginx -t
           sudo nginx -s reload
