@@ -549,7 +549,7 @@ async def _cleanup_phantom_runs() -> int:
             WHERE status = 'running'
             AND (
                 updated_at IS NULL
-                OR datetime(updated_at) < datetime('now', '-1 hours')
+                OR updated_at < datetime('now', '-1 hours')
             )
         """)
         reset = result.rowcount
@@ -567,7 +567,7 @@ async def _cleanup_phantom_runs() -> int:
             WHERE status IN ('running', 'paused')
             AND (
                 updated_at IS NULL
-                OR datetime(updated_at) < datetime('now', '-48 hours')
+                OR updated_at < datetime('now', '-48 hours')
             )
         """)
         abandoned = result.rowcount

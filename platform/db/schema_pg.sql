@@ -513,7 +513,10 @@ CREATE TABLE IF NOT EXISTS mission_runs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TEXT,
-    parent_mission_id TEXT DEFAULT ''
+    parent_mission_id TEXT DEFAULT '',
+    resume_attempts INTEGER DEFAULT 0,
+    last_resume_at TEXT,
+    human_input_required INTEGER DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
 CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
@@ -912,3 +915,17 @@ CREATE TABLE IF NOT EXISTS wiki_pages (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Deploy Targets Registry (cloud/infra platform selector)
+CREATE TABLE IF NOT EXISTS deploy_targets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    driver TEXT NOT NULL DEFAULT 'docker_local',
+    config_json TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'unknown',
+    last_check TEXT,
+    is_default INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver);

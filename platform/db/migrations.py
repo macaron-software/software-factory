@@ -1559,6 +1559,18 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver)"
     )
+    # mission_runs: missing columns added post-launch (added 2026-03)
+    for col, defn in [
+        ("resume_attempts", "INTEGER DEFAULT 0"),
+        ("last_resume_at", "TEXT"),
+        ("human_input_required", "INTEGER DEFAULT 0"),
+    ]:
+        try:
+            conn.execute(
+                f"ALTER TABLE mission_runs ADD COLUMN IF NOT EXISTS {col} {defn}"
+            )
+        except Exception:
+            pass
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 

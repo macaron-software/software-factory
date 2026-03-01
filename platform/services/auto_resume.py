@@ -579,7 +579,7 @@ async def handle_failed_runs() -> int:
             UPDATE mission_runs SET status='paused', updated_at=datetime('now')
             WHERE status = 'running'
             AND workflow_id IS NOT NULL
-            AND (updated_at IS NULL OR datetime(updated_at) < datetime('now', '-30 minutes'))
+            AND (updated_at IS NULL OR updated_at < datetime('now', '-30 minutes'))
         """)
         phantom_count = phantom.rowcount
         if phantom_count:
