@@ -91,7 +91,7 @@ jobs:
             deploy-platform-${INACTIVE}-1:/app/macaron_platform/
 
           # ── Start with new code ──────────────────────────────────────────────
-          docker update --restart=unless-stopped deploy-platform-${INACTIVE}-1
+          docker update --restart=unless-stopped deploy-platform-${INACTIVE}-1 2>/dev/null || true
           docker start deploy-platform-${INACTIVE}-1
 
           # ── Health check (up to 60s) ─────────────────────────────────────────
