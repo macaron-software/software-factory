@@ -319,17 +319,32 @@ def test_hot_restart_ovh(ovh, ssh_run_ovh):
 
 @pytest.mark.stability
 def test_nginx_failover_azure(az, ssh_run_az):
-    """Azure: stop web container → nginx returns 503 (not 502), restart → 200."""
+    """Azure: kill web container → nginx returns 503 (not 502), restart → 200.
+
+    Uses docker kill (SIGKILL) instead of stop (SIGTERM) to ensure immediate
+    termination — docker stop has a 10s grace period during which uvicorn still
+    handles requests, making the 503 check unreliable.
+    """
     active = ssh_run_az(
         "cat /home/azureadmin/macaron-active-slot 2>/dev/null || echo blue"
     ).strip()
-    ssh_run_az(f"docker stop deploy-platform-{active}-1 2>/dev/null || true")
-    time.sleep(3)
+    # SIGKILL = immediate, no graceful shutdown
+    ssh_run_az(f"docker kill deploy-platform-{active}-1 2>/dev/null || true")
+    # Wait until container is confirmed stopped
+    for _ in range(10):
+        time.sleep(1)
+        state = ssh_run_az(
+            f"docker inspect deploy-platform-{active}-1 --format '{{{{.State.Running}}}}' 2>/dev/null || echo false"
+        ).strip()
+        if state in ("false", ""):
+            break
+    time.sleep(1)
     code, _, _ = _http_get(f"{az}/api/health", timeout=10)
     # Restart before asserting (don't leave it down)
     ssh_run_az(f"docker start deploy-platform-{active}-1 2>/dev/null || true")
     assert code == 503, f"Azure nginx failover returned {code} (expected 503)"
     # Wait for recovery
+    code2 = 0
     for _ in range(20):
         time.sleep(3)
         code2, _, _ = _http_get(f"{az}/api/health", timeout=10)
