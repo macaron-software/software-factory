@@ -1613,6 +1613,15 @@ def _migrate_pg(conn):
             )
         except Exception:
             pass
+    # platform_settings: key-value store for runtime config (added 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            description TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 
