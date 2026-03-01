@@ -5,6 +5,7 @@ Supports: unit tests (TestClient), endurance/chaos tests (live httpx.Client).
 
 import os
 import sys
+import subprocess
 
 import pytest
 
@@ -20,6 +21,10 @@ def pytest_configure(config):
     config.addinivalue_line("markers", "chaos: chaos / fault-injection tests")
     config.addinivalue_line(
         "markers", "live: tests that hit a live server (require --live)"
+    )
+    config.addinivalue_line(
+        "markers",
+        "stability: remote stability/stress tests (require STABILITY_TESTS=1)",
     )
 
 
@@ -39,9 +44,15 @@ def pytest_collection_modifyitems(config, items):
     if config.getoption("--live"):
         return
     skip_live = pytest.mark.skip(reason="need --live option to run")
+    # Skip stability tests unless STABILITY_TESTS=1
+    skip_stability = pytest.mark.skip(
+        reason="set STABILITY_TESTS=1 to run remote stability tests"
+    )
     for item in items:
         if "live" in item.keywords:
             item.add_marker(skip_live)
+        if "stability" in item.keywords and not os.environ.get("STABILITY_TESTS"):
+            item.add_marker(skip_stability)
 
 
 # ─── Fixtures ───────────────────────────────────────────────────
@@ -90,3 +101,84 @@ def client():
 
     with TestClient(app) as c:
         yield c
+
+
+# ─── Stability / Remote fixtures ────────────────────────────────
+
+
+@pytest.fixture(scope="session")
+def az_base_url():
+    host = os.environ.get("STABILITY_AZ_HOST", "4.233.64.30")
+    return f"http://{host}"
+
+
+@pytest.fixture(scope="session")
+def ovh_base_url():
+    host = os.environ.get("STABILITY_OVH_HOST", "sf.macaron-software.com")
+    return f"https://{host}"
+
+
+@pytest.fixture(scope="session")
+def ssh_key_az():
+    return os.environ.get(
+        "STABILITY_SSH_AZ_KEY",
+        os.path.expanduser("~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"),
+    )
+
+
+@pytest.fixture(scope="session")
+def ssh_key_ovh():
+    return os.environ.get(
+        "STABILITY_SSH_OVH_KEY",
+        os.path.expanduser("~/.ssh/id_ed25519"),
+    )
+
+
+@pytest.fixture(scope="session")
+def ssh_run_az(ssh_key_az):
+    """Run a command on Azure VM and return stdout+stderr."""
+
+    def _run(cmd: str, timeout: int = 30) -> str:
+        full = (
+            f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
+            f"-i {ssh_key_az} azureadmin@4.233.64.30 '{cmd}'"
+        )
+        try:
+            r = subprocess.run(
+                ["/bin/bash", "-c", full],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            return r.stdout + r.stderr
+        except subprocess.TimeoutExpired:
+            return "TIMEOUT"
+        except Exception as exc:
+            return str(exc)
+
+    return _run
+
+
+@pytest.fixture(scope="session")
+def ssh_run_ovh(ssh_key_ovh):
+    """Run a command on OVH demo server and return stdout+stderr."""
+
+    def _run(cmd: str, timeout: int = 30) -> str:
+        full = (
+            f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
+            f"-i {ssh_key_ovh} debian@54.36.183.124 '{cmd}'"
+        )
+        try:
+            r = subprocess.run(
+                ["/bin/bash", "-c", full],
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+            return r.stdout + r.stderr
+        except subprocess.TimeoutExpired:
+            return "TIMEOUT"
+        except Exception as exc:
+            return str(exc)
+
+    return _run

@@ -10,6 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed layers
+        id: changes
+        run: |
+          # Detect if only UI files changed (web/templates, web/static, web/routes)
+          # vs factory files (agents, missions, patterns, services, llm, db, a2a, ops)
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "platform/")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          UI_ONLY=true
+          while IFS= read -r f; do
+            # Any non-web platform file → factory must be redeployed
+            if echo "$f" | grep -qE '^platform/(agents|missions|patterns|services|llm|db|a2a|ops|memory|generators|skills|tools|config|models|security|sessions|workers|events)'; then
+              UI_ONLY=false
+              break
+            fi
+          done <<< "$CHANGED"
+
+          echo "ui_only=$UI_ONLY" >> "$GITHUB_OUTPUT"
+          echo "Deploy mode: ui_only=$UI_ONLY"
 
       - name: Set up SSH
         run: |
@@ -29,12 +52,55 @@ jobs:
             platform/ \
             azureadmin@${{ secrets.AZURE_IP }}:/home/azureadmin/macaron_update/platform/
 
-      - name: Blue-Green Deploy
+      - name: Deploy Factory (when factory code changed)
+        if: steps.changes.outputs.ui_only == 'false'
+        run: |
+          ssh azureadmin@${{ secrets.AZURE_IP }} << 'ENDSSH'
+          set -e
+          COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
+
+          # ── Ensure factory slot dir exists ────────────────────────────────
+          mkdir -p /opt/macaron/slots/factory
+
+          # ── Start factory container if not running ────────────────────────
+          docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
+            up -d --no-deps platform-factory 2>/dev/null || true
+          sleep 2
+
+          # ── Push new factory code via docker cp ───────────────────────────
+          FACTORY_CONTAINER=$(docker ps -q --filter "name=deploy-platform-factory" | head -1)
+          if [ -n "$FACTORY_CONTAINER" ]; then
+            docker cp /home/azureadmin/macaron_update/platform/. \
+              "${FACTORY_CONTAINER}:/app/macaron_platform/"
+          else
+            # First deploy: copy to slot dir
+            cp -r /home/azureadmin/macaron_update/platform/. /opt/macaron/slots/factory/
+          fi
+
+          # ── Restart factory (drains gracefully, < 5s for headless) ──────
+          docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
+            restart platform-factory 2>/dev/null || true
+
+          # ── Wait for factory health ────────────────────────────────────────
+          echo "Waiting for platform-factory..."
+          OK=0
+          for i in $(seq 1 20); do
+            sleep 3
+            FACTORY_CTR=$(docker ps -q --filter "name=deploy-platform-factory" | head -1)
+            [ -z "$FACTORY_CTR" ] && continue
+            HTTP=$(docker exec "$FACTORY_CTR" \
+              curl -sf -o /dev/null -w "%{http_code}" http://localhost:8091/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/20] factory health=${HTTP}"
+            if [ "$HTTP" = "200" ]; then OK=1; break; fi
+          done
+          [ "$OK" = "1" ] && echo "platform-factory healthy ✓" || echo "WARNING: factory health check timed out (non-fatal)"
+          ENDSSH
+
+      - name: Blue-Green Deploy (UI / web process)
         run: |
           ssh azureadmin@${{ secrets.AZURE_IP }} << 'ENDSSH'
           set -e
 
-          # Staging compose file (always fresh from rsync — used for ALL compose cmds)
           COMPOSE=/home/azureadmin/macaron_update/platform/deploy/docker-compose-vm.yml
 
           # ── Self-signed cert for default 443 (HTTPS-by-IP → redirect) ─────────
@@ -63,7 +129,10 @@ jobs:
               /home/azureadmin/macaron-nginx-conf/default.conf
             echo "nginx conf updated (slot preserved: ${CURRENT_SLOT})"
           fi
-          # Recreate nginx with new dir-mount if volume changed (one-time migration)
+          # Ensure Redis is running
+          docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
+            up -d --no-deps redis 2>/dev/null || true
+          # Ensure nginx is up
           docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
             up -d --no-deps nginx
 

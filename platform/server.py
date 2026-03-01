@@ -111,6 +111,14 @@ async def lifespan(app: FastAPI):
 
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
 
+    # PLATFORM_MODE: full (default) | factory (headless) | ui (web-only)
+    _mode = os.environ.get("PLATFORM_MODE", "full").lower()
+    if _mode not in ("full", "factory", "ui"):
+        logger.warning("Unknown PLATFORM_MODE=%r — falling back to 'full'", _mode)
+        _mode = "full"
+    if _mode != "full":
+        logger.warning("PLATFORM_MODE=%s", _mode)
+
     cfg = get_config()
     logger.info("Starting Software Factory on port %s", cfg.server.port)
 
@@ -279,27 +287,45 @@ async def lifespan(app: FastAPI):
     import asyncio as _asyncio
     from .services.auto_resume import auto_resume_missions as _auto_resume_missions
 
-    _asyncio.create_task(_auto_resume_missions())
-    logger.warning("Auto-resume watchdog scheduled")
+    if _mode != "ui":
+        _asyncio.create_task(_auto_resume_missions())
+        logger.warning("Auto-resume watchdog scheduled")
 
     # Start endurance watchdog (continuous auto-resume, session recovery, health)
-    try:
-        from .ops.endurance_watchdog import watchdog_loop, ENABLED as _wd_enabled
+    if _mode != "ui":
+        try:
+            from .ops.endurance_watchdog import watchdog_loop, ENABLED as _wd_enabled
 
-        if _wd_enabled:
-            _asyncio.create_task(watchdog_loop())
-            logger.info("Endurance watchdog started as background task")
-    except Exception as e:
-        logger.warning("Failed to start endurance watchdog: %s", e)
+            if _wd_enabled:
+                _asyncio.create_task(watchdog_loop())
+                logger.info("Endurance watchdog started as background task")
+        except Exception as e:
+            logger.warning("Failed to start endurance watchdog: %s", e)
 
     # Start evolution scheduler (nightly GA + RL retraining at 02:00 UTC)
-    try:
-        from .agents.evolution_scheduler import start_evolution_scheduler as _evo_sched
+    if _mode != "ui":
+        try:
+            from .agents.evolution_scheduler import (
+                start_evolution_scheduler as _evo_sched,
+            )
 
-        _asyncio.create_task(_evo_sched())
-        logger.info("Evolution scheduler started as background task")
-    except Exception as e:
-        logger.warning("Failed to start evolution scheduler: %s", e)
+            _asyncio.create_task(_evo_sched())
+            logger.info("Evolution scheduler started as background task")
+        except Exception as e:
+            logger.warning("Failed to start evolution scheduler: %s", e)
+
+    # Redis pub/sub: connect bus and start cross-process listener
+    _redis_url = os.environ.get("REDIS_URL")
+    if _redis_url:
+        import asyncio as _asyncio2
+        from .a2a.bus import get_bus as _get_bus
+
+        _bus = _get_bus()
+        _asyncio2.create_task(_bus.connect_redis(_redis_url))
+        if _mode in ("ui", "full"):
+            # UI process subscribes to factory events via Redis
+            _asyncio2.create_task(_bus.start_redis_listener(_redis_url))
+            logger.info("Redis SSE listener scheduled")
 
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
@@ -932,8 +958,10 @@ def create_app() -> FastAPI:
             raise
 
     # Static files
-    if STATIC_DIR.exists():
-        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    _mode = os.environ.get("PLATFORM_MODE", "full").lower()
+    if _mode != "factory":
+        if STATIC_DIR.exists():
+            app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     # Serve manifest.json for PWA
     @app.get("/manifest.json")
@@ -1150,15 +1178,17 @@ def create_app() -> FastAPI:
         except ImportError:
             pass
 
-    app.state.templates = templates
+    app.state.templates = templates if _mode != "factory" else None
 
-    # Routes — core (required)
-    from .web.routes import router as web_router
+    # Routes — core (skipped in factory mode)
     from .web.routes.auth import router as auth_router
     from .web.ws import router as sse_router
 
     app.include_router(auth_router)
-    app.include_router(web_router)
+    if _mode != "factory":
+        from .web.routes import router as web_router
+
+        app.include_router(web_router)
     app.include_router(sse_router, prefix="/sse")
 
     # Routes — optional (safe mode: import failures are logged, not fatal)

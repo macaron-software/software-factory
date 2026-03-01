@@ -2,6 +2,13 @@
 A2A Message Bus - Internal pub/sub for agent communication.
 =============================================================
 Async message routing with per-agent queues, persistence, and SSE bridge.
+
+Redis pub/sub (optional):
+  - If REDIS_URL is set, all SSE events are also published to Redis channel
+    ``a2a:events``, enabling cross-process (IHM ↔ Factory) event delivery.
+  - Fallback: in-memory only when Redis is unavailable or not configured.
+  - Call ``start_redis_listener(redis_url)`` in the UI process to receive
+    factory events and forward them to local SSE listeners.
 """
 
 from __future__ import annotations
@@ -11,17 +18,20 @@ import json
 import logging
 import sqlite3
 from datetime import datetime
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from ..models import A2AMessage, MessageType
 
 logger = logging.getLogger(__name__)
+
+REDIS_CHANNEL = "a2a:events"
 
 
 class MessageBus:
     """
     Central message bus for Agent-to-Agent communication.
     Supports direct messages, broadcasts, topic subscriptions, and SSE streaming.
+    Optionally backed by Redis pub/sub for cross-process event delivery.
     """
 
     def __init__(self, db_conn: sqlite3.Connection = None):
@@ -33,6 +43,7 @@ class MessageBus:
         self._max_dead_letter = 1000
         self._handlers: dict[str, Callable] = {}  # agent_id → receive callback
         self._stats = {"published": 0, "delivered": 0, "dead_letter": 0}
+        self._redis: Any = None  # redis.asyncio client (set via connect_redis)
 
     # ── Registration ──────────────────────────────────────────────────
 
@@ -141,7 +152,7 @@ class MessageBus:
             self._sse_listeners.remove(queue)
 
     async def _notify_sse(self, message: A2AMessage):
-        """Push message to all SSE listeners."""
+        """Push message to all local SSE listeners, and publish to Redis if connected."""
         for q in self._sse_listeners:
             try:
                 q.put_nowait(message)
@@ -149,13 +160,112 @@ class MessageBus:
                 # Drop event but keep listener alive — streaming produces many deltas
                 pass
 
+        # Publish to Redis for cross-process delivery (IHM ↔ Factory)
+        if self._redis is not None:
+            try:
+                payload = json.dumps(
+                    {
+                        "id": message.id,
+                        "session_id": message.session_id,
+                        "from_agent": message.from_agent,
+                        "to_agent": message.to_agent,
+                        "message_type": message.message_type.value,
+                        "content": message.content,
+                        "metadata": message.metadata,
+                        "artifacts": message.artifacts,
+                        "parent_id": message.parent_id,
+                        "priority": message.priority,
+                        "requires_response": message.requires_response,
+                        "timestamp": message.timestamp.isoformat(),
+                    }
+                )
+                await self._redis.publish(REDIS_CHANNEL, payload)
+            except Exception as exc:
+                logger.debug("Redis publish error (non-fatal): %s", exc)
+
+    async def connect_redis(self, redis_url: str) -> bool:
+        """Connect to Redis for cross-process pub/sub. Returns True on success."""
+        try:
+            import redis.asyncio as aioredis
+
+            self._redis = aioredis.from_url(
+                redis_url, decode_responses=True, socket_connect_timeout=5
+            )
+            await self._redis.ping()
+            logger.info("MessageBus: Redis connected at %s", redis_url)
+            return True
+        except ImportError:
+            logger.warning("redis[asyncio] not installed — bus running in-memory only")
+        except Exception as exc:
+            logger.warning("Redis unavailable (%s) — bus running in-memory only", exc)
+        self._redis = None
+        return False
+
+    async def start_redis_listener(self, redis_url: str) -> None:
+        """Subscribe to Redis a2a:events and fan out to local SSE listeners.
+
+        Run this as a background task in the UI process to receive events
+        published by the factory process.
+        """
+        try:
+            import redis.asyncio as aioredis
+        except ImportError:
+            logger.warning("redis[asyncio] not installed — Redis listener not started")
+            return
+
+        while True:
+            try:
+                client = aioredis.from_url(
+                    redis_url, decode_responses=True, socket_connect_timeout=5
+                )
+                pubsub = client.pubsub()
+                await pubsub.subscribe(REDIS_CHANNEL)
+                logger.info(
+                    "MessageBus: Redis subscriber started on channel %s", REDIS_CHANNEL
+                )
+                async for raw in pubsub.listen():
+                    if raw["type"] != "message":
+                        continue
+                    try:
+                        data = json.loads(raw["data"])
+                        msg = A2AMessage(
+                            id=data.get("id", ""),
+                            session_id=data.get("session_id", ""),
+                            from_agent=data.get("from_agent", ""),
+                            to_agent=data.get("to_agent"),
+                            message_type=MessageType(data.get("message_type", "chat")),
+                            content=data.get("content", ""),
+                            metadata=data.get("metadata", {}),
+                            artifacts=data.get("artifacts", []),
+                            parent_id=data.get("parent_id"),
+                            priority=data.get("priority", 5),
+                            requires_response=bool(
+                                data.get("requires_response", False)
+                            ),
+                            timestamp=datetime.fromisoformat(data["timestamp"])
+                            if data.get("timestamp")
+                            else datetime.now(),
+                        )
+                        for q in self._sse_listeners:
+                            try:
+                                q.put_nowait(msg)
+                            except asyncio.QueueFull:
+                                pass
+                    except Exception as exc:
+                        logger.debug("Redis message parse error: %s", exc)
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                logger.warning("Redis listener error (%s) — reconnecting in 5s", exc)
+                await asyncio.sleep(5)
+
     # ── Dead Letter ───────────────────────────────────────────────────
 
     def _dead_letter_add(self, message: A2AMessage):
         self._dead_letter.append(message)
         self._stats["dead_letter"] += 1
         if len(self._dead_letter) > self._max_dead_letter:
-            self._dead_letter = self._dead_letter[-self._max_dead_letter:]
+            self._dead_letter = self._dead_letter[-self._max_dead_letter :]
 
     def get_dead_letters(self, limit: int = 50) -> list[A2AMessage]:
         return self._dead_letter[-limit:]
@@ -172,11 +282,17 @@ class MessageBus:
                     priority, requires_response, timestamp)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    message.id, message.session_id, message.from_agent,
-                    message.to_agent, message.message_type.value,
-                    message.content, json.dumps(message.metadata),
-                    json.dumps(message.artifacts), message.parent_id,
-                    message.priority, int(message.requires_response),
+                    message.id,
+                    message.session_id,
+                    message.from_agent,
+                    message.to_agent,
+                    message.message_type.value,
+                    message.content,
+                    json.dumps(message.metadata),
+                    json.dumps(message.artifacts),
+                    message.parent_id,
+                    message.priority,
+                    int(message.requires_response),
                     message.timestamp.isoformat(),
                 ),
             )
@@ -201,11 +317,14 @@ class MessageBus:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def search_messages(self, query: str, session_id: str = None, limit: int = 20) -> list[dict]:
+    def search_messages(
+        self, query: str, session_id: str = None, limit: int = 20
+    ) -> list[dict]:
         """Full-text search on messages."""
         if not self.db:
             return []
         from ..db.adapter import is_postgresql
+
         if is_postgresql():
             # PostgreSQL: tsvector search
             if session_id:
@@ -262,5 +381,6 @@ def get_bus() -> MessageBus:
     global _bus
     if _bus is None:
         from ..db.migrations import get_db
+
         _bus = MessageBus(db_conn=get_db())
     return _bus

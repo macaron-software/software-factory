@@ -9,6 +9,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed layers
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "platform/")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          UI_ONLY=true
+          while IFS= read -r f; do
+            if echo "$f" | grep -qE '^platform/(agents|missions|patterns|services|llm|db|a2a|ops|memory|generators|skills|tools|config|models|security|sessions|workers|events)'; then
+              UI_ONLY=false
+              break
+            fi
+          done <<< "$CHANGED"
+
+          echo "ui_only=$UI_ONLY" >> "$GITHUB_OUTPUT"
+          echo "Deploy mode: ui_only=$UI_ONLY"
 
       - name: Set up SSH
         run: |
@@ -54,7 +74,39 @@ jobs:
             echo "Disk available after cleanup: $AVAIL"
           ' || true
 
-      - name: Blue-Green Deploy
+      - name: Deploy Factory (when factory code changed)
+        if: steps.changes.outputs.ui_only == 'false'
+        run: |
+          ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/software-factory
+
+          # Ensure factory slot dir exists
+          mkdir -p /opt/software-factory/slots/factory
+
+          # Push new factory code to slot dir
+          rsync -a --delete /opt/software-factory/staging/platform/ \
+            /opt/software-factory/slots/factory/
+
+          # Ensure Redis is running
+          docker compose up -d --no-deps redis 2>/dev/null || true
+
+          # Start/restart factory container
+          docker compose up -d --no-deps platform-factory 2>/dev/null || true
+
+          # Wait for factory health
+          echo "Waiting for platform-factory..."
+          OK=0
+          for i in $(seq 1 20); do
+            sleep 3
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8092/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/20] factory health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          [ "$OK" = "1" ] && echo "platform-factory healthy ✓" || echo "WARNING: factory health check timed out (non-fatal)"
+          ENDSSH
+
+      - name: Blue-Green Deploy (UI / web process)
         run: |
           ssh -o StrictHostKeyChecking=no debian@${{ secrets.OVH_IP }} << 'ENDSSH'
           set -e
@@ -78,8 +130,11 @@ jobs:
           find /opt/software-factory/slots/${INACTIVE} -name "__pycache__" -type d \
             -exec rm -rf {} + 2>/dev/null || true
 
-          # ── Start inactive container ─────────────────────────────────────────
+          # ── Ensure Redis is running ──────────────────────────────────────────
           cd /opt/software-factory
+          docker compose up -d --no-deps redis 2>/dev/null || true
+
+          # ── Start inactive container ─────────────────────────────────────────
           docker compose up -d --no-deps platform-${INACTIVE}
 
           # ── Health check (up to 60s) ─────────────────────────────────────────
@@ -119,14 +174,15 @@ jobs:
           # ── Persist active slot ──────────────────────────────────────────────
           echo "$INACTIVE" > /opt/software-factory/active-slot
 
-          # ── Reboot script: restart only the active slot on boot ──────────────
+          # ── Reboot script: restart only the active slot + factory on boot ────
           BOOT_SCRIPT='/opt/software-factory/start-active-slot.sh'
           echo '#!/bin/bash' > "$BOOT_SCRIPT"
-          echo '# cron @reboot — starts only the active slot' >> "$BOOT_SCRIPT"
-          echo 'ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")' >> "$BOOT_SCRIPT"
+          echo '# cron @reboot — starts factory + active web slot' >> "$BOOT_SCRIPT"
           echo 'cd /opt/software-factory' >> "$BOOT_SCRIPT"
+          echo 'docker compose up -d --no-deps redis postgres platform-factory' >> "$BOOT_SCRIPT"
+          echo 'ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")' >> "$BOOT_SCRIPT"
           echo 'docker compose up -d --no-deps platform-${ACTIVE}' >> "$BOOT_SCRIPT"
-          echo 'echo "$(date) boot: started platform-${ACTIVE}" >> /var/log/sf-boot.log' >> "$BOOT_SCRIPT"
+          echo 'echo "$(date) boot: started factory + platform-${ACTIVE}" >> /var/log/sf-boot.log' >> "$BOOT_SCRIPT"
           chmod +x "$BOOT_SCRIPT"
           # Ensure cron @reboot entry exists (idempotent)
           (crontab -l 2>/dev/null | grep -v 'start-active-slot'; \
