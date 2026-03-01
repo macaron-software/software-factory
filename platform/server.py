@@ -1177,6 +1177,9 @@ def create_app() -> FastAPI:
     from .web.ws import router as sse_router
 
     app.include_router(auth_router)
+    from .web.routes.api.health import router as health_router
+
+    app.include_router(health_router)
     if _mode != "factory":
         from .web.routes import router as web_router
 
