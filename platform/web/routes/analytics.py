@@ -75,19 +75,19 @@ async def get_top_skills(limit: int = 10) -> SkillsTopResponse:
 
         db = get_db()
 
-        # Query skills usage with counts
+        # Count how many agents use each skill (via skills_json)
+        # skills table: id, name, source
         query = """
-            SELECT 
-                si.id,
-                si.title,
-                si.source,
-                COUNT(su.id) as usage_count,
-                MAX(su.used_at) as last_used
-            FROM skills_index si
-            LEFT JOIN skills_usage su ON si.id = su.skill_id
-            GROUP BY si.id, si.title, si.source
-            HAVING usage_count > 0
-            ORDER BY usage_count DESC
+            SELECT
+                s.id,
+                s.name  AS title,
+                s.source,
+                COUNT(DISTINCT a.id) as usage_count,
+                s.updated_at as last_used
+            FROM skills s
+            LEFT JOIN agents a ON a.skills_json LIKE '%' || s.id || '%'
+            GROUP BY s.id, s.name, s.source, s.updated_at
+            ORDER BY usage_count DESC, s.name ASC
             LIMIT ?
         """
 
@@ -95,11 +95,11 @@ async def get_top_skills(limit: int = 10) -> SkillsTopResponse:
 
         skills_data = [
             {
-                "id": row[0],
-                "title": row[1],
-                "source": row[2],
-                "usage_count": row[3],
-                "last_used": row[4],
+                "id": row["id"] if hasattr(row, "keys") else row[0],
+                "title": row["title"] if hasattr(row, "keys") else row[1],
+                "source": row["source"] if hasattr(row, "keys") else row[2],
+                "usage_count": row["usage_count"] if hasattr(row, "keys") else row[3],
+                "last_used": str(row["last_used"] if hasattr(row, "keys") else row[4]),
             }
             for row in results
         ]
@@ -382,13 +382,13 @@ async def get_tma_overview() -> TMAOverviewResponse:
 
         db = get_db()
 
-        # Count by type
+        # Count by category
         by_type = db.execute(
             """
-            SELECT type, COUNT(*) as count
-            FROM tma_tickets
+            SELECT category as type, COUNT(*) as count
+            FROM support_tickets
             WHERE status != 'archived'
-            GROUP BY type
+            GROUP BY category
             ORDER BY count DESC
         """
         ).fetchall()
@@ -397,7 +397,7 @@ async def get_tma_overview() -> TMAOverviewResponse:
         by_status = db.execute(
             """
             SELECT status, COUNT(*) as count
-            FROM tma_tickets
+            FROM support_tickets
             WHERE status != 'archived'
             GROUP BY status
             ORDER BY count DESC
@@ -406,7 +406,7 @@ async def get_tma_overview() -> TMAOverviewResponse:
 
         # Total tickets
         total = db.execute(
-            "SELECT COUNT(*) FROM tma_tickets WHERE status != 'archived'"
+            "SELECT COUNT(*) FROM support_tickets WHERE status != 'archived'"
         ).fetchone()[0]
 
         return TMAOverviewResponse(
@@ -434,23 +434,34 @@ async def get_system_health() -> SystemHealthResponse:
     try:
         import os
         from ...db.migrations import get_db
+        from ...db.adapter import is_postgresql
 
         db = get_db()
 
-        # Database size
+        # Database size (only meaningful for SQLite)
         db_path = "platform.db"
         db_size_mb = (
             os.path.getsize(db_path) / (1024 * 1024) if os.path.exists(db_path) else 0
         )
 
-        # Table counts
-        tables = db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-        ).fetchall()
+        # Table list — SQLite vs PostgreSQL
+        if is_postgresql():
+            tables_raw = db.execute(
+                "SELECT tablename as name FROM pg_tables WHERE schemaname='public' ORDER BY tablename"
+            ).fetchall()
+        else:
+            tables_raw = db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            ).fetchall()
 
         table_stats = []
         total_rows = 0
-        for (table_name,) in tables:
+        for row in tables_raw:
+            table_name = (
+                row[0]
+                if not hasattr(row, "keys")
+                else (row["name"] if "name" in row.keys() else row["tablename"])
+            )
             try:
                 count = db.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]  # noqa: S608
                 table_stats.append({"table": table_name, "rows": count})
@@ -463,7 +474,7 @@ async def get_system_health() -> SystemHealthResponse:
             data={
                 "database": {
                     "size_mb": round(db_size_mb, 2),
-                    "tables": len(tables),
+                    "tables": len(tables_raw),
                     "total_rows": total_rows,
                 },
                 "tables": sorted(table_stats, key=lambda x: x["rows"], reverse=True)[
@@ -487,9 +498,13 @@ async def get_analytics_overview() -> dict[str, Any]:
         missions_status = await get_missions_status()
         missions_perf = await get_missions_performance()
         agents_leaderboard = await get_agents_leaderboard(limit=5)
+        agents_util = await get_agents_utilization()
         tma_overview = await get_tma_overview()
         system_health = await get_system_health()
         cache_stats = await get_skills_cache_stats()
+
+        leaderboard = agents_leaderboard.data[:5] if agents_leaderboard.success else []
+        util_data = agents_util.get("data", {}) if agents_util.get("success") else {}
 
         return {
             "success": True,
@@ -505,11 +520,12 @@ async def get_analytics_overview() -> dict[str, Any]:
                     ),
                 },
                 "agents": {
-                    "leaderboard": (
-                        agents_leaderboard.data[:5]
-                        if agents_leaderboard.success
-                        else []
-                    ),
+                    "leaderboard": leaderboard,
+                    "utilization": {
+                        "total": util_data.get("total_agents", len(leaderboard)),
+                        "with_skills": util_data.get("agents_with_skills", 0),
+                        "utilization_rate": util_data.get("utilization_rate", 0),
+                    },
                 },
                 "tma": tma_overview.data if tma_overview.success else {},
                 "system": system_health.data if system_health.success else {},
@@ -1038,92 +1054,118 @@ async def get_agent_scores() -> dict[str, Any]:
 
 
 @router.get("/api/analytics/cost")
-async def get_cost_analytics() -> dict[str, Any]:
+async def get_cost_analytics(period: str = "7d") -> dict[str, Any]:
     """Cost & token analytics — breakdown by project/domain/agent from llm_traces."""
     try:
         from ...db.migrations import get_db
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
-        # Per-project breakdown (join via mission_runs.session_id → llm_traces.session_id)
-        project_rows = db.execute("""
+        # Map period to days
+        days = {"1d": 1, "7d": 7, "30d": 30}.get(period, 7)
+        since = f"datetime('now', '-{days} days')"
+
+        # Per-project breakdown
+        project_rows = db.execute(f"""
             SELECT
                 COALESCE(mr.project_id, 'unknown') as project_id,
                 COUNT(DISTINCT t.session_id) as sessions,
                 SUM(t.tokens_in + t.tokens_out) as tokens_total,
-                SUM(t.tokens_in) as tokens_in,
-                SUM(t.tokens_out) as tokens_out,
                 ROUND(SUM(t.cost_usd), 4) as cost_usd,
-                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as success_rate,
-                ROUND(AVG(t.duration_ms)) as avg_duration_ms
+                COUNT(DISTINCT mr.id) as missions
             FROM llm_traces t
             LEFT JOIN mission_runs mr ON mr.session_id = t.session_id
-            WHERE t.created_at >= datetime('now', '-30 days')
+            WHERE t.created_at >= {since}
             GROUP BY COALESCE(mr.project_id, 'unknown')
             ORDER BY cost_usd DESC
             LIMIT 30
-        """).fetchall()
+        """).fetchall()  # noqa: S608
 
-        # Per-agent breakdown
-        agent_rows = db.execute("""
+        # Per-model breakdown
+        model_rows = db.execute(f"""
             SELECT
-                t.agent_id,
-                COALESCE(a.name, t.agent_id) as agent_name,
                 t.model,
                 COUNT(*) as calls,
-                SUM(t.tokens_in + t.tokens_out) as tokens_total,
                 ROUND(SUM(t.cost_usd), 6) as cost_usd,
-                ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as success_rate
+                SUM(t.tokens_in + t.tokens_out) as tokens_total
             FROM llm_traces t
-            LEFT JOIN agents a ON a.id = t.agent_id
-            WHERE t.created_at >= datetime('now', '-30 days')
-              AND t.agent_id != ''
-            GROUP BY t.agent_id, t.model
+            WHERE t.created_at >= {since}
+            GROUP BY t.model
             ORDER BY cost_usd DESC
             LIMIT 20
-        """).fetchall()
+        """).fetchall()  # noqa: S608
 
-        # Daily cost trend (last 14 days)
-        daily_rows = db.execute("""
+        # Daily cost trend
+        daily_rows = db.execute(f"""
             SELECT
-                DATE(t.created_at) as day,
-                SUM(t.tokens_in + t.tokens_out) as tokens_total,
-                ROUND(SUM(t.cost_usd), 6) as cost_usd,
+                DATE(t.created_at) as date,
+                SUM(t.tokens_in + t.tokens_out) as tokens,
+                ROUND(SUM(t.cost_usd), 6) as cost,
                 COUNT(*) as calls
             FROM llm_traces t
-            WHERE t.created_at >= datetime('now', '-14 days')
+            WHERE t.created_at >= {since}
             GROUP BY DATE(t.created_at)
-            ORDER BY day ASC
-        """).fetchall()
+            ORDER BY date ASC
+        """).fetchall()  # noqa: S608
 
         # Summary totals
-        totals = db.execute("""
+        totals = db.execute(f"""
             SELECT
                 SUM(t.tokens_in + t.tokens_out) as tokens_total,
                 SUM(t.tokens_in) as tokens_in,
                 SUM(t.tokens_out) as tokens_out,
                 ROUND(SUM(t.cost_usd), 4) as cost_usd,
                 COUNT(*) as calls,
-                COUNT(DISTINCT t.session_id) as sessions,
                 ROUND(100.0 * SUM(CASE WHEN t.status='ok' THEN 1 ELSE 0 END) /
-                    (COUNT(*) + 0.001), 1) as success_rate,
-                ROUND(AVG(t.duration_ms)) as avg_duration_ms
+                    (COUNT(*) + 0.001), 1) as success_rate
             FROM llm_traces t
-            WHERE t.created_at >= datetime('now', '-30 days')
-        """).fetchone()
+            WHERE t.created_at >= {since}
+        """).fetchone()  # noqa: S608
 
-        db.close()
+        total_cost = float(totals["cost_usd"] or 0) if totals else 0
+        total_calls = int(totals["calls"] or 0) if totals else 0
 
         return {
             "success": True,
-            "period": "last_30_days",
-            "summary": dict(totals) if totals else {},
-            "by_project": [dict(r) for r in project_rows],
-            "by_agent": [dict(r) for r in agent_rows],
-            "daily_trend": [dict(r) for r in daily_rows],
+            "period": period,
+            "total_cost_usd": total_cost,
+            "total_tokens_in": int(totals["tokens_in"] or 0) if totals else 0,
+            "total_tokens_out": int(totals["tokens_out"] or 0) if totals else 0,
+            "total_calls": total_calls,
+            "success_rate": float(totals["success_rate"] or 0) / 100 if totals else 0,
+            "avg_cost_per_mission": round(total_cost / max(total_calls, 1), 6),
+            "by_project": [
+                {
+                    "project_id": r["project_id"] if hasattr(r, "keys") else r[0],
+                    "name": r["project_id"] if hasattr(r, "keys") else r[0],
+                    "cost": float(r["cost_usd"] if hasattr(r, "keys") else r[3] or 0),
+                    "tokens": int(
+                        r["tokens_total"] if hasattr(r, "keys") else r[2] or 0
+                    ),
+                    "missions": int(r["missions"] if hasattr(r, "keys") else r[4] or 0),
+                }
+                for r in project_rows
+            ],
+            "by_model": [
+                {
+                    "model": r["model"] if hasattr(r, "keys") else r[0],
+                    "calls": int(r["calls"] if hasattr(r, "keys") else r[1] or 0),
+                    "cost": float(r["cost_usd"] if hasattr(r, "keys") else r[2] or 0),
+                    "tokens": int(
+                        r["tokens_total"] if hasattr(r, "keys") else r[3] or 0
+                    ),
+                }
+                for r in model_rows
+            ],
+            "by_day": [
+                {
+                    "date": str(r["date"] if hasattr(r, "keys") else r[0]),
+                    "tokens": int(r["tokens"] if hasattr(r, "keys") else r[1] or 0),
+                    "cost": float(r["cost"] if hasattr(r, "keys") else r[2] or 0),
+                    "calls": int(r["calls"] if hasattr(r, "keys") else r[3] or 0),
+                }
+                for r in daily_rows
+            ],
         }
     except Exception as e:
         logger.exception("Cost analytics error")
