@@ -531,7 +531,6 @@ async def workflow_resume(session_id: str):
 async def workflow_nogo(session_id: str):
     """Reject a paused workflow checkpoint — stops the workflow as failed."""
     from ...sessions.store import get_session_store
-    from ...sessions.models import SessionStatus
     from ...db.migrations import get_db
 
     store = get_session_store()
@@ -539,7 +538,7 @@ async def workflow_nogo(session_id: str):
     if not sess:
         return {"error": "Session not found"}
 
-    store.update_status(session_id, SessionStatus.FAILED)
+    store.update_status(session_id, "failed")
 
     # Record NO GO message in thread
     from ...sessions.store import MessageDef
