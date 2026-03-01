@@ -959,54 +959,61 @@ async def _cleanup_disk() -> None:
     """Hourly cleanup: orphaned workspaces + old LLM traces + stale cancelled runs."""
     from ..db.migrations import get_db
 
-    db = get_db()
+    db = None
+    try:
+        db = get_db()
 
-    # 1. Remove workspaces for non-active sessions
-    ws_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "workspaces")
-    ws_dir = os.path.normpath(ws_dir)
-    if not os.path.isdir(ws_dir):
-        # Try absolute path used in container
-        ws_dir = "/app/data/workspaces"
-    if os.path.isdir(ws_dir):
-        active_sessions = {
-            r[0]
-            for r in db.execute(
-                "SELECT session_id FROM mission_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
-            ).fetchall()
-        }
-        removed_ws = 0
-        for ws_name in os.listdir(ws_dir):
-            if ws_name not in active_sessions:
-                try:
-                    shutil.rmtree(os.path.join(ws_dir, ws_name))
-                    removed_ws += 1
-                except Exception:
-                    pass
-        if removed_ws:
-            logger.warning("cleanup_disk: removed %d orphaned workspaces", removed_ws)
+        # 1. Remove workspaces for non-active sessions
+        ws_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "workspaces")
+        ws_dir = os.path.normpath(ws_dir)
+        if not os.path.isdir(ws_dir):
+            # Try absolute path used in container
+            ws_dir = "/app/data/workspaces"
+        if os.path.isdir(ws_dir):
+            active_sessions = {
+                r[0]
+                for r in db.execute(
+                    "SELECT session_id FROM mission_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
+                ).fetchall()
+            }
+            removed_ws = 0
+            for ws_name in os.listdir(ws_dir):
+                if ws_name not in active_sessions:
+                    try:
+                        shutil.rmtree(os.path.join(ws_dir, ws_name))
+                        removed_ws += 1
+                    except Exception:
+                        pass
+            if removed_ws:
+                logger.warning("cleanup_disk: removed %d orphaned workspaces", removed_ws)
 
-    # 2. Purge LLM traces older than 14 days (keep recent for observability)
-    deleted_traces = db.execute(
-        "DELETE FROM llm_traces WHERE created_at < datetime('now', '-14 days')"
-    ).rowcount
-    if deleted_traces:
-        db.commit()
-        logger.warning("cleanup_disk: purged %d LLM traces >14d", deleted_traces)
+        # 2. Purge LLM traces older than 14 days (keep recent for observability)
+        deleted_traces = db.execute(
+            "DELETE FROM llm_traces WHERE created_at < datetime('now', '-14 days')"
+        ).rowcount
+        if deleted_traces:
+            db.commit()
+            logger.warning("cleanup_disk: purged %d LLM traces >14d", deleted_traces)
 
-    # 3. Purge cancelled run records older than 7 days
-    deleted_runs = db.execute(
-        "DELETE FROM mission_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
-    ).rowcount
-    if deleted_runs:
-        db.commit()
-        logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
+        # 3. Purge cancelled run records older than 7 days
+        deleted_runs = db.execute(
+            "DELETE FROM mission_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
+        ).rowcount
+        if deleted_runs:
+            db.commit()
+            logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
 
-    # 4. SQLite VACUUM to reclaim space after mass deletes
-    if deleted_traces + deleted_runs > 100:
-        db.execute("VACUUM")
-        logger.warning(
-            "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
-        )
+        # 4. SQLite VACUUM to reclaim space after mass deletes
+        if deleted_traces + deleted_runs > 100:
+            db.execute("VACUUM")
+            logger.warning(
+                "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
+            )
+    except Exception:
+        pass
+    finally:
+        if db:
+            db.close()
 
 
 async def _cleanup_workspace_containers() -> None:

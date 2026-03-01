@@ -807,6 +807,7 @@ class MissionContextBuilder:
 
     def _load_po_kanban(self, mission, tool_features):
         po_backlog, po_sprint, po_done = [], [], []
+        db = None
         try:
             from ..db.migrations import get_db
 
@@ -832,6 +833,9 @@ class MissionContextBuilder:
                     po_backlog.append(feat)
         except Exception:
             pass
+        finally:
+            if db:
+                db.close()
         if not po_backlog and not po_sprint and not po_done and tool_features:
             for f in tool_features:
                 po_done.append(

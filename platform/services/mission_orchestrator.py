@@ -1265,6 +1265,7 @@ class MissionOrchestrator:
                         _pre_phase_msg_count,
                     )
                 )
+                _fdb = None
                 try:
                     from ..db.migrations import get_db as _gdb_feat
 
@@ -1314,6 +1315,9 @@ class MissionOrchestrator:
                         )
                 except Exception:
                     pass
+                finally:
+                    if _fdb:
+                        _fdb.close()
 
             await self._push_sse(
                 session_id,

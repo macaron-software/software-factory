@@ -997,10 +997,14 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
             (tid, mission_id, title, desc, severity, category, agent_id),
         )
         db.commit()
-        db.close()
         return f"Ticket {tid} created: [{severity}] {title}"
     except Exception as e:
         return f"Error creating ticket: {e}"
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
 
 
 async def _tool_local_ci(args: dict, ctx: ExecutionContext) -> str:
