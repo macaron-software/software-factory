@@ -6,7 +6,7 @@ import hashlib
 import logging
 import os
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .sanitize import sanitize_user_input, sanitize_agent_output, sanitize_command
@@ -82,7 +82,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             or hashlib.sha256(token.encode()).hexdigest()
             != hashlib.sha256(api_key.encode()).hexdigest()
         ):
-            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+            from starlette.responses import JSONResponse as _JSONResponse
+
+            return _JSONResponse(
+                {"detail": "Invalid or missing API key"}, status_code=401
+            )
 
         request.state.authenticated = True
         return await call_next(request)

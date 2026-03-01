@@ -825,7 +825,7 @@ async def llm_costs():
                 ],
                 "daily": [
                     {
-                        "date": r["date"],
+                        "date": str(r["date"]),
                         "calls": r["calls"],
                         "cost_usd": round(r["cost_usd"], 6),
                     }
@@ -1055,7 +1055,7 @@ async def cost_analytics(request: Request, period: str = "7d"):
                 ],
                 "by_day": [
                     {
-                        "date": r["date"],
+                        "date": str(r["date"]),
                         "cost": round(r["cost"], 6),
                         "tokens": r["tokens"] or 0,
                     }
