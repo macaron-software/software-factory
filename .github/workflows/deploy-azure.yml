@@ -51,8 +51,10 @@ jobs:
           # ── Migrate old single-container setup if needed ─────────────────────
           docker stop deploy-platform-1 2>/dev/null || true
 
-          # ── Determine active / inactive slot ────────────────────────────────
-          ACTIVE=$(cat /opt/macaron/active-slot 2>/dev/null || echo "blue")
+          # ── Determine active / inactive slot (ground truth = nginx conf) ───
+          ACTIVE=$(grep -oE 'platform-(blue|green)' /home/azureadmin/macaron-nginx-conf/default.conf \
+            2>/dev/null | head -1 | sed 's/platform-//' || echo "blue")
+          ACTIVE=${ACTIVE:-blue}
           INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
           echo "=== Blue-Green: $ACTIVE → $INACTIVE ==="
 
@@ -105,7 +107,7 @@ jobs:
           docker compose --env-file /opt/macaron/.env -f "$COMPOSE" \
             stop platform-${ACTIVE} 2>/dev/null || true
 
-          # ── Persist active slot ──────────────────────────────────────────────
-          echo "$INACTIVE" > /opt/macaron/active-slot
+          # ── Persist active slot (azureadmin-writable path) ──────────────────
+          echo "$INACTIVE" > /home/azureadmin/macaron-active-slot
           echo "=== Deploy complete: active=$INACTIVE ==="
           ENDSSH
