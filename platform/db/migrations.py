@@ -1069,6 +1069,19 @@ def _migrate(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_wiki_cat ON wiki_pages(category)")
 
+    # ── Wiki translations (i18n content) ─────────────────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS wiki_translations (
+            slug TEXT NOT NULL,
+            lang TEXT NOT NULL,
+            title TEXT NOT NULL,
+            content TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (slug, lang)
+        )
+    """)
+
     # ── Evolution / GA tables ─────────────────────────────────────────
     conn.execute("""
         CREATE TABLE IF NOT EXISTS evolution_proposals (

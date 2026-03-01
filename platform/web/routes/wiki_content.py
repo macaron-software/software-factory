@@ -11,9 +11,9 @@ WIKI_PAGES = [
         "content": """\
 # Getting Started
 
-Welcome to the **Macaron Software Factory** — a multi-agent collaborative platform for software engineering.
+Welcome to the **Macaron Software Factory** — a multi-agent collaborative platform for autonomous software engineering.
 
-## Quick Start
+## Quick Start (local)
 
 ```bash
 # Clone & install
@@ -21,10 +21,10 @@ git clone https://github.com/macaron-software/software-factory.git
 cd software-factory/platform
 pip install -r requirements.txt
 
-# Run locally
-python -m uvicorn platform.server:app --port 8090 --ws none
+# Run locally (from parent directory — NEVER use --reload)
+python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
 
-# Open http://localhost:8090
+# Open http://localhost:8099
 ```
 
 ## Docker
@@ -50,7 +50,17 @@ make run      # starts platform on port 8090
 | `PLATFORM_LLM_PROVIDER` | `minimax` | LLM provider (minimax, azure-openai, azure-ai) |
 | `PLATFORM_LLM_MODEL` | `MiniMax-M2.5` | Model name |
 | `PLATFORM_PORT` | `8090` | HTTP port |
-| `PLATFORM_DB_PATH` | `data/platform.db` | SQLite database path |
+| `DATABASE_URL` | *(none)* | PostgreSQL URL — `postgresql://user:pass@host/db` |
+| `REDIS_URL` | *(none)* | Redis URL — `redis://host:6379/0` (optional, enables pub/sub) |
+| `PLATFORM_MODE` | `full` | Process mode: `full`, `factory` (headless), or `ui` (web only) |
+| `PLATFORM_DB_PATH` | `data/platform.db` | SQLite path (dev only, ignored when DATABASE_URL set) |
+
+## Important Caveats
+
+- **NEVER** use `--reload` with uvicorn (naming conflict with Python stdlib `platform` module)
+- **NEVER** `import platform` at top-level inside the package
+- **Always** run from the parent directory: `python -m uvicorn platform.server:app ...`
+- `--ws none` is mandatory (the platform uses SSE, not WebSockets)
 """,
     },
     {
@@ -169,26 +179,37 @@ Live agent collaboration with real-time SSE streaming, color-coded by role.
         "content": """\
 # Architecture Overview
 
+## Production Architecture (IHM/Factory decoupled)
+
 ```
-┌─── Web UI (HTMX + SSE) ────────────────────────────────┐
-│  Dashboard │ Projects │ Sessions │ Agents │ Metrics      │
-└─────────────────────────────────────────────────────────┘
-         │ SSE (real-time)          │ REST API
-┌────────┴──────────────────────────┴────────────────────┐
-│              ORCHESTRATOR (Python/FastAPI)               │
-│  Router │ Scheduler (WSJF) │ A2A Bus │ Pattern Engine   │
-└─────────────────────────────────────────────────────────┘
-         │
-┌────────┴────────────────────────────────────────────────┐
-│              AGENT RUNTIME                               │
-│  👔 Business  📋 PM  🏗️ Lead Dev  💻 Dev  🧪 Tester    │
-│  🔒 Security  🚀 DevOps  🏛️ Architect  🎨 UX  📊 Data │
-└─────────────────────────────────────────────────────────┘
-         │
-┌────────┴────────────────────────────────────────────────┐
-│  LLM Providers │ Memory (SQLite+FTS5) │ MCP Tools       │
-└─────────────────────────────────────────────────────────┘
+Browser
+  |
+  v
+nginx (port 80/443)  --  blue-green switch
+  +-- /* --> platform-web-blue/green:8090  (IHM, restartable)
+
+platform-web  --Redis sub-->  Redis pub/sub  <--Redis pub--  platform-factory
+                                                                    |
+                                                              PostgreSQL (shared)
 ```
+
+- **platform-factory** — headless agent engine, never restarts on UI changes
+  - Missions, patterns engine, orchestrator, watchdog, A2A bus
+  - Publishes events to Redis channel `a2a:events`
+- **platform-web** (blue/green) — IHM, hot-restartable
+  - Web routes, Jinja2 templates, static files, SSE streams
+  - Subscribes to Redis `a2a:events` and forwards to browser SSE
+- **Redis** — pub/sub bridge between factory and web containers
+- **PostgreSQL** — shared persistent storage (both containers read/write)
+- **nginx** — blue-green switch + TLS termination
+
+`PLATFORM_MODE` controls which subsystems start:
+
+| Mode | Factory (agents/missions) | Web (routes/UI) | Redis listener |
+|------|--------------------------|-----------------|----------------|
+| `full` | yes | yes | if REDIS_URL set |
+| `factory` | yes | no | publisher |
+| `ui` | no | yes | subscriber |
 
 ## Tech Stack
 
@@ -196,39 +217,60 @@ Live agent collaboration with real-time SSE streaming, color-coded by role.
 |-------|-----------|
 | **Frontend** | HTMX + Jinja2 templates + SSE |
 | **Backend** | Python 3.12 + FastAPI + Uvicorn |
-| **Database** | SQLite (WAL) + FTS5 full-text search |
-| **LLM** | MiniMax M2.5, Azure OpenAI, Azure AI |
+| **Database** | PostgreSQL (prod) / SQLite WAL (dev) |
+| **Cache/Pub-sub** | Redis 7 (optional, fallback to in-memory) |
+| **LLM** | MiniMax M2.5, Azure OpenAI gpt-5-mini, Azure AI |
 | **Tools** | MCP protocol (fetch, memory, playwright, solaris) |
-| **Deploy** | Docker on Azure VM + nginx |
+| **Deploy** | Docker + docker-compose on Azure VM + OVH VPS |
+| **Reverse proxy** | nginx — blue-green + TLS + HSTS |
 | **Auth** | JWT (HttpOnly cookies) |
+| **i18n** | 18 languages via Accept-Language header |
 
 ## Directory Structure
 
 ```
 platform/
-├── server.py          # FastAPI entry point (port 8090)
-├── config.py          # Configuration
-├── models.py          # Pydantic models
-├── web/
-│   ├── routes/        # 13 route modules + API sub-package
-│   ├── templates/     # Jinja2 HTML templates
-│   └── static/        # CSS, JS, images
-├── agents/            # Agent loop, executor, store
-├── orchestrator/      # Mission orchestrator, WSJF
-├── patterns/          # 15 orchestration patterns
-├── workflows/         # 36 built-in workflows
-├── llm/               # Multi-provider LLM client
-├── tools/             # Code, git, deploy, memory, security
-├── db/                # Migrations and adapters
-├── a2a/               # Agent-to-Agent protocol
-├── missions/          # SAFe lifecycle
-├── mcps/              # MCP server manager
-├── memory/            # Persistent memory (FTS5)
-├── services/          # Notifications
-├── ops/               # Auto-heal, chaos, backup
-├── security/          # Auth, RBAC
-└── i18n/              # 8 languages
+|-- server.py          # FastAPI entry point + PLATFORM_MODE dispatch
+|-- config.py          # Configuration (7 classes)
+|-- models.py          # Pydantic models (~25)
+|-- web/
+|   |-- routes/        # 13 route modules + wiki, wiki_content
+|   |-- templates/     # Jinja2 HTML templates (64 files)
+|   +-- static/        # CSS, JS, images
+|-- agents/            # Agent loop, executor, store, tool_schemas
+|-- orchestrator/      # Mission orchestrator, WSJF
+|-- patterns/          # 15 orchestration patterns + engine
+|-- workflows/         # 36 built-in workflows
+|-- llm/               # Multi-provider LLM client (fallback chain)
+|-- tools/             # Code, git, deploy, memory, security, web, MCP
+|-- db/                # Migrations, PG adapter, pool management
+|-- a2a/               # Agent-to-Agent protocol + Redis pub/sub backend
+|-- missions/          # SAFe lifecycle (Epics, Features, Stories, Tasks)
+|-- mcps/              # MCP server manager
+|-- memory/            # 4-layer persistent memory (FTS5)
+|-- services/          # Notifications + mission orchestration
+|-- ops/               # Auto-heal, chaos, backup/restore
+|-- security/          # Auth, RBAC, permissions
+|-- i18n/              # Locale catalogs (18 languages)
++-- deploy/            # Dockerfile, docker-compose-vm.yml, nginx configs
 ```
+
+## Agent Architecture
+
+```
+Pattern Engine (engine.py)
+  |
+  +-- Sequential: A -> B -> C
+  +-- Parallel: A | B | C -> merge
+  +-- Hierarchical: Lead -> [Dev1, Dev2, QA]
+  +-- Loop: iterate until quality gate passes
+  +-- Router: dispatch by content type
+  +-- Aggregator: synthesize multiple outputs
+  +-- Adversarial: L0 (deterministic) + L1 (LLM guard)
+  +-- Network: debate / human-in-the-loop
+```
+
+See [Orchestration Patterns](patterns) for details.
 """,
     },
     {
@@ -543,34 +585,208 @@ Cost of Delay = User Value + Time Criticality + Risk Reduction
         "content": """\
 # Deployment Guide
 
-## Docker (Recommended)
+## Environments
+
+| Environment | URL | Server | Mode |
+|-------------|-----|--------|------|
+| Local dev | http://localhost:8099 | macOS, Python 3.12 | full |
+| OVH Demo | http://54.36.183.124 | Debian VPS | full |
+| Azure Prod | https://sf.macaron-software.com | Azure VM D4as_v5 4CPU/16GB | factory + web blue/green |
+
+## Local Development
+
+```bash
+cd software-factory/platform
+pip install -r requirements.txt
+
+# Run (NEVER --reload, ALWAYS --ws none, run from parent dir)
+python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
+
+# Tests
+python -m pytest tests/ -v                  # unit + integration
+cd tests/e2e && npx playwright test         # E2E (82+ tests)
+```
+
+## Docker (local or simple server)
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
 docker compose up -d
-# → http://localhost:8090
+# -> http://localhost:8090
 ```
 
-## Azure VM (Production)
+## Azure Prod — Blue-Green Deployment
+
+Architecture: nginx -> blue/green swap. Factory never restarts for UI changes.
+
+```
+nginx:443 -> platform-web-blue:8090  (active)
+          -> platform-web-green:8090 (standby)
+platform-factory:8091               (always-on headless engine)
+redis:6379                          (pub/sub bridge)
+postgres:5432                       (shared DB)
+```
+
+### Full redeploy (rsync + rebuild)
 
 ```bash
-# nginx reverse proxy → Docker container (port 8090)
-# Patches: /opt/macaron/patches → /patches in container
-# Backup: docker exec platform cp /app/data/platform.db /app/data/backup.db
+SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
+rsync -azP --delete \
+  --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' \
+  platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
+  "cd /opt/macaron && docker compose --env-file .env \
+   -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
 ```
 
-## Local Development
+### Hotpatch (no rebuild, no factory restart)
 
 ```bash
-cd platform && pip install -r requirements.txt
-# NEVER --reload, ALWAYS --ws none
-python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
-
-# Tests
-python -m pytest tests/ -v                    # 52+ tests
-cd tests/e2e && npx playwright test           # 82+ E2E tests
+# Fast: copy files, restart only web container
+tar cf /tmp/update.tar web/templates/ web/static/ web/routes/
+scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
+  "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && \
+   docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && \
+   docker restart deploy-platform-1"
 ```
+
+> Note: hotpatch content is lost on next `docker compose --build`. Always rsync before rebuild.
+
+### Blue-green switch (nginx)
+
+```bash
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
+  "docker exec nginx-proxy sh -c 'ln -sf /etc/nginx/conf.d/blue.conf /etc/nginx/conf.d/active.conf && nginx -s reload'"
+```
+
+## OVH Demo
+
+```bash
+ssh debian@54.36.183.124
+cd /opt/software-factory
+docker compose pull && docker compose up -d
+```
+
+CI/CD: GitHub Actions `.github/workflows/deploy-demo.yml`
+Secrets: `OVH_SSH_KEY`, `OVH_IP`
+
+## CI/CD
+
+| Pipeline | Trigger | Actions |
+|----------|---------|---------|
+| `.github/workflows/deploy-demo.yml` | push to `main` | rsync + docker restart on OVH |
+| `.gitlab-ci.yml` | push to `main` | rsync + docker build on Azure |
+
+Smart deploy: if diff limited to `web/templates/`, `web/static/`, `web/routes/` only, factory is NOT restarted.
+""",
+    },
+    {
+        "slug": "resilience",
+        "title": "Resilience & Stability",
+        "category": "DevOps",
+        "icon": "",
+        "sort_order": 15,
+        "content": """\
+# Resilience & Stability
+
+## PostgreSQL Connection Pool
+
+The platform uses `psycopg_pool.ConnectionPool` (psycopg3 sync pool) with an asyncio FastAPI server.
+
+| Container | Pool size | Notes |
+|-----------|-----------|-------|
+| platform-factory | 20 | Runs missions, watchdog, auto-resume, auto-heal concurrently |
+| platform-web (blue/green) | 5 | Read-heavy, lighter load |
+
+### Connection Leak Prevention
+
+All DB connections MUST follow this pattern:
+
+```python
+db = None
+try:
+    db = get_db()
+    # ... work ...
+finally:
+    if db:
+        db.close()   # returns connection to pool via putconn()
+```
+
+A missing `finally` block = connection never returned to pool on exception.
+The `PgConnectionWrapper` has a `__del__` GC safety net, but GC is non-deterministic.
+
+### Symptoms of Pool Exhaustion
+
+```
+PoolTimeout: couldn't get a connection after 15.00 sec
+```
+
+This appears in logs when all connections are held (either active or leaked).
+Check with: `SELECT count(*), state FROM pg_stat_activity GROUP BY state;`
+
+## Blue-Green nginx Failover
+
+nginx upstream uses a health-checked blue-green switch:
+
+```nginx
+upstream platform_web {
+    server platform-blue:8090  max_fails=3 fail_timeout=10s;
+    server platform-green:8090 max_fails=3 fail_timeout=10s backup;
+}
+```
+
+Health endpoint: `GET /health` returns `{"status": "ok"}` with HTTP 200.
+nginx re-adds a recovered upstream automatically after `fail_timeout`.
+
+## IHM / Factory Decoupling
+
+**Problem:** Restarting the web container to deploy a UI change was interrupting running missions.
+
+**Solution:** `PLATFORM_MODE` splits the process:
+
+- `factory`: starts agents/missions/orchestrator, connects Redis as publisher, no HTTP routes
+- `ui`: starts web routes/templates/SSE, subscribes Redis for events, no agent execution
+- `full`: both (default, for dev or simple deployments)
+
+Redis pub/sub channel: `a2a:events` — factory publishes, web subscribes and forwards to browser SSE.
+Fallback: if `REDIS_URL` is not set, falls back to in-memory bus (no cross-process events, `full` mode only).
+
+## Stability Test Suite
+
+Located at `platform/tests/test_stability.py`. Run with:
+
+```bash
+STABILITY_TESTS=1 \
+STABILITY_AZ_HOST=https://sf.macaron-software.com \
+STABILITY_OVH_HOST=http://54.36.183.124 \
+python -m pytest tests/test_stability.py -v -m stability
+```
+
+| Test | What it checks |
+|------|---------------|
+| `test_health_az/ovh` | `/health` returns 200 |
+| `test_latency_p99` | p99 < 3s over 20 requests |
+| `test_concurrent_10/50` | 10/50 concurrent requests, < 5% error rate |
+| `test_rate_limit` | 429 returned when rate exceeded |
+| `test_pages_smoke` | 8 key pages return 200 |
+| `test_sse_connect` | SSE stream connects and sends `:ping` keepalive |
+| `test_disk_memory` | disk < 90%, memory < 90% |
+| `test_hot_restart` | container restart, service back in < 30s |
+| `test_nginx_failover` | stop blue, nginx switches to green, back in < 10s |
+| `test_cold_restart` | full server reboot, service back in < 120s |
+| `test_chaos_pause_resume` | docker pause/unpause mission container |
+
+## Auto-Heal
+
+`ops/auto_heal.py` monitors platform health every 60s and creates P1/P2 incidents for:
+
+- LLM provider failures (auto-switches provider)
+- PG pool exhaustion (logs alert, triggers incident)
+- Container memory > 90% (creates P0 incident)
+
+Incidents visible at `/toolbox` under the Incidents tab.
 """,
     },
     {
@@ -2924,6 +3140,393 @@ Five tabs accessible at `/teams`:
 - [Agents System](agents) — agent catalog and roles
 - [Orchestration Patterns](patterns) — where `skill:` prefix activates Darwin
 - [Metrics Guide](metrics-guide) — DORA and quality metrics
+""",
+    },
+]
+
+# ── French translations ────────────────────────────────────────────────────────
+# Each entry overrides the EN page for French-speaking browsers.
+WIKI_TRANSLATIONS = [
+    {
+        "slug": "getting-started",
+        "lang": "fr",
+        "title": "Premiers pas",
+        "content": """\
+# Premiers pas
+
+Bienvenue dans la **Macaron Software Factory** — une plateforme multi-agents pour l'ingénierie logicielle autonome.
+
+## Démarrage rapide (local)
+
+```bash
+# Cloner et installer
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory/platform
+pip install -r requirements.txt
+
+# Lancer (depuis le répertoire parent — JAMAIS --reload)
+python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
+
+# Ouvrir http://localhost:8099
+```
+
+## Docker
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+make setup    # construit l'image Docker
+make run      # démarre la plateforme sur le port 8090
+```
+
+## Premiers pas dans l'interface
+
+1. **Compléter l'onboarding** — le premier écran guide la configuration initiale
+2. **Créer un projet** — aller dans Projets → Nouveau projet
+3. **Lancer une mission** — ouvrir le projet et envoyer un message au Lead Agent
+4. **Observer la collaboration** — la vue session affiche la collaboration en temps réel via SSE
+
+## Variables d'environnement
+
+| Variable | Défaut | Description |
+|----------|--------|-------------|
+| `PLATFORM_LLM_PROVIDER` | `minimax` | Fournisseur LLM (minimax, azure-openai, azure-ai) |
+| `PLATFORM_LLM_MODEL` | `MiniMax-M2.5` | Nom du modèle |
+| `PLATFORM_PORT` | `8090` | Port HTTP |
+| `DATABASE_URL` | *(aucun)* | URL PostgreSQL — `postgresql://user:pass@host/db` |
+| `REDIS_URL` | *(aucun)* | URL Redis — `redis://host:6379/0` (optionnel, active le pub/sub) |
+| `PLATFORM_MODE` | `full` | Mode de process : `full`, `factory` (headless) ou `ui` (web uniquement) |
+| `PLATFORM_DB_PATH` | `data/platform.db` | Chemin SQLite (dev uniquement) |
+
+## Points importants
+
+- Ne **jamais** utiliser `--reload` avec uvicorn (conflit avec le module stdlib `platform`)
+- Ne **jamais** faire `import platform` en top-level dans le package
+- Toujours lancer depuis le répertoire parent : `python -m uvicorn platform.server:app ...`
+- `--ws none` est obligatoire (la plateforme utilise SSE, pas WebSocket)
+""",
+    },
+    {
+        "slug": "architecture",
+        "lang": "fr",
+        "title": "Architecture",
+        "content": """\
+# Architecture
+
+## Architecture de production (IHM/Factory découplées)
+
+```
+Navigateur
+  |
+  v
+nginx (port 80/443)  --  commutation blue-green
+  +-- /* --> platform-web-blue/green:8090  (IHM, redémarrable)
+
+platform-web  --Redis sub-->  Redis pub/sub  <--Redis pub--  platform-factory
+                                                                    |
+                                                              PostgreSQL (partagé)
+```
+
+- **platform-factory** — moteur d'agents headless, ne redémarre jamais pour une modif UI
+  - Missions, moteur de patterns, orchestrateur, watchdog, bus A2A
+  - Publie les events sur le canal Redis `a2a:events`
+- **platform-web** (blue/green) — IHM, redémarrable à chaud
+  - Routes web, templates Jinja2, fichiers statiques, flux SSE
+  - S'abonne à Redis `a2a:events` et relaie vers le navigateur via SSE
+- **Redis** — pont pub/sub entre les conteneurs factory et web
+- **PostgreSQL** — stockage persistant partagé
+- **nginx** — commutation blue-green + terminaison TLS
+
+`PLATFORM_MODE` contrôle les sous-systèmes démarrés :
+
+| Mode | Factory (agents/missions) | Web (routes/IHM) | Listener Redis |
+|------|--------------------------|-----------------|----------------|
+| `full` | oui | oui | si REDIS_URL défini |
+| `factory` | oui | non | publisher |
+| `ui` | non | oui | subscriber |
+
+## Stack technique
+
+| Couche | Technologie |
+|--------|-------------|
+| **Frontend** | HTMX + templates Jinja2 + SSE |
+| **Backend** | Python 3.12 + FastAPI + Uvicorn |
+| **Base de données** | PostgreSQL (prod) / SQLite WAL (dev) |
+| **Cache/Pub-sub** | Redis 7 (optionnel, fallback in-memory) |
+| **LLM** | MiniMax M2.5, Azure OpenAI gpt-5-mini, Azure AI |
+| **Outils** | Protocole MCP (fetch, memory, playwright, solaris) |
+| **Déploiement** | Docker + docker-compose sur Azure VM + OVH VPS |
+| **Reverse proxy** | nginx — blue-green + TLS + HSTS |
+| **Auth** | JWT (cookies HttpOnly) |
+| **i18n** | 18 langues via en-tête Accept-Language |
+
+## Architecture des agents
+
+```
+Moteur de patterns (engine.py)
+  |
+  +-- Sequential  : A -> B -> C
+  +-- Parallel    : A | B | C -> fusion
+  +-- Hierarchical: Lead -> [Dev1, Dev2, QA]
+  +-- Loop        : itère jusqu'au critère qualité
+  +-- Router      : dispatch par type de contenu
+  +-- Aggregator  : synthèse de sorties multiples
+  +-- Adversarial : L0 (déterministe) + L1 (garde LLM)
+  +-- Network     : débat / human-in-the-loop
+```
+
+Voir [Patterns d'orchestration](patterns) pour les détails.
+""",
+    },
+    {
+        "slug": "deployment",
+        "lang": "fr",
+        "title": "Guide de déploiement",
+        "content": """\
+# Guide de déploiement
+
+## Environnements
+
+| Environnement | URL | Serveur | Mode |
+|---------------|-----|---------|------|
+| Dev local | http://localhost:8099 | macOS, Python 3.12 | full |
+| OVH Démo | http://54.36.183.124 | VPS Debian | full |
+| Azure Prod | https://sf.macaron-software.com | Azure VM D4as_v5 4CPU/16GB | factory + web blue/green |
+
+## Développement local
+
+```bash
+cd software-factory/platform
+pip install -r requirements.txt
+
+# Lancer (JAMAIS --reload, TOUJOURS --ws none, depuis le répertoire parent)
+python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
+
+# Tests
+python -m pytest tests/ -v                  # tests unitaires + intégration
+cd tests/e2e && npx playwright test         # tests E2E (82+)
+```
+
+## Azure Prod — Déploiement Blue-Green
+
+Architecture : nginx -> commutation blue/green. La factory ne redémarre jamais pour une modif UI.
+
+```
+nginx:443 -> platform-web-blue:8090  (actif)
+          -> platform-web-green:8090 (standby)
+platform-factory:8091               (moteur headless toujours actif)
+redis:6379                          (pont pub/sub)
+postgres:5432                       (DB partagée)
+```
+
+### Déploiement complet (rsync + rebuild)
+
+```bash
+SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
+rsync -azP --delete \\
+  --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' \\
+  platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \\
+  "cd /opt/macaron && docker compose --env-file .env \\
+   -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
+```
+
+### Hotpatch (sans rebuild, sans arrêt de la factory)
+
+```bash
+tar cf /tmp/update.tar web/templates/ web/static/ web/routes/
+scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \\
+  "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && \\
+   docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && \\
+   docker restart deploy-platform-1"
+```
+
+## OVH Démo
+
+```bash
+ssh debian@54.36.183.124
+cd /opt/software-factory
+docker compose pull && docker compose up -d
+```
+
+CI/CD : GitHub Actions `.github/workflows/deploy-demo.yml`
+Secrets : `OVH_SSH_KEY`, `OVH_IP`
+
+## CI/CD
+
+| Pipeline | Déclencheur | Actions |
+|----------|-------------|---------|
+| `.github/workflows/deploy-demo.yml` | push sur `main` | rsync + docker restart sur OVH |
+| `.gitlab-ci.yml` | push sur `main` | rsync + docker build sur Azure |
+
+Déploiement intelligent : si le diff est limité à `web/templates/`, `web/static/`, `web/routes/`, la factory n'est PAS redémarrée.
+""",
+    },
+    {
+        "slug": "resilience",
+        "lang": "fr",
+        "title": "Résilience & Stabilité",
+        "content": """\
+# Résilience & Stabilité
+
+## Pool de connexions PostgreSQL
+
+La plateforme utilise `psycopg_pool.ConnectionPool` (pool synchrone psycopg3) avec un serveur FastAPI asyncio.
+
+| Conteneur | Taille du pool | Notes |
+|-----------|---------------|-------|
+| platform-factory | 20 | Exécute missions, watchdog, auto-resume, auto-heal en parallèle |
+| platform-web (blue/green) | 5 | Lecture dominante, charge plus légère |
+
+### Prévention des fuites de connexions
+
+Toutes les connexions DB DOIVENT suivre ce modèle :
+
+```python
+db = None
+try:
+    db = get_db()
+    # ... travail ...
+finally:
+    if db:
+        db.close()   # retourne la connexion au pool via putconn()
+```
+
+Un bloc `finally` manquant = connexion jamais retournée en cas d'exception.
+`PgConnectionWrapper` dispose d'un filet de sécurité GC via `__del__`, mais le GC est non-déterministe.
+
+### Symptômes d'épuisement du pool
+
+```
+PoolTimeout: couldn't get a connection after 15.00 sec
+```
+
+Vérifier avec : `SELECT count(*), state FROM pg_stat_activity GROUP BY state;`
+
+## Failover nginx Blue-Green
+
+L'upstream nginx utilise une commutation blue-green avec health check :
+
+```nginx
+upstream platform_web {
+    server platform-blue:8090  max_fails=3 fail_timeout=10s;
+    server platform-green:8090 max_fails=3 fail_timeout=10s backup;
+}
+```
+
+Endpoint de santé : `GET /health` retourne `{"status": "ok"}` avec HTTP 200.
+
+## Découplage IHM / Factory
+
+**Problème :** Redémarrer le conteneur web pour déployer une modif UI interrompait les missions en cours.
+
+**Solution :** `PLATFORM_MODE` divise le processus :
+
+- `factory` : démarre agents/missions/orchestrateur, publie sur Redis, pas de routes HTTP
+- `ui` : démarre routes web/templates/SSE, s'abonne à Redis pour les events, pas d'exécution d'agents
+- `full` : les deux (défaut, pour dev ou déploiements simples)
+
+Canal Redis pub/sub : `a2a:events` — factory publie, web s'abonne et relaie vers le SSE navigateur.
+Fallback : si `REDIS_URL` n'est pas défini, bascule sur le bus in-memory (mode `full` uniquement).
+
+## Suite de tests de stabilité
+
+Emplacement : `platform/tests/test_stability.py`. Lancer avec :
+
+```bash
+STABILITY_TESTS=1 \\
+STABILITY_AZ_HOST=https://sf.macaron-software.com \\
+STABILITY_OVH_HOST=http://54.36.183.124 \\
+python -m pytest tests/test_stability.py -v -m stability
+```
+
+| Test | Ce qu'il vérifie |
+|------|-----------------|
+| `test_health_az/ovh` | `/health` retourne 200 |
+| `test_latency_p99` | p99 < 3s sur 20 requêtes |
+| `test_concurrent_10/50` | 10/50 requêtes concurrentes, < 5% d'erreurs |
+| `test_rate_limit` | 429 retourné quand la limite est dépassée |
+| `test_pages_smoke` | 8 pages clés retournent 200 |
+| `test_sse_connect` | Le flux SSE se connecte et envoie le keepalive `:ping` |
+| `test_disk_memory` | disque < 90%, mémoire < 90% |
+| `test_hot_restart` | redémarrage du conteneur, service de retour en < 30s |
+| `test_nginx_failover` | arrêt blue, nginx bascule sur green, retour en < 10s |
+| `test_cold_restart` | redémarrage complet du serveur, service de retour en < 120s |
+| `test_chaos_pause_resume` | docker pause/unpause du conteneur mission |
+
+## Auto-Heal
+
+`ops/auto_heal.py` surveille la santé de la plateforme toutes les 60s et crée des incidents P1/P2 pour :
+
+- Échecs de fournisseur LLM (bascule automatique de provider)
+- Épuisement du pool PG (log d'alerte, déclenchement d'incident)
+- Mémoire du conteneur > 90% (crée un incident P0)
+
+Les incidents sont visibles dans `/toolbox` sous l'onglet Incidents.
+""",
+    },
+    {
+        "slug": "user-guide",
+        "lang": "fr",
+        "title": "Guide utilisateur",
+        "content": """\
+# Guide utilisateur
+
+## Tableau de bord
+
+Personnalisé par perspective : **DSI** (portfolio), **Produit** (backlog), **Engineering** (sessions), **Scrum Master** (vélocité).
+
+## Projets
+
+1. Aller dans **Projets** → **Nouveau projet**
+2. Renseigner le nom, la description, choisir une couleur
+3. Choisir le Lead Agent, configurer Git (optionnel)
+4. Utiliser le chat pour envoyer des missions
+
+## Missions
+
+- **Flux de statut** : planning → active → review → completed
+- Chaque mission a des runs (tentatives) avec des phases (étapes agents)
+
+## Sessions
+
+Collaboration d'agents en direct avec streaming SSE temps réel, code couleur par rôle.
+
+## Backlog & Idéation
+
+- **Backlog** : features priorisées par WSJF
+- **Idéation** : brainstorming multi-agents — taper un prompt, les agents collaborent
+
+## Métriques
+
+| Onglet | Contenu |
+|--------|---------|
+| **DORA** | Fréquence de déploiement, lead time, taux d'échec, MTTR |
+| **Qualité** | Scores de qualité de code, couverture de tests, sécurité |
+| **Analytics** | Stats missions, performance des agents, santé du système |
+| **Monitoring** | CPU, mémoire, latence des requêtes en temps réel |
+| **Pipeline** | Performance des pipelines CI/CD |
+
+## Boîte à outils
+
+| Onglet | Contenu |
+|--------|---------|
+| **Skills** | Bibliothèque de compétences des agents |
+| **Memory** | Navigateur de mémoire persistante |
+| **MCPs** | Gestion des serveurs MCP |
+| **API** | Documentation Swagger interactive |
+| **CLI** | Terminal web |
+| **Design System** | Référence des composants UI |
+| **Wiki** | Cette documentation |
+
+## Raccourcis clavier
+
+| Raccourci | Action |
+|-----------|--------|
+| `Ctrl+K` | Recherche rapide |
+| `Ctrl+Enter` | Envoyer un message |
+| `Esc` | Fermer un modal |
 """,
     },
 ]

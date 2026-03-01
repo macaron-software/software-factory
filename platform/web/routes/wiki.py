@@ -58,29 +58,48 @@ async def wiki_partial(request: Request):
     )
 
 
+def _resolve_page(db, slug: str, lang: str) -> dict | None:
+    """Return wiki page dict, applying translation overlay if available."""
+    page = db.execute("SELECT * FROM wiki_pages WHERE slug = ?", (slug,)).fetchone()
+    if not page:
+        return None
+    page = dict(page)
+    if lang and lang != "en":
+        trans = db.execute(
+            "SELECT title, content FROM wiki_translations WHERE slug = ? AND lang = ?",
+            (slug, lang),
+        ).fetchone()
+        if trans:
+            page["title"] = trans["title"]
+            page["content"] = trans["content"]
+    return page
+
+
 @router.get("/wiki/page/{slug}", response_class=HTMLResponse)
 async def wiki_page_content(request: Request, slug: str):
     """Return only the wiki page content (no sidebar) — HTMX target for sidebar links."""
+    lang = getattr(request.state, "lang", "en") or "en"
     db = _wiki_db()
-    page = db.execute("SELECT * FROM wiki_pages WHERE slug = ?", (slug,)).fetchone()
+    page = _resolve_page(db, slug, lang)
     return _templates(request).TemplateResponse(
         "_partial_wiki_page.html",
-        {"request": request, "page": dict(page) if page else None},
+        {"request": request, "page": page},
     )
 
 
 @router.get("/wiki/{slug}", response_class=HTMLResponse)
 async def wiki_page(request: Request, slug: str):
     """Return a single wiki page partial (HTMX target)."""
+    lang = getattr(request.state, "lang", "en") or "en"
     db = _wiki_db()
-    page = db.execute("SELECT * FROM wiki_pages WHERE slug = ?", (slug,)).fetchone()
+    page = _resolve_page(db, slug, lang)
     pages = db.execute(
         "SELECT slug, title, category, icon, sort_order, parent_slug "
         "FROM wiki_pages ORDER BY category, sort_order, title"
     ).fetchall()
     return _templates(request).TemplateResponse(
         "_partial_wiki.html",
-        {"request": request, "pages": pages, "page": dict(page) if page else None},
+        {"request": request, "pages": pages, "page": page},
     )
 
 
@@ -165,11 +184,11 @@ async def api_wiki_delete(slug: str):
 
 @router.post("/api/wiki/seed", response_class=JSONResponse)
 async def api_wiki_seed():
-    """Seed wiki with built-in documentation pages."""
+    """Seed wiki with built-in documentation pages (INSERT OR IGNORE — keeps existing)."""
     db = _wiki_db()
     now = datetime.now(timezone.utc).isoformat()
 
-    pages = _get_seed_pages()
+    pages, translations = _get_seed_data()
     inserted = 0
     for p in pages:
         try:
@@ -178,26 +197,62 @@ async def api_wiki_seed():
                 "(slug, title, content, category, icon, sort_order, parent_slug, created_at, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    p["slug"],
-                    p["title"],
-                    p["content"],
-                    p["category"],
-                    p["icon"],
-                    p["sort_order"],
-                    p.get("parent_slug"),
-                    now,
-                    now,
+                    p["slug"], p["title"], p["content"], p["category"],
+                    p["icon"], p["sort_order"], p.get("parent_slug"), now, now,
                 ),
             )
             inserted += 1
+        except Exception:
+            pass
+    for t in translations:
+        try:
+            db.execute(
+                "INSERT OR IGNORE INTO wiki_translations (slug, lang, title, content, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (t["slug"], t["lang"], t["title"], t["content"], now, now),
+            )
         except Exception:
             pass
     db.commit()
     return {"success": True, "inserted": inserted, "total": len(pages)}
 
 
-def _get_seed_pages():
-    """Return list of seed wiki pages with markdown content."""
-    from .wiki_content import WIKI_PAGES
+@router.post("/api/wiki/reseed", response_class=JSONResponse)
+async def api_wiki_reseed():
+    """Force-update wiki pages with latest built-in content (INSERT OR REPLACE — overwrites)."""
+    db = _wiki_db()
+    now = datetime.now(timezone.utc).isoformat()
 
-    return WIKI_PAGES
+    pages, translations = _get_seed_data()
+    updated = 0
+    for p in pages:
+        try:
+            db.execute(
+                "INSERT OR REPLACE INTO wiki_pages "
+                "(slug, title, content, category, icon, sort_order, parent_slug, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    p["slug"], p["title"], p["content"], p["category"],
+                    p["icon"], p["sort_order"], p.get("parent_slug"), now, now,
+                ),
+            )
+            updated += 1
+        except Exception:
+            pass
+    for t in translations:
+        try:
+            db.execute(
+                "INSERT OR REPLACE INTO wiki_translations (slug, lang, title, content, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (t["slug"], t["lang"], t["title"], t["content"], now, now),
+            )
+        except Exception:
+            pass
+    db.commit()
+    return {"success": True, "updated": updated, "total": len(pages), "translations": len(translations)}
+
+
+def _get_seed_data():
+    """Return (pages, translations) from wiki_content module."""
+    from .wiki_content import WIKI_PAGES, WIKI_TRANSLATIONS
+    return WIKI_PAGES, WIKI_TRANSLATIONS
