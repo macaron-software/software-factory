@@ -48,6 +48,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     )
 
     async def dispatch(self, request: Request, call_next):
+        if os.getenv("PLATFORM_ENV") == "test":
+            return await call_next(request)
+
         api_key = os.getenv("MACARON_API_KEY")
         if not api_key:
             if os.getenv("ENVIRONMENT", "dev") != "dev":

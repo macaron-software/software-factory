@@ -1851,6 +1851,16 @@ def _migrate_pg(conn):
             (iid, name, itype, category, icon, desc, cfg, roles),
         )
 
+    # ── Memory tables (ensure columns exist for existing PG DBs) ────────────
+    for tbl, col, typedef in [
+        ("memory_project", "agent_role", "TEXT DEFAULT ''"),
+        ("memory_project", "relevance_score", "REAL"),
+        ("memory_global", "relevance_score", "REAL"),
+    ]:
+        conn.execute(
+            f"ALTER TABLE {tbl} ADD COLUMN IF NOT EXISTS {col} {typedef}"
+        )
+
     conn.commit()
 
 

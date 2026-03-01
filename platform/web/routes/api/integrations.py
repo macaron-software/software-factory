@@ -22,7 +22,8 @@ async def list_integrations():
     db = get_db()
     try:
         rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
-        return JSONResponse([dict(r) for r in rows])
+        import json as _json
+        return JSONResponse(_json.loads(_json.dumps([dict(r) for r in rows], default=str)))
     finally:
         db.close()
 
