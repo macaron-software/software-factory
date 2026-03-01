@@ -123,6 +123,46 @@ Piensa en ello como una **fabrica de software virtual** donde 191 agentes IA col
 <img src="docs/screenshots/en/ideation_projet.png" alt="Ideación Proyecto" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Centro de Configuración — Concurrencia, Presupuesto y Modo YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Configuración" width="100%">
+</td>
+<td width="50%">
+<strong>Centro de Mando de Misiones — Cockpit en Tiempo Real (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Cockpit de Misión" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Panel de Misiones — Todas las Misiones y Ejecuciones (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Panel de Misiones" width="100%">
+</td>
+<td width="50%">
+<strong>Memoria y Conocimiento — RAG de 4 Capas (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Memoria" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Flujos de Trabajo — 36 Pipelines Integrados (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Flujos de Trabajo" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Reparación e Infraestructura (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="Dashboard OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Control de Acceso Basado en Roles (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog de Producto — Épicas, Features e Historias (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Inicio rapido
@@ -958,6 +998,34 @@ Cada proyecto obtiene automaticamente 4 misiones operativas:
 - **Repeticion paso a paso** — cada turno de agente y llamada a herramienta reproducida en `/missions/{id}/replay`
 - **Costo y tokens por paso** — desglose granular del gasto LLM por agente
 - **Historia exportable** — descarga la repeticion como JSON para depuracion y auditoria
+
+### Hub de Configuración
+
+Configuración centralizada de la plataforma en `/settings`:
+
+- **Concurrencia de misiones** — ajusta el semáforo de ejecución (1–10 misiones paralelas) en vivo
+- **Límite de presupuesto** — establece el gasto LLM máximo por run; los runs que superan el presupuesto se pausan
+- **Watchdog de auto-reanudación** — reanuda automáticamente las misiones pausadas al reiniciar
+- **Modo YOLO** — desactiva la validación human-in-the-loop para runs totalmente autónomos
+- **Persistente** — todos los ajustes almacenados en BD, sobreviven a reinicios
+
+### Cockpit de Misiones
+
+Centro de mando en tiempo real en `/cockpit`:
+
+- **Vista de pipeline en vivo** — ideación → misiones → en ejecución → pruebas → desplegado
+- **Estado por misión** — agente, llamadas a herramientas en progreso, coste LLM acumulado
+- **Indicador de semáforo** — visualiza los slots libres vs ocupados de un vistazo
+- **Controles rápidos** — pausar, reanudar, cancelar cualquier misión desde el cockpit
+
+### Seguimiento de Costes LLM por Misión
+
+Visibilidad granular del gasto por run:
+
+- **`llm_cost_usd` por run** — cada ejecución registra el gasto LLM exacto en USD
+- **Alertas de presupuesto** — advertencia o parada forzada cuando una misión alcanza su límite
+- **Comparación de proveedores** — compara el coste de la misma tarea en minimax / azure / openai
+- **Paneles acumulativos** — costes agregados por proyecto, sprint o rango de fechas
 
 ### Panel de Metricas LLM
 - **Monitoreo en tiempo real de costo/latencia/proveedor** en `/metrics`

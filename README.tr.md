@@ -123,6 +123,46 @@ Software Factory, birlikte calisan uzmanlasmis yapay zeka ajanlari kullanarak ya
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Ayarlar Merkezi — Eşzamanlılık, Bütçe & YOLO Modu (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Ayarlar" width="100%">
+</td>
+<td width="50%">
+<strong>Görev Komuta Merkezi — Gerçek Zamanlı Kokpit (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Görev Kokpiti" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Görev Panosu — Tüm Görevler & Çalışmalar (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Görev Panosu" width="100%">
+</td>
+<td width="50%">
+<strong>Bellek & Bilgi — 4 Katmanlı RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Bellek" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>İş Akışları — 36 Yerleşik Pipeline (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="İş Akışları" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Otomatik Onarım & Altyapı (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS Panosu" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Rol Tabanlı Erişim Kontrolü (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Ürün Birikimi — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Birikim" width="100%">
+</td>
+</tr>
 </table>
 
 ## Hizli Baslangic
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Ayarlar Merkezi
+
+`/settings` üzerinde merkezi platform yapılandırması:
+
+- **Görev eşzamanlılığı** — yürütme semaforunu canlı ayarlayın (1–10 paralel görev)
+- **Bütçe sınırı** — görev başına maksimum LLM harcaması belirleyin; bütçeyi aşan çalışmalar duraklatılır
+- **Otomatik devam ettirme izleyicisi** — platform yeniden başlatıldığında duraklatılmış görevleri otomatik devam ettirir
+- **YOLO modu** — tamamen otonom çalışmalar için Human-in-the-loop doğrulamasını devre dışı bırakır
+- **Kalıcı** — tüm ayarlar DB'de saklanır, sunucu yeniden başlatmalarından sonra da geçerli
+
+### Görev Kokpiti
+
+`/cockpit` üzerinde gerçek zamanlı komuta merkezi:
+
+- **Canlı boru hattı görünümü** — fikirlendirme → görevler → çalışıyor → testler → dağıtıldı
+- **Görev başına durum** — ajan, sürmekte olan araç çağrıları, şimdiye kadarki LLM maliyeti
+- **Semafor göstergesi** — kaç yuvası serbest vs meşgul olduğunu tek bakışta görün
+- **Hızlı kontroller** — kokpitten herhangi bir görevi duraklat, devam ettir, iptal et
+
+### Görev Başına LLM Maliyet Takibi
+
+Çalışma başına ayrıntılı harcama görünürlüğü:
+
+- **Çalışma başına `llm_cost_usd`** — her yürütme USD cinsinden kesin LLM harcamasını kaydeder
+- **Bütçe uyarıları** — görev sınırına ulaştığında uyarı veya zorla durdurma
+- **Sağlayıcı karşılaştırması** — aynı görevin minimax / azure / openai'daki maliyetini karşılaştırın
+- **Kümülatif panolar** — projeye, sprinte veya tarih aralığına göre maliyet toplamı
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

@@ -158,6 +158,46 @@ Think of it as a **virtual software factory** where 191 AI agents collaborate th
 <img src="docs/screenshots/en/mission_replay.png" alt="Mission Replay" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Settings Hub — Concurrency, Budget & YOLO Mode (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Settings" width="100%">
+</td>
+<td width="50%">
+<strong>Mission Command Center — Real-time Cockpit (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Mission Cockpit" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Mission Board — All Missions & Runs (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Missions Board" width="100%">
+</td>
+<td width="50%">
+<strong>Memory & Knowledge — 4-Layer RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Memory" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Workflows — 36 Built-in Pipelines (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Workflows" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Heal & Infrastructure (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS Dashboard" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Role-Based Access Control (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Product Backlog — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Quick Start
@@ -543,6 +583,34 @@ Step-by-step mission execution replay at `/missions/{id}/replay`:
 - **Per-step cost and tokens** — see exactly what each agent spent
 - **Duration breakdown** — timeline view showing where time was spent
 - **Exportable** — download replay as JSON for analysis or debugging
+
+### Settings Hub
+
+Centralized platform configuration at `/settings`:
+
+- **Mission concurrency** — tune the execution semaphore (1–10 parallel missions) live
+- **Budget cap** — set max LLM spend per mission run; over-budget runs are paused
+- **Auto-resume watchdog** — automatically resume paused missions on platform restart
+- **YOLO mode** — bypass human-in-the-loop validation for fully autonomous runs
+- **Persistent** — all settings stored in DB, survive server restarts
+
+### Mission Cockpit
+
+Real-time command center at `/cockpit`:
+
+- **Live pipeline view** — ideation → missions → running → tests → deployed
+- **Per-mission status** — agent, tool calls in progress, LLM cost so far
+- **Semaphore gauge** — see how many slots are free vs busy at a glance
+- **Quick controls** — pause, resume, cancel any mission from the cockpit
+
+### LLM Cost Tracking per Mission
+
+Granular spend visibility per run:
+
+- **`llm_cost_usd` per run** — every execution records exact LLM spend in USD
+- **Budget alerts** — warn or hard-stop when a mission hits its cap
+- **Provider comparison** — compare cost of same task across minimax / azure / openai
+- **Cumulative dashboards** — roll-up costs by project, sprint, or date range
 
 ## Four Interfaces
 

@@ -160,9 +160,77 @@ La base de données a migré de SQLite vers **PostgreSQL** :
 <img src="docs/screenshots/fr/ideation.png" alt="Idéation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Centre de Configuration — Concurrence, Budget & Mode YOLO (/settings)</strong><br>
+<img src="docs/screenshots/fr/settings.png" alt="Paramètres" width="100%">
+</td>
+<td width="50%">
+<strong>Cockpit de Mission — Centre de Commandement Temps Réel (/cockpit)</strong><br>
+<img src="docs/screenshots/fr/cockpit.png" alt="Cockpit Mission" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Tableau de Bord Missions — Toutes Missions & Exécutions (/missions)</strong><br>
+<img src="docs/screenshots/fr/missions.png" alt="Tableau des Missions" width="100%">
+</td>
+<td width="50%">
+<strong>Mémoire & Connaissance — RAG 4 Couches (/memory)</strong><br>
+<img src="docs/screenshots/fr/memory.png" alt="Mémoire" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Workflows — 36 Pipelines Intégrés (/workflows)</strong><br>
+<img src="docs/screenshots/fr/workflows.png" alt="Workflows" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Réparation & Infrastructure (/ops)</strong><br>
+<img src="docs/screenshots/fr/ops.png" alt="Dashboard OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Contrôle d'Accès Basé sur les Rôles (/rbac)</strong><br>
+<img src="docs/screenshots/fr/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog Produit — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/fr/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ---
+
+### Centre de Configuration — Settings Hub
+
+Configuration centralisée à `/settings` :
+
+- **Concurrence des missions** — ajustez le sémaphore d'exécution (1–10 missions parallèles) en direct
+- **Plafond budgétaire** — budget LLM maximum par run ; les runs dépassant le budget sont mis en pause
+- **Watchdog d'auto-reprise** — reprend automatiquement les missions en pause au redémarrage
+- **Mode YOLO** — désactivez la validation pour des runs totalement autonomes
+- **Persistant** — tous les paramètres stockés en DB, survivent aux redémarrages
+
+### Cockpit de Mission
+
+Centre de commandement temps réel à `/cockpit` :
+
+- **Vue pipeline en direct** — idéation → missions → en cours → tests → déployé
+- **Statut par mission** — agent, appels outils en cours, coût LLM accumulé
+- **Jauge sémaphore** — slots libres vs occupés en un coup d'œil
+- **Contrôles rapides** — pause, reprise, annulation de toute mission depuis le cockpit
+
+### Suivi des Coûts LLM par Mission
+
+Visibilité granulaire des dépenses par run :
+
+- **`llm_cost_usd` par run** — chaque exécution enregistre le coût LLM exact en USD
+- **Alertes budgétaires** — avertissement ou arrêt forcé quand une mission atteint son plafond
+- **Comparaison de fournisseurs** — comparez le coût de la même tâche entre les fournisseurs configurés
+- **Tableaux de bord cumulatifs** — agrégation des coûts par projet, sprint ou plage de dates
 
 ## Intelligence Adaptative
 

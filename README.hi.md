@@ -123,6 +123,46 @@ Software Factory एक **स्वायत्त बहु-एजेंट प
 <img src="docs/screenshots/en/ideation_projet.png" alt="Project Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>सेटिंग्स हब — कंकरेंसी, बजट और YOLO मोड (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="सेटिंग्स" width="100%">
+</td>
+<td width="50%">
+<strong>मिशन कमांड सेंटर — रियल-टाइम कॉकपिट (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="मिशन कॉकपिट" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>मिशन बोर्ड — सभी मिशन और रन (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="मिशन बोर्ड" width="100%">
+</td>
+<td width="50%">
+<strong>मेमोरी और नॉलेज — 4-लेयर RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="मेमोरी" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>वर्कफ्लो — 36 बिल्ट-इन पाइपलाइन (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="वर्कफ्लो" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — ऑटो-हील और इंफ्रास्ट्रक्चर (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS डैशबोर्ड" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — रोल-बेस्ड एक्सेस कंट्रोल (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>प्रोडक्ट बैकलॉग — Epics, Features और Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="बैकलॉग" width="100%">
+</td>
+</tr>
 </table>
 
 ## त्वरित शुरुआत
@@ -958,6 +998,34 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 - **Step-by-Step Replay** — `/missions/{id}/replay` पर प्रत्येक Agent Turn और Tool Call
 - **Cost और Tokens per Step** — per Agent granular LLM Cost Breakdown
 - **Exportable History** — Debugging और Audit के लिए Replay JSON के रूप में download करें
+
+### सेटिंग्स हब
+
+`/settings` पर केंद्रीकृत प्लेटफॉर्म कॉन्फ़िगरेशन:
+
+- **मिशन कंकरेंसी** — एग्जीक्यूशन सेमाफोर को लाइव ट्यून करें (1–10 पैरेलल मिशन)
+- **बजट कैप** — प्रति मिशन रन अधिकतम LLM खर्च सेट करें; ओवर-बजट रन पॉज हो जाते हैं
+- **ऑटो-रिज्यूम वॉचडॉग** — प्लेटफॉर्म रिस्टार्ट पर पॉज्ड मिशन स्वचालित रूप से रिज्यूम हों
+- **YOLO मोड** — पूरी तरह से ऑटोनॉमस रन के लिए Human-in-the-loop वेलिडेशन बाईपास करें
+- **परसिस्टेंट** — सभी सेटिंग्स DB में स्टोर, सर्वर रिस्टार्ट के बाद भी बनी रहती हैं
+
+### मिशन कॉकपिट
+
+`/cockpit` पर रियल-टाइम कमांड सेंटर:
+
+- **लाइव पाइपलाइन व्यू** — आइडिएशन → मिशन → रनिंग → टेस्ट → डिप्लॉयड
+- **प्रति मिशन स्टेटस** — एजेंट, टूल कॉल्स इन प्रोग्रेस, LLM कॉस्ट अब तक
+- **सेमाफोर गेज** — कितने स्लॉट फ्री बनाम बिजी हैं एक नज़र में देखें
+- **क्विक कंट्रोल्स** — कॉकपिट से किसी भी मिशन को पॉज, रिज्यूम, कैंसल करें
+
+### मिशन के अनुसार LLM कॉस्ट ट्रैकिंग
+
+प्रति रन दानेदार खर्च विजिबिलिटी:
+
+- **प्रति रन `llm_cost_usd`** — हर एग्जीक्यूशन सटीक LLM खर्च USD में रिकॉर्ड करती है
+- **बजट अलर्ट** — जब मिशन अपनी कैप तक पहुंचे तो चेतावनी या हार्ड-स्टॉप
+- **प्रोवाइडर कम्पेरिजन** — minimax / azure / openai पर एक ही टास्क की कॉस्ट तुलना करें
+- **कुमुलेटिव डैशबोर्ड** — प्रोजेक्ट, स्प्रिंट या डेट रेंज के अनुसार कॉस्ट रोल-अप करें
 
 ### LLM Metrics Dashboard
 - **Real-time Cost/Latency/Provider Monitoring** `/metrics` पर

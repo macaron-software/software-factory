@@ -123,6 +123,46 @@ Wyobraz sobie **wirtualna fabryke oprogramowania**, gdzie 191 agentow AI wspolpr
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Hub Ustawień — Współbieżność, Budżet & Tryb YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Ustawienia" width="100%">
+</td>
+<td width="50%">
+<strong>Centrum Dowodzenia Misjami — Kokpit w Czasie Rzeczywistym (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Kokpit Misji" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Tablica Misji — Wszystkie Misje & Uruchomienia (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Tablica Misji" width="100%">
+</td>
+<td width="50%">
+<strong>Pamięć & Wiedza — 4-warstwowy RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Pamięć" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Przepływy Pracy — 36 Wbudowanych Potoków (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Przepływy Pracy" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Automatyczne Naprawianie & Infrastruktura (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="Dashboard OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Kontrola Dostępu Oparta na Rolach (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog Produktu — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Szybki Start
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Hub Ustawień
+
+Scentralizowana konfiguracja platformy pod `/settings`:
+
+- **Współbieżność misji** — dostosuj semafor wykonania na żywo (1–10 równoległych misji)
+- **Limit budżetu** — ustaw maksymalne wydatki LLM na uruchomienie; uruchomienia przekraczające budżet są wstrzymywane
+- **Watchdog automatycznego wznawiania** — automatycznie wznawia wstrzymane misje przy ponownym uruchomieniu
+- **Tryb YOLO** — wyłącz walidację Human-in-the-loop dla w pełni autonomicznych uruchomień
+- **Trwały** — wszystkie ustawienia przechowywane w DB, przeżywają restarty serwera
+
+### Kokpit Misji
+
+Centrum dowodzenia w czasie rzeczywistym pod `/cockpit`:
+
+- **Podgląd potoku na żywo** — ideacja → misje → w toku → testy → wdrożone
+- **Status każdej misji** — agent, bieżące wywołania narzędzi, dotychczasowy koszt LLM
+- **Wskaźnik semafora** — widok wolnych vs zajętych slotów na pierwszy rzut oka
+- **Szybkie sterowanie** — wstrzymaj, wznów, anuluj dowolną misję z kokpitu
+
+### Śledzenie Kosztów LLM na Misję
+
+Szczegółowa widoczność wydatków na uruchomienie:
+
+- **`llm_cost_usd` na uruchomienie** — każde wykonanie rejestruje dokładne wydatki LLM w USD
+- **Alerty budżetowe** — ostrzeżenie lub twarde zatrzymanie gdy misja osiągnie limit
+- **Porównanie dostawców** — porównaj koszt tego samego zadania w minimax / azure / openai
+- **Zbiorcze pulpity** — koszty agregowane według projektu, sprintu lub zakresu dat
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

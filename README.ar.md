@@ -123,6 +123,46 @@ Software Factory هي **منصة متعددة الوكلاء المستقلة** 
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>مركز الإعدادات — التزامن والميزانية ووضع YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="الإعدادات" width="100%">
+</td>
+<td width="50%">
+<strong>مركز قيادة المهمة — كوكبيت الوقت الفعلي (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="كوكبيت المهمة" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>لوحة المهام — جميع المهام والتشغيلات (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="لوحة المهام" width="100%">
+</td>
+<td width="50%">
+<strong>الذاكرة والمعرفة — RAG بأربع طبقات (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="الذاكرة" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>سير العمل — 36 خط أنابيب مدمج (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="سير العمل" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — الإصلاح التلقائي والبنية التحتية (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="لوحة OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — التحكم في الوصول القائم على الأدوار (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>قائمة متأخرات المنتج — Epics وFeatures وStories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="المتأخرات" width="100%">
+</td>
+</tr>
 </table>
 
 ## البدء السريع
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### مركز الإعدادات
+
+تهيئة المنصة المركزية في `/settings`:
+
+- **تزامن المهام** — ضبط سيمافور التنفيذ مباشرةً (1–10 مهام متوازية)
+- **حد الميزانية** — تعيين الحد الأقصى لإنفاق LLM لكل تشغيل؛ تُوقف التشغيلات المتجاوزة للميزانية مؤقتاً
+- **حارس الاستئناف التلقائي** — استئناف المهام الموقوفة تلقائياً عند إعادة تشغيل المنصة
+- **وضع YOLO** — تعطيل التحقق البشري في الحلقة لتشغيلات مستقلة بالكامل
+- **دائم** — جميع الإعدادات مخزنة في قاعدة البيانات وتبقى بعد إعادة التشغيل
+
+### كوكبيت المهمة
+
+مركز القيادة في الوقت الفعلي في `/cockpit`:
+
+- **عرض خط الأنابيب المباشر** — توليد الأفكار → المهام → قيد التشغيل → الاختبارات → مُنشور
+- **حالة كل مهمة** — الوكيل، استدعاءات الأدوات الجارية، تكلفة LLM المتراكمة
+- **مقياس السيمافور** — رؤية الفتحات الحرة مقابل المشغولة بنظرة واحدة
+- **تحكم سريع** — إيقاف مؤقت أو استئناف أو إلغاء أي مهمة من الكوكبيت
+
+### تتبع تكاليف LLM لكل مهمة
+
+رؤية تفصيلية للإنفاق لكل تشغيل:
+
+- **`llm_cost_usd` لكل تشغيل** — تسجل كل عملية تنفيذ الإنفاق الدقيق بالدولار الأمريكي
+- **تنبيهات الميزانية** — تحذير أو إيقاف قسري عند وصول المهمة إلى الحد
+- **مقارنة المزودين** — مقارنة تكلفة نفس المهمة عبر minimax / azure / openai
+- **لوحات إجمالية** — تجميع التكاليف حسب المشروع أو السبرينت أو النطاق الزمني
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

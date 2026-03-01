@@ -123,6 +123,46 @@ Immaginate una **fabbrica software virtuale** in cui 191 agenti IA collaborano a
 <img src="docs/screenshots/en/ideation_projet.png" alt="Ideazione progetto" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Hub Impostazioni — Concorrenza, Budget & Modalità YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Impostazioni" width="100%">
+</td>
+<td width="50%">
+<strong>Centro di Comando Missioni — Cockpit in Tempo Reale (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Cockpit Missione" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Pannello Missioni — Tutte le Missioni & Esecuzioni (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Pannello Missioni" width="100%">
+</td>
+<td width="50%">
+<strong>Memoria & Conoscenza — RAG a 4 Livelli (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Memoria" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Workflow — 36 Pipeline Integrate (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Workflow" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Ripristino & Infrastruttura (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="Dashboard OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Controllo Accessi Basato sui Ruoli (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog Prodotto — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Avvio rapido
@@ -958,6 +998,34 @@ Ogni progetto riceve automaticamente 4 missioni operative:
 - **Replay passo per passo** — ogni turno dell'agente e chiamata agli strumenti su `/missions/{id}/replay`
 - **Costi e token per passo** — ripartizione granulare dei costi LLM per agente
 - **Storico esportabile** — scaricare il replay come JSON per debugging e audit
+
+### Hub Impostazioni
+
+Configurazione centralizzata della piattaforma su `/settings`:
+
+- **Concorrenza delle missioni** — regola il semaforo di esecuzione in tempo reale (1–10 missioni parallele)
+- **Limite di budget** — imposta la spesa LLM massima per run; i run che superano il budget vengono messi in pausa
+- **Watchdog di ripresa automatica** — riprende automaticamente le missioni in pausa al riavvio della piattaforma
+- **Modalità YOLO** — disabilita la validazione human-in-the-loop per run completamente autonomi
+- **Persistente** — tutte le impostazioni memorizzate nel DB, sopravvivono ai riavvii del server
+
+### Cockpit Missione
+
+Centro di comando in tempo reale su `/cockpit`:
+
+- **Vista pipeline live** — ideazione → missioni → in esecuzione → test → distribuito
+- **Stato per missione** — agente, chiamate agli strumenti in corso, costo LLM finora
+- **Indicatore semaforo** — visualizza quanti slot sono liberi vs occupati a colpo d'occhio
+- **Controlli rapidi** — pausa, riprendi, annulla qualsiasi missione dal cockpit
+
+### Monitoraggio dei Costi LLM per Missione
+
+Visibilità granulare delle spese per run:
+
+- **`llm_cost_usd` per run** — ogni esecuzione registra la spesa LLM esatta in USD
+- **Avvisi di budget** — avviso o arresto forzato quando una missione raggiunge il suo limite
+- **Confronto provider** — confronta il costo dello stesso compito su minimax / azure / openai
+- **Dashboard cumulativi** — aggregazione dei costi per progetto, sprint o intervallo di date
 
 ### Dashboard metriche LLM
 - **Monitoraggio in tempo reale di costi/latenza/provider** su `/metrics`

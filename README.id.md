@@ -123,6 +123,46 @@ Bayangkan sebuah **pabrik perangkat lunak virtual** di mana 191 agen AI berkolab
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Pusat Pengaturan — Konkurensi, Anggaran & Mode YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Pengaturan" width="100%">
+</td>
+<td width="50%">
+<strong>Pusat Komando Misi — Kokpit Real-time (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Kokpit Misi" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Papan Misi — Semua Misi & Jalankan (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Papan Misi" width="100%">
+</td>
+<td width="50%">
+<strong>Memori & Pengetahuan — RAG 4 Lapis (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Memori" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Alur Kerja — 36 Pipeline Bawaan (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Alur Kerja" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Perbaikan Otomatis & Infrastruktur (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="Dashboard OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Kontrol Akses Berbasis Peran (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog Produk — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Mulai Cepat
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Pusat Pengaturan
+
+Konfigurasi platform terpusat di `/settings`:
+
+- **Konkurensi misi** — sesuaikan semafore eksekusi secara langsung (1–10 misi paralel)
+- **Batas anggaran** — tetapkan pengeluaran LLM maksimum per run; run yang melebihi anggaran dijeda
+- **Watchdog resume otomatis** — melanjutkan misi yang dijeda secara otomatis saat platform dimulai ulang
+- **Mode YOLO** — lewati validasi human-in-the-loop untuk run yang sepenuhnya otonom
+- **Persisten** — semua pengaturan disimpan di DB, bertahan setelah restart server
+
+### Kokpit Misi
+
+Pusat komando waktu nyata di `/cockpit`:
+
+- **Tampilan pipeline langsung** — ideasi → misi → berjalan → pengujian → diterapkan
+- **Status per misi** — agen, panggilan alat yang sedang berlangsung, biaya LLM sejauh ini
+- **Pengukur semafore** — lihat berapa banyak slot yang bebas vs sibuk sekilas
+- **Kontrol cepat** — jeda, lanjutkan, batalkan misi dari kokpit
+
+### Pelacakan Biaya LLM per Misi
+
+Visibilitas pengeluaran granular per run:
+
+- **`llm_cost_usd` per run** — setiap eksekusi mencatat pengeluaran LLM yang tepat dalam USD
+- **Peringatan anggaran** — peringatan atau penghentian paksa ketika misi mencapai batasnya
+- **Perbandingan penyedia** — bandingkan biaya tugas yang sama di minimax / azure / openai
+- **Dasbor kumulatif** — penggabungan biaya berdasarkan proyek, sprint, atau rentang tanggal
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

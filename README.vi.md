@@ -123,6 +123,46 @@ Hãy tưởng tượng một **nhà máy phần mềm ảo** nơi 191 tác nhân
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Trung Tâm Cài Đặt — Đồng thời, Ngân sách & Chế độ YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Cài Đặt" width="100%">
+</td>
+<td width="50%">
+<strong>Trung Tâm Chỉ Huy Nhiệm Vụ — Buồng Lái Thời Gian Thực (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Buồng Lái Nhiệm Vụ" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Bảng Nhiệm Vụ — Tất cả Nhiệm vụ & Lần chạy (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Bảng Nhiệm Vụ" width="100%">
+</td>
+<td width="50%">
+<strong>Bộ nhớ & Kiến thức — RAG 4 lớp (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Bộ nhớ" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Luồng công việc — 36 Pipeline tích hợp sẵn (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Luồng công việc" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Tự động sửa chữa & Cơ sở hạ tầng (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="Bảng điều khiển OPS" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Kiểm soát truy cập dựa trên vai trò (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Backlog Sản phẩm — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Bắt Đầu Nhanh
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Trung Tâm Cài Đặt
+
+Cấu hình nền tảng tập trung tại `/settings`:
+
+- **Đồng thời nhiệm vụ** — điều chỉnh semaphore thực thi trực tiếp (1–10 nhiệm vụ song song)
+- **Giới hạn ngân sách** — đặt chi phí LLM tối đa mỗi lần chạy; các lần chạy vượt ngân sách bị tạm dừng
+- **Watchdog tự động tiếp tục** — tự động tiếp tục các nhiệm vụ đã tạm dừng khi khởi động lại nền tảng
+- **Chế độ YOLO** — bỏ qua xác nhận Human-in-the-loop để chạy hoàn toàn tự động
+- **Bền vững** — tất cả cài đặt lưu trong DB, tồn tại sau khi khởi động lại máy chủ
+
+### Buồng Lái Nhiệm Vụ
+
+Trung tâm chỉ huy thời gian thực tại `/cockpit`:
+
+- **Chế độ xem pipeline trực tiếp** — ý tưởng → nhiệm vụ → đang chạy → kiểm tra → đã triển khai
+- **Trạng thái mỗi nhiệm vụ** — tác nhân, các lệnh gọi công cụ đang tiến hành, chi phí LLM đến nay
+- **Đồng hồ đo semaphore** — xem bao nhiêu slot rảnh so với đang bận trong nháy mắt
+- **Điều khiển nhanh** — tạm dừng, tiếp tục, hủy bất kỳ nhiệm vụ nào từ buồng lái
+
+### Theo Dõi Chi Phí LLM theo Nhiệm Vụ
+
+Khả năng hiển thị chi tiêu chi tiết theo mỗi lần chạy:
+
+- **`llm_cost_usd` mỗi lần chạy** — mỗi lần thực thi ghi lại chi tiêu LLM chính xác bằng USD
+- **Cảnh báo ngân sách** — cảnh báo hoặc dừng cứng khi nhiệm vụ đạt giới hạn
+- **So sánh nhà cung cấp** — so sánh chi phí cùng một nhiệm vụ trên minimax / azure / openai
+- **Bảng điều khiển tích lũy** — tổng hợp chi phí theo dự án, sprint hoặc khoảng thời gian
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

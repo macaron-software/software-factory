@@ -123,6 +123,46 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 191 KI-Agenten ue
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Einstellungs-Hub — Nebenläufigkeit, Budget & YOLO-Modus (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Einstellungen" width="100%">
+</td>
+<td width="50%">
+<strong>Missions-Cockpit — Echtzeit-Kommandozentrale (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Missions-Cockpit" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Missions-Übersicht — Alle Missionen & Läufe (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Missions-Übersicht" width="100%">
+</td>
+<td width="50%">
+<strong>Gedächtnis & Wissen — 4-Schichten-RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Gedächtnis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Workflows — 36 integrierte Pipelines (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Workflows" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Reparatur & Infrastruktur (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS-Dashboard" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Rollenbasierte Zugriffskontrolle (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Produkt-Backlog — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Schnellstart
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Einstellungs-Hub
+
+Zentrale Plattformkonfiguration unter `/settings`:
+
+- **Missions-Nebenläufigkeit** — Ausführungs-Semaphor live anpassen (1–10 parallele Missionen)
+- **Budgetlimit** — maximale LLM-Ausgabe pro Run festlegen; überschrittene Runs werden pausiert
+- **Auto-Wiederaufnahme-Watchdog** — pausierte Missionen beim Neustart automatisch fortsetzen
+- **YOLO-Modus** — Human-in-the-loop-Validierung für vollautonome Läufe deaktivieren
+- **Persistent** — alle Einstellungen in der DB gespeichert, überleben Neustarts
+
+### Missions-Cockpit
+
+Echtzeit-Kommandozentrale unter `/cockpit`:
+
+- **Live-Pipeline-Ansicht** — Ideation → Missionen → laufend → Tests → deployed
+- **Status je Mission** — Agent, laufende Werkzeugaufrufe, bisherige LLM-Kosten
+- **Semaphor-Anzeige** — freie vs. belegte Slots auf einen Blick
+- **Schnellsteuerung** — Missionen direkt aus dem Cockpit pausieren, fortsetzen oder abbrechen
+
+### LLM-Kostenverfolgung pro Mission
+
+Granulare Ausgabentransparenz pro Run:
+
+- **`llm_cost_usd` pro Run** — jede Ausführung erfasst exakte LLM-Kosten in USD
+- **Budgetwarnungen** — Warnung oder Zwangsstopp wenn eine Mission ihr Limit erreicht
+- **Anbietervergleich** — Kosten derselben Aufgabe bei minimax / azure / openai vergleichen
+- **Kumulative Dashboards** — Kosten nach Projekt, Sprint oder Datumsbereich aggregieren
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

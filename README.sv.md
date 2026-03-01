@@ -123,6 +123,46 @@ Föreställ dig en **virtuell mjukvarifabrik** där 191 AI-agenter samarbetar ge
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Inställningshub — Parallellitet, Budget & YOLO-läge (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Inställningar" width="100%">
+</td>
+<td width="50%">
+<strong>Uppdragskontrollcentrum — Realtidscockpit (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Uppdragscockpit" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Uppdragstavla — Alla Uppdrag & Körningar (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Uppdragstavla" width="100%">
+</td>
+<td width="50%">
+<strong>Minne & Kunskap — 4-Lagers RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Minne" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Arbetsflöden — 36 Inbyggda Pipelines (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Arbetsflöden" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Självläkning & Infrastruktur (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS-instrumentpanel" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Rollbaserad Åtkomstkontroll (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Produktbacklog — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Snabbstart
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Inställningshub
+
+Centraliserad plattformskonfiguration på `/settings`:
+
+- **Uppdragsparallellitet** — justera körningssemaforen live (1–10 parallella uppdrag)
+- **Budgetgräns** — ange maximala LLM-utgifter per körning; körningar som överstiger budgeten pausas
+- **Auto-återupptagningswatchdog** — återupptar automatiskt pausade uppdrag vid omstart
+- **YOLO-läge** — inaktivera human-in-the-loop validering för helt autonoma körningar
+- **Persistent** — alla inställningar sparade i DB, överlever serveromstarter
+
+### Uppdragscockpit
+
+Realtidskontrollcentrum på `/cockpit`:
+
+- **Live pipeline-vy** — idéskapande → uppdrag → pågående → tester → driftsatt
+- **Status per uppdrag** — agent, pågående verktygsanrop, LLM-kostnad hittills
+- **Semaforgauge** — se hur många platser som är lediga vs upptagna med en blick
+- **Snabbkontroller** — pausa, återuppta, avbryt vilket uppdrag som helst från cockpit
+
+### LLM-Kostnadsspårning per Uppdrag
+
+Granulär utgiftssynlighet per körning:
+
+- **`llm_cost_usd` per körning** — varje körning registrerar exakta LLM-utgifter i USD
+- **Budgetvarningar** — varning eller tvångsstopp när ett uppdrag når sitt gränsvärde
+- **Leverantörsjämförelse** — jämför kostnaden för samma uppgift mellan minimax / azure / openai
+- **Kumulativa instrumentpaneler** — sammanlagda kostnader per projekt, sprint eller datumintervall
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

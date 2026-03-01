@@ -123,6 +123,46 @@ Software Factory — это **автономная многоагентная п
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Центр Настроек — Параллелизм, Бюджет & Режим YOLO (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Настройки" width="100%">
+</td>
+<td width="50%">
+<strong>Командный Центр Миссий — Кокпит Реального Времени (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Кокпит Миссии" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Доска Миссий — Все Миссии & Запуски (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Доска Миссий" width="100%">
+</td>
+<td width="50%">
+<strong>Память & Знания — 4-Уровневый RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Память" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Рабочие Процессы — 36 Встроенных Пайплайнов (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Рабочие Процессы" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Авто-Восстановление & Инфраструктура (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS Панель" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Управление Доступом на Основе Ролей (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Бэклог Продукта — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Бэклог" width="100%">
+</td>
+</tr>
 </table>
 
 ## Быстрый старт
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Центр Настроек
+
+Централизованная конфигурация платформы в `/settings`:
+
+- **Параллелизм миссий** — настройка семафора выполнения в реальном времени (1–10 параллельных миссий)
+- **Лимит бюджета** — установка максимальных расходов LLM на запуск; превысившие запуски приостанавливаются
+- **Watchdog автовозобновления** — автоматическое возобновление приостановленных миссий при перезапуске
+- **Режим YOLO** — отключение проверки Human-in-the-loop для полностью автономных запусков
+- **Персистентность** — все настройки хранятся в БД и сохраняются после перезапусков
+
+### Кокпит Миссий
+
+Командный центр реального времени в `/cockpit`:
+
+- **Живой вид пайплайна** — идея → миссии → выполняются → тесты → развёрнуто
+- **Статус каждой миссии** — агент, текущие вызовы инструментов, накопленная стоимость LLM
+- **Индикатор семафора** — количество свободных и занятых слотов с первого взгляда
+- **Быстрое управление** — пауза, возобновление, отмена любой миссии из кокпита
+
+### Отслеживание Затрат LLM на Миссию
+
+Детализированная видимость расходов на запуск:
+
+- **`llm_cost_usd` на запуск** — каждое выполнение записывает точные расходы LLM в USD
+- **Оповещения о бюджете** — предупреждение или принудительная остановка при достижении лимита
+- **Сравнение провайдеров** — сравнение стоимости одной задачи у minimax / azure / openai
+- **Сводные дашборды** — суммирование затрат по проекту, спринту или диапазону дат
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`

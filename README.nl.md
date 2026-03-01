@@ -123,6 +123,46 @@ Stel je een **virtuele softwarefabriek** voor waar 191 AI-agenten samenwerken vi
 <img src="docs/screenshots/en/ideation_projet.png" alt="Projekt-Ideation" width="100%">
 </td>
 </tr>
+<tr>
+<td width="50%">
+<strong>Instellingen Hub — Gelijktijdigheid, Budget & YOLO-Modus (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="Instellingen" width="100%">
+</td>
+<td width="50%">
+<strong>Missie Commandocentrum — Realtime Cockpit (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="Missie Cockpit" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Missiebord — Alle Missies & Uitvoeringen (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="Missiebord" width="100%">
+</td>
+<td width="50%">
+<strong>Geheugen & Kennis — 4-Laags RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="Geheugen" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>Werkstromen — 36 Ingebouwde Pipelines (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="Werkstromen" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — Auto-Herstel & Infrastructuur (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS Dashboard" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — Rolgebaseerde Toegangscontrole (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>Product Backlog — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="Backlog" width="100%">
+</td>
+</tr>
 </table>
 
 ## Snel Starten
@@ -958,6 +998,34 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Schritt-für-Schritt-Replay** — jeder Agenten-Turn und Werkzeugaufruf unter `/missions/{id}/replay`
 - **Kosten und Tokens je Schritt** — granulare LLM-Kostenaufschlüsselung je Agent
 - **Exportierbare Historie** — Replay als JSON herunterladen für Debugging und Audit
+
+### Instellingen Hub
+
+Gecentraliseerde platformconfiguratie op `/settings`:
+
+- **Missieparallellisme** — stem de uitvoeringsemafoor live af (1–10 parallelle missies)
+- **Budgetlimiet** — stel maximale LLM-uitgaven per run in; runs die het budget overschrijden worden gepauzeerd
+- **Auto-hervattingswatchdog** — gepauzeerde missies automatisch hervatten bij platformherstart
+- **YOLO-modus** — human-in-the-loop validatie uitschakelen voor volledig autonome runs
+- **Persistent** — alle instellingen opgeslagen in DB, overleven serverherstart
+
+### Missie Cockpit
+
+Realtime commandocentrum op `/cockpit`:
+
+- **Live pipelineoverzicht** — ideatie → missies → actief → testen → uitgerold
+- **Status per missie** — agent, lopende tool-aanroepen, LLM-kosten tot nu toe
+- **Semafoormeter** — zie hoeveel slots vrij vs bezet zijn in één oogopslag
+- **Snelle bediening** — pauzeer, hervat, annuleer elke missie vanuit het cockpit
+
+### LLM-Kostentracking per Missie
+
+Gedetailleerde uitgavenvisibiliteit per run:
+
+- **`llm_cost_usd` per run** — elke uitvoering registreert exacte LLM-uitgaven in USD
+- **Budgetwaarschuwingen** — waarschuwing of harde stop wanneer een missie de limiet bereikt
+- **Vergelijking providers** — vergelijk kosten van dezelfde taak bij minimax / azure / openai
+- **Cumulatieve dashboards** — kosten samengevat per project, sprint of datumbereik
 
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
