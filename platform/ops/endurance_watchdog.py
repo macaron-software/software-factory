@@ -536,10 +536,32 @@ async def _cleanup_failed_sessions() -> int:
 
 
 async def _cleanup_phantom_runs() -> int:
-    """Mark mission runs that have been running/paused > 48h without activity as 'abandoned'."""
-    abandoned = 0
+    """Clean up stale mission runs:
+    - running > 1h without update → paused (so auto_resume can retry)
+    - running/paused > 48h without update → abandoned
+    """
+    total = 0
     try:
         db = _get_db()
+        # Step 1: running but stale 1h+ → reset to paused so watchdog retries
+        result = db.execute("""
+            UPDATE mission_runs SET status='paused', updated_at=datetime('now')
+            WHERE status = 'running'
+            AND (
+                updated_at IS NULL
+                OR datetime(updated_at) < datetime('now', '-1 hours')
+            )
+        """)
+        reset = result.rowcount
+        if reset:
+            db.commit()
+            _log_metric("phantom_runs_reset", reset)
+            logger.warning(
+                "WATCHDOG: reset %d phantom running runs → paused (stale > 1h)", reset
+            )
+            total += reset
+
+        # Step 2: running/paused > 48h → abandon definitively
         result = db.execute("""
             UPDATE mission_runs SET status='abandoned'
             WHERE status IN ('running', 'paused')
@@ -555,10 +577,11 @@ async def _cleanup_phantom_runs() -> int:
             logger.info(
                 "WATCHDOG: abandoned %d phantom mission runs (stale > 48h)", abandoned
             )
+            total += abandoned
         db.close()
     except Exception as e:
         logger.warning("WATCHDOG: phantom run cleanup error: %s", e)
-    return abandoned
+    return total
 
 
 async def _daily_report():

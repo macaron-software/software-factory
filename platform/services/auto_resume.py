@@ -566,6 +566,7 @@ async def handle_failed_runs() -> int:
     Repair failed mission_runs so the watchdog can retry them.
     - Init failures (no progress) → reset to paused, reset pending phases
     - Phase failures (had progress) → reset to paused + create TMA incident run
+    - Phantom running runs (stale > 30min) → reset to paused immediately
     Called once at startup (before the watchdog loop starts retrying paused runs).
     Returns number of runs repaired.
     """
@@ -573,6 +574,21 @@ async def handle_failed_runs() -> int:
 
     db = get_db()
     try:
+        # First: reset phantom running runs (stale > 30min) → paused so watchdog picks them up
+        phantom = db.execute("""
+            UPDATE mission_runs SET status='paused', updated_at=datetime('now')
+            WHERE status = 'running'
+            AND workflow_id IS NOT NULL
+            AND (updated_at IS NULL OR datetime(updated_at) < datetime('now', '-30 minutes'))
+        """)
+        phantom_count = phantom.rowcount
+        if phantom_count:
+            db.commit()
+            logger.warning(
+                "handle_failed_runs: reset %d phantom running runs → paused",
+                phantom_count,
+            )
+
         rows = db.execute("""
             SELECT mr.id, mr.workflow_id, mr.workflow_name, mr.current_phase,
                    mr.phases_json, mr.project_id, mr.brief,
@@ -587,7 +603,7 @@ async def handle_failed_runs() -> int:
         db.close()
 
     if not rows:
-        return 0
+        return phantom_count
 
     repaired = 0
     tma_created = 0

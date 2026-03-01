@@ -425,6 +425,10 @@ class PgConnectionWrapper:
     def close(self):
         """Return connection to pool instead of closing."""
         try:
+            # Rollback any open transaction before returning to pool
+            # (avoids psycopg_pool "rolling back returned connection" warnings)
+            if self._conn.info.transaction_status != 0:  # 0 = IDLE
+                self._conn.rollback()
             pool = _get_pg_pool()
             pool.putconn(self._conn)
         except (psycopg.OperationalError, OSError):
