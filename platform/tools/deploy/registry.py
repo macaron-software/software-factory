@@ -59,15 +59,26 @@ def get_target(name: str | None = None) -> DeployTarget:
     """
     Return a deploy target by name.
 
-    Looks up the name in the deploy_targets DB table.
-    Falls back to the builtin docker-local target if name is None or not found.
+    If name is None, returns the DB-registered default (is_default=1).
+    Falls back to the builtin docker-local target if nothing found.
     """
-    if not name or name == "docker-local":
-        return _DOCKER_LOCAL
-
     try:
         from ...db.adapter import get_connection
         conn = get_connection()
+
+        # Resolve name=None → DB default
+        if not name or name == "docker-local":
+            row_default = conn.execute(
+                "SELECT name, driver, config_json FROM deploy_targets WHERE is_default=1 LIMIT 1"
+            ).fetchone()
+            if row_default and row_default[1] != "docker_local":
+                # Use DB default if it's not just docker_local (which is the builtin anyway)
+                name = row_default[0]
+            elif row_default and row_default[1] == "docker_local" and row_default[0] != "docker-local":
+                name = row_default[0]
+            else:
+                return _DOCKER_LOCAL
+
         row = conn.execute(
             "SELECT driver, config_json FROM deploy_targets WHERE name = ?", (name,)
         ).fetchone()
