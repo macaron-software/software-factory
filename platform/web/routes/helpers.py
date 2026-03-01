@@ -38,7 +38,7 @@ def _is_json_request(request: Request) -> bool:
 _active_mission_tasks: dict[str, asyncio.Task] = {}
 
 # Limit concurrent mission execution — value read from config at runtime
-_mission_semaphore = asyncio.Semaphore(2)
+_mission_semaphore = asyncio.Semaphore(3)
 _mission_semaphore_value = 2
 
 
