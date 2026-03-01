@@ -240,6 +240,8 @@ PUBLIC_PATHS = {
     "/docs",
     "/openapi.json",
     "/js-error",
+    "/auth/github",
+    "/auth/azure",
 }
 
 
