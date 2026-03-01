@@ -1,9 +1,27 @@
 {% extends "base.html" %}
 
 {% block topbar_actions %}
-<span class="badge" style="background:var(--purple);color:#fff;font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:4px">
+<span class="badge {% if mission.status.value == 'paused' %}badge-yellow{% elif mission.status.value == 'completed' %}badge-blue{% elif mission.status.value == 'failed' %}badge-red{% elif mission.status.value == 'running' %}badge-green{% else %}badge-yellow{% endif %}"
+      style="font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:4px">
     {{ mission.status.value|upper }}
 </span>
+{% if mission.status.value == 'paused' and session_id and mission.workflow_id %}
+<button class="btn btn-sm" style="background:var(--green,#22c55e);color:#fff;"
+        hx-post="/api/workflow/{{ session_id }}/resume"
+        hx-swap="none"
+        hx-on::after-request="location.reload()"
+        title="Valider et continuer le workflow">
+    <svg class="icon icon-sm"><use href="#icon-check"/></svg> GO
+</button>
+<button class="btn btn-sm btn-danger"
+        onclick="if(!confirm('Rejeter ce checkpoint et arrêter le workflow ?')) return false;"
+        hx-post="/api/workflow/{{ session_id }}/nogo"
+        hx-swap="none"
+        hx-on::after-request="location.reload()"
+        title="Rejeter le checkpoint et arrêter le workflow">
+    <svg class="icon icon-sm"><use href="#icon-x"/></svg> NO GO
+</button>
+{% endif %}
 <button class="btn btn-ghost btn-sm" onclick="replayMission()" title="Replay this mission run">
     <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Replay
 </button>

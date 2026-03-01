@@ -182,6 +182,23 @@ CREATE TABLE IF NOT EXISTS features (
 
 CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id);
 
+CREATE TABLE IF NOT EXISTS user_stories (
+    id TEXT PRIMARY KEY,
+    feature_id TEXT REFERENCES features(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    acceptance_criteria TEXT DEFAULT '',
+    story_points INTEGER DEFAULT 1,
+    priority INTEGER DEFAULT 5,
+    status TEXT DEFAULT 'backlog',
+    assigned_to TEXT DEFAULT '',
+    jira_key TEXT DEFAULT '',
+    sprint_id TEXT DEFAULT '',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_stories_feature ON user_stories(feature_id);
+
 -- ============================================================================
 -- SESSIONS (legacy — kept for backward compatibility)
 -- ============================================================================
