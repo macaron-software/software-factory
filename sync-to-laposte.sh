@@ -38,6 +38,16 @@ if [ ! -d "$LAPOSTE_REPO/.git" ]; then
     fi
 fi
 
+# ── 1b. Reset GitLab local sur origin/main AVANT le rsync ────────────────────
+# (évite que le reset conflict du rebase n'écrase les fichiers rsynqués)
+if ! $DRY_RUN && [ -d "$LAPOSTE_REPO/.git" ]; then
+    cd "$LAPOSTE_REPO"
+    git fetch origin 2>/dev/null || true
+    git reset --hard origin/main 2>/dev/null || true
+    echo "-> GitLab local reset sur origin/main"
+    cd "$GITHUB_REPO"
+fi
+
 # ── 2. Sync du code (sans agents/workflows/projets) ───────────────────────────
 echo "Synchronisation du code..."
 RSYNC_OPTS="-a --delete"
@@ -110,24 +120,11 @@ $DRY_RUN || cp "$GITHUB_REPO/README.laposte.md" "$LAPOSTE_REPO/README.md"
 if ! $DRY_RUN; then
     cd "$LAPOSTE_REPO"
 
-    # Pull remote commits first (postiers may have committed directly on GitLab)
-    echo "-> Pull GitLab (intégration commits postiers)..."
-    git fetch origin 2>/dev/null || true
-    if git rev-parse origin/main >/dev/null 2>&1; then
-        git rebase origin/main 2>/dev/null || {
-            # Rebase conflict: ours always wins (GitHub is source of truth for platform code)
-            git rebase --abort 2>/dev/null || true
-            git reset --hard origin/main 2>/dev/null || true
-            echo "   ⚠ Conflit rebase — reset sur origin/main (GitHub source of truth)"
-        }
-    fi
-
     git add -A
     if git diff --cached --quiet; then
         echo "-> Déjà à jour — aucun changement"
     else
         # Reprendre les messages des commits GitHub depuis le dernier sync
-        LAST_SYNC_SHA=$(git log -1 --pretty=%H 2>/dev/null || echo "")
         GITHUB_LOG=$(cd "$GITHUB_REPO" && git log --oneline --no-merges -10 --pretty="%s" 2>/dev/null | head -5)
         COMMIT_MSG=$(echo "$GITHUB_LOG" | head -1)
         EXTRA=$(echo "$GITHUB_LOG" | tail -n +2 | sed 's/^/- /')
