@@ -1622,6 +1622,43 @@ def _migrate_pg(conn):
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    # Quality metrics tables (added 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quality_reports (
+            id SERIAL PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            mission_id TEXT,
+            session_id TEXT,
+            dimension TEXT NOT NULL,
+            score REAL NOT NULL,
+            details_json TEXT DEFAULT '{}',
+            tool_used TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qr_project ON quality_reports(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qr_mission ON quality_reports(mission_id)"
+    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_qr_ts ON quality_reports(created_at)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS quality_snapshots (
+            id SERIAL PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            mission_id TEXT,
+            global_score REAL NOT NULL,
+            breakdown_json TEXT NOT NULL DEFAULT '{}',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qs_project ON quality_snapshots(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
+    )
     _bump_schema_version(conn, _SCHEMA_VERSION)
     conn.commit()
 

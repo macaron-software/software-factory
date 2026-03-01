@@ -74,6 +74,31 @@ async def metrics_tab_quality(request: Request):
     )
 
 
+@router.post("/api/quality/scan/{project_id}", response_class=JSONResponse)
+async def trigger_quality_scan(request: Request, project_id: str):
+    """Trigger an async quality scan for a project."""
+    import asyncio
+    from ....metrics.quality import QualityScanner
+    from ....projects.manager import get_project_store
+
+    proj = get_project_store().get(project_id)
+    if not proj:
+        return JSONResponse({"error": "Project not found"}, status_code=404)
+    if not proj.path or not proj.exists:
+        return JSONResponse({"error": "Project has no workspace"}, status_code=400)
+
+    async def _run():
+        try:
+            scanner = QualityScanner()
+            await scanner.full_scan(proj.path, project_id=project_id)
+            logger.info("Quality scan done for %s", project_id)
+        except Exception as exc:
+            logger.warning("Quality scan failed for %s: %s", project_id, exc)
+
+    asyncio.create_task(_run())
+    return JSONResponse({"status": "started", "project_id": project_id})
+
+
 @router.get("/metrics/tab/analytics", response_class=HTMLResponse)
 async def metrics_tab_analytics(request: Request):
     """Analytics tab partial."""

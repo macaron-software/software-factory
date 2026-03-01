@@ -79,6 +79,10 @@
                 <option value="{{ proj.id }}" {% if proj.id == selected_project %}selected{% endif %}>{{ proj.name }}</option>
                 {% endfor %}
             </select>
+            <button id="qScanBtn" class="btn btn-sm btn-primary" style="display:none"
+                    onclick="runQualityScan()">
+                <svg class="icon icon-xs"><use href="#icon-zap"/></svg> Scan
+            </button>
         </div>
     </div>
 
@@ -193,8 +197,30 @@
 <script>
 function loadQuality() {
     const pid = document.getElementById('qualityProject').value;
+    const btn = document.getElementById('qScanBtn');
+    if (btn) btn.style.display = pid ? '' : 'none';
     htmx.ajax('GET', '/metrics/tab/quality' + (pid ? '?project_id=' + pid : ''), '#metrics-content');
 }
+
+function runQualityScan() {
+    const pid = document.getElementById('qualityProject').value;
+    if (!pid) return;
+    const btn = document.getElementById('qScanBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Scanning...'; }
+    fetch('/api/quality/scan/' + pid, { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+            setTimeout(() => loadQuality(), 8000); // reload after 8s
+        })
+        .catch(() => { if (btn) { btn.disabled = false; btn.textContent = 'Scan'; } });
+}
+
+// Show scan button if a project is already selected
+(function() {
+    const btn = document.getElementById('qScanBtn');
+    const sel = document.getElementById('qualityProject');
+    if (btn && sel && sel.value) btn.style.display = '';
+})();
 
 {% if snapshot and snapshot.breakdown and snapshot.breakdown.dimensions %}
 // Radar chart
