@@ -131,6 +131,9 @@ def list_targets() -> list[dict]:
 
     # Add builtin only if not already registered in DB
     if "docker-local" not in db_names:
+        # Mark builtin as non-default if a DB default exists
+        has_db_default = any(t["is_default"] for t in targets)
+        builtin["is_default"] = not has_db_default
         targets.insert(0, builtin)
 
     return targets
