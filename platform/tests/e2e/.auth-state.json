@@ -2,40 +2,40 @@
   "cookies": [
     {
       "name": "refresh_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJzaWQiOiIzZTc1NWMzODI1YTA0M2MyIiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzMwMDY0NTEsImlhdCI6MTc3MjQwMTY1MX0.aTNeIDO4XwnFCXbOhZNgIq8NPLB37g4-LOSLqW4dg94",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJzaWQiOiJiZWYyNzlhYjFmMzA0MDU1IiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzMwMDY1OTYsImlhdCI6MTc3MjQwMTc5Nn0.nyezRTA-RrAScWHddhPnSWU30SSuNjEKWa61pgEEnHA",
       "domain": "127.0.0.1",
       "path": "/api/auth",
-      "expires": 1773006451.896,
+      "expires": 1773006596.035,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "refresh_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJzaWQiOiIzZTc1NWMzODI1YTA0M2MyIiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzMwMDY0NTEsImlhdCI6MTc3MjQwMTY1MX0.aTNeIDO4XwnFCXbOhZNgIq8NPLB37g4-LOSLqW4dg94",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJzaWQiOiJiZWYyNzlhYjFmMzA0MDU1IiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzMwMDY1OTYsImlhdCI6MTc3MjQwMTc5Nn0.nyezRTA-RrAScWHddhPnSWU30SSuNjEKWa61pgEEnHA",
       "domain": "localhost",
       "path": "/api/auth",
-      "expires": 1773006451.896,
+      "expires": 1773006596.035,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "access_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzI0MDI1NTEsImlhdCI6MTc3MjQwMTY1MX0.gdZ_W8nAeloMXVmD0pGkCeyp9uoUxEQbIOj2ofB1D8s",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzI0MDI2OTYsImlhdCI6MTc3MjQwMTc5Nn0.ljC7nJpld2cTE3hBuF1PIad_HlhkqpH8hz2X-4hNBxY",
       "domain": "127.0.0.1",
       "path": "/",
-      "expires": 1772402551.896,
+      "expires": 1772402696.035,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
     },
     {
       "name": "access_token",
-      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzI0MDI1NTEsImlhdCI6MTc3MjQwMTY1MX0.gdZ_W8nAeloMXVmD0pGkCeyp9uoUxEQbIOj2ofB1D8s",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmOTdkYjRiNjZhYWEiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzI0MDI2OTYsImlhdCI6MTc3MjQwMTc5Nn0.ljC7nJpld2cTE3hBuF1PIad_HlhkqpH8hz2X-4hNBxY",
       "domain": "localhost",
       "path": "/",
-      "expires": 1772402551.896,
+      "expires": 1772402696.035,
       "httpOnly": true,
       "secure": false,
       "sameSite": "Lax"
