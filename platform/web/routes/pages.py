@@ -857,6 +857,8 @@ async def save_orchestrator_settings(request: Request):
             oc.worker_nodes = [u.strip() for u in raw if u.strip()]
         elif isinstance(raw, str):
             oc.worker_nodes = [u.strip() for u in raw.splitlines() if u.strip()]
+    if "yolo_mode" in body:
+        oc.yolo_mode = bool(body["yolo_mode"])
 
     save_config(cfg)
     # Apply semaphore change live
@@ -887,6 +889,7 @@ async def save_orchestrator_settings(request: Request):
         "max_active_projects": oc.max_active_projects,
         "deployed_container_ttl_hours": oc.deployed_container_ttl_hours,
         "worker_nodes": oc.worker_nodes,
+        "yolo_mode": oc.yolo_mode,
         "cpu_now": _cpu_now,
         "ram_now": _ram_now,
         "ram_total_gb": _ram_total_gb,

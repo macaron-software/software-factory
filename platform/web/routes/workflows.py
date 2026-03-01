@@ -527,7 +527,50 @@ async def workflow_resume(session_id: str):
     }
 
 
-# ── DSI Board ────────────────────────────────────────────────────
+@router.post("/api/workflow/{session_id}/nogo")
+async def workflow_nogo(session_id: str):
+    """Reject a paused workflow checkpoint — stops the workflow as failed."""
+    from ...sessions.store import get_session_store
+    from ...sessions.models import SessionStatus
+    from ...db.migrations import get_db
+
+    store = get_session_store()
+    sess = store.get(session_id)
+    if not sess:
+        return {"error": "Session not found"}
+
+    store.update_status(session_id, SessionStatus.FAILED)
+
+    # Record NO GO message in thread
+    from ...sessions.store import MessageDef
+    store.add_message(MessageDef(
+        session_id=session_id,
+        from_agent="system",
+        to_agent="user",
+        message_type="system",
+        content="**❌ NO GO — Workflow arrêté**\n\nLe checkpoint humain a été rejeté. Le workflow a été interrompu.",
+    ))
+
+    # Update mission run to failed if linked
+    config = sess.config or {}
+    mission_run_id = config.get("mission_run_id")
+    if mission_run_id:
+        try:
+            from datetime import datetime, timezone
+            db = get_db()
+            db.execute(
+                "UPDATE mission_runs SET status='failed', completed_at=? WHERE id=?",
+                (datetime.now(timezone.utc).isoformat(), mission_run_id),
+            )
+            db.commit()
+            db.close()
+        except Exception:
+            pass
+
+    return {"status": "nogo", "session_id": session_id}
+
+
+
 
 
 @router.get("/dsi", response_class=HTMLResponse)

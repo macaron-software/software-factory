@@ -11,6 +11,9 @@ async def run_human_in_the_loop(engine, run, task: str):
     """
     from ..engine import _sse, WorkflowPaused
     from ...sessions.store import get_session_store, MessageDef
+    from ...config import get_config
+
+    _yolo = get_config().orchestrator.yolo_mode
 
     nodes = engine._ordered_nodes(run.pattern)
     if not nodes:
@@ -48,6 +51,16 @@ async def run_human_in_the_loop(engine, run, task: str):
                 "requires_input": True,
             })
             run.flow_step = "Checkpoint humain — en attente"
+            # YOLO mode: auto-approve, just log the checkpoint and continue
+            if _yolo:
+                store.add_message(MessageDef(
+                    session_id=run.session_id,
+                    from_agent="system",
+                    to_agent="user",
+                    message_type="system",
+                    content=f"**CHECKPOINT AUTO-APPROUVÉ** _(YOLO mode activé)_\n\n{checkpoint_msg}",
+                ))
+                continue
             # Pause the workflow — the human must explicitly resume it
             raise WorkflowPaused(checkpoint_msg=checkpoint_msg, phase_index=0)
 
@@ -79,5 +92,15 @@ async def run_human_in_the_loop(engine, run, task: str):
                 "content": "Validation humaine requise",
                 "requires_input": True,
             })
+            # YOLO mode: auto-approve checkpoint edge
+            if _yolo:
+                store.add_message(MessageDef(
+                    session_id=run.session_id,
+                    from_agent="system",
+                    to_agent="user",
+                    message_type="system",
+                    content=f"**VALIDATION AUTO-APPROUVÉE** _(YOLO mode activé)_\n\n_Résultat :_\n{output[:500]}",
+                ))
+                continue
             # Pause the workflow — the human must explicitly resume it
             raise WorkflowPaused(checkpoint_msg="Validation humaine requise", phase_index=0)

@@ -234,6 +234,30 @@
 
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
+              <!-- YOLO mode -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Human-in-the-Loop</div>
+              <div style="display:flex;align-items:center;gap:1rem;padding:0.7rem 0.9rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                <label class="switch" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">
+                  <input type="checkbox" name="yolo_mode" id="yolo_mode_toggle" {% if config.orchestrator.yolo_mode %}checked{% endif %}
+                    style="opacity:0;width:0;height:0">
+                  <span style="position:absolute;cursor:pointer;inset:0;background:{% if config.orchestrator.yolo_mode %}var(--yellow,#eab308){% else %}var(--border){% endif %};border-radius:22px;transition:.2s"
+                        id="yolo_slider"></span>
+                  <span style="position:absolute;left:{% if config.orchestrator.yolo_mode %}20px{% else %}3px{% endif %};top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none"
+                        id="yolo_knob"></span>
+                </label>
+                <div>
+                  <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary)">
+                    YOLO Mode — Auto-approve all checkpoints
+                  </div>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.1rem">
+                    When enabled, <code>human-in-the-loop</code> phases are auto-approved without pausing.
+                    Useful for testing or fully automated runs. <strong style="color:var(--yellow,#eab308)">⚠ Use with care.</strong>
+                  </div>
+                </div>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
               <!-- Worker nodes -->
               <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
@@ -718,6 +742,8 @@ async function saveOrchSettings() {
   });
   const ta = form.querySelector('textarea[name="worker_nodes"]');
   if (ta) data['worker_nodes'] = ta.value;
+  const yolo = form.querySelector('#yolo_mode_toggle');
+  if (yolo) data['yolo_mode'] = yolo.checked;
   const st = document.getElementById('orch-save-status');
   st.textContent = 'Saving…';
   try {
@@ -739,10 +765,22 @@ async function saveOrchSettings() {
   }
 }
 
+// YOLO toggle animation
+(function() {
+  const tog = document.getElementById('yolo_mode_toggle');
+  if (!tog) return;
+  const slider = document.getElementById('yolo_slider');
+  const knob = document.getElementById('yolo_knob');
+  tog.addEventListener('change', function() {
+    const on = tog.checked;
+    slider.style.background = on ? 'var(--yellow,#eab308)' : 'var(--border)';
+    knob.style.left = on ? '20px' : '3px';
+  });
+})();
+
 async function refreshLoad() {
   try {
     const r = await fetch('/api/metrics/load');
-    if (!r.ok) return;
     const d = await r.json();
     const cpu = d.cpu_percent ?? '—';
     const ram = d.ram_percent ?? '—';

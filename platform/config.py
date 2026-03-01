@@ -155,6 +155,8 @@ class OrchestratorConfig:
     deployed_container_ttl_hours: float = 4.0  # stop macaron-app-* containers after N hours idle
     # Worker nodes for multi-server dispatch (list of base URLs)
     worker_nodes: list = field(default_factory=list)
+    # YOLO mode: auto-approve all human-in-the-loop checkpoints (no pause)
+    yolo_mode: bool = False
 
 
 @dataclass
