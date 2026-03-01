@@ -1594,6 +1594,7 @@ def _migrate_pg(conn):
         ("resume_attempts", "INTEGER DEFAULT 0"),
         ("last_resume_at", "TEXT"),
         ("human_input_required", "INTEGER DEFAULT 0"),
+        ("llm_cost_usd", "DOUBLE PRECISION DEFAULT 0.0"),
     ]:
         try:
             conn.execute(
