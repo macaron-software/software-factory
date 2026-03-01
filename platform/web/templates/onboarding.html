@@ -124,7 +124,13 @@
         <!-- Step 2: Choose Projects -->
         <div class="step" id="step-2">
             <div class="step-title">Which projects do you manage?</div>
-            <div class="step-subtitle">Select one or more — you can change this anytime.</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <span class="step-subtitle" style="margin:0">Select one or more — you can change this anytime.</span>
+                <span style="display:flex;gap:6px">
+                    <button class="btn-secondary" style="font-size:0.72rem;padding:3px 10px" onclick="document.querySelectorAll('.project-card:not(.selected)').forEach(c=>toggleProject(c))">Select all</button>
+                    <button class="btn-secondary" style="font-size:0.72rem;padding:3px 10px" onclick="document.querySelectorAll('.project-card.selected').forEach(c=>toggleProject(c))">Unselect all</button>
+                </span>
+            </div>
             <div class="project-grid">
                 {% for p in projects %}
                 <div class="project-card" data-project="{{ p.id }}" onclick="toggleProject(this)">
