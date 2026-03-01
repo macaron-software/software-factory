@@ -1821,6 +1821,36 @@ def _migrate_pg(conn):
         "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
     )
     _bump_schema_version(conn, _SCHEMA_VERSION)
+
+    # ── GitHub OSS tool integrations ──
+    # Ensure columns exist first (SQLite path added them in _migrate)
+    for col, typ in [("category", "TEXT"), ("icon", "TEXT"), ("description", "TEXT"), ("agent_roles", "TEXT"), ("enabled", "INTEGER DEFAULT 0")]:
+        conn.execute(f"ALTER TABLE integrations ADD COLUMN IF NOT EXISTS {col} {typ}")
+    _github_tools = [
+        ("scrapy","Scrapy","github_tool","testing","🕷️","github.com/scrapy/scrapy — Web scraping & crawling framework.",'{"repo_url":"https://github.com/scrapy/scrapy","version":"latest"}','["dev","qa","marketing","data"]'),
+        ("opensandbox","OpenSandbox","github_tool","devops","📦","github.com/alibaba/OpenSandbox — Secure sandboxed code execution.",'{"repo_url":"https://github.com/alibaba/OpenSandbox","version":"latest"}','["dev","security","qa","architecture"]'),
+        ("locust","Locust","github_tool","testing","🦗","github.com/locustio/locust — Scalable load testing.",'{"repo_url":"https://github.com/locustio/locust","version":"latest","target_url":""}','["qa","dev","architecture"]'),
+        ("k6","Grafana k6","github_tool","testing","⚡","github.com/grafana/k6 — Modern load & performance testing.",'{"repo_url":"https://github.com/grafana/k6","version":"latest","target_url":""}','["qa","dev","architecture"]'),
+        ("trufflehog","TruffleHog","github_tool","security","🐷","github.com/trufflesecurity/trufflehog — Secret scanning.",'{"repo_url":"https://github.com/trufflesecurity/trufflehog","scan_depth":"100"}','["security","dev","qa"]'),
+        ("semgrep","Semgrep","github_tool","security","🔍","github.com/returntocorp/semgrep — Static analysis, 2000+ rules.",'{"repo_url":"https://github.com/returntocorp/semgrep","ruleset":"auto"}','["security","dev","qa","reviewer"]'),
+        ("checkov","Checkov","github_tool","security","✅","github.com/bridgecrewio/checkov — IaC security scanner.",'{"repo_url":"https://github.com/bridgecrewio/checkov","framework":"terraform,kubernetes"}','["security","architecture","dev"]'),
+        ("zap","OWASP ZAP","github_tool","security","🕵️","github.com/zaproxy/zaproxy — Web application security scanner.",'{"repo_url":"https://github.com/zaproxy/zaproxy","target_url":"","scan_mode":"baseline"}','["security","qa","dev"]'),
+        ("renovate","Renovate","github_tool","devops","♻️","github.com/renovatebot/renovate — Automated dependency updates.",'{"repo_url":"https://github.com/renovatebot/renovate","auto_merge":"patch"}','["dev","architecture","security"]'),
+        ("semantic-release","Semantic Release","github_tool","devops","🏷️","github.com/semantic-release/semantic-release — Automated versioning.",'{"repo_url":"https://github.com/semantic-release/semantic-release","branch":"main"}','["dev","architecture"]'),
+        ("hadolint","Hadolint","github_tool","devops","🐳","github.com/hadolint/hadolint — Dockerfile linter.",'{"repo_url":"https://github.com/hadolint/hadolint"}','["dev","security","architecture"]'),
+        ("mermaid","Mermaid","github_tool","architecture","🧜","github.com/mermaid-js/mermaid — Diagrams as code.",'{"repo_url":"https://github.com/mermaid-js/mermaid"}','["architecture","dev","product"]'),
+        ("structurizr","Structurizr","github_tool","architecture","🏛️","github.com/structurizr/structurizr-cli — C4 model diagrams.",'{"repo_url":"https://github.com/structurizr/structurizr-cli"}','["architecture","dev"]'),
+        ("mkdocs-material","MkDocs Material","github_tool","devops","📚","github.com/squidfunk/mkdocs-material — Documentation site generator.",'{"repo_url":"https://github.com/squidfunk/mkdocs-material","site_dir":"docs/site"}','["dev","architecture","product"]'),
+        ("mlflow","MLflow","github_tool","devops","🔬","github.com/mlflow/mlflow — ML experiment tracking.",'{"repo_url":"https://github.com/mlflow/mlflow","tracking_uri":""}','["dev","architecture","data"]'),
+        ("httpie","HTTPie","github_tool","testing","🌐","github.com/httpie/cli — Human-friendly HTTP client.",'{"repo_url":"https://github.com/httpie/cli"}','["dev","qa","security"]'),
+    ]
+    for iid, name, itype, category, icon, desc, cfg, roles in _github_tools:
+        conn.execute(
+            "INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, config_json, agent_roles) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (iid, name, itype, category, icon, desc, cfg, roles),
+        )
+
     conn.commit()
 
 
