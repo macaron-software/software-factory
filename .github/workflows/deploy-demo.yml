@@ -117,15 +117,14 @@ jobs:
           echo "$INACTIVE" > /opt/software-factory/active-slot
 
           # ── Reboot script: restart only the active slot on boot ──────────────
-          cat > /opt/software-factory/start-active-slot.sh << 'BOOTEOF'
-#!/bin/bash
-# Started by cron @reboot — brings up the active slot only
-ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")
-cd /opt/software-factory
-docker compose up -d --no-deps platform-${ACTIVE}
-echo "$(date) boot: started platform-${ACTIVE}" >> /var/log/sf-boot.log
-BOOTEOF
-          chmod +x /opt/software-factory/start-active-slot.sh
+          BOOT_SCRIPT='/opt/software-factory/start-active-slot.sh'
+          echo '#!/bin/bash' > "$BOOT_SCRIPT"
+          echo '# cron @reboot — starts only the active slot' >> "$BOOT_SCRIPT"
+          echo 'ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")' >> "$BOOT_SCRIPT"
+          echo 'cd /opt/software-factory' >> "$BOOT_SCRIPT"
+          echo 'docker compose up -d --no-deps platform-${ACTIVE}' >> "$BOOT_SCRIPT"
+          echo 'echo "$(date) boot: started platform-${ACTIVE}" >> /var/log/sf-boot.log' >> "$BOOT_SCRIPT"
+          chmod +x "$BOOT_SCRIPT"
           # Ensure cron @reboot entry exists (idempotent)
           (crontab -l 2>/dev/null | grep -v 'start-active-slot'; \
             echo "@reboot /opt/software-factory/start-active-slot.sh") | crontab -
