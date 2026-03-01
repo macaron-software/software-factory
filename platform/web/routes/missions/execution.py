@@ -135,7 +135,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         workflow_id=wf_id,
         workflow_name=wf.name,
         brief=task_desc,
-        status=MissionStatus.RUNNING,
+        status=MissionStatus.PENDING,
         phases=phases,
         project_id=mission.project_id or mission_id,
         session_id=session.id,
@@ -147,11 +147,13 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     except Exception:
         pass
 
-    from ..helpers import _active_mission_tasks
+    async def _guarded_workflow():
+        async with get_mission_semaphore():
+            await _run_workflow_background(
+                wf, session.id, task_desc, mission.project_id or ""
+            )
 
-    _wf_task = asyncio.create_task(
-        _run_workflow_background(wf, session.id, task_desc, mission.project_id or "")
-    )
+    _wf_task = asyncio.create_task(_guarded_workflow())
     _active_mission_tasks[session.id] = _wf_task
     _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
 
