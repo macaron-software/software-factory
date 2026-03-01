@@ -178,8 +178,8 @@
 <script type="importmap">
 {
     "imports": {
-        "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
-        "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
     }
 }
 </script>
@@ -190,16 +190,6 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
-
-// WebGPU renderer — try to import, fall back gracefully
-let WebGPURenderer = null;
-let WebGPU = null;
-try {
-    const wgpuMod = await import('three/addons/renderers/webgpu/WebGPURenderer.js');
-    const capsMod = await import('three/addons/capabilities/WebGPU.js');
-    WebGPURenderer = wgpuMod.default;
-    WebGPU = capsMod.default;
-} catch (_) { /* WebGPU not available — use WebGL */ }
 
 // ═══════════════════════════════════════════════════════════════
 // MACARON WORLD — 3D Sims-like Agent Visualization
@@ -315,20 +305,8 @@ async function init() {
     camera.position.set(40, 35, 40);
     camera.lookAt(0, 0, 0);
 
-    // Renderer — try WebGPU first, fall back to WebGL
-    let useWebGPU = false;
-    if (WebGPU && WebGPURenderer && WebGPU.isAvailable()) {
-        try {
-            renderer = new WebGPURenderer({ canvas, antialias: false });
-            await renderer.init();
-            useWebGPU = true;
-            const badge = document.getElementById('gpu-badge');
-            if (badge) { badge.textContent = 'WebGPU'; badge.className = 'wgp-badge webgpu'; }
-        } catch (_) { renderer = null; }
-    }
-    if (!renderer) {
-        renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
-    }
+    // Renderer — WebGL
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false });
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.shadowMap.enabled = true;
