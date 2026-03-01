@@ -27,31 +27,13 @@ function showAPITab() {
                 </svg>
                 API Documentation
             </h1>
-            <p style="color:var(--text-secondary);margin-bottom:2rem">
-                Documentation interactive Swagger de l'API REST. Testez les endpoints directement depuis l'interface.
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem">
+                Documentation interactive de l'API REST. Testez les endpoints directement depuis l'interface.
             </p>
-            
-            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;overflow:hidden">
-                <div style="padding:1rem;background:var(--bg-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
-                    <div style="display:flex;align-items:center;gap:0.5rem">
-                        <svg style="width:20px;height:20px;color:var(--green)" viewBox="0 0 24 24" fill="currentColor">
-                            <circle cx="12" cy="12" r="10"/>
-                        </svg>
-                        <span style="font-weight:600">Swagger UI</span>
-                    </div>
-                    <a href="/docs" target="_blank" style="padding:0.5rem 1rem;background:var(--purple);color:#fff;text-decoration:none;border-radius:6px;font-size:0.85rem;font-weight:600">
-                        Ouvrir dans nouvel onglet
-                        <svg style="width:14px;height:14px;vertical-align:-2px;margin-left:4px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                            <polyline points="15 3 21 3 21 9"></polyline>
-                            <line x1="10" y1="14" x2="21" y2="3"></line>
-                        </svg>
-                    </a>
-                </div>
-                <iframe src="/docs" style="width:100%;height:calc(100vh - 300px);border:none"></iframe>
-            </div>
+            <div id="swagger-ui-container"></div>
         </div>
     `;
+    _loadSwaggerUI();
 }
 
 function showCLITab() {
@@ -544,6 +526,67 @@ async function runIdeation(prompt) {
         terminal.appendChild(errorDiv);
         terminal.scrollTop = terminal.scrollHeight;
     }
+}
+
+function _loadSwaggerUI() {
+    const container = document.getElementById('swagger-ui-container');
+    if (!container) return;
+
+    // Inject Swagger UI CSS + JS from unpkg (already in CSP allowlist)
+    if (!document.getElementById('swagger-css')) {
+        const link = document.createElement('link');
+        link.id = 'swagger-css';
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/swagger-ui-dist@5/swagger-ui.css';
+        document.head.appendChild(link);
+    }
+
+    // Dark-mode overrides so it fits the SF theme
+    if (!document.getElementById('swagger-dark')) {
+        const style = document.createElement('style');
+        style.id = 'swagger-dark';
+        style.textContent = `
+            #swagger-ui-container .swagger-ui { background: var(--bg-primary, #0f0f1a); color: var(--text-primary, #e2e8f0); }
+            #swagger-ui-container .swagger-ui .opblock-summary-description,
+            #swagger-ui-container .swagger-ui table thead tr th,
+            #swagger-ui-container .swagger-ui .info .title,
+            #swagger-ui-container .swagger-ui .info p { color: var(--text-primary, #e2e8f0); }
+            #swagger-ui-container .swagger-ui .opblock { background: var(--bg-secondary, #1a1a2e); border-color: var(--border, #2d2d45); margin-bottom: 8px; border-radius: 6px; }
+            #swagger-ui-container .swagger-ui .opblock .opblock-summary { border-color: var(--border, #2d2d45); }
+            #swagger-ui-container .swagger-ui .btn { border-radius: 4px; }
+            #swagger-ui-container .swagger-ui input[type=text], #swagger-ui-container .swagger-ui textarea { background: var(--bg-tertiary, #1e2030); color: var(--text-primary, #e2e8f0); border-color: var(--border, #2d2d45); }
+            #swagger-ui-container .swagger-ui .topbar { display: none; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    if (window.SwaggerUIBundle) {
+        _initSwagger();
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js';
+    script.onload = _initSwagger;
+    script.onerror = () => {
+        container.innerHTML = '<p style="padding:2rem;color:var(--text-secondary)">Failed to load Swagger UI. <a href="/docs" target="_blank">Open /docs directly</a>.</p>';
+    };
+    document.head.appendChild(script);
+}
+
+function _initSwagger() {
+    window.SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui-container',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+        layout: 'BaseLayout',
+        deepLinking: false,
+        displayRequestDuration: true,
+        defaultModelsExpandDepth: 0,
+        defaultModelExpandDepth: 0,
+        filter: true,
+        tryItOutEnabled: true,
+    });
 }
 </script>
 {% endblock %}
