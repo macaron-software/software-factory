@@ -275,7 +275,26 @@ class GitCommitTool(BaseTool):
                 cwd=cwd,
                 timeout=30,
             )
-            return (r.stdout or r.stderr) + branch_msg
+            commit_out = (r.stdout or r.stderr).strip()
+            if r.returncode != 0:
+                return commit_out + branch_msg
+
+            # Auto-push after successful commit
+            _configure_git_credentials(cwd)
+            branch = _current_branch(cwd)
+            push = subprocess.run(
+                ["git", "push", "--set-upstream", "origin", branch],
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
+            )
+            push_msg = (
+                f"\nPushed to origin/{branch}"
+                if push.returncode == 0
+                else f"\nPush failed: {push.stderr.strip()}"
+            )
+            return commit_out + branch_msg + push_msg
         except Exception as e:
             return f"Error: {e}"
 
