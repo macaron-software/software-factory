@@ -337,7 +337,7 @@ class LLMClient:
     async def chat(
         self,
         messages: list[LLMMessage],
-        provider: str = "minimax",
+        provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -403,7 +403,7 @@ class LLMClient:
 
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
-            if not key or key == "no-key":
+            if not pcfg.get("no_auth") and (not key or key == "no-key"):
                 logger.warning("LLM %s skipped (no API key)", prov)
                 continue
 
@@ -758,7 +758,7 @@ class LLMClient:
     async def stream(
         self,
         messages: list[LLMMessage],
-        provider: str = "minimax",
+        provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -780,15 +780,13 @@ class LLMClient:
                 continue
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
-            if not key or key == "no-key":
+            if not pcfg.get("no_auth") and (not key or key == "no-key"):
                 continue
             use_model = (
                 model
                 if (prov == provider and model and model in pcfg.get("models", []))
                 else pcfg["default"]
             )
-
-            # Rate limiter: queue until a slot is available (no timeout — industrial pipeline)
             try:
                 await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:

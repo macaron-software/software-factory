@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 TOOL_PROVIDER = "azure-openai"
 TOOL_MODEL = "gpt-5-mini"
 # Providers that support native function calling
-TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai"}
+TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama"}
 
 # Backward-compat aliases (executor.py used underscore-prefixed names)
 _TOOL_PROVIDER = TOOL_PROVIDER
