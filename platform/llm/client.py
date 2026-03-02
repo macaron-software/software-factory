@@ -89,22 +89,32 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,  # skip auth header entirely
     },
+    "ollama": {
+        "name": "Ollama (local)",
+        "base_url": os.environ.get("OLLAMA_URL", "http://localhost:11434/v1"),
+        "key_env": None,
+        "models": [os.environ.get("OLLAMA_MODEL", "qwen3:14b")],
+        "default": os.environ.get("OLLAMA_MODEL", "qwen3:14b"),
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+        "no_auth": True,
+    },
 }
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
-# Auto-detect Azure when AZURE_OPENAI_API_KEY is present and no explicit provider set
+# Auto-detect Azure when AZURE_DEPLOY=1 (not just from key presence)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
-_is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get(
-    "AZURE_OPENAI_API_KEY", ""
-)
-# On local dev (not Azure), include local-mlx in Thompson candidates if server is available
+_is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
+# On local dev, include local-mlx or ollama in Thompson candidates if available
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
+_ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _FALLBACK_CHAIN = [_primary] + [
     p
     for p in (
         (["local-mlx"] if _local_mlx_enabled else [])
+        + (["ollama"] if _ollama_enabled else [])
         + ["minimax", "azure-openai", "azure-ai", "openai"]
     )
     if p != _primary
@@ -588,7 +598,13 @@ class LLMClient:
 
         msgs = []
         if system_prompt:
-            msgs.append({"role": "system", "content": system_prompt})
+            # For Ollama/Qwen3: prepend /no_think to disable thinking mode (saves tokens)
+            sp = (
+                f"/no_think\n{system_prompt}" if provider == "ollama" else system_prompt
+            )
+            msgs.append({"role": "system", "content": sp})
+        elif provider == "ollama":
+            msgs.append({"role": "system", "content": "/no_think"})
         for m in messages:
             # Accept both LLMMessage objects and plain dicts
             if isinstance(m, dict):
@@ -671,7 +687,10 @@ class LLMClient:
         choice = choices[0] if choices else {}
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
-        # Strip <think> blocks from MiniMax
+        # Ollama/Qwen3: thinking models put response in reasoning field when content is empty
+        if not content and msg.get("reasoning"):
+            content = msg["reasoning"].strip()
+        # Strip <think> blocks from MiniMax / Qwen3
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
             after_think = content[idx:].strip()
