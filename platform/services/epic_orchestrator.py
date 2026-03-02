@@ -758,6 +758,55 @@ class EpicOrchestrator:
                     )
                     phase_error = str(exc)
 
+                # ── ESCALATE: auto-switch workflow if architect requested it ──
+                # Detect [ESCALATE: workflow-id] in any node output of this phase.
+                # Triggers when feature-design determines brief is too complex for
+                # feature-sprint and should be handled by epic-decompose instead.
+                if phase_success and wf_phase and wf_phase.id == "feature-design":
+                    escalate_target = None
+                    import re as _re
+                    for _node in result.nodes.values():
+                        _txt = (_node.output or "") + (
+                            (_node.result.content if _node.result else "") or ""
+                        )
+                        _m = _re.search(
+                            r"\[ESCALATE:\s*([\w\-]+)\]", _txt, _re.IGNORECASE
+                        )
+                        if _m:
+                            escalate_target = _m.group(1).strip()
+                            break
+                    if escalate_target:
+                        from ..workflows.store import get_workflow_store as _get_wf
+                        _new_wf = _get_wf().get(escalate_target)
+                        if _new_wf:
+                            logger.warning(
+                                "ESCALATE: mission %s → switching workflow %s → %s",
+                                mission.id,
+                                mission.workflow_id,
+                                escalate_target,
+                            )
+                            await self._sse_orch_msg(
+                                f"🔀 **Escalade automatique** — brief trop complexe pour "
+                                f"`feature-sprint`, relance en `{escalate_target}`…",
+                                phase.phase_id,
+                            )
+                            # Rebuild mission phases from new workflow
+                            from ..models import PhaseRun, PhaseStatus
+                            mission.workflow_id = escalate_target
+                            mission.phases = [
+                                PhaseRun(
+                                    phase_id=wp.id,
+                                    phase_name=wp.name,
+                                    status=PhaseStatus.PENDING,
+                                )
+                                for wp in _new_wf.phases
+                            ]
+                            run_store.update(mission)
+                            self.wf = _new_wf
+                            # Restart phase loop from index 0
+                            i = 0
+                            continue
+
                 # SAFe B2: Sprint Review + Retro Auto
                 if is_dev_phase and current_sprint_id:
                     try:

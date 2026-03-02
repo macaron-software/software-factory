@@ -8,7 +8,17 @@ phases:
 - id: feature-design
   pattern_id: aggregator
   name: Feature Design
-  description: Lead + Archi définissent l'architecture de la feature. Stories, acceptance criteria, interfaces.
+  description: >
+    Lead + Archi analysent le brief et DÉCIDENT du workflow adapté.
+    RÈGLE CRITIQUE — avant tout design, évaluer la complexité :
+    • Si le brief décrit UNE fonction / UN endpoint / UN module simple (< 5 fichiers estimés)
+      → continuer en feature-sprint normalement.
+    • Si le brief décrit UN système complet (auth, API multi-routes, CRUD, microservice, etc.)
+      → émettre exactement [ESCALATE: epic-decompose] dans la réponse pour basculer
+        automatiquement vers la décomposition en Epic avec Feature Teams parallèles.
+    En cas d'escalade, ne pas écrire de code — juste [ESCALATE: epic-decompose] + 1 phrase
+    expliquant pourquoi.
+    Sinon : définir stories, acceptance criteria, interfaces.
   gate: always
   config:
     agents:
