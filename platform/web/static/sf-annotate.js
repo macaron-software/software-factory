@@ -117,70 +117,119 @@
 
   // ── Toolbar ────────────────────────────────────────────────────
   function buildToolbar() {
+    // Inject theme-aware CSS for toolbar
+    const style = document.createElement('style');
+    style.textContent = `
+      #sf-ann-toolbar {
+        position: fixed; z-index: 2147483647; bottom: 24px; right: 24px;
+        background: var(--bg-secondary, #ffffff);
+        border: 1px solid var(--border, #d0d7de);
+        border-radius: 12px; padding: 8px;
+        display: flex; align-items: center; gap: 4px;
+        box-shadow: 0 4px 20px rgba(0,0,0,.12);
+        user-select: none; font-family: system-ui, -apple-system, sans-serif;
+        transition: box-shadow .2s;
+      }
+      #sf-ann-toolbar button {
+        background: transparent;
+        color: var(--text-secondary, #57606a);
+        border: none; border-radius: 7px; padding: 0;
+        cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+        width: 28px; height: 28px; transition: background .12s, color .12s;
+      }
+      #sf-ann-toolbar button:hover {
+        background: var(--bg-tertiary, #f6f8fa);
+        color: var(--text-primary, #1f2328);
+      }
+      #sf-ann-toolbar button.sf-tb-active {
+        background: var(--accent, #0969da);
+        color: #fff !important;
+      }
+      #sf-ann-toolbar button.sf-tb-accent {
+        background: #7c3aed; color: #fff;
+      }
+      #sf-ann-toolbar button.sf-tb-accent:hover { background: #6d28d9; }
+      #sf-tb-toggle { width: auto !important; padding: 0 10px !important; gap: 6px; }
+      #sf-tb-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; flex-shrink: 0; }
+      #sf-tb-label { font-size: 11px; font-weight: 600; white-space: nowrap; }
+      #sf-ann-toolbar .sf-tb-sep {
+        width: 1px; height: 20px;
+        background: var(--border, #d0d7de); margin: 0 2px; flex-shrink: 0;
+      }
+      #sf-ann-toolbar button svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; }
+      #sf-tb-type-bar button.sf-tb-selected {
+        background: var(--bg-tertiary, #f6f8fa);
+        color: var(--text-primary, #1f2328);
+        outline: 2px solid var(--accent, #0969da);
+        outline-offset: -2px;
+      }
+      #sf-ann-mode-banner {
+        display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;
+        background: var(--accent, #0969da); color: #fff;
+        font-family: system-ui, sans-serif; font-size: 12px; font-weight: 600;
+        padding: 5px 16px; align-items: center; justify-content: space-between; gap: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      }
+      #sf-ann-mode-banner button {
+        background: rgba(255,255,255,.2); border: none; color: #fff;
+        border-radius: 4px; padding: 2px 10px; cursor: pointer;
+        font-size: 11px; font-weight: 600; white-space: nowrap;
+        width: auto !important; height: auto !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     const tb = document.createElement('div');
     tb.id = 'sf-ann-toolbar';
-    // Start collapsed — just the pencil button visible
-    tb.style.cssText = `
-      position: fixed; z-index: 2147483647; bottom: 24px; right: 24px;
-      background: rgba(15,17,23,.95); backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,.15); border-radius: 12px;
-      padding: 8px; display: flex; align-items: center; gap: 4px;
-      box-shadow: 0 4px 20px rgba(0,0,0,.5); user-select: none;
-      font-family: system-ui, -apple-system, sans-serif;
-      transition: all .2s ease;
-    `;
     tb.innerHTML = `
-      <button id="sf-tb-toggle" title="Annoter cette page (Ctrl+Shift+A)" style="${btnStyle('transparent','rgba(255,255,255,.7)')}">
-        ${ICONS['edit-2']} <span id="sf-tb-label" style="font-size:11px;font-weight:600;margin-left:4px;color:rgba(255,255,255,.7)">Annoter</span>
+      <button id="sf-tb-toggle" title="Annoter cette page (Ctrl+Shift+A)">
+        <svg viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        <span id="sf-tb-label">Annoter</span>
       </button>
       <div id="sf-tb-expanded" style="display:none;align-items:center;gap:3px">
-        <div id="sf-tb-types" style="display:flex;align-items:center;gap:3px">
+        <div id="sf-tb-type-bar" style="display:flex;align-items:center;gap:3px">
           ${Object.entries(TYPE_META).map(([k,v]) => `
-            <button class="sf-tb-type" data-type="${k}" title="${v.label}" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-              <span style="width:14px;height:14px;display:inline-flex">${ICONS[v.icon]}</span>
+            <button class="sf-tb-type" data-type="${k}" title="${v.label}">
+              <svg viewBox="0 0 24 24">${ICONS[v.icon].replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
             </button>
           `).join('')}
         </div>
-        <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
-        <button id="sf-tb-pause" title="Pause animations (P)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-          ${ICONS['pause-circle']}
+        <div class="sf-tb-sep"></div>
+        <button id="sf-tb-pause" title="Pause animations (P)">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>
         </button>
-        <button id="sf-tb-visibility" title="Afficher/masquer marqueurs (H)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-          ${ICONS['eye']}
+        <button id="sf-tb-visibility" title="Afficher/masquer marqueurs (H)">
+          <svg viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         </button>
-        <button id="sf-tb-copy" title="Copier markdown (C)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-          ${ICONS['clipboard']}
+        <button id="sf-tb-copy" title="Copier markdown (C)">
+          <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
         </button>
-        <button id="sf-tb-clear" title="Effacer tout (X)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-          ${ICONS['trash-2']}
+        <button id="sf-tb-clear" title="Effacer tout (X)">
+          <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
         </button>
-        <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
-        <button id="sf-tb-fixall" title="Fix All — créer une mission agent" style="${btnStyle('#7c3aed','#fff')}">
-          ${ICONS['zap']}
+        <div class="sf-tb-sep"></div>
+        <button id="sf-tb-fixall" class="sf-tb-accent" title="Fix All — créer une mission agent">
+          <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
         </button>
-        <button id="sf-tb-view" title="Voir toutes les annotations" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-          ${ICONS['layout']}
+        <button id="sf-tb-view" title="Voir toutes les annotations">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
         </button>
       </div>
     `;
     document.body.appendChild(tb);
 
-    // Mode banner — top of page, shown when annotation mode is ON
+    // Mode banner
     const banner = document.createElement('div');
     banner.id = 'sf-ann-mode-banner';
-    banner.style.cssText = `
-      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;
-      background: #1d4ed8; color: #fff; font-family: system-ui, sans-serif;
-      font-size: 12px; font-weight: 600; padding: 5px 16px;
-      align-items: center; justify-content: space-between; gap: 12px;
-      box-shadow: 0 2px 8px rgba(29,78,216,.4);
-    `;
     banner.innerHTML = `
       <span style="display:flex;align-items:center;gap:8px">
-        <svg style="width:13px;height:13px;stroke:#93c5fd;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-        Mode Annotation actif — cliquez un élément pour annoter · Ctrl+Shift+A pour désactiver
+        <svg style="width:13px;height:13px;stroke:rgba(255,255,255,.8);fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        Mode Annotation actif — cliquez un élément pour annoter · <kbd style="background:rgba(255,255,255,.2);border-radius:3px;padding:0 4px">Ctrl+Shift+A</kbd> pour désactiver
       </span>
-      <button onclick="toggleAnnotate()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:2px 10px;cursor:pointer;font-size:11px;font-weight:600">Désactiver ✕</button>
+      <button onclick="window.toggleAnnotate()">
+        <svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2.5;margin-right:4px" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Désactiver
+      </button>
     `;
     document.body.appendChild(banner);
 
@@ -216,7 +265,7 @@
   }
 
   function btnStyle(bg, color) {
-    return `background:${bg};color:${color};border:none;border-radius:7px;padding:5px 7px;cursor:pointer;display:inline-flex;align-items:center;transition:opacity .15s;width:28px;height:28px;justify-content:center;`;
+    return `background:${bg};color:${color};border:none;border-radius:7px;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;transition:background .12s,color .12s;`;
   }
 
   // ── Toggle Annotate ────────────────────────────────────────────
@@ -225,15 +274,11 @@
     const btn = document.getElementById('sf-tb-toggle');
     const expanded = document.getElementById('sf-tb-expanded');
     const lbl = document.getElementById('sf-tb-label');
-    // Toggle button style
-    btn.style.background = active ? '#3b82f6' : 'transparent';
-    btn.style.color = active ? '#fff' : 'rgba(255,255,255,.7)';
-    if (lbl) { lbl.style.color = active ? '#fff' : 'rgba(255,255,255,.7)'; lbl.textContent = active ? 'Annoter ON' : 'Annoter'; }
-    // Show/hide full toolbar
+    btn.classList.toggle('sf-tb-active', active);
+    if (lbl) lbl.textContent = active ? 'Annoter ON' : 'Annoter';
     if (expanded) expanded.style.display = active ? 'flex' : 'none';
     document.body.style.cursor = active ? 'crosshair' : '';
     if (!active && hoveredEl) { hoveredEl.classList.remove('sf-ann-highlight', `sf-ann-highlight-${annotType}`); hoveredEl = null; }
-    // Show/hide mode banner
     const banner = document.getElementById('sf-ann-mode-banner');
     if (banner) banner.style.display = active ? 'flex' : 'none';
   }
@@ -249,9 +294,7 @@
   function setType(type) {
     annotType = type;
     document.querySelectorAll('.sf-tb-type').forEach(btn => {
-      const t = btn.dataset.type;
-      btn.style.background = t === type ? 'rgba(255,255,255,.15)' : 'transparent';
-      btn.style.color = t === type ? '#fff' : 'rgba(255,255,255,.5)';
+      btn.classList.toggle('sf-tb-selected', btn.dataset.type === type);
     });
   }
 
@@ -262,7 +305,9 @@
       el.style.transitionDuration = paused ? '0s' : '';
     });
     const btn = document.getElementById('sf-tb-pause');
-    btn.innerHTML = ICONS[paused ? 'play-circle' : 'pause-circle'];
+    btn.innerHTML = paused
+      ? `<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>`
+      : `<svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><line x1="10" y1="15" x2="10" y2="9"/><line x1="14" y1="15" x2="14" y2="9"/></svg>`;
     btn.style.color = paused ? '#fbbf24' : 'rgba(255,255,255,.5)';
   }
 
@@ -397,9 +442,14 @@
     const effectiveType = quotedText ? 'text' : annotType;
 
     popup.style.cssText = `
-      position: fixed; z-index: 2147483646; left: ${Math.min(pLeft, window.innerWidth - 320)}px; top: ${Math.min(pTop, window.innerHeight - 200)}px;
-      width: 300px; background: rgba(15,17,23,.98); border: 1px solid rgba(255,255,255,.15);
-      border-radius: 10px; padding: 12px; box-shadow: 0 8px 32px rgba(0,0,0,.6);
+      position: fixed; z-index: 2147483646;
+      left: ${Math.min(pLeft, window.innerWidth - 320)}px;
+      top: ${Math.min(pTop, window.innerHeight - 200)}px;
+      width: 300px;
+      background: var(--bg-secondary, #ffffff);
+      border: 1px solid var(--border, #d0d7de);
+      border-radius: 10px; padding: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.12);
       font-family: system-ui, sans-serif;
     `;
 
@@ -407,22 +457,22 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
         <div style="display:flex;gap:4px">
           ${Object.entries(TYPE_META).filter(([k]) => !quotedText || k === 'text').map(([k,v]) => `
-            <button class="sf-pop-type" data-type="${k}" style="padding:3px 8px;border-radius:5px;border:1px solid rgba(255,255,255,.15);background:${k===effectiveType?'rgba(255,255,255,.15)':'transparent'};color:rgba(255,255,255,.7);cursor:pointer;font-size:11px">
+            <button class="sf-pop-type" data-type="${k}" style="padding:3px 8px;border-radius:5px;border:1px solid var(--border,#d0d7de);background:${k===effectiveType?'var(--accent,#0969da)':'transparent'};color:${k===effectiveType?'#fff':'var(--text-secondary,#57606a)'};cursor:pointer;font-size:11px">
               ${v.label}
             </button>
           `).join('')}
         </div>
-        <button onclick="this.closest('#sf-ann-popover').remove()" style="background:none;border:none;color:rgba(255,255,255,.4);cursor:pointer;padding:2px">
-          ${ICONS['x']}
+        <button onclick="this.closest('#sf-ann-popover').remove()" style="background:none;border:none;color:var(--text-tertiary,#6e7781);cursor:pointer;padding:2px;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:4px">
+          <svg style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      ${quotedText ? `<div style="font-size:11px;color:rgba(255,255,255,.5);font-style:italic;margin-bottom:8px;padding:6px;background:rgba(255,255,255,.05);border-radius:5px">"${quotedText.substring(0,80)}"</div>` : ''}
-      ${selector ? `<div style="font-size:10px;font-family:monospace;color:rgba(255,255,255,.4);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${selector}</div>` : ''}
-      <textarea id="sf-pop-msg" placeholder="Describe the issue or feedback..." style="width:100%;min-height:64px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:6px;color:#e2e8f0;font-size:12px;padding:8px;resize:vertical;font-family:inherit;outline:none">${quotedText ? 'Typo/copy change' : ''}</textarea>
-      ${css ? `<details style="margin-top:6px"><summary style="font-size:10px;color:rgba(255,255,255,.4);cursor:pointer">CSS styles</summary><div style="font-size:9px;font-family:monospace;color:rgba(255,255,255,.3);margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${css}</div></details>` : ''}
+      ${quotedText ? `<div style="font-size:11px;color:var(--text-secondary,#57606a);font-style:italic;margin-bottom:8px;padding:6px;background:var(--bg-tertiary,#f6f8fa);border-radius:5px;border-left:3px solid var(--accent,#0969da)">"${quotedText.substring(0,80)}"</div>` : ''}
+      ${selector ? `<div style="font-size:10px;font-family:monospace;color:var(--text-tertiary,#6e7781);margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${selector}</div>` : ''}
+      <textarea id="sf-pop-msg" placeholder="Décrire le problème ou le feedback..." style="width:100%;min-height:64px;background:var(--bg-primary,#ffffff);border:1px solid var(--border,#d0d7de);border-radius:6px;color:var(--text-primary,#1f2328);font-size:12px;padding:8px;resize:vertical;font-family:inherit;outline:none;box-sizing:border-box">${quotedText ? 'Correction texte' : ''}</textarea>
+      ${css ? `<details style="margin-top:6px"><summary style="font-size:10px;color:var(--text-tertiary,#6e7781);cursor:pointer">CSS styles</summary><div style="font-size:9px;font-family:monospace;color:var(--text-tertiary,#6e7781);margin-top:4px;white-space:pre-wrap;max-height:80px;overflow-y:auto">${css}</div></details>` : ''}
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:10px">
-        <button onclick="this.closest('#sf-ann-popover').remove()" style="padding:5px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:transparent;color:rgba(255,255,255,.6);cursor:pointer;font-size:12px">Cancel</button>
-        <button id="sf-pop-save" style="padding:5px 14px;border-radius:6px;border:none;background:#3b82f6;color:#fff;cursor:pointer;font-size:12px;font-weight:600">Add</button>
+        <button onclick="this.closest('#sf-ann-popover').remove()" style="padding:5px 12px;border-radius:6px;border:1px solid var(--border,#d0d7de);background:transparent;color:var(--text-secondary,#57606a);cursor:pointer;font-size:12px">Annuler</button>
+        <button id="sf-pop-save" style="padding:5px 14px;border-radius:6px;border:none;background:var(--accent,#0969da);color:#fff;cursor:pointer;font-size:12px;font-weight:600">Ajouter</button>
       </div>
     `;
 
@@ -434,7 +484,11 @@
     popup.querySelectorAll('.sf-pop-type').forEach(btn => {
       btn.addEventListener('click', () => {
         popType = btn.dataset.type;
-        popup.querySelectorAll('.sf-pop-type').forEach(b => b.style.background = b.dataset.type === popType ? 'rgba(255,255,255,.15)' : 'transparent');
+        popup.querySelectorAll('.sf-pop-type').forEach(b => {
+          const sel = b.dataset.type === popType;
+          b.style.background = sel ? 'var(--accent,#0969da)' : 'transparent';
+          b.style.color = sel ? '#fff' : 'var(--text-secondary,#57606a)';
+        });
       });
     });
 
