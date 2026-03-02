@@ -87,7 +87,7 @@ document.getElementById('missionForm').addEventListener('submit', async e => {
     btn.disabled = true;
     btn.textContent = 'Lancement...';
     try {
-        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const r = await fetch('/api/epics/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
         else alert(j.error || 'Error');

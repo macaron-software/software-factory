@@ -276,7 +276,7 @@
         <div class="ps-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
             {% for m in missions %}
-            <a href="/missions/{{ m.id }}" class="ps-workflow-card" style="text-decoration:none;display:block">
+            <a href="/epics/{{ m.id }}" class="ps-workflow-card" style="text-decoration:none;display:block">
                 <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem">
                     <span class="status-dot {% if m.status == 'active' %}active{% elif m.status == 'completed' %}done{% else %}idle{% endif %}" style="width:7px;height:7px"></span>
                     <span class="ps-workflow-name" style="margin:0">{{ m.name }}</span>
@@ -631,7 +631,7 @@ function deleteProject(projectId, projectName) {
     openDeleteModal({
         title: 'Supprimer ce projet',
         subtitle: 'Supprime le projet et TOUTES les données associées',
-        warning: 'Toutes les missions, epics, features, user stories, sprints, tâches, sessions, messages, mémoire projet et agents associés seront définitivement supprimés.',
+        warning: 'Toutes les epics, epics, features, user stories, sprints, tâches, sessions, messages, mémoire projet et agents associés seront définitivement supprimés.',
         expectedName: projectName,
         onConfirm: async () => {
             const r = await fetch(`/api/projects/${projectId}`, {method:'DELETE'});

@@ -13,8 +13,8 @@
 .mission-filter{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-secondary);padding:0.35rem 0.75rem;border-radius:6px;font-size:0.78rem;cursor:pointer;transition:all .15s}
 .mission-filter:hover,.mission-filter.active{background:var(--purple);color:#fff;border-color:var(--purple)}
 
-.mission-card{position:relative}
-.mission-card .item-icon{position:relative}
+.epic-card{position:relative}
+.epic-card .item-icon{position:relative}
 .mc-sprint-badge{position:absolute;bottom:-2px;right:-2px;font-size:0.6rem;background:var(--purple);color:#fff;border-radius:4px;padding:0 4px;font-weight:700}
 .mc-progress{display:flex;align-items:center;gap:0.5rem;margin-top:0.4rem}
 .mc-progress-bar{flex:1;height:4px;background:var(--bg-tertiary);border-radius:2px;overflow:hidden}
@@ -48,7 +48,7 @@
 
 <div class="item-grid" data-view-grid data-view="card">
     {% for m in missions %}
-    <a href="/missions/{{ m.mission.id }}" class="item-card mission-card">
+    <a href="/epics/{{ m.mission.id }}" class="item-card epic-card">
         <div class="item-icon">
             <span class="status-dot {% if m.mission.status == 'active' %}active{% elif m.mission.status == 'completed' %}done{% elif m.mission.status == 'blocked' %}error{% else %}idle{% endif %}"></span>
             {% if m.sprint_count > 0 %}
@@ -87,8 +87,8 @@
     </a>
     {% else %}
     <div class="empty-state">
-        <p>{{ _('no_mission') }}</p>
-        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_missions") }}</p>
+        <p>{{ _('no_epic') }}</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_epics") }}</p>
         <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
     </div>
     {% endfor %}
@@ -133,7 +133,7 @@ document.getElementById('newMissionForm').addEventListener('submit', async e => 
     const btn = e.target.querySelector('[type=submit]');
     btn.disabled = true; btn.textContent = 'Lancement...';
     try {
-        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const r = await fetch('/api/epics/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
         else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch'); }

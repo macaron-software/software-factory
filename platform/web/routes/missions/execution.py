@@ -19,6 +19,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.post("/api/epics/{mission_id}/start", responses={200: {"model": OkResponse}})
 @router.post("/api/missions/{mission_id}/start", responses={200: {"model": OkResponse}})
 async def start_mission(mission_id: str):
     """Activate a mission."""
@@ -180,6 +181,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     )
 
 
+@router.post("/api/epics/start")
 @router.post("/api/missions/start")
 async def api_mission_start(request: Request):
     """Create a mission run and start the CDP agent."""
@@ -439,6 +441,7 @@ async def api_mission_start(request: Request):
     )
 
 
+@router.post("/api/epics/{mission_id}/chat/stream")
 @router.post("/api/missions/{mission_id}/chat/stream")
 async def mission_chat_stream(request: Request, mission_id: str):
     """Stream a conversation with the CDP agent in mission context."""
@@ -656,6 +659,7 @@ async def mission_chat_stream(request: Request, mission_id: str):
     )
 
 
+@router.post("/api/epics/{mission_id}/exec")
 @router.post("/api/missions/{mission_id}/exec")
 async def api_mission_exec(request: Request, mission_id: str):
     """Execute a command in the mission workspace. Returns JSON {stdout, stderr, returncode}."""
@@ -728,6 +732,7 @@ async def api_mission_exec(request: Request, mission_id: str):
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 
 
+@router.post("/api/epics/{mission_id}/validate")
 @router.post("/api/missions/{mission_id}/validate")
 async def api_mission_validate(request: Request, mission_id: str):
     """Human validates a checkpoint (GO/NOGO/PIVOT)."""
@@ -793,6 +798,7 @@ async def api_mission_validate(request: Request, mission_id: str):
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
 
 
+@router.post("/api/epics/{mission_id}/reset")
 @router.post("/api/missions/{mission_id}/reset")
 async def api_mission_reset(request: Request, mission_id: str):
     """Reset a mission: all phases back to pending, clear messages, ready to re-run."""
@@ -995,6 +1001,7 @@ async def _launch_orchestrator(mission_id: str):
     task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
 
 
+@router.post("/api/epics/{mission_id}/run")
 @router.post("/api/missions/{mission_id}/run")
 async def api_mission_run(request: Request, mission_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
@@ -1183,6 +1190,7 @@ async def _run_quality_scan_background(
 # ── Mission Debug & Replay ────────────────────────────────────────
 
 
+@router.get("/api/epics/{run_id}/debug")
 @router.get("/api/missions/{run_id}/debug")
 async def mission_debug(run_id: str):
     """Return debug info for a mission run: phases, llm_traces, cost breakdown."""
@@ -1238,6 +1246,7 @@ def _table_exists(conn, table: str) -> bool:
     return bool(row)
 
 
+@router.post("/api/epics/{run_id}/replay")
 @router.post("/api/missions/{run_id}/replay")
 async def mission_replay(run_id: str, from_phase: int = 0):
     """Create a new mission run as replay of an existing one."""
@@ -1293,6 +1302,7 @@ async def mission_replay(run_id: str, from_phase: int = 0):
 # ── Compliance Reports ────────────────────────────────────────────────
 
 
+@router.get("/api/epics/{run_id}/compliance-reports")
 @router.get("/api/missions/{run_id}/compliance-reports")
 async def get_compliance_reports(run_id: str):
     """Get all compliance verdicts for a mission run."""

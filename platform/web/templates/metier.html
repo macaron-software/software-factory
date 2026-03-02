@@ -149,7 +149,7 @@
                     <span style="font-size:0.6rem;color:var(--text-muted);font-weight:400;margin-left:auto">{{ project_epics|length }} run{{ 's' if project_epics|length != 1 else '' }}</span>
                 </summary>
                 {% for e in project_epics %}
-                <a href="/missions/{{ e.id }}/control" style="text-decoration:none;color:inherit;display:block">
+                <a href="/epics/{{ e.id }}/control" style="text-decoration:none;color:inherit;display:block">
                 <div class="met-epic">
                     <div class="met-epic-header">
                         <div class="met-epic-name">{{ e.name }}</div>
@@ -198,7 +198,7 @@
                 {% else %}
                 <div class="met-empty">
                     <svg><use href="#icon-inbox"/></svg>
-                    <div class="met-empty-text">{{ _('no_mission_active') }}</div>
+                    <div class="met-empty-text">{{ _('no_epic_active') }}</div>
                 </div>
                 {% endif %}
             </div>

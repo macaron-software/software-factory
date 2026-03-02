@@ -47,7 +47,7 @@
 .hub-mission{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .85rem;margin-bottom:.5rem;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .hub-mission:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .hub-mission-name{font-size:.82rem;font-weight:600;color:var(--text-primary);margin-bottom:.25rem}
-.hub-mission-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.hub-epic-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
 .hub-m-status{font-size:.68rem;padding:.15rem .45rem;border-radius:99px;font-weight:600}
 .hub-m-status.active{background:#1a4a1a;color:var(--green)}
 .hub-m-status.planning{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
@@ -154,9 +154,9 @@
         <span style="font-size:.65rem;font-weight:400;color:var(--text-tertiary)">(TMA / Sécu / Dette)</span>
       </div>
       {% for m in system_missions %}
-      <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
+      <div class="hub-mission" onclick="location.href='/epics/{{ m.id }}'">
         <div class="hub-mission-name">{{ m.name }}</div>
-        <div class="hub-mission-meta">
+        <div class="hub-epic-meta">
           <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
           <span class="hub-m-type">{{ m.type }}</span>
           {% if m.active_phases %}
@@ -166,7 +166,7 @@
         </div>
       </div>
       {% else %}
-      <div class="hub-empty">Aucune mission système — <a href="#" onclick="hubHealMissions();return false">Générer</a></div>
+      <div class="hub-empty">Aucun epic système — <a href="#" onclick="hubHealMissions();return false">Générer</a></div>
       {% endfor %}
       <button onclick="hubHealMissions()" style="width:100%;margin-top:.25rem;padding:.4rem;font-size:.72rem;background:none;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-tertiary);cursor:pointer">↻ Synchroniser</button>
     </div>
@@ -179,16 +179,16 @@
         <button onclick="hubNewMission()" style="margin-left:auto;font-size:.68rem;padding:.2rem .5rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">+ Mission</button>
       </div>
       {% for m in functional_missions %}
-      <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
+      <div class="hub-mission" onclick="location.href='/epics/{{ m.id }}'">
         <div class="hub-mission-name">{{ m.name }}</div>
-        <div class="hub-mission-meta">
+        <div class="hub-epic-meta">
           <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
           <span class="hub-m-type">{{ m.type }}</span>
           <span class="hub-m-wsjf">WSJF {{ m.wsjf_score }}</span>
         </div>
       </div>
       {% else %}
-      <div class="hub-empty">Aucune mission fonctionnelle — demandez à l'agent PM d'en créer</div>
+      <div class="hub-empty">Aucun epic fonctionnelle — demandez à l'agent PM d'en créer</div>
       {% endfor %}
     </div>
 
@@ -239,7 +239,7 @@ var _hubProjectId = {{ project.id | tojson }};
 var _hubProjectName = {{ project.name | tojson }};
 
 function hubSetPhase(phaseId) {
-  if (!confirm('Passer en phase "' + phaseId + '" ? Les statuts des missions système seront mis à jour.')) return;
+  if (!confirm('Passer en phase "' + phaseId + '" ? Les statuts des epics système seront mis à jour.')) return;
   fetch('/api/projects/' + encodeURIComponent(_hubProjectId) + '/phase', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({phase: phaseId})
@@ -265,7 +265,7 @@ function hubHealMissions() {
 function hubNewMission() {
   var name = prompt('Nom de la nouvelle mission ?');
   if (!name) return;
-  hubSuggest('Crée une mission fonctionnelle "' + name + '" pour ce projet avec description et objectif');
+  hubSuggest('Crée un epic fonctionnelle "' + name + '" pour ce projet avec description et objectif');
 }
 
 function hubSuggest(msg) {

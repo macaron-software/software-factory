@@ -27,37 +27,37 @@
 .mpager-btn:hover:not(:disabled){border-color:var(--purple-dim);color:var(--text-primary)}
 .mpager-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
 .mpager-btn:disabled{opacity:0.35;cursor:default}
-.mission-list{display:flex;flex-direction:column;gap:0.75rem}
-.mission-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
-.mission-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
-.mission-card-wrap .mission-card{border-radius:10px 10px 0 0}
-.mission-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-.mission-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
-.mission-status-icon.completed{background:rgba(34,197,94,.12);color:var(--green)}
-.mission-status-icon.failed{background:rgba(239,68,68,.12);color:var(--red)}
-.mission-status-icon.paused,.mission-status-icon.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
-.mission-body{min-width:0}
-.mission-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
-.mission-brief{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;margin-bottom:0.45rem}
-.mission-progress-row{display:flex;align-items:center;gap:0.6rem}
-.mission-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
-.mission-progress-fill{height:100%;border-radius:3px;transition:width .3s}
-.mission-progress-fill.running{background:var(--purple)}
-.mission-progress-fill.completed{background:var(--green)}
-.mission-progress-fill.failed{background:var(--red)}
-.mission-progress-fill.pending{background:var(--text-secondary)}
-.mission-progress-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);min-width:60px}
-.mission-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
-.mission-date{font-size:0.72rem;color:var(--text-secondary)}
-.mission-badge{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
-.mission-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
-.mission-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
-.mission-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
-.mission-badge.paused,.mission-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
-.mission-badge.resolved{background:rgba(34,197,94,.12);color:var(--green)}
-.mission-badge.active{background:rgba(124,58,237,.15);color:var(--purple)}
-.mission-card-wrap{display:flex;flex-direction:column;gap:0}
-.mission-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
+.epic-list{display:flex;flex-direction:column;gap:0.75rem}
+.epic-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.epic-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
+.epic-card-wrap .epic-card{border-radius:10px 10px 0 0}
+.epic-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.epic-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.epic-status-icon.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.epic-status-icon.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.epic-status-icon.paused,.epic-status-icon.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.epic-body{min-width:0}
+.epic-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
+.epic-brief{font-size:0.8rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:500px;margin-bottom:0.45rem}
+.epic-progress-row{display:flex;align-items:center;gap:0.6rem}
+.epic-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.epic-progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.epic-progress-fill.running{background:var(--purple)}
+.epic-progress-fill.completed{background:var(--green)}
+.epic-progress-fill.failed{background:var(--red)}
+.epic-progress-fill.pending{background:var(--text-secondary)}
+.epic-progress-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);min-width:60px}
+.epic-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
+.epic-date{font-size:0.72rem;color:var(--text-secondary)}
+.epic-badge{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
+.epic-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.epic-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.epic-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.epic-badge.paused,.epic-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.epic-badge.resolved{background:rgba(34,197,94,.12);color:var(--green)}
+.epic-badge.active{background:rgba(124,58,237,.15);color:var(--purple)}
+.epic-card-wrap{display:flex;flex-direction:column;gap:0}
+.epic-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
 .nm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
 .nm-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
 .nm-form h3{margin:0 0 1rem;color:var(--text-primary)}
@@ -75,9 +75,9 @@
 .wf-card-body{display:flex;flex-direction:column;gap:0.2rem}
 .wf-card-body strong{font-size:0.88rem;color:var(--text-primary)}
 .wf-card-body span{font-size:0.75rem;color:var(--text-secondary);line-height:1.3}
-.mission-card.stuck{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.03)}
-.mission-status-icon.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
-.mission-badge.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
+.epic-card.stuck{border-color:rgba(245,158,11,.4);background:rgba(245,158,11,.03)}
+.epic-status-icon.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
+.epic-badge.stuck{background:rgba(245,158,11,.15);color:#f59e0b}
 /* Collapsible sections */
 .pi-section{margin-bottom:1.5rem}
 .pi-section-header{display:flex;align-items:center;gap:0.5rem;cursor:pointer;user-select:none;padding:0.4rem 0;margin-bottom:0.75rem}
@@ -161,10 +161,10 @@
 .pi-section-body.view-list .tma-card-desc{display:none}
 .pi-section-body.view-list .tma-card-header{margin-bottom:0}
 .pi-section-body.view-list .tma-card-footer{margin:0}
-.pi-section-body.view-list .mission-card{padding:0.6rem 1rem;border-radius:6px}
-.pi-section-body.view-list .mission-brief{display:none}
-.pi-section-body.view-list .mission-card-wrap .mission-card{border-radius:6px 6px 0 0}
-.pi-section-body.view-list .mission-actions{padding:0.25rem 1rem 0.4rem}
+.pi-section-body.view-list .epic-card{padding:0.6rem 1rem;border-radius:6px}
+.pi-section-body.view-list .epic-brief{display:none}
+.pi-section-body.view-list .epic-card-wrap .epic-card{border-radius:6px 6px 0 0}
+.pi-section-body.view-list .epic-actions{padding:0.25rem 1rem 0.4rem}
 /* ── Compact view ── */
 .pi-section-body.view-compact .epic-card{display:flex;align-items:center;gap:0.6rem;padding:0.35rem 0.8rem;border-radius:4px;margin-bottom:2px;border:none;background:transparent;border-bottom:1px solid var(--border)}
 .pi-section-body.view-compact .epic-card:hover{background:var(--bg-secondary)}
@@ -182,15 +182,15 @@
 .pi-section-body.view-compact .tma-card-header{margin-bottom:0;flex:1;min-width:0}
 .pi-section-body.view-compact .tma-card-title{font-size:0.78rem}
 .pi-section-body.view-compact .tma-type-icon{width:22px;height:22px;border-radius:4px}
-.pi-section-body.view-compact .mission-list{gap:0}
-.pi-section-body.view-compact .mission-card{padding:0.35rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
-.pi-section-body.view-compact .mission-card:hover{background:var(--bg-secondary)}
-.pi-section-body.view-compact .mission-brief{display:none}
-.pi-section-body.view-compact .mission-status-icon{width:28px;height:28px;border-radius:6px;font-size:0.85rem}
-.pi-section-body.view-compact .mission-title{font-size:0.82rem}
-.pi-section-body.view-compact .mission-card-wrap .mission-card{border-radius:0}
-.pi-section-body.view-compact .mission-card-wrap{border-bottom:1px solid var(--border)}
-.pi-section-body.view-compact .mission-actions{display:none}
+.pi-section-body.view-compact .epic-list{gap:0}
+.pi-section-body.view-compact .epic-card{padding:0.35rem 0.8rem;border-radius:0;border:none;border-bottom:1px solid var(--border);background:transparent}
+.pi-section-body.view-compact .epic-card:hover{background:var(--bg-secondary)}
+.pi-section-body.view-compact .epic-brief{display:none}
+.pi-section-body.view-compact .epic-status-icon{width:28px;height:28px;border-radius:6px;font-size:0.85rem}
+.pi-section-body.view-compact .epic-title{font-size:0.82rem}
+.pi-section-body.view-compact .epic-card-wrap .epic-card{border-radius:0}
+.pi-section-body.view-compact .epic-card-wrap{border-bottom:1px solid var(--border)}
+.pi-section-body.view-compact .epic-actions{display:none}
 </style>
 
 <!-- ═══ Epics (SAFe Portfolio) ═══ -->
@@ -218,7 +218,7 @@
                 <span class="epic-project-badge">{{ e.project_name }}</span>
             </div>
             <div style="display:flex;align-items:center;gap:0.6rem">
-                <span class="mission-badge {{ e.status }}">{{ e.status }}</span>
+                <span class="epic-badge {{ e.status }}">{{ e.status }}</span>
                 <button class="epic-toggle" onclick="event.stopPropagation();this.closest('.epic-card').querySelector('.epic-features').classList.toggle('hidden')">
                     <svg class="icon icon-sm" style="width:14px;height:14px"><use href="#icon-chevron-down"/></svg> features
                 </button>
@@ -396,8 +396,8 @@
 {% else %}
 <div class="empty-state" style="text-align:center;padding:3rem;">
     <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-zap"/></svg></p>
-    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_mission') }}</h3>
-    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">{{ _("lancez_une_mission_pour_orchestrer_un") }}</p>
+    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_epic') }}</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">{{ _("lancez_un_epic_pour_orchestrer_un") }}</p>
     <button class="btn btn-primary" onclick="document.getElementById('newMissionModal').style.display='flex'">
         <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
     </button>
@@ -427,7 +427,7 @@
 <div id="newMissionModal" class="nm-overlay" onclick="if(event.target===this)this.style.display='none'">
     <div class="nm-form" id="step1" style="max-width:600px">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-zap"/></svg> {{ _('new_mission') }}</h3>
-        <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">{{ _("choisissez_le_type_de_mission") }}</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem;margin:-0.5rem 0 1rem">{{ _("choisissez_le_type_d_epic") }}</p>
         <div class="wf-grid">
             <button type="button" class="wf-card" onclick="selectWf('product-lifecycle')">
                 <div class="wf-card-icon" style="background:rgba(124,58,237,.15);color:var(--purple)"><svg class="icon"><use href="#icon-git-merge"/></svg></div>
@@ -481,7 +481,7 @@
         <input type="hidden" name="project_id" value="software-factory">
         <input type="hidden" name="workflow_id" id="wfInput">
         <div class="nm-field">
-            <label>{{ _("mission_brief") }}</label>
+            <label>{{ _("epic_brief") }}</label>
             <textarea name="brief" id="briefInput" placeholder="Nom - Description du besoin, contexte, objectifs..." required style="min-height:100px"></textarea>
         </div>
         <div class="nm-actions">
@@ -558,7 +558,7 @@ document.getElementById('step2').addEventListener('submit', async e => {
     const btn = e.target.querySelector('[type=submit]');
     btn.disabled = true; btn.textContent = 'Lancement...';
     try {
-        const r = await fetch('/api/missions/start', {method:'POST', body: fd});
+        const r = await fetch('/api/epics/start', {method:'POST', body: fd});
         const j = await r.json();
         if (j.redirect) location.href = j.redirect;
         else { alert(j.error || 'Erreur'); btn.disabled = false; btn.textContent = 'Lancer'; }
@@ -576,8 +576,8 @@ async function runPhase(runId) {
 
 async function deleteRun(runId, runName) {
     openDeleteModal({
-        title: 'Supprimer cette mission',
-        subtitle: 'Supprime la mission et toutes les données associées',
+        title: 'Supprimer cet epic',
+        subtitle: 'Supprime l'epic et toutes les données associées',
         warning: 'Sprints, tâches, sessions, messages, traces LLM et artefacts seront définitivement supprimés.',
         expectedName: runName || runId.slice(0,8),
         onConfirm: async () => {
@@ -592,7 +592,7 @@ async function deleteMission(missionId, missionName) {
     openDeleteModal({
         title: 'Supprimer cette epic',
         subtitle: 'Supprime l\'epic et toutes ses missions, features et données',
-        warning: 'Toutes les missions (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
+        warning: 'Toutes les epics (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
         expectedName: missionName || missionId.slice(0,8),
         onConfirm: async () => {
             const r = await fetch(`/api/missions/${missionId}`, {method:'DELETE'});
@@ -843,7 +843,7 @@ function setMF(dim, val, btn) {
 function renderMF() {
     const list = document.getElementById('missionList');
     if (!list) return;
-    const cards = Array.from(list.querySelectorAll('.mission-card-wrap'));
+    const cards = Array.from(list.querySelectorAll('.epic-card-wrap'));
     // Filter
     const visible = cards.filter(c => {
         const wf = c.dataset.wf || '';

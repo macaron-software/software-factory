@@ -7,13 +7,13 @@
     </span>
     {% if mission.status == 'planning' %}
     <button class="btn btn-sm btn-primary"
-            hx-post="/api/missions/{{ mission.id }}/start"
+            hx-post="/api/epics/{{ mission.id }}/start"
             hx-swap="none"
             hx-on::after-request="location.reload()">
         <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
     </button>
     {% elif mission.status == 'active' %}
-    <a href="/missions/{{ mission.id }}/live" class="btn btn-sm btn-primary">
+    <a href="/epics/{{ mission.id }}/live" class="btn btn-sm btn-primary">
         <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Live
     </a>
     <button class="btn btn-sm btn-ghost" id="btnLaunchWorkflow"
@@ -21,7 +21,7 @@
         <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_workflow') }}
     </button>
     {% endif %}
-    <a href="/missions/{{ mission.id }}/replay" class="btn btn-sm btn-ghost">
+    <a href="/epics/{{ mission.id }}/replay" class="btn btn-sm btn-ghost">
         <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Replay
     </a>
 </div>
@@ -170,14 +170,14 @@
         {% if sprints %}
         <div class="sprint-timeline">
             {% for s in sprints %}
-            <a href="/missions/{{ mission.id }}?sprint={{ s.id }}" class="sprint-chip {{ s.status }}{% if s.status == 'active' %} active-sprint{% endif %}{% if selected_sprint and selected_sprint.id == s.id %} selected{% endif %}">
+            <a href="/epics/{{ mission.id }}?sprint={{ s.id }}" class="sprint-chip {{ s.status }}{% if s.status == 'active' %} active-sprint{% endif %}{% if selected_sprint and selected_sprint.id == s.id %} selected{% endif %}">
                 <span class="sprint-dot {{ s.status }}"></span>
                 Sprint {{ s.number }}{% if s.name %}: {{ s.name }}{% endif %}
             </a>
             {% endfor %}
             {% if mission.status in ('planning', 'active') %}
             <button class="sprint-chip" style="border-style:dashed"
-                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-post="/api/epics/{{ mission.id }}/sprints"
                     hx-swap="none"
                     hx-on::after-request="location.reload()">
                 <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Sprint
@@ -188,7 +188,7 @@
         <div style="text-align:center;padding:2rem;color:var(--text-secondary)">
             <p>{{ _('no_sprint') }}</p>
             <button class="btn btn-primary"
-                    hx-post="/api/missions/{{ mission.id }}/sprints"
+                    hx-post="/api/epics/{{ mission.id }}/sprints"
                     hx-swap="none"
                     hx-on::after-request="location.reload()">
                 <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _('new_sprint') }}
@@ -265,7 +265,7 @@
         </script>
 
         <div class="kanban"
-             hx-get="/api/missions/{{ mission.id }}/board?sprint={{ selected_sprint.id }}"
+             hx-get="/api/epics/{{ mission.id }}/board?sprint={{ selected_sprint.id }}"
              hx-trigger="every 10s"
              hx-swap="innerHTML">
             {% set cols = [('pending', 'Backlog', 'clipboard'), ('in_progress', 'In Progress', 'zap'), ('review', 'Review', 'eye'), ('done', 'Done', 'check')] %}
@@ -400,7 +400,7 @@ async function addTask() {
     if (!title) return;
     input.value = '';
     try {
-        await fetch('/api/missions/{{ mission.id }}/tasks', {
+        await fetch('/api/epics/{{ mission.id }}/tasks', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
@@ -417,7 +417,7 @@ async function launchWorkflow() {
     btn.disabled = true;
     btn.textContent = 'Création...';
     try {
-        const resp = await fetch('/api/missions/{{ mission.id }}/launch-workflow', {
+        const resp = await fetch('/api/epics/{{ mission.id }}/launch-workflow', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
         });
@@ -534,7 +534,7 @@ async function saveMdWSJF() {
         job_duration: parseInt(document.getElementById('md-wsjf-jd').value),
     };
     try {
-        const resp = await fetch('/api/missions/{{ mission.id }}/wsjf', {
+        const resp = await fetch('/api/epics/{{ mission.id }}/wsjf', {
             method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body),
         });
         const data = await resp.json();

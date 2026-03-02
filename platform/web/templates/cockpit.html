@@ -323,12 +323,12 @@
     document.getElementById('projList').innerHTML = projs.length
       ? projs.map(proj => {
         const pct = proj.progress || 0;
-        const barCls = proj.active_missions > 0 ? 'prog-active' : '';
+        const barCls = proj.active_epics > 0 ? 'prog-active' : '';
         return `
         <div class="proj-item" onclick="location.href='/projects/${proj.id}'">
           <div class="proj-header">
             <span class="proj-name">${proj.name}</span>
-            <span class="proj-meta">${proj.active_missions} actives · ${proj.total_missions} total</span>
+            <span class="proj-meta">${proj.active_epics} actives · ${proj.total_missions} total</span>
           </div>
           <div class="prog-bar"><div class="prog-fill ${barCls}" style="width:${pct}%"></div></div>
           <div style="display:flex;justify-content:space-between;margin-top:0.2rem">

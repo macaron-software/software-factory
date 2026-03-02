@@ -15,6 +15,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+@router.post("/api/epics/{mission_id}/confluence/sync")
 @router.post("/api/missions/{mission_id}/confluence/sync")
 async def api_confluence_sync_all(mission_id: str):
     """Sync all mission tabs to Confluence."""
@@ -31,6 +32,7 @@ async def api_confluence_sync_all(mission_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@router.post("/api/epics/{mission_id}/confluence/sync/{tab}")
 @router.post("/api/missions/{mission_id}/confluence/sync/{tab}")
 async def api_confluence_sync_tab(mission_id: str, tab: str):
     """Sync a single tab to Confluence."""
@@ -47,6 +49,7 @@ async def api_confluence_sync_tab(mission_id: str, tab: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@router.get("/api/epics/{mission_id}/confluence/status")
 @router.get("/api/missions/{mission_id}/confluence/status")
 async def api_confluence_status(mission_id: str):
     """Get Confluence sync status for a mission."""
@@ -66,6 +69,7 @@ async def api_confluence_status(mission_id: str):
 # ── Screenshots API ──
 
 
+@router.get("/api/epics/{mission_id}/screenshots")
 @router.get("/api/missions/{mission_id}/screenshots")
 async def api_mission_screenshots(mission_id: str):
     """List screenshots from mission workspace."""
@@ -97,6 +101,7 @@ async def api_mission_screenshots(mission_id: str):
 # ── Support Tickets API (TMA) ──
 
 
+@router.get("/api/epics/{mission_id}/tickets")
 @router.get("/api/missions/{mission_id}/tickets")
 async def api_list_tickets(mission_id: str, status: str = ""):
     from ....db.migrations import get_db
@@ -118,6 +123,7 @@ async def api_list_tickets(mission_id: str, status: str = ""):
     return JSONResponse([dict(r) for r in rows])
 
 
+@router.post("/api/epics/{mission_id}/tickets")
 @router.post("/api/missions/{mission_id}/tickets")
 async def api_create_ticket(request: Request, mission_id: str):
     import uuid
@@ -147,6 +153,7 @@ async def api_create_ticket(request: Request, mission_id: str):
     return JSONResponse(dict(row), status_code=201)
 
 
+@router.patch("/api/epics/{mission_id}/tickets/{ticket_id}")
 @router.patch("/api/missions/{mission_id}/tickets/{ticket_id}")
 async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     from ....db.migrations import get_db

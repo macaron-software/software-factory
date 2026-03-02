@@ -149,7 +149,7 @@
         Mission
       </div>
       <div id="trace-mission-name" style="font-size:.78rem;font-weight:600;color:var(--text-primary,#e2e8f0);margin-bottom:2px">—</div>
-      <div id="trace-mission-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
+      <div id="trace-epic-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
     </div>
   </div>
 </div>
@@ -350,7 +350,7 @@ function loadTraceability(screenId) {
       }
       if (d.mission) {
         document.getElementById('trace-mission-name').textContent = d.mission.name || '—';
-        document.getElementById('trace-mission-meta').textContent = [d.mission.workflow, d.mission.status].filter(Boolean).join(' · ');
+        document.getElementById('trace-epic-meta').textContent = [d.mission.workflow, d.mission.status].filter(Boolean).join(' · ');
       }
     }).catch(() => {});
 }

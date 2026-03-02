@@ -81,8 +81,8 @@
 .metric-label{font-size:0.72rem;color:var(--text-secondary);margin-top:0.3rem;text-transform:uppercase;letter-spacing:0.5px}
 
 .portfolio-projects{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem}
-.project-mission-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.15rem;transition:border-color .15s;text-decoration:none;color:inherit;display:block}
-.project-mission-card:hover{border-color:var(--purple);background:var(--bg-tertiary)}
+.project-epic-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.15rem;transition:border-color .15s;text-decoration:none;color:inherit;display:block}
+.project-epic-card:hover{border-color:var(--purple);background:var(--bg-tertiary)}
 .pmc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem}
 .pmc-title{font-size:1rem;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:0.5rem}
 .pmc-status{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:8px;font-weight:600}
@@ -143,14 +143,14 @@
 
 /* Projects — list view */
 .section-body.port-view-list .portfolio-projects{grid-template-columns:1fr;gap:0.4rem}
-.section-body.port-view-list .project-mission-card{padding:0.65rem 1rem;display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:center}
+.section-body.port-view-list .project-epic-card{padding:0.65rem 1rem;display:grid;grid-template-columns:1fr auto;gap:0.5rem;align-items:center}
 .section-body.port-view-list .pmc-missions,.section-body.port-view-list .pmc-team,.section-body.port-view-list .pmc-progress-bar,.section-body.port-view-list .pmc-header>div[style]{display:none}
 .section-body.port-view-list .pmc-header{margin-bottom:0}
 .section-body.port-view-list .pmc-badges{margin-top:0;justify-self:end}
 
 /* Projects — compact view */
 .section-body.port-view-compact .portfolio-projects{grid-template-columns:1fr;gap:0}
-.section-body.port-view-compact .project-mission-card{padding:0.4rem 0.8rem;border-radius:0;border-bottom:1px solid var(--border);border-left:none;border-right:none;border-top:none;display:flex;align-items:center;gap:0.6rem}
+.section-body.port-view-compact .project-epic-card{padding:0.4rem 0.8rem;border-radius:0;border-bottom:1px solid var(--border);border-left:none;border-right:none;border-top:none;display:flex;align-items:center;gap:0.6rem}
 .section-body.port-view-compact .pmc-header{margin-bottom:0;flex:1}
 .section-body.port-view-compact .pmc-missions,.section-body.port-view-compact .pmc-team,.section-body.port-view-compact .pmc-progress-bar,.section-body.port-view-compact .pmc-header>div[style],.section-body.port-view-compact .pmc-badges{display:none}
 .section-body.port-view-compact .pmc-status{font-size:0.6rem}
@@ -251,7 +251,7 @@
                 <div class="metric-label">{{ _("epics") }}</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value">{{ active_missions }}</div>
+                <div class="metric-value">{{ active_epics }}</div>
                 <div class="metric-label">{{ _("in_progress") }}</div>
             </div>
             <div class="metric-card">
@@ -280,7 +280,7 @@
         <div class="section-body" id="body-projects">
         <div class="portfolio-projects">
             {% for p in projects %}
-            <a href="/projects/{{ p.id }}" class="project-mission-card">
+            <a href="/projects/{{ p.id }}" class="project-epic-card">
                 <div class="pmc-header">
                     <div class="pmc-title">
                         <span class="project-type-dot {{ p.factory_type }}"></span>
@@ -384,7 +384,7 @@
                 <tbody>
                 {% for e in epics %}
                 <tr>
-                    <td><a href="/missions/{{ e.id }}" class="epic-name" style="text-decoration:none;color:inherit">{{ e.name }}</a></td>
+                    <td><a href="/epics/{{ e.id }}" class="epic-name" style="text-decoration:none;color:inherit">{{ e.name }}</a></td>
                     <td class="epic-project">{{ e.project_name }}</td>
                     <td><span class="epic-status {{ e.run_status or e.status }}">{{ e.run_status or e.status }}</span></td>
                     <td style="font-size:0.72rem;color:var(--purple-light)">{{ e.current_phase or '—' }}</td>

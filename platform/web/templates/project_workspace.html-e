@@ -127,9 +127,6 @@ html,body{height:100%;overflow:hidden}
     <button class="ws-activity-btn" data-view="deploylogs" onclick="wsSetView('deploylogs');wsDeployLogsStart()" title="Deploy Logs">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     </button>
-    <button class="ws-activity-btn" data-view="annotate" onclick="window.open('/annotate/'+_wsProjectId,'_blank')" title="Annotation Studio — open business review mode">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-    </button>
     <button class="ws-activity-btn" onclick="document.getElementById('wsImportModal').style.display='flex'" title="Importer un dépôt GitHub">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
     </button>
@@ -379,7 +376,7 @@ html,body{height:100%;overflow:hidden}
           <div class="ws-pane-content" style="flex-direction:column">
             <!-- Launch mission panel (hidden by default) -->
             <div id="wsLaunchMissionPanel" style="display:none;flex-direction:column;gap:.5rem;padding:.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)">
-              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer un epic</div>
+              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer une mission</div>
               <select id="wsLaunchWorkflow" style="width:100%;padding:.3rem .5rem;font-size:.75rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px">
                 <option value="">Choisir un workflow…</option>
                 <option value="feature-sprint">Feature Sprint (TDD)</option>
@@ -561,7 +558,7 @@ html,body{height:100%;overflow:hidden}
             <select id="wsTimelineFilter" onchange="wsLoadTimeline()" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:.73rem">
               <option value="all">Tout</option>
               <option value="commit">Git commits</option>
-              <option value="mission">Epics</option>
+              <option value="mission">Missions</option>
               <option value="deploy">Déploiements</option>
             </select>
             <button class="ws-term-run" style="padding:.2rem .6rem;font-size:.72rem" onclick="wsLoadTimeline()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
@@ -1086,7 +1083,7 @@ function wsLoadToolcalls() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez un epic pour voir les tool calls</span></div>'; return; }
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez une mission pour voir les tool calls</span></div>'; return; }
       var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Paramètres</th><th>Statut</th><th>Durée</th></tr></thead><tbody>';
       items.forEach(function(tc) {
         var params = ''; try { var p=JSON.parse(tc.parameters_json||'{}'); params=JSON.stringify(p).substring(0,80); } catch(e){}
@@ -1179,7 +1176,7 @@ function wsLaunchMission() {
   var status = document.getElementById('wsLaunchMissionStatus');
   if (!wfId || !brief) { if (status) status.textContent = '⚠ Workflow et brief requis'; return; }
   if (status) status.textContent = '⏳ Lancement…';
-  fetch('/api/epics/start', {
+  fetch('/api/missions/start', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ workflow_id: wfId, brief: brief, project_id: _wsProjectId })
   }).then(function(r){ return r.json(); })
@@ -1279,7 +1276,7 @@ function wsLoadBacklog() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var missions = data.missions || [];
-      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucun epic pour ce projet</span><span class="ws-empty-hint">Créez un epic depuis la page projet</span></div>'; return; }
+      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucune mission pour ce projet</span><span class="ws-empty-hint">Créez une mission depuis la page projet</span></div>'; return; }
       var html = '';
       missions.forEach(function(m) {
         var sc = m.status==='active'?'ws-badge-ok':m.status==='planning'?'ws-badge-idle':'ws-badge-err';
@@ -1320,7 +1317,7 @@ function wsLoadCompliance() {
         summary.innerHTML = '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> <strong>'+totalPass+'</strong> PASS</span><span style="margin-left:.5rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <strong>'+totalFail+'</strong> FAIL</span><span style="margin-left:.5rem;opacity:.6">'+by.length+' agents</span>';
       }
       if (!recent.length) {
-        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'un epic avec des agents de conformité</span></div>';
+        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'une mission avec des agents de conformité</span></div>';
         return;
       }
       var html = '<table class="ws-table"><thead><tr><th>Milestone</th><th>Agent</th><th>Verdict</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
@@ -1798,7 +1795,7 @@ function wsLoadProgress() {
     .then(function(r){ return r.json(); })
     .then(function(d) {
       if (!d.exists || !d.content) {
-        el.innerHTML = '<div class="ws-empty-state"><span>Pas de PROGRESS.md</span><span class="ws-empty-hint">Sera créé par les agents lors d\'un epic</span></div>';
+        el.innerHTML = '<div class="ws-empty-state"><span>Pas de PROGRESS.md</span><span class="ws-empty-hint">Sera créé par les agents lors d\'une mission</span></div>';
         return;
       }
       // Simple markdown → HTML (headings, bold, code blocks, lists)

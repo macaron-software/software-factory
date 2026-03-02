@@ -191,7 +191,7 @@
         <div class="stat-card">
             <h3>Success Rate</h3>
             <div class="stat-value" id="stat-success">—</div>
-            <div class="stat-label">Mission completion rate</div>
+            <div class="stat-label">Epic completion rate</div>
         </div>
         <div class="stat-card">
             <h3>Active Agents</h3>
@@ -865,7 +865,7 @@ async function loadThompsonScores() {
 
         const tbody = document.getElementById('ts-tbody');
         if (!d.agents.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donnée — les scores s\'accumulent en cours de mission</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donnée — les scores s\'accumulent en cours d'epic</td></tr>';
             return;
         }
         tbody.innerHTML = d.agents.map(a => {

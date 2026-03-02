@@ -133,7 +133,7 @@
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(52,211,153,.15)"><svg style="color:var(--green)"><use href="#icon-activity"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ active_missions }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
+        <div><div class="dsi-kpi-value">{{ active_epics }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(59,130,246,.15)"><svg style="color:var(--blue)"><use href="#icon-check"/></svg></div>
@@ -388,7 +388,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     <span class="dsi-col-count">{{ col.missions|length }}</span>
                 </div>
                 {% for m in col.missions %}
-                <a href="/missions/{{ m.id }}" class="dsi-card">
+                <a href="/epics/{{ m.id }}" class="dsi-card">
                     <div class="dsi-card-name">{{ m.name }}</div>
                     <div class="dsi-card-project">{{ m.project_name }}</div>
                     <div class="dsi-card-meta">
