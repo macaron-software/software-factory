@@ -342,9 +342,9 @@
                 </div>
                 <div style="display:flex;gap:10px;align-items:center">
                   <span id="spec-not-linked" style="display:none;font-size:.65rem;color:var(--text-tertiary,#6e7781);font-style:italic">Page non liée — </span>
-                  <a id="spec-ann-link" href="/annotate/_sf" target="_blank" style="font-size:.65rem;color:var(--accent,#0969da);text-decoration:none;display:flex;align-items:center;gap:3px">
+                  <button id="spec-ann-link" onclick="if(window.toggleAnnotate){window.toggleAnnotate()}else{window.open('/annotate/_sf','_blank')}" style="font-size:.65rem;color:var(--accent,#0969da);text-decoration:none;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">
                     <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Annoter cette page
-                  </a>
+                  </button>
                   <a id="spec-backlog-link" href="/backlog" target="_blank" style="font-size:.65rem;color:var(--text-secondary,#57606a);text-decoration:none;display:flex;align-items:center;gap:3px">
                     <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog SAFe
                   </a>
