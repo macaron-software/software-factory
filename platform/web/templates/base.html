@@ -708,50 +708,154 @@ document.addEventListener('DOMContentLoaded', function() {
   }).catch(function(){});
 })();
 </script>
-<!-- SF Wireframe Mode -->
+<!-- SF Wireframe Mode + Annotation Help -->
 <style>
-  body.sf-wireframe * {
-    background: transparent !important;
-    color: #b0bec5 !important;
-    border-color: #37474f !important;
-    box-shadow: none !important;
-    text-shadow: none !important;
-    background-image: none !important;
-    font-family: monospace !important;
-  }
-  body.sf-wireframe { background: #0d1117 !important; }
-  body.sf-wireframe img, body.sf-wireframe video, body.sf-wireframe canvas { opacity: 0.08 !important; filter: grayscale(1); }
-  body.sf-wireframe .sidebar { background: #0d1117 !important; border-right: 1px dashed #37474f !important; }
-  body.sf-wireframe .topbar { background: #0d1117 !important; border-bottom: 1px dashed #37474f !important; }
-  body.sf-wireframe button, body.sf-wireframe .btn, body.sf-wireframe [class*="btn"] {
-    border: 1px dashed #546e7a !important; border-radius: 3px !important;
-    background: transparent !important;
-  }
-  body.sf-wireframe input, body.sf-wireframe select, body.sf-wireframe textarea {
-    border: 1px solid #455a64 !important; background: #0d1117 !important;
-  }
-  body.sf-wireframe .card, body.sf-wireframe [class*="card"], body.sf-wireframe [class*="panel"] {
-    border: 1px dashed #37474f !important; background: transparent !important;
-  }
-  body.sf-wireframe #sfWireframeBtn {
-    color: #58a6ff !important; background: rgba(88,166,255,.12) !important; border-radius: 6px;
-  }
-  body.sf-wireframe .sf-wf-label { display: inline !important; }
-  .sf-wf-label { display: none; font-size: .68rem; color: #546e7a; margin-left: 4px; vertical-align: middle; }
+/* ── Skeleton shimmer animation ── */
+@keyframes sf-shimmer {
+  0%   { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.sf-skel {
+  background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%) !important;
+  background-size: 600px 100% !important;
+  animation: sf-shimmer 1.6s infinite linear !important;
+  color: transparent !important;
+  border-radius: 4px !important;
+  border: none !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+.sf-skel * { opacity: 0 !important; }
+
+/* ── Wireframe structural overlay ── */
+body.sf-wireframe {
+  background: #0d1117 !important;
+}
+body.sf-wireframe .sidebar {
+  background: #0d1117 !important;
+  border-right: 1px dashed #30363d !important;
+}
+body.sf-wireframe .topbar {
+  background: #0d1117 !important;
+  border-bottom: 1px dashed #30363d !important;
+}
+body.sf-wireframe .main-area {
+  background: #0d1117 !important;
+}
+body.sf-wireframe #sfWireframeBtn {
+  color: #58a6ff !important;
+  background: rgba(88,166,255,.15) !important;
+  border-radius: 6px !important;
+}
+
+/* ── Annotation help panel ── */
+#sfAnnHelp {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+  padding: 16px 20px; width: 280px; box-shadow: 0 8px 32px rgba(0,0,0,.6);
+  font-size: .78rem; color: #8b949e; display: none;
+}
+#sfAnnHelp h4 { margin: 0 0 10px; color: #e2e8f0; font-size: .85rem; display: flex; align-items: center; gap: 6px; }
+#sfAnnHelp .ann-step { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+#sfAnnHelp .ann-step-num { width: 20px; height: 20px; border-radius: 50%; background: #1d4ed8; color: #fff; font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+#sfAnnHelp .ann-step-text { line-height: 1.4; }
+#sfAnnHelp .ann-step-text strong { color: #e2e8f0; }
+#sfAnnHelp a.ann-cta { display: block; margin-top: 12px; background: #1d4ed8; color: #fff !important; border-radius: 6px; padding: 7px 12px; text-align: center; text-decoration: none; font-size: .78rem; font-weight: 600; }
+#sfAnnHelp a.ann-cta:hover { background: #2563eb; }
+#sfAnnHelp .ann-close { position: absolute; top: 10px; right: 12px; cursor: pointer; color: #6b7280; font-size: 1rem; line-height: 1; background: none; border: none; }
 </style>
+
+<!-- Annotation Help Panel -->
+<div id="sfAnnHelp">
+  <button class="ann-close" onclick="document.getElementById('sfAnnHelp').style.display='none'">×</button>
+  <h4>
+    <svg style="width:14px;height:14px;stroke:#58a6ff;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    Annotations SF
+  </h4>
+  <div class="ann-step">
+    <span class="ann-step-num">1</span>
+    <span class="ann-step-text">Activez <strong>Self-Annotation Mode</strong> dans Settings → General</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">2</span>
+    <span class="ann-step-text">Une <strong>toolbar flottante</strong> apparaît — cliquez un élément, sélectionnez du texte, ou faites glisser une zone</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">3</span>
+    <span class="ann-step-text">Chaque annotation est sauvegardée. Allez sur <strong>/annotate/_sf</strong> pour tout voir</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">4</span>
+    <span class="ann-step-text">Cliquez <strong>Fix All</strong> → un agent crée automatiquement les missions pour corriger chaque point</span>
+  </div>
+  <a class="ann-cta" href="/settings#panel-general" target="_blank">Activer Self-Annotation →</a>
+  <a class="ann-cta" href="/annotate/_sf" target="_blank" style="background:#0f3460;margin-top:6px">Voir les annotations →</a>
+</div>
+
 <script>
 (function() {
   var WF_KEY = 'sf_wireframe_mode';
   var btn = document.getElementById('sfWireframeBtn');
+
+  function applySkeleton() {
+    /* Cards, panels, stat blocks, list items → shimmer placeholders */
+    var selectors = [
+      '.metric-value', '.stat-value', '.stat-number',
+      'h1:not(.topbar h1):not(.sidebar h1)',
+      'h2:not(.topbar h2)', 'h3', 'h4',
+      'p:not(#sfAnnHelp p)', 'li', 'td', 'th',
+      '.badge', '.tag', '.chip',
+      'img', 'canvas', '.avatar',
+      'button:not(#sfWireframeBtn):not(.ann-close)',
+      'input', 'select', 'textarea',
+    ];
+    selectors.forEach(function(sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function(el) {
+          if (!el.closest('#sfAnnHelp') && !el.closest('.sf-annotate-toolbar') && !el.closest('[id^="sfAnn"]')) {
+            el.classList.add('sf-skel');
+          }
+        });
+      } catch(e) {}
+    });
+  }
+
+  function removeSkeleton() {
+    document.querySelectorAll('.sf-skel').forEach(function(el) {
+      el.classList.remove('sf-skel');
+    });
+  }
+
   if (sessionStorage.getItem(WF_KEY) === '1') {
     document.body.classList.add('sf-wireframe');
     if (btn) btn.title = 'Quitter le mode wireframe';
+    document.addEventListener('DOMContentLoaded', applySkeleton);
   }
+
   window.toggleWireframeMode = function() {
     var active = document.body.classList.toggle('sf-wireframe');
     sessionStorage.setItem(WF_KEY, active ? '1' : '0');
-    if (btn) btn.title = active ? 'Quitter le mode wireframe' : 'Wireframe mode — lo-fi skeleton view';
+    if (btn) btn.title = active ? 'Quitter le mode wireframe' : 'Wireframe mode — skeleton view';
+    if (active) applySkeleton(); else removeSkeleton();
   };
+
+  /* Wireframe button long-press (500ms) → show annotation help */
+  if (btn) {
+    var pressTimer;
+    btn.addEventListener('mousedown', function() {
+      pressTimer = setTimeout(function() {
+        var panel = document.getElementById('sfAnnHelp');
+        panel.style.display = panel.style.display === 'none' || !panel.style.display ? 'block' : 'none';
+      }, 500);
+    });
+    btn.addEventListener('mouseup', function() { clearTimeout(pressTimer); });
+    btn.addEventListener('mouseleave', function() { clearTimeout(pressTimer); });
+    /* Right-click → annotation help */
+    btn.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      document.getElementById('sfAnnHelp').style.display = 'block';
+    });
+  }
 })();
 </script>
 </body>
