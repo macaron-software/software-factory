@@ -86,9 +86,7 @@
         <button class="settings-tab" onclick="showSettingsTab('modules')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
         </button>
-        <button class="settings-tab" onclick="showSettingsTab('security')">
-            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-shield"/></svg> Security
-        </button>
+        <button class="settings-tab" onclick="showSettingsTab('security')">Security</button>
         <button class="settings-tab" onclick="showSettingsTab('deploy')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cloud"/></svg> Deploy Targets
         </button>
@@ -630,7 +628,7 @@
     <!-- ═══ Security ═══ -->
     <div class="settings-panel" id="panel-security">
         <section class="settings-section">
-            <h3>🛡️ Agent Sandbox</h3>
+            <h3>Agent Sandbox</h3>
             <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1.2rem">
                 Isolement filesystem des commandes shell exécutées par les agents. Chaque agent est restreint à son workspace projet — accès à la source platform et aux autres workspaces bloqué.
             </p>
@@ -638,7 +636,7 @@
             <!-- Landlock card -->
             <div class="integ-card" id="landlock-card" style="max-width:560px">
                 <div style="display:flex;align-items:flex-start;gap:1rem">
-                    <div style="font-size:2rem;line-height:1;margin-top:2px">🔒</div>
+                    <div style="font-size:2rem;line-height:1;margin-top:2px;color:var(--text-secondary);font-weight:700">[LL]</div>
                     <div style="flex:1;min-width:0">
                         <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
                             <span style="font-weight:700;font-size:0.95rem">Landlock Filesystem Sandbox</span>
@@ -658,7 +656,7 @@
                                 </div>
                                 <span id="landlock-toggle-label">—</span>
                             </label>
-                            <span id="landlock-save-hint" style="font-size:0.72rem;color:var(--purple);display:none">✓ Sauvegardé</span>
+                            <span id="landlock-save-hint" style="font-size:0.72rem;color:var(--purple);display:none">Saved</span>
                         </div>
                     </div>
                 </div>
@@ -1762,20 +1760,20 @@ function renderLandlock(d) {
     // Badge
     if (active) {
         badge.className = 'ck-badge badge-ok';
-        badge.textContent = '● Actif';
+        badge.textContent = 'active';
     } else if (found && !enabled) {
         badge.className = 'ck-badge badge-warn';
-        badge.textContent = '○ Désactivé';
+        badge.textContent = 'disabled';
     } else {
         badge.className = 'ck-badge badge-off';
-        badge.textContent = found ? '○ Off' : '✗ Binary manquant';
+        badge.textContent = found ? 'off' : 'binary missing';
     }
 
     // Card border
     card.className = 'integ-card' + (active ? ' enabled' : '');
 
     // Binary path
-    binaryInfo.textContent = found ? '📦 ' + d.landlock_binary_path : '⚠ Binary non trouvé — kernel Linux requis';
+    binaryInfo.textContent = found ? d.landlock_binary_path : 'binary not found — Linux kernel required';
 
     // Toggle
     if (enabled) {
