@@ -800,14 +800,56 @@ class LLMClient:
             max_attempts = 4
             for attempt in range(max_attempts):
                 try:
+                    # RTK prompt compression — same as chat() path
+                    _stream_messages = messages
+                    _stream_system = system_prompt
+                    _rtk_now = time.monotonic()
+                    if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
+                        try:
+                            from ..db.migrations import get_db as _get_db
+
+                            _db = _get_db()
+                            _row = _db.execute(
+                                "SELECT enabled FROM integrations WHERE id='rtk-compression'"
+                            ).fetchone()
+                            _db.close()
+                            _rtk_cache["enabled"] = (
+                                bool(_row["enabled"]) if _row else True
+                            )
+                        except Exception:
+                            _rtk_cache["enabled"] = not bool(
+                                os.environ.get("LLM_COMPRESS_DISABLED", "")
+                            )
+                        _rtk_cache["ts"] = _rtk_now
+                    if _rtk_cache.get("enabled", True):
+                        try:
+                            from .prompt_compressor import (
+                                compress_messages as _rtk_compress,
+                            )
+
+                            _stream_messages, _stream_system, _rtk_stats = (
+                                _rtk_compress(messages, system_prompt, provider=prov)
+                            )
+                            if _rtk_stats["savings_pct"] > 0:
+                                logger.warning(
+                                    "RTK stream compress %s: %d→%d tokens (-%s%%)",
+                                    prov,
+                                    _rtk_stats["original_tokens"],
+                                    _rtk_stats["compressed_tokens"],
+                                    _rtk_stats["savings_pct"],
+                                )
+                        except Exception as _ce:
+                            logger.debug(
+                                "RTK stream compressor error (skipped): %s", _ce
+                            )
                     async for chunk in self._do_stream(
                         pcfg,
                         prov,
                         use_model,
-                        messages,
+                        _stream_messages,
                         temperature,
                         max_tokens,
-                        system_prompt,
+                        _stream_system,
                     ):
                         yield chunk
                     self._cb_record_success(prov)

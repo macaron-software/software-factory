@@ -164,7 +164,27 @@ def _select_model_for_agent(
     import os
 
     if not os.environ.get("AZURE_DEPLOY", ""):
-        return agent.provider, agent.model
+        # Local multi-LLM routing: code/QA → local-mlx (Qwen), pilotage/reasoning → azure-openai,
+        # small talk / cheap ops → minimax
+        _local_primary = os.environ.get("PLATFORM_LLM_PROVIDER", "local-mlx")
+        _local_model = os.environ.get(
+            "PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
+        )
+        role_l = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
+        tags_l = {t.lower() for t in (agent.tags or [])}
+        if role_l in _CODE_ROLES or tags_l & _CODE_TAGS:
+            # Code generation, tests, QA → Qwen (local-mlx)
+            return _local_primary, _local_model
+        elif role_l in _REASONING_ROLES or tags_l & _REASONING_TAGS:
+            # Architecture, planning, pilotage → azure-openai fallback
+            _az_provider = (
+                "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
+            )
+            _az_model = os.environ.get("DEFAULT_MODEL", "gpt-5-mini")
+            return _az_provider, _az_model
+        else:
+            # Small talk, generic → minimax (cheap)
+            return CHEAP_PROVIDER, CHEAP_MODEL
 
     azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
     role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
