@@ -175,7 +175,7 @@ CREATE INDEX IF NOT EXISTS idx_epics_status ON epics(status);
 
 CREATE TABLE IF NOT EXISTS sprints (
     id TEXT PRIMARY KEY,
-    epic_id TEXT NOT NULL REFERENCES epics(id),
+    mission_id TEXT NOT NULL REFERENCES epics(id),
     number INTEGER NOT NULL DEFAULT 1,
     name TEXT DEFAULT '',
     goal TEXT DEFAULT '',
@@ -186,12 +186,12 @@ CREATE TABLE IF NOT EXISTS sprints (
     velocity INTEGER DEFAULT 0,
     planned_sp INTEGER DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_sprints_epic ON sprints(epic_id);
+CREATE INDEX IF NOT EXISTS idx_sprints_mission ON sprints(mission_id);
 
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     sprint_id TEXT NOT NULL REFERENCES sprints(id),
-    epic_id TEXT NOT NULL REFERENCES epics(id),
+    mission_id TEXT NOT NULL REFERENCES epics(id),
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     type TEXT DEFAULT 'feature',
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_sprint ON tasks(sprint_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_mission ON tasks(mission_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
 -- ============================================================================
