@@ -702,6 +702,22 @@ async def pipeline_metrics(mission_id: str):
         db.close()
 
 
+@router.get("/api/analytics/rtk")
+async def rtk_stats():
+    """RTK (context compression) savings stats from the in-memory metrics collector."""
+    from ....metrics.collector import get_collector
+
+    snap = get_collector().snapshot()
+    return JSONResponse(snap.get("rtk", {
+        "calls": 0,
+        "bytes_raw": 0,
+        "bytes_compressed": 0,
+        "bytes_saved": 0,
+        "ratio_pct": 0,
+        "tokens_saved_est": 0,
+    }))
+
+
 @router.get("/api/analytics/costs")
 async def llm_costs():
     """LLM cost breakdown by provider, mission and agent."""

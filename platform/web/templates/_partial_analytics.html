@@ -1058,6 +1058,18 @@ async function updateCosts() {
     } catch(e) {}
 }
 updateCosts();
+
+async function updateRtk() {
+    try {
+        const d = await fetch('/api/analytics/rtk').then(r => r.json());
+        const fmt = b => b >= 1048576 ? (b/1048576).toFixed(1)+'MB' : b >= 1024 ? (b/1024).toFixed(1)+'KB' : b+'B';
+        document.getElementById('rtk-calls').textContent = (d.calls||0).toLocaleString();
+        document.getElementById('rtk-saved').textContent = fmt(d.bytes_saved||0);
+        document.getElementById('rtk-ratio').textContent = (d.ratio_pct||0) + '%';
+        document.getElementById('rtk-tokens').textContent = (d.tokens_saved_est||0).toLocaleString();
+    } catch(e) {}
+}
+updateRtk();
 window.refreshData = refreshData;
 window.loadFailures = loadFailures;
 window.resumeAll = resumeAll;
@@ -1076,4 +1088,17 @@ window.rejectProposal = rejectProposal;
     <div class="stat-card"><h3>MiniMax</h3><p class="stat-value" id="cost-minimax">—</p><p class="stat-label">USD</p></div>
   </div>
   <div id="cost-by-agent" style="font-size:0.82rem"></div>
+</div>
+
+<div style="margin-top:2rem">
+  <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:0.75rem">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    RTK — Compression de contexte
+  </div>
+  <div class="stats-grid" style="margin-bottom:0.5rem">
+    <div class="stat-card"><h3>Appels compressés</h3><p class="stat-value" id="rtk-calls" style="color:#10b981">—</p><p class="stat-label">depuis démarrage</p></div>
+    <div class="stat-card"><h3>Bytes économisés</h3><p class="stat-value" id="rtk-saved" style="color:#10b981">—</p><p class="stat-label">raw − compressed</p></div>
+    <div class="stat-card"><h3>Taux compression</h3><p class="stat-value" id="rtk-ratio" style="color:#10b981">—</p><p class="stat-label">% réduit</p></div>
+    <div class="stat-card"><h3>Tokens estimés économisés</h3><p class="stat-value" id="rtk-tokens" style="color:#10b981">—</p><p class="stat-label">~4 chars/token</p></div>
+  </div>
 </div>
