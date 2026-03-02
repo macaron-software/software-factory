@@ -522,7 +522,9 @@ class LLMClient:
                         or "ConnectError" in err_str
                         or "RemoteProtocolError" in err_str
                     )
-                    if attempt < max_attempts - 1 and (is_transient or is_rate_limit):
+                    if attempt < max_attempts - 1 and (
+                        is_transient or (is_rate_limit and not _is_azure)
+                    ):
                         import random
 
                         # Exponential backoff with jitter: 10s, 20s, 40s, 80s
@@ -559,9 +561,10 @@ class LLMClient:
                     except Exception:
                         pass
                     if is_rate_limit:
-                        self._provider_cooldown[prov] = time.monotonic() + 90
+                        # Shorter cooldown so fallback to next provider happens faster
+                        self._provider_cooldown[prov] = time.monotonic() + 30
                         logger.warning(
-                            "LLM %s → cooldown 90s (rate limited), falling back to next provider",
+                            "LLM %s → cooldown 30s (rate limited), falling back to next provider",
                             prov,
                         )
                 continue
@@ -782,7 +785,9 @@ class LLMClient:
                         or "RemoteProtocolError" in err_str
                         or "ServerDisconnected" in err_str
                     )
-                    if attempt < max_attempts - 1 and (is_rate_limit or is_transient):
+                    if attempt < max_attempts - 1 and (
+                        (is_rate_limit and not _is_azure) or is_transient
+                    ):
                         import random
 
                         delay = min((2**attempt) * 10 + random.uniform(0, 5), 90)

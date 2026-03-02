@@ -141,6 +141,43 @@ async def dashboard_missions(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/dashboard/features")
+async def dashboard_features(request: Request):
+    """Active features with progress bars."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, title, status, story_points FROM features"
+            " WHERE status IN ('in_progress','active','running')"
+            " ORDER BY updated_at DESC LIMIT 8"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        db.close()
+
+    if not rows:
+        return HTMLResponse('<p class="text-muted">No active features</p>')
+
+    html = ""
+    for r in rows:
+        name = html_mod.escape((r["title"] or r["id"])[:40])
+        sp = r["story_points"] or ""
+        badge = (
+            f'<span style="font-size:0.65rem;color:var(--text-secondary);margin-left:4px">{sp}sp</span>'
+            if sp
+            else ""
+        )
+        html += f"""<div class="dash-mission">
+            <div class="dash-mission-name">{name}{badge}</div>
+            <div class="dash-mission-bar"><div class="dash-mission-fill" style="width:50%;background:var(--purple)"></div></div>
+            <div class="dash-mission-pct" style="color:var(--purple)">active</div>
+        </div>"""
+    return HTMLResponse(html)
+
+
 @router.get("/api/dashboard/sprints")
 async def dashboard_sprints(request: Request):
     """Active sprints summary."""

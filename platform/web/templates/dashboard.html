@@ -132,6 +132,12 @@
                 </div>
             </div>
             <div class="dash-section">
+                <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-lightning"/></svg> Active Features</h3>
+                <div id="dashFeatures" hx-get="/api/dashboard/features" hx-trigger="load, every 30s" hx-swap="innerHTML">
+                    <p class="text-muted">Loading...</p>
+                </div>
+            </div>
+            <div class="dash-section">
                 <h3><svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-check-circle"/></svg> Quality Overview</h3>
                 <div id="dashQuality" hx-get="/api/dashboard/quality" hx-trigger="load" hx-swap="innerHTML">
                     <p class="text-muted">Loading...</p>
