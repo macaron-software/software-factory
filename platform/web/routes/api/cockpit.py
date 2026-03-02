@@ -97,7 +97,8 @@ def _build_summary(db) -> dict[str, Any]:
 
 
 def _get_pipeline(db) -> dict:
-    row = db.execute(
+    # Epics (missions table)
+    epics = db.execute(
         "SELECT "
         "  COUNT(*) FILTER (WHERE status IN ('active','running')) AS active,"
         "  COUNT(*) AS total,"
@@ -105,6 +106,24 @@ def _get_pipeline(db) -> dict:
         "  COUNT(*) FILTER (WHERE status='planning') AS planning"
         " FROM missions"
     ).fetchone()
+    # Features
+    feats = db.execute(
+        "SELECT "
+        "  COUNT(*) FILTER (WHERE status IN ('active','running','in_progress')) AS active,"
+        "  COUNT(*) AS total,"
+        "  COUNT(*) FILTER (WHERE status='completed') AS completed"
+        " FROM features"
+    ).fetchone()
+    # Tasks
+    tsk = _safe(
+        lambda: db.execute(
+            "SELECT "
+            "  COUNT(*) FILTER (WHERE status IN ('active','running','in_progress')) AS active,"
+            "  COUNT(*) AS total"
+            " FROM tasks"
+        ).fetchone(),
+        None,
+    )
     ideation = db.execute(
         "SELECT COUNT(*) AS n FROM ideation_sessions WHERE status='active'"
     ).fetchone()
@@ -115,10 +134,23 @@ def _get_pipeline(db) -> dict:
     ).fetchone()
     return {
         "ideation_active": ideation["n"] if ideation else 0,
-        "missions_total": row["total"] if row else 0,
-        "missions_active": row["active"] if row else 0,
-        "missions_planning": row["planning"] if row else 0,
-        "missions_completed": row["completed"] if row else 0,
+        # Epics (formerly missions)
+        "epics_total": epics["total"] if epics else 0,
+        "epics_active": epics["active"] if epics else 0,
+        "epics_planning": epics["planning"] if epics else 0,
+        "epics_completed": epics["completed"] if epics else 0,
+        # Features
+        "features_total": feats["total"] if feats else 0,
+        "features_active": feats["active"] if feats else 0,
+        "features_completed": feats["completed"] if feats else 0,
+        # Tasks
+        "tasks_total": tsk["total"] if tsk else 0,
+        "tasks_active": tsk["active"] if tsk else 0,
+        # Legacy keys for backwards compat
+        "missions_total": epics["total"] if epics else 0,
+        "missions_active": epics["active"] if epics else 0,
+        "missions_planning": epics["planning"] if epics else 0,
+        "missions_completed": epics["completed"] if epics else 0,
         "deploys_today": deploys["n"] if deploys else 0,
     }
 

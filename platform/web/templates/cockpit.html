@@ -102,30 +102,30 @@
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
-      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#6b7280"><use href="#icon-clipboard"/></svg></span>
-      <span class="ps-value" id="ps-planning">—</span>
-      <span class="ps-label">Planifiées</span>
-      <span class="ps-sub">missions</span>
+      <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:var(--purple)"><use href="#icon-clipboard"/></svg></span>
+      <span class="ps-value" id="ps-epics-active">—</span>
+      <span class="ps-label">Épics actifs</span>
+      <span class="ps-sub" id="ps-epics-sub">/ — total</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
       <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#3b82f6"><use href="#icon-settings"/></svg></span>
-      <span class="ps-value" id="ps-active">—</span>
-      <span class="ps-label">En cours</span>
-      <span class="ps-sub">actives</span>
+      <span class="ps-value" id="ps-features-active">—</span>
+      <span class="ps-label">Features</span>
+      <span class="ps-sub" id="ps-features-sub">/ — total</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
       <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#22c55e"><use href="#icon-check-circle"/></svg></span>
       <span class="ps-value" id="ps-done">—</span>
-      <span class="ps-label">Complétées</span>
-      <span class="ps-sub">total</span>
+      <span class="ps-label">Épics done</span>
+      <span class="ps-sub">complétés</span>
     </div>
     <div class="pipeline-arrow">›</div>
     <div class="pipeline-stage">
       <span class="ps-icon"><svg class="icon" style="width:1.4rem;height:1.4rem;color:#f59e0b"><use href="#icon-rocket"/></svg></span>
       <span class="ps-value" id="ps-deploys">—</span>
-      <span class="ps-label">Déployées</span>
+      <span class="ps-label">Déployés</span>
       <span class="ps-sub">aujourd'hui</span>
     </div>
   </div>
@@ -209,7 +209,7 @@
     <div class="kpi-item">
       <span class="kpi-label">Auto-Heal actif</span>
       <span class="kpi-value" id="kpi-autoheal">—</span>
-      <span class="kpi-sub">missions en cours</span>
+      <span class="kpi-sub">épics en cours</span>
     </div>
     <div class="kpi-item">
       <span class="kpi-label">Lead Time (moy.)</span>
@@ -222,9 +222,14 @@
       <span class="kpi-sub">aujourd'hui</span>
     </div>
     <div class="kpi-item">
-      <span class="kpi-label">Total missions</span>
-      <span class="kpi-value" id="kpi-total">—</span>
-      <span class="kpi-sub">dans la SF</span>
+      <span class="kpi-label">Épics</span>
+      <span class="kpi-value" id="kpi-epics">—</span>
+      <span class="kpi-sub" id="kpi-epics-sub">total</span>
+    </div>
+    <div class="kpi-item">
+      <span class="kpi-label">Features</span>
+      <span class="kpi-value" id="kpi-features">—</span>
+      <span class="kpi-sub" id="kpi-features-sub">total</span>
     </div>
   </div>
 </div>
@@ -263,12 +268,14 @@
   }
 
   function render(data){
-    // Pipeline
+    // Pipeline — SAFe
     const p = data.pipeline || {};
     document.getElementById('ps-ideation').textContent = p.ideation_active ?? '—';
-    document.getElementById('ps-planning').textContent = p.missions_planning ?? '—';
-    document.getElementById('ps-active').textContent = p.missions_active ?? '—';
-    document.getElementById('ps-done').textContent = p.missions_completed ?? '—';
+    document.getElementById('ps-epics-active').textContent = p.epics_active ?? '—';
+    document.getElementById('ps-epics-sub').textContent = `/ ${p.epics_total ?? '—'} total`;
+    document.getElementById('ps-features-active').textContent = p.features_active ?? '—';
+    document.getElementById('ps-features-sub').textContent = `/ ${p.features_total ?? '—'} total`;
+    document.getElementById('ps-done').textContent = p.epics_completed ?? '—';
     document.getElementById('ps-deploys').textContent = p.deploys_today ?? '—';
 
     // Environments
@@ -365,7 +372,12 @@
     document.getElementById('kpi-lt').textContent =
       dora.lead_time_h != null ? dora.lead_time_h : '—';
     document.getElementById('kpi-df').textContent = dora.deploys_today ?? '—';
-    document.getElementById('kpi-total').textContent = pipeline2.missions_total ?? '—';
+    document.getElementById('kpi-epics').textContent = p.epics_total ?? '—';
+    document.getElementById('kpi-epics-sub').textContent =
+      p.epics_planning > 0 ? `${p.epics_planning} en backlog` : 'total';
+    document.getElementById('kpi-features').textContent = p.features_total ?? '—';
+    document.getElementById('kpi-features-sub').textContent =
+      p.features_completed > 0 ? `${p.features_completed} done` : 'total';
 
     // Timestamp
     const d = new Date(data.ts * 1000);
