@@ -399,8 +399,14 @@ class PgConnectionWrapper:
         last_cur = None
         for stmt in cleaned.split(";"):
             stmt = stmt.strip()
-            if not stmt or stmt.startswith("--"):
+            if not stmt:
                 continue
+            # Strip leading comment lines to check if there's actual SQL
+            import re as _re
+            sql_body = _re.sub(r"^\s*--[^\n]*\n?", "", stmt, flags=_re.MULTILINE).strip()
+            if not sql_body:
+                continue
+            stmt = sql_body  # execute only the SQL, not the comments
             cur = self._conn.cursor()
             try:
                 cur.execute("SAVEPOINT _exec_sp")
