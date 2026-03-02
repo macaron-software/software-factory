@@ -325,7 +325,14 @@
             {% set cfg = integ.config %}
             <div class="integ-card {% if integ.enabled %}enabled{% endif %}" id="integ-{{ integ.id }}" data-cat="{{ integ.category or integ.type }}">
                 <div class="integ-header">
-                    <div class="integ-icon-emoji">{{ integ.icon or '🔌' }}</div>
+                    <div class="integ-icon-emoji">
+                        {% if integ.icon and integ.icon.startswith('http') %}
+                        <img src="{{ integ.icon }}" style="width:28px;height:28px;object-fit:contain;border-radius:4px" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" alt="">
+                        <span style="display:none">🔌</span>
+                        {% else %}
+                        {{ integ.icon or '🔌' }}
+                        {% endif %}
+                    </div>
                     <div class="integ-info">
                         <div class="integ-name">{{ integ.name }}</div>
                         <div class="integ-type">{{ (integ.category or integ.type)|replace('_',' ') }}</div>
