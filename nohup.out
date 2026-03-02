@@ -16444,3 +16444,30 @@ Python(59093) MallocStackLogging: can't turn off malloc stack logging because it
 {"ts": "2026-03-02T19:15:29", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=ft-auth-dev2 round=4 tc=1 clen=2 fin=tool_calls", "trace_id": "4a33a280"}
 Python(60114) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
 Python(60115) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(60137) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(60140) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(60141) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T19:15:31", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=ft-auth-dev2 tool=git_commit args={'message': 'feat: enhance AppConfig with builder pattern and comprehensive tests\\n\\n- Added Default implementation for LogLevel\\n- Implemented new() builder method for AppConfig\\n- Added validate() m result=[agent/dev/1b88b069 77af1987] feat: enhance AppConfig with builder pattern and comprehensive tests\n 1 file changed, 511 insertions(+) (on branch: agent/dev/1b88b069)\nPushed to origin/agent/dev/1b88b06", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:15:31", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax circuit breaker OPEN, skipping → fallback", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:15:31", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:15:31", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit ... [rate: 7/15]", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:15:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 0e31f96d stalled 10298s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T19:16:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 0e31f96d stalled 10358s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T19:17:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 0e31f96d stalled 10418s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T19:18:26", "level": "WARNING", "logger": "platform.services.auto_resume", "msg": "auto_launch: 35 unstarted active missions, 0 continuous"}
+Python(60964) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T19:18:51", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 0e31f96d stalled 10480s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T19:19:30", "level": "ERROR", "logger": "platform.services.mission_orchestrator", "msg": "Phase tdd-sprint timed out after 600s (all retries exhausted)", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:19:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 1/15]", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:19:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (102 in, 175 out tokens)", "trace_id": "4a33a280"}
+Python(61196) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(61226) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T19:19:46", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "Evidence gate FAILED for tdd-sprint, max sprints exhausted — continuing with issues", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:19:46", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=tdd-sprint status=done_with_issues", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:19:47", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 2/15]", "trace_id": "4a33a280"}
+{"ts": "2026-03-02T19:19:54", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 0e31f96d stalled 10543s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T19:19:55", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: LLM health check failed"}
+{"ts": "2026-03-02T19:19:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (309 in, 231 out tokens)", "trace_id": "4a33a280"}
+Python(61309) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T19:19:58", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 3/15]", "trace_id": "4a33a280"}
+Python(61356) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
