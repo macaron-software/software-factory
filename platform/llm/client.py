@@ -75,6 +75,20 @@ _PROVIDERS = {
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },
+    "local-mlx": {
+        "name": "Local MLX (mlx_lm.server)",
+        "base_url": os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1"),
+        "key_env": None,  # no API key needed
+        "models": [
+            os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
+        ],
+        "default": os.environ.get(
+            "LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
+        ),
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+        "no_auth": True,  # skip auth header entirely
+    },
 }
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
@@ -85,8 +99,15 @@ _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
 _is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get(
     "AZURE_OPENAI_API_KEY", ""
 )
+# On local dev (not Azure), include local-mlx in Thompson candidates if server is available
+_local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
 _FALLBACK_CHAIN = [_primary] + [
-    p for p in ["minimax", "azure-openai", "azure-ai", "openai"] if p != _primary
+    p
+    for p in (
+        (["local-mlx"] if _local_mlx_enabled else [])
+        + ["minimax", "azure-openai", "azure-ai", "openai"]
+    )
+    if p != _primary
 ]
 
 
@@ -282,8 +303,10 @@ class LLMClient:
 
     def _build_headers(self, pcfg: dict) -> dict:
         headers = {"Content-Type": "application/json"}
+        if pcfg.get("no_auth"):
+            return headers
         key = self._get_api_key(pcfg)
-        if pcfg.get("auth_header") and key:
+        if pcfg.get("auth_header") and key and key != "no-key":
             headers[pcfg["auth_header"]] = f"{pcfg.get('auth_prefix', '')}{key}"
         return headers
 
@@ -892,7 +915,11 @@ class LLMClient:
         result = []
         for pid, pcfg in _PROVIDERS.items():
             key = self._get_api_key(pcfg)
-            has_key = bool(key and key != "no-key") or not pcfg.get("key_env")
+            has_key = (
+                bool(key and key != "no-key")
+                or not pcfg.get("key_env")
+                or pcfg.get("no_auth")
+            )
             result.append(
                 {
                     "id": pid,
