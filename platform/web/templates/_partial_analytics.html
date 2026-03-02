@@ -573,18 +573,12 @@ async function loadAnalytics() {
 }
 
 function updateStats(data) {
-    document.getElementById('stat-missions').textContent = 
-        data.missions?.status?.total || 0;
-    
+    function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+    set('stat-missions', data.missions?.status?.total || 0);
     const successRate = data.missions?.performance?.success_rate || 0;
-    document.getElementById('stat-success').textContent = 
-        successRate.toFixed(1) + '%';
-    
-    document.getElementById('stat-agents').textContent = 
-        data.agents?.utilization?.total || 0;
-    
-    document.getElementById('stat-skills').textContent = 
-        data.skills?.top?.length || 0;
+    set('stat-success', successRate.toFixed(1) + '%');
+    set('stat-agents', data.agents?.utilization?.total || 0);
+    set('stat-skills', data.skills?.top?.length || 0);
 }
 
 function renderCharts(data) {

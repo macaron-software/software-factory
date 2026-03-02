@@ -65,7 +65,8 @@
     </button>
 </div>
 
-<div id="metrics-content">
+<div id="metrics-content"
+    hx-on:htmx:before-swap="if(event.detail.xhr.status >= 400){ event.detail.shouldSwap=false; }">
     <p style="text-align:center;color:var(--text-secondary);padding:3rem">Loading...</p>
 </div>
 
@@ -77,6 +78,32 @@ document.querySelectorAll('.metrics-tab').forEach(tab => {
         tab.classList.add('active');
     });
 });
+
+// Graceful error handling: when a tab fails to load (500/network), show retry UI
+document.getElementById('metrics-content').addEventListener('htmx:responseError', function(e) {
+    const tab = document.querySelector('.metrics-tab.active')?.dataset?.tab || 'this tab';
+    document.getElementById('metrics-content').innerHTML =
+        `<div style="text-align:center;padding:3rem;color:var(--text-secondary)">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="1.5" style="margin-bottom:1rem"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <p style="margin:0 0 0.5rem;font-weight:600;color:var(--text-primary)">Failed to load ${tab}</p>
+            <p style="margin:0 0 1.5rem;font-size:0.85rem">Server error (${e.detail.xhr?.status || 'network'}). The platform may be restarting.</p>
+            <button onclick="htmx.trigger(document.querySelector('.metrics-tab.active'),'click')"
+                style="padding:6px 18px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);color:#a78bfa;border-radius:6px;cursor:pointer;font-size:0.85rem">
+                ↻ Retry
+            </button>
+        </div>`;
+});
+document.getElementById('metrics-content').addEventListener('htmx:sendError', function() {
+    document.getElementById('metrics-content').innerHTML =
+        `<div style="text-align:center;padding:3rem;color:var(--text-secondary)">
+            <p style="color:var(--text-primary);font-weight:600">Network error — cannot reach server</p>
+            <button onclick="htmx.trigger(document.querySelector('.metrics-tab.active'),'click')"
+                style="margin-top:1rem;padding:6px 18px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);color:#a78bfa;border-radius:6px;cursor:pointer;font-size:0.85rem">
+                ↻ Retry
+            </button>
+        </div>`;
+});
+
 // Auto-load tab from URL param or default to dora
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
