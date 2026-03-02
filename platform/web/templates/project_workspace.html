@@ -351,7 +351,7 @@ html,body{height:100%;overflow:hidden}
             <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </button>
-            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir dans un onglet">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </button>
           </div>
@@ -1263,7 +1263,9 @@ function wsLoadPreview() { var url=document.getElementById('wsPreviewUrl').value
 function wsPreviewLoad(url) {
   if(!url) url=document.getElementById('wsPreviewUrl').value.trim(); if(!url) return;
   document.getElementById('wsPreviewEmpty').style.display='none';
-  var f=document.getElementById('wsPreviewFrame'); f.style.display=''; f.src=url;
+  var f=document.getElementById('wsPreviewFrame'); f.style.display='';
+  // Route through server-side proxy so internal ports are reachable from any browser
+  f.src='/projects/'+encodeURIComponent(_wsProjectId)+'/preview/';
 }
 function wsPreviewToggleMobile() {
   _wsPreviewMobile=!_wsPreviewMobile;
