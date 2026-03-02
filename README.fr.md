@@ -607,6 +607,26 @@ Visibilité granulaire des dépenses par run :
 - **Comparaison de fournisseurs** — comparez le coût de la même tâche sur minimax / azure / openai
 - **Tableaux de bord cumulatifs** — agrégation des coûts par projet, sprint ou plage de dates
 
+### Studio d'Annotation — Feedback Visuel sur N'importe Quelle Page
+
+Une couche d'annotation visuelle intégrée qui transforme chaque page de la SF en canvas de revue collaboratif :
+
+- **✏️ Bouton Annoter** — cliquez pour activer le mode annotation ; une barre flottante apparaît sur chaque page
+- **Clic pour annoter** — cliquez sur n'importe quel élément pour poser une annotation typée (bug 🐛, commentaire 💬, feature ✨, design 🎨 ou correction de texte 📝)
+- **Barre de traçabilité SAFe** — icône persona dans la topbar pour afficher **Programme → Epic → Feature → Stories** pour la page courante
+- **Mode wireframe** — icône grille dans la topbar pour dépouiller les styles, couleurs et textes en vue squelette/shimmer pour inspection UX
+- **Génération de tickets** — chaque annotation peut déclencher une mission de correction directement depuis l'interface
+- **Auto-annotation SF** — la plateforme s'annote elle-même via `/annotate/_sf` avec les données SAFe rétro-ingéniérées (49 écrans, 8 epics, 29 features, 91 user stories)
+- **Adaptatif au thème** — barre d'outils, popover et barre de traçabilité utilisent des variables CSS et s'adaptent au thème clair/sombre
+
+```
+Topbar : [👤 Spec/Persona] [⊞ Wireframe]    ← deux boutons dans la topbar
+          ↓ clic
+Barre SAFe : Programme | Epic | Feature | Stories / Tasks
+          ↓ clic "Annoter cette page"
+Mode annotation : clic sur élément → popover → saisie → Sauvegarder → marqueur épinglé
+```
+
 ## Quatre Interfaces
 
 ### 1. Dashboard Web (HTMX + SSE)

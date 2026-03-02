@@ -232,6 +232,17 @@ Visibilité granulaire des dépenses par run :
 - **Comparaison de fournisseurs** — comparez le coût de la même tâche entre les fournisseurs configurés
 - **Tableaux de bord cumulatifs** — agrégation des coûts par projet, sprint ou plage de dates
 
+### Studio d'Annotation — Revue Visuelle Collaborative
+
+Une couche d'annotation visuelle intégrée pour les revues, la qualité UX et la traçabilité SAFe :
+
+- **Bouton ✏️ Annoter** — active le mode annotation sur n'importe quelle page
+- **Clic pour annoter** — cliquez sur tout élément : bug, commentaire, feature ou correction de texte
+- **Barre de traçabilité SAFe** — affiche **Programme → Epic → Feature → Stories** pour la page courante
+- **Mode wireframe** — vue squelette/shimmer pour inspection UX sans contenu
+- **Génération de tickets** — chaque annotation crée une mission de correction en un clic
+- **Thème adaptatif** — fonctionne en mode clair et sombre
+
 ## Intelligence Adaptative
 
 La plateforme intègre trois moteurs d'IA qui s'auto-optimisent en continu pour sélectionner la meilleure équipe, le meilleur pattern et la meilleure configuration de workflow pour chaque mission.

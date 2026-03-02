@@ -1027,6 +1027,18 @@ Granulare Ausgabentransparenz pro Run:
 - **Anbietervergleich** — Kosten derselben Aufgabe bei minimax / azure / openai vergleichen
 - **Kumulative Dashboards** — Kosten nach Projekt, Sprint oder Datumsbereich aggregieren
 
+### Annotations-Studio — Visuelles Feedback auf jeder Seite
+
+Eine eingebaute visuelle Annotationsschicht, die jede SF-Seite in ein kollaboratives Überprüfungs-Canvas verwandelt:
+
+- **✏️ Annotieren-Schaltfläche** — Klick zur Aktivierung des Annotationsmodus; schwebende Werkzeugleiste auf jeder Seite
+- **Klick-zum-Annotieren** — Beliebiges Element anklicken: Bug 🐛, Kommentar 💬, Feature ✨, Design 🎨 oder Textkorrektur 📝
+- **SAFe-Rückverfolgbarkeitsleiste** — Persona-Symbol in der Topbar → **Programm → Epic → Feature → Stories**
+- **Wireframe-Modus** — Raster-Symbol in der Topbar → Skeleton/Shimmer-Ansicht für UX-Inspektion
+- **Ticket-Generierung** — Jede Annotation kann direkt eine Fix-Mission starten
+- **Themen-adaptiv** — Toolbar und Popover verwenden CSS-Variablen und passen sich an Hell/Dunkel an
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

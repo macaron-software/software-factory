@@ -1027,6 +1027,18 @@ Granulär utgiftssynlighet per körning:
 - **Leverantörsjämförelse** — jämför kostnaden för samma uppgift mellan minimax / azure / openai
 - **Kumulativa instrumentpaneler** — sammanlagda kostnader per projekt, sprint eller datumintervall
 
+### Annotationsstudio — Visuell Feedback på Alla Sidor
+
+Ett inbyggt visuellt anteckningsskikt som förvandlar varje SF-sida till en samarbetsbaserad granskningsyta:
+
+- **✏️ Annotera-knapp** — klicka för att aktivera anteckningsläget; flytande verktygsfält på varje sida
+- **Klicka för att annotera** — klicka på vilket element som helst: bugg 🐛, kommentar 💬, feature ✨, design 🎨 eller textkorrigering 📝
+- **SAFe-spårningsrad** — personaikonen i toppfältet → **Program → Epic → Feature → Stories**
+- **Wireframe-läge** — rutnätsikon → skelett/shimmer-vy för UX-inspektion
+- **Biljettgenerering** — varje annotering kan starta ett fixuppdrag
+- **Temaanpassad** — använder CSS-variabler, anpassar sig till ljust/mörkt
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

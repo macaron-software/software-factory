@@ -194,6 +194,21 @@ def _migrate(conn):
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS epics (
+            id TEXT PRIMARY KEY,
+            programme_id TEXT DEFAULT '',
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            status TEXT DEFAULT 'active',
+            priority INTEGER DEFAULT 5,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_epics_programme ON epics(programme_id)"
+    )
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS features (
             id TEXT PRIMARY KEY,
             epic_id TEXT NOT NULL,
@@ -1601,6 +1616,81 @@ def _ensure_sqlite_tables(conn) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
+    # Annotation Studio
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_screens (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            page_url TEXT DEFAULT '',
+            svg_path TEXT DEFAULT '',
+            feature_id TEXT DEFAULT '',
+            mission_id TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_screens_project ON project_screens(project_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_annotations (
+            id TEXT PRIMARY KEY,
+            screen_id TEXT DEFAULT '',
+            project_id TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT 'comment',
+            selector TEXT DEFAULT '',
+            element_text TEXT DEFAULT '',
+            x_pct REAL DEFAULT 0,
+            y_pct REAL DEFAULT 0,
+            w_pct REAL DEFAULT 0,
+            h_pct REAL DEFAULT 0,
+            from_x_pct REAL DEFAULT 0,
+            from_y_pct REAL DEFAULT 0,
+            to_x_pct REAL DEFAULT 0,
+            to_y_pct REAL DEFAULT 0,
+            page_url TEXT DEFAULT '',
+            viewport_w INTEGER DEFAULT 1280,
+            viewport_h INTEGER DEFAULT 800,
+            quoted_text TEXT DEFAULT '',
+            computed_css TEXT DEFAULT '',
+            react_tree TEXT DEFAULT '',
+            message TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'open',
+            seq_num INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ann_project ON project_annotations(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ann_screen ON project_annotations(screen_id)"
+    )
+    # Migrate existing project_screens — add traceability columns if missing
+    try:
+        ps_cols = {
+            r[1] for r in conn.execute("PRAGMA table_info(project_screens)").fetchall()
+        }
+        if ps_cols and "feature_id" not in ps_cols:
+            conn.execute(
+                "ALTER TABLE project_screens ADD COLUMN feature_id TEXT DEFAULT ''"
+            )
+        if ps_cols and "mission_id" not in ps_cols:
+            conn.execute(
+                "ALTER TABLE project_screens ADD COLUMN mission_id TEXT DEFAULT ''"
+            )
+    except Exception:
+        pass
+    # Seed self-annotation setting
+    conn.execute(
+        "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
+        (
+            "self_annotation_enabled",
+            "false",
+            "Enable visual annotation overlay on the SF platform itself",
+        ),
+    )
     # Seed RTK integration
     conn.execute("""
         INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
@@ -2224,6 +2314,57 @@ def _ensure_darwin_tables(conn) -> None:
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
+    # Annotation Studio
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_screens (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            page_url TEXT DEFAULT '',
+            svg_path TEXT DEFAULT '',
+            feature_id TEXT DEFAULT '',
+            mission_id TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_screens_project ON project_screens(project_id)"
+    )
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS project_annotations (
+            id TEXT PRIMARY KEY,
+            screen_id TEXT DEFAULT '',
+            project_id TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT 'comment',
+            selector TEXT DEFAULT '',
+            element_text TEXT DEFAULT '',
+            x_pct REAL DEFAULT 0,
+            y_pct REAL DEFAULT 0,
+            w_pct REAL DEFAULT 0,
+            h_pct REAL DEFAULT 0,
+            from_x_pct REAL DEFAULT 0,
+            from_y_pct REAL DEFAULT 0,
+            to_x_pct REAL DEFAULT 0,
+            to_y_pct REAL DEFAULT 0,
+            page_url TEXT DEFAULT '',
+            viewport_w INTEGER DEFAULT 1280,
+            viewport_h INTEGER DEFAULT 800,
+            quoted_text TEXT DEFAULT '',
+            computed_css TEXT DEFAULT '',
+            react_tree TEXT DEFAULT '',
+            message TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'open',
+            seq_num INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            resolved_at TIMESTAMP
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ann_project ON project_annotations(project_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_ann_screen ON project_annotations(screen_id)"
+    )
     # Seed RTK integration
     conn.execute("""
         INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)

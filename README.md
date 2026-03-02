@@ -612,7 +612,27 @@ Granular spend visibility per run:
 - **Provider comparison** — compare cost of same task across minimax / azure / openai
 - **Cumulative dashboards** — roll-up costs by project, sprint, or date range
 
-## Four Interfaces
+### Annotation Studio — Visual Feedback on Any Page
+
+A built-in visual annotation layer that turns every SF page into a collaborative review canvas:
+
+- **✏️ Annotate button** — click to activate annotation mode; a floating toolbar appears on every page
+- **Click-to-annotate** — click any element to pin a typed annotation (bug 🐛, comment 💬, feature request ✨, design 🎨, or text correction 📝)
+- **SAFe traceability bar** — toggle (persona icon in topbar) to reveal a bar showing **Programme → Epic → Feature → Stories** for the current page
+- **Wireframe mode** — toggle (grid icon in topbar) to strip styles, colours and text into a skeleton/shimmer view for UX inspection
+- **Ticket generation** — each annotation can spawn a fix mission directly from the UI
+- **Self-annotation** — the SF platform annotates itself at `/annotate/_sf` using retro-engineered SAFe data for all 49 screens
+- **Theme-aware** — toolbar, popover and traceability bar use CSS variables and adapt to light/dark theme automatically
+
+```
+Topbar: [👤 Spec/Persona] [⊞ Wireframe]    ← two toggle buttons in topbar-right
+         ↓ on click
+SAFe bar: Programme | Epic | Feature | Stories / Tasks
+         ↓ click "Annoter cette page"
+Annotation mode: click any element → popover → type message → Save → marker pinned
+```
+
+
 
 ### 1. Web Dashboard (HTMX + SSE)
 

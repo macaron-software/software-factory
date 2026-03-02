@@ -1027,6 +1027,18 @@ Gedetailleerde uitgavenvisibiliteit per run:
 - **Vergelijking providers** — vergelijk kosten van dezelfde taak bij minimax / azure / openai
 - **Cumulatieve dashboards** — kosten samengevat per project, sprint of datumbereik
 
+### Annotatie Studio — Visuele Feedback op Elke Pagina
+
+Een ingebouwde visuele annotatielaag die elke SF-pagina omzet in een collaboratief reviewcanvas:
+
+- **✏️ Annoteren-knop** — klik om annotatiemodus te activeren; zwevende werkbalk op elke pagina
+- **Klik om te annoteren** — klik op elk element: bug 🐛, opmerking 💬, feature ✨, ontwerp 🎨 of tekstcorrectie 📝
+- **SAFe-traceerbaarheidsbalk** — persona-icoon in topbar → **Programma → Epic → Feature → Stories**
+- **Wireframe-modus** — raster-icoon → skelet/shimmer-weergave voor UX-inspectie
+- **Ticket-generatie** — elke annotatie kan een fix-missie starten
+- **Thema-adaptief** — gebruikt CSS-variabelen, past zich aan licht/donker aan
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

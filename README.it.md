@@ -1027,6 +1027,18 @@ Visibilità granulare delle spese per run:
 - **Confronto provider** — confronta il costo dello stesso compito su minimax / azure / openai
 - **Dashboard cumulativi** — aggregazione dei costi per progetto, sprint o intervallo di date
 
+### Studio di Annotazione — Feedback Visivo su Qualsiasi Pagina
+
+Un layer di annotazione visiva integrato che trasforma ogni pagina SF in un canvas di revisione collaborativa:
+
+- **✏️ Pulsante Annota** — clic per attivare la modalità annotazione; barra strumenti flottante su ogni pagina
+- **Clic per annotare** — clicca su qualsiasi elemento: bug 🐛, commento 💬, feature ✨, design 🎨 o correzione testo 📝
+- **Barra di tracciabilità SAFe** — icona persona nella topbar → **Programma → Epic → Feature → Storie**
+- **Modalità wireframe** — icona griglia → vista scheletro/shimmer per ispezione UX
+- **Generazione ticket** — ogni annotazione può avviare una missione di correzione
+- **Adattivo al tema** — usa variabili CSS, si adatta a chiaro/scuro
+
+
 ### Dashboard metriche LLM
 - **Monitoraggio in tempo reale di costi/latenza/provider** su `/metrics`
 - **Spese per agente e missione** — identificare e ottimizzare gli agenti costosi

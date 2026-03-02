@@ -1027,6 +1027,18 @@ Szczegółowa widoczność wydatków na uruchomienie:
 - **Porównanie dostawców** — porównaj koszt tego samego zadania w minimax / azure / openai
 - **Zbiorcze pulpity** — koszty agregowane według projektu, sprintu lub zakresu dat
 
+### Studio Adnotacji — Wizualna Informacja Zwrotna na Każdej Stronie
+
+Wbudowana warstwa adnotacji wizualnych, która zamienia każdą stronę SF w kolaboracyjne płótno do przeglądów:
+
+- **✏️ Przycisk Adnotuj** — kliknij, aby aktywować tryb adnotacji; pływający pasek narzędzi na każdej stronie
+- **Kliknij, aby adnotować** — kliknij dowolny element: błąd 🐛, komentarz 💬, feature ✨, design 🎨 lub korekta tekstu 📝
+- **Pasek śledzenia SAFe** — ikona persony w topbarze → **Program → Epic → Cecha → Historie**
+- **Tryb szkieletu** — ikona siatki → widok szkieletu/shimmer do inspekcji UX
+- **Generowanie biletów** — każda adnotacja może uruchomić misję naprawy
+- **Adaptacyjny motyw** — używa zmiennych CSS, dostosowuje się do jasnego/ciemnego
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

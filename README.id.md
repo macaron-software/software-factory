@@ -1027,6 +1027,18 @@ Visibilitas pengeluaran granular per run:
 - **Perbandingan penyedia** — bandingkan biaya tugas yang sama di minimax / azure / openai
 - **Dasbor kumulatif** — penggabungan biaya berdasarkan proyek, sprint, atau rentang tanggal
 
+### Studio Anotasi — Umpan Balik Visual di Semua Halaman
+
+Lapisan anotasi visual bawaan yang mengubah setiap halaman SF menjadi kanvas ulasan kolaboratif:
+
+- **✏️ Tombol Anotasi** — klik untuk mengaktifkan mode anotasi; bilah alat mengambang di setiap halaman
+- **Klik untuk anotasi** — klik elemen apa pun: bug 🐛, komentar 💬, fitur ✨, desain 🎨, atau koreksi teks 📝
+- **Bilah keterlacakan SAFe** — ikon persona di topbar → **Program → Epic → Fitur → Cerita**
+- **Mode wireframe** — ikon grid → tampilan skeleton/shimmer untuk inspeksi UX
+- **Pembuatan tiket** — setiap anotasi dapat memulai misi perbaikan
+- **Adaptif tema** — menggunakan variabel CSS, beradaptasi dengan tema terang/gelap
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

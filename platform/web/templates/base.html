@@ -297,50 +297,56 @@
                 </div>
             </header>
 
-            <!-- ── Spec / Persona bar ── -->
+            <!-- ── SAFe Spec bar ── -->
             <div id="sfSpecBar" style="display:none;background:var(--bg-secondary,#f6f8fa);border-bottom:1px solid var(--border,#d0d7de);padding:0;flex-shrink:0;overflow:hidden;transition:max-height .25s ease;max-height:0">
               <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border,#d0d7de)">
+                <!-- Programme -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Programme
+                  </div>
+                  <div id="spec-programme" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                  <div id="spec-programme-sub" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
+                </div>
+                <!-- Epic -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Epic
+                  </div>
+                  <div id="spec-epic" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                </div>
                 <!-- Feature -->
                 <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
                   <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Feature
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Feature
                   </div>
                   <div id="spec-feature" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
-                  <div id="spec-epic" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
+                  <div id="spec-feature-status" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
                 </div>
-                <!-- Persona -->
+                <!-- User Stories / Tasks -->
                 <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
                   <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Persona
-                  </div>
-                  <div id="spec-persona" style="font-size:.72rem;color:var(--text-secondary,#57606a);line-height:1.4">—</div>
-                </div>
-                <!-- User Stories -->
-                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>User Stories
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Stories / Tasks
                   </div>
                   <div id="spec-stories" style="font-size:.68rem;color:var(--text-secondary,#57606a);line-height:1.5">—</div>
-                </div>
-                <!-- Mission -->
-                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
-                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Mission
-                  </div>
-                  <div id="spec-mission" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
-                  <div id="spec-mission-meta" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
                 </div>
               </div>
               <!-- Footer bar -->
               <div id="spec-footer" style="background:var(--bg-tertiary,#f6f8fa);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border,#d0d7de)">
-                <span id="spec-page-slug" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);font-family:monospace"></span>
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span id="spec-page-slug" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);font-family:monospace"></span>
+                  <span id="spec-persona" style="display:none;font-size:.62rem;color:var(--text-secondary,#57606a);display:flex;align-items:center;gap:3px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span id="spec-persona-name">—</span>
+                  </span>
+                </div>
                 <div style="display:flex;gap:10px;align-items:center">
                   <span id="spec-not-linked" style="display:none;font-size:.65rem;color:var(--text-tertiary,#6e7781);font-style:italic">Page non liée — </span>
                   <a id="spec-ann-link" href="/annotate/_sf" target="_blank" style="font-size:.65rem;color:var(--accent,#0969da);text-decoration:none;display:flex;align-items:center;gap:3px">
                     <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Annoter cette page
                   </a>
-                  <a id="spec-backlog-link" href="#" target="_blank" style="display:none;font-size:.65rem;color:var(--text-secondary,#57606a);text-decoration:none;display:flex;align-items:center;gap:3px">
-                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog
+                  <a id="spec-backlog-link" href="/backlog" target="_blank" style="font-size:.65rem;color:var(--text-secondary,#57606a);text-decoration:none;display:flex;align-items:center;gap:3px">
+                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog SAFe
                   </a>
                 </div>
               </div>
@@ -1028,7 +1034,6 @@ body.sf-wireframe #sfWireframeBtn {
     var slugEl = document.getElementById('spec-page-slug');
     if (slugEl) slugEl.textContent = location.pathname;
 
-    /* Update annotate link with current page as pageName */
     var annLink = document.getElementById('spec-ann-link');
     if (annLink) annLink.href = '/annotate/_sf?page=' + encodeURIComponent(location.pathname);
 
@@ -1036,36 +1041,48 @@ body.sf-wireframe #sfWireframeBtn {
       .then(function(r) { return r.ok ? r.json() : null; })
       .then(function(d) {
         specLoaded = true;
-        if (!d) { showSpecNotLinked(slug); return; }
+        if (!d) { showSpecNotLinked(); return; }
 
+        // Programme
+        var progEl = document.getElementById('spec-programme');
+        if (progEl) progEl.textContent = (d.programme && d.programme.name) ? d.programme.name : 'Software Factory';
+
+        // Epic
+        var epicEl = document.getElementById('spec-epic');
+        if (epicEl) epicEl.textContent = (d.epic && d.epic.name) ? d.epic.name : '—';
+
+        // Feature
+        var featEl = document.getElementById('spec-feature');
+        var featStatusEl = document.getElementById('spec-feature-status');
         if (d.feature) {
-          document.getElementById('spec-feature').textContent = d.feature.name || '—';
-          document.getElementById('spec-epic').textContent = d.feature.epic ? 'Epic: ' + d.feature.epic : '';
+          if (featEl) featEl.textContent = d.feature.name || '—';
+          if (featStatusEl) featStatusEl.textContent = d.feature.status || '';
         } else {
-          document.getElementById('spec-feature').innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400">Non lié</span>';
+          if (featEl) featEl.innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Non liée</span>';
+          showSpecNotLinked();
         }
 
-        if (d.persona) {
-          document.getElementById('spec-persona').textContent = d.persona;
-        }
-
+        // Stories / Tasks
         if (d.user_stories && d.user_stories.length) {
           document.getElementById('spec-stories').innerHTML = d.user_stories.slice(0, 3).map(function(s) {
-            return '<div>• ' + s.title + '</div>';
-          }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da)">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
+            var dot = s.status === 'done' ? '✓' : '·';
+            return '<div style="display:flex;gap:3px"><span style="color:var(--accent,#0969da)">' + dot + '</span>' + s.title + '</div>';
+          }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da);margin-top:2px">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
         }
 
-        if (d.mission) {
-          document.getElementById('spec-mission').textContent = d.mission.name || '—';
-          document.getElementById('spec-mission-meta').textContent = [d.mission.workflow, d.mission.status].filter(Boolean).join(' · ');
-          var bl = document.getElementById('spec-backlog-link');
-          if (bl && d.mission.project_id) bl.href = '/missions/' + d.mission.project_id + '/backlog';
+        // Persona in footer
+        if (d.persona) {
+          var pEl = document.getElementById('spec-persona');
+          var pName = document.getElementById('spec-persona-name');
+          if (pEl) pEl.style.display = 'flex';
+          if (pName) pName.textContent = d.persona;
         }
-      }).catch(function() { showSpecNotLinked(slug); });
+      }).catch(function() { showSpecNotLinked(); });
   }
 
-  function showSpecNotLinked(slug) {
-    document.getElementById('spec-feature').innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Page non liée — ouvrez /annotate/_sf pour lier cette page à une feature</span>';
+  function showSpecNotLinked() {
+    var notLinked = document.getElementById('spec-not-linked');
+    if (notLinked) notLinked.style.display = 'inline';
   }
 
   /* Init on load */

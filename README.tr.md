@@ -1027,6 +1027,18 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 - **Sağlayıcı karşılaştırması** — aynı görevin minimax / azure / openai'daki maliyetini karşılaştırın
 - **Kümülatif panolar** — projeye, sprinte veya tarih aralığına göre maliyet toplamı
 
+### Açıklama Stüdyosu — Her Sayfada Görsel Geri Bildirim
+
+Her SF sayfasını işbirlikçi bir inceleme tuvaline dönüştüren yerleşik görsel açıklama katmanı:
+
+- **✏️ Açıkla Düğmesi** — açıklama modunu etkinleştirmek için tıklayın; her sayfada kayan araç çubuğu
+- **Açıklamak için tıklayın** — herhangi bir öğeye tıklayın: hata 🐛, yorum 💬, özellik ✨, tasarım 🎨 veya metin düzeltme 📝
+- **SAFe İzlenebilirlik Çubuğu** — üst çubuktaki persona simgesi → **Program → Epic → Özellik → Hikayeler**
+- **Wireframe Modu** — ızgara simgesi → UX denetimi için iskelet/parlaklık görünümü
+- **Bilet Oluşturma** — her açıklama bir düzeltme görevi başlatabilir
+- **Tema Uyarlamalı** — CSS değişkenlerini kullanır, açık/koyu temaya uyum sağlar
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren

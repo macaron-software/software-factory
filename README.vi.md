@@ -1027,6 +1027,18 @@ Khả năng hiển thị chi tiêu chi tiết theo mỗi lần chạy:
 - **So sánh nhà cung cấp** — so sánh chi phí cùng một nhiệm vụ trên minimax / azure / openai
 - **Bảng điều khiển tích lũy** — tổng hợp chi phí theo dự án, sprint hoặc khoảng thời gian
 
+### Studio Chú thích — Phản hồi Trực quan trên Mọi Trang
+
+Lớp chú thích trực quan tích hợp biến mỗi trang SF thành canvas đánh giá cộng tác:
+
+- **✏️ Nút Chú thích** — nhấp để kích hoạt chế độ chú thích; thanh công cụ nổi trên mỗi trang
+- **Nhấp để chú thích** — nhấp vào bất kỳ phần tử nào: lỗi 🐛, bình luận 💬, tính năng ✨, thiết kế 🎨 hoặc sửa văn bản 📝
+- **Thanh truy xuất SAFe** — biểu tượng persona trên thanh tiêu đề → **Chương trình → Epic → Tính năng → Câu chuyện**
+- **Chế độ wireframe** — biểu tượng lưới → chế độ xem skeleton/shimmer để kiểm tra UX
+- **Tạo ticket** — mỗi chú thích có thể khởi động nhiệm vụ sửa lỗi
+- **Thích nghi theo chủ đề** — sử dụng biến CSS, tự động thích nghi với chủ đề sáng/tối
+
+
 ### LLM-Metrik-Dashboard
 - **Echtzeit-Überwachung von Kosten/Latenz/Anbieter** unter `/metrics`
 - **Ausgaben je Agent und Mission** — teure Agenten identifizieren und optimieren
