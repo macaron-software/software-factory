@@ -104,8 +104,8 @@ class _RateLimiter:
         self._timestamps: list[float] = []
         self._lock = asyncio.Lock()
 
-    async def acquire(self, timeout: float = 120.0):
-        """Wait until a request slot is available. Raises TimeoutError after timeout."""
+    async def acquire(self, timeout: float = 86400.0):
+        """Wait until a request slot is available. Waits indefinitely by default — industrial pipeline."""
         deadline = time.monotonic() + timeout
         while True:
             async with self._lock:
@@ -366,15 +366,17 @@ class LLMClient:
                 else pcfg["default"]
             )
 
-            # Rate limiter: queue until a slot is available
-            try:
-                await _rate_limiter.acquire(timeout=180.0)
-            except TimeoutError:
-                logger.error(
-                    "LLM rate limiter timeout (180s) — queue full (%s)",
-                    _rate_limiter.usage,
-                )
-                continue
+            # Rate limiter: wait until a slot is available — no skip, no fail
+            while True:
+                try:
+                    await _rate_limiter.acquire(timeout=86400.0)
+                    break
+                except TimeoutError:
+                    logger.warning(
+                        "LLM rate limiter saturated — waiting 10s before retry (%s)",
+                        _rate_limiter.usage,
+                    )
+                    await asyncio.sleep(10)
 
             logger.warning(
                 "LLM trying %s/%s ... [rate: %s]", prov, use_model, _rate_limiter.usage
@@ -667,14 +669,17 @@ class LLMClient:
                 else pcfg["default"]
             )
 
-            # Rate limiter: queue until a slot is available
-            try:
-                await _rate_limiter.acquire(timeout=180.0)
-            except TimeoutError:
-                logger.error(
-                    "LLM stream rate limiter timeout (%s)", _rate_limiter.usage
-                )
-                continue
+            # Rate limiter: wait until a slot is available — no skip, no fail
+            while True:
+                try:
+                    await _rate_limiter.acquire(timeout=86400.0)
+                    break
+                except TimeoutError:
+                    logger.warning(
+                        "LLM stream rate limiter saturated — waiting 10s before retry (%s)",
+                        _rate_limiter.usage,
+                    )
+                    await asyncio.sleep(10)
 
             max_attempts = 4
             for attempt in range(max_attempts):

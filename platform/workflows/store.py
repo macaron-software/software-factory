@@ -436,10 +436,10 @@ async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, 
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=1800)
         except asyncio.TimeoutError:
             proc.kill()
-            return False, "Build timed out after 120s"
+            return False, "Build timed out after 1800s"
 
         if proc.returncode != 0:
             error_output = (stderr or stdout or b"").decode("utf-8", errors="replace")
@@ -703,8 +703,8 @@ async def run_workflow(
             break
 
         except asyncio.TimeoutError:
-            logger.error(
-                "Workflow phase %s timed out after %ds",
+            logger.warning(
+                "Workflow phase %s timed out after %ds — continuing (industrial pipeline, no stop)",
                 phase.name,
                 phase_timeout,
             )
@@ -718,31 +718,16 @@ async def run_workflow(
                     "timeout": True,
                 }
             )
-            # Timeouts: continue if gate allows or skip_on_failure
-            if (
-                phase.gate in ("always", "no_veto", "best_effort")
-                or phase.skip_on_failure
-            ):
-                await _rte_facilitate(
-                    session_id,
-                    f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
-                    f"{'skip_on_failure' if phase.skip_on_failure else f'gate={phase.gate}'}, on continue.\n{_last_summary}",
-                    to_agent=leader,
-                    project_id=project_id,
-                )
-                _save_checkpoint(store, session_id, i + 1)
-                continue
-            # Critical phase timeout — stop
-            run.status = "failed"
-            run.error = error_str
+            # Always continue — this is an industrial pipeline, timeouts never stop the chain
             await _rte_facilitate(
                 session_id,
-                f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
-                f"Le workflow est arrêté.\n{_last_summary}",
+                f"⏱️ La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
+                f"On passe à la suite — pipeline industriel, pas d'arrêt.\n{_last_summary}",
                 to_agent=leader,
                 project_id=project_id,
             )
-            break
+            _save_checkpoint(store, session_id, i + 1)
+            continue
 
         except Exception as e:
             logger.error("Workflow phase %s failed: %s", phase.name, e)
