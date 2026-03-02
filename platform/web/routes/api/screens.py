@@ -430,7 +430,7 @@ async def fix_all_annotations(project_id: str, request: Request):
 
 @router.get("/api/projects/{project_id}/screens/{screen_id}/traceability")
 async def get_screen_traceability(project_id: str, screen_id: str):
-    """Return full SAFe traceability: programme, epic, feature, stories, persona."""
+    """Return full SAFe traceability: programme, epic, feature, stories, persona, rbac."""
     db = _db()
 
     screen = db.execute(
@@ -444,6 +444,7 @@ async def get_screen_traceability(project_id: str, screen_id: str):
         "feature": None,
         "user_stories": [],
         "persona": None,
+        "rbac_roles": [],
         "specs_url": None,
         # backward-compat kept
         "mission": None,
@@ -451,6 +452,15 @@ async def get_screen_traceability(project_id: str, screen_id: str):
 
     if not screen:
         return JSONResponse(result)
+
+    # RBAC from screen
+    try:
+        import json as _json
+
+        rbac_raw = screen["rbac_roles"] if "rbac_roles" in screen.keys() else "[]"
+        result["rbac_roles"] = _json.loads(rbac_raw or "[]")
+    except Exception:
+        pass
 
     # Feature + Epic + Programme
     feature_id = (screen["feature_id"] or "") if screen else ""
@@ -465,6 +475,14 @@ async def get_screen_traceability(project_id: str, screen_id: str):
                 "status": feat["status"],
                 "story_points": feat.get("story_points", 0),
             }
+
+            # Persona from feature
+            try:
+                feat_persona = feat["persona"] if "persona" in feat.keys() else ""
+                if feat_persona:
+                    result["persona"] = feat_persona
+            except Exception:
+                pass
 
             # Epic
             epic_id = feat["epic_id"] or ""
@@ -507,16 +525,17 @@ async def get_screen_traceability(project_id: str, screen_id: str):
             ).fetchall()
             result["user_stories"] = [dict(s) for s in stories]
 
-    # Persona (from agents with persona defined on this project's missions)
-    try:
-        personas = db.execute(
-            "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
-            (project_id,),
-        ).fetchone()
-        if personas:
-            result["persona"] = personas["persona"]
-    except Exception:
-        pass
+    # Persona fallback: from agents with persona defined on this project's missions
+    if not result["persona"]:
+        try:
+            personas = db.execute(
+                "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            if personas:
+                result["persona"] = personas["persona"]
+        except Exception:
+            pass
 
     result["specs_url"] = f"/projects/{project_id}"
     return JSONResponse(result)

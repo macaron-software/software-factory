@@ -255,6 +255,10 @@ def _migrate(conn):
             conn.execute("ALTER TABLE features ADD COLUMN completed_at TEXT")
         if f_cols and "jira_key" not in f_cols:
             conn.execute("ALTER TABLE features ADD COLUMN jira_key TEXT")
+        if f_cols and "persona" not in f_cols:
+            conn.execute("ALTER TABLE features ADD COLUMN persona TEXT DEFAULT ''")
+        if f_cols and "rbac_roles" not in f_cols:
+            conn.execute("ALTER TABLE features ADD COLUMN rbac_roles TEXT DEFAULT '[]'")
     except Exception:
         pass
 
@@ -1679,6 +1683,10 @@ def _ensure_sqlite_tables(conn) -> None:
         if ps_cols and "mission_id" not in ps_cols:
             conn.execute(
                 "ALTER TABLE project_screens ADD COLUMN mission_id TEXT DEFAULT ''"
+            )
+        if ps_cols and "rbac_roles" not in ps_cols:
+            conn.execute(
+                "ALTER TABLE project_screens ADD COLUMN rbac_roles TEXT DEFAULT '[]'"
             )
     except Exception:
         pass
