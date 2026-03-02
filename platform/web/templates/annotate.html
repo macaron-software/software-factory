@@ -96,6 +96,10 @@
   <span class="ann-badge wireframe">Wireframe</span>
   {% endif %}
   <div class="ann-header-actions">
+    <button class="ann-btn" id="btnTraceToggle" onclick="toggleTrace()" title="Traceability — feature, persona, user stories, mission">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Traceability
+    </button>
     <button class="ann-btn" onclick="copyExport()" title="Copy markdown for agents">
       <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
       Export
@@ -106,6 +110,49 @@
     </button>
   </div>
 </header>
+
+<!-- Traceability bar -->
+<div id="annTraceBar" style="background:var(--bg-secondary,#161b22);border-bottom:1px solid var(--border,#30363d);overflow:hidden;max-height:0;transition:max-height .3s ease;flex-shrink:0">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border,#30363d)">
+    <!-- Feature -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Feature
+      </div>
+      <div id="trace-feature-name" style="font-size:.78rem;font-weight:600;color:var(--text-primary,#e2e8f0);margin-bottom:2px">—</div>
+      <div id="trace-feature-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
+      <select id="trace-feature-select" style="display:none;margin-top:6px;width:100%;font-size:.72rem;background:var(--bg-tertiary,#21262d);border:1px solid var(--border,#30363d);border-radius:4px;color:var(--text-primary,#e2e8f0);padding:3px" onchange="linkScreenFeature(this.value)">
+        <option value="">Lier à une feature...</option>
+      </select>
+    </div>
+    <!-- Persona -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Persona
+      </div>
+      <div id="trace-persona" style="font-size:.75rem;color:var(--text-secondary,#8b949e);line-height:1.4">—</div>
+    </div>
+    <!-- User Stories -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        User Stories
+      </div>
+      <div id="trace-stories" style="font-size:.72rem;color:var(--text-secondary,#8b949e);line-height:1.5">—</div>
+    </div>
+    <!-- Mission -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Mission
+      </div>
+      <div id="trace-mission-name" style="font-size:.78rem;font-weight:600;color:var(--text-primary,#e2e8f0);margin-bottom:2px">—</div>
+      <div id="trace-mission-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
+    </div>
+  </div>
+</div>
 
 <!-- Layout -->
 <div class="ann-layout">
@@ -267,6 +314,70 @@ window.addEventListener('message', (e) => {
 
 loadAnnotations();
 setInterval(loadAnnotations, 10000);
+
+// ─── Traceability bar ───────────────────────────────────────────────
+let traceOpen = false;
+let traceLoaded = false;
+let currentScreenId = null;
+
+function toggleTrace() {
+  const bar = document.getElementById('annTraceBar');
+  traceOpen = !traceOpen;
+  bar.style.maxHeight = traceOpen ? '200px' : '0';
+  document.getElementById('btnTraceToggle').style.background = traceOpen ? 'rgba(88,166,255,.15)' : '';
+  if (traceOpen && !traceLoaded) loadTraceability();
+}
+
+function loadTraceability(screenId) {
+  if (screenId) currentScreenId = screenId;
+  const sid = currentScreenId || 'current';
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/screens/${sid}/traceability`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d) { loadFeaturesForLink(); return; }
+      traceLoaded = true;
+      if (d.feature) {
+        document.getElementById('trace-feature-name').textContent = d.feature.name || '—';
+        document.getElementById('trace-feature-meta').textContent = [d.feature.epic ? `Epic: ${d.feature.epic}` : null, d.feature.story_points ? `${d.feature.story_points} pts` : null].filter(Boolean).join(' · ') || '';
+      } else {
+        document.getElementById('trace-feature-name').textContent = 'Non lié';
+        loadFeaturesForLink();
+      }
+      if (d.persona) document.getElementById('trace-persona').textContent = d.persona;
+      if (d.user_stories && d.user_stories.length) {
+        document.getElementById('trace-stories').innerHTML = d.user_stories.slice(0, 3).map(s => `<div style="margin-bottom:2px">• ${s.title}</div>`).join('') + (d.user_stories.length > 3 ? `<div style="color:var(--accent,#58a6ff)">${d.user_stories.length - 3} autres</div>` : '');
+      }
+      if (d.mission) {
+        document.getElementById('trace-mission-name').textContent = d.mission.name || '—';
+        document.getElementById('trace-mission-meta').textContent = [d.mission.workflow, d.mission.status].filter(Boolean).join(' · ');
+      }
+    }).catch(() => {});
+}
+
+function loadFeaturesForLink() {
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/features`).then(r => r.ok ? r.json() : []).then(features => {
+    const sel = document.getElementById('trace-feature-select');
+    if (!sel || !features.length) return;
+    sel.style.display = 'block';
+    features.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.id; o.textContent = f.name;
+      sel.appendChild(o);
+    });
+  }).catch(() => {});
+}
+
+function linkScreenFeature(featureId) {
+  if (!featureId || !currentScreenId) return;
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/screens/${currentScreenId}`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({feature_id: featureId})
+  }).then(() => { traceLoaded = false; loadTraceability(); }).catch(() => {});
+}
 </script>
 </body>
 </html>

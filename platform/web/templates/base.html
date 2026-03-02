@@ -261,6 +261,10 @@
                              hx-trigger="notif-open"
                              hx-swap="innerHTML"></div>
                     </div>
+                    <!-- Wireframe Mode Toggle -->
+                    <button id="sfWireframeBtn" class="topbar-bell" title="Wireframe mode — lo-fi skeleton view" onclick="toggleWireframeMode()" aria-label="Toggle wireframe mode">
+                        <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M3 15h6"/></svg>
+                    </button>
                     <button id="sfPushBtn" class="topbar-bell" aria-label="Enable push notifications"
                             title="Enable push notifications"
                             onclick="sfRequestPush().then(ok=>{ if(ok) this.style.display='none'; })"
@@ -682,6 +686,73 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
 });
+</script>
+<!-- SF Self-Annotation Mode (activated in Settings) -->
+<script>
+(function() {
+  fetch('/api/settings/general').then(function(r){return r.json();}).then(function(d){
+    if (d.self_annotation_enabled === 'true') {
+      window.SF_ANNOTATE = {
+        projectId: '_sf',
+        apiBase: '/api/projects/_sf',
+        selfMode: true,
+        pageName: document.title
+      };
+      var link = document.createElement('link');
+      link.rel = 'stylesheet'; link.href = '/static/sf-annotate.css';
+      document.head.appendChild(link);
+      var s = document.createElement('script');
+      s.src = '/static/sf-annotate.js'; s.defer = true;
+      document.head.appendChild(s);
+    }
+  }).catch(function(){});
+})();
+</script>
+<!-- SF Wireframe Mode -->
+<style>
+  body.sf-wireframe * {
+    background: transparent !important;
+    color: #b0bec5 !important;
+    border-color: #37474f !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    background-image: none !important;
+    font-family: monospace !important;
+  }
+  body.sf-wireframe { background: #0d1117 !important; }
+  body.sf-wireframe img, body.sf-wireframe video, body.sf-wireframe canvas { opacity: 0.08 !important; filter: grayscale(1); }
+  body.sf-wireframe .sidebar { background: #0d1117 !important; border-right: 1px dashed #37474f !important; }
+  body.sf-wireframe .topbar { background: #0d1117 !important; border-bottom: 1px dashed #37474f !important; }
+  body.sf-wireframe button, body.sf-wireframe .btn, body.sf-wireframe [class*="btn"] {
+    border: 1px dashed #546e7a !important; border-radius: 3px !important;
+    background: transparent !important;
+  }
+  body.sf-wireframe input, body.sf-wireframe select, body.sf-wireframe textarea {
+    border: 1px solid #455a64 !important; background: #0d1117 !important;
+  }
+  body.sf-wireframe .card, body.sf-wireframe [class*="card"], body.sf-wireframe [class*="panel"] {
+    border: 1px dashed #37474f !important; background: transparent !important;
+  }
+  body.sf-wireframe #sfWireframeBtn {
+    color: #58a6ff !important; background: rgba(88,166,255,.12) !important; border-radius: 6px;
+  }
+  body.sf-wireframe .sf-wf-label { display: inline !important; }
+  .sf-wf-label { display: none; font-size: .68rem; color: #546e7a; margin-left: 4px; vertical-align: middle; }
+</style>
+<script>
+(function() {
+  var WF_KEY = 'sf_wireframe_mode';
+  var btn = document.getElementById('sfWireframeBtn');
+  if (sessionStorage.getItem(WF_KEY) === '1') {
+    document.body.classList.add('sf-wireframe');
+    if (btn) btn.title = 'Quitter le mode wireframe';
+  }
+  window.toggleWireframeMode = function() {
+    var active = document.body.classList.toggle('sf-wireframe');
+    sessionStorage.setItem(WF_KEY, active ? '1' : '0');
+    if (btn) btn.title = active ? 'Quitter le mode wireframe' : 'Wireframe mode — lo-fi skeleton view';
+  };
+})();
 </script>
 </body>
 </html>

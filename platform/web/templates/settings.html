@@ -116,6 +116,28 @@
             </div>
             <hr style="border-color:var(--border);margin:1.2rem 0">
         </section>
+        <section class="settings-section">
+            <h3>
+                <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                Self-Annotation Mode
+            </h3>
+            <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1rem">
+                Activate the visual annotation overlay on the SF platform itself. Business users can navigate any SF page and add feedback, bug reports, or UX suggestions directly on the interface.
+            </p>
+            <div style="display:flex;align-items:center;gap:12px">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" id="self-ann-toggle" style="display:none" onchange="setSelfAnnotation(this.checked)">
+                    <span id="self-ann-track" style="width:40px;height:22px;border-radius:11px;background:var(--bg-tertiary,#21262d);border:1px solid var(--border,#30363d);display:inline-flex;align-items:center;padding:2px;transition:background .2s;cursor:pointer" onclick="document.getElementById('self-ann-toggle').click()">
+                        <span id="self-ann-thumb" style="width:16px;height:16px;border-radius:50%;background:#8b949e;transition:transform .2s,background .2s;display:block"></span>
+                    </span>
+                    <span id="self-ann-label" style="font-size:0.82rem;color:var(--text-secondary)">Désactivé</span>
+                </label>
+                <a href="/annotate/_sf" target="_blank" style="font-size:0.78rem;color:var(--accent,#58a6ff);text-decoration:none">
+                    <svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;margin-right:3px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Voir les annotations SF
+                </a>
+            </div>
+        </section>
     </div>
 
     <!-- ═══ Orchestrator ═══ -->
@@ -1615,6 +1637,52 @@ function closeIntegStats() {
 document.getElementById('integ-stats-modal').addEventListener('click', function(e) {
     if (e.target === this) closeIntegStats();
 });
+</script>
+
+<script>
+// Self-Annotation toggle
+(function() {
+  fetch('/api/settings/general').then(r=>r.json()).then(d => {
+    const enabled = d.self_annotation_enabled === 'true';
+    const cb = document.getElementById('self-ann-toggle');
+    const track = document.getElementById('self-ann-track');
+    const thumb = document.getElementById('self-ann-thumb');
+    const lbl = document.getElementById('self-ann-label');
+    if (!cb) return;
+    cb.checked = enabled;
+    if (enabled) {
+      track.style.background = '#1d4ed8';
+      thumb.style.transform = 'translateX(18px)';
+      thumb.style.background = '#fff';
+      lbl.textContent = 'Activé';
+      lbl.style.color = '#60a5fa';
+    }
+  }).catch(()=>{});
+})();
+
+function setSelfAnnotation(enabled) {
+  const track = document.getElementById('self-ann-track');
+  const thumb = document.getElementById('self-ann-thumb');
+  const lbl = document.getElementById('self-ann-label');
+  if (enabled) {
+    track.style.background = '#1d4ed8';
+    thumb.style.transform = 'translateX(18px)';
+    thumb.style.background = '#fff';
+    lbl.textContent = 'Activé';
+    lbl.style.color = '#60a5fa';
+  } else {
+    track.style.background = 'var(--bg-tertiary,#21262d)';
+    thumb.style.transform = 'translateX(0)';
+    thumb.style.background = '#8b949e';
+    lbl.textContent = 'Désactivé';
+    lbl.style.color = 'var(--text-secondary)';
+  }
+  fetch('/api/settings/general', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({self_annotation_enabled: enabled ? 'true' : 'false'})
+  });
+}
 </script>
 
 {% endblock %}

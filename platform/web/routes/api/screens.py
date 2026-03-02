@@ -368,3 +368,132 @@ async def fix_all_annotations(project_id: str, request: Request):
         return JSONResponse({"mission_id": mission.id, "ok": True})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ── Traceability ─────────────────────────────────────────────────
+
+@router.get("/api/projects/{project_id}/screens/{screen_id}/traceability")
+async def get_screen_traceability(project_id: str, screen_id: str):
+    """Return feature, user stories, mission, persona linked to a screen."""
+    db = _db()
+
+    # Get screen metadata
+    screen = db.execute(
+        "SELECT * FROM project_screens WHERE id=? AND project_id=?",
+        (screen_id, project_id),
+    ).fetchone()
+
+    result: dict = {"feature": None, "user_stories": [], "mission": None, "persona": None, "specs_url": None}
+
+    if not screen:
+        return JSONResponse(result)
+
+    # Feature
+    feature_id = (screen["feature_id"] or "") if screen else ""
+    if feature_id:
+        feat = db.execute("SELECT * FROM features WHERE id=?", (feature_id,)).fetchone()
+        if feat:
+            # Get epic name
+            epic_name = ""
+            try:
+                epic = db.execute("SELECT name FROM epics WHERE id=?", (feat["epic_id"],)).fetchone()
+                epic_name = epic["name"] if epic else feat["epic_id"]
+            except Exception:
+                pass
+            result["feature"] = {
+                "id": feat["id"],
+                "name": feat["name"],
+                "description": feat["description"],
+                "acceptance_criteria": feat.get("acceptance_criteria", ""),
+                "status": feat["status"],
+                "story_points": feat.get("story_points", 0),
+                "epic_name": epic_name,
+            }
+
+            # User stories for this feature
+            stories = db.execute(
+                "SELECT id, title, status FROM user_stories WHERE feature_id=? ORDER BY priority DESC LIMIT 5",
+                (feature_id,),
+            ).fetchall()
+            result["user_stories"] = [dict(s) for s in stories]
+
+    # Mission
+    mission_id = (screen["mission_id"] or "") if screen else ""
+    if not mission_id:
+        # Try to find latest mission for project
+        m = db.execute(
+            "SELECT id, name, description, type, status FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        if m:
+            mission_id = m["id"]
+
+    if mission_id:
+        mission = db.execute(
+            "SELECT id, name, description, type, status FROM missions WHERE id=?",
+            (mission_id,),
+        ).fetchone()
+        if mission:
+            result["mission"] = dict(mission)
+
+    # Persona (from most recent mission's config or from agents)
+    try:
+        personas = db.execute(
+            "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        if personas:
+            result["persona"] = personas["persona"]
+    except Exception:
+        pass
+
+    # Specs URL
+    result["specs_url"] = f"/projects/{project_id}"
+
+    return JSONResponse(result)
+
+
+@router.patch("/api/projects/{project_id}/screens/{screen_id}")
+async def update_screen(project_id: str, screen_id: str, request: Request):
+    """Update screen metadata (feature_id, mission_id, name)."""
+    body = await request.json()
+    db = _db()
+    fields, vals = [], []
+    for f in ("name", "feature_id", "mission_id", "page_url"):
+        if f in body:
+            fields.append(f"{f}=?")
+            vals.append(body[f])
+    if not fields:
+        return JSONResponse({"ok": True})
+    vals += [project_id, screen_id]
+    db.execute(
+        f"UPDATE project_screens SET {', '.join(fields)} WHERE project_id=? AND id=?", vals
+    )
+    db.commit()
+    return JSONResponse({"ok": True})
+
+
+# ── Settings ─────────────────────────────────────────────────────
+
+@router.get("/api/settings/general")
+async def get_general_settings():
+    """Return general platform settings (including self_annotation_enabled)."""
+    db = _db()
+    rows = db.execute(
+        "SELECT key, value FROM platform_settings WHERE key NOT LIKE 'rate_limit_%'"
+    ).fetchall()
+    return JSONResponse({r["key"]: r["value"] for r in rows})
+
+
+@router.post("/api/settings/general")
+async def update_general_settings(request: Request):
+    """Update one or more general platform settings."""
+    body = await request.json()
+    db = _db()
+    for key, value in body.items():
+        db.execute(
+            "INSERT INTO platform_settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP",
+            (key, str(value)),
+        )
+    db.commit()
+    return JSONResponse({"ok": True})
