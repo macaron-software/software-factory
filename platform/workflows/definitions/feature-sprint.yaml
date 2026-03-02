@@ -14,6 +14,18 @@ phases:
     agents:
     - system-architect-art
     dynamic_lead: true
+- id: env-setup
+  pattern_id: sequential
+  name: Environment Setup
+  description: >
+    DevOps lit le brief et détecte la stack technique (Rust/Node/Python/Go/etc.).
+    Écrit Dockerfile + docker-compose si besoin. Lance build() pour vérifier que
+    l'environnement compile à blanc (hello-world ou cargo check / npm install / go build).
+    BLOQUANT : la phase tdd-sprint ne démarre pas tant que build() ne retourne pas SUCCESS.
+  gate: always
+  config:
+    agents:
+    - ft-infra-lead
 - id: tdd-sprint
   pattern_id: loop
   name: TDD Sprint
@@ -54,6 +66,12 @@ phases:
 config:
   graph:
     nodes:
+    - id: n0
+      agent_id: ft-infra-lead
+      x: 400
+      y: -80
+      label: Env Setup
+      phase: env-setup
     - id: n1
       agent_id: system-architect-art
       x: 400
@@ -103,6 +121,10 @@ config:
       label: Deploy
       phase: feature-deploy
     edges:
+    - from: n0
+      to: n1
+      label: env ready
+      color: '#a855f7'
     - from: n1
       to: n2
       label: stories
