@@ -110,6 +110,7 @@ fn main() {
 }
 
 fn apply_sandbox(workspace: &PathBuf) -> Result<RulesetStatus, Box<dyn std::error::Error>> {
+    // Use best supported ABI — landlock crate auto-downgrades to highest supported ABI
     let abi = ABI::V3;
 
     let ro_access = AccessFs::from_read(abi);
