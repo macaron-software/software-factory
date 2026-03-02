@@ -1,9 +1,7 @@
 name: Deploy → Azure Prod
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+  workflow_dispatch:    # Manual only — Azure is now deployed via GitLab CI
 
 jobs:
   deploy:

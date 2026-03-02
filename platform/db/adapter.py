@@ -408,7 +408,25 @@ class PgConnectionWrapper:
                 cur.execute("RELEASE SAVEPOINT _exec_sp")
                 last_cur = cur
             except psycopg.errors.Error as exc:
-                _logger.debug("executescript: skipping statement error: %s", exc)
+                # "Already exists" errors are expected during idempotent schema init — ignore silently.
+                # Any other error is unexpected and should be visible in logs.
+                is_harmless = isinstance(
+                    exc,
+                    (
+                        psycopg.errors.DuplicateTable,
+                        psycopg.errors.DuplicateColumn,
+                        psycopg.errors.DuplicateObject,
+                        psycopg.errors.UniqueViolation,
+                    ),
+                )
+                if is_harmless:
+                    _logger.debug("executescript: skipping statement error: %s", exc)
+                else:
+                    _logger.warning(
+                        "executescript: unexpected error on stmt [%.80s]: %s",
+                        stmt,
+                        exc,
+                    )
                 try:
                     cur.execute("ROLLBACK TO SAVEPOINT _exec_sp")
                     cur.execute("RELEASE SAVEPOINT _exec_sp")
