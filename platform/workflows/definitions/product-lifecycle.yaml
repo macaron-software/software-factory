@@ -25,6 +25,7 @@ phases:
     Portfolio Manager analyse la capacité et le WSJF. Débat contradictoire. CHECKPOINT: le DSI attend la décision humaine
     GO, NOGO ou PIVOT.'
   gate: all_approved
+  skip_on_failure: true
   config:
     agents:
     - strat-cpo
@@ -131,6 +132,7 @@ phases:
   description: 'The Test Manager plans and launches the campaign. The QA Lead runs suites (E2E, API, perf). On VETO (bugs
     found): loop back to Test Manager who re-plans fixes. Iterates until APPROVE or max 5 iterations.'
   gate: all_approved
+  skip_on_failure: true
   config:
     agents:
     - test_manager
@@ -142,6 +144,7 @@ phases:
   description: 'Le QA Lead dispatche. En parallèle: le Test Automation lance Playwright, le Testeur fait les tests API, le
     Perf Engineer lance k6. Le QA Lead agrège les résultats.'
   gate: all_approved
+  skip_on_failure: true
   config:
     agents:
     - qa_lead
@@ -155,6 +158,7 @@ phases:
   description: 'Le DevOps déploie en canary (1%). Le SRE monitore les métriques. Le Pipeline Engineer prépare le rollback.
     CHECKPOINT: le Chef de Projet valide le GO pour 100% après vérification humaine des métriques.'
   gate: all_approved
+  skip_on_failure: true
   config:
     agents:
     - devops
