@@ -514,3 +514,17 @@ CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_events_mission ON events(mission_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);
+
+-- Deploy Targets Registry (cloud/infra platform selector)
+CREATE TABLE IF NOT EXISTS deploy_targets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    driver TEXT NOT NULL DEFAULT 'docker_local',
+    config_json TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'unknown',
+    last_check TEXT,
+    is_default INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver);

@@ -406,14 +406,37 @@ class LLMClient:
             max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
+                    # RTK-inspired prompt compression (always on for local-mlx, optional elsewhere)
+                    _send_messages = messages
+                    _send_system = system_prompt
+                    _compress_all = bool(os.environ.get("LLM_COMPRESS_ALL", ""))
+                    if prov == "local-mlx" or _compress_all:
+                        try:
+                            from .prompt_compressor import (
+                                compress_messages as _rtk_compress,
+                            )
+
+                            _send_messages, _send_system, _rtk_stats = _rtk_compress(
+                                messages, system_prompt, provider=prov
+                            )
+                            if _rtk_stats["savings_pct"] > 0:
+                                logger.warning(
+                                    "RTK compress %s: %d→%d tokens (-%s%%)",
+                                    prov,
+                                    _rtk_stats["original_tokens"],
+                                    _rtk_stats["compressed_tokens"],
+                                    _rtk_stats["savings_pct"],
+                                )
+                        except Exception as _ce:
+                            logger.debug("RTK compressor error (skipped): %s", _ce)
                     result = await self._do_chat(
                         pcfg,
                         prov,
                         use_model,
-                        messages,
+                        _send_messages,
                         temperature,
                         max_tokens,
-                        system_prompt,
+                        _send_system,
                         tools,
                     )
                     self._stats["calls"] += 1
