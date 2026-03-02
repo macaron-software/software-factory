@@ -991,3 +991,26 @@ async def reload_agents():
         )
     except Exception as e:
         return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
+
+
+@router.post("/api/admin/self-update")
+async def self_update():
+    """Pull latest code from GitHub main branch and hot-reload (no server restart needed for Python modules already imported)."""
+    import asyncio
+    import os
+
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "git", "pull", "origin", "main",
+            cwd=repo_root,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+        output = (stdout + stderr).decode(errors="replace").strip()
+        if proc.returncode != 0:
+            return JSONResponse({"status": "error", "output": output}, status_code=500)
+        return JSONResponse({"status": "ok", "output": output, "repo": repo_root})
+    except Exception as e:
+        return JSONResponse({"status": "error", "detail": str(e)}, status_code=500)
