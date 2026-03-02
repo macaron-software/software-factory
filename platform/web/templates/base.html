@@ -298,50 +298,49 @@
             </header>
 
             <!-- ── Spec / Persona bar ── -->
-            <div id="sfSpecBar" style="display:none;background:#0d1117;border-bottom:1px solid #21262d;padding:0;flex-shrink:0;overflow:hidden;transition:max-height .25s ease;max-height:0">
-              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#161b22">
+            <div id="sfSpecBar" style="display:none;background:var(--bg-secondary,#f6f8fa);border-bottom:1px solid var(--border,#d0d7de);padding:0;flex-shrink:0;overflow:hidden;transition:max-height .25s ease;max-height:0">
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border,#d0d7de)">
                 <!-- Feature -->
-                <div style="background:#0d1117;padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
                     <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Feature
                   </div>
-                  <div id="spec-feature" style="font-size:.75rem;font-weight:600;color:#e2e8f0">—</div>
-                  <div id="spec-epic"    style="font-size:.65rem;color:#4b5563;margin-top:1px"></div>
+                  <div id="spec-feature" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                  <div id="spec-epic" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
                 </div>
                 <!-- Persona -->
-                <div style="background:#0d1117;padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
                     <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Persona
                   </div>
-                  <div id="spec-persona" style="font-size:.72rem;color:#8b949e;line-height:1.4">—</div>
+                  <div id="spec-persona" style="font-size:.72rem;color:var(--text-secondary,#57606a);line-height:1.4">—</div>
                 </div>
                 <!-- User Stories -->
-                <div style="background:#0d1117;padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
                     <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>User Stories
                   </div>
-                  <div id="spec-stories" style="font-size:.68rem;color:#8b949e;line-height:1.5">—</div>
+                  <div id="spec-stories" style="font-size:.68rem;color:var(--text-secondary,#57606a);line-height:1.5">—</div>
                 </div>
-                <!-- Mission / Backlog -->
-                <div style="background:#0d1117;padding:10px 16px">
-                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4b5563;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                <!-- Mission -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
                     <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Mission
                   </div>
-                  <div id="spec-mission" style="font-size:.75rem;font-weight:600;color:#e2e8f0">—</div>
-                  <div id="spec-mission-meta" style="font-size:.65rem;color:#4b5563;margin-top:1px"></div>
+                  <div id="spec-mission" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                  <div id="spec-mission-meta" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
                 </div>
               </div>
-              <div style="background:#0d1117;padding:4px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #161b22">
-                <span id="spec-page-slug" style="font-size:.62rem;color:#4b5563;font-family:monospace"></span>
-                <div style="display:flex;gap:8px">
-                  <a id="spec-ann-link" href="/annotate/_sf" target="_blank" style="font-size:.65rem;color:#58a6ff;text-decoration:none">
-                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;margin-right:2px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Annoter
+              <!-- Footer bar -->
+              <div id="spec-footer" style="background:var(--bg-tertiary,#f6f8fa);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border,#d0d7de)">
+                <span id="spec-page-slug" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);font-family:monospace"></span>
+                <div style="display:flex;gap:10px;align-items:center">
+                  <span id="spec-not-linked" style="display:none;font-size:.65rem;color:var(--text-tertiary,#6e7781);font-style:italic">Page non liée — </span>
+                  <a id="spec-ann-link" href="/annotate/_sf" target="_blank" style="font-size:.65rem;color:var(--accent,#0969da);text-decoration:none;display:flex;align-items:center;gap:3px">
+                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Annoter cette page
                   </a>
-                  <a id="spec-backlog-link" href="#" target="_blank" style="font-size:.65rem;color:#6b7280;text-decoration:none">
-                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;margin-right:2px;vertical-align:-1px" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog
-                  </a>
-                  <a href="/settings#panel-general" target="_blank" style="font-size:.65rem;color:#6b7280;text-decoration:none">
-                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2;margin-right:2px;vertical-align:-1px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>Lier
+                  <a id="spec-backlog-link" href="#" target="_blank" style="display:none;font-size:.65rem;color:var(--text-secondary,#57606a);text-decoration:none;display:flex;align-items:center;gap:3px">
+                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog
                   </a>
                 </div>
               </div>
@@ -770,21 +769,27 @@ document.addEventListener('DOMContentLoaded', function() {
   0%   { background-position: -400px 0; }
   100% { background-position: 400px 0; }
 }
-/* Text skeleton bar */
+/* Text skeleton bar — adapts to light/dark via CSS vars */
 .sf-skel-bar {
   display: inline-block;
   height: .75em;
   border-radius: 3px;
-  background: linear-gradient(90deg, #30363d 25%, #444c56 50%, #30363d 75%) !important;
+  background: linear-gradient(90deg,
+    var(--bg-tertiary, #e6eaef) 25%,
+    var(--border, #d0d7de) 50%,
+    var(--bg-tertiary, #e6eaef) 75%) !important;
   background-size: 400px 100% !important;
   animation: sf-shimmer 1.4s infinite linear !important;
   vertical-align: middle;
   min-width: 40px;
 }
-/* Block skeleton (images, avatars, stat boxes) */
+/* Block skeleton */
 .sf-skel-block {
   border-radius: 6px !important;
-  background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%) !important;
+  background: linear-gradient(90deg,
+    var(--bg-tertiary, #e6eaef) 25%,
+    var(--border, #d0d7de) 50%,
+    var(--bg-tertiary, #e6eaef) 75%) !important;
   background-size: 400px 100% !important;
   animation: sf-shimmer 1.4s infinite linear !important;
   border: none !important;
@@ -792,39 +797,41 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .sf-skel-block > * { visibility: hidden !important; }
 
-/* ── Wireframe layout shell ── */
-body.sf-wireframe { background: #161b22 !important; }
+/* ── Wireframe layout shell — uses theme vars ── */
+body.sf-wireframe { background: var(--bg-primary, #ffffff) !important; }
 body.sf-wireframe .sidebar {
-  background: #161b22 !important;
-  border-right: 1px dashed #30363d !important;
+  background: var(--bg-secondary, #f6f8fa) !important;
+  border-right: 1px dashed var(--border, #d0d7de) !important;
 }
 body.sf-wireframe .topbar {
-  background: #161b22 !important;
-  border-bottom: 1px dashed #30363d !important;
+  background: var(--bg-secondary, #f6f8fa) !important;
+  border-bottom: 1px dashed var(--border, #d0d7de) !important;
 }
-body.sf-wireframe .main-area { background: #161b22 !important; }
+body.sf-wireframe .main-area { background: var(--bg-primary, #ffffff) !important; }
 
 body.sf-wireframe #sfWireframeBtn {
-  color: #58a6ff !important;
-  background: rgba(88,166,255,.18) !important;
+  color: var(--accent, #0969da) !important;
+  background: color-mix(in srgb, var(--accent, #0969da) 15%, transparent) !important;
   border-radius: 6px !important;
 }
 
 /* ── Annotation help panel ── */
 #sfAnnHelp {
   position: fixed; bottom: 20px; right: 20px; z-index: 9999;
-  background: #161b22; border: 1px solid #30363d; border-radius: 10px;
-  padding: 16px 20px; width: 280px; box-shadow: 0 8px 32px rgba(0,0,0,.6);
-  font-size: .78rem; color: #8b949e; display: none;
+  background: var(--bg-secondary, #f6f8fa);
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: 10px;
+  padding: 16px 20px; width: 280px; box-shadow: 0 8px 32px rgba(0,0,0,.15);
+  font-size: .78rem; color: var(--text-secondary, #57606a); display: none;
 }
-#sfAnnHelp h4 { margin: 0 0 10px; color: #e2e8f0; font-size: .85rem; display: flex; align-items: center; gap: 6px; }
+#sfAnnHelp h4 { margin: 0 0 10px; color: var(--text-primary, #1f2328); font-size: .85rem; display: flex; align-items: center; gap: 6px; }
 #sfAnnHelp .ann-step { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
-#sfAnnHelp .ann-step-num { width: 20px; height: 20px; border-radius: 50%; background: #1d4ed8; color: #fff; font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+#sfAnnHelp .ann-step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent,#0969da); color: #fff; font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
 #sfAnnHelp .ann-step-text { line-height: 1.4; }
-#sfAnnHelp .ann-step-text strong { color: #e2e8f0; }
-#sfAnnHelp a.ann-cta { display: block; margin-top: 12px; background: #1d4ed8; color: #fff !important; border-radius: 6px; padding: 7px 12px; text-align: center; text-decoration: none; font-size: .78rem; font-weight: 600; }
-#sfAnnHelp a.ann-cta:hover { background: #2563eb; }
-#sfAnnHelp .ann-close { position: absolute; top: 10px; right: 12px; cursor: pointer; color: #6b7280; font-size: 1rem; line-height: 1; background: none; border: none; }
+#sfAnnHelp .ann-step-text strong { color: var(--text-primary,#1f2328); }
+#sfAnnHelp a.ann-cta { display: block; margin-top: 12px; background: var(--accent,#0969da); color: #fff !important; border-radius: 6px; padding: 7px 12px; text-align: center; text-decoration: none; font-size: .78rem; font-weight: 600; }
+#sfAnnHelp a.ann-cta:hover { opacity: .88; }
+#sfAnnHelp .ann-close { position: absolute; top: 10px; right: 12px; cursor: pointer; color: var(--text-tertiary,#6e7781); font-size: 1rem; line-height: 1; background: none; border: none; }
 </style>
 
 <!-- Annotation Help Panel -->
@@ -851,7 +858,7 @@ body.sf-wireframe #sfWireframeBtn {
     <span class="ann-step-text">Cliquez <strong>Fix All</strong> → un agent crée automatiquement les missions pour corriger chaque point</span>
   </div>
   <a class="ann-cta" href="/settings#panel-general" target="_blank">Activer Self-Annotation →</a>
-  <a class="ann-cta" href="/annotate/_sf" target="_blank" style="background:#0f3460;margin-top:6px">Voir les annotations →</a>
+  <a class="ann-cta" href="/annotate/_sf" target="_blank" style="background:var(--bg-tertiary,#f6f8fa);color:var(--text-primary,#1f2328);margin-top:6px">Voir les annotations →</a>
 </div>
 
 <script>
@@ -1037,7 +1044,7 @@ body.sf-wireframe #sfWireframeBtn {
           document.getElementById('spec-feature').textContent = d.feature.name || '—';
           document.getElementById('spec-epic').textContent = d.feature.epic ? 'Epic: ' + d.feature.epic : '';
         } else {
-          document.getElementById('spec-feature').innerHTML = '<span style="color:#4b5563;font-weight:400">Non lié</span>';
+          document.getElementById('spec-feature').innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400">Non lié</span>';
         }
 
         if (d.persona) {
@@ -1047,7 +1054,7 @@ body.sf-wireframe #sfWireframeBtn {
         if (d.user_stories && d.user_stories.length) {
           document.getElementById('spec-stories').innerHTML = d.user_stories.slice(0, 3).map(function(s) {
             return '<div>• ' + s.title + '</div>';
-          }).join('') + (d.user_stories.length > 3 ? '<div style="color:#58a6ff">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
+          }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da)">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
         }
 
         if (d.mission) {
@@ -1060,7 +1067,7 @@ body.sf-wireframe #sfWireframeBtn {
   }
 
   function showSpecNotLinked(slug) {
-    document.getElementById('spec-feature').innerHTML = '<span style="color:#4b5563;font-weight:400;font-size:.68rem">Page non liée — ouvrez /annotate/_sf pour lier cette page à une feature</span>';
+    document.getElementById('spec-feature').innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Page non liée — ouvrez /annotate/_sf pour lier cette page à une feature</span>';
   }
 
   /* Init on load */
