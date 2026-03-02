@@ -10661,3 +10661,160 @@ psycopg_pool.PoolTimeout: couldn't get a connection after 15.00 sec
 {"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 1/15]"}
 {"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.services.auto_resume", "msg": "auto_launch: 33 unstarted active missions, 0 continuous"}
 {"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (552 in, 493 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 2/15]"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (580 in, 488 out tokens)"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 3/15]"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Francois Mercier] attempt=1 score=10: TOO_SHORT: 95 chars (min 200 for dev); L1: HALLUCINATION: Claims intent to explore workspace but no tools used; L1: SLOP: Generic filler text with no real substance - just stated intent without execution", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 4/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:35", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Rachid Mansouri] attempt=2 score=9: L1: SLOP: Extremely brief output with no real substance - just a restatement of intent; L1: HALLUCINATION: Claims to 'réellement exécuter les tests' but no test execution visible - only shows a malformed code_read with <path> placeholder; L1: INCOMPLETE: No test results shown, no regression verification performed, no incident check done"}
+{"ts": "2026-03-02T15:05:36", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent sre: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:05:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:05:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 83f0ed40 stalled 6641s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:05:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e64939c1 stalled 6636s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:05:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e0936f95 stalled 6330s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T15:05:39", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:05:40", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5788 in, 123 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:40", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 6/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1750 in, 104 out tokens)"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=ft-e2e-api round=6 tc=1 clen=243 fin=tool_calls"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=ft-e2e-api tool=code_read args={'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/46468925/Cargo.toml'} result=[package]\nname = \"health_axum\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\naxum = \"0.6\"\ntokio = { version = \"1.28\", features = [\"full\"] }\nserde = { version = \"1.0\", features = [\"derive\"] }\nserd"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying azure-openai/gpt-5-mini ..."}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream azure-openai/gpt-5-mini failed: RuntimeError('HTTP 401: b\\'{\"error\":{\"code\":\"401\",\"message\":\"Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a  — trying next"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit ..."}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit failed: RuntimeError('HTTP 404: b\\'{\"error\": \"No user query found in messages.\"}\\'') — trying next"}
+{"ts": "2026-03-02T15:05:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5190 in, 135 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (269 in, 330 out tokens)"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=sre count=1 len=8"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=sre count=2 len=8"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=sre count=3 len=8"}
+{"ts": "2026-03-02T15:05:44", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:05:45", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=sre deltas=47 think=0"}
+{"ts": "2026-03-02T15:05:45", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 11/15]"}
+{"ts": "2026-03-02T15:05:46", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5450 in, 95 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:46", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 12/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:49", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5190 in, 112 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:49", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:05:52", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=ft-e2e-api count=1 len=8"}
+{"ts": "2026-03-02T15:05:52", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=ft-e2e-api count=2 len=8"}
+{"ts": "2026-03-02T15:05:52", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=ft-e2e-api count=3 len=8"}
+{"ts": "2026-03-02T15:05:53", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5348 in, 158 out tokens)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (631 in, 610 out tokens)"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1136 in, 1903 out tokens)"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Thibault Renaud] attempt=1 score=7: L1: SLOP: Output is mostly French text rephrasing the context without substantive work; L1: ECHO: Agent restates the task ('Je dois livrer mon analyse maintenant') but doesn't actually do it; L1: HALLUCINATION: Claims 'Exécution des Tests de Régression' in heading but no test execution evidence exists"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T15:06:35", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T15:06:36", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=ft-e2e-api deltas=75 think=0"}
+{"ts": "2026-03-02T15:06:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T15:06:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 83f0ed40 stalled 6701s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:06:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e64939c1 stalled 6696s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:06:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e0936f95 stalled 6390s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T15:06:45", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (9578 in, 378 out tokens)"}
+{"ts": "2026-03-02T15:06:45", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit ... [rate: 8/15]"}
+{"ts": "2026-03-02T15:06:50", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (263 in, 346 out tokens)"}
+{"ts": "2026-03-02T15:06:51", "level": "ERROR", "logger": "platform.confluence.sync", "msg": "Failed to sync tab po: Client error '400 ' for url 'https://wiki.net.extra.laposte.fr/confluence/rest/api/content'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"}
+{"ts": "2026-03-02T15:06:52", "level": "ERROR", "logger": "platform.confluence.sync", "msg": "Failed to sync tab qa: Client error '400 ' for url 'https://wiki.net.extra.laposte.fr/confluence/rest/api/content'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"}
+{"ts": "2026-03-02T15:06:53", "level": "ERROR", "logger": "platform.confluence.sync", "msg": "Failed to sync tab archi: Client error '400 ' for url 'https://wiki.net.extra.laposte.fr/confluence/rest/api/content'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"}
+{"ts": "2026-03-02T15:06:54", "level": "ERROR", "logger": "platform.confluence.sync", "msg": "Failed to sync tab wiki: Client error '400 ' for url 'https://wiki.net.extra.laposte.fr/confluence/rest/api/content'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"}
+{"ts": "2026-03-02T15:06:55", "level": "ERROR", "logger": "platform.confluence.sync", "msg": "Failed to sync tab projet: Client error '400 ' for url 'https://wiki.net.extra.laposte.fr/confluence/rest/api/content'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/400"}
+{"ts": "2026-03-02T15:06:55", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 6/15]"}
+{"ts": "2026-03-02T15:06:55", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1705 in, 680 out tokens)"}
+{"ts": "2026-03-02T15:06:55", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Romain Leclerc] attempt=1 score=9: L1: AGENT OUTPUT IS COMPLETELY OFF-TASK - Responds about not having code_write function to write src/index.ts, but task was QA E2E testing for an Axum/Rust server; L1: NO PLAYWRIGHT TEST EXECUTION EVIDENCE - Task required running playwright_test spec=tests/e2e/smoke.spec.ts, but no test run is shown in tools; L1: NO SCREENSHOTS TAKEN - Task explicitly required 'screenshot par page', no evidence of screenshot tool usage"}
+{"ts": "2026-03-02T15:06:55", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 7/15]"}
+{"ts": "2026-03-02T15:06:57", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7696 in, 127 out tokens)"}
+{"ts": "2026-03-02T15:06:57", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit ... [rate: 8/15]"}
+{"ts": "2026-03-02T15:07:20", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (893 in, 942 out tokens)"}
+{"ts": "2026-03-02T15:07:20", "level": "WARNING", "logger": "platform.services.auto_resume", "msg": "auto_resume: mission_run=83f0ed40 acquired semaphore"}
+{"ts": "2026-03-02T15:07:20", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH START mission=83f0ed40 phases=5 session=4ab71b98"}
+{"ts": "2026-03-02T15:07:20", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH stopped existing agent loops for session 4ab71b98"}
+{"ts": "2026-03-02T15:07:20", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH evidence gate: 3 criteria for tma-autoheal"}
+{"ts": "2026-03-02T15:07:21", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=diagnose status=RUNNING agents=['brain', 'architecte', 'sre'] pattern=hierarchical"}
+{"ts": "2026-03-02T15:07:21", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent architecte: tools_enabled=True, tools=YES, allowed=['code_read', 'code_write', 'code_edit']"}
+{"ts": "2026-03-02T15:07:21", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T15:07:27", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (6020 in, 161 out tokens)"}
+{"ts": "2026-03-02T15:07:27", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=architecte round=0 tc=1 clen=454 fin=tool_calls"}
+{"ts": "2026-03-02T15:07:27", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=architecte tool=list_files args={'depth': 3, 'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/83f0ed40'} result=Error: not a directory: /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/83f0ed40"}
+{"ts": "2026-03-02T15:07:27", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]"}
+{"ts": "2026-03-02T15:07:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5416 in, 77 out tokens)"}
+{"ts": "2026-03-02T15:07:30", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=architecte round=1 tc=1 clen=97 fin=tool_calls"}
+{"ts": "2026-03-02T15:07:30", "level": "WARNING", "logger": "platform.agents.permissions", "msg": "PERMISSION DENIED: agent=architecte tool=list_files reason=Path outside workspace boundary path=/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces"}
+{"ts": "2026-03-02T15:07:30", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=architecte tool=list_files args={'depth': 2, 'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces'} result=Permission denied: path is outside the project workspace."}
+{"ts": "2026-03-02T15:07:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 11/15]"}
+{"ts": "2026-03-02T15:07:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit OK (7045 in, 56 out tokens)"}
+{"ts": "2026-03-02T15:07:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 12/15]"}
+{"ts": "2026-03-02T15:07:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 83f0ed40 stalled 3615s in phase diagnose — triggering retry"}
+{"ts": "2026-03-02T15:07:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e64939c1 stalled 6756s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:07:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e0936f95 stalled 6450s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit OK (576 in, 300 out tokens)"}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.agents.adversarial", "msg": "L1 adversarial check failed: Expecting value: line 1 column 1 (char 0)"}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent release_train_engineer: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (6837 in, 71 out tokens)"}
+{"ts": "2026-03-02T15:07:39", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]"}
+{"ts": "2026-03-02T15:07:40", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1173 in, 463 out tokens)"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=architecte round=2 tc=1 clen=1604 fin=tool_calls"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=architecte tool=code_write args={'content': '// Workspace exploration in progress\\n// Attempting to diagnose build_failure error\\n// Mission: 5be3c590\\n// Phase: TDD Sprint\\n\\nconsole.log(\"Diagnose and fix error \\'build_failure\\'\"); result=Written 181 chars to /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/83f0ed40/src/index.ts"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit ... [rate: 11/15]"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit failed after 1 attempts: RuntimeError('HTTP 404: {\"error\": \"System message must be at the beginning.\"}')"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit failed after 2 attempts: RuntimeError('HTTP 404: {\"error\": \"System message must be at the beginning.\"}')"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx/mlx-community/Qwen3.5-35B-A3B-4bit failed after 3 attempts: RuntimeError('HTTP 404: {\"error\": \"System message must be at the beginning.\"}')"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying azure-openai/gpt-5-mini ... [rate: 12/15]"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini failed after 1 attempts: RuntimeError('HTTP 401: {\"error\":{\"code\":\"401\",\"message\":\"Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a cor"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini failed after 2 attempts: RuntimeError('HTTP 401: {\"error\":{\"code\":\"401\",\"message\":\"Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a cor"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini failed after 3 attempts: RuntimeError('HTTP 401: {\"error\":{\"code\":\"401\",\"message\":\"Access denied due to invalid subscription key or wrong API endpoint. Make sure to provide a valid key for an active subscription and use a cor"}
+{"ts": "2026-03-02T15:07:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T15:07:43", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7143 in, 138 out tokens)"}
+{"ts": "2026-03-02T15:07:43", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T15:07:46", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7734 in, 79 out tokens)"}
+{"ts": "2026-03-02T15:07:46", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T15:07:54", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7527 in, 107 out tokens)"}
+{"ts": "2026-03-02T15:07:54", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T15:07:57", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7662 in, 105 out tokens)"}
+{"ts": "2026-03-02T15:08:00", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T15:08:01", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent release_train_engineer: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:08:01", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:08:04", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:08:18", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (2788 in, 641 out tokens)"}
+{"ts": "2026-03-02T15:08:18", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T15:08:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=1 len=8"}
+{"ts": "2026-03-02T15:08:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=2 len=8"}
+{"ts": "2026-03-02T15:08:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=3 len=8"}
+{"ts": "2026-03-02T15:08:24", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=release_train_engineer deltas=201 think=0"}
+{"ts": "2026-03-02T15:08:24", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent release_train_engineer: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:08:24", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:08:27", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:08:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (2486 in, 686 out tokens)"}
+{"ts": "2026-03-02T15:08:33", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=feature-e2e status=done"}
+{"ts": "2026-03-02T15:08:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T15:08:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 83f0ed40 stalled 3675s in phase diagnose — triggering retry"}
+{"ts": "2026-03-02T15:08:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e64939c1 stalled 6816s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:08:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e0936f95 stalled 6510s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T15:08:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (341 in, 327 out tokens)"}
+{"ts": "2026-03-02T15:08:42", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T15:08:47", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 8/15]"}
+{"ts": "2026-03-02T15:08:49", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent release_train_engineer: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:08:49", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:08:52", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:09:01", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (578 in, 556 out tokens)"}
+{"ts": "2026-03-02T15:09:15", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=1 len=8"}
+{"ts": "2026-03-02T15:09:15", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=2 len=8"}
+{"ts": "2026-03-02T15:09:15", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=release_train_engineer count=3 len=8"}
+{"ts": "2026-03-02T15:09:18", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=release_train_engineer deltas=171 think=0"}
+{"ts": "2026-03-02T15:09:18", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent release_train_engineer: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T15:09:18", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T15:09:21", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.missions.store", "msg": "Darwin fitness update error: column \"lt.provider\" must appear in the GROUP BY clause or be used in an aggregate function\nLINE 2: ...      SELECT lt.agent_id, s.pattern_id, lt.model, lt.provide...\n                                                             ^"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1949 in, 1897 out tokens)"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 5/15]"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 83f0ed40 stalled 3735s in phase diagnose — triggering retry"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e64939c1 stalled 6876s in phase  — triggering retry"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission e0936f95 stalled 6570s in phase tdd-sprint — triggering retry"}
+{"ts": "2026-03-02T15:09:36", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: LLM health check failed"}
+{"ts": "2026-03-02T15:09:49", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1010 in, 735 out tokens)"}
+{"ts": "2026-03-02T15:09:49", "level": "ERROR", "logger": "platform.web.routes.missions.internal", "msg": "Post-phase QA screenshots failed: name '_auto_qa_screenshots' is not defined"}
+{"ts": "2026-03-02T15:10:00", "level": "ERROR", "logger": "platform.services.mission_orchestrator", "msg": "Phase feature-deploy timed out after 600s (all retries exhausted)", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:10:00", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "Phase feature-deploy max sprints exhausted — continuing with issues", "trace_id": "dd5e8ed7"}
+{"ts": "2026-03-02T15:10:00", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=feature-deploy status=done_with_issues", "trace_id": "dd5e8ed7"}
