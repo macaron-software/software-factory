@@ -158,6 +158,25 @@
     `;
     document.body.appendChild(tb);
 
+    // Mode banner — top of page, shown when annotation mode is ON
+    const banner = document.createElement('div');
+    banner.id = 'sf-ann-mode-banner';
+    banner.style.cssText = `
+      display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 2147483646;
+      background: #1d4ed8; color: #fff; font-family: system-ui, sans-serif;
+      font-size: 12px; font-weight: 600; padding: 5px 16px;
+      align-items: center; justify-content: space-between; gap: 12px;
+      box-shadow: 0 2px 8px rgba(29,78,216,.4);
+    `;
+    banner.innerHTML = `
+      <span style="display:flex;align-items:center;gap:8px">
+        <svg style="width:13px;height:13px;stroke:#93c5fd;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+        Mode Annotation actif — cliquez un élément pour annoter · Ctrl+Shift+A pour désactiver
+      </span>
+      <button onclick="toggleAnnotate()" style="background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:4px;padding:2px 10px;cursor:pointer;font-size:11px;font-weight:600">Désactiver ✕</button>
+    `;
+    document.body.appendChild(banner);
+
     // Make draggable
     let tbDrag = null;
     tb.addEventListener('mousedown', e => {
@@ -202,7 +221,18 @@
     types.style.display = active ? 'flex' : 'none';
     document.body.style.cursor = active ? 'crosshair' : '';
     if (!active && hoveredEl) { hoveredEl.classList.remove('sf-ann-highlight', `sf-ann-highlight-${annotType}`); hoveredEl = null; }
+    // Show/hide mode banner
+    const banner = document.getElementById('sf-ann-mode-banner');
+    if (banner) banner.style.display = active ? 'flex' : 'none';
   }
+
+  // ── Capture-phase click interceptor — blocks ALL navigation when active ──
+  document.addEventListener('click', e => {
+    if (!active) return;
+    if (e.target.closest('#sf-ann-toolbar') || e.target.closest('#sf-ann-popover') || e.target.closest('.sf-ann-marker')) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, true);
 
   function setType(type) {
     annotType = type;
@@ -466,10 +496,18 @@
   });
 
   // ── Init ───────────────────────────────────────────────────────
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', buildToolbar);
-  } else {
+  function init() {
     buildToolbar();
+    toggleAnnotate(); // start in annotation mode
+  }
+
+  // Expose for banner button (inline onclick)
+  window.toggleAnnotate = toggleAnnotate;
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
 })();
