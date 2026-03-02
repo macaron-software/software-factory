@@ -65,7 +65,7 @@ class AgentLoop:
         session_id: str,
         project_id: str = "",
         project_path: str = "",
-        think_timeout: float = 300.0,
+        think_timeout: float = 3600.0,
         max_rounds: int = 10,
         workspace_id: str = "default",
     ):
@@ -290,13 +290,13 @@ class AgentLoop:
                         len(result.content or ""),
                     )
                 except asyncio.TimeoutError:
-                    logger.error(
-                        "Executor timeout  agent=%s session=%s timeout=%.0fs",
+                    logger.warning(
+                        "Executor timeout  agent=%s session=%s timeout=%.0fs — retrying",
                         self.agent.id,
                         self.session_id,
                         self.think_timeout,
                     )
-                    await self._set_status(AgentStatus.ERROR)
+                    await asyncio.sleep(5)
                     continue
 
                 if result.error:

@@ -436,10 +436,10 @@ async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, 
             stderr=asyncio.subprocess.PIPE,
         )
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=1800)
         except asyncio.TimeoutError:
             proc.kill()
-            return False, "Build timed out after 120s"
+            return False, "Build timed out after 1800s"
 
         if proc.returncode != 0:
             error_output = (stderr or stdout or b"").decode("utf-8", errors="replace")
@@ -491,7 +491,7 @@ def _find_main_py(workspace: str) -> str:
 # ── Workflow Engine ──────────────────────────────────────────────
 
 
-PHASE_TIMEOUT_SECONDS = 600  # 10 min max per phase
+PHASE_TIMEOUT_SECONDS = 172800  # 48h — industrial pipeline, never stop
 
 
 async def run_workflow(
@@ -694,10 +694,17 @@ async def run_workflow(
 
         except WorkflowPaused:
             # Human-in-the-loop requested a pause — save checkpoint at current phase
-            _save_checkpoint(store, session_id, i)  # i not i+1: re-run this phase on resume
+            _save_checkpoint(
+                store, session_id, i
+            )  # i not i+1: re-run this phase on resume
             run.status = "paused"
             run.phase_results.append(
-                {"phase": phase.name, "success": False, "paused": True, "error": "Awaiting human validation"}
+                {
+                    "phase": phase.name,
+                    "success": False,
+                    "paused": True,
+                    "error": "Awaiting human validation",
+                }
             )
             logger.info("Workflow paused at phase %s (%d)", phase.name, i)
             break
@@ -732,17 +739,16 @@ async def run_workflow(
                 )
                 _save_checkpoint(store, session_id, i + 1)
                 continue
-            # Critical phase timeout — stop
-            run.status = "failed"
-            run.error = error_str
+            # Critical phase timeout — always continue (industrial pipeline, never stop)
             await _rte_facilitate(
                 session_id,
                 f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
-                f"Le workflow est arrêté.\n{_last_summary}",
+                f"On continue malgré tout (pipeline industriel).\n{_last_summary}",
                 to_agent=leader,
                 project_id=project_id,
             )
-            break
+            _save_checkpoint(store, session_id, i + 1)
+            continue
 
         except Exception as e:
             logger.error("Workflow phase %s failed: %s", phase.name, e)

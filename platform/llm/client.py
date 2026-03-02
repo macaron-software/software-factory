@@ -366,14 +366,15 @@ class LLMClient:
                 else pcfg["default"]
             )
 
-            # Rate limiter: queue until a slot is available
+            # Rate limiter: queue until a slot is available (no timeout — industrial pipeline)
             try:
-                await _rate_limiter.acquire(timeout=180.0)
+                await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:
-                logger.error(
-                    "LLM rate limiter timeout (180s) — queue full (%s)",
+                logger.warning(
+                    "LLM rate limiter timeout (86400s) — retrying (%s)",
                     _rate_limiter.usage,
                 )
+                await asyncio.sleep(10)
                 continue
 
             logger.warning(
@@ -667,13 +668,15 @@ class LLMClient:
                 else pcfg["default"]
             )
 
-            # Rate limiter: queue until a slot is available
+            # Rate limiter: queue until a slot is available (no timeout — industrial pipeline)
             try:
-                await _rate_limiter.acquire(timeout=180.0)
+                await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:
-                logger.error(
-                    "LLM stream rate limiter timeout (%s)", _rate_limiter.usage
+                logger.warning(
+                    "LLM stream rate limiter timeout — retrying (%s)",
+                    _rate_limiter.usage,
                 )
+                await asyncio.sleep(10)
                 continue
 
             max_attempts = 4
