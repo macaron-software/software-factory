@@ -110,6 +110,8 @@ _FALLBACK_CHAIN = [_primary] + [
     if p != _primary
 ]
 
+_rtk_cache: dict = {}
+
 
 class _RateLimiter:
     """Sliding window rate limiter with async queuing.
@@ -407,13 +409,28 @@ class LLMClient:
             for attempt in range(max_attempts):
                 try:
                     # RTK-inspired prompt compression — on by default for all providers
-                    # Disable with LLM_COMPRESS_DISABLED=1
+                    # Toggle via integrations table (cached 60s), fallback to env
                     _send_messages = messages
                     _send_system = system_prompt
-                    _compress_disabled = bool(
-                        os.environ.get("LLM_COMPRESS_DISABLED", "")
-                    )
-                    if not _compress_disabled:
+                    _rtk_now = time.monotonic()
+                    if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
+                        try:
+                            from ..db.migrations import get_db as _get_db
+
+                            _db = _get_db()
+                            _row = _db.execute(
+                                "SELECT enabled FROM integrations WHERE id='rtk-compression'"
+                            ).fetchone()
+                            _db.close()
+                            _rtk_cache["enabled"] = (
+                                bool(_row["enabled"]) if _row else True
+                            )
+                        except Exception:
+                            _rtk_cache["enabled"] = not bool(
+                                os.environ.get("LLM_COMPRESS_DISABLED", "")
+                            )
+                        _rtk_cache["ts"] = _rtk_now
+                    if _rtk_cache.get("enabled", True):
                         try:
                             from .prompt_compressor import (
                                 compress_messages as _rtk_compress,
@@ -430,6 +447,19 @@ class LLMClient:
                                     _rtk_stats["compressed_tokens"],
                                     _rtk_stats["savings_pct"],
                                 )
+                                try:
+                                    from .prompt_compressor import (
+                                        record_compression_stats as _rtk_record,
+                                    )
+
+                                    _rtk_record(
+                                        prov,
+                                        _rtk_stats["original_tokens"],
+                                        _rtk_stats["compressed_tokens"],
+                                        _rtk_stats["savings_pct"],
+                                    )
+                                except Exception:
+                                    pass
                         except Exception as _ce:
                             logger.debug("RTK compressor error (skipped): %s", _ce)
                     result = await self._do_chat(

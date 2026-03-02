@@ -199,3 +199,23 @@ def compress_messages(
             "savings_pct": round(savings, 1),
         },
     )
+
+
+def record_compression_stats(
+    provider: str, original_tokens: int, compressed_tokens: int, savings_pct: float
+) -> None:
+    """Persist compression stats to DB (fire-and-forget, no exception propagation)."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        try:
+            db.execute(
+                "INSERT INTO rtk_compression_stats (provider, original_tokens, compressed_tokens, savings_pct) VALUES (?,?,?,?)",
+                (provider, original_tokens, compressed_tokens, savings_pct),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception:
+        pass

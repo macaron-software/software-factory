@@ -1589,6 +1589,34 @@ def _ensure_sqlite_tables(conn) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver)"
     )
+    # RTK compression stats
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rtk_compression_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            original_tokens INTEGER DEFAULT 0,
+            compressed_tokens INTEGER DEFAULT 0,
+            savings_pct REAL DEFAULT 0,
+            ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
+    # Seed RTK integration
+    conn.execute("""
+        INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
+        VALUES (
+            'rtk-compression',
+            'RTK Prompt Compression',
+            'platform',
+            'platform',
+            '🗜️',
+            'RTK-inspired prompt compressor: reduces tokens sent to LLMs by normalizing whitespace, truncating long code blocks, and summarizing old conversation history. Saves 40-70% tokens per call.',
+            1,
+            'connected',
+            '{"threshold_tokens": 12000, "max_msg_tokens": 3000, "history_keep_recent": 4}',
+            '[]'
+        )
+    """)
     conn.commit()
 
 
@@ -2183,6 +2211,35 @@ def _ensure_darwin_tables(conn) -> None:
             )
     except Exception:
         pass
+
+    # RTK compression stats
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS rtk_compression_stats (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider TEXT NOT NULL,
+            original_tokens INTEGER DEFAULT 0,
+            compressed_tokens INTEGER DEFAULT 0,
+            savings_pct REAL DEFAULT 0,
+            ts TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
+    # Seed RTK integration
+    conn.execute("""
+        INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
+        VALUES (
+            'rtk-compression',
+            'RTK Prompt Compression',
+            'platform',
+            'platform',
+            '🗜️',
+            'RTK-inspired prompt compressor: reduces tokens sent to LLMs by normalizing whitespace, truncating long code blocks, and summarizing old conversation history. Saves 40-70% tokens per call.',
+            1,
+            'connected',
+            '{"threshold_tokens": 12000, "max_msg_tokens": 3000, "history_keep_recent": 4}',
+            '[]'
+        )
+    """)
 
     conn.commit()
 
