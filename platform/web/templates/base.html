@@ -765,41 +765,48 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 <!-- SF Wireframe Mode + Annotation Help -->
 <style>
-/* ── Skeleton shimmer animation ── */
+/* ── Skeleton shimmer — light gray on dark ── */
 @keyframes sf-shimmer {
-  0%   { background-position: -600px 0; }
-  100% { background-position: 600px 0; }
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
 }
-.sf-skel {
+/* Text skeleton bar */
+.sf-skel-bar {
+  display: inline-block;
+  height: .75em;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #30363d 25%, #444c56 50%, #30363d 75%) !important;
+  background-size: 400px 100% !important;
+  animation: sf-shimmer 1.4s infinite linear !important;
+  vertical-align: middle;
+  min-width: 40px;
+}
+/* Block skeleton (images, avatars, stat boxes) */
+.sf-skel-block {
+  border-radius: 6px !important;
   background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%) !important;
-  background-size: 600px 100% !important;
-  animation: sf-shimmer 1.6s infinite linear !important;
-  color: transparent !important;
-  border-radius: 4px !important;
+  background-size: 400px 100% !important;
+  animation: sf-shimmer 1.4s infinite linear !important;
   border: none !important;
   box-shadow: none !important;
-  pointer-events: none !important;
 }
-.sf-skel * { opacity: 0 !important; }
+.sf-skel-block > * { visibility: hidden !important; }
 
-/* ── Wireframe structural overlay ── */
-body.sf-wireframe {
-  background: #0d1117 !important;
-}
+/* ── Wireframe layout shell ── */
+body.sf-wireframe { background: #161b22 !important; }
 body.sf-wireframe .sidebar {
-  background: #0d1117 !important;
+  background: #161b22 !important;
   border-right: 1px dashed #30363d !important;
 }
 body.sf-wireframe .topbar {
-  background: #0d1117 !important;
+  background: #161b22 !important;
   border-bottom: 1px dashed #30363d !important;
 }
-body.sf-wireframe .main-area {
-  background: #0d1117 !important;
-}
+body.sf-wireframe .main-area { background: #161b22 !important; }
+
 body.sf-wireframe #sfWireframeBtn {
   color: #58a6ff !important;
-  background: rgba(88,166,255,.15) !important;
+  background: rgba(88,166,255,.18) !important;
   border-radius: 6px !important;
 }
 
@@ -851,64 +858,133 @@ body.sf-wireframe #sfWireframeBtn {
 (function() {
   var WF_KEY = 'sf_wireframe_mode';
   var btn = document.getElementById('sfWireframeBtn');
+  var _origText = [];  /* [{node, orig}] to restore */
+  var _skelBlocks = [];
 
-  function applySkeleton() {
-    /* Cards, panels, stat blocks, list items → shimmer placeholders */
-    var selectors = [
-      '.metric-value', '.stat-value', '.stat-number',
-      'h1:not(.topbar h1):not(.sidebar h1)',
-      'h2:not(.topbar h2)', 'h3', 'h4',
-      'p:not(#sfAnnHelp p)', 'li', 'td', 'th',
-      '.badge', '.tag', '.chip',
-      'img', 'canvas', '.avatar',
-      'button:not(#sfWireframeBtn):not(.ann-close)',
-      'input', 'select', 'textarea',
+  /* Helpers */
+  var SKIP = ['SCRIPT','STYLE','#sfAnnHelp','#sfSpecBar','.sf-annotate-toolbar','[id^="sfAnn"]','[id^="sfSpec"]'];
+  function isProtected(el) {
+    return SKIP.some(function(s) { try { return el.closest && el.closest(s); } catch(e) { return false; } });
+  }
+
+  /* Replace a single text node with a shimmer bar */
+  function skelText(node) {
+    var txt = node.textContent.trim();
+    if (!txt || txt.length < 2) return;
+    var w = Math.min(Math.max(txt.length * 7, 40), 220);
+    var span = document.createElement('span');
+    span.className = 'sf-skel-bar sf-skel-inserted';
+    span.style.width = w + 'px';
+    span.setAttribute('aria-hidden', 'true');
+    _origText.push({ node: node, parent: node.parentNode, next: node.nextSibling, text: node.textContent });
+    node.parentNode.replaceChild(span, node);
+  }
+
+  /* Walk leaf text nodes inside an element */
+  function walkText(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n) {
+        if (n.textContent.trim().length < 2) return NodeFilter.FILTER_REJECT;
+        var p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (isProtected(p)) return NodeFilter.FILTER_REJECT;
+        /* Skip structural/nav labels we want to keep readable */
+        var tag = p.tagName;
+        if (['SCRIPT','STYLE','OPTION'].includes(tag)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }, false);
+    var nodes = [];
+    var n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(skelText);
+  }
+
+  /* Block-level skeleton for images, charts, avatars, stat numbers */
+  function skelBlocks() {
+    var blockSels = [
+      'img:not([src^="data:svg"]):not(.topbar img)',
+      '.avatar', '.user-avatar',
+      'canvas',
+      '.metric-value', '.stat-value', '.stat-number', '.kpi-value',
+      'input:not([type=hidden])', 'select', 'textarea',
     ];
-    selectors.forEach(function(sel) {
+    blockSels.forEach(function(sel) {
       try {
         document.querySelectorAll(sel).forEach(function(el) {
-          if (!el.closest('#sfAnnHelp') && !el.closest('.sf-annotate-toolbar') && !el.closest('[id^="sfAnn"]')) {
-            el.classList.add('sf-skel');
-          }
+          if (isProtected(el) || el.classList.contains('sf-skel-block')) return;
+          el.classList.add('sf-skel-block');
+          _skelBlocks.push(el);
         });
       } catch(e) {}
     });
   }
 
-  function removeSkeleton() {
-    document.querySelectorAll('.sf-skel').forEach(function(el) {
-      el.classList.remove('sf-skel');
+  function applySkeleton() {
+    /* Main content area only — skip sidebar nav + topbar */
+    var targets = document.querySelectorAll('.main-area, .content-area, main, [role="main"]');
+    if (!targets.length) targets = [document.body];
+    targets.forEach(function(root) {
+      if (!isProtected(root)) walkText(root);
     });
+    skelBlocks();
+  }
+
+  function removeSkeleton() {
+    /* Restore text nodes */
+    _origText.forEach(function(item) {
+      var inserted = item.parent && item.parent.querySelector('.sf-skel-inserted');
+      if (item.parent && item.next && item.next.parentNode === item.parent) {
+        try { item.parent.insertBefore(item.node, item.next); } catch(e) {}
+      } else if (item.parent && item.parent.parentNode) {
+        try { item.parent.appendChild(item.node); } catch(e) {}
+      }
+    });
+    _origText = [];
+    /* Remove inserted skeleton spans */
+    document.querySelectorAll('.sf-skel-inserted').forEach(function(el) { el.remove(); });
+    /* Remove block skeletons */
+    _skelBlocks.forEach(function(el) { el.classList.remove('sf-skel-block'); });
+    _skelBlocks = [];
+  }
+
+  function activate() {
+    document.body.classList.add('sf-wireframe');
+    if (btn) { btn.title = 'Quitter le mode wireframe'; }
+    setTimeout(applySkeleton, 50);
   }
 
   if (sessionStorage.getItem(WF_KEY) === '1') {
-    document.body.classList.add('sf-wireframe');
-    if (btn) btn.title = 'Quitter le mode wireframe';
-    document.addEventListener('DOMContentLoaded', applySkeleton);
+    document.addEventListener('DOMContentLoaded', activate);
   }
 
   window.toggleWireframeMode = function() {
-    var active = document.body.classList.toggle('sf-wireframe');
-    sessionStorage.setItem(WF_KEY, active ? '1' : '0');
-    if (btn) btn.title = active ? 'Quitter le mode wireframe' : 'Wireframe mode — skeleton view';
-    if (active) applySkeleton(); else removeSkeleton();
+    if (document.body.classList.contains('sf-wireframe')) {
+      document.body.classList.remove('sf-wireframe');
+      sessionStorage.setItem(WF_KEY, '0');
+      if (btn) btn.title = 'Wireframe — skeleton view';
+      removeSkeleton();
+    } else {
+      sessionStorage.setItem(WF_KEY, '1');
+      activate();
+    }
   };
 
-  /* Wireframe button long-press (500ms) → show annotation help */
+  /* Right-click / long-press → annotation help */
   if (btn) {
     var pressTimer;
     btn.addEventListener('mousedown', function() {
       pressTimer = setTimeout(function() {
-        var panel = document.getElementById('sfAnnHelp');
-        panel.style.display = panel.style.display === 'none' || !panel.style.display ? 'block' : 'none';
-      }, 500);
+        var p = document.getElementById('sfAnnHelp');
+        p.style.display = p.style.display === 'block' ? 'none' : 'block';
+      }, 600);
     });
-    btn.addEventListener('mouseup', function() { clearTimeout(pressTimer); });
+    btn.addEventListener('mouseup',    function() { clearTimeout(pressTimer); });
     btn.addEventListener('mouseleave', function() { clearTimeout(pressTimer); });
-    /* Right-click → annotation help */
     btn.addEventListener('contextmenu', function(e) {
       e.preventDefault();
-      document.getElementById('sfAnnHelp').style.display = 'block';
+      var p = document.getElementById('sfAnnHelp');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
     });
   }
 })();
