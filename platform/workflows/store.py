@@ -491,7 +491,7 @@ def _find_main_py(workspace: str) -> str:
 # ── Workflow Engine ──────────────────────────────────────────────
 
 
-PHASE_TIMEOUT_SECONDS = 600  # 10 min max per phase
+PHASE_TIMEOUT_SECONDS = 172800  # 48h max per phase — no artificial cap on long-running workflows
 
 
 async def run_workflow(
