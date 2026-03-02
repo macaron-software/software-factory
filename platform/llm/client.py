@@ -645,6 +645,14 @@ class LLMClient:
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
 
+        # local-mlx requires system message strictly at position 0 — merge all system msgs
+        if provider == "local-mlx":
+            embedded_sys = [m for m in msgs if m["role"] == "system"]
+            msgs = [m for m in msgs if m["role"] != "system"]
+            if embedded_sys:
+                merged = "\n\n".join(m["content"] for m in embedded_sys)
+                msgs.insert(0, {"role": "system", "content": merged})
+
         body = {
             "model": model,
             "messages": msgs,
