@@ -143,7 +143,7 @@ TOOLS = [
     },
     {
         "name": "platform_missions",
-        "description": "List all missions or get details of one mission including phase statuses.",
+        "description": "List SAFe epics or get details of one epic including phase statuses.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -160,7 +160,10 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "mission_id": {"type": "string", "description": "Mission ID (required)"},
+                "mission_id": {
+                    "type": "string",
+                    "description": "Mission ID (required)",
+                },
             },
             "required": ["mission_id"],
         },
@@ -171,9 +174,18 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "session_id": {"type": "string", "description": "Session ID (required)"},
-                "limit": {"type": "integer", "description": "Max messages (default 30)"},
-                "from_agent": {"type": "string", "description": "Filter by sender agent ID"},
+                "session_id": {
+                    "type": "string",
+                    "description": "Session ID (required)",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max messages (default 30)",
+                },
+                "from_agent": {
+                    "type": "string",
+                    "description": "Filter by sender agent ID",
+                },
             },
             "required": ["session_id"],
         },
@@ -208,7 +220,10 @@ TOOLS = [
                     "enum": ["log", "status", "diff", "show", "branch"],
                     "description": "Git subcommand",
                 },
-                "workspace": {"type": "string", "description": "Workspace path (required)"},
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace path (required)",
+                },
                 "args": {
                     "type": "string",
                     "description": "Extra args (e.g. '--oneline -20' for log, commit SHA for show)",
@@ -228,12 +243,18 @@ TOOLS = [
                     "enum": ["read", "search", "list"],
                     "description": "read=file content, search=grep, list=directory listing",
                 },
-                "workspace": {"type": "string", "description": "Workspace root path (required)"},
+                "workspace": {
+                    "type": "string",
+                    "description": "Workspace root path (required)",
+                },
                 "path": {
                     "type": "string",
                     "description": "File path (for read) or subdir (for list)",
                 },
-                "pattern": {"type": "string", "description": "Search pattern (for search)"},
+                "pattern": {
+                    "type": "string",
+                    "description": "Search pattern (for search)",
+                },
                 "glob": {
                     "type": "string",
                     "description": "File glob filter for search (e.g. '*.swift')",
@@ -269,7 +290,10 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "epic_id": {"type": "string", "description": "Epic/mission ID (required)"},
+                "epic_id": {
+                    "type": "string",
+                    "description": "Epic/mission ID (required)",
+                },
                 "action": {
                     "type": "string",
                     "enum": ["list", "create"],
@@ -290,7 +314,10 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "mission_id": {"type": "string", "description": "Mission ID (required)"},
+                "mission_id": {
+                    "type": "string",
+                    "description": "Mission ID (required)",
+                },
             },
             "required": ["mission_id"],
         },
@@ -306,7 +333,10 @@ TOOLS = [
                     "enum": ["list", "create"],
                     "description": "list or create (default: list)",
                 },
-                "title": {"type": "string", "description": "Incident title (for create)"},
+                "title": {
+                    "type": "string",
+                    "description": "Incident title (for create)",
+                },
                 "severity": {
                     "type": "string",
                     "enum": ["P0", "P1", "P2", "P3"],
@@ -475,15 +505,21 @@ def _handle_missions(args: dict) -> str:
                 phases.append(
                     {
                         "phase_id": p.phase_id,
-                        "status": p.status.value if hasattr(p.status, "value") else str(p.status),
-                        "result": (p.result or "")[:200] if hasattr(p, "result") else "",
+                        "status": p.status.value
+                        if hasattr(p.status, "value")
+                        else str(p.status),
+                        "result": (p.result or "")[:200]
+                        if hasattr(p, "result")
+                        else "",
                     }
                 )
         return json.dumps(
             {
                 "id": m.id,
                 "brief": (m.brief or "")[:500],
-                "status": m.status.value if hasattr(m.status, "value") else str(m.status),
+                "status": m.status.value
+                if hasattr(m.status, "value")
+                else str(m.status),
                 "workflow_id": m.workflow_id,
                 "session_id": m.session_id,
                 "workspace_path": m.workspace_path,
@@ -524,7 +560,9 @@ def _handle_phases(args: dict) -> str:
             phases.append(
                 {
                     "phase_id": p.phase_id,
-                    "status": p.status.value if hasattr(p.status, "value") else str(p.status),
+                    "status": p.status.value
+                    if hasattr(p.status, "value")
+                    else str(p.status),
                     "pattern": getattr(p, "pattern_id", ""),
                     "result": (p.result or "")[:300] if hasattr(p, "result") else "",
                 }
@@ -670,36 +708,26 @@ def _handle_metrics(args: dict) -> str:
     if not DB_PATH.exists():
         return json.dumps({"error": "platform.db not found"})
     conn = sqlite3.connect(str(DB_PATH))
-    try:
-        agents_count = conn.execute("SELECT COUNT(*) FROM agents").fetchone()[0]
-    except Exception:
-        agents_count = 0
-    try:
-        missions_count = conn.execute("SELECT COUNT(*) FROM mission_runs").fetchone()[0]
-    except Exception:
-        missions_count = 0
-    try:
-        sessions_count = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-    except Exception:
-        sessions_count = 0
-    try:
-        messages_count = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-    except Exception:
-        messages_count = 0
-    try:
-        memory_count = conn.execute("SELECT COUNT(*) FROM memory").fetchone()[0]
-    except Exception:
-        memory_count = 0
+
+    def _count(table):
+        try:
+            return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        except Exception:
+            return 0
+
+    result = {
+        "projects": _count("projects"),
+        "epics": _count("missions"),
+        "features": _count("features"),
+        "tasks": _count("tasks"),
+        "agents": _count("agents"),
+        "epic_runs": _count("mission_runs"),
+        "sessions": _count("sessions"),
+        "messages": _count("messages"),
+        "memory_entries": _count("memory"),
+    }
     conn.close()
-    return json.dumps(
-        {
-            "agents": agents_count,
-            "missions": missions_count,
-            "sessions": sessions_count,
-            "messages": messages_count,
-            "memory_entries": memory_count,
-        }
-    )
+    return json.dumps(result)
 
 
 def _handle_projects(args: dict) -> str:
@@ -836,7 +864,8 @@ def _handle_search(args: dict) -> str:
     results["projects"] = [dict(r) for r in rows]
     # Search missions
     rows = conn.execute(
-        "SELECT id, name, status FROM missions WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+        "SELECT id, name, status FROM missions WHERE name LIKE ? LIMIT 5",
+        (f"%{query}%",),
     ).fetchall()
     results["missions"] = [dict(r) for r in rows]
     # Search messages (FTS)

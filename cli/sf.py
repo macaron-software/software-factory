@@ -128,7 +128,7 @@ def cmd_status(args):
     missions_count = health.get("missions", {})
     if isinstance(missions_count, dict):
         print(
-            f"Missions: {missions_count.get('running', 0)} running  {missions_count.get('total', 0)} total"
+            f"Epics: {missions_count.get('running', 0)} running  {missions_count.get('total', 0)} total"
         )
 
 

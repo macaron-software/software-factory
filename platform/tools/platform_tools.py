@@ -57,7 +57,7 @@ class PlatformAgentsTool(BaseTool):
 class PlatformMissionsTool(BaseTool):
     name = "platform_missions"
     description = (
-        "List all missions/epics or get details of one, including phase statuses."
+        "List SAFe epics (missions) or get details of one, including phase statuses."
     )
     category = "platform"
 
@@ -149,8 +149,8 @@ class PlatformMemoryTool(BaseTool):
 class PlatformMetricsTool(BaseTool):
     name = "platform_metrics"
     description = (
-        "Get platform statistics. Pass project_id to filter by project: "
-        "mission_runs count, sessions, messages, agents involved."
+        "Get platform SAFe portfolio statistics. Pass project_id to filter by project. "
+        "Returns epics, features, tasks, agents, sessions, messages counts."
     )
     category = "platform"
 
@@ -162,18 +162,34 @@ class PlatformMetricsTool(BaseTool):
         counts = {}
 
         if project_id:
-            # Project-specific metrics
-            for table, col in (
-                ("mission_runs", "project_id"),
-                ("sessions", "project_id"),
+            for table, col, key in (
+                ("missions", "project_id", "epics"),
+                ("features", "epic_id", None),  # features join via epics
+                ("mission_runs", "project_id", "epic_runs"),
+                ("sessions", "project_id", "sessions"),
             ):
                 try:
-                    counts[table] = db.execute(
-                        f"SELECT COUNT(*) FROM {table} WHERE {col}=?", (project_id,)
-                    ).fetchone()[0]
+                    if table == "features":
+                        counts["features"] = db.execute(
+                            "SELECT COUNT(*) FROM features WHERE epic_id IN "
+                            "(SELECT id FROM missions WHERE project_id=?)",
+                            (project_id,),
+                        ).fetchone()[0]
+                    else:
+                        counts[key] = db.execute(
+                            f"SELECT COUNT(*) FROM {table} WHERE {col}=?", (project_id,)
+                        ).fetchone()[0]
                 except Exception:
-                    counts[table] = 0
-            # Messages via sessions of the project
+                    counts[key or table] = 0
+            try:
+                counts["tasks"] = db.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE feature_id IN ("
+                    "SELECT id FROM features WHERE epic_id IN ("
+                    "SELECT id FROM missions WHERE project_id=?))",
+                    (project_id,),
+                ).fetchone()[0]
+            except Exception:
+                counts["tasks"] = 0
             try:
                 counts["messages"] = db.execute(
                     "SELECT COUNT(*) FROM messages WHERE session_id IN "
@@ -182,7 +198,6 @@ class PlatformMetricsTool(BaseTool):
                 ).fetchone()[0]
             except Exception:
                 counts["messages"] = 0
-            # Agents involved via mission_runs
             try:
                 counts["agents_involved"] = db.execute(
                     "SELECT COUNT(DISTINCT cdp_agent_id) FROM mission_runs WHERE project_id=?",
@@ -192,13 +207,21 @@ class PlatformMetricsTool(BaseTool):
                 counts["agents_involved"] = 0
             counts["project_id"] = project_id
         else:
-            for table in ("agents", "missions", "mission_runs", "sessions", "messages"):
+            # Global portfolio stats — SAFe labels
+            def _count(table):
                 try:
-                    counts[table] = db.execute(
-                        f"SELECT COUNT(*) FROM {table}"
-                    ).fetchone()[0]
+                    return db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                 except Exception:
-                    counts[table] = 0
+                    return 0
+
+            counts["projects"] = _count("projects")
+            counts["epics"] = _count("missions")
+            counts["features"] = _count("features")
+            counts["tasks"] = _count("tasks")
+            counts["agents"] = _count("agents")
+            counts["epic_runs"] = _count("mission_runs")
+            counts["sessions"] = _count("sessions")
+            counts["messages"] = _count("messages")
         return json.dumps(counts)
 
 
