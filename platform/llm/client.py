@@ -406,11 +406,14 @@ class LLMClient:
             max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
-                    # RTK-inspired prompt compression (always on for local-mlx, optional elsewhere)
+                    # RTK-inspired prompt compression — on by default for all providers
+                    # Disable with LLM_COMPRESS_DISABLED=1
                     _send_messages = messages
                     _send_system = system_prompt
-                    _compress_all = bool(os.environ.get("LLM_COMPRESS_ALL", ""))
-                    if prov == "local-mlx" or _compress_all:
+                    _compress_disabled = bool(
+                        os.environ.get("LLM_COMPRESS_DISABLED", "")
+                    )
+                    if not _compress_disabled:
                         try:
                             from .prompt_compressor import (
                                 compress_messages as _rtk_compress,
