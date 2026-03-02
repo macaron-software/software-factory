@@ -1,0 +1,18 @@
+[package]
+name = "landlock-runner"
+version = "0.1.0"
+edition = "2021"
+description = "Landlock filesystem sandbox wrapper for SF agent shell execution"
+
+[[bin]]
+name = "landlock-runner"
+path = "src/main.rs"
+
+[dependencies]
+landlock = "0.4"
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1

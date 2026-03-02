@@ -645,6 +645,14 @@ class LLMClient:
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
 
+        # local-mlx requires system message strictly at position 0 — merge all system msgs
+        if provider == "local-mlx":
+            embedded_sys = [m for m in msgs if m["role"] == "system"]
+            msgs = [m for m in msgs if m["role"] != "system"]
+            if embedded_sys:
+                merged = "\n\n".join(m["content"] for m in embedded_sys)
+                msgs.insert(0, {"role": "system", "content": merged})
+
         body = {
             "model": model,
             "messages": msgs,
@@ -941,7 +949,17 @@ class LLMClient:
                     d.pop("content", None)
             msgs.append(d)
         # Inject system prompt
-        if sys_content:
+        # local-mlx (mlx_lm.server) requires system message strictly at position 0 —
+        # collect any embedded system msgs from history, merge, put first.
+        if provider == "local-mlx":
+            embedded_sys = [m for m in msgs if m["role"] == "system"]
+            msgs = [m for m in msgs if m["role"] != "system"]
+            all_sys = ([sys_content] if sys_content else []) + [
+                m["content"] for m in embedded_sys
+            ]
+            if all_sys:
+                msgs.insert(0, {"role": "system", "content": "\n\n".join(all_sys)})
+        elif sys_content:
             if provider == "minimax":
                 for i, m in enumerate(msgs):
                     if m["role"] == "user":
