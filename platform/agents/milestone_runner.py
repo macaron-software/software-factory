@@ -20,7 +20,7 @@ Add to mission config::
     }
 
 Then launch via ``MilestoneRunner.run()`` — called automatically from
-``platform/web/routes/missions/execution.py`` when milestones are present.
+``platform/web/routes/epics/execution.py`` when milestones are present.
 """
 
 from __future__ import annotations
@@ -568,7 +568,7 @@ def _load_compliance_history(project_id: str, agent_id: str) -> str:
             """SELECT cv.verdict, cv.milestone_id, cv.goal, cv.created_at,
                       substr(cv.content, 1, 300) as preview
                FROM compliance_verdicts cv
-               JOIN mission_runs mr ON cv.session_id = mr.session_id
+               JOIN epic_runs mr ON cv.session_id = mr.session_id
                WHERE mr.project_id = ? AND cv.agent_id = ?
                ORDER BY cv.created_at DESC LIMIT 5""",
             (project_id, agent_id),

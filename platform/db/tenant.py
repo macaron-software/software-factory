@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS missions (
     id TEXT PRIMARY KEY, name TEXT, description TEXT, workflow_id TEXT,
     project_id TEXT, status TEXT DEFAULT 'created', created_at TEXT, updated_at TEXT
 );
-CREATE TABLE IF NOT EXISTS mission_runs (
+CREATE TABLE IF NOT EXISTS epic_runs (
     id TEXT PRIMARY KEY, mission_id TEXT, status TEXT DEFAULT 'pending',
     current_phase TEXT, created_at TEXT, updated_at TEXT
 );

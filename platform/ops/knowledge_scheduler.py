@@ -19,7 +19,7 @@ async def run_knowledge_maintenance(project_id: str | None = None) -> str | None
     """Launch a knowledge-maintenance mission. Returns mission_id or None on error."""
     try:
         from ..missions.engine import get_engine
-        from ..missions.store import MissionStore, MissionRunStore
+        from ..epics.store import EpicStore, EpicRunStore
 
         engine = get_engine()
 
@@ -37,8 +37,8 @@ async def run_knowledge_maintenance(project_id: str | None = None) -> str | None
                 return None
             project_id = row["id"]
 
-        mission_store = MissionStore()
-        mission = mission_store.create(
+        epic_store = EpicStore()
+        mission = epic_store.create(
             name="Knowledge Maintenance (scheduled)",
             workflow_id="knowledge-maintenance",
             project_id=project_id,
@@ -46,7 +46,7 @@ async def run_knowledge_maintenance(project_id: str | None = None) -> str | None
             tags=["knowledge", "scheduled", "nightly"],
         )
 
-        run_store = MissionRunStore()
+        run_store = EpicRunStore()
         run = run_store.create(mission_id=mission.id)
 
         asyncio.create_task(engine.run(run.id))

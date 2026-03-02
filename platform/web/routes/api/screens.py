@@ -407,14 +407,14 @@ async def fix_all_annotations(project_id: str, request: Request):
         return JSONResponse({"error": "No open annotations to fix"}, status_code=400)
 
     try:
-        from ....missions.store import get_mission_store
+        from ....epics.store import get_epic_store
         from ....projects.manager import get_project_store
 
         proj = get_project_store().get(project_id)
         proj_name = proj.name if proj else project_id
 
-        mission_store = get_mission_store()
-        mission = mission_store.create_mission(
+        epic_store = get_epic_store()
+        mission = epic_store.create_mission(
             project_id=project_id,
             title=f"Fix UI Annotations — {proj_name}",
             description=f"Fix all open UI annotations from the Annotation Studio:\n\n{markdown}",
@@ -529,7 +529,7 @@ async def get_screen_traceability(project_id: str, screen_id: str):
     if not result["persona"]:
         try:
             personas = db.execute(
-                "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
+                "SELECT a.persona FROM agents a JOIN epics m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
                 (project_id,),
             ).fetchone()
             if personas:

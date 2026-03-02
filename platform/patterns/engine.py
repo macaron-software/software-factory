@@ -310,7 +310,7 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     if not fail_lines:
         return
 
-    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    mission_id = getattr(ctx, "epic_run_id", "") or ""
     agent_id = ctx.agent.id if ctx.agent else source
     db = get_db()
     try:
@@ -985,8 +985,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
         "Épic" in content or "Epic" in content or "US-" in content or "Story" in content
     ):
         mission_id = run.session_id  # fallback
-        if hasattr(ctx, "mission_run_id") and ctx.mission_run_id:
-            mission_id = ctx.mission_run_id
+        if hasattr(ctx, "epic_run_id") and ctx.epic_run_id:
+            mission_id = ctx.epic_run_id
         else:
             # Try to get mission_id from session config
             try:
@@ -1225,7 +1225,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # Create platform_incident for adversarial rejections (DORA tracking)
                 # Auto-close if agent already has >=3 open quality_rejection incidents
                 try:
-                    from ..missions.feedback import create_platform_incident
+                    from ..epics.feedback import create_platform_incident
                     from ..db.migrations import get_db as _get_db
 
                     _db = _get_db()

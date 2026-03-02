@@ -75,7 +75,7 @@ def check_pg_connectivity() -> dict:
         conn = psycopg.connect(pg_url)
         cur = conn.execute(
             "SELECT COUNT(*) FROM agents UNION ALL "
-            "SELECT COUNT(*) FROM missions UNION ALL "
+            "SELECT COUNT(*) FROM epics UNION ALL "
             "SELECT COUNT(*) FROM messages"
         )
         rows = [r[0] for r in cur.fetchall()]

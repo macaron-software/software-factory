@@ -349,7 +349,7 @@ Réponds UNIQUEMENT avec ce JSON (sans commentaires, JSON valide strict):
     "stack": ["React Native", "React", "Node.js", "PostgreSQL"],
     "factory_type": "sf"
   },
-  "missions": [
+  "epics": [
     {
       "name": "Nom de la mission (orienté valeur, pas technique)",
       "description": "Ce que ça délivre et à qui",
@@ -377,7 +377,7 @@ async def ideation_create_epic(request: Request):
     """PO agent structures project + epic + features + stories from ideation."""
     import subprocess as _sp
     from ...llm.client import get_llm_client, LLMMessage
-    from ...missions.store import get_mission_store, MissionDef
+    from ...epics.store import get_epic_store, MissionDef
     from ...missions.product import get_product_backlog, FeatureDef, UserStoryDef
     from ...projects.manager import get_project_store, Project
     from ...config import FACTORY_ROOT
@@ -492,8 +492,8 @@ async def ideation_create_epic(request: Request):
 
     proj_data = plan.get("project", {})
     epic_data = plan.get("epic", {})
-    # Support both new "missions" array and legacy "features" array
-    missions_data = plan.get("missions", [])
+    # Support both new "epics" array and legacy "features" array
+    missions_data = plan.get("epics", [])
     features_data = plan.get("features", [])
     team_data = plan.get("team", [])
 
@@ -607,7 +607,7 @@ async def ideation_create_epic(request: Request):
     workflow_id = workflow_map.get(request_type, "feature-request")
     po = data.get("po_proposal", {})
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
 
     # Create one mission per component (new format) or fallback to single epic (legacy)
     created_missions = []
@@ -638,7 +638,7 @@ async def ideation_create_epic(request: Request):
                     "po_proposal": po,
                 },
             )
-            m = mission_store.create_mission(m)
+            m = epic_store.create_mission(m)
             created_missions.append(m)
         mission = created_missions[0] if created_missions else None
     else:
@@ -661,7 +661,7 @@ async def ideation_create_epic(request: Request):
                 "po_proposal": po,
             },
         )
-        mission = mission_store.create_mission(mission)
+        mission = epic_store.create_mission(mission)
         created_missions.append(mission)
 
     # ── Step 5: Create features + user stories (legacy, for single epic) ──
@@ -860,7 +860,7 @@ async def ideation_create_epic(request: Request):
             "project_name": project_name,
             "mission_id": created_missions[0].id if created_missions else None,
             "mission_name": created_missions[0].name if created_missions else None,
-            "missions": [{"id": m.id, "name": m.name} for m in created_missions],
+            "epics": [{"id": m.id, "name": m.name} for m in created_missions],
             "missions_count": len(created_missions),
             "type": mission_type,
             "workflow_id": workflow_id,

@@ -12,7 +12,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from ..interfaces import (
-    EventPayload, ReactionAction, ReactionEvent, ReactionRule,
+    EventPayload,
+    ReactionAction,
+    ReactionEvent,
+    ReactionRule,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,42 +26,55 @@ DEFAULT_RULES: list[ReactionRule] = [
     ReactionRule(
         event=ReactionEvent.CI_FAILED,
         action=ReactionAction.SEND_TO_AGENT,
-        auto=True, retries=2, priority="warning",
+        auto=True,
+        retries=2,
+        priority="warning",
     ),
     ReactionRule(
         event=ReactionEvent.CHANGES_REQUESTED,
         action=ReactionAction.SEND_TO_AGENT,
-        auto=True, escalate_after_sec=1800, priority="action",
+        auto=True,
+        escalate_after_sec=1800,
+        priority="action",
     ),
     ReactionRule(
         event=ReactionEvent.APPROVED_AND_GREEN,
         action=ReactionAction.NOTIFY,
-        auto=False, priority="action",
+        auto=False,
+        priority="action",
     ),
     ReactionRule(
         event=ReactionEvent.DEPLOY_FAILED,
         action=ReactionAction.ROLLBACK,
-        auto=True, retries=1, priority="urgent",
+        auto=True,
+        retries=1,
+        priority="urgent",
     ),
     ReactionRule(
         event=ReactionEvent.DEPLOY_SUCCESS,
         action=ReactionAction.NOTIFY,
-        auto=True, priority="info",
+        auto=True,
+        priority="info",
     ),
     ReactionRule(
         event=ReactionEvent.AGENT_STUCK,
         action=ReactionAction.ESCALATE,
-        auto=True, escalate_after_sec=600, priority="urgent",
+        auto=True,
+        escalate_after_sec=600,
+        priority="urgent",
     ),
     ReactionRule(
         event=ReactionEvent.PHASE_TIMEOUT,
         action=ReactionAction.RETRY,
-        auto=True, retries=1, priority="warning",
+        auto=True,
+        retries=1,
+        priority="warning",
     ),
     ReactionRule(
         event=ReactionEvent.TMA_INCIDENT,
         action=ReactionAction.CREATE_TASK,
-        auto=True, priority="action",
+        auto=True,
+        priority="action",
     ),
 ]
 
@@ -78,11 +94,10 @@ class ReactionEngine:
         self._history: list[dict] = []
         self._retry_counts: dict[str, int] = {}
 
-        for rule in (rules or DEFAULT_RULES):
+        for rule in rules or DEFAULT_RULES:
             self.rules[rule.event] = rule
 
-    def register_handler(self, action: ReactionAction,
-                         handler: Callable) -> None:
+    def register_handler(self, action: ReactionAction, handler: Callable) -> None:
         """Register an async handler for an action type."""
         self._handlers[action] = handler
 
@@ -107,16 +122,25 @@ class ReactionEngine:
         if not rule.auto:
             logger.info("Event %s requires manual action", payload.event)
             await self._notify_manual(payload, rule)
-            return {"handled": False, "reason": "manual_required", "action": rule.action.value}
+            return {
+                "handled": False,
+                "reason": "manual_required",
+                "action": rule.action.value,
+            }
 
         # Check retry budget
         retry_key = f"{payload.session_id}:{payload.event.value}"
         retries_used = self._retry_counts.get(retry_key, 0)
         if retries_used >= rule.retries and rule.action in (
-            ReactionAction.RETRY, ReactionAction.SEND_TO_AGENT
+            ReactionAction.RETRY,
+            ReactionAction.SEND_TO_AGENT,
         ):
-            logger.warning("Retry budget exhausted for %s (%d/%d), escalating",
-                           retry_key, retries_used, rule.retries)
+            logger.warning(
+                "Retry budget exhausted for %s (%d/%d), escalating",
+                retry_key,
+                retries_used,
+                rule.retries,
+            )
             return await self._escalate(payload, rule, retries_used)
 
         handler = self._handlers.get(rule.action)
@@ -129,9 +153,13 @@ class ReactionEngine:
             result = await handler(payload, rule)
             self._retry_counts[retry_key] = retries_used + 1
             self._record(payload, rule, result)
-            logger.info("Reaction: %s → %s (attempt %d/%d)",
-                        payload.event.value, rule.action.value,
-                        retries_used + 1, rule.retries)
+            logger.info(
+                "Reaction: %s → %s (attempt %d/%d)",
+                payload.event.value,
+                rule.action.value,
+                retries_used + 1,
+                rule.retries,
+            )
             return {
                 "handled": True,
                 "action": rule.action.value,
@@ -142,42 +170,56 @@ class ReactionEngine:
             logger.error("Reaction handler failed: %s", e)
             return {"handled": False, "error": str(e)}
 
-    async def _escalate(self, payload: EventPayload,
-                        rule: ReactionRule, retries: int) -> dict:
+    async def _escalate(
+        self, payload: EventPayload, rule: ReactionRule, retries: int
+    ) -> dict:
         """Escalate when retry budget exhausted."""
         escalate_handler = self._handlers.get(ReactionAction.ESCALATE)
         if escalate_handler:
             result = await escalate_handler(payload, rule)
             self._record(payload, rule, result, escalated=True)
-            return {"handled": True, "action": "escalated",
-                    "result": result, "retries_exhausted": retries}
+            return {
+                "handled": True,
+                "action": "escalated",
+                "result": result,
+                "retries_exhausted": retries,
+            }
 
         notify_handler = self._handlers.get(ReactionAction.NOTIFY)
         if notify_handler:
             await notify_handler(payload, rule)
 
-        return {"handled": False, "reason": "escalation_no_handler",
-                "retries_exhausted": retries}
+        return {
+            "handled": False,
+            "reason": "escalation_no_handler",
+            "retries_exhausted": retries,
+        }
 
-    async def _notify_manual(self, payload: EventPayload,
-                             rule: ReactionRule) -> None:
+    async def _notify_manual(self, payload: EventPayload, rule: ReactionRule) -> None:
         """Notify that manual action is required."""
         handler = self._handlers.get(ReactionAction.NOTIFY)
         if handler:
             await handler(payload, rule)
 
-    def _record(self, payload: EventPayload, rule: ReactionRule,
-                result: Any, escalated: bool = False) -> None:
+    def _record(
+        self,
+        payload: EventPayload,
+        rule: ReactionRule,
+        result: Any,
+        escalated: bool = False,
+    ) -> None:
         """Record reaction in history."""
-        self._history.append({
-            "event": payload.event.value,
-            "action": rule.action.value,
-            "project_id": payload.project_id,
-            "session_id": payload.session_id,
-            "escalated": escalated,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "result_summary": str(result)[:200] if result else None,
-        })
+        self._history.append(
+            {
+                "event": payload.event.value,
+                "action": rule.action.value,
+                "project_id": payload.project_id,
+                "session_id": payload.session_id,
+                "escalated": escalated,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "result_summary": str(result)[:200] if result else None,
+            }
+        )
         # Keep last 500
         if len(self._history) > 500:
             self._history = self._history[-500:]
@@ -188,8 +230,7 @@ class ReactionEngine:
         for k in keys:
             del self._retry_counts[k]
 
-    def get_history(self, project_id: str = "",
-                    limit: int = 50) -> list[dict]:
+    def get_history(self, project_id: str = "", limit: int = 50) -> list[dict]:
         """Get reaction history, optionally filtered by project."""
         items = self._history
         if project_id:
@@ -199,6 +240,7 @@ class ReactionEngine:
     def get_stats(self) -> dict:
         """Get reaction statistics."""
         from collections import Counter
+
         events = Counter(h["event"] for h in self._history)
         actions = Counter(h["action"] for h in self._history)
         escalated = sum(1 for h in self._history if h.get("escalated"))
@@ -227,12 +269,12 @@ def get_reaction_engine() -> ReactionEngine:
 def _register_default_handlers(engine: ReactionEngine) -> None:
     """Register built-in handlers."""
 
-    async def handle_send_to_agent(payload: EventPayload,
-                                   rule: ReactionRule) -> dict:
+    async def handle_send_to_agent(payload: EventPayload, rule: ReactionRule) -> dict:
         """Send CI failure or review feedback back to the agent."""
         try:
             from ..a2a.bus import get_bus
             from ..models import A2AMessage, MessageType
+
             bus = get_bus()
             msg = A2AMessage(
                 id="",
@@ -247,23 +289,25 @@ def _register_default_handlers(engine: ReactionEngine) -> None:
         except Exception as e:
             return {"sent": False, "error": str(e)}
 
-    async def handle_notify(payload: EventPayload,
-                            rule: ReactionRule) -> dict:
+    async def handle_notify(payload: EventPayload, rule: ReactionRule) -> dict:
         """Push SSE notification."""
         try:
             from ..sessions.runner import _push_sse
-            _push_sse(payload.session_id, {
-                "type": "reaction",
-                "event": payload.event.value,
-                "priority": rule.priority,
-                "details": payload.details,
-            })
+
+            _push_sse(
+                payload.session_id,
+                {
+                    "type": "reaction",
+                    "event": payload.event.value,
+                    "priority": rule.priority,
+                    "details": payload.details,
+                },
+            )
             return {"notified": True}
         except Exception as e:
             return {"notified": False, "error": str(e)}
 
-    async def handle_create_task(payload: EventPayload,
-                                 rule: ReactionRule) -> dict:
+    async def handle_create_task(payload: EventPayload, rule: ReactionRule) -> dict:
         """Create a TMA task from an incident."""
         return {
             "task_created": True,
@@ -271,29 +315,26 @@ def _register_default_handlers(engine: ReactionEngine) -> None:
             "project": payload.project_id,
         }
 
-    async def handle_retry(payload: EventPayload,
-                           rule: ReactionRule) -> dict:
+    async def handle_retry(payload: EventPayload, rule: ReactionRule) -> dict:
         """Retry failed phase."""
         try:
             mission_id = payload.mission_id
             if mission_id:
-                from ..web.routes.helpers import api_mission_run
                 return {"retried": True, "mission_id": mission_id}
         except Exception as e:
             return {"retried": False, "error": str(e)}
         return {"retried": False, "reason": "no_mission_id"}
 
-    async def handle_escalate(payload: EventPayload,
-                              rule: ReactionRule) -> dict:
+    async def handle_escalate(payload: EventPayload, rule: ReactionRule) -> dict:
         """Escalate to human."""
         await handle_notify(payload, rule)
         return {"escalated": True, "event": payload.event.value}
 
-    async def handle_rollback(payload: EventPayload,
-                              rule: ReactionRule) -> dict:
+    async def handle_rollback(payload: EventPayload, rule: ReactionRule) -> dict:
         """Rollback a failed deploy."""
-        logger.warning("ROLLBACK requested for %s/%s",
-                       payload.project_id, payload.mission_id)
+        logger.warning(
+            "ROLLBACK requested for %s/%s", payload.project_id, payload.mission_id
+        )
         return {"rollback": True, "project": payload.project_id}
 
     engine.register_handler(ReactionAction.SEND_TO_AGENT, handle_send_to_agent)

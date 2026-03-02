@@ -84,10 +84,10 @@ def _session_store():
     return _stores["session"]
 
 
-def _mission_store():
+def _epic_store():
     if "mission" not in _stores:
-        mod = __import__(f"{_PKG}.missions.store", fromlist=["get_mission_run_store"])
-        _stores["mission"] = mod.get_mission_run_store()
+        mod = __import__(f"{_PKG}.missions.store", fromlist=["get_epic_run_store"])
+        _stores["mission"] = mod.get_epic_run_store()
     return _stores["mission"]
 
 
@@ -493,7 +493,7 @@ def _handle_agents(args: dict) -> str:
 
 
 def _handle_missions(args: dict) -> str:
-    store = _mission_store()
+    store = _epic_store()
     mission_id = args.get("mission_id")
     if mission_id:
         m = store.get(mission_id)
@@ -531,7 +531,7 @@ def _handle_missions(args: dict) -> str:
 
     conn = sqlite3.connect(str(DB_PATH))
     rows = conn.execute(
-        "SELECT id, brief, status, workflow_id, session_id FROM mission_runs ORDER BY created_at DESC LIMIT 20"
+        "SELECT id, brief, status, workflow_id, session_id FROM epic_runs ORDER BY created_at DESC LIMIT 20"
     ).fetchall()
     conn.close()
     return json.dumps(
@@ -549,7 +549,7 @@ def _handle_missions(args: dict) -> str:
 
 
 def _handle_phases(args: dict) -> str:
-    store = _mission_store()
+    store = _epic_store()
     mission_id = args.get("mission_id", "")
     m = store.get(mission_id)
     if not m:
@@ -717,11 +717,11 @@ def _handle_metrics(args: dict) -> str:
 
     result = {
         "projects": _count("projects"),
-        "epics": _count("missions"),
+        "epics": _count("epics"),
         "features": _count("features"),
         "tasks": _count("tasks"),
         "agents": _count("agents"),
-        "epic_runs": _count("mission_runs"),
+        "epic_runs": _count("epic_runs"),
         "sessions": _count("sessions"),
         "messages": _count("messages"),
         "memory_entries": _count("memory"),
@@ -864,10 +864,10 @@ def _handle_search(args: dict) -> str:
     results["projects"] = [dict(r) for r in rows]
     # Search missions
     rows = conn.execute(
-        "SELECT id, name, status FROM missions WHERE name LIKE ? LIMIT 5",
+        "SELECT id, name, status FROM epics WHERE name LIKE ? LIMIT 5",
         (f"%{query}%",),
     ).fetchall()
-    results["missions"] = [dict(r) for r in rows]
+    results["epics"] = [dict(r) for r in rows]
     # Search messages (FTS)
     try:
         rows = conn.execute(

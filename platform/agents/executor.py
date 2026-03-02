@@ -103,7 +103,7 @@ class ExecutionContext:
     # Callback for SSE tool events
     on_tool_call: object | None = None  # async callable(tool_name, args, result)
     # Mission run ID (for CDP phase tools)
-    mission_run_id: str | None = None
+    epic_run_id: str | None = None
     # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
     capability_grade: str = "executor"
 
@@ -261,23 +261,23 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
         pass
 
 
-def _update_mission_cost(session_id: str, mission_run_id: str | None) -> None:
-    """Update mission_runs.llm_cost_usd from llm_traces. Never raises."""
+def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
+    """Update epic_runs.llm_cost_usd from llm_traces. Never raises."""
     try:
         from ..db.migrations import get_db
 
         with get_db() as db:
-            mid = mission_run_id
+            mid = epic_run_id
             if not mid and session_id:
                 row = db.execute(
-                    "SELECT id FROM mission_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
+                    "SELECT id FROM epic_runs WHERE session_id=? ORDER BY created_at DESC LIMIT 1",
                     (session_id,),
                 ).fetchone()
                 if row:
                     mid = row[0]
             if mid:
                 db.execute(
-                    "UPDATE mission_runs SET llm_cost_usd="
+                    "UPDATE epic_runs SET llm_cost_usd="
                     "(SELECT COALESCE(SUM(cost_usd),0) FROM llm_traces WHERE session_id=?)"
                     " WHERE id=?",
                     (session_id, mid),
@@ -396,7 +396,7 @@ class AgentExecutor:
                 and all(t in _CHEAP_TOOLS for t in (ctx.allowed_tools or []))
             )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode
+                agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode
             )
 
             # Tool-calling loop
@@ -722,7 +722,7 @@ class AgentExecutor:
                 content = content[: content.index("<think>")].strip()
             delegations = self._parse_delegations(content)
 
-            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
+            _update_mission_cost(ctx.session_id, ctx.epic_run_id)
             result = ExecutionResult(
                 content=content,
                 agent_id=agent.id,
@@ -847,7 +847,7 @@ class AgentExecutor:
                 and all(t in _CHEAP_TOOLS_2 for t in (ctx.allowed_tools or []))
             )
             use_provider, use_model = _route_provider(
-                agent, tools, mission_id=ctx.mission_run_id, cheap_mode=_cheap_mode_2
+                agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
             for round_num in range(MAX_TOOL_ROUNDS):
@@ -1219,7 +1219,7 @@ class AgentExecutor:
             final_content = _strip_raw_tokens(final_content)
             delegations = self._parse_delegations(final_content)
 
-            _update_mission_cost(ctx.session_id, ctx.mission_run_id)
+            _update_mission_cost(ctx.session_id, ctx.epic_run_id)
             yield (
                 "result",
                 ExecutionResult(

@@ -165,7 +165,7 @@ async def project_git_status(project_id: str):
 async def project_overview(request: Request, project_id: str):
     """Project overview page — created from ideation, shows epic/features/team."""
     from ...projects.manager import get_project_store
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...missions.product import get_product_backlog
     from ...agents.store import get_agent_store
 
@@ -174,8 +174,8 @@ async def project_overview(request: Request, project_id: str):
     if not project:
         return HTMLResponse("<h2>Project not found</h2>", status_code=404)
 
-    mission_store = get_mission_store()
-    epics = mission_store.list_missions(project_id=project_id)
+    epic_store = get_epic_store()
+    epics = epic_store.list_missions(project_id=project_id)
 
     backlog = get_product_backlog()
     agent_store = get_agent_store()
@@ -334,9 +334,9 @@ async def project_detail(request: Request, project_id: str):
     # Load missions for this project
     project_missions = []
     try:
-        from ...missions.store import get_mission_store
+        from ...epics.store import get_epic_store
 
-        m_store = get_mission_store()
+        m_store = get_epic_store()
         project_missions = m_store.list_missions(project_id=project_id)
     except Exception:
         pass
@@ -360,7 +360,7 @@ async def project_detail(request: Request, project_id: str):
             "messages": messages,
             "memory_files": memory_files,
             "workflows": workflows,
-            "missions": project_missions,
+            "epics": project_missions,
         },
     )
 
@@ -373,7 +373,7 @@ async def project_board_page(request: Request, project_id: str):
     """Kanban board view for a project."""
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store, get_mission_run_store
+    from ...epics.store import get_epic_store, get_epic_run_store
     from ...missions.product import get_product_backlog
 
     proj_store = get_project_store()
@@ -396,17 +396,17 @@ async def project_board_page(request: Request, project_id: str):
             return f"/static/avatars/{agent_id}.svg"
         return ""
 
-    # Build task list from missions + mission_run phases (live)
+    # Build task list from missions + epic_run phases (live)
     tasks = []
     try:
-        m_store = get_mission_store()
-        run_store = get_mission_run_store()
+        m_store = get_epic_store()
+        run_store = get_epic_run_store()
         missions = m_store.list_missions(project_id=project_id)
         all_runs = run_store.list_runs(limit=100)
         runs_by_mission = {}
         for r in all_runs:
-            if r.parent_mission_id:
-                runs_by_mission[r.parent_mission_id] = r
+            if r.parent_epic_id:
+                runs_by_mission[r.parent_epic_id] = r
             runs_by_mission[r.id] = r
 
         status_col = {
@@ -435,7 +435,7 @@ async def project_board_page(request: Request, project_id: str):
                     "agent_name": agent.name if agent else "",
                 }
             )
-            # Also add phases from mission_run as sub-tasks
+            # Also add phases from epic_run as sub-tasks
             run = runs_by_mission.get(m.id)
             if run and run.phases:
                 phase_col_map = {
@@ -1758,7 +1758,7 @@ async def ws_metrics(project_id: str, request: Request):
     try:
         active_agents = (
             db.execute(
-                "SELECT COUNT(DISTINCT agent_id) FROM mission_runs WHERE project_id=? AND status='running'",
+                "SELECT COUNT(DISTINCT agent_id) FROM epic_runs WHERE project_id=? AND status='running'",
                 (project_id,),
             ).fetchone()[0]
             or 0
@@ -1791,7 +1791,7 @@ async def ws_metrics(project_id: str, request: Request):
     try:
         active_missions = (
             db.execute(
-                "SELECT COUNT(*) FROM mission_runs WHERE project_id=? AND status='running'",
+                "SELECT COUNT(*) FROM epic_runs WHERE project_id=? AND status='running'",
                 (project_id,),
             ).fetchone()[0]
             or 0
@@ -1818,7 +1818,7 @@ async def ws_metrics(project_id: str, request: Request):
             "active_agents": active_agents,
             "tool_calls_last_hour": calls_h,
             "files_written": files_w,
-            "mission_runs_active": active_missions,
+            "epic_runs_active": active_missions,
             "last_commit_hash": last_hash,
             "last_commit_msg": last_msg,
         }
@@ -1938,7 +1938,7 @@ async def ws_agents(project_id: str, request: Request):
     try:
         rows = db.execute(
             "SELECT mr.agent_id, mr.status, mr.phase, mr.progress, m.title, s.id "
-            "FROM mission_runs mr LEFT JOIN missions m ON mr.mission_id=m.id "
+            "FROM epic_runs mr LEFT JOIN epics m ON mr.mission_id=m.id "
             "LEFT JOIN sessions s ON s.project_id=mr.project_id "
             "WHERE mr.project_id=? AND mr.status IN ('running','active') "
             "ORDER BY mr.started_at DESC LIMIT 20",
@@ -1976,7 +1976,7 @@ async def ws_backlog(project_id: str, request: Request):
     missions = []
     try:
         rows = db.execute(
-            "SELECT id, title, status, type, goal FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 30",
+            "SELECT id, title, status, type, goal FROM epics WHERE project_id=? ORDER BY created_at DESC LIMIT 30",
             (project_id,),
         ).fetchall()
         for row in rows:
@@ -2009,7 +2009,7 @@ async def ws_backlog(project_id: str, request: Request):
     except Exception:
         pass
     db.close()
-    return JSONResponse({"missions": missions})
+    return JSONResponse({"epics": missions})
 
 
 # ── Docker ────────────────────────────────────────────────────────────────────
@@ -2283,7 +2283,7 @@ async def ws_timeline(project_id: str, request: Request, filter: str = "all"):
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT title, status, created_at FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
+                "SELECT title, status, created_at FROM epics WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
                 (project_id,),
             ).fetchall()
             for r in rows:

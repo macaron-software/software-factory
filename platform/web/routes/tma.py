@@ -32,7 +32,7 @@ async def get_ticket(request: Request, ticket_id: str):
         """
         SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, 
                m.created_at, m.updated_at, p.name as project_name
-        FROM missions m 
+        FROM epics m 
         LEFT JOIN projects p ON m.project_id = p.id
         WHERE m.id = ? AND m.type IN ('bug', 'debt', 'security', 'performance')
     """,
@@ -66,7 +66,7 @@ async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpda
     # Verify ticket exists and is TMA type
     existing = db.execute(
         """
-        SELECT id, type FROM missions 
+        SELECT id, type FROM epics 
         WHERE id = ? AND type IN ('bug', 'debt', 'security', 'performance')
     """,
         (ticket_id,),
@@ -107,7 +107,7 @@ async def update_ticket(request: Request, ticket_id: str, payload: TMATicketUpda
     params.append(datetime.now().isoformat())
     params.append(ticket_id)
 
-    query = f"UPDATE missions SET {', '.join(updates)} WHERE id = ?"
+    query = f"UPDATE epics SET {', '.join(updates)} WHERE id = ?"
 
     try:
         db.execute(query, tuple(params))
@@ -151,7 +151,7 @@ async def delete_ticket(request: Request, ticket_id: str):
     # Verify ticket exists
     existing = db.execute(
         """
-        SELECT id FROM missions 
+        SELECT id FROM epics 
         WHERE id = ? AND type IN ('bug', 'debt', 'security', 'performance')
     """,
         (ticket_id,),
@@ -164,7 +164,7 @@ async def delete_ticket(request: Request, ticket_id: str):
         # Soft delete: mark as archived
         db.execute(
             """
-            UPDATE missions 
+            UPDATE epics 
             SET status = 'archived', updated_at = ?
             WHERE id = ?
         """,
@@ -214,7 +214,7 @@ async def list_tickets(
         f"""
         SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type,
                m.created_at, m.updated_at, p.name as project_name
-        FROM missions m
+        FROM epics m
         LEFT JOIN projects p ON m.project_id = p.id
         WHERE {where_sql}
         ORDER BY

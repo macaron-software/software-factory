@@ -9,6 +9,7 @@ Hierarchy of product artifacts:
 
 Permission matrix: role_category × artifact_type × action
 """
+
 from __future__ import annotations
 
 import logging
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 # ── Actions ──────────────────────────────────────────────────────
+
 
 class Action(str, Enum):
     CREATE = "create"
@@ -30,6 +32,7 @@ class Action(str, Enum):
 
 
 # ── Product Artifact types ───────────────────────────────────────
+
 
 class ProductArtifact(str, Enum):
     PRODUCT_BRIEF = "product_brief"
@@ -46,6 +49,7 @@ class ProductArtifact(str, Enum):
 
 
 # ── Human roles ──────────────────────────────────────────────────
+
 
 class HumanRole(str, Enum):
     ADMIN = "admin"
@@ -125,107 +129,107 @@ AGENT_ROLE_CATEGORY: dict[str, str] = {
 _AGENT_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "strategic": {
         "product_brief": {"create", "read", "update", "approve", "veto"},
-        "prd":           {"create", "read", "update", "approve", "veto"},
-        "epic":          {"create", "read", "update", "approve", "veto"},
-        "feature":       {"read", "approve", "veto"},
-        "user_story":    {"read", "approve"},
-        "sprint_goal":   {"read", "approve", "veto"},
-        "release_note":  {"read", "approve", "veto"},
-        "code":          {"read"},
-        "test":          {"read"},
-        "config":        {"read"},
-        "review":        {"read"},
+        "prd": {"create", "read", "update", "approve", "veto"},
+        "epic": {"create", "read", "update", "approve", "veto"},
+        "feature": {"read", "approve", "veto"},
+        "user_story": {"read", "approve"},
+        "sprint_goal": {"read", "approve", "veto"},
+        "release_note": {"read", "approve", "veto"},
+        "code": {"read"},
+        "test": {"read"},
+        "config": {"read"},
+        "review": {"read"},
     },
     "product": {
         "product_brief": {"create", "read", "update"},
-        "prd":           {"create", "read", "update"},
-        "epic":          {"create", "read", "update"},
-        "feature":       {"create", "read", "update", "assign"},
-        "user_story":    {"create", "read", "update", "assign"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read"},
-        "code":          {"read"},
-        "test":          {"read"},
-        "config":        {"read"},
-        "review":        {"read"},
+        "prd": {"create", "read", "update"},
+        "epic": {"create", "read", "update"},
+        "feature": {"create", "read", "update", "assign"},
+        "user_story": {"create", "read", "update", "assign"},
+        "sprint_goal": {"read"},
+        "release_note": {"read"},
+        "code": {"read"},
+        "test": {"read"},
+        "config": {"read"},
+        "review": {"read"},
     },
     "management": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read", "update", "approve"},
-        "feature":       {"read", "update", "assign", "approve"},
-        "user_story":    {"read", "update", "assign"},
-        "sprint_goal":   {"create", "read", "update", "approve"},
-        "release_note":  {"create", "read", "update"},
-        "code":          {"read"},
-        "test":          {"read"},
-        "config":        {"read"},
-        "review":        {"read", "approve"},
+        "prd": {"read"},
+        "epic": {"read", "update", "approve"},
+        "feature": {"read", "update", "assign", "approve"},
+        "user_story": {"read", "update", "assign"},
+        "sprint_goal": {"create", "read", "update", "approve"},
+        "release_note": {"create", "read", "update"},
+        "code": {"read"},
+        "test": {"read"},
+        "config": {"read"},
+        "review": {"read", "approve"},
     },
     "architecture": {
         "product_brief": {"read"},
-        "prd":           {"read", "update"},
-        "epic":          {"read", "update"},
-        "feature":       {"read", "update"},
-        "user_story":    {"read", "update", "create"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read", "update"},
-        "code":          {"create", "read", "update", "approve", "veto"},
-        "test":          {"create", "read", "update"},
-        "config":        {"create", "read", "update", "approve"},
-        "review":        {"create", "read", "approve", "veto"},
+        "prd": {"read", "update"},
+        "epic": {"read", "update"},
+        "feature": {"read", "update"},
+        "user_story": {"read", "update", "create"},
+        "sprint_goal": {"read"},
+        "release_note": {"read", "update"},
+        "code": {"create", "read", "update", "approve", "veto"},
+        "test": {"create", "read", "update"},
+        "config": {"create", "read", "update", "approve"},
+        "review": {"create", "read", "approve", "veto"},
     },
     "development": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read"},
-        "feature":       {"read"},
-        "user_story":    {"read", "update"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read"},
-        "code":          {"create", "read", "update"},
-        "test":          {"create", "read", "update"},
-        "config":        {"create", "read", "update"},
-        "review":        {"read"},
+        "prd": {"read"},
+        "epic": {"read"},
+        "feature": {"read"},
+        "user_story": {"read", "update"},
+        "sprint_goal": {"read"},
+        "release_note": {"read"},
+        "code": {"create", "read", "update"},
+        "test": {"create", "read", "update"},
+        "config": {"create", "read", "update"},
+        "review": {"read"},
     },
     "quality": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read"},
-        "feature":       {"read"},
-        "user_story":    {"read", "update"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read", "update"},
-        "code":          {"read"},
-        "test":          {"create", "read", "update", "approve", "veto"},
-        "config":        {"read"},
-        "review":        {"create", "read", "approve", "veto"},
+        "prd": {"read"},
+        "epic": {"read"},
+        "feature": {"read"},
+        "user_story": {"read", "update"},
+        "sprint_goal": {"read"},
+        "release_note": {"read", "update"},
+        "code": {"read"},
+        "test": {"create", "read", "update", "approve", "veto"},
+        "config": {"read"},
+        "review": {"create", "read", "approve", "veto"},
     },
     "security": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read"},
-        "feature":       {"read"},
-        "user_story":    {"read"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read"},
-        "code":          {"read", "veto"},
-        "test":          {"create", "read", "update"},
-        "config":        {"read", "veto"},
-        "review":        {"create", "read", "approve", "veto"},
+        "prd": {"read"},
+        "epic": {"read"},
+        "feature": {"read"},
+        "user_story": {"read"},
+        "sprint_goal": {"read"},
+        "release_note": {"read"},
+        "code": {"read", "veto"},
+        "test": {"create", "read", "update"},
+        "config": {"read", "veto"},
+        "review": {"create", "read", "approve", "veto"},
     },
     "ops": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read"},
-        "feature":       {"read"},
-        "user_story":    {"read"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"create", "read", "update"},
-        "code":          {"read", "update"},
-        "test":          {"read"},
-        "config":        {"create", "read", "update", "approve"},
-        "review":        {"create", "read"},
+        "prd": {"read"},
+        "epic": {"read"},
+        "feature": {"read"},
+        "user_story": {"read"},
+        "sprint_goal": {"read"},
+        "release_note": {"create", "read", "update"},
+        "code": {"read", "update"},
+        "test": {"read"},
+        "config": {"create", "read", "update", "approve"},
+        "review": {"create", "read"},
     },
 }
 
@@ -238,35 +242,36 @@ _HUMAN_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "admin": {art.value: _ALL_ACTIONS for art in ProductArtifact},
     "project_manager": {
         "product_brief": {"create", "read", "update", "delete", "approve"},
-        "prd":           {"create", "read", "update", "delete", "approve"},
-        "epic":          {"create", "read", "update", "delete", "approve"},
-        "feature":       {"create", "read", "update", "delete", "assign", "approve"},
-        "user_story":    {"create", "read", "update", "delete", "assign", "approve"},
-        "sprint_goal":   {"create", "read", "update", "approve"},
-        "release_note":  {"create", "read", "update", "approve"},
-        "code":          {"read"},
-        "test":          {"read"},
-        "config":        {"read"},
-        "review":        {"read", "approve"},
+        "prd": {"create", "read", "update", "delete", "approve"},
+        "epic": {"create", "read", "update", "delete", "approve"},
+        "feature": {"create", "read", "update", "delete", "assign", "approve"},
+        "user_story": {"create", "read", "update", "delete", "assign", "approve"},
+        "sprint_goal": {"create", "read", "update", "approve"},
+        "release_note": {"create", "read", "update", "approve"},
+        "code": {"read"},
+        "test": {"read"},
+        "config": {"read"},
+        "review": {"read", "approve"},
     },
     "developer": {
         "product_brief": {"read"},
-        "prd":           {"read"},
-        "epic":          {"read"},
-        "feature":       {"read"},
-        "user_story":    {"read", "update"},
-        "sprint_goal":   {"read"},
-        "release_note":  {"read"},
-        "code":          {"create", "read", "update"},
-        "test":          {"create", "read", "update"},
-        "config":        {"create", "read", "update"},
-        "review":        {"create", "read"},
+        "prd": {"read"},
+        "epic": {"read"},
+        "feature": {"read"},
+        "user_story": {"read", "update"},
+        "sprint_goal": {"read"},
+        "release_note": {"read"},
+        "code": {"create", "read", "update"},
+        "test": {"create", "read", "update"},
+        "config": {"create", "read", "update"},
+        "review": {"create", "read"},
     },
     "viewer": {art.value: {"read"} for art in ProductArtifact},
 }
 
 
 # ── Public API ───────────────────────────────────────────────────
+
 
 def get_agent_category(agent_id: str) -> str:
     """Resolve agent ID to role category. Handles cloned agents (dev_frontend_1)."""
@@ -290,12 +295,17 @@ def human_can(role: str, artifact: str, action: str) -> bool:
     return action in perms.get(artifact, set())
 
 
-def check_agent_permission(agent_id: str, artifact: str, action: str) -> tuple[bool, str]:
+def check_agent_permission(
+    agent_id: str, artifact: str, action: str
+) -> tuple[bool, str]:
     """Check permission, return (allowed, reason)."""
     if agent_can(agent_id, artifact, action):
         return True, "ok"
     category = get_agent_category(agent_id)
-    return False, f"Agent '{agent_id}' (category: {category}) cannot {action} '{artifact}'"
+    return (
+        False,
+        f"Agent '{agent_id}' (category: {category}) cannot {action} '{artifact}'",
+    )
 
 
 def check_human_permission(role: str, artifact: str, action: str) -> tuple[bool, str]:
@@ -322,9 +332,10 @@ def human_permissions_summary(role: str) -> dict[str, list[str]]:
 # Controls what users can do on platform resources (projects, missions, etc.)
 # This is separate from product artifact RBAC above.
 
+
 class PlatformResource(str, Enum):
     PROJECTS = "projects"
-    MISSIONS = "missions"
+    MISSIONS = "epics"
     AGENTS = "agents"
     SESSIONS = "sessions"
     FEATURES = "features"
@@ -349,37 +360,37 @@ _ALL_PLATFORM_ACTIONS = {a.value for a in PlatformAction}
 _PLATFORM_PERMISSIONS: dict[str, dict[str, set[str]]] = {
     "admin": {r.value: _ALL_PLATFORM_ACTIONS for r in PlatformResource},
     "project_manager": {
-        "projects":  {"view", "create", "edit"},
-        "missions":  {"view", "create", "edit", "delete", "execute"},
-        "agents":    {"view"},
-        "sessions":  {"view", "create", "edit", "delete"},
-        "features":  {"view", "create", "edit", "delete"},
+        "projects": {"view", "create", "edit"},
+        "epics": {"view", "create", "edit", "delete", "execute"},
+        "agents": {"view"},
+        "sessions": {"view", "create", "edit", "delete"},
+        "features": {"view", "create", "edit", "delete"},
         "workflows": {"view", "execute"},
-        "settings":  {"view"},
-        "users":     {"view"},
-        "tma":       {"view", "create", "edit", "delete"},
+        "settings": {"view"},
+        "users": {"view"},
+        "tma": {"view", "create", "edit", "delete"},
     },
     "developer": {
-        "projects":  {"view"},
-        "missions":  {"view", "execute"},
-        "agents":    {"view"},
-        "sessions":  {"view", "create"},
-        "features":  {"view", "edit"},
+        "projects": {"view"},
+        "epics": {"view", "execute"},
+        "agents": {"view"},
+        "sessions": {"view", "create"},
+        "features": {"view", "edit"},
         "workflows": {"view"},
-        "settings":  set(),
-        "users":     set(),
-        "tma":       {"view", "edit"},
+        "settings": set(),
+        "users": set(),
+        "tma": {"view", "edit"},
     },
     "viewer": {
-        "projects":  {"view"},
-        "missions":  {"view"},
-        "agents":    {"view"},
-        "sessions":  {"view"},
-        "features":  {"view"},
+        "projects": {"view"},
+        "epics": {"view"},
+        "agents": {"view"},
+        "sessions": {"view"},
+        "features": {"view"},
         "workflows": {"view"},
-        "settings":  set(),
-        "users":     set(),
-        "tma":       {"view"},
+        "settings": set(),
+        "users": set(),
+        "tma": {"view"},
     },
 }
 

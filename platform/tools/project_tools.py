@@ -32,13 +32,13 @@ class GetProjectHealthTool(BaseTool):
         project_id = params.get("project_id", "")
         try:
             from ..projects.manager import get_project_store
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
             proj = get_project_store().get(project_id)
             if not proj:
                 return json.dumps({"error": f"Project '{project_id}' not found"})
 
-            missions = get_mission_store().list_missions(limit=500)
+            missions = get_epic_store().list_missions(limit=500)
             proj_missions = [m for m in missions if m.project_id == proj.id]
 
             by_cat: dict[str, list] = {"system": [], "functional": [], "custom": []}
@@ -83,7 +83,7 @@ class GetProjectHealthTool(BaseTool):
                     "name": proj.name,
                     "current_phase": proj.current_phase or "discovery",
                     "health_score": score,
-                    "missions": by_cat,
+                    "epics": by_cat,
                     "docs": docs_status,
                     "summary": {
                         "total": total,
@@ -165,13 +165,13 @@ class SuggestNextMissionsTool(BaseTool):
         project_id = params.get("project_id", "")
         try:
             from ..projects.manager import get_project_store
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
             proj = get_project_store().get(project_id)
             if not proj:
                 return json.dumps({"error": "Project not found"})
 
-            missions = get_mission_store().list_missions(limit=500)
+            missions = get_epic_store().list_missions(limit=500)
             proj_missions = [m for m in missions if m.project_id == proj.id]
             phase = proj.current_phase or "discovery"
             existing_types = {m.type for m in proj_missions}

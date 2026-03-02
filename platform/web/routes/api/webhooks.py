@@ -32,11 +32,11 @@ async def _launch_mission(
 ) -> str | None:
     """Launch a workflow mission and return run_id."""
     try:
-        from ...missions.store import MissionStore, MissionRunStore
+        from ...epics.store import EpicStore, EpicRunStore
         from ...orchestrator.engine import get_engine
         import asyncio
 
-        ms = MissionStore()
+        ms = EpicStore()
         mission = ms.create(
             name=name,
             workflow_id=workflow_id,
@@ -44,7 +44,7 @@ async def _launch_mission(
             goal=goal,
             tags=["webhook", "auto"],
         )
-        mrs = MissionRunStore()
+        mrs = EpicRunStore()
         run = mrs.create(mission_id=mission.id)
         engine = get_engine()
         asyncio.create_task(engine.run(run.id))

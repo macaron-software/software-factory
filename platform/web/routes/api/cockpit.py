@@ -104,7 +104,7 @@ def _get_pipeline(db) -> dict:
         "  COUNT(*) AS total,"
         "  COUNT(*) FILTER (WHERE status='completed') AS completed,"
         "  COUNT(*) FILTER (WHERE status='planning') AS planning"
-        " FROM missions"
+        " FROM epics"
     ).fetchone()
     # Features
     feats = db.execute(
@@ -128,7 +128,7 @@ def _get_pipeline(db) -> dict:
         "SELECT COUNT(*) AS n FROM ideation_sessions WHERE status='active'"
     ).fetchone()
     deploys = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '1 day'"
     ).fetchone()
@@ -326,7 +326,7 @@ def _get_projects(db) -> list[dict]:
         "  COUNT(m.id) FILTER (WHERE m.status='completed') AS done_missions,"
         "  MAX(m.created_at) AS last_activity"
         " FROM projects p"
-        " LEFT JOIN missions m ON m.project_id = p.id"
+        " LEFT JOIN epics m ON m.project_id = p.id"
         " GROUP BY p.id, p.name"
         " ORDER BY last_activity DESC NULLS LAST"
         " LIMIT 8"
@@ -419,7 +419,7 @@ def _get_incidents(db) -> dict:
     ah_active = 0
     try:
         ah_row = db.execute(
-            "SELECT COUNT(*) AS n FROM missions"
+            "SELECT COUNT(*) AS n FROM epics"
             " WHERE created_by='auto-heal' AND status='active'"
         ).fetchone()
         ah_active = ah_row["n"] if ah_row else 0
@@ -439,19 +439,19 @@ def _get_incidents(db) -> dict:
 def _get_dora(db) -> dict:
     """Approximate DORA metrics from missions data."""
     deploys_week = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '7 days'"
     ).fetchone()
     deploys_today = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '1 day'"
     ).fetchone()
     # Lead time: avg(completed_at - created_at) for completed missions this week
     lt_row = db.execute(
         "SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600) AS avg_h"
-        " FROM missions"
+        " FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '7 days'"
     ).fetchone()

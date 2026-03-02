@@ -268,7 +268,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         ]
         # Reuse same connection for missions/sessions/sprints/features/messages
         missions = adb.execute(
-            "SELECT status, COUNT(*) as cnt FROM missions GROUP BY status"
+            "SELECT status, COUNT(*) as cnt FROM epics GROUP BY status"
         ).fetchall()
         sessions = adb.execute(
             "SELECT status, COUNT(*) as cnt FROM sessions GROUP BY status"
@@ -807,7 +807,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         except Exception:
             pass
 
-    # ── Mission phase durations (from mission_runs.phases_json) ──
+    # ── Mission phase durations (from epic_runs.phases_json) ──
     phase_stats = []
     try:
         from ....db.migrations import get_db
@@ -815,7 +815,7 @@ async def monitoring_live(request: Request, hours: int = 24):
         db = get_db()
         runs = db.execute("""
             SELECT phases_json, status, current_phase
-            FROM mission_runs WHERE phases_json IS NOT NULL
+            FROM epic_runs WHERE phases_json IS NOT NULL
         """).fetchall()
         phase_counts = {}
         for run in runs:
@@ -933,7 +933,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             "total_messages": agents_historical.get("total_messages", 0),
             "top_agents": agents_historical.get("top_agents", []),
         },
-        "missions": {s["status"]: s["cnt"] for s in missions},
+        "epics": {s["status"]: s["cnt"] for s in missions},
         "sessions": {s["status"]: s["cnt"] for s in sessions},
         "sprints": {s["status"]: s["cnt"] for s in sprints},
         "features": {s["status"]: s["cnt"] for s in features},
@@ -999,10 +999,17 @@ async def self_update():
     import asyncio
     import os
 
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+    repo_root = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        )
+    )
     try:
         proc = await asyncio.create_subprocess_exec(
-            "git", "pull", "origin", "main",
+            "git",
+            "pull",
+            "origin",
+            "main",
             cwd=repo_root,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,

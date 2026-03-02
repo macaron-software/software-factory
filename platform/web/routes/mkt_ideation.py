@@ -427,7 +427,7 @@ async def mkt_generate_plan(request: Request):
 @router.post("/api/mkt-ideation/create-mission")
 async def mkt_create_mission(request: Request):
     """Create a Go-to-Market mission from a completed marketing plan."""
-    from ...missions.store import get_mission_store, MissionDef
+    from ...epics.store import get_epic_store, MissionDef
 
     data = await request.json()
     plan = data.get("plan", {})
@@ -438,7 +438,7 @@ async def mkt_create_mission(request: Request):
     vision = plan.get("business_vision", {})
     brand = plan.get("brand_strategy", {})
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
     mission = MissionDef(
         name=f"Go-to-Market — {brand.get('headline', 'Lancement produit')}",
         description=(
@@ -459,7 +459,7 @@ async def mkt_create_mission(request: Request):
             "type": "go_to_market",
         },
     )
-    mission = mission_store.create_mission(mission)
+    mission = epic_store.create_mission(mission)
 
     if session_id:
         from ...db.migrations import get_db as _gdb

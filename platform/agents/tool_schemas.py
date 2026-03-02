@@ -2038,7 +2038,7 @@ def _platform_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {
+                        "parent_epic_id": {
                             "type": "string",
                             "description": "Parent mission/epic ID",
                         },
@@ -2073,7 +2073,7 @@ def _platform_schemas() -> list[dict]:
                             "description": "Extra config: team_ids, stack, ao_refs",
                         },
                     },
-                    "required": ["parent_mission_id", "name"],
+                    "required": ["parent_epic_id", "name"],
                 },
             },
         },
@@ -2085,12 +2085,12 @@ def _platform_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {
+                        "parent_epic_id": {
                             "type": "string",
                             "description": "Parent mission ID",
                         },
                     },
-                    "required": ["parent_mission_id"],
+                    "required": ["parent_epic_id"],
                 },
             },
         },
@@ -2435,7 +2435,13 @@ def _platform_schemas() -> list[dict]:
                     "properties": {
                         "group_id": {
                             "type": "string",
-                            "enum": ["knowledge", "archi", "security", "data-ai", "pi-planning"],
+                            "enum": [
+                                "knowledge",
+                                "archi",
+                                "security",
+                                "data-ai",
+                                "pi-planning",
+                            ],
                             "description": "The expert community to engage",
                         },
                         "prompt": {

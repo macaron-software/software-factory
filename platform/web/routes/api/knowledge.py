@@ -38,8 +38,8 @@ async def knowledge_health(request: Request):
         conn = get_db()
         row = conn.execute(
             "SELECT mr.id, mr.status, mr.completed_at, mr.llm_cost_usd "
-            "FROM mission_runs mr "
-            "JOIN missions m ON mr.mission_id = m.id "
+            "FROM epic_runs mr "
+            "JOIN epics m ON mr.mission_id = m.id "
             "WHERE m.workflow_id = 'knowledge-maintenance' "
             "ORDER BY mr.started_at DESC LIMIT 1"
         ).fetchone()

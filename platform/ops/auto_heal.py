@@ -79,7 +79,7 @@ def scan_open_incidents() -> list[IncidentGroup]:
                FROM platform_incidents
                WHERE status = 'open'
                  AND NOT EXISTS (
-                   SELECT 1 FROM missions m
+                   SELECT 1 FROM epics m
                    WHERE m.id = platform_incidents.mission_id
                      AND m.created_by = 'auto-heal'
                  )
@@ -116,15 +116,15 @@ def scan_open_incidents() -> list[IncidentGroup]:
 
 def create_heal_epic(group: IncidentGroup) -> str:
     """Create a mission (epic) for an incident group. Returns mission_id."""
-    from ..missions.store import get_mission_store, MissionDef
+    from ..epics.store import get_epic_store, MissionDef
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
 
     # Check if there's already an active TMA mission for this error type
     db = _get_db()
     try:
         existing = db.execute(
-            """SELECT id FROM missions
+            """SELECT id FROM epics
                WHERE type = 'bug' AND status IN ('planning', 'active')
                  AND name LIKE ?
                LIMIT 1""",
@@ -172,7 +172,7 @@ def create_heal_epic(group: IncidentGroup) -> str:
             "incident_ids": group.incident_ids[:20],
         },
     )
-    mission = mission_store.create_mission(mission)
+    mission = epic_store.create_mission(mission)
 
     # Link incidents to the new mission
     db = _get_db()
@@ -221,15 +221,15 @@ def _sev_to_wsjf(sev: str) -> float:
 
 async def launch_tma_workflow(mission_id: str) -> Optional[str]:
     """Launch the TMA workflow for a mission. Returns session_id."""
-    from ..missions.store import get_mission_store
+    from ..epics.store import get_epic_store
     from ..workflows.store import get_workflow_store
     from ..sessions.store import get_session_store, SessionDef
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
     wf_store = get_workflow_store()
     session_store = get_session_store()
 
-    mission = mission_store.get_mission(mission_id)
+    mission = epic_store.get_mission(mission_id)
     if not mission:
         logger.error("Auto-heal: mission %s not found", mission_id)
         return None
@@ -308,7 +308,7 @@ async def resolve_completed_missions():
         # Find completed TMA missions
         rows = db.execute(
             """SELECT m.id as mission_id, m.status
-               FROM missions m
+               FROM epics m
                WHERE m.type = 'bug' AND m.created_by = 'auto-heal'
                  AND m.status IN ('completed', 'failed')
                  AND EXISTS (
@@ -383,7 +383,7 @@ async def heal_cycle():
     db = _get_db()
     try:
         rows = db.execute(
-            "SELECT id FROM missions WHERE created_by='auto-heal' AND status='active'"
+            "SELECT id FROM epics WHERE created_by='auto-heal' AND status='active'"
         ).fetchall()
         _active_heals = {r["id"] for r in rows}
     finally:
@@ -442,7 +442,7 @@ async def _recover_interrupted_heals():
         try:
             stuck = db.execute(
                 """SELECT DISTINCT m.id as mission_id, m.name
-                   FROM missions m
+                   FROM epics m
                    WHERE m.created_by = 'auto-heal' AND m.status = 'active'
                      AND NOT EXISTS (
                          SELECT 1 FROM sessions s
@@ -521,16 +521,16 @@ def get_autoheal_stats() -> dict:
     db = _get_db()
     try:
         total = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal'"
         ).fetchone()["n"]
         active = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='active'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='active'"
         ).fetchone()["n"]
         completed = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='completed'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='completed'"
         ).fetchone()["n"]
         failed = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='failed'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='failed'"
         ).fetchone()["n"]
         open_incidents = db.execute(
             "SELECT COUNT(*) as n FROM platform_incidents WHERE status='open'"
@@ -557,7 +557,7 @@ def get_autoheal_stats() -> dict:
             "interval_s": SCAN_INTERVAL,
             "severity_threshold": SEVERITY_THRESHOLD,
             "max_concurrent": MAX_CONCURRENT_HEALS,
-            "missions": {
+            "epics": {
                 "total": total,
                 "active": active,
                 "completed": completed,

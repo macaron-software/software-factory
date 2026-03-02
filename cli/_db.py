@@ -49,7 +49,7 @@ class DBBackend:
 
     def monitoring(self) -> dict:
         agents = self._q("SELECT COUNT(*) as c FROM agents")[0]["c"]
-        missions = self._q("SELECT COUNT(*) as c FROM missions")[0]["c"]
+        missions = self._q("SELECT COUNT(*) as c FROM epics")[0]["c"]
         return {"agents_total": agents, "missions_total": missions, "mode": "offline"}
 
     # ── Projects ──
@@ -110,7 +110,7 @@ class DBBackend:
 
     def project_health(self, pid: str) -> dict:
         rows = self._conn.execute(
-            "SELECT status, COUNT(*) as cnt FROM missions WHERE project_id=? GROUP BY status",
+            "SELECT status, COUNT(*) as cnt FROM epics WHERE project_id=? GROUP BY status",
             (pid,),
         ).fetchall()
         counts = {r[0]: r[1] for r in rows}
@@ -132,7 +132,7 @@ class DBBackend:
         existing = {
             r[0].lower()
             for r in self._conn.execute(
-                "SELECT name FROM missions WHERE project_id=?", (pid,)
+                "SELECT name FROM epics WHERE project_id=?", (pid,)
             ).fetchall()
         }
         SUGGESTIONS = {
@@ -179,7 +179,7 @@ class DBBackend:
     def missions_list(
         self, project: str | None = None, status: str | None = None
     ) -> list:
-        sql = "SELECT id, project_id, name, status, type, wsjf_score, workflow_id, created_at FROM missions"
+        sql = "SELECT id, project_id, name, status, type, wsjf_score, workflow_id, created_at FROM epics"
         conds, params = [], []
         if project:
             conds.append("project_id=?")
@@ -193,7 +193,7 @@ class DBBackend:
         return self._q(sql, tuple(params))
 
     def mission_show(self, mid: str) -> dict:
-        return self._q1("SELECT * FROM missions WHERE id=?", (mid,)) or {
+        return self._q1("SELECT * FROM epics WHERE id=?", (mid,)) or {
             "error": "not found"
         }
 
@@ -204,7 +204,7 @@ class DBBackend:
 
         mid = str(uuid.uuid4())[:8]
         self._conn.execute(
-            "INSERT INTO missions (id, name, project_id, type, status) VALUES (?,?,?,?,?)",
+            "INSERT INTO epics (id, name, project_id, type, status) VALUES (?,?,?,?,?)",
             (mid, name, project_id, mission_type, "draft"),
         )
         self._conn.commit()
@@ -213,11 +213,11 @@ class DBBackend:
     def mission_start(self, mid: str) -> dict:
         return {"error": "Cannot start missions in offline mode — server required"}
 
-    def mission_run(self, mid: str) -> dict:
+    def epic_run(self, mid: str) -> dict:
         return {"error": "Cannot run missions in offline mode — server required"}
 
     def mission_reset(self, mid: str) -> dict:
-        self._conn.execute("UPDATE missions SET status='draft' WHERE id=?", (mid,))
+        self._conn.execute("UPDATE epics SET status='draft' WHERE id=?", (mid,))
         self._conn.commit()
         return {"status": "reset"}
 
@@ -226,7 +226,7 @@ class DBBackend:
     ) -> dict:
         score = round((bv + tc + rr) / max(jd, 1), 2)
         self._conn.execute(
-            "UPDATE missions SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
+            "UPDATE epics SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
             (score, bv, tc, rr, jd, mid),
         )
         self._conn.commit()
@@ -234,14 +234,14 @@ class DBBackend:
 
     def mission_children(self, mid: str) -> list:
         return self._q(
-            "SELECT id, name, status, type FROM missions WHERE parent_mission_id=?",
+            "SELECT id, name, status, type FROM epics WHERE parent_epic_id=?",
             (mid,),
         )
 
     def mission_chat_url(self, mid: str) -> str:
         return ""
 
-    def mission_run_sse_url(self, mid: str) -> str:
+    def epic_run_sse_url(self, mid: str) -> str:
         return ""
 
     # ── Features ──
@@ -484,9 +484,9 @@ class DBBackend:
     # ── Metrics (computed from DB) ──
 
     def metrics_dora(self, project_id: str | None = None) -> dict:
-        total = self._q("SELECT COUNT(*) as c FROM missions WHERE status='completed'")[
-            0
-        ]["c"]
+        total = self._q("SELECT COUNT(*) as c FROM epics WHERE status='completed'")[0][
+            "c"
+        ]
         return {"deployments": total, "note": "offline approximation"}
 
     def metrics_velocity(self) -> dict:
@@ -542,7 +542,7 @@ class DBBackend:
         now = datetime.utcnow().isoformat()
         try:
             self._conn.execute(
-                "INSERT INTO missions (id, project_id, name, status, type, goal, wsjf_score, created_at) VALUES (?, ?, ?, 'planning', 'program', ?, 5.0, ?)",
+                "INSERT INTO epics (id, project_id, name, status, type, goal, wsjf_score, created_at) VALUES (?, ?, ?, 'planning', 'program', ?, 5.0, ?)",
                 (mid, project_id, f"[Copilot] {title}", goal, now),
             )
             self._conn.commit()
@@ -556,7 +556,7 @@ class DBBackend:
 
     def task_brief_status(self, mid: str) -> dict:
         row = self._conn.execute(
-            "SELECT id, name, status, created_at FROM missions WHERE id=?", (mid,)
+            "SELECT id, name, status, created_at FROM epics WHERE id=?", (mid,)
         ).fetchone()
         if not row:
             return {"error": "not found"}
@@ -660,15 +660,15 @@ class DBBackend:
             "SELECT id, name FROM projects WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
         )
         missions = self._q(
-            "SELECT id, name FROM missions WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+            "SELECT id, name FROM epics WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
         )
-        return {"messages": msgs, "projects": projs, "missions": missions}
+        return {"messages": msgs, "projects": projs, "epics": missions}
 
     # ── Export ──
 
     def export_epics(self, fmt: str = "json") -> Any:
         return self._q(
-            "SELECT id, project_id, name, status, type, wsjf_score FROM missions WHERE type='epic' ORDER BY created_at DESC"
+            "SELECT id, project_id, name, status, type, wsjf_score FROM epics WHERE type='epic' ORDER BY created_at DESC"
         )
 
     def export_features(self, fmt: str = "json") -> Any:
@@ -680,7 +680,7 @@ class DBBackend:
 
     def releases(self, project_id: str) -> list:
         return self._q(
-            "SELECT * FROM missions WHERE project_id=? AND status='completed' ORDER BY completed_at DESC",
+            "SELECT * FROM epics WHERE project_id=? AND status='completed' ORDER BY completed_at DESC",
             (project_id,),
         )
 

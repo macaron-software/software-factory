@@ -125,7 +125,7 @@ def cmd_status(args):
         print(
             f"Agents: {agents_count.get('total', 0)} total  {agents_count.get('active', 0)} active"
         )
-    missions_count = health.get("missions", {})
+    missions_count = health.get("epics", {})
     if isinstance(missions_count, dict):
         print(
             f"Epics: {missions_count.get('running', 0)} running  {missions_count.get('total', 0)} total"
@@ -262,12 +262,12 @@ def cmd_missions_run(args):
         run_headless(sys.argv)
         return
     # Start the mission first
-    result = b.mission_run(args.id)
+    result = b.epic_run(args.id)
     if "error" in result:
         output(args, result)
         return
     # Then stream SSE
-    url = b.mission_run_sse_url(args.id)
+    url = b.epic_run_sse_url(args.id)
     if url:
         out.info(f"Mission {args.id} started — streaming live...")
         from cli._stream import print_stream
@@ -1232,7 +1232,7 @@ def build_parser() -> argparse.ArgumentParser:
     pms.set_defaults(func=cmd_projects_missions_suggest)
 
     # ── missions ──
-    miss = sub.add_parser("missions", help="Mission management")
+    miss = sub.add_parser("epics", help="Mission management")
     miss_sub = miss.add_subparsers(dest="subcmd")
 
     ml = miss_sub.add_parser("list", help="List missions")

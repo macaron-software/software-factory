@@ -445,7 +445,7 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     """Run a mission phase via pattern engine."""
     from datetime import datetime
 
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
     from ..models import PhaseStatus
     from ..patterns.engine import run_pattern
     from ..patterns.store import get_pattern_store
@@ -456,8 +456,8 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     if not phase_id:
         return "Error: phase_id is required"
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission. Start a mission first."
 
@@ -585,11 +585,11 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_get_phase_status(args: dict, ctx: ExecutionContext) -> str:
     """Get status of a specific phase."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
 
     phase_id = args.get("phase_id", "")
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission"
 
@@ -612,10 +612,10 @@ async def _tool_get_phase_status(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
     """List all phases with status."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission"
 
@@ -639,15 +639,15 @@ async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_request_validation(args: dict, ctx: ExecutionContext) -> str:
     """Request human validation — emit SSE checkpoint event."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
     from ..models import PhaseStatus
     from ..sessions.store import MessageDef, get_session_store
 
     question = args.get("question", "Proceed?")
     options = args.get("options", "GO,NOGO,PIVOT")
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
 
     # Update current phase to waiting
     if mission and mission.current_phase:
@@ -988,7 +988,7 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
         return "Error: ticket title required"
     tid = str(uuid.uuid4())[:8]
     agent_id = ctx.agent.id if ctx.agent else "unknown"
-    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    mission_id = getattr(ctx, "epic_run_id", "") or ""
     try:
         db = get_db()
         db.execute(
@@ -1585,7 +1585,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 missions = db.execute(
-                    "SELECT id, name, type, status, category FROM missions WHERE project_id=? ORDER BY status",
+                    "SELECT id, name, type, status, category FROM epics WHERE project_id=? ORDER BY status",
                     (project_id,),
                 ).fetchall()
             finally:
@@ -1623,12 +1623,12 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
                 db.commit()
             finally:
                 db.close()
-            # Trigger heal_missions to re-evaluate system mission statuses
+            # Trigger heal_epics to re-evaluate system mission statuses
             try:
-                from ..ops.auto_heal import heal_missions
+                from ..ops.auto_heal import heal_epics
 
                 await asyncio.get_event_loop().run_in_executor(
-                    None, heal_missions, project_id
+                    None, heal_epics, project_id
                 )
             except Exception:
                 pass
@@ -1641,7 +1641,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 existing = db.execute(
-                    "SELECT name, type, status FROM missions WHERE project_id=? ORDER BY status",
+                    "SELECT name, type, status FROM epics WHERE project_id=? ORDER BY status",
                     (project_id,),
                 ).fetchall()
             finally:
@@ -1682,7 +1682,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 cur = db.execute(
-                    "UPDATE missions SET status=? WHERE id=?",
+                    "UPDATE epics SET status=? WHERE id=?",
                     (new_status, mission_id),
                 )
                 db.commit()
@@ -1701,7 +1701,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 failed = db.execute(
-                    "SELECT name FROM missions WHERE project_id=? AND status='failed'",
+                    "SELECT name FROM epics WHERE project_id=? AND status='failed'",
                     (project_id,),
                 ).fetchall()
             finally:

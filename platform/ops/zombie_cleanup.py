@@ -32,7 +32,7 @@ def run_zombie_cleanup() -> dict:
             # running > 48h → failed (unconditional)
             cur = db.execute(
                 """
-                UPDATE mission_runs
+                UPDATE epic_runs
                 SET status = 'failed',
                     current_phase = 'zombie: running for >48h'
                 WHERE status = 'running'
@@ -44,7 +44,7 @@ def run_zombie_cleanup() -> dict:
             # running > 6h without update → failed
             cur = db.execute(
                 """
-                UPDATE mission_runs
+                UPDATE epic_runs
                 SET status = 'failed',
                     current_phase = 'zombie: stale for >6h'
                 WHERE status = 'running'
@@ -56,7 +56,7 @@ def run_zombie_cleanup() -> dict:
             # paused > 24h → abandoned
             cur = db.execute(
                 """
-                UPDATE mission_runs
+                UPDATE epic_runs
                 SET status = 'abandoned'
                 WHERE status = 'paused'
                   AND updated_at < datetime('now', '-24 hours')

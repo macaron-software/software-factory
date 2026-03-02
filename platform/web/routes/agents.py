@@ -759,18 +759,18 @@ async def agent_world_page(request: Request):
     """3D Sims-like agent visualization with live data."""
     import json as _json
     from ...agents.store import AgentStore
-    from ...missions.store import MissionRunStore
+    from ...epics.store import EpicRunStore
     from ...sessions.store import SessionStore
 
     agent_store = AgentStore()
-    mission_store = MissionRunStore()
+    epic_store = EpicRunStore()
     session_store = SessionStore()
     all_agents = agent_store.list_all()
 
     selected_project = request.query_params.get("project", "")
 
     # Active missions — collect all first to build project list
-    all_runs = mission_store.list_runs(limit=100)
+    all_runs = epic_store.list_runs(limit=100)
 
     def _s(v):
         return v.value if hasattr(v, "value") else str(v) if v else "pending"
@@ -859,7 +859,7 @@ async def agent_world_page(request: Request):
     )
     live_json = _json.dumps(
         {
-            "missions": active_missions,
+            "epics": active_missions,
             "messages": recent_messages,
             "agent_sessions": agent_sessions,
         }
@@ -884,16 +884,16 @@ async def agent_world_page(request: Request):
 async def world_live_data(project: str = ""):
     """Live world data for periodic refresh — returns missions + agent sessions."""
     from fastapi.responses import JSONResponse
-    from ...missions.store import MissionRunStore
+    from ...epics.store import EpicRunStore
     from ...sessions.store import SessionStore
 
-    mission_store = MissionRunStore()
+    epic_store = EpicRunStore()
     session_store = SessionStore()
 
     def _s(v):
         return v.value if hasattr(v, "value") else str(v) if v else "pending"
 
-    all_runs = mission_store.list_runs(limit=100)
+    all_runs = epic_store.list_runs(limit=100)
     all_active = []
     project_ids_seen: dict = {}
     for mr in all_runs:
@@ -956,7 +956,7 @@ async def world_live_data(project: str = ""):
 
     return JSONResponse(
         {
-            "missions": active_missions,
+            "epics": active_missions,
             "messages": recent_messages[:20],
             "agent_sessions": agent_sessions,
             "projects": [

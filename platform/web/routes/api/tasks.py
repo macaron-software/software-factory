@@ -114,7 +114,7 @@ async def submit_copilot_brief(request: Request) -> JSONResponse:
     db = get_db()
     try:
         db.execute(
-            """INSERT INTO missions
+            """INSERT INTO epics
                (id, project_id, name, status, type, goal, wsjf_score, created_at)
                VALUES (?, ?, ?, 'planning', 'program', ?, 5.0, ?)""",
             (mission_id, project_id, f"[Copilot] {title}", goal, now),
@@ -147,7 +147,7 @@ async def get_copilot_brief_status(mission_id: str) -> JSONResponse:
     db = get_db()
     try:
         row = db.execute(
-            "SELECT id, name, status, goal, created_at FROM missions WHERE id=?",
+            "SELECT id, name, status, goal, created_at FROM epics WHERE id=?",
             (mission_id,),
         ).fetchone()
     finally:

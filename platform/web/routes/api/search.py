@@ -619,7 +619,7 @@ async def search_all(request: Request):
 
         # Search missions (epics)
         for r in db.execute(
-            "SELECT id, name, status, project_id, type, workflow_id FROM missions WHERE name LIKE ? OR description LIKE ? LIMIT 20",
+            "SELECT id, name, status, project_id, type, workflow_id FROM epics WHERE name LIKE ? OR description LIKE ? LIMIT 20",
             (like, like),
         ).fetchall():
             results.append(
@@ -700,7 +700,7 @@ async def export_epics_csv(request: Request):
         rows = db.execute("""
             SELECT m.id, m.name, m.status, m.project_id, m.type, m.workflow_id, m.wsjf_score,
                    m.created_at, COUNT(f.id) as feature_count, COALESCE(SUM(f.story_points),0) as total_sp
-            FROM missions m LEFT JOIN features f ON f.epic_id = m.id
+            FROM epics m LEFT JOIN features f ON f.epic_id = m.id
             GROUP BY m.id ORDER BY m.created_at DESC
         """).fetchall()
 
@@ -848,7 +848,7 @@ async def github_webhook(request: Request):
             commits = payload.get("commits", [])
             mid = str(uuid.uuid4())[:8]
             db.execute(
-                "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'planning', ?, ?)",
+                "INSERT INTO epics (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'planning', ?, ?)",
                 (
                     mid,
                     f"Build: {repo}@{branch}",
@@ -867,7 +867,7 @@ async def github_webhook(request: Request):
             if action in ("opened", "synchronize"):
                 mid = str(uuid.uuid4())[:8]
                 db.execute(
-                    "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'in_review', ?, ?)",
+                    "INSERT INTO epics (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, 'feature', 'in_review', ?, ?)",
                     (
                         mid,
                         f"Review: PR #{pr.get('number')} {pr.get('title', '')}",
@@ -898,7 +898,7 @@ async def github_webhook(request: Request):
                     else "feature"
                 )
                 db.execute(
-                    "INSERT INTO missions (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, ?, 'planning', ?, ?)",
+                    "INSERT INTO epics (id, name, project_id, type, status, description, created_at) VALUES (?, ?, ?, ?, 'planning', ?, ?)",
                     (
                         mid,
                         f"Issue #{issue.get('number')}: {issue.get('title', '')}",

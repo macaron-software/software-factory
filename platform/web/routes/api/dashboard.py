@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 async def dashboard_kpis(request: Request, perspective: str = "admin"):
     """KPI cards adapted to perspective."""
     from ....agents.store import get_agent_store
-    from ....missions.store import get_mission_run_store, get_mission_store
+    from ....epics.store import get_epic_run_store, get_epic_store
     from ....sessions.store import get_session_store
 
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
     agent_store = get_agent_store()
     session_store = get_session_store()
 
-    missions = mission_store.list_missions(limit=500)
+    missions = epic_store.list_missions(limit=500)
     runs = run_store.list_runs(limit=500)
     agents = agent_store.list_all()
     sessions = session_store.list_all(limit=100)
@@ -108,13 +108,13 @@ async def dashboard_kpis(request: Request, perspective: str = "admin"):
 @router.get("/api/dashboard/missions")
 async def dashboard_missions(request: Request):
     """Active missions with progress bars."""
-    from ....missions.store import get_mission_run_store, get_mission_store
+    from ....epics.store import get_epic_run_store, get_epic_store
 
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
-    missions = mission_store.list_missions(limit=50)
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
+    missions = epic_store.list_missions(limit=50)
     runs = run_store.list_runs(limit=50)
-    runs_map = {r.parent_mission_id: r for r in runs if r.parent_mission_id}
+    runs_map = {r.parent_epic_id: r for r in runs if r.parent_epic_id}
 
     html = ""
     active = [m for m in missions if m.status in ("active", "running")][:8]
@@ -181,9 +181,9 @@ async def dashboard_features(request: Request):
 @router.get("/api/dashboard/sprints")
 async def dashboard_sprints(request: Request):
     """Active sprints summary."""
-    from ....missions.store import get_mission_store
+    from ....epics.store import get_epic_store
 
-    store = get_mission_store()
+    store = get_epic_store()
     try:
         sprints = store.list_sprints(limit=10)
     except Exception:
@@ -211,9 +211,9 @@ async def dashboard_sprints(request: Request):
 @router.get("/api/dashboard/backlog")
 async def dashboard_backlog(request: Request):
     """Backlog stats for PO."""
-    from ....missions.store import get_mission_store
+    from ....epics.store import get_epic_store
 
-    store = get_mission_store()
+    store = get_epic_store()
     try:
         features = store.list_features(limit=100)
     except Exception:

@@ -143,8 +143,8 @@ async def metrics_tab_knowledge(request: Request):
         conn = get_db()
         row = conn.execute(
             "SELECT mr.id, mr.status, mr.started_at, mr.completed_at, mr.llm_cost_usd "
-            "FROM mission_runs mr "
-            "JOIN missions m ON mr.mission_id = m.id "
+            "FROM epic_runs mr "
+            "JOIN epics m ON mr.mission_id = m.id "
             "WHERE m.workflow_id = 'knowledge-maintenance' "
             "ORDER BY mr.started_at DESC LIMIT 1"
         ).fetchone()
@@ -191,7 +191,7 @@ async def metrics_tab_ops(request: Request):
     tasks_count = 0
     try:
         rows = db.execute(
-            "SELECT id, name, status FROM missions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 50"
+            "SELECT id, name, status FROM epics WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 50"
         ).fetchall()
         active_missions = [dict(r) for r in rows]
     except Exception:
@@ -279,8 +279,8 @@ async def metrics_tab_ops(request: Request):
 
     table_sizes: dict[str, int] = {}
     for tbl in (
-        "missions",
-        "mission_runs",
+        "epics",
+        "epic_runs",
         "llm_usage",
         "memory_global",
         "evolution_proposals",
@@ -482,7 +482,7 @@ async def burndown_data(epic_id: str):
 
 @router.get("/api/metrics/velocity")
 async def velocity_data():
-    """Get velocity across weeks — from mission_runs completed per week."""
+    """Get velocity across weeks — from epic_runs completed per week."""
     from datetime import datetime, timedelta
 
     from ....db.migrations import get_db
@@ -492,7 +492,7 @@ async def velocity_data():
         # Last 12 weeks of completed mission runs, grouped by week
         cutoff = (datetime.utcnow() - timedelta(weeks=12)).isoformat()
         rows = db.execute(
-            """SELECT completed_at FROM mission_runs
+            """SELECT completed_at FROM epic_runs
                WHERE status='completed' AND completed_at IS NOT NULL AND completed_at >= ?
                ORDER BY completed_at""",
             (cutoff,),
@@ -545,8 +545,8 @@ async def cycle_time_data(project_id: str = ""):
 
         missions = db.execute(
             f"""SELECT m.name, m.created_at, mr.completed_at
-                FROM missions m
-                JOIN mission_runs mr ON mr.mission_id = m.id
+                FROM epics m
+                JOIN epic_runs mr ON mr.mission_id = m.id
                 WHERE mr.status='completed' AND mr.completed_at IS NOT NULL
                   AND m.created_at IS NOT NULL {where}
                 ORDER BY mr.completed_at""",
@@ -623,7 +623,7 @@ async def pipeline_metrics(mission_id: str):
         tool_stats = db.execute(
             "SELECT tool_name, COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok "
             "FROM tool_calls WHERE session_id IN "
-            "(SELECT id FROM sessions WHERE mission_run_id=?) "
+            "(SELECT id FROM sessions WHERE epic_run_id=?) "
             "GROUP BY tool_name ORDER BY total DESC",
             (mission_id,),
         ).fetchall()
@@ -633,7 +633,7 @@ async def pipeline_metrics(mission_id: str):
             "SELECT agent_id, COUNT(*) as messages, "
             "SUM(CASE WHEN role='assistant' THEN 1 ELSE 0 END) as responses "
             "FROM messages WHERE session_id IN "
-            "(SELECT id FROM sessions WHERE mission_run_id=?) "
+            "(SELECT id FROM sessions WHERE epic_run_id=?) "
             "GROUP BY agent_id ORDER BY messages DESC",
             (mission_id,),
         ).fetchall()
@@ -641,14 +641,14 @@ async def pipeline_metrics(mission_id: str):
         # Phase timing
         phases = db.execute(
             "SELECT phase_id, status, started_at, completed_at FROM sessions "
-            "WHERE mission_run_id=? ORDER BY created_at",
+            "WHERE epic_run_id=? ORDER BY created_at",
             (mission_id,),
         ).fetchall()
 
         # Screenshots count
-        from ....missions.store import get_mission_run_store
+        from ....epics.store import get_epic_run_store
 
-        store = get_mission_run_store()
+        store = get_epic_run_store()
         mission = store.get(mission_id)
         screenshot_count = 0
         if mission and mission.workspace_path:
@@ -762,7 +762,7 @@ async def llm_costs():
             LIMIT 10
         """).fetchall()
 
-        # Per-project breakdown (join with mission_runs)
+        # Per-project breakdown (join with epic_runs)
         by_project = db.execute("""
             SELECT mr.project_id,
                    COUNT(DISTINCT mr.id) as missions,
@@ -772,7 +772,7 @@ async def llm_costs():
                    COALESCE(SUM(t.cost_usd), 0) as cost_usd,
                    SUM(CASE WHEN mr.status='completed' THEN 1 ELSE 0 END) as completed,
                    SUM(CASE WHEN mr.status='paused' THEN 1 ELSE 0 END) as paused
-            FROM mission_runs mr
+            FROM epic_runs mr
             LEFT JOIN llm_traces t ON t.mission_id = mr.id
             GROUP BY mr.project_id
             ORDER BY cost_usd DESC
@@ -786,7 +786,7 @@ async def llm_costs():
                 COALESCE(AVG(COALESCE(resume_attempts,0)),0) as avg_attempts,
                 SUM(CASE WHEN COALESCE(human_input_required,0)=1 THEN 1 ELSE 0 END) as human_input_needed,
                 SUM(CASE WHEN COALESCE(resume_attempts,0)>=3 THEN 1 ELSE 0 END) as exhausted
-            FROM mission_runs WHERE status='paused'
+            FROM epic_runs WHERE status='paused'
         """).fetchone()
 
         by_agent = db.execute("""
@@ -836,15 +836,15 @@ async def llm_costs():
                 "by_project": [
                     {
                         "project_id": r["project_id"],
-                        "missions": r["missions"],
+                        "epics": r["epics"],
                         "llm_calls": r["llm_calls"],
                         "tokens_in": r["tokens_in"],
                         "tokens_out": r["tokens_out"],
                         "cost_usd": round(r["cost_usd"], 6),
                         "completed": r["completed"],
                         "paused": r["paused"],
-                        "success_rate": round(r["completed"] / r["missions"], 2)
-                        if r["missions"]
+                        "success_rate": round(r["completed"] / r["epics"], 2)
+                        if r["epics"]
                         else 0,
                     }
                     for r in by_project
@@ -888,19 +888,19 @@ async def llm_costs():
 
 @router.get("/api/releases/{project_id}")
 async def releases_data(project_id: str):
-    """Get release notes — completed mission_runs + active epics with done features."""
+    """Get release notes — completed epic_runs + active epics with done features."""
     from ....db.migrations import get_db
 
     db = get_db()
     try:
         releases = []
 
-        # 1. Completed mission_runs as releases (primary source)
+        # 1. Completed epic_runs as releases (primary source)
         pid_filter = "AND project_id=?" if project_id and project_id != "all" else ""
         params = (project_id,) if project_id and project_id != "all" else ()
         runs = db.execute(
             f"SELECT id, workflow_name, project_id, phases_json, updated_at "
-            f"FROM mission_runs WHERE status='completed' {pid_filter} "
+            f"FROM epic_runs WHERE status='completed' {pid_filter} "
             f"ORDER BY updated_at DESC LIMIT 30",
             params,
         ).fetchall()
@@ -930,7 +930,7 @@ async def releases_data(project_id: str):
         # 2. Active epics with partial completion (backlog view) — skip if tables missing
         try:
             active = db.execute(
-                f"SELECT id, name, status FROM missions WHERE type='epic' "
+                f"SELECT id, name, status FROM epics WHERE type='epic' "
                 f"AND status IN ('active','planning') {pid_filter} ORDER BY created_at DESC LIMIT 10",
                 params,
             ).fetchall()
@@ -1043,9 +1043,9 @@ async def cost_analytics(request: Request, period: str = "7d"):
             """SELECT mr.project_id,
                       COALESCE(SUM(u.cost_usd),0) as cost,
                       COALESCE(SUM(u.tokens_in)+SUM(u.tokens_out),0) as tokens,
-                      COUNT(DISTINCT u.mission_run_id) as missions
+                      COUNT(DISTINCT u.epic_run_id) as missions
                FROM llm_usage u
-               JOIN mission_runs mr ON mr.id = u.mission_run_id
+               JOIN epic_runs mr ON mr.id = u.epic_run_id
                WHERE u.created_at >= ?
                GROUP BY mr.project_id ORDER BY cost DESC LIMIT 20""",
             (cutoff,),
@@ -1063,7 +1063,7 @@ async def cost_analytics(request: Request, period: str = "7d"):
         mission_stats = db.execute(
             """SELECT COUNT(*) as total,
                       SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) as completed
-               FROM mission_runs WHERE created_at >= ?""",
+               FROM epic_runs WHERE created_at >= ?""",
             (cutoff,),
         ).fetchone()
 
@@ -1086,7 +1086,7 @@ async def cost_analytics(request: Request, period: str = "7d"):
                         "name": r["project_id"] or "unknown",
                         "cost": round(r["cost"], 6),
                         "tokens": r["tokens"] or 0,
-                        "missions": r["missions"] or 0,
+                        "epics": r["epics"] or 0,
                     }
                     for r in by_project
                 ],

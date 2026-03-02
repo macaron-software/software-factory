@@ -61,22 +61,22 @@ def _overall_level(levels: list[str]) -> str:
 
 
 class DORAMetrics:
-    """Compute DORA metrics from platform DB — uses mission_runs phases as source of truth."""
+    """Compute DORA metrics from platform DB — uses epic_runs phases as source of truth."""
 
     def _phase_data(self, project_id: str = "") -> tuple[int, int, int, list]:
-        """Get phase counts from mission_runs. Returns (total, done, failed, runs)."""
+        """Get phase counts from epic_runs. Returns (total, done, failed, runs)."""
         import json
 
         db = get_db()
         try:
             if project_id:
                 rows = db.execute(
-                    "SELECT phases_json, created_at, updated_at, project_id FROM mission_runs WHERE project_id=?",
+                    "SELECT phases_json, created_at, updated_at, project_id FROM epic_runs WHERE project_id=?",
                     (project_id,),
                 ).fetchall()
             else:
                 rows = db.execute(
-                    "SELECT phases_json, created_at, updated_at, project_id FROM mission_runs"
+                    "SELECT phases_json, created_at, updated_at, project_id FROM epic_runs"
                 ).fetchall()
             total = done = failed = 0
             runs = []
@@ -337,7 +337,7 @@ class DORAMetrics:
                 s_row = db.execute(
                     "SELECT COUNT(*) as cnt FROM sprints WHERE status='completed' AND completed_at >= ? AND completed_at < ?"
                     + (
-                        " AND mission_id IN (SELECT id FROM missions WHERE project_id=?)"
+                        " AND mission_id IN (SELECT id FROM epics WHERE project_id=?)"
                         if project_id
                         else ""
                     ),
@@ -345,9 +345,9 @@ class DORAMetrics:
                 ).fetchone()
                 data["deploy"].append(s_row["cnt"] if s_row else 0)
 
-                # Lead time: average mission_run duration (hours) for runs completed this week
+                # Lead time: average epic_run duration (hours) for runs completed this week
                 lt_rows = db.execute(
-                    "SELECT updated_at, created_at FROM mission_runs "
+                    "SELECT updated_at, created_at FROM epic_runs "
                     "WHERE status='completed' AND updated_at >= ? AND updated_at < ?"
                     + proj_filter,
                     proj_params,

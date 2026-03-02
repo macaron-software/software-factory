@@ -127,6 +127,14 @@ async def lifespan(app: FastAPI):
 
     init_db()
 
+    # SAFe rename migration: missions → epics, mission_runs → epic_runs
+    try:
+        from .db.migration_epic_rename import run_migration as _epic_migration
+
+        _epic_migration()
+    except Exception as _me:
+        logger.warning("Epic rename migration failed (non-fatal): %s", _me)
+
     # Seed built-in agents
     from .agents.store import get_agent_store
 
@@ -158,13 +166,13 @@ async def lifespan(app: FastAPI):
     _prov_count = 0
     for proj in ps.list_all():
         try:
-            created = ps.heal_missions(proj)
+            created = ps.heal_epics(proj)
             _prov_count += len(created)
         except Exception as e:
-            logger.warning("heal_missions failed for %s: %s", proj.id, e)
+            logger.warning("heal_epics failed for %s: %s", proj.id, e)
     if _prov_count:
         logger.warning(
-            "heal_missions: created %d missions across all projects", _prov_count
+            "heal_epics: created %d missions across all projects", _prov_count
         )
 
     # Scaffold all projects: ensure workspace + git + docker + docs + code exist
@@ -194,28 +202,32 @@ async def lifespan(app: FastAPI):
 
     seed_demo_data()
 
-    # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
-    from .agents.store import DEFAULT_MODEL as _current_model
+    # Sync agent models+provider: ensure DB agents match the current DEFAULT_MODEL/PROVIDER
+    from .agents.store import (
+        DEFAULT_MODEL as _current_model,
+        DEFAULT_PROVIDER as _current_provider,
+    )
 
     try:
         from .db.migrations import get_db as _gdb_sync
 
         _sdb = _gdb_sync()
-        # Only update agents that have a stale/wrong model (not matching env)
+        # Only update agents that have a stale/wrong model or provider (not matching env)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('', 'demo-model')",
-            (_current_model,),
+            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model')",
+            (_current_model, _current_provider),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('', 'demo-model')",
-                (_current_model, _current_model),
+                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model')",
+                (_current_model, _current_provider),
             )
             _sdb.commit()
             logger.warning(
-                "Synced %d agents to DEFAULT_MODEL=%s (from env/provider settings)",
+                "Synced %d agents to DEFAULT_MODEL=%s provider=%s (from env/provider settings)",
                 _stale_models,
                 _current_model,
+                _current_provider,
             )
         _sdb.close()
     except Exception as e:
@@ -229,29 +241,29 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
-    # Reset stale "running" mission_runs (orphaned after container restart)
-    from .missions.store import get_mission_run_store
+    # Reset stale "running" epic_runs (orphaned after container restart)
+    from .epics.store import get_epic_run_store
 
-    _mrs = get_mission_run_store()
+    _mrs = get_epic_run_store()
     try:
         from .db.migrations import get_db as _gdb
 
         _rdb = _gdb()
         _stale = _rdb.execute(
-            "UPDATE mission_runs SET status='paused' WHERE status='running'"
+            "UPDATE epic_runs SET status='paused' WHERE status='running'"
         ).rowcount
         # Reset resume_attempts too — restart ≠ failure, don't burn backoff budget.
         # Wrapped separately so older DBs without the column don't break the status reset.
         try:
             _rdb.execute(
-                "UPDATE mission_runs SET resume_attempts=0 WHERE status='paused' AND (resume_attempts IS NULL OR resume_attempts > 0)"
+                "UPDATE epic_runs SET resume_attempts=0 WHERE status='paused' AND (resume_attempts IS NULL OR resume_attempts > 0)"
             )
         except Exception:
             pass
         # Also fix phases stuck at "running" inside phases_json
         _stuck_phases = 0
         _rows = _rdb.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE ?",
+            "SELECT id, phases_json FROM epic_runs WHERE phases_json LIKE ?",
             ('%"running"%',),
         ).fetchall()
         for _row in _rows:
@@ -269,14 +281,14 @@ async def lifespan(app: FastAPI):
                     _stuck_phases += 1
             if _fixed:
                 _rdb.execute(
-                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    "UPDATE epic_runs SET phases_json=? WHERE id=?",
                     (_json.dumps(_phases, default=str), _row[0]),
                 )
         _rdb.commit()
         _rdb.close()
         if _stale or _stuck_phases:
             logger.warning(
-                "Reset %d stale mission_runs to paused, fixed %d stuck running phases",
+                "Reset %d stale epic_runs to paused, fixed %d stuck running phases",
                 _stale,
                 _stuck_phases,
             )
@@ -285,10 +297,10 @@ async def lifespan(app: FastAPI):
 
     # Auto-resume watchdog: handles paused/failed runs + launches unstarted continuous missions
     import asyncio as _asyncio
-    from .services.auto_resume import auto_resume_missions as _auto_resume_missions
+    from .services.auto_resume import auto_resume_epics as _auto_resume_epics
 
     if _mode != "ui":
-        _asyncio.create_task(_auto_resume_missions())
+        _asyncio.create_task(_auto_resume_epics())
         logger.warning("Auto-resume watchdog scheduled")
 
     # Start endurance watchdog (continuous auto-resume, session recovery, health)
@@ -540,9 +552,9 @@ async def lifespan(app: FastAPI):
 
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
-        from .missions.store import get_mission_run_store
+        from .epics.store import get_epic_run_store
 
-        _mrs = get_mission_run_store()
+        _mrs = get_epic_run_store()
         _all_runs = _mrs.list_runs(limit=50)
         _paused = [m for m in _all_runs if m.status.value == "paused"]
         if _paused:

@@ -64,18 +64,18 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
 async def cmd_platform_status() -> SFCommandResponse:
     """Get platform status."""
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...projects.manager import get_project_store
     from ...skills.library import get_skill_library
 
     try:
         agent_store = get_agent_store()
-        mission_store = get_mission_store()
+        epic_store = get_epic_store()
         project_store = get_project_store()
         skill_library = get_skill_library()
 
         agents = agent_store.list_all()
-        missions = mission_store.list_missions(limit=500)
+        missions = epic_store.list_missions(limit=500)
         projects = project_store.list_all()
         skills = skill_library.scan_all()
 
@@ -107,7 +107,7 @@ Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             output=output,
             data={
                 "agents": len(agents),
-                "missions": len(missions),
+                "epics": len(missions),
                 "projects": len(projects),
                 "skills": len(skills),
                 "running_missions": running,
@@ -120,10 +120,10 @@ Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
     """List missions with filters."""
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
 
     try:
-        store = get_mission_store()
+        store = get_epic_store()
         limit = 20
         status_filter = None
 
@@ -180,10 +180,10 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
 
 async def cmd_missions_show(mission_id: str) -> SFCommandResponse:
     """Show mission details."""
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
 
     try:
-        store = get_mission_store()
+        store = get_epic_store()
         mission = store.get(mission_id)
 
         if not mission:
@@ -534,7 +534,7 @@ SF_COMMANDS = {
     "platform": {
         "status": cmd_platform_status,
     },
-    "missions": {
+    "epics": {
         "list": cmd_missions_list,
         "show": cmd_missions_show,
     },
@@ -565,7 +565,7 @@ async def execute_sf_command(request: SFCommandRequest) -> SFCommandResponse:
             return SFCommandResponse(success=False, output="", error="Empty command")
 
         # Parse command
-        cmd_group = cmd_parts[0]  # e.g., "platform", "missions"
+        cmd_group = cmd_parts[0]  # e.g., "platform", "epics"
         cmd_action = cmd_parts[1] if len(cmd_parts) > 1 else None
         cmd_args = cmd_parts[2:] if len(cmd_parts) > 2 else []
         cmd_args.extend(request.args)  # Add args from API

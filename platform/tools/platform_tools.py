@@ -62,11 +62,11 @@ class PlatformMissionsTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.store import get_mission_run_store, get_mission_store
+        from ..epics.store import get_epic_run_store, get_epic_store
 
         mission_id = params.get("mission_id")
         if mission_id:
-            store = get_mission_run_store()
+            store = get_epic_run_store()
             m = store.get(mission_id)
             if not m:
                 return json.dumps({"error": f"Mission {mission_id} not found"})
@@ -96,10 +96,10 @@ class PlatformMissionsTool(BaseTool):
                 }
             )
         # List missions (not runs) with optional status/project filter
-        mstore = get_mission_store()
+        epic_store = get_epic_store()
         status_filter = params.get("status")
         project_filter = params.get("project_id")
-        missions = mstore.list_missions(limit=int(params.get("limit", 100)))
+        missions = epic_store.list_missions(limit=int(params.get("limit", 100)))
         items = []
         for m in missions:
             s = (
@@ -121,7 +121,7 @@ class PlatformMissionsTool(BaseTool):
                     "project_id": getattr(m, "project_id", ""),
                 }
             )
-        return json.dumps({"total": len(items), "missions": items})
+        return json.dumps({"total": len(items), "epics": items})
 
 
 class PlatformMemoryTool(BaseTool):
@@ -163,16 +163,16 @@ class PlatformMetricsTool(BaseTool):
 
         if project_id:
             for table, col, key in (
-                ("missions", "project_id", "epics"),
+                ("epics", "project_id", "epics"),
                 ("features", "epic_id", None),  # features join via epics
-                ("mission_runs", "project_id", "epic_runs"),
+                ("epic_runs", "project_id", "epic_runs"),
                 ("sessions", "project_id", "sessions"),
             ):
                 try:
                     if table == "features":
                         counts["features"] = db.execute(
                             "SELECT COUNT(*) FROM features WHERE epic_id IN "
-                            "(SELECT id FROM missions WHERE project_id=?)",
+                            "(SELECT id FROM epics WHERE project_id=?)",
                             (project_id,),
                         ).fetchone()[0]
                     else:
@@ -185,7 +185,7 @@ class PlatformMetricsTool(BaseTool):
                 counts["tasks"] = db.execute(
                     "SELECT COUNT(*) FROM tasks WHERE feature_id IN ("
                     "SELECT id FROM features WHERE epic_id IN ("
-                    "SELECT id FROM missions WHERE project_id=?))",
+                    "SELECT id FROM epics WHERE project_id=?))",
                     (project_id,),
                 ).fetchone()[0]
             except Exception:
@@ -200,7 +200,7 @@ class PlatformMetricsTool(BaseTool):
                 counts["messages"] = 0
             try:
                 counts["agents_involved"] = db.execute(
-                    "SELECT COUNT(DISTINCT cdp_agent_id) FROM mission_runs WHERE project_id=?",
+                    "SELECT COUNT(DISTINCT cdp_agent_id) FROM epic_runs WHERE project_id=?",
                     (project_id,),
                 ).fetchone()[0]
             except Exception:
@@ -215,11 +215,11 @@ class PlatformMetricsTool(BaseTool):
                     return 0
 
             counts["projects"] = _count("projects")
-            counts["epics"] = _count("missions")
+            counts["epics"] = _count("epics")
             counts["features"] = _count("features")
             counts["tasks"] = _count("tasks")
             counts["agents"] = _count("agents")
-            counts["epic_runs"] = _count("mission_runs")
+            counts["epic_runs"] = _count("epic_runs")
             counts["sessions"] = _count("sessions")
             counts["messages"] = _count("messages")
         return json.dumps(counts)
@@ -292,7 +292,7 @@ class PlatformCreateFeatureTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.product import FeatureDef, ProductBacklog
+        from ..epics.product import FeatureDef, ProductBacklog
 
         epic_id = params.get("epic_id", "")
         name = params.get("name", "")
@@ -322,7 +322,7 @@ class PlatformCreateStoryTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.product import ProductBacklog, UserStoryDef
+        from ..epics.product import ProductBacklog, UserStoryDef
 
         feature_id = params.get("feature_id", "")
         title = params.get("title", "")
@@ -383,12 +383,12 @@ class PlatformCreateProjectTool(BaseTool):
         except Exception as _e:
             scaffold_result = {"error": str(_e)}
 
-        # List missions provisioned by store.create() → heal_missions()
+        # List missions provisioned by store.create() → heal_epics()
         missions_created = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             missions_created = [
                 {
                     "mission_id": m.id,
@@ -408,7 +408,7 @@ class PlatformCreateProjectTool(BaseTool):
                 "name": proj.name,
                 "workspace": proj.path,
                 "scaffold": scaffold_result.get("actions", []),
-                "missions": missions_created,
+                "epics": missions_created,
             }
         )
 
@@ -418,12 +418,12 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
 
     Idempotent: skips any mission whose workflow_id already exists for this project.
     """
-    from ..missions.store import get_mission_store, MissionDef, get_mission_run_store
-    from ..models import MissionRun, MissionStatus
+    from ..epics.store import get_epic_store, MissionDef, get_epic_run_store
+    from ..models import EpicRun, EpicStatus
     import uuid
 
-    m_store = get_mission_store()
-    run_store = get_mission_run_store()
+    m_store = get_epic_store()
+    run_store = get_epic_run_store()
     created = []
 
     # Idempotency: collect already-existing workflow_ids for this project
@@ -466,10 +466,10 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
                 status="active",
             )
             mission = m_store.create_mission(mission)
-            run = MissionRun(
+            run = EpicRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PENDING,
+                status=EpicStatus.PENDING,
                 project_id=project_id,
             )
             run = run_store.create(run)
@@ -533,7 +533,7 @@ async def _ensure_project_for_mission(
     proj = store.create(proj)
 
     # Full scaffold: workspace, git init, README, docs/spec.md, Dockerfile, docker-compose
-    # NOTE: store.create() already calls heal_missions() which provisions standard missions.
+    # NOTE: store.create() already calls heal_epics() which provisions standard missions.
     try:
         scaffold_project(proj)
     except Exception as _e:
@@ -561,7 +561,7 @@ class PlatformCreateMissionTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.store import get_mission_store, MissionDef
+        from ..epics.store import get_epic_store, MissionDef
 
         name = params.get("name", "").strip()
         if not name:
@@ -579,7 +579,7 @@ class PlatformCreateMissionTool(BaseTool):
                 "auto_created_project_name": proj_name,
             }
 
-        store = get_mission_store()
+        store = get_epic_store()
         mission = MissionDef(
             name=name,
             description=params.get("description", params.get("goal", "")),
@@ -590,30 +590,30 @@ class PlatformCreateMissionTool(BaseTool):
         )
         mission = store.create_mission(mission)
 
-        # Auto-launch orchestrator (create mission_run + start execution)
+        # Auto-launch orchestrator (create epic_run + start execution)
         run_info = {}
         try:
-            from ..missions.store import get_mission_run_store
-            from ..models import MissionRun, MissionStatus
+            from ..epics.store import get_epic_run_store
+            from ..models import EpicRun, EpicStatus
             import uuid
             import asyncio
 
-            run_store = get_mission_run_store()
-            run = MissionRun(
+            run_store = get_epic_run_store()
+            run = EpicRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PENDING,
+                status=EpicStatus.PENDING,
                 project_id=mission.project_id or "",
             )
             run = run_store.create(run)
-            run_info = {"mission_run_id": run.id}
+            run_info = {"epic_run_id": run.id}
 
             # Schedule launch in background (don't block tool response)
             async def _launch():
                 try:
-                    from ..services.mission_orchestrator import MissionOrchestrator
+                    from ..services.epic_orchestrator import EpicOrchestrator
 
-                    orch = MissionOrchestrator()
+                    orch = EpicOrchestrator()
                     await orch.run(run.id)
                 except Exception:
                     pass
@@ -892,9 +892,9 @@ class PlatformCreateDomainTool(BaseTool):
 
         missions_created = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             missions_created = [
                 {
                     "mission_id": m.id,
@@ -935,7 +935,7 @@ class PlatformCreateDomainTool(BaseTool):
                 "name": domain.name,
                 "workspace": domain.path,
                 "scaffold": scaffold_result.get("actions", []),
-                "missions": missions_created,
+                "epics": missions_created,
                 "sub_projects": sub_projects_created,
             }
         )
@@ -972,7 +972,7 @@ class PlatformTmaTool(BaseTool):
             inc_args.append(severity)
         if project_id:
             inc_where.append(
-                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+                "mission_id IN (SELECT id FROM epics WHERE project_id = ?)"
             )
             inc_args.append(project_id)
 
@@ -997,7 +997,7 @@ class PlatformTmaTool(BaseTool):
             tkt_args.append(severity)
         if project_id:
             tkt_where.append(
-                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+                "mission_id IN (SELECT id FROM epics WHERE project_id = ?)"
             )
             tkt_args.append(project_id)
 
@@ -1014,9 +1014,9 @@ class PlatformTmaTool(BaseTool):
         # TMA missions summary
         tma_missions = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             all_missions = m_store.list_missions(limit=200)
             for m in all_missions:
                 wf = getattr(m, "workflow_id", "") or ""

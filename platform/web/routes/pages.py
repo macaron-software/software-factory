@@ -92,23 +92,23 @@ async def dashboard_page(request: Request):
 async def portfolio_page(request: Request):
     """Portfolio dashboard — tour de contrôle DSI (legacy view)."""
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...epics.store import get_epic_run_store, get_epic_store
     from ...projects.manager import get_project_store
 
     project_store = get_project_store()
     agent_store = get_agent_store()
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
 
     all_projects = project_store.list_all()
     all_agents = agent_store.list_all()
-    all_missions = mission_store.list_missions(limit=500)
+    all_missions = epic_store.list_missions(limit=500)
     all_runs = run_store.list_runs(limit=500)
-    # Index runs by parent_mission_id for quick lookup
+    # Index runs by parent_epic_id for quick lookup
     runs_by_mission: dict = {}
     for r in all_runs:
-        if r.parent_mission_id:
-            runs_by_mission[r.parent_mission_id] = r
+        if r.parent_epic_id:
+            runs_by_mission[r.parent_epic_id] = r
         runs_by_mission[r.id] = r  # Also index by run id (same as mission id)
 
     strategic_raw = [
@@ -169,7 +169,7 @@ async def portfolio_page(request: Request):
         p_active = 0
         mission_cards = []
         for m in p_missions:
-            # Compute progress from mission_run phases (live data)
+            # Compute progress from epic_run phases (live data)
             run = runs_by_mission.get(m.id)
             if run and run.phases:
                 t_total = len(run.phases)
@@ -185,7 +185,7 @@ async def portfolio_page(request: Request):
                 )
             else:
                 # Fallback to task-based stats
-                stats = mission_store.mission_stats(m.id)
+                stats = epic_store.mission_stats(m.id)
                 t_total = stats.get("total", 0)
                 t_done = stats.get("done", 0)
                 current_name = ""
@@ -246,7 +246,7 @@ async def portfolio_page(request: Request):
                 "name": p.name,
                 "factory_type": p.factory_type,
                 "description": p.description or (p.vision or "")[:100],
-                "missions": mission_cards,
+                "epics": mission_cards,
                 "mission_count": len(p_missions),
                 "active_mission_count": p_active,
                 "team_avatars": team_avatars,
@@ -287,7 +287,7 @@ async def portfolio_page(request: Request):
             )
             run_status = run.status.value
         else:
-            stats = mission_store.mission_stats(m.id)
+            stats = epic_store.mission_stats(m.id)
             t_total = stats.get("total", 0)
             t_done = stats.get("done", 0)
             current_name = ""
@@ -397,11 +397,11 @@ async def backlog_page(request: Request, tab: str = "backlog"):
 async def pi_board_page(request: Request):
     """PI Board — epics + missions list with creation."""
     from ...db.migrations import get_db
-    from ...missions.store import get_mission_run_store
+    from ...epics.store import get_epic_run_store
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
 
-    runs = get_mission_run_store().list_runs(limit=500)
+    runs = get_epic_run_store().list_runs(limit=500)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
@@ -412,7 +412,7 @@ async def pi_board_page(request: Request):
         rows = db.execute("""
             SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
                    p.name as project_name
-            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            FROM epics m LEFT JOIN projects p ON m.project_id = p.id
             WHERE m.type = 'epic'
             ORDER BY m.created_at DESC
         """).fetchall()
@@ -467,7 +467,7 @@ async def pi_board_page(request: Request):
         tma_rows = db.execute("""
             SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
                    p.name as project_name
-            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            FROM epics m LEFT JOIN projects p ON m.project_id = p.id
             WHERE m.type IN ('bug', 'debt', 'security')
             ORDER BY
                 CASE m.type WHEN 'security' THEN 0 WHEN 'bug' THEN 1 WHEN 'debt' THEN 2 ELSE 3 END,
@@ -980,16 +980,16 @@ async def metier_page(request: Request):
     from datetime import timedelta
 
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_run_store
+    from ...epics.store import get_epic_run_store
     from ...sessions.store import get_session_store
     from ...workflows.store import get_workflow_store
 
     wf_store = get_workflow_store()
     session_store = get_session_store()
     agent_store = get_agent_store()
-    mission_store = get_mission_run_store()
+    epic_store = get_epic_run_store()
 
-    all_missions = mission_store.list_runs(limit=500)
+    all_missions = epic_store.list_runs(limit=500)
     all_sessions = session_store.list_all(limit=200)
     all_agents = agent_store.list_all()
     all_workflows = wf_store.list_all()
@@ -1214,17 +1214,17 @@ async def product_line_page(request: Request):
     """Product Line Manager — produits, roadmap, milestones, DORA."""
     from ...metrics.dora import get_dora_metrics
     from ...missions.product import get_product_backlog
-    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...epics.store import get_epic_run_store, get_epic_store
     from ...projects.manager import LEAN_VALUES, get_project_store
 
     project_store = get_project_store()
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
     backlog = get_product_backlog()
     dora_engine = get_dora_metrics()
 
     all_projects = project_store.list_all()
-    all_missions = mission_store.list_missions()
+    all_missions = epic_store.list_missions()
     all_runs = run_store.list_runs(limit=200)
 
     # Group missions by project
@@ -1233,7 +1233,7 @@ async def product_line_page(request: Request):
         pid = m.project_id or "default"
         missions_by_project.setdefault(pid, []).append(m)
 
-    # Group mission_runs by project
+    # Group epic_runs by project
     runs_by_project: dict[str, list] = {}
     for r in all_runs:
         pid = r.project_id or "default"
@@ -1287,7 +1287,7 @@ async def product_line_page(request: Request):
                 }
             )
 
-        # Also include mission_runs as epics
+        # Also include epic_runs as epics
         for r in proj_runs:
             epic_name = r.brief.split(" - ")[0] if " - " in r.brief else r.brief[:50]
             done_phases = (
@@ -1434,15 +1434,15 @@ async def product_line_page(request: Request):
 async def product_page(request: Request):
     """Product backlog — Epic → Feature → User Story hierarchy."""
     from ...missions.product import get_product_backlog
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...projects.manager import get_project_store
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
     backlog = get_product_backlog()
     project_store = get_project_store()
 
     all_projects = project_store.list_all()
-    all_missions = mission_store.list_missions()
+    all_missions = epic_store.list_missions()
     filter_project = request.query_params.get("project", "")
 
     if filter_project:

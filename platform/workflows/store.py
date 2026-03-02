@@ -328,7 +328,7 @@ def _reset_stuck_phases(store, session_id: str):
 
         db = get_db()
         rows = db.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE session_id=? AND phases_json LIKE '%\"running\"%'",
+            "SELECT id, phases_json FROM epic_runs WHERE session_id=? AND phases_json LIKE '%\"running\"%'",
             (session_id,),
         ).fetchall()
         for row in rows:
@@ -345,7 +345,7 @@ def _reset_stuck_phases(store, session_id: str):
                     fixed = True
             if fixed:
                 db.execute(
-                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    "UPDATE epic_runs SET phases_json=? WHERE id=?",
                     (_json.dumps(phases, default=str), row[0]),
                 )
         db.commit()
@@ -397,7 +397,7 @@ async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, 
 
         db = _gdb()
         row = db.execute(
-            "SELECT workspace_path FROM mission_runs WHERE session_id=? LIMIT 1",
+            "SELECT workspace_path FROM epic_runs WHERE session_id=? LIMIT 1",
             (session_id,),
         ).fetchone()
         db.close()
