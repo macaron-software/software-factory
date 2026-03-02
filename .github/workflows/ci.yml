@@ -1,5 +1,11 @@
 name: CI
 
+# SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
+# - permissions: contents: read — GITHUB_TOKEN minimal scope (no write access)
+# - Actions pinned to SHA (not mutable tags) — prevents supply chain via tag mutation
+# - No pull_request_target — prevents pwn-request fork attacks
+# - No ${{ github.* }} variables in run: steps — prevents context injection
+
 on:
   push:
     branches: [ main, master ]
@@ -7,7 +13,7 @@ on:
     branches: [ main, master ]
 
 permissions:
-  contents: read
+  contents: read  # Minimal — no write access to repo via GITHUB_TOKEN
 
 jobs:
   build-and-test:

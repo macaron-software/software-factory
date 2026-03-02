@@ -1,11 +1,19 @@
 name: Deploy → OVH Demo
 
+# SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
+# - permissions: contents: read — GITHUB_TOKEN ne peut pas modifier le repo
+# - Actions SHA-pinned — résistant à la mutation de tags
+# - Trigger: push sur main uniquement — seul code mergé déclenche le deploy
+# - SSH via secret (OVH_SSH_KEY / OVH_IP) — pas de credentials en clair
+# - ssh-keyscan avant connexion — host key vérifié (MITM impossible)
+# - Pas de ${{ github.* }} dans les run: — pas d'injection de contexte
+
 on:
   push:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: read  # Minimal — pas d'écriture repo via GITHUB_TOKEN
 
 jobs:
   deploy:

@@ -1,10 +1,16 @@
 name: Deploy → Azure Prod
 
+# SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
+# - permissions: contents: read — GITHUB_TOKEN minimal scope
+# - workflow_dispatch uniquement — aucun déclenchement automatique possible
+# - Actions SHA-pinned — résistant à la mutation de tags
+# - SSH via secret (AZURE_SSH_KEY / AZURE_IP) — pas de credentials en clair
+
 on:
   workflow_dispatch:    # Manual only — Azure is now deployed via GitLab CI
 
 permissions:
-  contents: read
+  contents: read  # Minimal — pas d'écriture repo via GITHUB_TOKEN
 
 jobs:
   deploy:
