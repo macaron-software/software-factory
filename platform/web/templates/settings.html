@@ -86,6 +86,9 @@
         <button class="settings-tab" onclick="showSettingsTab('modules')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
         </button>
+        <button class="settings-tab" onclick="showSettingsTab('security')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-shield"/></svg> Security
+        </button>
         <button class="settings-tab" onclick="showSettingsTab('deploy')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cloud"/></svg> Deploy Targets
         </button>
@@ -620,6 +623,49 @@
             </div>
             <div id="modules-container">
                 <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══ Security ═══ -->
+    <div class="settings-panel" id="panel-security">
+        <section class="settings-section">
+            <h3>🛡️ Agent Sandbox</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1.2rem">
+                Isolement filesystem des commandes shell exécutées par les agents. Chaque agent est restreint à son workspace projet — accès à la source platform et aux autres workspaces bloqué.
+            </p>
+
+            <!-- Landlock card -->
+            <div class="integ-card" id="landlock-card" style="max-width:560px">
+                <div style="display:flex;align-items:flex-start;gap:1rem">
+                    <div style="font-size:2rem;line-height:1;margin-top:2px">🔒</div>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
+                            <span style="font-weight:700;font-size:0.95rem">Landlock Filesystem Sandbox</span>
+                            <span id="landlock-status-badge" class="ck-badge badge-off" style="font-size:0.65rem">Chargement…</span>
+                        </div>
+                        <p style="font-size:0.78rem;color:var(--text-secondary);margin:0 0 0.6rem 0;line-height:1.5">
+                            Linux Security Module (kernel ≥ 5.13). Sandbox léger kernel-level — zéro overhead contrairement au Docker sandbox. Restreint l'accès fichiers de chaque shell agent à son workspace + chemins système en lecture seule.
+                        </p>
+                        <div id="landlock-binary-info" style="font-size:0.72rem;color:var(--text-secondary);font-family:monospace;margin-bottom:0.8rem">—</div>
+                        <div style="display:flex;align-items:center;gap:1rem">
+                            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;font-weight:600">
+                                <div class="toggle-switch" id="landlock-toggle" onclick="toggleLandlock()" style="position:relative;width:40px;height:22px;cursor:pointer">
+                                    <input type="checkbox" id="landlock-checkbox" style="opacity:0;width:0;height:0;position:absolute">
+                                    <span id="landlock-slider" style="position:absolute;inset:0;border-radius:22px;background:var(--border);transition:.3s;display:flex;align-items:center">
+                                        <span id="landlock-knob" style="width:16px;height:16px;border-radius:50%;background:#fff;margin-left:3px;transition:transform .3s;display:block;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+                                    </span>
+                                </div>
+                                <span id="landlock-toggle-label">—</span>
+                            </label>
+                            <span id="landlock-save-hint" style="font-size:0.72rem;color:var(--purple);display:none">✓ Sauvegardé</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);font-size:0.75rem;color:var(--text-secondary)">
+                    <strong>Politique appliquée :</strong>
+                    <span style="margin-left:0.4rem">workspace → RW · /bin /usr /lib /etc /tmp → RO · /app/platform + autres workspaces → <span style="color:#ef4444;font-weight:600">BLOQUÉ</span></span>
+                </div>
             </div>
         </section>
     </div>
@@ -1683,6 +1729,98 @@ function setSelfAnnotation(enabled) {
     body: JSON.stringify({self_annotation_enabled: enabled ? 'true' : 'false'})
   });
 }
+</script>
+
+<script>
+// ── Security tab — Landlock ──────────────────────────────────────
+let _landlock_state = false;
+
+async function loadSecurityTab() {
+    try {
+        const r = await fetch('/api/settings/security');
+        const d = await r.json();
+        _landlock_state = d.landlock_enabled;
+        renderLandlock(d);
+    } catch(e) {
+        console.warn('Security settings load failed', e);
+    }
+}
+
+function renderLandlock(d) {
+    const card = document.getElementById('landlock-card');
+    const badge = document.getElementById('landlock-status-badge');
+    const binaryInfo = document.getElementById('landlock-binary-info');
+    const slider = document.getElementById('landlock-slider');
+    const knob = document.getElementById('landlock-knob');
+    const label = document.getElementById('landlock-toggle-label');
+    if (!card) return;
+
+    const active = d.landlock_active;
+    const enabled = d.landlock_enabled;
+    const found = d.landlock_binary_found;
+
+    // Badge
+    if (active) {
+        badge.className = 'ck-badge badge-ok';
+        badge.textContent = '● Actif';
+    } else if (found && !enabled) {
+        badge.className = 'ck-badge badge-warn';
+        badge.textContent = '○ Désactivé';
+    } else {
+        badge.className = 'ck-badge badge-off';
+        badge.textContent = found ? '○ Off' : '✗ Binary manquant';
+    }
+
+    // Card border
+    card.className = 'integ-card' + (active ? ' enabled' : '');
+
+    // Binary path
+    binaryInfo.textContent = found ? '📦 ' + d.landlock_binary_path : '⚠ Binary non trouvé — kernel Linux requis';
+
+    // Toggle
+    if (enabled) {
+        slider.style.background = 'var(--purple)';
+        knob.style.transform = 'translateX(18px)';
+    } else {
+        slider.style.background = 'var(--border)';
+        knob.style.transform = 'translateX(0)';
+    }
+    label.textContent = enabled ? 'Activé' : 'Désactivé';
+
+    if (!found) {
+        document.getElementById('landlock-toggle').style.opacity = '0.5';
+        document.getElementById('landlock-toggle').style.pointerEvents = 'none';
+    }
+}
+
+async function toggleLandlock() {
+    _landlock_state = !_landlock_state;
+    try {
+        const r = await fetch('/api/settings/security', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({landlock_enabled: _landlock_state})
+        });
+        const d = await r.json();
+        // Reload full status
+        const r2 = await fetch('/api/settings/security');
+        const d2 = await r2.json();
+        renderLandlock(d2);
+        const hint = document.getElementById('landlock-save-hint');
+        hint.style.display = 'inline';
+        setTimeout(() => { hint.style.display = 'none'; }, 2000);
+    } catch(e) {
+        console.error('Toggle failed', e);
+        _landlock_state = !_landlock_state; // revert
+    }
+}
+
+// Hook into tab switching
+const _secOrigShow = window.showSettingsTab;
+window.showSettingsTab = function(tab) {
+    _secOrigShow && _secOrigShow(tab);
+    if (tab === 'security') loadSecurityTab();
+};
 </script>
 
 {% endblock %}

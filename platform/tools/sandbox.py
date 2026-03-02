@@ -49,11 +49,26 @@ _LANDLOCK_DEFAULT = os.path.join(
 _LANDLOCK_PATH = os.environ.get("LANDLOCK_RUNNER_PATH", "") or (
     _LANDLOCK_DEFAULT if os.path.isfile(_LANDLOCK_DEFAULT) else ""
 )
-LANDLOCK_ENABLED = os.environ.get("LANDLOCK_ENABLED", "auto").lower() not in (
-    "false",
-    "0",
-    "no",
-) and bool(_LANDLOCK_PATH)
+
+
+def _landlock_enabled() -> bool:
+    """Runtime check — respects config override (can be toggled in /settings)."""
+    env_val = os.environ.get("LANDLOCK_ENABLED", "auto").lower()
+    if env_val in ("false", "0", "no"):
+        return False
+    if not _LANDLOCK_PATH:
+        return False
+    # Check platform config for runtime toggle
+    try:
+        from ..config import get_config
+
+        cfg = get_config()
+        return cfg.security.landlock_enabled
+    except Exception:
+        return True  # default on if binary exists
+
+
+LANDLOCK_ENABLED = _landlock_enabled()
 
 # RTK proxy — auto-detect unless explicitly set
 _RTK_ENABLED_ENV = os.environ.get("RTK_ENABLED", "auto").lower()
@@ -337,7 +352,7 @@ class SandboxExecutor:
         # Result: filesystem access restricted to workspace + system RO paths
         effective_workspace = cwd or self.workspace
         landlock_applied = False
-        if LANDLOCK_ENABLED and effective_workspace and effective_workspace != ".":
+        if _landlock_enabled() and effective_workspace and effective_workspace != ".":
             ws_abs = os.path.abspath(effective_workspace)
             if os.path.isdir(ws_abs):
                 proxied = f"{_LANDLOCK_PATH} {shlex.quote(ws_abs)} -- sh -c {shlex.quote(proxied)}"
