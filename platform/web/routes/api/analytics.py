@@ -708,14 +708,19 @@ async def rtk_stats():
     from ....metrics.collector import get_collector
 
     snap = get_collector().snapshot()
-    return JSONResponse(snap.get("rtk", {
-        "calls": 0,
-        "bytes_raw": 0,
-        "bytes_compressed": 0,
-        "bytes_saved": 0,
-        "ratio_pct": 0,
-        "tokens_saved_est": 0,
-    }))
+    return JSONResponse(
+        snap.get(
+            "rtk",
+            {
+                "calls": 0,
+                "bytes_raw": 0,
+                "bytes_compressed": 0,
+                "bytes_saved": 0,
+                "ratio_pct": 0,
+                "tokens_saved_est": 0,
+            },
+        )
+    )
 
 
 @router.get("/api/analytics/costs")
@@ -796,7 +801,7 @@ async def llm_costs():
             LIMIT 10
         """).fetchall()
 
-        daily = db.execute("""
+        daily = db.execute(f"""
             SELECT DATE(created_at) as date,
                    COUNT(*) as calls,
                    COALESCE(SUM(cost_usd), 0) as cost_usd

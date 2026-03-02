@@ -376,18 +376,21 @@ def get_project_role(user_id: str, project_id: str) -> str:
 
 def get_user_projects(user_id: str) -> list[dict]:
     """Get all project roles for a user."""
-    with get_db() as db:
-        rows = db.execute(
-            "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
-            (user_id,),
-        ).fetchall()
-    return [
-        {
-            "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
-            "role": r[1] if isinstance(r, tuple) else r["role"],
-        }
-        for r in rows
-    ]
+    try:
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
+                (user_id,),
+            ).fetchall()
+        return [
+            {
+                "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
+                "role": r[1] if isinstance(r, tuple) else r["role"],
+            }
+            for r in rows
+        ]
+    except Exception:
+        return []
 
 
 def remove_project_role(user_id: str, project_id: str):
