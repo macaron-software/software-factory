@@ -44,18 +44,30 @@ _PROVIDERS = {
         "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
     "azure-openai": {
-        "name": "Azure OpenAI (GPT-5-mini)",
+        "name": "Azure OpenAI",
         "base_url": os.environ.get(
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5-mini"],
+        "models": ["gpt-5-mini", "gpt-5", "gpt-5.2", "gpt-5.1-codex", "gpt-5.2-codex"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2025-01-01-preview",
-        "azure_deployment_map": {"gpt-5-mini": "gpt-5-mini"},
-        "max_tokens_param": {"gpt-5-mini": "max_completion_tokens"},
+        "azure_deployment_map": {
+            "gpt-5-mini": os.environ.get("AZURE_DEPLOY_GPT5_MINI", "gpt-5-mini"),
+            "gpt-5": os.environ.get("AZURE_DEPLOY_GPT5", "gpt-5"),
+            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-52"),
+            "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.1-codex"),
+            "gpt-5.2-codex": os.environ.get("AZURE_DEPLOY_CODEX2", "gpt-5.2-codex"),
+        },
+        "max_tokens_param": {
+            "gpt-5-mini": "max_completion_tokens",
+            "gpt-5": "max_completion_tokens",
+            "gpt-5.2": "max_completion_tokens",
+            "gpt-5.1-codex": "max_completion_tokens",
+            "gpt-5.2-codex": "max_completion_tokens",
+        },
     },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",
@@ -637,15 +649,22 @@ class LLMClient:
             "model": model,
             "messages": msgs,
         }
-        # GPT-5-mini only supports temperature=1 (default)
-        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+        # Reasoning models (gpt-5.x) don't support temperature param
+        _reasoning_model = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
+        if not _reasoning_model:
             body["temperature"] = temperature
-        # MiniMax uses <think> blocks that consume tokens — boost limit
-        # GPT-5-mini is a reasoning model — needs extra tokens for internal reasoning
+        # MiniMax uses <think> blocks — boost token limit
+        # GPT-5.x are reasoning models — need extra tokens
         effective_max = max_tokens
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
-        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+        elif _reasoning_model:
             effective_max = max(max_tokens, 8000)
         # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
@@ -896,9 +915,16 @@ class LLMClient:
                 msgs.insert(0, {"role": "system", "content": sys_content})
 
         effective_max = max_tokens
+        _reasoning_model_s = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
-        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+        elif _reasoning_model_s:
             effective_max = max(max_tokens, 8000)
 
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
@@ -908,8 +934,8 @@ class LLMClient:
             mt_param: effective_max,
             "stream": True,
         }
-        # GPT-5-mini only supports temperature=1 (default)
-        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+        # Reasoning models don't support temperature param
+        if not _reasoning_model_s:
             body["temperature"] = temperature
 
         # Use a separate client for streaming to avoid blocking the shared client

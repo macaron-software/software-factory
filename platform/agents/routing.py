@@ -6,6 +6,14 @@ Extracted from executor.py. Handles Darwin LLM Thompson Sampling + DB routing co
 Public API:
   _route_provider(agent, tools, ...) → (provider, model)
   _invalidate_routing_cache()
+
+Azure model tiers:
+  small talk / default  → azure-openai  gpt-5-mini
+  pilotage / leadership → azure-openai  gpt-5.2
+  code / tests          → azure-openai  gpt-5.1-codex  (or gpt-5.2-codex via AZURE_CODEX_MODEL)
+OVH: minimax MiniMax-M2.5
+Local: local-mlx Qwen3.5-35B-A3B-4bit
+All: RTK prompt compression enabled by default
 """
 
 from __future__ import annotations
@@ -174,11 +182,18 @@ def _select_model_for_agent(
     light_cfg = routing.get(category_light, {})
 
     candidates: list[tuple[str, str]] = []
+    # Model tiers (all on azure-openai endpoint):
+    #   reasoning/leadership → gpt-5
+    #   code/tests           → gpt-5.1-codex
+    #   small talk/default   → gpt-5-mini
+    codex_model = os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
+    h_model_reasoning = "gpt-5.2"
+    h_model_code = codex_model
     if azure_ai_key:
-        h_provider = heavy_cfg.get("provider", "azure-ai")
+        h_provider = heavy_cfg.get("provider", "azure-openai")
         h_model = heavy_cfg.get(
             "model",
-            "gpt-5.2" if category_heavy == "reasoning_heavy" else "gpt-5.1-codex",
+            h_model_reasoning if category_heavy == "reasoning_heavy" else h_model_code,
         )
         l_provider = light_cfg.get("provider", "azure-openai")
         l_model = light_cfg.get("model", "gpt-5-mini")
@@ -207,15 +222,9 @@ def _select_model_for_agent(
         return heavy_cfg["provider"], heavy_cfg.get("model", "gpt-5-mini")
 
     if role in _REASONING_ROLES or tags & _REASONING_TAGS:
-        return (
-            ("azure-ai", "gpt-5.2") if azure_ai_key else ("azure-openai", "gpt-5-mini")
-        )
+        return "azure-openai", "gpt-5.2"
     if role in _CODE_ROLES or tags & _CODE_TAGS:
-        return (
-            ("azure-ai", "gpt-5.1-codex")
-            if azure_ai_key
-            else ("azure-openai", "gpt-5-mini")
-        )
+        return "azure-openai", os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
     return "azure-openai", "gpt-5-mini"
 
 
