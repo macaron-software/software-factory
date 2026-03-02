@@ -401,6 +401,36 @@ def check_l0(
             )
             score += 2  # warning, not hard reject
 
+        # Detect fake test files — markdown/plan files created inside tests/ directory
+        for tc in tool_calls:
+            if tc.get("name") not in ("code_write", "code_edit"):
+                continue
+            fp = str(
+                tc.get("args", {}).get("path", "")
+                or tc.get("args", {}).get("file_path", "")
+            ).lower()
+            if (
+                "tests/" in fp or "/test/" in fp or fp.startswith("test")
+            ) and fp.endswith((".md", ".txt", ".plan", ".todo")):
+                issues.append(
+                    f"FAKE_TESTS: Non-code file '{fp}' created in test directory — use actual test code"
+                )
+                score += 6  # hard reject
+
+    # Check build tool failures — if any build/test tool returned [FAIL], force rejection
+    if tool_calls:
+        for tc in tool_calls:
+            if tc.get("name") not in ("build", "test", "lint"):
+                continue
+            result_str = str(tc.get("result", ""))
+            if "[FAIL]" in result_str or "command not found" in result_str.lower():
+                cmd = str(tc.get("args", {}).get("command", "?"))[:80]
+                issues.append(
+                    f"BUILD_FAILED: Tool '{tc.get('name')}' failed: {cmd!r} — "
+                    f"fix errors before approving"
+                )
+                score += 7  # hard reject — broken build cannot be approved
+
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)

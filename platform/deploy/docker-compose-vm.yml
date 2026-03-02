@@ -117,6 +117,9 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - PG_POOL_MAX_SIZE=5
+      - SANDBOX_ENABLED=true
+      - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
+      - SANDBOX_NETWORK=bridge
     volumes:
       - platform-data:/app/data
       - workspace-data:/app/workspace
@@ -125,6 +128,7 @@ services:
       - /opt/macaron/core:/app/core
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
@@ -153,6 +157,7 @@ services:
       - /opt/macaron/core:/app/core
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock
 
   android-builder:
     build:
