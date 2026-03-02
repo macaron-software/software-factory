@@ -782,6 +782,10 @@ async def _execute_node(
             or "fullstack" in role_lower
             or "backend" in role_lower
             or "frontend" in role_lower
+            or "worker" in role_lower
+            or "tdd" in role_lower
+            or "coder" in role_lower
+            or "implementer" in role_lower
         ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
