@@ -44,18 +44,30 @@ _PROVIDERS = {
         "max_tokens_param": {"gpt-5.2": "max_completion_tokens"},
     },
     "azure-openai": {
-        "name": "Azure OpenAI (GPT-5-mini)",
+        "name": "Azure OpenAI",
         "base_url": os.environ.get(
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5-mini"],
+        "models": ["gpt-5-mini", "gpt-5", "gpt-5.2", "gpt-5.1-codex", "gpt-5.2-codex"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
         "azure_api_version": "2025-01-01-preview",
-        "azure_deployment_map": {"gpt-5-mini": "gpt-5-mini"},
-        "max_tokens_param": {"gpt-5-mini": "max_completion_tokens"},
+        "azure_deployment_map": {
+            "gpt-5-mini": os.environ.get("AZURE_DEPLOY_GPT5_MINI", "gpt-5-mini"),
+            "gpt-5": os.environ.get("AZURE_DEPLOY_GPT5", "gpt-5"),
+            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-52"),
+            "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.1-codex"),
+            "gpt-5.2-codex": os.environ.get("AZURE_DEPLOY_CODEX2", "gpt-5.2-codex"),
+        },
+        "max_tokens_param": {
+            "gpt-5-mini": "max_completion_tokens",
+            "gpt-5": "max_completion_tokens",
+            "gpt-5.2": "max_completion_tokens",
+            "gpt-5.1-codex": "max_completion_tokens",
+            "gpt-5.2-codex": "max_completion_tokens",
+        },
     },
     "nvidia": {
         "name": "NVIDIA (Kimi K2)",
@@ -89,22 +101,32 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,  # skip auth header entirely
     },
+    "ollama": {
+        "name": "Ollama (local)",
+        "base_url": os.environ.get("OLLAMA_URL", "http://localhost:11434/v1"),
+        "key_env": None,
+        "models": [os.environ.get("OLLAMA_MODEL", "qwen3:14b")],
+        "default": os.environ.get("OLLAMA_MODEL", "qwen3:14b"),
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+        "no_auth": True,
+    },
 }
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
-# Auto-detect Azure when AZURE_OPENAI_API_KEY is present and no explicit provider set
+# Auto-detect Azure when AZURE_DEPLOY=1 (not just from key presence)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
-_is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get(
-    "AZURE_OPENAI_API_KEY", ""
-)
-# On local dev (not Azure), include local-mlx in Thompson candidates if server is available
+_is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
+# On local dev, include local-mlx or ollama in Thompson candidates if available
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
+_ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _FALLBACK_CHAIN = [_primary] + [
     p
     for p in (
         (["local-mlx"] if _local_mlx_enabled else [])
+        + (["ollama"] if _ollama_enabled else [])
         + ["minimax", "azure-openai", "azure-ai", "openai"]
     )
     if p != _primary
@@ -315,7 +337,7 @@ class LLMClient:
     async def chat(
         self,
         messages: list[LLMMessage],
-        provider: str = "minimax",
+        provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -381,7 +403,7 @@ class LLMClient:
 
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
-            if not key or key == "no-key":
+            if not pcfg.get("no_auth") and (not key or key == "no-key"):
                 logger.warning("LLM %s skipped (no API key)", prov)
                 continue
 
@@ -416,12 +438,19 @@ class LLMClient:
                     if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
                         try:
                             from ..db.migrations import get_db as _get_db
+
                             _db = _get_db()
-                            _row = _db.execute("SELECT enabled FROM integrations WHERE id='rtk-compression'").fetchone()
+                            _row = _db.execute(
+                                "SELECT enabled FROM integrations WHERE id='rtk-compression'"
+                            ).fetchone()
                             _db.close()
-                            _rtk_cache["enabled"] = bool(_row["enabled"]) if _row else True
+                            _rtk_cache["enabled"] = (
+                                bool(_row["enabled"]) if _row else True
+                            )
                         except Exception:
-                            _rtk_cache["enabled"] = not bool(os.environ.get("LLM_COMPRESS_DISABLED", ""))
+                            _rtk_cache["enabled"] = not bool(
+                                os.environ.get("LLM_COMPRESS_DISABLED", "")
+                            )
                         _rtk_cache["ts"] = _rtk_now
                     if _rtk_cache.get("enabled", True):
                         try:
@@ -441,8 +470,16 @@ class LLMClient:
                                     _rtk_stats["savings_pct"],
                                 )
                                 try:
-                                    from .prompt_compressor import record_compression_stats as _rtk_record
-                                    _rtk_record(prov, _rtk_stats["original_tokens"], _rtk_stats["compressed_tokens"], _rtk_stats["savings_pct"])
+                                    from .prompt_compressor import (
+                                        record_compression_stats as _rtk_record,
+                                    )
+
+                                    _rtk_record(
+                                        prov,
+                                        _rtk_stats["original_tokens"],
+                                        _rtk_stats["compressed_tokens"],
+                                        _rtk_stats["savings_pct"],
+                                    )
                                 except Exception:
                                     pass
                         except Exception as _ce:
@@ -507,7 +544,9 @@ class LLMClient:
                         or "ConnectError" in err_str
                         or "RemoteProtocolError" in err_str
                     )
-                    if attempt < max_attempts - 1 and (is_transient or is_rate_limit):
+                    if attempt < max_attempts - 1 and (
+                        is_transient or (is_rate_limit and not _is_azure)
+                    ):
                         import random
 
                         # Exponential backoff with jitter: 10s, 20s, 40s, 80s
@@ -544,9 +583,10 @@ class LLMClient:
                     except Exception:
                         pass
                     if is_rate_limit:
-                        self._provider_cooldown[prov] = time.monotonic() + 90
+                        # Shorter cooldown so fallback to next provider happens faster
+                        self._provider_cooldown[prov] = time.monotonic() + 30
                         logger.warning(
-                            "LLM %s → cooldown 90s (rate limited), falling back to next provider",
+                            "LLM %s → cooldown 30s (rate limited), falling back to next provider",
                             prov,
                         )
                 continue
@@ -570,7 +610,13 @@ class LLMClient:
 
         msgs = []
         if system_prompt:
-            msgs.append({"role": "system", "content": system_prompt})
+            # For Ollama/Qwen3: prepend /no_think to disable thinking mode (saves tokens)
+            sp = (
+                f"/no_think\n{system_prompt}" if provider == "ollama" else system_prompt
+            )
+            msgs.append({"role": "system", "content": sp})
+        elif provider == "ollama":
+            msgs.append({"role": "system", "content": "/no_think"})
         for m in messages:
             # Accept both LLMMessage objects and plain dicts
             if isinstance(m, dict):
@@ -603,15 +649,22 @@ class LLMClient:
             "model": model,
             "messages": msgs,
         }
-        # GPT-5-mini only supports temperature=1 (default)
-        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+        # Reasoning models (gpt-5.x) don't support temperature param
+        _reasoning_model = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
+        if not _reasoning_model:
             body["temperature"] = temperature
-        # MiniMax uses <think> blocks that consume tokens — boost limit
-        # GPT-5-mini is a reasoning model — needs extra tokens for internal reasoning
+        # MiniMax uses <think> blocks — boost token limit
+        # GPT-5.x are reasoning models — need extra tokens
         effective_max = max_tokens
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
-        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+        elif _reasoning_model:
             effective_max = max(max_tokens, 8000)
         # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
@@ -653,7 +706,10 @@ class LLMClient:
         choice = choices[0] if choices else {}
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
-        # Strip <think> blocks from MiniMax
+        # Ollama/Qwen3: thinking models put response in reasoning field when content is empty
+        if not content and msg.get("reasoning"):
+            content = msg["reasoning"].strip()
+        # Strip <think> blocks from MiniMax / Qwen3
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
             after_think = content[idx:].strip()
@@ -702,7 +758,7 @@ class LLMClient:
     async def stream(
         self,
         messages: list[LLMMessage],
-        provider: str = "minimax",
+        provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
         max_tokens: int = 4096,
@@ -724,15 +780,13 @@ class LLMClient:
                 continue
             pcfg = self._get_provider_config(prov)
             key = self._get_api_key(pcfg)
-            if not key or key == "no-key":
+            if not pcfg.get("no_auth") and (not key or key == "no-key"):
                 continue
             use_model = (
                 model
                 if (prov == provider and model and model in pcfg.get("models", []))
                 else pcfg["default"]
             )
-
-            # Rate limiter: queue until a slot is available (no timeout — industrial pipeline)
             try:
                 await _rate_limiter.acquire(timeout=86400.0)
             except TimeoutError:
@@ -746,14 +800,46 @@ class LLMClient:
             max_attempts = 4
             for attempt in range(max_attempts):
                 try:
+                    # RTK prompt compression — same as chat() path
+                    _stream_messages = messages
+                    _stream_system = system_prompt
+                    _rtk_now = time.monotonic()
+                    if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
+                        try:
+                            from ..db.migrations import get_db as _get_db
+                            _db = _get_db()
+                            _row = _db.execute(
+                                "SELECT enabled FROM integrations WHERE id='rtk-compression'"
+                            ).fetchone()
+                            _db.close()
+                            _rtk_cache["enabled"] = bool(_row["enabled"]) if _row else True
+                        except Exception:
+                            _rtk_cache["enabled"] = not bool(os.environ.get("LLM_COMPRESS_DISABLED", ""))
+                        _rtk_cache["ts"] = _rtk_now
+                    if _rtk_cache.get("enabled", True):
+                        try:
+                            from .prompt_compressor import compress_messages as _rtk_compress
+                            _stream_messages, _stream_system, _rtk_stats = _rtk_compress(
+                                messages, system_prompt, provider=prov
+                            )
+                            if _rtk_stats["savings_pct"] > 0:
+                                logger.warning(
+                                    "RTK stream compress %s: %d→%d tokens (-%s%%)",
+                                    prov,
+                                    _rtk_stats["original_tokens"],
+                                    _rtk_stats["compressed_tokens"],
+                                    _rtk_stats["savings_pct"],
+                                )
+                        except Exception as _ce:
+                            logger.debug("RTK stream compressor error (skipped): %s", _ce)
                     async for chunk in self._do_stream(
                         pcfg,
                         prov,
                         use_model,
-                        messages,
+                        _stream_messages,
                         temperature,
                         max_tokens,
-                        system_prompt,
+                        _stream_system,
                     ):
                         yield chunk
                     self._cb_record_success(prov)
@@ -767,7 +853,9 @@ class LLMClient:
                         or "RemoteProtocolError" in err_str
                         or "ServerDisconnected" in err_str
                     )
-                    if attempt < max_attempts - 1 and (is_rate_limit or is_transient):
+                    if attempt < max_attempts - 1 and (
+                        (is_rate_limit and not _is_azure) or is_transient
+                    ):
                         import random
 
                         delay = min((2**attempt) * 10 + random.uniform(0, 5), 90)
@@ -843,7 +931,15 @@ class LLMClient:
                     d.pop("content", None)
             msgs.append(d)
         # Inject system prompt
-        if sys_content:
+        # local-mlx (mlx_lm.server) requires system message strictly at position 0 —
+        # collect any embedded system msgs from history, merge, put first.
+        if provider == "local-mlx":
+            embedded_sys = [m for m in msgs if m["role"] == "system"]
+            msgs = [m for m in msgs if m["role"] != "system"]
+            all_sys = ([sys_content] if sys_content else []) + [m["content"] for m in embedded_sys]
+            if all_sys:
+                msgs.insert(0, {"role": "system", "content": "\n\n".join(all_sys)})
+        elif sys_content:
             if provider == "minimax":
                 for i, m in enumerate(msgs):
                     if m["role"] == "user":
@@ -857,9 +953,16 @@ class LLMClient:
                 msgs.insert(0, {"role": "system", "content": sys_content})
 
         effective_max = max_tokens
+        _reasoning_model_s = (
+            model.startswith("gpt-5-mini")
+            or model.startswith("gpt-5.1-codex")
+            or model.startswith("gpt-5.2-codex")
+            or model.startswith("gpt-5.2")
+            or model.startswith("gpt-5")
+        )
         if provider == "minimax":
             effective_max = max(max_tokens, 16000)
-        elif model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex"):
+        elif _reasoning_model_s:
             effective_max = max(max_tokens, 8000)
 
         mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
@@ -869,8 +972,8 @@ class LLMClient:
             mt_param: effective_max,
             "stream": True,
         }
-        # GPT-5-mini only supports temperature=1 (default)
-        if not (model.startswith("gpt-5-mini") or model.startswith("gpt-5.1-codex")):
+        # Reasoning models don't support temperature param
+        if not _reasoning_model_s:
             body["temperature"] = temperature
 
         # Use a separate client for streaming to avoid blocking the shared client

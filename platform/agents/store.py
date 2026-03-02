@@ -26,11 +26,13 @@ def _resolve_default_model() -> str:
         return explicit
     # Infer from provider
     _provider_models = {
-        "minimax": "MiniMax-M1-80k",
+        "minimax": "MiniMax-M2.5",
         "azure-openai": "gpt-5-mini",
-        "azure-ai": "gpt-5-mini",
+        "azure-ai": "gpt-5.2",
         "anthropic": "claude-sonnet-4-20250514",
         "glm": "glm-4-flash",
+        "local-mlx": "mlx-community/Qwen3.5-35B-A3B-4bit",
+        "ollama": "qwen3:14b",
     }
     return _provider_models.get(DEFAULT_PROVIDER, "gpt-5-mini")
 
@@ -1251,7 +1253,14 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "e2e", "api", "qa"],
                 permissions={},
-                system_prompt="QA API E2E. Fetch direct, guards 401/403, failures 400/404/409.",
+                system_prompt=(
+                    "QA API E2E. Tu DOIS utiliser l'outil 'test' pour exécuter les tests du projet "
+                    "(ex: `cargo test`, `pytest`, `npm test`, `go test ./...`) et l'outil 'build' pour "
+                    "compiler/vérifier le code (ex: `cargo check`, `cargo build`). "
+                    "MANDATORY: call 'build' then 'test' with the correct command for the project language. "
+                    "Report exact output. Si tests échouent → appelle code_write pour corriger. "
+                    "Ensuite fetch direct les endpoints, guards 401/403, failures 400/404/409."
+                ),
             ),
             AgentDef(
                 id="ft-e2e-ihm",
@@ -1270,7 +1279,13 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "e2e", "ihm", "playwright"],
                 permissions={},
-                system_prompt="QA IHM E2E. Playwright workflows complets, multi-users, a11y.",
+                system_prompt=(
+                    "QA IHM E2E. Tu DOIS utiliser l'outil 'test' pour exécuter les tests du projet "
+                    "(ex: `cargo test`, `pytest`, `npm test`) et l'outil 'build' pour compiler/vérifier. "
+                    "MANDATORY: call 'build' then 'test' with the correct command for the project language. "
+                    "Report exact output. Si tests échouent → appelle code_write pour corriger. "
+                    "Playwright workflows complets, multi-users, a11y."
+                ),
             ),
             # ── Feature Team: Proto & Data ──────────────────────────────────
             AgentDef(

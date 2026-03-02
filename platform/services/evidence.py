@@ -4,6 +4,7 @@ After each dev sprint, verifies that real artifacts were produced.
 Loop until criteria met or max sprints exhausted.
 No LLM — pure subprocess/filesystem checks.
 """
+
 from __future__ import annotations
 
 import glob
@@ -28,47 +29,138 @@ class Criterion:
 # ── Default criteria per project type ──
 
 ANDROID_CRITERIA = [
-    Criterion("kotlin-files", "Au moins 5 fichiers Kotlin", "file_count_min",
-              {"pattern": "**/*.kt", "min": 5}),
-    Criterion("gradle-build", "Fichier build.gradle.kts existe", "file_exists",
-              {"pattern": "**/build.gradle*"}),
-    Criterion("manifest", "AndroidManifest.xml existe", "file_exists",
-              {"pattern": "**/AndroidManifest.xml"}),
-    Criterion("app-structure", "Structure app/src/main existe", "dir_exists",
-              {"path": "app/src/main"}),
-    Criterion("tests-exist", "Au moins 2 fichiers de test", "file_count_min",
-              {"pattern": "**/*Test*.kt", "min": 2}),
-    Criterion("no-swift", "Pas de fichiers Swift dans un projet Android", "file_count_max",
-              {"pattern": "**/*.swift", "max": 0}),
-    Criterion("real-gradlew", "gradlew n'est pas un fake", "no_fake_files",
-              {"pattern": "**/gradlew", "min_size": 100}),
+    Criterion(
+        "kotlin-files",
+        "Au moins 5 fichiers Kotlin",
+        "file_count_min",
+        {"pattern": "**/*.kt", "min": 5},
+    ),
+    Criterion(
+        "gradle-build",
+        "Fichier build.gradle.kts existe",
+        "file_exists",
+        {"pattern": "**/build.gradle*"},
+    ),
+    Criterion(
+        "manifest",
+        "AndroidManifest.xml existe",
+        "file_exists",
+        {"pattern": "**/AndroidManifest.xml"},
+    ),
+    Criterion(
+        "app-structure",
+        "Structure app/src/main existe",
+        "dir_exists",
+        {"path": "app/src/main"},
+    ),
+    Criterion(
+        "tests-exist",
+        "Au moins 2 fichiers de test",
+        "file_count_min",
+        {"pattern": "**/*Test*.kt", "min": 2},
+    ),
+    Criterion(
+        "no-swift",
+        "Pas de fichiers Swift dans un projet Android",
+        "file_count_max",
+        {"pattern": "**/*.swift", "max": 0},
+    ),
+    Criterion(
+        "real-gradlew",
+        "gradlew n'est pas un fake",
+        "no_fake_files",
+        {"pattern": "**/gradlew", "min_size": 100},
+    ),
 ]
 
 IOS_CRITERIA = [
-    Criterion("swift-files", "Au moins 5 fichiers Swift", "file_count_min",
-              {"pattern": "**/*.swift", "min": 5}),
-    Criterion("xcodeproj", "Projet Xcode existe", "file_exists",
-              {"pattern": "**/*.xcodeproj"}),
-    Criterion("tests-exist", "Au moins 2 fichiers de test", "file_count_min",
-              {"pattern": "**/*Test*.swift", "min": 2}),
-    Criterion("no-kotlin", "Pas de Kotlin dans un projet iOS", "file_count_max",
-              {"pattern": "**/*.kt", "max": 0}),
+    Criterion(
+        "swift-files",
+        "Au moins 5 fichiers Swift",
+        "file_count_min",
+        {"pattern": "**/*.swift", "min": 5},
+    ),
+    Criterion(
+        "xcodeproj", "Projet Xcode existe", "file_exists", {"pattern": "**/*.xcodeproj"}
+    ),
+    Criterion(
+        "tests-exist",
+        "Au moins 2 fichiers de test",
+        "file_count_min",
+        {"pattern": "**/*Test*.swift", "min": 2},
+    ),
+    Criterion(
+        "no-kotlin",
+        "Pas de Kotlin dans un projet iOS",
+        "file_count_max",
+        {"pattern": "**/*.kt", "max": 0},
+    ),
 ]
 
 WEB_CRITERIA = [
-    Criterion("package-json", "package.json existe", "file_exists",
-              {"pattern": "**/package.json"}),
-    Criterion("source-files", "Au moins 5 fichiers source", "file_count_min",
-              {"pattern": "**/*.{ts,tsx,js,jsx,svelte,vue}", "min": 5}),
-    Criterion("tests-exist", "Au moins 2 fichiers de test", "file_count_min",
-              {"pattern": "**/*.{test,spec}.{ts,tsx,js,jsx}", "min": 2}),
+    Criterion(
+        "package-json",
+        "package.json existe",
+        "file_exists",
+        {"pattern": "**/package.json"},
+    ),
+    Criterion(
+        "source-files",
+        "Au moins 5 fichiers source",
+        "file_count_min",
+        {"pattern": "**/*.{ts,tsx,js,jsx,svelte,vue}", "min": 5},
+    ),
+    Criterion(
+        "tests-exist",
+        "Au moins 2 fichiers de test",
+        "file_count_min",
+        {"pattern": "**/*.{test,spec}.{ts,tsx,js,jsx}", "min": 2},
+    ),
 ]
 
 BACKEND_CRITERIA = [
-    Criterion("source-files", "Au moins 5 fichiers source", "file_count_min",
-              {"pattern": "**/*.{py,rs,go,java}", "min": 5}),
-    Criterion("tests-exist", "Au moins 2 fichiers de test", "file_count_min",
-              {"pattern": "**/*test*.*", "min": 2}),
+    Criterion(
+        "source-files",
+        "Au moins 5 fichiers source",
+        "file_count_min",
+        {"pattern": "**/*.{py,rs,go,java}", "min": 5},
+    ),
+    Criterion(
+        "tests-exist",
+        "Au moins 2 fichiers de test",
+        "file_count_min",
+        {"pattern": "**/*test*.*", "min": 2},
+    ),
+]
+
+RUST_CRITERIA = [
+    Criterion(
+        "cargo-toml", "Cargo.toml existe", "file_exists", {"pattern": "**/Cargo.toml"}
+    ),
+    Criterion(
+        "lib-or-main",
+        "src/lib.rs ou src/main.rs existe",
+        "file_exists",
+        {"pattern": "**/{lib,main}.rs"},
+    ),
+    Criterion(
+        "cargo-check",
+        "cargo check passe (compilation OK)",
+        "command_ok",
+        {"command": "cargo check 2>&1", "cwd": "."},
+    ),
+    Criterion(
+        "cargo-test",
+        "cargo test passe (tous les tests OK)",
+        "command_ok",
+        {"command": "cargo test 2>&1", "cwd": "."},
+    ),
+    Criterion(
+        "tests-in-code",
+        "Au moins 1 test #[test] dans les sources",
+        "file_count_min",
+        {"pattern": "**/*.rs", "min": 1},
+    ),
 ]
 
 _TYPE_MAP = {
@@ -77,10 +169,13 @@ _TYPE_MAP = {
     "web": WEB_CRITERIA,
     "frontend": WEB_CRITERIA,
     "backend": BACKEND_CRITERIA,
+    "rust": RUST_CRITERIA,
 }
 
 
-def get_criteria_for_workflow(workflow_id: str, workflow_config: dict | None = None, workspace: str = "") -> list[Criterion]:
+def get_criteria_for_workflow(
+    workflow_id: str, workflow_config: dict | None = None, workspace: str = ""
+) -> list[Criterion]:
     """Get acceptance criteria — from workflow config, auto-detect, or workspace scan."""
     # 1. Check workflow config for explicit criteria
     if workflow_config and "acceptance_criteria" in workflow_config:
@@ -91,29 +186,69 @@ def get_criteria_for_workflow(workflow_id: str, workflow_config: dict | None = N
     for key, criteria in _TYPE_MAP.items():
         if key in wid:
             # Deep copy to avoid mutating defaults
-            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in criteria]
+            return [
+                Criterion(c.id, c.description, c.check, dict(c.params))
+                for c in criteria
+            ]
 
     # 3. Auto-detect from workspace contents
     if workspace and os.path.isdir(workspace):
-        if _glob_recursive(workspace, "**/build.gradle*") or _glob_recursive(workspace, "**/*.kt"):
-            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in ANDROID_CRITERIA]
-        if _glob_recursive(workspace, "**/*.xcodeproj") or _glob_recursive(workspace, "**/*.swift"):
-            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in IOS_CRITERIA]
+        if _glob_recursive(workspace, "**/build.gradle*") or _glob_recursive(
+            workspace, "**/*.kt"
+        ):
+            return [
+                Criterion(c.id, c.description, c.check, dict(c.params))
+                for c in ANDROID_CRITERIA
+            ]
+        if _glob_recursive(workspace, "**/*.xcodeproj") or _glob_recursive(
+            workspace, "**/*.swift"
+        ):
+            return [
+                Criterion(c.id, c.description, c.check, dict(c.params))
+                for c in IOS_CRITERIA
+            ]
+        if _glob_recursive(workspace, "**/Cargo.toml") or _glob_recursive(
+            workspace, "**/*.rs"
+        ):
+            return [
+                Criterion(c.id, c.description, c.check, dict(c.params))
+                for c in RUST_CRITERIA
+            ]
         if _glob_recursive(workspace, "**/package.json"):
-            return [Criterion(c.id, c.description, c.check, dict(c.params)) for c in WEB_CRITERIA]
+            return [
+                Criterion(c.id, c.description, c.check, dict(c.params))
+                for c in WEB_CRITERIA
+            ]
 
     # 4. Generic fallback — works for any project type
     return [
-        Criterion("source-files", "Au moins 3 fichiers source créés", "file_count_min",
-                  {"pattern": "**/*.{html,css,js,ts,tsx,jsx,py,rs,go,java,kt,swift,svelte,vue}", "min": 3}),
-        Criterion("no-empty-files", "Pas de fichiers vides (>50 bytes)", "no_fake_files",
-                  {"pattern": "**/*.{html,css,js,ts,py,rs}", "min_size": 50}),
-        Criterion("has-git-commits", "Au moins 1 commit git", "command_ok",
-                  {"command": "git log --oneline -1"}),
+        Criterion(
+            "source-files",
+            "Au moins 3 fichiers source créés",
+            "file_count_min",
+            {
+                "pattern": "**/*.{html,css,js,ts,tsx,jsx,py,rs,go,java,kt,swift,svelte,vue}",
+                "min": 3,
+            },
+        ),
+        Criterion(
+            "no-empty-files",
+            "Pas de fichiers vides (>50 bytes)",
+            "no_fake_files",
+            {"pattern": "**/*.{html,css,js,ts,py,rs}", "min_size": 50},
+        ),
+        Criterion(
+            "has-git-commits",
+            "Au moins 1 commit git",
+            "command_ok",
+            {"command": "git log --oneline -1"},
+        ),
     ]
 
 
-def run_evidence_checks(workspace: str, criteria: list[Criterion]) -> tuple[bool, list[Criterion]]:
+def run_evidence_checks(
+    workspace: str, criteria: list[Criterion]
+) -> tuple[bool, list[Criterion]]:
     """Run all acceptance criteria checks. Returns (all_passed, results)."""
     if not workspace or not os.path.isdir(workspace):
         for c in criteria:
@@ -160,9 +295,17 @@ def run_evidence_checks(workspace: str, criteria: list[Criterion]) -> tuple[bool
                         else:
                             # Check content for placeholder patterns
                             try:
-                                with open(f, 'r', errors='ignore') as fh:
+                                with open(f, "r", errors="ignore") as fh:
                                     content = fh.read(200)
-                                if any(p in content.lower() for p in ('placeholder', 'echo', '/dev/null', 'stub')):
+                                if any(
+                                    p in content.lower()
+                                    for p in (
+                                        "placeholder",
+                                        "echo",
+                                        "/dev/null",
+                                        "stub",
+                                    )
+                                ):
                                     fakes.append(f)
                             except Exception:
                                 pass
@@ -171,16 +314,35 @@ def run_evidence_checks(workspace: str, criteria: list[Criterion]) -> tuple[bool
 
             elif c.check == "command_ok":
                 cmd = c.params.get("command", "true")
+                timeout = c.params.get("timeout", 120)
+                # Ensure cargo is findable on common install paths
+                import os as _os
+
+                env = dict(_os.environ)
+                home = env.get("HOME", "/root")
+                cargo_bin = f"{home}/.cargo/bin"
+                if cargo_bin not in env.get("PATH", ""):
+                    env["PATH"] = cargo_bin + ":" + env.get("PATH", "")
                 try:
                     result = subprocess.run(
-                        cmd, shell=True, cwd=workspace,
-                        capture_output=True, text=True, timeout=60,
+                        cmd,
+                        shell=True,
+                        cwd=workspace,
+                        capture_output=True,
+                        text=True,
+                        timeout=timeout,
+                        env=env,
                     )
                     c.passed = result.returncode == 0
-                    c.detail = "exit 0" if c.passed else f"exit {result.returncode}"
+                    out = (result.stdout + result.stderr)[-500:]
+                    c.detail = (
+                        ("exit 0: " + out[:200])
+                        if c.passed
+                        else f"exit {result.returncode}: {out[:300]}"
+                    )
                 except subprocess.TimeoutExpired:
                     c.passed = False
-                    c.detail = "timeout"
+                    c.detail = f"timeout after {timeout}s"
 
             else:
                 c.passed = False
@@ -212,8 +374,12 @@ def format_evidence_report(criteria: list[Criterion]) -> str:
         lines.append("\n--- ACTIONS REQUISES (MANDATORY) ---")
         for c in failed:
             lines.append(f"  - {c.description} ({c.detail})")
-        lines.append("\nNe PAS passer au sprint suivant tant que ces critères ne sont pas remplis.")
-        lines.append("Utilisez les VRAIS outils de build (android_build, build, test) — pas de faux scripts.")
+        lines.append(
+            "\nNe PAS passer au sprint suivant tant que ces critères ne sont pas remplis."
+        )
+        lines.append(
+            "Utilisez les VRAIS outils de build (android_build, build, test) — pas de faux scripts."
+        )
 
     return "\n".join(lines)
 
@@ -221,17 +387,22 @@ def format_evidence_report(criteria: list[Criterion]) -> str:
 def _glob_recursive(workspace: str, pattern: str) -> list[str]:
     """Glob with brace expansion support."""
     # Handle {a,b} patterns by expanding manually
-    if '{' in pattern and '}' in pattern:
+    if "{" in pattern and "}" in pattern:
         import re
-        m = re.search(r'\{([^}]+)\}', pattern)
+
+        m = re.search(r"\{([^}]+)\}", pattern)
         if m:
-            options = m.group(1).split(',')
+            options = m.group(1).split(",")
             results = []
             for opt in options:
-                expanded = pattern[:m.start()] + opt.strip() + pattern[m.end():]
-                results.extend(glob.glob(os.path.join(workspace, expanded), recursive=True))
+                expanded = pattern[: m.start()] + opt.strip() + pattern[m.end() :]
+                results.extend(
+                    glob.glob(os.path.join(workspace, expanded), recursive=True)
+                )
             # Deduplicate
-            return list(set(f for f in results if not f.endswith('/.git') and '/.git/' not in f))
+            return list(
+                set(f for f in results if not f.endswith("/.git") and "/.git/" not in f)
+            )
 
     found = glob.glob(os.path.join(workspace, pattern), recursive=True)
-    return [f for f in found if not f.endswith('/.git') and '/.git/' not in f]
+    return [f for f in found if not f.endswith("/.git") and "/.git/" not in f]

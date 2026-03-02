@@ -194,28 +194,29 @@ async def lifespan(app: FastAPI):
 
     seed_demo_data()
 
-    # Sync agent models: ensure DB agents match the current DEFAULT_MODEL
-    from .agents.store import DEFAULT_MODEL as _current_model
+    # Sync agent models+provider: ensure DB agents match the current DEFAULT_MODEL/PROVIDER
+    from .agents.store import DEFAULT_MODEL as _current_model, DEFAULT_PROVIDER as _current_provider
 
     try:
         from .db.migrations import get_db as _gdb_sync
 
         _sdb = _gdb_sync()
-        # Only update agents that have a stale/wrong model (not matching env)
+        # Only update agents that have a stale/wrong model or provider (not matching env)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE model != ? AND model NOT IN ('', 'demo-model')",
-            (_current_model,),
+            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model')",
+            (_current_model, _current_provider),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ? WHERE model != ? AND model NOT IN ('', 'demo-model')",
-                (_current_model, _current_model),
+                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model')",
+                (_current_model, _current_provider),
             )
             _sdb.commit()
             logger.warning(
-                "Synced %d agents to DEFAULT_MODEL=%s (from env/provider settings)",
+                "Synced %d agents to DEFAULT_MODEL=%s provider=%s (from env/provider settings)",
                 _stale_models,
                 _current_model,
+                _current_provider,
             )
         _sdb.close()
     except Exception as e:
@@ -673,7 +674,7 @@ def create_app() -> FastAPI:
         if path.startswith("/projects/") and path.endswith("/workspace"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline'; "
                 "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
@@ -685,7 +686,7 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com https://i.pravatar.cc; "
@@ -703,13 +704,21 @@ def create_app() -> FastAPI:
     from collections import defaultdict as _dd
 
     _rate_buckets: dict[str, list[float]] = _dd(list)
-    _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "120"))  # per minute
+    _RATE_LIMIT = int(os.environ.get("API_RATE_LIMIT", "300"))  # per minute
     _RATE_WINDOW = 60.0
+    # Lightweight UI-polling endpoints exempt from rate limiting
+    _RATE_EXEMPT = {
+        "/api/notifications/badge",
+        "/api/autoheal/heartbeat",
+        "/api/cto/chips",
+        "/api/health",
+    }
 
     @app.middleware("http")
     async def rate_limit_middleware(request, call_next):
         if (
             request.url.path.startswith("/api/")
+            and request.url.path not in _RATE_EXEMPT
             and os.environ.get("PLATFORM_ENV") != "test"
         ):
             client_ip = request.client.host if request.client else "unknown"
@@ -1177,6 +1186,9 @@ def create_app() -> FastAPI:
     from .web.ws import router as sse_router
 
     app.include_router(auth_router)
+    from .web.routes.api.health import router as health_router
+
+    app.include_router(health_router)
     if _mode != "factory":
         from .web.routes import router as web_router
 

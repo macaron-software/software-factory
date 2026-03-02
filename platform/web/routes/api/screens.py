@@ -1,4 +1,5 @@
 """API routes — Annotation Studio (project screens + annotations)."""
+
 from __future__ import annotations
 
 import json
@@ -14,6 +15,7 @@ router = APIRouter()
 
 def _db():
     from ....db.migrations import get_db
+
     return get_db()
 
 
@@ -24,6 +26,7 @@ def _screens_dir(project_id: str) -> Path:
 
 
 # ── Wireframe generation ─────────────────────────────────────────
+
 
 def _html_to_wireframe_svg(html: str, width: int = 1280, height: int = 800) -> str:
     """Convert HTML to a lo-fi wireframe SVG."""
@@ -55,30 +58,44 @@ def _html_to_wireframe_svg(html: str, width: int = 1280, height: int = 800) -> s
         inputs = tag.find_all("input", limit=4)
         imgs = tag.find_all("img", limit=3)
 
-        label = headings[0].get_text(strip=True)[:50] if headings else (tag.get("id") or cls[:30] or "Section")
-        elements.append(("rect", 16, y, width - 32, section_h, "#f8f8f8", "#ccc", label, 13))
+        label = (
+            headings[0].get_text(strip=True)[:50]
+            if headings
+            else (tag.get("id") or cls[:30] or "Section")
+        )
+        elements.append(
+            ("rect", 16, y, width - 32, section_h, "#f8f8f8", "#ccc", label, 13)
+        )
 
         bx = 32
         for btn in buttons:
             btxt = btn.get_text(strip=True)[:20] or "Button"
-            elements.append(("btn", bx, y + section_h - 36, 100, 28, "#d0d0d0", "#888", btxt, 12))
+            elements.append(
+                ("btn", bx, y + section_h - 36, 100, 28, "#d0d0d0", "#888", btxt, 12)
+            )
             bx += 116
 
         ix = 32
         for inp in inputs:
             placeholder = inp.get("placeholder", inp.get("name", "Input"))[:20]
-            elements.append(("input", ix, y + 40, 180, 28, "#fff", "#bbb", placeholder, 11))
+            elements.append(
+                ("input", ix, y + 40, 180, 28, "#fff", "#bbb", placeholder, 11)
+            )
             ix += 196
 
         for i, img in enumerate(imgs):
-            elements.append(("img", 32 + i * 120, y + 50, 100, 70, "#f0f0f0", "#ccc", "", 0))
+            elements.append(
+                ("img", 32 + i * 120, y + 50, 100, 70, "#f0f0f0", "#ccc", "", 0)
+            )
 
         y += section_h + 16
         if y > height - 60:
             break
 
     # Footer
-    elements.append(("rect", 0, height - 48, width, 48, "#e8e8e8", "#999", "Footer", 12))
+    elements.append(
+        ("rect", 0, height - 48, width, 48, "#e8e8e8", "#999", "Footer", 12)
+    )
 
     # Build SVG
     svg_parts = [
@@ -88,7 +105,16 @@ def _html_to_wireframe_svg(html: str, width: int = 1280, height: int = 800) -> s
 
     for elem in elements:
         kind = elem[0]
-        x, ey, w, h, fill, stroke, label, fs = elem[1], elem[2], elem[3], elem[4], elem[5], elem[6], elem[7], elem[8]
+        x, ey, w, h, fill, stroke, label, fs = (
+            elem[1],
+            elem[2],
+            elem[3],
+            elem[4],
+            elem[5],
+            elem[6],
+            elem[7],
+            elem[8],
+        )
         rx = 4 if kind in ("btn", "input") else 2
         sid = f"el-{uuid.uuid4().hex[:8]}"
         svg_parts.append(
@@ -96,8 +122,12 @@ def _html_to_wireframe_svg(html: str, width: int = 1280, height: int = 800) -> s
             f'fill="{fill}" stroke="{stroke}" stroke-width="1" data-label="{label}"/>'
         )
         if kind == "img":
-            svg_parts.append(f'<line x1="{x}" y1="{ey}" x2="{x+w}" y2="{ey+h}" stroke="{stroke}" stroke-width="1"/>')
-            svg_parts.append(f'<line x1="{x+w}" y1="{ey}" x2="{x}" y2="{ey+h}" stroke="{stroke}" stroke-width="1"/>')
+            svg_parts.append(
+                f'<line x1="{x}" y1="{ey}" x2="{x + w}" y2="{ey + h}" stroke="{stroke}" stroke-width="1"/>'
+            )
+            svg_parts.append(
+                f'<line x1="{x + w}" y1="{ey}" x2="{x}" y2="{ey + h}" stroke="{stroke}" stroke-width="1"/>'
+            )
         elif label and fs > 0:
             ty = ey + h // 2 + fs // 3
             svg_parts.append(
@@ -113,12 +143,13 @@ def _empty_wireframe_svg(width: int = 1280, height: int = 800) -> str:
     return (
         f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}">'
         f'<rect width="{width}" height="{height}" fill="white"/>'
-        f'<text x="{width//2}" y="{height//2}" text-anchor="middle" fill="#999" font-size="18" font-family="sans-serif">No preview available</text>'
+        f'<text x="{width // 2}" y="{height // 2}" text-anchor="middle" fill="#999" font-size="18" font-family="sans-serif">No preview available</text>'
         f"</svg>"
     )
 
 
 # ── Wireframe endpoint ───────────────────────────────────────────
+
 
 @router.post("/api/projects/{project_id}/wireframe")
 async def generate_wireframe(project_id: str, request: Request):
@@ -156,6 +187,7 @@ async def generate_wireframe(project_id: str, request: Request):
 
 # ── Screens CRUD ─────────────────────────────────────────────────
 
+
 @router.get("/api/projects/{project_id}/screens")
 async def list_screens(project_id: str):
     db = _db()
@@ -184,7 +216,10 @@ async def get_screen_svg(project_id: str, screen_id: str):
 @router.delete("/api/projects/{project_id}/screens/{screen_id}")
 async def delete_screen(project_id: str, screen_id: str):
     db = _db()
-    db.execute("DELETE FROM project_screens WHERE id=? AND project_id=?", (screen_id, project_id))
+    db.execute(
+        "DELETE FROM project_screens WHERE id=? AND project_id=?",
+        (screen_id, project_id),
+    )
     db.execute("DELETE FROM project_annotations WHERE screen_id=?", (screen_id,))
     db.commit()
     return JSONResponse({"ok": True})
@@ -192,8 +227,11 @@ async def delete_screen(project_id: str, screen_id: str):
 
 # ── Annotations CRUD ─────────────────────────────────────────────
 
+
 @router.get("/api/projects/{project_id}/annotations")
-async def list_annotations(project_id: str, screen_id: Optional[str] = None, page_url: Optional[str] = None):
+async def list_annotations(
+    project_id: str, screen_id: Optional[str] = None, page_url: Optional[str] = None
+):
     db = _db()
     if screen_id:
         rows = db.execute(
@@ -240,12 +278,17 @@ async def create_annotation(project_id: str, request: Request):
             body.get("type", "comment"),
             body.get("selector", ""),
             body.get("element_text", ""),
-            body.get("x_pct", 0), body.get("y_pct", 0),
-            body.get("w_pct", 0), body.get("h_pct", 0),
-            body.get("from_x_pct", 0), body.get("from_y_pct", 0),
-            body.get("to_x_pct", 0), body.get("to_y_pct", 0),
+            body.get("x_pct", 0),
+            body.get("y_pct", 0),
+            body.get("w_pct", 0),
+            body.get("h_pct", 0),
+            body.get("from_x_pct", 0),
+            body.get("from_y_pct", 0),
+            body.get("to_x_pct", 0),
+            body.get("to_y_pct", 0),
             body.get("page_url", ""),
-            body.get("viewport_w", 1280), body.get("viewport_h", 800),
+            body.get("viewport_w", 1280),
+            body.get("viewport_h", 800),
             body.get("quoted_text", ""),
             body.get("computed_css", ""),
             body.get("react_tree", ""),
@@ -284,12 +327,16 @@ async def update_annotation(project_id: str, ann_id: str, request: Request):
 @router.delete("/api/projects/{project_id}/annotations/{ann_id}")
 async def delete_annotation(project_id: str, ann_id: str):
     db = _db()
-    db.execute("DELETE FROM project_annotations WHERE id=? AND project_id=?", (ann_id, project_id))
+    db.execute(
+        "DELETE FROM project_annotations WHERE id=? AND project_id=?",
+        (ann_id, project_id),
+    )
     db.commit()
     return JSONResponse({"ok": True})
 
 
 # ── Export ───────────────────────────────────────────────────────
+
 
 @router.get("/api/projects/{project_id}/annotations/export")
 async def export_annotations(project_id: str):
@@ -308,6 +355,7 @@ async def export_annotations(project_id: str):
     # Project name
     try:
         from ....projects.manager import get_project_store
+
         proj = get_project_store().get(project_id)
         proj_name = proj.name if proj else project_id
     except Exception:
@@ -325,13 +373,19 @@ async def export_annotations(project_id: str):
                 msg = a["message"]
                 if a["type"] == "move" and (a["to_x_pct"] or a["to_y_pct"]):
                     pos = f"from ({a['from_x_pct']:.0f}%,{a['from_y_pct']:.0f}%) → to ({a['to_x_pct']:.0f}%,{a['to_y_pct']:.0f}%)"
-                    lines.append(f"**#{a['seq_num']}** [{typ}] `{sel}`{etxt} — {pos} — \"{msg}\"")
+                    lines.append(
+                        f'**#{a["seq_num"]}** [{typ}] `{sel}`{etxt} — {pos} — "{msg}"'
+                    )
                 elif a["type"] == "text" and a["quoted_text"]:
-                    lines.append(f"**#{a['seq_num']}** [{typ}] \"{a['quoted_text']}\" — \"{msg}\"")
+                    lines.append(
+                        f'**#{a["seq_num"]}** [{typ}] "{a["quoted_text"]}" — "{msg}"'
+                    )
                 elif a["w_pct"] and a["h_pct"]:
-                    lines.append(f"**#{a['seq_num']}** [{typ}] area ({a['x_pct']:.0f}%,{a['y_pct']:.0f}% → {a['x_pct']+a['w_pct']:.0f}%,{a['y_pct']+a['h_pct']:.0f}%) — \"{msg}\"")
+                    lines.append(
+                        f'**#{a["seq_num"]}** [{typ}] area ({a["x_pct"]:.0f}%,{a["y_pct"]:.0f}% → {a["x_pct"] + a["w_pct"]:.0f}%,{a["y_pct"] + a["h_pct"]:.0f}%) — "{msg}"'
+                    )
                 else:
-                    lines.append(f"**#{a['seq_num']}** [{typ}] `{sel}`{etxt} — \"{msg}\"")
+                    lines.append(f'**#{a["seq_num"]}** [{typ}] `{sel}`{etxt} — "{msg}"')
                 if a["computed_css"]:
                     lines.append(f"  CSS: {a['computed_css']}")
                 if a["react_tree"]:
@@ -355,6 +409,7 @@ async def fix_all_annotations(project_id: str, request: Request):
     try:
         from ....missions.store import get_mission_store
         from ....projects.manager import get_project_store
+
         proj = get_project_store().get(project_id)
         proj_name = proj.name if proj else project_id
 
@@ -372,34 +427,45 @@ async def fix_all_annotations(project_id: str, request: Request):
 
 # ── Traceability ─────────────────────────────────────────────────
 
+
 @router.get("/api/projects/{project_id}/screens/{screen_id}/traceability")
 async def get_screen_traceability(project_id: str, screen_id: str):
-    """Return feature, user stories, mission, persona linked to a screen."""
+    """Return full SAFe traceability: programme, epic, feature, stories, persona, rbac."""
     db = _db()
 
-    # Get screen metadata
     screen = db.execute(
         "SELECT * FROM project_screens WHERE id=? AND project_id=?",
         (screen_id, project_id),
     ).fetchone()
 
-    result: dict = {"feature": None, "user_stories": [], "mission": None, "persona": None, "specs_url": None}
+    result: dict = {
+        "programme": None,
+        "epic": None,
+        "feature": None,
+        "user_stories": [],
+        "persona": None,
+        "rbac_roles": [],
+        "specs_url": None,
+        # backward-compat kept
+        "mission": None,
+    }
 
     if not screen:
         return JSONResponse(result)
 
-    # Feature
+    # RBAC from screen
+    try:
+        import json as _json
+        rbac_raw = screen["rbac_roles"] if "rbac_roles" in screen.keys() else "[]"
+        result["rbac_roles"] = _json.loads(rbac_raw or "[]")
+    except Exception:
+        pass
+
+    # Feature + Epic + Programme
     feature_id = (screen["feature_id"] or "") if screen else ""
     if feature_id:
         feat = db.execute("SELECT * FROM features WHERE id=?", (feature_id,)).fetchone()
         if feat:
-            # Get epic name
-            epic_name = ""
-            try:
-                epic = db.execute("SELECT name FROM epics WHERE id=?", (feat["epic_id"],)).fetchone()
-                epic_name = epic["name"] if epic else feat["epic_id"]
-            except Exception:
-                pass
             result["feature"] = {
                 "id": feat["id"],
                 "name": feat["name"],
@@ -407,49 +473,70 @@ async def get_screen_traceability(project_id: str, screen_id: str):
                 "acceptance_criteria": feat.get("acceptance_criteria", ""),
                 "status": feat["status"],
                 "story_points": feat.get("story_points", 0),
-                "epic_name": epic_name,
             }
 
-            # User stories for this feature
+            # Persona from feature
+            try:
+                feat_persona = feat["persona"] if "persona" in feat.keys() else ""
+                if feat_persona:
+                    result["persona"] = feat_persona
+            except Exception:
+                pass
+
+            # Epic
+            epic_id = feat["epic_id"] or ""
+            if epic_id:
+                try:
+                    epic = db.execute(
+                        "SELECT * FROM epics WHERE id=?", (epic_id,)
+                    ).fetchone()
+                    if epic:
+                        result["epic"] = {
+                            "id": epic["id"],
+                            "name": epic["name"],
+                            "description": epic["description"],
+                        }
+                        # Programme
+                        prog_id = epic["programme_id"] or ""
+                        if prog_id:
+                            prog = db.execute(
+                                "SELECT id, name, description FROM org_portfolios WHERE id=?",
+                                (prog_id,),
+                            ).fetchone()
+                            if prog:
+                                result["programme"] = {
+                                    "id": prog["id"],
+                                    "name": prog["name"],
+                                }
+                    else:
+                        result["epic"] = {
+                            "id": epic_id,
+                            "name": epic_id,
+                            "description": "",
+                        }
+                except Exception:
+                    result["epic"] = {"id": epic_id, "name": epic_id, "description": ""}
+
+            # User stories
             stories = db.execute(
                 "SELECT id, title, status FROM user_stories WHERE feature_id=? ORDER BY priority DESC LIMIT 5",
                 (feature_id,),
             ).fetchall()
             result["user_stories"] = [dict(s) for s in stories]
 
-    # Mission
-    mission_id = (screen["mission_id"] or "") if screen else ""
-    if not mission_id:
-        # Try to find latest mission for project
-        m = db.execute(
-            "SELECT id, name, description, type, status FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 1",
-            (project_id,),
-        ).fetchone()
-        if m:
-            mission_id = m["id"]
+    # Persona fallback: from agents with persona defined on this project's missions
+    if not result["persona"]:
+        try:
+            personas = db.execute(
+                "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            if personas:
+                result["persona"] = personas["persona"]
+        except Exception:
+            pass
 
-    if mission_id:
-        mission = db.execute(
-            "SELECT id, name, description, type, status FROM missions WHERE id=?",
-            (mission_id,),
-        ).fetchone()
-        if mission:
-            result["mission"] = dict(mission)
-
-    # Persona (from most recent mission's config or from agents)
-    try:
-        personas = db.execute(
-            "SELECT a.persona FROM agents a JOIN missions m ON m.project_id=? WHERE a.persona != '' LIMIT 1",
-            (project_id,),
-        ).fetchone()
-        if personas:
-            result["persona"] = personas["persona"]
-    except Exception:
-        pass
-
-    # Specs URL
     result["specs_url"] = f"/projects/{project_id}"
-
     return JSONResponse(result)
 
 
@@ -467,13 +554,15 @@ async def update_screen(project_id: str, screen_id: str, request: Request):
         return JSONResponse({"ok": True})
     vals += [project_id, screen_id]
     db.execute(
-        f"UPDATE project_screens SET {', '.join(fields)} WHERE project_id=? AND id=?", vals
+        f"UPDATE project_screens SET {', '.join(fields)} WHERE project_id=? AND id=?",
+        vals,
     )
     db.commit()
     return JSONResponse({"ok": True})
 
 
 # ── Settings ─────────────────────────────────────────────────────
+
 
 @router.get("/api/settings/general")
 async def get_general_settings():

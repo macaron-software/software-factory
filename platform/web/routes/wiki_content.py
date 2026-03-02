@@ -4115,4 +4115,153 @@ Collaboration d'agents en direct avec streaming SSE temps réel, code couleur pa
 | `Esc` | Fermer un modal |
 """,
     },
+    # ── Annotation Studio ─────────────────────────────────────────────────
+    {
+        "slug": "annotation-studio-safe-traceability",
+        "title": "Annotation Studio — Feedback Visuel & Traçabilité SAFe",
+        "category": "Guide",
+        "icon": "✏️",
+        "sort_order": 59,
+        "content": """\
+# Annotation Studio — Feedback Visuel & Traçabilité SAFe
+
+## Vue d'ensemble
+
+L'**Annotation Studio** est un layer de feedback visuel intégré à la Software Factory.
+Il permet à n'importe quel utilisateur (PM, designer, développeur, QA, stakeholder) d'annoter
+directement les pages de la plateforme sans quitter l'interface.
+
+Il s'auto-applique à la SF elle-même via le projet réservé `_sf` (rétro-ingénierie SAFe complète).
+
+---
+
+## Activation
+
+Deux boutons sont disponibles dans la topbar de chaque page :
+
+| Icône | Action | Résultat |
+|-------|--------|----------|
+| 👤 Persona | Barre de traçabilité SAFe | Affiche Programme → Epic → Feature → Stories pour la page courante |
+| ⊞ Wireframe | Mode wireframe | Remplace le contenu par un squelette/shimmer pour inspection UX |
+
+### Mode Annotation
+
+Cliquez sur **✏️ Annoter** (bas-droite) pour activer le mode annotation :
+- Tous les clics sont interceptés (navigation bloquée)
+- Une bannière bleue confirme que le mode est actif
+- Cliquez sur n'importe quel élément → popover de saisie
+
+---
+
+## Types d'annotations
+
+| Type | Usage |
+|------|-------|
+| Bug 🐛 | Défaut fonctionnel, comportement incorrect |
+| Commentaire 💬 | Note, question, suggestion libre |
+| Feature ✨ | Demande d'une nouvelle fonctionnalité |
+| Design 🎨 | Problème visuel, alignement, couleur |
+| Texte 📝 | Correction de copie, traduction |
+
+Chaque annotation capture : sélecteur CSS, texte visible, styles computed, URL + timestamp.
+
+---
+
+## Barre de traçabilité SAFe
+
+La barre affiche la hiérarchie SAFe de la page courante :
+
+```
+┌─────────────────┬──────────────────┬──────────────────┬──────────────────────┐
+│   Programme     │      Epic        │     Feature      │   Stories / Tasks    │
+│ Software Factory│ Backlog & Planning│  Product Backlog │ · Prioriser stories  │
+│                 │                  │  status: active  │ · Affiner le backlog │
+│                 │                  │                  │ · Filtrer par epic   │
+└─────────────────┴──────────────────┴──────────────────┴──────────────────────┘
+  Persona: Product Owner  |  /backlog  |  ✏️ Annoter cette page  |  Backlog SAFe
+```
+
+---
+
+## Rétro-ingénierie — Mapping SAFe de la SF
+
+Script : `platform/scripts/retro_sf_safe.py`
+
+La hiérarchie SAFe de la SF couvre **49 écrans** répartis en **8 epics** :
+
+| Epic | Features | Pages couvertes |
+|------|----------|-----------------|
+| Orchestration & Missions | 4 | /, /cockpit, /mission-control, /art, /live |
+| SAFe Backlog & Planning | 4 | /portfolio, /pi, /backlog, /projects |
+| Agent Factory | 4 | /agents, /skills, /workflows, /patterns |
+| Monitoring & Quality | 5 | /monitoring, /analytics, /quality, /memory, /ops |
+| Product Discovery | 3 | /ideation, /product-line, /generate |
+| Integrations & Marketplace | 3 | /marketplace, /mcps, /metier |
+| Platform Administration | 4 | /settings, /admin/users, /org, /notifications |
+| UX & Annotation Studio | 2 | /annotate, /design-system |
+
+**Total** : 8 epics · 29 features · 91 user stories · 49 écrans
+
+Pour ré-exécuter la rétro-ingénierie :
+```bash
+python3 platform/scripts/retro_sf_safe.py
+```
+
+---
+
+## Mode Wireframe
+
+Le mode wireframe transforme les pages en squelette UX :
+
+- **TreeWalker** : parcourt les nœuds texte feuilles → `.sf-skel-bar` (shimmer)
+- **Blocs** : images, inputs, iframes → `.sf-skel-block`
+- **Périmètre** : `.main-area` uniquement (sidebar/topbar inchangées)
+- **Restauration** : `removeSkeleton()` restaure les nœuds DOM originaux
+- **Thème** : shimmer utilise `var(--bg-secondary/tertiary/border)` → light/dark compatible
+
+---
+
+## API Endpoints
+
+| Endpoint | Méthode | Description |
+|----------|---------|-------------|
+| `/api/projects/{id}/annotations` | GET | Liste des annotations |
+| `/api/projects/{id}/annotations` | POST | Créer une annotation |
+| `/api/projects/{id}/annotations/{ann_id}` | PATCH | Mettre à jour |
+| `/api/projects/{id}/annotations/{ann_id}` | DELETE | Supprimer |
+| `/api/projects/{id}/annotations/export` | GET | Export JSON/CSV |
+| `/api/projects/{id}/screens/{screen_id}/traceability` | GET | SAFe traceability |
+| `/api/projects/{id}/screens/{screen_id}` | PATCH | Lier écran ↔ feature |
+
+---
+
+## Architecture technique
+
+```
+sf-annotate.js (chargé sur toutes les pages via base.html)
+├── buildToolbar()       — barre flottante bas-droite (CSS vars)
+├── toggleAnnotate()     — active/désactive le mode + bannière
+├── captureClick()       — intercepte les clics (capture phase)
+├── showPopover()        — popover de saisie (CSS vars, thème-adaptatif)
+├── saveAnnotation()     — POST /api/projects/_sf/annotations
+└── renderMarkers()      — affiche les markers sur la page
+
+base.html
+├── toggleSpecBar()      — barre SAFe (Programme|Epic|Feature|Stories)
+├── loadSpecData()       — fetch traceability API → populate cards
+└── toggleWireframeMode() — TreeWalker skeleton + CSS vars shimmer
+```
+
+## Fichiers clés
+
+| Fichier | Rôle |
+|---------|------|
+| `platform/web/static/sf-annotate.js` | Toolbar, popover, markers, API calls |
+| `platform/web/templates/base.html` | SAFe bar, wireframe mode, topbar buttons |
+| `platform/web/templates/annotate.html` | Studio standalone `/annotate/{project_id}` |
+| `platform/web/routes/api/screens.py` | Endpoints annotation + traceability |
+| `platform/scripts/retro_sf_safe.py` | Rétro-ingénierie SAFe de la SF |
+| `platform/db/migrations.py` | Table `epics` (programme_id, name, description) |
+""",
+    },
 ]
