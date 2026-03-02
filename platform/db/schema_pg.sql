@@ -148,7 +148,7 @@ CREATE TABLE IF NOT EXISTS mcps (
 -- MISSIONS
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS missions (
+CREATE TABLE IF NOT EXISTS epics (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -157,7 +157,7 @@ CREATE TABLE IF NOT EXISTS missions (
     status TEXT DEFAULT 'planning',
     type TEXT DEFAULT 'feature',
     workflow_id TEXT,
-    parent_mission_id TEXT,
+    parent_epic_id TEXT,
     wsjf_score REAL DEFAULT 0,
     created_by TEXT DEFAULT '',
     config_json TEXT DEFAULT '{}',
@@ -170,12 +170,12 @@ CREATE TABLE IF NOT EXISTS missions (
     kanban_status TEXT DEFAULT 'funnel',
     jira_key TEXT
 );
-CREATE INDEX IF NOT EXISTS idx_missions_project ON missions(project_id);
-CREATE INDEX IF NOT EXISTS idx_missions_status ON missions(status);
+CREATE INDEX IF NOT EXISTS idx_epics_project ON epics(project_id);
+CREATE INDEX IF NOT EXISTS idx_epics_status ON epics(status);
 
 CREATE TABLE IF NOT EXISTS sprints (
     id TEXT PRIMARY KEY,
-    mission_id TEXT NOT NULL REFERENCES missions(id),
+    epic_id TEXT NOT NULL REFERENCES epics(id),
     number INTEGER NOT NULL DEFAULT 1,
     name TEXT DEFAULT '',
     goal TEXT DEFAULT '',
@@ -186,12 +186,12 @@ CREATE TABLE IF NOT EXISTS sprints (
     velocity INTEGER DEFAULT 0,
     planned_sp INTEGER DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_sprints_mission ON sprints(mission_id);
+CREATE INDEX IF NOT EXISTS idx_sprints_epic ON sprints(epic_id);
 
 CREATE TABLE IF NOT EXISTS tasks (
     id TEXT PRIMARY KEY,
     sprint_id TEXT NOT NULL REFERENCES sprints(id),
-    mission_id TEXT NOT NULL REFERENCES missions(id),
+    epic_id TEXT NOT NULL REFERENCES epics(id),
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     type TEXT DEFAULT 'feature',
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_sprint ON tasks(sprint_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_mission ON tasks(mission_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_epic ON tasks(epic_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 
 -- ============================================================================
@@ -500,7 +500,7 @@ CREATE INDEX IF NOT EXISTS idx_team_members_agent ON org_team_members(agent_id);
 -- MISSION RUNS
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS mission_runs (
+CREATE TABLE IF NOT EXISTS epic_runs (
     id TEXT PRIMARY KEY,
     workflow_id TEXT NOT NULL,
     workflow_name TEXT DEFAULT '',
@@ -515,13 +515,13 @@ CREATE TABLE IF NOT EXISTS mission_runs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     completed_at TEXT,
-    parent_mission_id TEXT DEFAULT '',
+    parent_epic_id TEXT DEFAULT '',
     resume_attempts INTEGER DEFAULT 0,
     last_resume_at TEXT,
     human_input_required INTEGER DEFAULT 0
 );
-CREATE INDEX IF NOT EXISTS idx_mission_runs_project ON mission_runs(project_id);
-CREATE INDEX IF NOT EXISTS idx_mission_runs_status ON mission_runs(status);
+CREATE INDEX IF NOT EXISTS idx_epic_runs_project ON epic_runs(project_id);
+CREATE INDEX IF NOT EXISTS idx_epic_runs_status ON epic_runs(status);
 
 -- ============================================================================
 -- PROGRAM INCREMENTS
@@ -545,7 +545,7 @@ CREATE INDEX IF NOT EXISTS idx_pi_art ON program_increments(art_id);
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS confluence_pages (
-    mission_id TEXT NOT NULL,
+    epic_id TEXT NOT NULL,
     tab TEXT NOT NULL,
     confluence_page_id TEXT NOT NULL,
     last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -558,7 +558,7 @@ CREATE TABLE IF NOT EXISTS confluence_pages (
 
 CREATE TABLE IF NOT EXISTS support_tickets (
     id TEXT PRIMARY KEY,
-    mission_id TEXT NOT NULL,
+    epic_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     severity TEXT DEFAULT 'P3',
@@ -621,8 +621,8 @@ CREATE INDEX IF NOT EXISTS idx_llm_traces_session ON llm_traces(session_id);
 -- ============================================================================
 
 -- Missions: sort by priority
-CREATE INDEX IF NOT EXISTS idx_missions_wsjf ON missions(wsjf_score DESC NULLS LAST);
-CREATE INDEX IF NOT EXISTS idx_missions_created ON missions(created_at);
+CREATE INDEX IF NOT EXISTS idx_epics_wsjf ON epics(wsjf_score DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS idx_epics_created ON epics(created_at);
 
 -- Sessions: timeline queries
 CREATE INDEX IF NOT EXISTS idx_sessions_created ON sessions(created_at);
