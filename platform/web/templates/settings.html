@@ -317,6 +317,7 @@
             <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">🎨 Design</button>
             <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">📐 Architecture</button>
             <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">🐙 GitHub OSS</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="platform" onclick="filterIntegCat('platform',this)">⚙️ Platform</button>
         </div>
 
         <div class="integ-grid" id="integ-grid">
@@ -324,7 +325,14 @@
             {% set cfg = integ.config %}
             <div class="integ-card {% if integ.enabled %}enabled{% endif %}" id="integ-{{ integ.id }}" data-cat="{{ integ.category or integ.type }}">
                 <div class="integ-header">
-                    <div class="integ-icon-emoji">{{ integ.icon or '🔌' }}</div>
+                    <div class="integ-icon-emoji">
+                        {% if integ.icon and integ.icon.startswith('http') %}
+                        <img src="{{ integ.icon }}" style="width:28px;height:28px;object-fit:contain;border-radius:4px" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" alt="">
+                        <span style="display:none">🔌</span>
+                        {% else %}
+                        {{ integ.icon or '🔌' }}
+                        {% endif %}
+                    </div>
                     <div class="integ-info">
                         <div class="integ-name">{{ integ.name }}</div>
                         <div class="integ-type">{{ (integ.category or integ.type)|replace('_',' ') }}</div>
@@ -378,6 +386,9 @@
                     </button>
                     <button class="btn btn-ghost btn-sm" onclick="testInteg('{{ integ.id }}')" style="font-size:0.72rem">
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="showIntegStats('{{ integ.id }}', '{{ integ.name }}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-bar-chart"/></svg> Stats
                     </button>
                 </div>
             </div>
@@ -1518,5 +1529,92 @@ window.showSettingsTab = function(tab) {
         <div id="dt-prov-log" style="font-family:monospace;max-height:300px;overflow-y:auto;padding:0.5rem;background:var(--bg-secondary);border-radius:6px;margin-top:0.5rem;display:block"></div>
     </div>
 </div>
+
+<!-- Integration Stats Modal -->
+<div id="integ-stats-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;width:min(700px,95vw);max-height:85vh;overflow-y:auto;padding:1.5rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem">
+            <h3 id="integ-stats-title" style="margin:0;font-size:1rem;font-weight:700">Integration Stats</h3>
+            <button onclick="closeIntegStats()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.3rem;line-height:1">×</button>
+        </div>
+        <div id="integ-stats-body" style="color:var(--text-secondary);font-size:0.85rem">Loading...</div>
+    </div>
+</div>
+<script>
+function showIntegStats(integId, integName) {
+    document.getElementById('integ-stats-title').textContent = integName + ' — Stats';
+    document.getElementById('integ-stats-body').innerHTML = '<div style="text-align:center;padding:2rem;opacity:.6">Loading...</div>';
+    const modal = document.getElementById('integ-stats-modal');
+    modal.style.display = 'flex';
+
+    fetch('/api/integrations/' + integId + '/stats')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.ok) { document.getElementById('integ-stats-body').textContent = d.error || 'Error'; return; }
+            let html = '';
+            if (integId === 'rtk-compression') {
+                const saved = d.total_tokens_saved || 0;
+                const savedK = saved >= 1000 ? (saved/1000).toFixed(1) + 'K' : saved;
+                html = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.2rem">
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--purple)">${d.total_calls}</div>
+                        <div style="font-size:.75rem;opacity:.6">Total calls</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#4ade80">${savedK}</div>
+                        <div style="font-size:.75rem;opacity:.6">Tokens saved</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#facc15">${d.avg_savings_pct}%</div>
+                        <div style="font-size:.75rem;opacity:.6">Avg compression</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#60a5fa">${d.last_24h.calls}</div>
+                        <div style="font-size:.75rem;opacity:.6">Last 24h calls</div>
+                    </div>
+                </div>`;
+                if (d.by_provider && d.by_provider.length) {
+                    html += '<div style="margin-bottom:1rem"><div style="font-weight:600;margin-bottom:.5rem;font-size:.82rem;opacity:.8">By Provider</div>';
+                    html += '<table style="width:100%;border-collapse:collapse;font-size:.8rem">';
+                    html += '<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:.4rem">Provider</th><th style="text-align:right;padding:.4rem">Calls</th><th style="text-align:right;padding:.4rem">Orig tokens</th><th style="text-align:right;padding:.4rem">Compressed</th><th style="text-align:right;padding:.4rem">Saving</th></tr></thead><tbody>';
+                    d.by_provider.forEach(p => {
+                        const pct = p.avg_pct ? p.avg_pct.toFixed(1) : '0';
+                        html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:.4rem">${p.provider}</td><td style="text-align:right;padding:.4rem">${p.calls}</td><td style="text-align:right;padding:.4rem">${(p.orig_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.4rem">${(p.comp_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.4rem;color:#4ade80">${pct}%</td></tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                if (d.recent && d.recent.length) {
+                    html += '<div><div style="font-weight:600;margin-bottom:.5rem;font-size:.82rem;opacity:.8">Recent calls (last 20)</div>';
+                    html += '<table style="width:100%;border-collapse:collapse;font-size:.78rem">';
+                    html += '<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:.3rem">Provider</th><th style="text-align:right;padding:.3rem">Orig</th><th style="text-align:right;padding:.3rem">Compressed</th><th style="text-align:right;padding:.3rem">Saving</th><th style="text-align:right;padding:.3rem">Time</th></tr></thead><tbody>';
+                    d.recent.forEach(r => {
+                        const pct = r.savings_pct ? r.savings_pct.toFixed(1) : '0';
+                        const t = r.ts ? r.ts.slice(0,16).replace('T',' ') : '';
+                        html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:.3rem">${r.provider}</td><td style="text-align:right;padding:.3rem">${(r.original_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.3rem">${(r.compressed_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.3rem;color:#4ade80">${pct}%</td><td style="text-align:right;padding:.3rem;opacity:.6">${t}</td></tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                if (!d.total_calls) html = '<div style="text-align:center;padding:2rem;opacity:.5">No compression stats yet.<br>Stats appear after the first LLM call with RTK enabled.</div>';
+            } else {
+                html = `<div style="display:grid;gap:.5rem">
+                    <div><span style="opacity:.5">Status:</span> ${d.status || 'unknown'}</div>
+                    <div><span style="opacity:.5">Last sync:</span> ${d.last_sync || 'never'}</div>
+                    <div><span style="opacity:.5">Updated:</span> ${d.updated_at || '-'}</div>
+                    ${d.note ? '<div style="opacity:.5;margin-top:.5rem">'+d.note+'</div>' : ''}
+                </div>`;
+            }
+            document.getElementById('integ-stats-body').innerHTML = html;
+        })
+        .catch(e => { document.getElementById('integ-stats-body').textContent = 'Error: ' + e; });
+}
+
+function closeIntegStats() {
+    document.getElementById('integ-stats-modal').style.display = 'none';
+}
+document.getElementById('integ-stats-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeIntegStats();
+});
+</script>
 
 {% endblock %}

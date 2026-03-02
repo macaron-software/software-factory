@@ -1,0 +1,7 @@
+/* SF Annotation Studio — injected styles */
+/* Core styles are injected inline by sf-annotate.js */
+
+.sf-ann-marker {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}

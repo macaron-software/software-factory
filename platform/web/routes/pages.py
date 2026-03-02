@@ -1543,3 +1543,123 @@ async def analytics_page(request: Request):
     from starlette.responses import RedirectResponse
 
     return RedirectResponse("/metrics?tab=analytics", status_code=302)
+
+
+# ── Annotation Studio ─────────────────────────────────────────────
+
+
+def _get_deploy_url(project_id: str) -> str:
+    """Try to find deployed URL for a project."""
+    import json as _json
+    try:
+        from ...db.migrations import get_db
+        db = get_db()
+        for table in ("projects", "project_missions"):
+            try:
+                row = db.execute(f"SELECT config_json FROM {table} WHERE id=?", (project_id,)).fetchone()
+                if row:
+                    cfg = _json.loads(row["config_json"] or "{}")
+                    url = cfg.get("deploy_url") or cfg.get("result_deploy_url", "")
+                    if url:
+                        return url
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return ""
+
+
+@router.get("/annotate/{project_id}", response_class=HTMLResponse)
+async def annotation_studio(project_id: str, request: Request):
+    """Annotation Studio — standalone business-user page."""
+    templates = _templates(request)
+    try:
+        from ...projects.manager import get_project_store
+        proj = get_project_store().get(project_id)
+    except Exception:
+        proj = None
+
+    deploy_url = _get_deploy_url(project_id)
+
+    return templates.TemplateResponse(
+        "annotate.html",
+        {
+            "request": request,
+            "project_id": project_id,
+            "project_name": proj.name if proj else project_id,
+            "deploy_url": deploy_url,
+            "has_live": bool(deploy_url),
+        },
+    )
+
+
+@router.api_route(
+    "/annotate/{project_id}/proxy/{path:path}",
+    methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+)
+async def annotation_proxy(project_id: str, path: str, request: Request):
+    """HTTP proxy that injects annotation overlay script into the project's deployed app."""
+    import httpx
+    from fastapi.responses import StreamingResponse, Response as FResponse
+
+    try:
+        deploy_url = _get_deploy_url(project_id)
+        if not deploy_url:
+            return HTMLResponse("<h1>No deployed URL for this project</h1>", status_code=404)
+
+        target = deploy_url.rstrip("/") + "/" + path
+        qs = str(request.url.query)
+        if qs:
+            target += "?" + qs
+
+        headers = dict(request.headers)
+        headers.pop("host", None)
+        headers.pop("Host", None)
+
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            resp = await client.request(
+                method=request.method,
+                url=target,
+                headers=headers,
+                content=await request.body(),
+            )
+
+        # Inject annotation script into HTML responses
+        content_type = resp.headers.get("content-type", "")
+        if "text/html" in content_type:
+            html = resp.text
+            inject = (
+                f'<script>window.SF_ANNOTATE={{projectId:"{project_id}",proxyBase:"/annotate/{project_id}/proxy",apiBase:"/api/projects/{project_id}"}};</script>'
+                '<link rel="stylesheet" href="/static/sf-annotate.css">'
+                '<script src="/static/sf-annotate.js" defer></script>'
+            )
+            if "<head>" in html:
+                html = html.replace("<head>", "<head>" + inject, 1)
+            else:
+                html = inject + html
+
+            # Rewrite absolute URLs to go through proxy
+            html = html.replace('href="/', f'href="/annotate/{project_id}/proxy/')
+            html = html.replace('src="/', f'src="/annotate/{project_id}/proxy/')
+            html = html.replace("href='/", f"href='/annotate/{project_id}/proxy/")
+            html = html.replace("src='/", f"src='/annotate/{project_id}/proxy/")
+
+            resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in (
+                "x-frame-options", "content-security-policy", "content-length",
+                "transfer-encoding", "content-encoding",
+            )}
+            return HTMLResponse(content=html, status_code=resp.status_code, headers=resp_headers)
+
+        # Pass through non-HTML responses
+        resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in (
+            "x-frame-options", "content-security-policy", "transfer-encoding",
+        )}
+        return FResponse(
+            content=resp.content,
+            status_code=resp.status_code,
+            media_type=content_type,
+            headers=resp_headers,
+        )
+    except Exception as e:
+        logger.error(f"Annotation proxy error: {e}")
+        return HTMLResponse(f"<h1>Proxy error: {e}</h1>", status_code=502)

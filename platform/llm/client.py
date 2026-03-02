@@ -79,8 +79,12 @@ _PROVIDERS = {
         "name": "Local MLX (mlx_lm.server)",
         "base_url": os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1"),
         "key_env": None,  # no API key needed
-        "models": [os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")],
-        "default": os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"),
+        "models": [
+            os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
+        ],
+        "default": os.environ.get(
+            "LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
+        ),
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
         "no_auth": True,  # skip auth header entirely
@@ -98,11 +102,15 @@ _is_azure = os.environ.get("AZURE_DEPLOY", "") or os.environ.get(
 # On local dev (not Azure), include local-mlx in Thompson candidates if server is available
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
 _FALLBACK_CHAIN = [_primary] + [
-    p for p in (
-        (["local-mlx"] if _local_mlx_enabled else []) +
-        ["minimax", "azure-openai", "azure-ai", "openai"]
-    ) if p != _primary
+    p
+    for p in (
+        (["local-mlx"] if _local_mlx_enabled else [])
+        + ["minimax", "azure-openai", "azure-ai", "openai"]
+    )
+    if p != _primary
 ]
+
+_rtk_cache: dict = {}
 
 
 class _RateLimiter:
@@ -400,14 +408,53 @@ class LLMClient:
             max_attempts = 3  # Retry within provider, then fall back to next
             for attempt in range(max_attempts):
                 try:
+                    # RTK-inspired prompt compression — on by default for all providers
+                    # Toggle via integrations table (cached 60s), fallback to env
+                    _send_messages = messages
+                    _send_system = system_prompt
+                    _rtk_now = time.monotonic()
+                    if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
+                        try:
+                            from ..db.migrations import get_db as _get_db
+                            _db = _get_db()
+                            _row = _db.execute("SELECT enabled FROM integrations WHERE id='rtk-compression'").fetchone()
+                            _db.close()
+                            _rtk_cache["enabled"] = bool(_row["enabled"]) if _row else True
+                        except Exception:
+                            _rtk_cache["enabled"] = not bool(os.environ.get("LLM_COMPRESS_DISABLED", ""))
+                        _rtk_cache["ts"] = _rtk_now
+                    if _rtk_cache.get("enabled", True):
+                        try:
+                            from .prompt_compressor import (
+                                compress_messages as _rtk_compress,
+                            )
+
+                            _send_messages, _send_system, _rtk_stats = _rtk_compress(
+                                messages, system_prompt, provider=prov
+                            )
+                            if _rtk_stats["savings_pct"] > 0:
+                                logger.warning(
+                                    "RTK compress %s: %d→%d tokens (-%s%%)",
+                                    prov,
+                                    _rtk_stats["original_tokens"],
+                                    _rtk_stats["compressed_tokens"],
+                                    _rtk_stats["savings_pct"],
+                                )
+                                try:
+                                    from .prompt_compressor import record_compression_stats as _rtk_record
+                                    _rtk_record(prov, _rtk_stats["original_tokens"], _rtk_stats["compressed_tokens"], _rtk_stats["savings_pct"])
+                                except Exception:
+                                    pass
+                        except Exception as _ce:
+                            logger.debug("RTK compressor error (skipped): %s", _ce)
                     result = await self._do_chat(
                         pcfg,
                         prov,
                         use_model,
-                        messages,
+                        _send_messages,
                         temperature,
                         max_tokens,
-                        system_prompt,
+                        _send_system,
                         tools,
                     )
                     self._stats["calls"] += 1
@@ -909,7 +956,11 @@ class LLMClient:
         result = []
         for pid, pcfg in _PROVIDERS.items():
             key = self._get_api_key(pcfg)
-            has_key = bool(key and key != "no-key") or not pcfg.get("key_env") or pcfg.get("no_auth")
+            has_key = (
+                bool(key and key != "no-key")
+                or not pcfg.get("key_env")
+                or pcfg.get("no_auth")
+            )
             result.append(
                 {
                     "id": pid,
