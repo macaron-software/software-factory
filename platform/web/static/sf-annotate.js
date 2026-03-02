@@ -119,42 +119,49 @@
   function buildToolbar() {
     const tb = document.createElement('div');
     tb.id = 'sf-ann-toolbar';
+    // Start collapsed — just the pencil button visible
     tb.style.cssText = `
       position: fixed; z-index: 2147483647; bottom: 24px; right: 24px;
       background: rgba(15,17,23,.95); backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,.12); border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.15); border-radius: 12px;
       padding: 8px; display: flex; align-items: center; gap: 4px;
-      box-shadow: 0 8px 32px rgba(0,0,0,.6); user-select: none;
+      box-shadow: 0 4px 20px rgba(0,0,0,.5); user-select: none;
       font-family: system-ui, -apple-system, sans-serif;
+      transition: all .2s ease;
     `;
     tb.innerHTML = `
-      <button id="sf-tb-toggle" title="Toggle Annotate (Ctrl+Shift+A)" style="${btnStyle('#3b82f6','#fff')}">
-        ${ICONS['edit-2']} <span style="font-size:11px;font-weight:600;margin-left:4px">Annotate</span>
+      <button id="sf-tb-toggle" title="Annoter cette page (Ctrl+Shift+A)" style="${btnStyle('transparent','rgba(255,255,255,.7)')}">
+        ${ICONS['edit-2']} <span id="sf-tb-label" style="font-size:11px;font-weight:600;margin-left:4px;color:rgba(255,255,255,.7)">Annoter</span>
       </button>
-      <div id="sf-tb-types" style="display:none;align-items:center;gap:3px">
-        ${Object.entries(TYPE_META).map(([k,v]) => `
-          <button class="sf-tb-type" data-type="${k}" title="${v.label}" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-            <span style="width:14px;height:14px;display:inline-flex">${ICONS[v.icon]}</span>
-          </button>
-        `).join('')}
+      <div id="sf-tb-expanded" style="display:none;align-items:center;gap:3px">
+        <div id="sf-tb-types" style="display:flex;align-items:center;gap:3px">
+          ${Object.entries(TYPE_META).map(([k,v]) => `
+            <button class="sf-tb-type" data-type="${k}" title="${v.label}" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+              <span style="width:14px;height:14px;display:inline-flex">${ICONS[v.icon]}</span>
+            </button>
+          `).join('')}
+        </div>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
+        <button id="sf-tb-pause" title="Pause animations (P)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+          ${ICONS['pause-circle']}
+        </button>
+        <button id="sf-tb-visibility" title="Afficher/masquer marqueurs (H)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+          ${ICONS['eye']}
+        </button>
+        <button id="sf-tb-copy" title="Copier markdown (C)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+          ${ICONS['clipboard']}
+        </button>
+        <button id="sf-tb-clear" title="Effacer tout (X)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+          ${ICONS['trash-2']}
+        </button>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
+        <button id="sf-tb-fixall" title="Fix All — créer une mission agent" style="${btnStyle('#7c3aed','#fff')}">
+          ${ICONS['zap']}
+        </button>
+        <button id="sf-tb-view" title="Voir toutes les annotations" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
+          ${ICONS['layout']}
+        </button>
       </div>
-      <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
-      <button id="sf-tb-pause" title="Pause animations (P)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-        ${ICONS['pause-circle']}
-      </button>
-      <button id="sf-tb-visibility" title="Show/hide markers (H)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-        ${ICONS['eye']}
-      </button>
-      <button id="sf-tb-copy" title="Copy markdown (C)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-        ${ICONS['clipboard']}
-      </button>
-      <button id="sf-tb-clear" title="Clear all annotations (X)" style="${btnStyle('transparent','rgba(255,255,255,.5)')}">
-        ${ICONS['trash-2']}
-      </button>
-      <div style="width:1px;height:20px;background:rgba(255,255,255,.12);margin:0 2px"></div>
-      <button id="sf-tb-fixall" title="Fix all — create agent mission" style="${btnStyle('#7c3aed','#fff')}">
-        ${ICONS['zap']}
-      </button>
     `;
     document.body.appendChild(tb);
 
@@ -199,6 +206,7 @@
     document.getElementById('sf-tb-copy').addEventListener('click', copyMarkdown);
     document.getElementById('sf-tb-clear').addEventListener('click', clearAll);
     document.getElementById('sf-tb-fixall').addEventListener('click', fixAll);
+    document.getElementById('sf-tb-view').addEventListener('click', () => window.open('/annotate/_sf', '_blank'));
     document.querySelectorAll('.sf-tb-type').forEach(btn => {
       btn.addEventListener('click', () => setType(btn.dataset.type));
     });
@@ -215,10 +223,14 @@
   function toggleAnnotate() {
     active = !active;
     const btn = document.getElementById('sf-tb-toggle');
-    const types = document.getElementById('sf-tb-types');
+    const expanded = document.getElementById('sf-tb-expanded');
+    const lbl = document.getElementById('sf-tb-label');
+    // Toggle button style
     btn.style.background = active ? '#3b82f6' : 'transparent';
-    btn.style.color = active ? '#fff' : 'rgba(255,255,255,.5)';
-    types.style.display = active ? 'flex' : 'none';
+    btn.style.color = active ? '#fff' : 'rgba(255,255,255,.7)';
+    if (lbl) { lbl.style.color = active ? '#fff' : 'rgba(255,255,255,.7)'; lbl.textContent = active ? 'Annoter ON' : 'Annoter'; }
+    // Show/hide full toolbar
+    if (expanded) expanded.style.display = active ? 'flex' : 'none';
     document.body.style.cursor = active ? 'crosshair' : '';
     if (!active && hoveredEl) { hoveredEl.classList.remove('sf-ann-highlight', `sf-ann-highlight-${annotType}`); hoveredEl = null; }
     // Show/hide mode banner
@@ -498,10 +510,9 @@
   // ── Init ───────────────────────────────────────────────────────
   function init() {
     buildToolbar();
-    toggleAnnotate(); // start in annotation mode
+    // Do NOT auto-activate — user clicks "Annoter" button to start
   }
 
-  // Expose for banner button (inline onclick)
   window.toggleAnnotate = toggleAnnotate;
 
   if (document.readyState === 'loading') {

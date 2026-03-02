@@ -744,22 +744,20 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- SF Self-Annotation Mode (activated in Settings) -->
 <script>
 (function() {
-  fetch('/api/settings/general').then(function(r){return r.json();}).then(function(d){
-    if (d.self_annotation_enabled === 'true') {
-      window.SF_ANNOTATE = {
-        projectId: '_sf',
-        apiBase: '/api/projects/_sf',
-        selfMode: true,
-        pageName: document.title
-      };
-      var link = document.createElement('link');
-      link.rel = 'stylesheet'; link.href = '/static/sf-annotate.css';
-      document.head.appendChild(link);
-      var s = document.createElement('script');
-      s.src = '/static/sf-annotate.js'; s.defer = true;
-      document.head.appendChild(s);
-    }
-  }).catch(function(){});
+  // Always inject sf-annotate — toolbar appears as small floating button
+  window.SF_ANNOTATE = {
+    projectId: '_sf',
+    apiBase: '/api/projects/_sf',
+    selfMode: true,
+    pageName: document.title,
+    startActive: false  // toolbar visible but annotation OFF until user clicks
+  };
+  var link = document.createElement('link');
+  link.rel = 'stylesheet'; link.href = '/static/sf-annotate.css';
+  document.head.appendChild(link);
+  var s = document.createElement('script');
+  s.src = '/static/sf-annotate.js';
+  document.head.appendChild(s);
 })();
 </script>
 <!-- SF Wireframe Mode + Annotation Help -->

@@ -4869,3 +4869,170 @@ Python(201) MallocStackLogging: can't turn off malloc stack logging because it w
 {"ts": "2026-03-02T11:36:29", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (236 in, 289 out tokens)"}
 Python(1057) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
 Python(1079) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(1100) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(1121) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(1124) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:36:29", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:36:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini failed after 2 attempts: RuntimeError('HTTP 400: {\\n  \"error\": {\\n    \"message\": \"Invalid parameter: messages with role \\'tool\\' must be a response to a preceeding message with \\'tool_calls\\'.\",\\n    \"type\": \"invalid_request_"}
+{"ts": "2026-03-02T11:36:30", "level": "ERROR", "logger": "platform.llm.client", "msg": "Circuit breaker OPEN for azure-openai (5 failures in 60s) — blocked for 120s"}
+{"ts": "2026-03-02T11:36:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini rate-limited (429), retry in 16s (attempt 1/3) [rate: 15/15]"}
+{"ts": "2026-03-02T11:36:34", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:36:41", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1146 in, 611 out tokens)"}
+{"ts": "2026-03-02T11:36:41", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Thibault Renaud] attempt=2 score=8: TOO_SHORT: 25 chars (min 80 for default); L1: TASK_INCOMPLETE: Agent hit max tool rounds without completing root cause analysis; L1: TOOL_FAILURE: All deep_search calls failed with 'could not initialize RLM for project macaron-platform (no path found)'"}
+{"ts": "2026-03-02T11:36:41", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent architecte: tools_enabled=False, tools=NO, allowed=all"}
+{"ts": "2026-03-02T11:36:43", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (427 in, 654 out tokens)"}
+{"ts": "2026-03-02T11:36:44", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream trying minimax/MiniMax-M2.5 ..."}
+{"ts": "2026-03-02T11:36:46", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini rate-limited (429), retry in 11s (attempt 2/3) [rate: 14/15]"}
+{"ts": "2026-03-02T11:36:50", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM stream minimax/MiniMax-M2.5 connected"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent lead_dev: tools_enabled=True, tools=YES, allowed=['code_read', 'code_write', 'code_edit']"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=lead_dev round=0 tc=0 clen=150 fin=stop"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=lead_dev count=1 len=8"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=lead_dev count=2 len=8"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=lead_dev count=3 len=8"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=lead_dev deltas=19 think=0"}
+{"ts": "2026-03-02T11:36:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T11:36:58", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini failed after 3 attempts: RuntimeError('HTTP 400: {\\n  \"error\": {\\n    \"message\": \"Invalid parameter: messages with role \\'tool\\' must be a response to a preceeding message with \\'tool_calls\\'.\",\\n    \"type\": \"invalid_request_"}
+{"ts": "2026-03-02T11:36:58", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:36:58", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 failed after 1 attempts: RuntimeError('HTTP 400: {\"type\":\"error\",\"error\":{\"type\":\"bad_request_error\",\"message\":\"invalid params, tool result\\'s tool id(call_L9w30bYrEfteqm8iRI20tyZo) not found (2013)\",\"http_code\":\"400\"},\"reque"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 failed after 2 attempts: RuntimeError('HTTP 400: {\"type\":\"error\",\"error\":{\"type\":\"bad_request_error\",\"message\":\"invalid params, tool result\\'s tool id(call_L9w30bYrEfteqm8iRI20tyZo) not found (2013)\",\"http_code\":\"400\"},\"reque"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 failed after 3 attempts: RuntimeError('HTTP 400: {\"type\":\"error\",\"error\":{\"type\":\"bad_request_error\",\"message\":\"invalid params, tool result\\'s tool id(call_L9w30bYrEfteqm8iRI20tyZo) not found (2013)\",\"http_code\":\"400\"},\"reque"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-ai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:36:59", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent dev streaming LLM error, retrying in 58s: All LLM providers failed for azure-openai/gpt-5-mini"}
+{"ts": "2026-03-02T11:37:03", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (540 in, 402 out tokens)"}
+{"ts": "2026-03-02T11:37:03", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Thomas Dubois] attempt=1 score=10: L1: HALLUCINATION: Claims it will explore workspace and verify context but NO tools were actually used - just text stating intent; L1: SLOP: Pure filler text with no substance - just says 'je vais analyser' and 'je commence par explorer' without doing anything; L1: ECHO: Just restates the task ('Nous démarrons l'idéation') without any actual contribution"}
+{"ts": "2026-03-02T11:37:03", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:37:03", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:37:03", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 12/15]"}
+{"ts": "2026-03-02T11:37:08", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (8045 in, 181 out tokens)"}
+{"ts": "2026-03-02T11:37:08", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:37:08", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:37:08", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T11:37:09", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1819 in, 2051 out tokens)"}
+{"ts": "2026-03-02T11:37:09", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T11:37:12", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7309 in, 108 out tokens)"}
+{"ts": "2026-03-02T11:37:12", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:37:12", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:37:12", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=architecte count=1 len=8"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=architecte count=2 len=8"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=architecte count=3 len=8"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 508f964b stalled 6660s in phase  — triggering retry"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission b55652ab stalled 6649s in phase qa-campaign — triggering retry"}
+{"ts": "2026-03-02T11:37:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission aabc7572 stalled 5706s in phase  — triggering retry"}
+{"ts": "2026-03-02T11:37:26", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=architecte deltas=279 think=0"}
+{"ts": "2026-03-02T11:37:26", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]"}
+{"ts": "2026-03-02T11:37:27", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (636 in, 649 out tokens)"}
+Python(1686) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(1687) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(1708) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:37:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T11:37:48", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (1198 in, 610 out tokens)"}
+{"ts": "2026-03-02T11:37:48", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "ADVERSARIAL REJECT [Pierre Duval] attempt=1 score=7: L1: ECHO: Agent rephrased the problem without doing the actual task - never checked if files are complete/incomplete; L1: HALLUCINATION: Claims 'accès non configuré' but there are no tool calls attempted - could have tried code_read on auto_heal.py; L1: Task failure: Task was 'Review completeness. [COMPLETE] or [INCOMPLETE] + missing items' - agent gave architectural proposals instead of a binary verdict"}
+{"ts": "2026-03-02T11:37:48", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:37:48", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T11:37:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7142 in, 167 out tokens)"}
+{"ts": "2026-03-02T11:37:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:37:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]"}
+{"ts": "2026-03-02T11:37:58", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent dev: tools_enabled=True, tools=YES, allowed=['code_read', 'code_write', 'code_edit']"}
+{"ts": "2026-03-02T11:37:58", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=dev round=0 tc=0 clen=0 fin=stop"}
+{"ts": "2026-03-02T11:37:58", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=dev deltas=0 think=0"}
+Python(2071) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(2078) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(2104) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:38:00", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent qa_lead: tools_enabled=True, tools=YES, allowed=['code_read', 'code_write', 'code_edit']"}
+{"ts": "2026-03-02T11:38:00", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:00", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:00", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T11:38:04", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7391 in, 66 out tokens)"}
+{"ts": "2026-03-02T11:38:04", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:04", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 9/15]"}
+{"ts": "2026-03-02T11:38:06", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7441 in, 51 out tokens)"}
+{"ts": "2026-03-02T11:38:06", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:06", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 10/15]"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (10938 in, 359 out tokens)"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=qa_lead round=0 tc=1 clen=208 fin=tool_calls"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=qa_lead tool=list_files args={'depth': 3, 'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/5d08aa8b'} result=5d08aa8b/\n  README.md\n  package-lock.json\n  package.json\n  security.md\n  tsconfig.json\n  docs/\n    security/\n      owasp-schema.md\n  node_modules/\n    .package-lock.json\n    .bin/\n      tsc\n      tsse"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:07", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 11/15]"}
+{"ts": "2026-03-02T11:38:09", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7491 in, 48 out tokens)"}
+{"ts": "2026-03-02T11:38:09", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:09", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 11/15]"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (10461 in, 119 out tokens)"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=qa_lead round=1 tc=2 clen=58 fin=tool_calls"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=qa_lead tool=code_read args={'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/5d08aa8b/security.md'} result=# Security Documentation - OWASP Top 10\n\n## Overview\nThis document covers the OWASP Top 10 security vulnerabilities and their mitigation strategies.\n\n## Covered Topics\n1. Injection\n2. Broken Authentic"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=qa_lead tool=code_read args={'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/5d08aa8b/package.json'} result={\n  \"name\": \"security-cli\",\n  \"version\": \"1.0.0\",\n  \"type\": \"module\",\n  \"description\": \"Security CLI for OWASP Top 10 validation and scanning\",\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\n    \"build\": \""}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:10", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 11/15]"}
+{"ts": "2026-03-02T11:38:11", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (8171 in, 74 out tokens)"}
+[EXECUTOR] deep_search called: auto_heal.py templates.py validator.py
+{"ts": "2026-03-02T11:38:11", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:11", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 12/15]"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (685 in, 865 out tokens)"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.services.auto_resume", "msg": "auto_resume: mission_run=0cef9567 acquired semaphore"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH START mission=0cef9567 phases=2 session=672b3ade"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH stopped existing agent loops for session 672b3ade"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH evidence gate: 3 criteria for review-cycle"}
+Python(2289) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(2290) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=p1 status=RUNNING agents=['lead_dev', 'securite', 'arch-critic'] pattern=sequential"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.agents.executor", "msg": "Agent lead_dev: tools_enabled=True, tools=YES, allowed=['code_read', 'code_write', 'code_edit']"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 12/15]"}
+{"ts": "2026-03-02T11:38:13", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (8234 in, 52 out tokens)"}
+{"ts": "2026-03-02T11:38:14", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:14", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 13/15]"}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (6460 in, 95 out tokens)"}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=qa_lead round=2 tc=1 clen=181 fin=tool_calls"}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=qa_lead tool=code_read args={'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/5d08aa8b/src/index.ts'} result=#!/usr/bin/env node\n\n/**\n * Security CLI - OWASP Top 10 Scanner & Documentation Tool\n * \n * Provides commands to:\n * - Scan project dependencies for vulnerabilities\n * - Check container security\n * - "}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:19", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 14/15]"}
+{"ts": "2026-03-02T11:38:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 508f964b stalled 6720s in phase  — triggering retry"}
+{"ts": "2026-03-02T11:38:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission b55652ab stalled 6709s in phase qa-campaign — triggering retry"}
+{"ts": "2026-03-02T11:38:20", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission aabc7572 stalled 5766s in phase  — triggering retry"}
+{"ts": "2026-03-02T11:38:23", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7059 in, 173 out tokens)"}
+{"ts": "2026-03-02T11:38:23", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=qa_lead round=3 tc=1 clen=487 fin=tool_calls"}
+Python(2443) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=qa_lead tool=build args={'command': 'npm run build', 'cwd': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/5d08aa8b'} result=[BUILD] SUCCESS\n$ npm run build\n\n> security-cli@1.0.0 build\n> tsc -p tsconfig.json\n\n"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5775 in, 367 out tokens)"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=lead_dev round=0 tc=2 clen=138 fin=tool_calls"}
+{"ts": "2026-03-02T11:38:24", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=lead_dev tool=list_files args={'depth': 3, 'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/0cef9567'} result=Error: not a directory: /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/0cef9567"}
+Python(2479) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:38:25", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=lead_dev tool=code_search args={'path': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/0cef9567', 'pattern': 'security\\\\.md'} result=No matches found"}
+{"ts": "2026-03-02T11:38:25", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:25", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:26", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:29", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (4119 in, 158 out tokens)"}
+{"ts": "2026-03-02T11:38:29", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (5119 in, 72 out tokens)"}
+{"ts": "2026-03-02T11:38:30", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=lead_dev round=1 tc=1 clen=97 fin=tool_calls"}
+Python(2495) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:38:30", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_EXEC agent=lead_dev tool=git_status args={'cwd': '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/0cef9567'} result=Error: [Errno 2] No such file or directory: '/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/workspaces/0cef9567'"}
+{"ts": "2026-03-02T11:38:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai circuit breaker OPEN, skipping → fallback"}
+{"ts": "2026-03-02T11:38:30", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM local-mlx skipped (no API key)"}
+{"ts": "2026-03-02T11:38:36", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:40", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (7803 in, 3778 out tokens)"}
+{"ts": "2026-03-02T11:38:45", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (4768 in, 937 out tokens)"}
+{"ts": "2026-03-02T11:38:45", "level": "WARNING", "logger": "platform.agents.executor", "msg": "TOOL_DBG agent=qa_lead round=4 tc=0 clen=2333 fin=stop"}
+{"ts": "2026-03-02T11:38:45", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=qa_lead count=1 len=8"}
+{"ts": "2026-03-02T11:38:45", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=qa_lead count=2 len=8"}
+{"ts": "2026-03-02T11:38:45", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DELTA agent=qa_lead count=3 len=8"}
+{"ts": "2026-03-02T11:38:48", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying azure-openai/gpt-5-mini ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:49", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini rate-limited (429), retry in 12s (attempt 1/3) [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:54", "level": "WARNING", "logger": "platform.patterns.engine", "msg": "STREAM_DONE agent=qa_lead deltas=292 think=0"}
+{"ts": "2026-03-02T11:38:54", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=p2 status=done"}
+{"ts": "2026-03-02T11:38:56", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:38:57", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (4175 in, 355 out tokens)"}
+{"ts": "2026-03-02T11:39:01", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:39:01", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM azure-openai/gpt-5-mini rate-limited (429), retry in 15s (attempt 2/3) [rate: 15/15]"}
+{"ts": "2026-03-02T11:39:01", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (214 in, 348 out tokens)"}
+Python(2987) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(3009) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
