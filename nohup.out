@@ -3563,3 +3563,19 @@ Python(88188) MallocStackLogging: can't turn off malloc stack logging because it
 {"ts": "2026-03-02T11:15:31", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (223 in, 316 out tokens)"}
 Python(88508) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
 Python(88539) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(88561) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(88582) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(88585) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+{"ts": "2026-03-02T11:15:33", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:15:43", "level": "ERROR", "logger": "platform.services.mission_orchestrator", "msg": "Phase p1 timed out after 600s (all retries exhausted)"}
+{"ts": "2026-03-02T11:15:43", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "Phase p1 max sprints exhausted — continuing with issues"}
+{"ts": "2026-03-02T11:15:43", "level": "WARNING", "logger": "platform.services.mission_orchestrator", "msg": "ORCH phase=p1 status=done_with_issues"}
+{"ts": "2026-03-02T11:15:47", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:15:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 5d08aa8b stalled 5402s in phase p1 — triggering retry"}
+{"ts": "2026-03-02T11:15:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission 508f964b stalled 5369s in phase  — triggering retry"}
+{"ts": "2026-03-02T11:15:49", "level": "WARNING", "logger": "platform.ops.endurance_watchdog", "msg": "WATCHDOG: mission b55652ab stalled 5358s in phase qa-campaign — triggering retry"}
+{"ts": "2026-03-02T11:15:50", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (407 in, 739 out tokens)"}
+{"ts": "2026-03-02T11:16:03", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM trying minimax/MiniMax-M2.5 ... [rate: 15/15]"}
+{"ts": "2026-03-02T11:16:07", "level": "WARNING", "logger": "platform.llm.client", "msg": "LLM minimax/MiniMax-M2.5 OK (334 in, 746 out tokens)"}
+Python(89074) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
+Python(89103) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
