@@ -495,7 +495,7 @@ SAFE_MAP = [
                 "description": "Configuration globale : LLM, intégrations, notifications, clés API.",
                 "persona": "Admin Plateforme",
                 "rbac": ROLES["admin_only"],
-                "pages": ["/settings"],
+                "pages": ["/settings", "/setup", "/login"],
                 "stories": [
                     "Configurer le fournisseur LLM par défaut",
                     "Gérer les clés API des intégrations tierces",
@@ -752,7 +752,7 @@ def run():
             "Plateforme d'orchestration d'agents IA — Software Factory",
         ),
     )
-    print(f"✓ Programme: {PROGRAMME_NAME}")
+    print(f"[ok] Programme: {PROGRAMME_NAME}")
 
     total_features = total_stories = total_screens = 0
 
@@ -840,7 +840,7 @@ def run():
         pass
 
     print(
-        f"\n✅ Done: {len(SAFE_MAP)} epics | {total_features} features | {total_stories} stories | {total_screens} screens"
+        f"\nDone: {len(SAFE_MAP)} epics | {total_features} features | {total_stories} stories | {total_screens} screens"
     )
 
 
