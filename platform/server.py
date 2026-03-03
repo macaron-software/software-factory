@@ -35,7 +35,7 @@ if os.environ.get("OTEL_ENABLED"):
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         _otel_resource = Resource.create(
             {
@@ -57,15 +57,16 @@ if os.environ.get("OTEL_ENABLED"):
             _http_ep = _otlp_endpoint.replace(":4317", ":4318")
             _traces_ep = _http_ep + "/v1/traces"
             _otel_provider.add_span_processor(
-                SimpleSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
             )
             logger.warning("OTEL: exporting traces to %s", _traces_ep)
         except ImportError:
-            from opentelemetry.sdk.trace.export import ConsoleSpanExporter
-
-            _otel_provider.add_span_processor(
-                SimpleSpanProcessor(ConsoleSpanExporter())
+            from opentelemetry.sdk.trace.export import (
+                BatchSpanProcessor,
+                ConsoleSpanExporter,
             )
+
+            _otel_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
             logger.warning("OTEL: OTLP exporter not available, using console")
 
         trace.set_tracer_provider(_otel_provider)

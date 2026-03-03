@@ -61,13 +61,10 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - GITHUB_TOKEN=${GITHUB_TOKEN:-}
       - PG_POOL_MAX_SIZE=20
+      - OTEL_ENABLED=1
+      - OTEL_SERVICE_NAME=macaron-factory
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     volumes:
-      - platform-data:/app/data
-      - workspace-data:/app/workspace
-      - /opt/macaron/.factory-keys:/app/.config/factory:ro
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/macaron/repos:/opt/macaron/repos
-      - /opt/macaron/slots/factory:/app/macaron_platform
       - /opt/macaron/core:/app/core
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
@@ -120,11 +117,10 @@ services:
       - SANDBOX_ENABLED=true
       - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
       - SANDBOX_NETWORK=bridge
+      - OTEL_ENABLED=1
+      - OTEL_SERVICE_NAME=macaron-ui
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     volumes:
-      - platform-data:/app/data
-      - workspace-data:/app/workspace
-      - /opt/macaron/.factory-keys:/app/.config/factory:ro
-      - /opt/macaron/slots/blue:/app/macaron_platform
       - /opt/macaron/core:/app/core
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
@@ -158,6 +154,21 @@ services:
       - /opt/macaron/skills:/app/skills
       - /opt/macaron/projects:/app/projects
       - /var/run/docker.sock:/var/run/docker.sock
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
 
   android-builder:
     build:
