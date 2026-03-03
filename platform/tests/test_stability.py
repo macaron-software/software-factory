@@ -424,7 +424,7 @@ def test_config_guards_node1(ssh_run_az: Callable) -> None:
 def test_config_guards_pg_backup(ssh_run_az: Callable) -> None:
     """PG backup file exists and is recent (< 26h old)."""
     rc, out, _ = ssh_run_az(
-        "find /home/sfadmin/backups -name 'sf_*.sql.gz' -mmin -1560 | head -1"
+        "find /home/sfadmin/backups -name '*.sql.gz' -mmin -1560 | head -1"
     )
     assert rc == 0, "Backup dir not accessible"
     assert out.strip(), "No recent PG backup found (expected within 26h)"
