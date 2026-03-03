@@ -375,6 +375,15 @@ async def lifespan(app: FastAPI):
             _asyncio2.create_task(_bus.start_redis_listener(_redis_url))
             logger.info("Redis SSE listener scheduled")
 
+    # PG NOTIFY/LISTEN: cross-node SSE fan-out (no Redis needed)
+    import asyncio as _asyncio3
+    from .a2a.bus import get_bus as _get_bus2
+
+    _bus2 = _get_bus2()
+    _asyncio3.create_task(_bus2.connect_pg_notify())
+    _asyncio3.create_task(_bus2.start_pg_listen())
+    logger.warning("PG NOTIFY/LISTEN cross-node bus scheduled")
+
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
         await _asyncio.sleep(5)  # wait for DB init

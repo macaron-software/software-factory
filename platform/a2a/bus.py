@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import sqlite3
+import os
 from datetime import datetime
 from typing import Any, Callable
 
@@ -25,6 +25,7 @@ from ..models import A2AMessage, MessageType
 logger = logging.getLogger(__name__)
 
 REDIS_CHANNEL = "a2a:events"
+PG_NOTIFY_CHANNEL = "a2a_events"  # PostgreSQL LISTEN/NOTIFY channel (cross-node)
 
 
 class MessageBus:
@@ -34,7 +35,7 @@ class MessageBus:
     Optionally backed by Redis pub/sub for cross-process event delivery.
     """
 
-    def __init__(self, db_conn: sqlite3.Connection = None):
+    def __init__(self, db_conn=None):
         self.db = db_conn
         self._agent_queues: dict[str, asyncio.Queue[A2AMessage]] = {}
         self._topic_subscribers: dict[str, list[str]] = {}  # topic → [agent_ids]
@@ -44,6 +45,8 @@ class MessageBus:
         self._handlers: dict[str, Callable] = {}  # agent_id → receive callback
         self._stats = {"published": 0, "delivered": 0, "dead_letter": 0}
         self._redis: Any = None  # redis.asyncio client (set via connect_redis)
+        self._pg_notify_conn: Any = None  # psycopg async conn for NOTIFY
+        self._pg_listen_task: asyncio.Task | None = None  # background LISTEN task
 
     # ── Registration ──────────────────────────────────────────────────
 
@@ -183,6 +186,115 @@ class MessageBus:
             except Exception as exc:
                 logger.debug("Redis publish error (non-fatal): %s", exc)
 
+        # Publish to PG NOTIFY for cross-node delivery
+        if self._pg_notify_conn is not None:
+            try:
+                payload = json.dumps(
+                    {
+                        "id": message.id,
+                        "session_id": message.session_id,
+                        "from_agent": message.from_agent,
+                        "to_agent": message.to_agent,
+                        "message_type": message.message_type.value,
+                        "content": message.content[
+                            :2000
+                        ],  # PG NOTIFY limit: 8000 bytes
+                        "metadata": message.metadata,
+                        "priority": message.priority,
+                        "timestamp": message.timestamp.isoformat(),
+                    }
+                )
+                await self._pg_notify_conn.execute(
+                    f"NOTIFY {PG_NOTIFY_CHANNEL}, %s", (payload,)
+                )
+            except Exception as exc:
+                logger.debug("PG NOTIFY error (non-fatal): %s", exc)
+
+    async def connect_pg_notify(self, database_url: str | None = None) -> bool:
+        """Open a dedicated async PG connection for cross-node LISTEN/NOTIFY.
+
+        Enables SSE events to be shared across cluster nodes via PostgreSQL.
+        Falls back silently if psycopg async is unavailable or DB is not PG.
+        """
+        from ..db.adapter import is_postgresql
+
+        if not is_postgresql():
+            return False
+        db_url = database_url or os.environ.get("DATABASE_URL", "")
+        if not db_url:
+            return False
+        try:
+            import psycopg
+
+            conn = await psycopg.AsyncConnection.connect(db_url, autocommit=True)
+            self._pg_notify_conn = conn
+            logger.info(
+                "MessageBus: PG NOTIFY connected on channel %s", PG_NOTIFY_CHANNEL
+            )
+            return True
+        except Exception as exc:
+            logger.warning("PG NOTIFY unavailable (%s) — bus cross-node disabled", exc)
+            self._pg_notify_conn = None
+            return False
+
+    async def start_pg_listen(self, database_url: str | None = None) -> None:
+        """Subscribe to PG LISTEN and fan out incoming NOTIFY to local SSE listeners.
+
+        Run as a background asyncio task. Reconnects automatically on failure.
+        Messages from other nodes are forwarded to local SSE clients.
+        """
+        from ..db.adapter import is_postgresql
+
+        if not is_postgresql():
+            return
+        db_url = database_url or os.environ.get("DATABASE_URL", "")
+        if not db_url:
+            return
+
+        node_id = os.environ.get("SF_NODE_ID", "unknown")
+
+        while True:
+            try:
+                import psycopg
+
+                async with await psycopg.AsyncConnection.connect(
+                    db_url, autocommit=True
+                ) as conn:
+                    await conn.execute(f"LISTEN {PG_NOTIFY_CHANNEL}")
+                    logger.info("MessageBus: PG LISTEN started (node=%s)", node_id)
+                    async for notify in conn.notifies():
+                        if not notify.payload:
+                            continue
+                        try:
+                            data = json.loads(notify.payload)
+                            msg = A2AMessage(
+                                id=data.get("id", ""),
+                                session_id=data.get("session_id", ""),
+                                from_agent=data.get("from_agent", ""),
+                                to_agent=data.get("to_agent"),
+                                message_type=MessageType(
+                                    data.get("message_type", "chat")
+                                ),
+                                content=data.get("content", ""),
+                                metadata=data.get("metadata", {}),
+                                priority=data.get("priority", 5),
+                                timestamp=datetime.fromisoformat(data["timestamp"])
+                                if data.get("timestamp")
+                                else datetime.now(),
+                            )
+                            for q in self._sse_listeners:
+                                try:
+                                    q.put_nowait(msg)
+                                except asyncio.QueueFull:
+                                    pass
+                        except Exception as exc:
+                            logger.debug("PG LISTEN parse error: %s", exc)
+            except asyncio.CancelledError:
+                return
+            except Exception as exc:
+                logger.warning("PG LISTEN error (%s) — reconnecting in 5s", exc)
+                await asyncio.sleep(5)
+
     async def connect_redis(self, redis_url: str) -> bool:
         """Connect to Redis for cross-process pub/sub. Returns True on success."""
         try:
@@ -297,7 +409,7 @@ class MessageBus:
                 ),
             )
             self.db.commit()
-        except (sqlite3.Error, OSError) as e:
+        except Exception as e:
             logger.error(f"Failed to persist message: {e}")
 
     # ── Query ─────────────────────────────────────────────────────────
@@ -320,45 +432,23 @@ class MessageBus:
     def search_messages(
         self, query: str, session_id: str = None, limit: int = 20
     ) -> list[dict]:
-        """Full-text search on messages."""
+        """Full-text search on messages (PostgreSQL tsvector)."""
         if not self.db:
             return []
-        from ..db.adapter import is_postgresql
-
-        if is_postgresql():
-            # PostgreSQL: tsvector search
-            if session_id:
-                rows = self.db.execute(
-                    """SELECT m.* FROM messages m
-                       WHERE m.content_tsv @@ plainto_tsquery('simple', ?) AND m.session_id = ?
-                       ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
-                    (query, session_id, query, limit),
-                ).fetchall()
-            else:
-                rows = self.db.execute(
-                    """SELECT m.* FROM messages m
-                       WHERE m.content_tsv @@ plainto_tsquery('simple', ?)
-                       ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
-                    (query, query, limit),
-                ).fetchall()
+        if session_id:
+            rows = self.db.execute(
+                """SELECT m.* FROM messages m
+                   WHERE m.content_tsv @@ plainto_tsquery('simple', ?) AND m.session_id = ?
+                   ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
+                (query, session_id, query, limit),
+            ).fetchall()
         else:
-            # SQLite: FTS5 search
-            if session_id:
-                rows = self.db.execute(
-                    """SELECT m.* FROM messages m
-                       JOIN messages_fts f ON m.rowid = f.rowid
-                       WHERE messages_fts MATCH ? AND m.session_id = ?
-                       ORDER BY rank LIMIT ?""",
-                    (query, session_id, limit),
-                ).fetchall()
-            else:
-                rows = self.db.execute(
-                    """SELECT m.* FROM messages m
-                       JOIN messages_fts f ON m.rowid = f.rowid
-                       WHERE messages_fts MATCH ?
-                       ORDER BY rank LIMIT ?""",
-                    (query, limit),
-                ).fetchall()
+            rows = self.db.execute(
+                """SELECT m.* FROM messages m
+                   WHERE m.content_tsv @@ plainto_tsquery('simple', ?)
+                   ORDER BY ts_rank(m.content_tsv, plainto_tsquery('simple', ?)) DESC LIMIT ?""",
+                (query, query, limit),
+            ).fetchall()
         return [dict(r) for r in rows]
 
     # ── Stats ─────────────────────────────────────────────────────────
