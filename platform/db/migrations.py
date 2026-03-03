@@ -890,6 +890,44 @@ def _ensure_darwin_tables(conn) -> None:
         )
     """)
 
+    # Seed Image Generation provider integrations
+    for img_integ in [
+        (
+            "image-gen-falai",
+            "fal.ai — Flux",
+            "image-gen",
+            "ai-llm",
+            "🌊",
+            "Flux.1 via fal.ai. Best quality for backgrounds, concept art, general game assets. ~$0.05/image. Set FAL_KEY.",
+            '{"env_key": "FAL_KEY", "base_url": "https://fal.run", "models": ["fal-ai/flux-pro", "fal-ai/flux/dev", "fal-ai/flux/schnell"]}',
+        ),
+        (
+            "image-gen-pixellab",
+            "PixelLab",
+            "image-gen",
+            "ai-llm",
+            "🎮",
+            "Purpose-built pixel art API: sprites, tilesets, animations, sprite sheets. Set PIXELLAB_API_KEY.",
+            '{"env_key": "PIXELLAB_API_KEY", "base_url": "https://api.pixellab.ai/v1", "models": ["pixelart"]}',
+        ),
+        (
+            "image-gen-replicate",
+            "Replicate",
+            "image-gen",
+            "ai-llm",
+            "🔁",
+            "Access to all open image models (Flux, SDXL, custom LoRAs). Good for style-consistent asset libraries. Set REPLICATE_API_TOKEN.",
+            '{"env_key": "REPLICATE_API_TOKEN", "base_url": "https://api.replicate.com/v1", "models": ["black-forest-labs/flux-1.1-pro", "stability-ai/sdxl"]}',
+        ),
+    ]:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 'disconnected', ?, '[]')
+        """,
+            img_integ,
+        )
+
     conn.commit()
 
 

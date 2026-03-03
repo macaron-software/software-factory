@@ -593,6 +593,74 @@
             </div>
         </section>
 
+        <!-- Image Generation -->
+        <section class="settings-section" style="margin-top:2rem">
+            <h3>Image Generation</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem">Providers used by agents to generate visual assets (sprites, backgrounds, concept art). Used in game dev and design workflows.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem" id="image-gen-grid">
+                <!-- fal.ai / Flux -->
+                <div class="llm-provider-card" id="imgprov-falai">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🌊 fal.ai — Flux</div>
+                            <div class="llm-prov-models">flux-pro · flux-dev · flux-schnell</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-falai-toggle" onchange="saveImageProviderKey('falai', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Best quality for general assets, backgrounds, concept art. ~$0.05/image.</p>
+                    <input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('falai')">
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('falai')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- PixelLab -->
+                <div class="llm-provider-card" id="imgprov-pixellab">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🎮 PixelLab</div>
+                            <div class="llm-prov-models">sprites · tilesets · animations</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-pixellab-toggle" onchange="saveImageProviderKey('pixellab', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Purpose-built for pixel art game assets. Sprite sheets, rotations, animation frames.</p>
+                    <input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('pixellab')">
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('pixellab')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- Replicate -->
+                <div class="llm-provider-card" id="imgprov-replicate">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🔁 Replicate</div>
+                            <div class="llm-prov-models">flux · sdxl · custom LoRA</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-replicate-toggle" onchange="saveImageProviderKey('replicate', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Access to all open models (Flux, SDXL + LoRAs). Good for experimentation and style-consistent asset libraries.</p>
+                    <input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('replicate')">
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('replicate')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <!-- Darwin LLM Thompson Sampling -->
         <section class="settings-section" style="margin-top:2rem">
             <h3>Darwin LLM A/B</h3>
@@ -1119,6 +1187,50 @@ async function deleteCustomProvider(id) {
 
 // ── LLM Tab ──────────────────────────────────────────────────────────────
 
+// Image Generation providers — keys stored as integrations
+const _IMAGE_PROVIDERS = {
+    falai:     { integ_id: 'image-gen-falai',     env_key: 'FAL_KEY' },
+    pixellab:  { integ_id: 'image-gen-pixellab',  env_key: 'PIXELLAB_API_KEY' },
+    replicate: { integ_id: 'image-gen-replicate', env_key: 'REPLICATE_API_TOKEN' },
+};
+
+function markImageProviderDirty(id) {
+    const btn = document.querySelector(`#imgprov-${id} button`);
+    if (btn) btn.style.opacity = '1';
+}
+
+async function saveImageProviderKey(id, enabled) {
+    const keyInput = document.getElementById(`imgprov-${id}-key`);
+    const toggle = document.getElementById(`imgprov-${id}-toggle`);
+    const { integ_id, env_key } = _IMAGE_PROVIDERS[id];
+    const key = keyInput ? keyInput.value.trim() : '';
+    const isEnabled = enabled !== undefined ? enabled : (toggle ? toggle.checked : false);
+    const cfg = { env_key };
+    if (key) cfg.api_key = key;
+    await fetch(`/api/integrations/${integ_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: isEnabled, config: cfg }),
+    });
+    if (keyInput && key) { keyInput.value = ''; keyInput.placeholder = '••••••••  (saved)'; }
+}
+
+async function loadImageGenProviders() {
+    try {
+        const r = await fetch('/api/integrations');
+        const rows = await r.json();
+        for (const [id, { integ_id }] of Object.entries(_IMAGE_PROVIDERS)) {
+            const row = rows.find(r => r.id === integ_id);
+            if (row) {
+                const toggle = document.getElementById(`imgprov-${id}-toggle`);
+                const card = document.getElementById(`imgprov-${id}`);
+                if (toggle) toggle.checked = !!row.enabled;
+                if (card) card.classList.toggle('active', !!row.enabled);
+            }
+        }
+    } catch(e) { /* silent */ }
+}
+
 let _llmModels = [];
 const _ROUTING_ROWS = [
     {key_heavy:'reasoning_heavy', key_light:'reasoning_light', label:'Reasoning', sub:'Architecture, planning, strategy'},
@@ -1135,6 +1247,7 @@ async function loadLLMTab() {
         renderProviders(d.providers || []);
         renderRoutingTable(d.routing || {});
         loadLLMABTests();
+        loadImageGenProviders();
     } catch(e) {
         document.getElementById('llm-providers-grid').innerHTML = '<p style="color:var(--red)">Failed to load: ' + e.message + '</p>';
     }
