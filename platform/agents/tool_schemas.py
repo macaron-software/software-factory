@@ -2506,6 +2506,11 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "launch_ideation",
         "launch_mkt_ideation",
         "launch_group_ideation",
+        # Jira / Confluence (project tracking & knowledge)
+        "jira_search",
+        "jira_board_issues",
+        "jira_add_comment",
+        "confluence_read",
         # Web / fetch
         "mcp_fetch_fetch",
         "deep_search",
