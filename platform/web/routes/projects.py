@@ -702,6 +702,7 @@ async def create_project(request: Request):
         factory_type=str(form.get("factory_type", "standalone")),
         lead_agent_id=str(form.get("lead_agent_id", "brain")),
         owner_id=user.id if user else "",
+        client_domain=str(form.get("client_domain", "")),
         values=[
             v.strip()
             for v in str(form.get("values", "quality,feedback")).split(",")
