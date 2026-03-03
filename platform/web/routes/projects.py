@@ -679,6 +679,7 @@ async def api_projects(request: Request):
                 "status": p.status,
                 "has_vision": bool(p.vision),
                 "values": p.values,
+                "client_domain": p.client_domain or "",
             }
             for p in store.list_all(owner_id=owner_filter)
         ]
