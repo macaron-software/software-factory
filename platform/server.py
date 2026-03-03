@@ -1055,7 +1055,6 @@ def create_app() -> FastAPI:
                 "/setup",
                 "/onboarding",
                 "/health",
-                "/metrics",
                 "/favicon.ico",
                 "/manifest.json",
                 "/sw.js",
@@ -1413,7 +1412,7 @@ def create_app() -> FastAPI:
             from .metrics.collector import get_collector as _get_collector
             from fastapi import Response as _Response
 
-            @app.get("/metrics", include_in_schema=False)
+            @app.get("/api/metrics/prometheus", include_in_schema=False)
             async def prometheus_metrics():
                 """Live Prometheus scrape endpoint — reads MetricsCollector snapshot."""
                 snap = _get_collector().snapshot()
