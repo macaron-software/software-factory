@@ -78,6 +78,7 @@ class Project:
     )  # [{id, name, icon, mission_types_active[]}]
     owner_id: str = ""  # User ID of the owner (empty = shared/admin-only)
     starred: bool = False  # Pinned/featured project
+    client_domain: str = ""  # Portfolio domain label (e.g. "LA POSTE", "MARATHON")
     container_url: str = ""  # Live URL (production VPS / container)
     created_at: str = ""
     updated_at: str = ""
@@ -590,6 +591,7 @@ class ProjectStore:
             ("current_phase", "''"),
             ("phases_json", "'[]'"),
             ("owner_id", "''"),
+            ("client_domain", "''"),
         ]:
             if col not in cols:
                 try:
@@ -706,8 +708,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json, owner_id, starred, container_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id, starred, container_url, client_domain)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -728,6 +730,7 @@ class ProjectStore:
                 p.owner_id or "",
                 bool(p.starred),
                 p.container_url or "",
+                p.client_domain or "",
             ),
         )
         conn.commit()
@@ -1109,7 +1112,7 @@ class ProjectStore:
             UPDATE projects SET
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
-                active_pattern_id=?, status=?, starred=?, container_url=?,
+                active_pattern_id=?, status=?, starred=?, container_url=?, client_domain=?,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """,
@@ -1127,6 +1130,7 @@ class ProjectStore:
                 p.status,
                 bool(p.starred),
                 p.container_url or "",
+                p.client_domain or "",
                 p.id,
             ),
         )
@@ -1437,6 +1441,7 @@ class ProjectStore:
             or [],
             owner_id=row["owner_id"] if "owner_id" in keys else "",
             starred=bool(row["starred"]) if "starred" in keys else False,
+            client_domain=row["client_domain"] if "client_domain" in keys else "",
             container_url=row["container_url"] if "container_url" in keys else "",
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",

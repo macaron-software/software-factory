@@ -88,25 +88,52 @@ def _auto_git_init(project):
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
-    """Projects list (legacy)."""
+    """Projects list."""
     from ...projects.manager import get_project_store
 
     store = get_project_store()
-    projects = store.list_all()
+    q = request.query_params.get("q", "").strip()
+    factory_type = request.query_params.get("type", "").strip()
+    has_workspace = request.query_params.get("ws", "").strip()
+    all_projects = store.list_all()
+    # Server-side filter
+    projects_raw = [
+        p
+        for p in all_projects
+        if (not q or q.lower() in p.name.lower() or q.lower() in p.id.lower())
+        and (not factory_type or p.factory_type == factory_type)
+    ]
+    projects = [
+        {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
+        for p in projects_raw
+    ]
+    # Build domain groups (preserving insertion order: domains with projects come first)
+    _domain_order: list[str] = []
+    _domain_map: dict[str, list] = {}
+    for proj in projects:
+        dom = proj["info"].client_domain or ""
+        if dom:
+            if dom not in _domain_map:
+                _domain_order.append(dom)
+                _domain_map[dom] = []
+            _domain_map[dom].append(proj)
+    domain_groups = [{"domain": d, "projects": _domain_map[d]} for d in _domain_order]
+    ungrouped = [p for p in projects if not p["info"].client_domain]
+
     return _templates(request).TemplateResponse(
         "projects.html",
         {
             "request": request,
             "page_title": "Projects",
-            "projects": [
-                {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
-                for p in projects
-            ],
+            "projects": projects,
+            "domain_groups": domain_groups,
+            "ungrouped": ungrouped,
             "total_pages": 1,
             "page": 1,
-            "q": "",
-            "factory_type": "",
-            "has_workspace": "",
+            "q": q,
+            "factory_type": factory_type,
+            "has_workspace": has_workspace,
+            "total": len(projects),
         },
     )
 
