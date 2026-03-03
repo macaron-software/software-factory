@@ -91,6 +91,209 @@ def _compute_quality_score(
         return 0.0
 
 
+def _extract_stack_fingerprint(workspace: str) -> str:
+    """Read manifest files and return a stack+version fingerprint for sprint context.
+
+    Examples:
+      "Rust (cargo) | edition=2021 | axum=0.7, tokio=1, serde=1"
+      "Node.js/TypeScript | node>=18 | angular=17, rxjs=7, typescript=5"
+      "Python | python=^3.12 | fastapi=0.110, pydantic=2"
+
+    Injected into sprint N+1 so agents never switch stack or upgrade versions.
+    """
+    import os
+    import re
+    import json
+
+    parts: list[str] = []
+
+    # ── Rust ──────────────────────────────────────────────────────────────────
+    cargo_path = os.path.join(workspace, "Cargo.toml")
+    if os.path.exists(cargo_path):
+        try:
+            text = open(cargo_path).read()
+            edition = re.search(r'edition\s*=\s*"(\d+)"', text)
+            deps: dict[str, str] = {}
+            in_deps = False
+            for line in text.splitlines():
+                if re.match(r"^\[(.*dependencies.*)\]", line):
+                    in_deps = True
+                    continue
+                if line.startswith("[") and "dependencies" not in line:
+                    in_deps = False
+                if in_deps:
+                    m = re.match(r'^([\w-]+)\s*=\s*["\{]?([0-9][^\s,"}\n]*)', line)
+                    if m:
+                        deps[m.group(1)] = m.group(2).rstrip('",}')
+            parts.append("Rust (cargo)")
+            if edition:
+                parts.append(f"edition={edition.group(1)}")
+            if deps:
+                parts.append(", ".join(f"{k}={v}" for k, v in list(deps.items())[:8]))
+        except Exception:
+            parts.append("Rust (cargo)")
+
+    # ── Node.js / TypeScript ──────────────────────────────────────────────────
+    pkg_path = os.path.join(workspace, "package.json")
+    if os.path.exists(pkg_path) and not parts:
+        try:
+            pkg = json.load(open(pkg_path))
+            node_ver = pkg.get("engines", {}).get("node", "")
+            all_deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+            key_pkgs = [
+                "angular",
+                "@angular/core",
+                "react",
+                "vue",
+                "next",
+                "express",
+                "fastify",
+                "typescript",
+                "rxjs",
+                "vite",
+                "webpack",
+                "nestjs",
+            ]
+            selected = {}
+            for raw_k, v in all_deps.items():
+                short = raw_k.lstrip("@").split("/")[-1]
+                if any(
+                    raw_k == kp or short == kp.lstrip("@").split("/")[-1]
+                    for kp in key_pkgs
+                ):
+                    selected[short] = v.lstrip("^~")
+            parts.append("Node.js/TypeScript (npm)")
+            if node_ver:
+                parts.append(f"node={node_ver}")
+            if selected:
+                parts.append(
+                    ", ".join(f"{k}={v}" for k, v in list(selected.items())[:6])
+                )
+        except Exception:
+            parts.append("Node.js/TypeScript (npm)")
+
+    # ── Python ────────────────────────────────────────────────────────────────
+    py_path = os.path.join(workspace, "pyproject.toml")
+    req_path = os.path.join(workspace, "requirements.txt")
+    if os.path.exists(py_path) and not parts:
+        try:
+            import tomllib
+
+            data = tomllib.load(open(py_path, "rb"))
+            py_ver = data.get("project", {}).get("requires-python", "") or data.get(
+                "tool", {}
+            ).get("poetry", {}).get("dependencies", {}).get("python", "")
+            raw_deps = data.get("project", {}).get("dependencies", []) or list(
+                data.get("tool", {}).get("poetry", {}).get("dependencies", {}).items()
+            )
+            dep_strs = []
+            for d in raw_deps[:6]:
+                if isinstance(d, str):
+                    dep_strs.append(d.split(">=")[0].split("==")[0].split("[")[0])
+                elif isinstance(d, tuple):
+                    dep_strs.append(f"{d[0]}={str(d[1]).lstrip('^~>=').split(',')[0]}")
+            parts.append("Python")
+            if py_ver:
+                parts.append(f"python={py_ver}")
+            if dep_strs:
+                parts.append(", ".join(dep_strs))
+        except Exception:
+            parts.append("Python")
+    elif os.path.exists(req_path) and not parts:
+        try:
+            reqs = [
+                line.strip()
+                for line in open(req_path)
+                if line.strip() and not line.startswith("#")
+            ]
+            parts.append("Python (pip)")
+            if reqs:
+                parts.append(", ".join(reqs[:5]))
+        except Exception:
+            parts.append("Python (pip)")
+
+    # ── Go ────────────────────────────────────────────────────────────────────
+    go_path = os.path.join(workspace, "go.mod")
+    if os.path.exists(go_path) and not parts:
+        try:
+            text = open(go_path).read()
+            go_ver = re.search(r"^go\s+(\S+)", text, re.MULTILINE)
+            mod_name = re.search(r"^module\s+(\S+)", text, re.MULTILINE)
+            parts.append("Go")
+            if go_ver:
+                parts.append(f"go={go_ver.group(1)}")
+            if mod_name:
+                parts.append(f"module={mod_name.group(1)}")
+        except Exception:
+            parts.append("Go")
+
+    return " | ".join(parts) if parts else ""
+
+
+def _extract_build_summary(result) -> str:
+    """Extract a short build/test summary from a pattern result for sprint context injection."""
+    try:
+        summaries = []
+        for node in result.nodes.values():
+            output = (node.output or "") + (
+                (node.result.content if node.result else "") or ""
+            )
+            # Look for build tool output lines
+            for line in output.splitlines():
+                if any(
+                    k in line
+                    for k in (
+                        "test result:",
+                        "BUILD SUCCESS",
+                        "BUILD FAILED",
+                        "error[E",
+                        "warning[",
+                        "cargo test",
+                        "passed",
+                        "failed",
+                    )
+                ):
+                    summaries.append(line.strip()[:120])
+                    if len(summaries) >= 4:
+                        break
+            if len(summaries) >= 4:
+                break
+        return " | ".join(summaries) if summaries else "no build output captured"
+    except Exception:
+        return "unknown"
+
+
+def _detect_tool_not_found(result) -> list[str]:
+    """Scan agent outputs for 'tool: not found' / 'exit 127' errors.
+
+    Returns list of missing tool names (e.g. ['cargo', 'docker-compose']).
+    These signal that the dev team needs infra help before retrying.
+    """
+    missing: list[str] = []
+    try:
+        for node in result.nodes.values():
+            output = (node.output or "") + (
+                (node.result.content if node.result else "") or ""
+            )
+            for line in output.splitlines():
+                # Pattern: "cargo: not found", "npm: not found", "go: not found"
+                if ": not found" in line or "exit 127" in line:
+                    # Extract tool name
+                    tool = line.split(":")[0].strip().split()[-1].strip()
+                    if tool and tool not in missing:
+                        missing.append(tool)
+                # Also catch "command not found: cargo"
+                if "command not found:" in line.lower():
+                    parts = line.lower().split("command not found:")
+                    if len(parts) > 1:
+                        tool = parts[1].strip().split()[0]
+                        if tool and tool not in missing:
+                            missing.append(tool)
+    except Exception:
+        pass
+    return missing
+
+
 class EpicOrchestrator:
     """Drives mission execution: CDP orchestrates phases sequentially.
 
@@ -666,6 +869,21 @@ class EpicOrchestrator:
                         except Exception:
                             pass
 
+                    # Stack fingerprint injection — EVERY sprint (not just N+1)
+                    # Dev agents must know the stack from sprint 1 to avoid cross-stack confusion
+                    if is_dev_phase and workspace:
+                        _fp = _extract_stack_fingerprint(workspace)
+                        if _fp:
+                            phase_task += (
+                                f"\n\n⚠️ STACK DÉTECTÉE: {_fp}\n"
+                                f"RÈGLES ABSOLUES:\n"
+                                f"1. Ne créer AUCUN fichier d'une autre stack\n"
+                                f"2. Si un outil est absent (cargo/npm/python/go), "
+                                f"utiliser: `docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                f"3. NE PAS utiliser `docker-compose` (v1) — utiliser `docker compose` (v2, avec espace)\n"
+                                f"4. Lire BUILD_INSTRUCTIONS.md s'il existe dans le workspace"
+                            )
+
                 try:
                     # Phase timeout: 10 minutes max per phase execution
                     PHASE_TIMEOUT = 600
@@ -765,6 +983,7 @@ class EpicOrchestrator:
                 if phase_success and wf_phase and wf_phase.id == "feature-design":
                     escalate_target = None
                     import re as _re
+
                     for _node in result.nodes.values():
                         _txt = (_node.output or "") + (
                             (_node.result.content if _node.result else "") or ""
@@ -777,6 +996,7 @@ class EpicOrchestrator:
                             break
                     if escalate_target:
                         from ..workflows.store import get_workflow_store as _get_wf
+
                         _new_wf = _get_wf().get(escalate_target)
                         if _new_wf:
                             logger.warning(
@@ -792,6 +1012,7 @@ class EpicOrchestrator:
                             )
                             # Rebuild mission phases from new workflow
                             from ..models import PhaseRun, PhaseStatus
+
                             mission.workflow_id = escalate_target
                             mission.phases = [
                                 PhaseRun(
@@ -880,8 +1101,83 @@ class EpicOrchestrator:
                     except Exception as e:
                         logger.warning("Sprint update failed: %s", e)
 
+                # Inject stack fingerprint + sprint outcome into next-sprint context.
+                # Done on BOTH success and failure so sprint N+1 agents never lose their bearings.
+                if workspace:
+                    _fingerprint = _extract_stack_fingerprint(workspace)
+                    if _fingerprint:
+                        prev_context += (
+                            f"\n\n⚠️ STACK & VERSIONS VERROUILLÉES: {_fingerprint}\n"
+                            f"RÈGLES ABSOLUES pour le sprint suivant:\n"
+                            f"1. Ne créer AUCUN fichier d'une autre stack (ex: pas de package.json si Rust)\n"
+                            f"2. Ne PAS changer les versions de dépendances déjà définies\n"
+                            f"3. Lire les manifests (Cargo.toml/package.json/etc.) avant d'écrire du code"
+                        )
+
                 if not phase_success:
                     if sprint_num < max_sprints:
+                        # ── Infra escalation: tool not found → run ft-infra-lead before retry ──
+                        missing_tools = _detect_tool_not_found(result) if result else []
+                        if missing_tools and is_dev_phase:
+                            tools_str = ", ".join(missing_tools)
+                            logger.warning(
+                                "Sprint %s: tool not found [%s] — escalating to ft-infra-lead",
+                                sprint_num,
+                                tools_str,
+                            )
+                            await self._sse_orch_msg(
+                                f"⚠️ Outils manquants [{tools_str}] — escalade vers infra avant relance…",
+                                phase.phase_id,
+                            )
+                            # Build infra-fix prompt
+                            _infra_prompt = (
+                                f"URGENCE INFRA: Le sprint dev a échoué car ces outils sont absents du container SF: [{tools_str}].\n"
+                                f"RÈGLES:\n"
+                                f"1. Ne PAS installer ces outils directement dans le container SF — ce n'est pas ton rôle.\n"
+                                f"2. Créer/mettre à jour docker-compose.project.yml dans le workspace pour que les devs puissent lancer les tests VIA DOCKER.\n"
+                                f"3. Utiliser `docker compose` (v2, avec espace) — PAS `docker-compose` (v1, déprécié, absent).\n"
+                                f"4. Format correct: `docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                f"5. Tester que docker compose run fonctionne: build(command='docker compose -f docker-compose.project.yml run --rm app <tool> --version')\n"
+                                f"6. Écrire dans le workspace un fichier BUILD_INSTRUCTIONS.md expliquant exactement quelle commande utiliser.\n"
+                                f"\nWorkspace: {workspace}\nBrief original: {(mission.brief or '')[:300]}"
+                            )
+                            try:
+                                from ..patterns.store import PatternDef
+
+                                _infra_pattern = PatternDef(
+                                    pattern_id="solo",
+                                    name="Infra Fix",
+                                    config={"agent_id": "ft-infra-lead"},
+                                )
+                                _infra_result = await asyncio.wait_for(
+                                    run_pattern(
+                                        _infra_pattern,
+                                        session_id,
+                                        _infra_prompt,
+                                        project_id=mission.project_id or mission.id,
+                                        project_path=mission.workspace_path,
+                                        phase_id=f"{phase.phase_id}-infra-fix",
+                                    ),
+                                    timeout=300,
+                                )
+                                prev_context += (
+                                    f"\n\n🔧 INFRA FIX (sprint {sprint_num}): ft-infra-lead a corrigé l'environnement.\n"
+                                    f"Outils absents: [{tools_str}] → utiliser MAINTENANT: "
+                                    f"`docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                    f"Ne PAS appeler cargo/npm/python/go directement — toujours via docker compose run."
+                                )
+                                logger.warning(
+                                    "Infra fix completed for sprint %s (tools: %s)",
+                                    sprint_num,
+                                    tools_str,
+                                )
+                            except Exception as _infra_err:
+                                logger.warning("Infra fix failed: %s", _infra_err)
+                                prev_context += (
+                                    f"\n\n⚠️ INFRA: outils [{tools_str}] absents du container SF."
+                                    f" Utiliser: `docker compose -f docker-compose.project.yml run --rm app <commande>`"
+                                )
+
                         retry_label = (
                             f"Itération {sprint_num}/{max_sprints}"
                             if not is_dev_phase
@@ -970,8 +1266,9 @@ class EpicOrchestrator:
                             passed_count,
                             total_count,
                         )
-                        # Inject evidence feedback into next sprint prompt
-                        prev_context += f"\n\n{evidence_report}"
+                        # Inject evidence feedback + build summary into next sprint prompt
+                        build_summary = _extract_build_summary(result)
+                        prev_context += f"\n\n✅ Sprint {sprint_num} build: {build_summary}\n{evidence_report}"
                         continue  # Loop to next sprint
                     await self._sse_orch_msg(
                         f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint, poursuite avec avertissement.\n{evidence_report}",
@@ -985,6 +1282,11 @@ class EpicOrchestrator:
                     phase_error = (
                         f"Evidence gate: {passed_count}/{total_count} criteria met"
                     )
+                    break
+
+                # Sprint succeeded but evidence gate was not applicable (no criteria).
+                # Break immediately — do NOT run sprint N+1 just because max_sprints > 1.
+                if phase_success:
                     break
 
                 if max_sprints > 1 and sprint_num < max_sprints:
@@ -1054,7 +1356,23 @@ class EpicOrchestrator:
                 PhaseStatus.DONE,
                 PhaseStatus.DONE_WITH_ISSUES,
             )
-            phase_success = phase_actually_done
+            # For critical gate phases (env-setup, tdd-sprint), done_with_issues is
+            # treated as a soft-failure: log prominently and trigger the reloop mechanism
+            _critical_phase = any(
+                k in (phase.phase_id or "").lower()
+                for k in ("env-setup", "tdd-sprint", "dev-sprint")
+            )
+            if phase.status == PhaseStatus.DONE_WITH_ISSUES and _critical_phase:
+                logger.warning(
+                    "ORCH phase=%s DONE_WITH_ISSUES on critical phase — will reloop if possible",
+                    phase.phase_id,
+                )
+                # Keep phase_success=False to trigger reloop logic below
+                phase_success = False
+                if not phase_error:
+                    phase_error = f"Phase {phase.phase_id} completed with issues — quality gate not met"
+            else:
+                phase_success = phase_actually_done
             logger.warning(
                 "ORCH phase=%s status=%s", phase.phase_id, phase.status.value
             )
@@ -1158,6 +1476,9 @@ class EpicOrchestrator:
                         _qual_val = _compute_quality_score(
                             session_id, aids or [], _phase_start_time, _db
                         )
+                        phase.quality_score = int(
+                            _qual_val * 100
+                        )  # expose on phase object
                         _db.execute(
                             """INSERT INTO phase_outcomes
                                (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
@@ -1270,6 +1591,9 @@ class EpicOrchestrator:
                         _qual_fail = _compute_quality_score(
                             session_id, aids or [], _phase_start_time, _db
                         )
+                        phase.quality_score = int(
+                            _qual_fail * 100
+                        )  # expose on phase object
                         _db.execute(
                             """INSERT INTO phase_outcomes
                                (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
