@@ -218,3 +218,181 @@ jobs:
           AVAIL=$(df -h / | awk 'NR==2 {print $4}')
           echo "=== Deploy complete: active=$INACTIVE | disk free: $AVAIL ==="
           ENDSSH
+
+  # ── Innovation Cluster: Blue/Green rolling deploy (slave → master) ──────────
+  deploy-innovation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed layers
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "platform/")
+          UI_ONLY=true
+          while IFS= read -r f; do
+            if echo "$f" | grep -qE '^platform/(agents|missions|patterns|services|llm|db|a2a|ops|memory|generators|skills|tools|config|models|security|sessions|workers|events)'; then
+              UI_ONLY=false; break
+            fi
+          done <<< "$CHANGED"
+          echo "ui_only=$UI_ONLY" >> "$GITHUB_OUTPUT"
+          echo "Deploy mode: ui_only=$UI_ONLY — changed files:"
+          echo "$CHANGED" | head -20
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/sf_key
+          chmod 600 ~/.ssh/sf_key
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "${{ secrets.SF_NODE2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          echo -e "Host *\n  StrictHostKeyChecking no\n  ConnectTimeout 20\n  ServerAliveInterval 10" >> ~/.ssh/config
+
+      - name: Package platform code
+        run: |
+          tar czf /tmp/platform.tar.gz \
+            --exclude 'platform/__pycache__' \
+            --exclude 'platform/.venv' \
+            --exclude 'platform/data' \
+            --exclude '*.pyc' \
+            platform/
+
+      - name: Deploy to sf-node-2 (slave — first)
+        run: |
+          NODE="${{ secrets.SF_NODE2_IP }}"
+          SSH="ssh -i ~/.ssh/sf_key sfadmin@$NODE"
+          SCP="scp -i ~/.ssh/sf_key"
+
+          # Upload code
+          $SCP /tmp/platform.tar.gz sfadmin@$NODE:/tmp/platform.tar.gz
+
+          $SSH bash -s << 'ENDSSH'
+          set -e
+          SLOT_FILE=/home/sfadmin/active-slot
+          ACTIVE=$(cat $SLOT_FILE 2>/dev/null || echo "blue")
+          INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+          echo "=== sf-node-2: $ACTIVE → $INACTIVE ==="
+
+          # Unpack new code to inactive slot
+          mkdir -p /home/sfadmin/slots/$INACTIVE
+          tar xzf /tmp/platform.tar.gz -C /tmp/
+          rsync -a --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude '.venv' \
+            /tmp/platform/ /home/sfadmin/slots/$INACTIVE/
+          rm -rf /tmp/platform /tmp/platform.tar.gz
+
+          # Update venv if requirements changed
+          if ! diff -q /home/sfadmin/slots/$ACTIVE/requirements.txt \
+                        /home/sfadmin/slots/$INACTIVE/requirements.txt 2>/dev/null; then
+            echo "Requirements changed — updating venv..."
+            /home/sfadmin/.venv/bin/pip install -r /home/sfadmin/slots/$INACTIVE/requirements.txt -q
+          fi
+
+          # Run DB migrations (PG — no service stop needed)
+          DATABASE_URL=$(grep DATABASE_URL /etc/systemd/system/sf-platform.service | grep -oP 'DATABASE_URL=\K[^"]+')
+          if [ -n "$DATABASE_URL" ]; then
+            DATABASE_URL="$DATABASE_URL" /home/sfadmin/.venv/bin/python3 -c \
+              "import sys; sys.path.insert(0,'$(readlink -f /home/sfadmin/slots/$INACTIVE)/..'); \
+               import importlib.util; spec=importlib.util.spec_from_file_location('migrations',\
+               '/home/sfadmin/slots/$INACTIVE/db/migrations.py'); m=importlib.util.module_from_spec(spec); \
+               spec.loader.exec_module(m); m.init_db()" 2>&1 || echo "Migration skipped (handled at startup)"
+          fi
+
+          # Swap symlink (atomic)
+          ln -sfn /home/sfadmin/slots/$INACTIVE /home/sfadmin/platform
+          echo $INACTIVE > $SLOT_FILE
+
+          # Restart service
+          sudo systemctl restart sf-platform
+
+          # Health check (up to 60s)
+          echo "Waiting for sf-node-2 health..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] health=$HTTP"
+            if [ "$HTTP" = "200" ]; then OK=1; break; fi
+          done
+
+          if [ "$OK" = "0" ]; then
+            echo "ROLLBACK: sf-node-2 unhealthy — reverting to $ACTIVE"
+            ln -sfn /home/sfadmin/slots/$ACTIVE /home/sfadmin/platform
+            echo $ACTIVE > $SLOT_FILE
+            sudo systemctl restart sf-platform
+            exit 1
+          fi
+          echo "=== sf-node-2 deployed: active=$INACTIVE ==="
+          ENDSSH
+
+      - name: Deploy to sf-node-1 (master — second)
+        run: |
+          NODE="${{ secrets.SF_NODE1_IP }}"
+          SSH="ssh -i ~/.ssh/sf_key sfadmin@$NODE"
+          SCP="scp -i ~/.ssh/sf_key"
+
+          $SCP /tmp/platform.tar.gz sfadmin@$NODE:/tmp/platform.tar.gz
+
+          $SSH bash -s << 'ENDSSH'
+          set -e
+          SLOT_FILE=/home/sfadmin/active-slot
+          ACTIVE=$(cat $SLOT_FILE 2>/dev/null || echo "blue")
+          INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+          echo "=== sf-node-1: $ACTIVE → $INACTIVE ==="
+
+          mkdir -p /home/sfadmin/slots/$INACTIVE
+          tar xzf /tmp/platform.tar.gz -C /tmp/
+          rsync -a --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude '.venv' \
+            /tmp/platform/ /home/sfadmin/slots/$INACTIVE/
+          rm -rf /tmp/platform /tmp/platform.tar.gz
+
+          if ! diff -q /home/sfadmin/slots/$ACTIVE/requirements.txt \
+                        /home/sfadmin/slots/$INACTIVE/requirements.txt 2>/dev/null; then
+            echo "Requirements changed — updating venv..."
+            /home/sfadmin/.venv/bin/pip install -r /home/sfadmin/slots/$INACTIVE/requirements.txt -q
+          fi
+
+          DATABASE_URL=$(grep DATABASE_URL /etc/systemd/system/sf-platform.service | grep -oP 'DATABASE_URL=\K[^"]+')
+          if [ -n "$DATABASE_URL" ]; then
+            DATABASE_URL="$DATABASE_URL" /home/sfadmin/.venv/bin/python3 -c \
+              "import sys; sys.path.insert(0,'$(readlink -f /home/sfadmin/slots/$INACTIVE)/..'); \
+               import importlib.util; spec=importlib.util.spec_from_file_location('migrations',\
+               '/home/sfadmin/slots/$INACTIVE/db/migrations.py'); m=importlib.util.module_from_spec(spec); \
+               spec.loader.exec_module(m); m.init_db()" 2>&1 || echo "Migration skipped (handled at startup)"
+          fi
+
+          ln -sfn /home/sfadmin/slots/$INACTIVE /home/sfadmin/platform
+          echo $INACTIVE > $SLOT_FILE
+          sudo systemctl restart sf-platform
+
+          echo "Waiting for sf-node-1 health..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] health=$HTTP"
+            if [ "$HTTP" = "200" ]; then OK=1; break; fi
+          done
+
+          if [ "$OK" = "0" ]; then
+            echo "ROLLBACK: sf-node-1 unhealthy — reverting to $ACTIVE"
+            ln -sfn /home/sfadmin/slots/$ACTIVE /home/sfadmin/platform
+            echo $ACTIVE > $SLOT_FILE
+            sudo systemctl restart sf-platform
+            exit 1
+          fi
+          echo "=== sf-node-1 deployed: active=$INACTIVE ==="
+          ENDSSH
+
+      - name: Cluster health summary
+        if: always()
+        run: |
+          SSH="ssh -i ~/.ssh/sf_key"
+          echo "=== Cluster status ==="
+          for NODE in ${{ secrets.SF_NODE1_IP }} ${{ secrets.SF_NODE2_IP }}; do
+            STATUS=$($SSH sfadmin@$NODE "curl -s http://localhost:8090/api/health && echo '' && cat /home/sfadmin/active-slot" 2>/dev/null || echo "unreachable")
+            echo "  $NODE: $STATUS"
+          done
