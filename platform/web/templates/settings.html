@@ -638,6 +638,26 @@
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
                     </button>
                 </div>
+                <!-- Gemini Image (Nano Banana) -->
+                <div class="llm-provider-card" id="imgprov-gemini-image">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🍌 Gemini Image (Nano Banana)</div>
+                            <div class="llm-prov-models">gemini-2.5-flash · imagen-3</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-gemini-image-toggle" onchange="saveImageProviderKey('gemini-image', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">UI mockups, screens & flows. Generate full interface designs from a prompt, then feed image to Claude to implement. Uses your existing GEMINI_API_KEY.</p>
+                    <input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('gemini-image')">
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('gemini-image')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
                 <!-- Replicate -->
                 <div class="llm-provider-card" id="imgprov-replicate">
                     <div class="llm-prov-header">
@@ -1189,9 +1209,10 @@ async function deleteCustomProvider(id) {
 
 // Image Generation providers — keys stored as integrations
 const _IMAGE_PROVIDERS = {
-    falai:     { integ_id: 'image-gen-falai',     env_key: 'FAL_KEY' },
-    pixellab:  { integ_id: 'image-gen-pixellab',  env_key: 'PIXELLAB_API_KEY' },
-    replicate: { integ_id: 'image-gen-replicate', env_key: 'REPLICATE_API_TOKEN' },
+    falai:          { integ_id: 'image-gen-falai',         env_key: 'FAL_KEY' },
+    pixellab:       { integ_id: 'image-gen-pixellab',      env_key: 'PIXELLAB_API_KEY' },
+    'gemini-image': { integ_id: 'image-gen-gemini-image',  env_key: 'GEMINI_API_KEY' },
+    replicate:      { integ_id: 'image-gen-replicate',     env_key: 'REPLICATE_API_TOKEN' },
 };
 
 function markImageProviderDirty(id) {

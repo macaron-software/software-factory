@@ -911,6 +911,15 @@ def _ensure_darwin_tables(conn) -> None:
             '{"env_key": "PIXELLAB_API_KEY", "base_url": "https://api.pixellab.ai/v1", "models": ["pixelart"]}',
         ),
         (
+            "image-gen-gemini-image",
+            "Gemini Image — Nano Banana",
+            "image-gen",
+            "ai-llm",
+            "🍌",
+            "Gemini 2.5 Flash Image (aka Nano Banana). Generates UI mockups and screen flows from text prompts. Attach output to Claude/Gemini prompt to implement. Reuses GEMINI_API_KEY.",
+            '{"env_key": "GEMINI_API_KEY", "base_url": "https://generativelanguage.googleapis.com/v1beta", "models": ["gemini-2.5-flash", "imagen-3.0-generate-002"]}',
+        ),
+        (
             "image-gen-replicate",
             "Replicate",
             "image-gen",
