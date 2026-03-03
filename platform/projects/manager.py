@@ -726,7 +726,7 @@ class ProjectStore:
                 p.current_phase or "",
                 json.dumps(p.phases),
                 p.owner_id or "",
-                int(p.starred),
+                bool(p.starred),
                 p.container_url or "",
             ),
         )
@@ -1125,7 +1125,7 @@ class ProjectStore:
                 json.dumps(p.agents),
                 p.active_pattern_id,
                 p.status,
-                int(p.starred),
+                bool(p.starred),
                 p.container_url or "",
                 p.id,
             ),
