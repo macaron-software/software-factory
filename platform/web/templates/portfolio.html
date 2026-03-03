@@ -251,7 +251,7 @@
                 <div class="metric-label">{{ _("epics") }}</div>
             </div>
             <div class="metric-card">
-                <div class="metric-value">{{ active_missions }}</div>
+                <div class="metric-value">{{ active_epics }}</div>
                 <div class="metric-label">{{ _("in_progress") }}</div>
             </div>
             <div class="metric-card">
@@ -298,7 +298,7 @@
                 {% endif %}
 
                 <div class="pmc-missions">
-                    {% for m in p.missions[:3] %}
+                    {% for m in p.epics[:3] %}
                     <div class="pmc-mission">
                         <span class="pmc-mission-dot {{ m.run_status or m.status }}"></span>
                         <span class="pmc-mission-name">{{ m.name }}</span>
@@ -438,7 +438,8 @@ let activeCard = null;
 function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
 function closePopover(){
-    document.getElementById('agentPopover').classList.remove('visible');
+    const _pop = document.getElementById('agentPopover');
+    if(_pop) _pop.classList.remove('visible');
     if(activeCard){ activeCard.classList.remove('active'); activeCard=null; }
 }
 
