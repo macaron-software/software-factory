@@ -96,12 +96,32 @@ def init_db(db_path: Path = DB_PATH):
 
 
 def _init_pg():
-    """Initialize PostgreSQL schema."""
+    """Initialize PostgreSQL schema.
+
+    Uses a PostgreSQL advisory lock (id=20260301) so that when multiple nodes
+    start simultaneously they serialize schema migrations instead of racing.
+    """
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
     conn = get_connection()
-    schema = SCHEMA_PG_PATH.read_text()
-    conn.executescript(schema)
-    conn.commit()
-    _migrate_pg(conn)
+    # Acquire exclusive advisory lock — other nodes block here until migration done
+    try:
+        conn.execute("SELECT pg_advisory_lock(20260301)")
+        _log.info("DB migration: advisory lock acquired")
+    except Exception:
+        pass  # non-fatal if advisory locks not supported
+
+    try:
+        schema = SCHEMA_PG_PATH.read_text()
+        conn.executescript(schema)
+        conn.commit()
+        _migrate_pg(conn)
+    finally:
+        try:
+            conn.execute("SELECT pg_advisory_unlock(20260301)")
+        except Exception:
+            pass
     return conn
 
 
