@@ -44,6 +44,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/api/monitoring/live",
         "/api/notifications/status",
         "/api/analytics",
+        "/api/cockpit",
     )
 
     async def dispatch(self, request: Request, call_next):

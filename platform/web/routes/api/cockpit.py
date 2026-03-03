@@ -129,6 +129,43 @@ def _get_pipeline(db) -> dict:
 def _get_environments() -> list[dict]:
     import httpx
 
+    cluster_role = os.environ.get("CLUSTER_ROLE", "")  # "master" / "slave" / ""
+    is_cluster = bool(cluster_role)
+
+    # In cluster mode: probe cluster nodes from PLATFORM_WORKER_NODES env
+    if is_cluster:
+        try:
+            from ..missions.dispatch import _get_worker_urls
+
+            urls = _get_worker_urls()
+            results = []
+            for idx, url in enumerate(urls):
+                node_id = f"node-{idx + 1}"
+                try:
+                    r = httpx.get(f"{url}/api/health", timeout=2.0)
+                    data = r.json() if r.status_code == 200 else {}
+                    status = "online" if data.get("status") == "ok" else "degraded"
+                    version = data.get("version")
+                    node_name = data.get("node", node_id)
+                except Exception:
+                    status = "offline"
+                    version = None
+                    node_name = node_id
+                results.append(
+                    {
+                        "id": node_id,
+                        "name": node_name,
+                        "url": url,
+                        "status": status,
+                        "version": version,
+                        "role": cluster_role if idx == 0 else "slave",
+                    }
+                )
+            if results:
+                return results
+        except Exception:
+            pass
+
     # Local env — we're running on this server, mark as online directly
     local_version = None
     try:
