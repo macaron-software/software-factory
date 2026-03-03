@@ -230,6 +230,7 @@ PUBLIC_PATHS = {
     "/api/i18n",
     "/api/webhooks",
     "/api/autoheal/heartbeat",
+    "/api/cockpit",
     "/api/notifications/badge",
     "/login",
     "/setup",
