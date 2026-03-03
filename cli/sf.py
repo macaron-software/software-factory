@@ -7,6 +7,7 @@ Dual mode: API (server) or DB (offline/direct sqlite3).
 Usage:
     sf status
     sf ideation "site web de suivi de vélo iot gps"
+    sf jarvis "quelle stack pour un jeu 3D temps-réel ?"
     sf missions list --project myproj
     sf projects chat myproj "ajoute un module auth"
     sf agents list
@@ -590,6 +591,57 @@ def cmd_ideation_create_epic(args):
 def cmd_ideation_list(args):
     b = get_backend(args)
     output(args, b.ideation_list())
+
+
+# ── CTO / Jarvis ──
+
+def cmd_jarvis(args):
+    """Send a message to Jarvis (CTO agent) via /api/cto/message — stored in Jarvis history."""
+    b = get_backend(args)
+    message = " ".join(args.message)
+    session_id = getattr(args, "session_id", None) or ""
+
+    if not message:
+        out.error("Usage: sf jarvis \"your question\"")
+        sys.exit(1)
+
+    url = b.cto_message_url()
+    if not url:
+        out.error("Jarvis requires API mode (server must be running)")
+        sys.exit(1)
+
+    # Create a new session if none specified
+    if not session_id:
+        result = b.cto_new_session()
+        session_id = result.get("session_id", "")
+
+    out.info(f"Jarvis [{session_id[:8]}] — {message[:80]}...")
+
+    from cli._stream import print_stream, stream_sse
+
+    auth_headers = b._auth_headers() if hasattr(b, "_auth_headers") else {}
+
+    # Stream the CTO message — events: user_html (skip), chunk (text), done, error
+    print_stream(
+        url,
+        method="POST",
+        json_body={"content": message, "session_id": session_id},
+        headers=auth_headers,
+    )
+    print()
+
+
+def cmd_jarvis_list(args):
+    b = get_backend(args)
+    sessions = b.cto_sessions()
+    if not sessions:
+        out.info("No Jarvis sessions found.")
+        return
+    for s in sessions[:20]:
+        sid = s.get("id", s.get("session_id", "?"))[:8]
+        title = s.get("title") or s.get("name") or "(no title)"
+        ts = (s.get("updated_at") or s.get("created_at") or "")[:16]
+        print(f"  {sid}  {ts}  {title}")
 
 
 # ── Metrics ──
@@ -1444,6 +1496,21 @@ def build_parser() -> argparse.ArgumentParser:
     # ── ideation shortcut: sf ideation "prompt" ──
     # handled in main() below
 
+    # ── jarvis ──
+    jar = sub.add_parser("jarvis", help="Chat with Jarvis (CTO agent) — stored in Jarvis history")
+    jar_sub = jar.add_subparsers(dest="subcmd")
+
+    jar_msg = jar_sub.add_parser("ask", help="Ask Jarvis a question")
+    jar_msg.add_argument("message", nargs="+")
+    jar_msg.add_argument("--session", "-s", dest="session_id", default="", help="Reuse existing session ID")
+    jar_msg.set_defaults(func=cmd_jarvis)
+
+    jar_list = jar_sub.add_parser("sessions", help="List Jarvis chat sessions")
+    jar_list.set_defaults(func=cmd_jarvis_list)
+
+    # ── jarvis shortcut: sf jarvis "message" ──
+    # handled in main() below
+
     # ── metrics ──
     met = sub.add_parser("metrics", help="Platform metrics")
     met_sub = met.add_subparsers(dest="subcmd")
@@ -1719,6 +1786,19 @@ def main():
             "-h",
         ):
             sys.argv.insert(idx + 1, "start")
+    except ValueError:
+        pass
+
+    # Handle jarvis shortcut: sf [options] jarvis "message..."
+    try:
+        idx = sys.argv.index("jarvis")
+        if idx + 1 < len(sys.argv) and sys.argv[idx + 1] not in (
+            "ask",
+            "sessions",
+            "--help",
+            "-h",
+        ):
+            sys.argv.insert(idx + 1, "ask")
     except ValueError:
         pass
 

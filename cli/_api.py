@@ -30,6 +30,10 @@ class APIBackend:
 
     # ── helpers ──
 
+    def _auth_headers(self) -> dict:
+        """Return auth headers for use with external streaming calls (e.g. _stream.print_stream)."""
+        return dict(self._client.headers)
+
     def _get(self, path: str, params: dict | None = None) -> Any:
         r = self._client.get(path, params=params)
         r.raise_for_status()
@@ -340,6 +344,19 @@ class APIBackend:
 
     def ideation_session_url(self, session_id: str) -> str:
         return f"{self.base_url}/api/sessions/{session_id}/sse"
+
+    # ── CTO / Jarvis ──
+
+    def cto_new_session(self, title: str = "") -> dict:
+        """Create a new CTO chat session (visible in Jarvis history UI)."""
+        return self._post("/api/cto/sessions/new", {"title": title} if title else {})
+
+    def cto_sessions(self) -> list:
+        """List CTO sessions."""
+        return self._get("/api/cto/sessions") or []
+
+    def cto_message_url(self) -> str:
+        return f"{self.base_url}/api/cto/message"
 
     # ── Metrics ──
 
