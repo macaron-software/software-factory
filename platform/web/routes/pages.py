@@ -823,7 +823,7 @@ async def settings_page(request: Request):
 async def save_orchestrator_settings(request: Request):
     """Save mission concurrency + backpressure + worker_nodes settings and apply them live."""
     from ...config import get_config, save_config
-    from ..helpers import get_mission_semaphore
+    from .helpers import get_mission_semaphore
 
     body = await request.json()
     cfg = get_config()
