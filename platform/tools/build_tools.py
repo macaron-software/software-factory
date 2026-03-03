@@ -9,7 +9,7 @@ from __future__ import annotations
 import subprocess
 from ..models import AgentInstance
 from .registry import BaseTool
-from .sandbox import get_sandbox, SANDBOX_ENABLED
+from .sandbox import get_sandbox
 
 
 class BuildTool(BaseTool):
@@ -25,6 +25,7 @@ class BuildTool(BaseTool):
         # Command injection guard
         try:
             from ..security.sanitize import sanitize_command
+
             cmd, err = sanitize_command(cmd, "build")
             if err:
                 return err
@@ -32,12 +33,21 @@ class BuildTool(BaseTool):
             pass
         # Fix swift command to use Apple Swift (not OpenStack CLI)
         import os
+
         if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
             cmd = "/usr/bin/" + cmd.strip()
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
-        output = result.stdout[-3000:] if result.returncode == 0 else (result.stderr[-3000:] or result.stdout[-3000:])
-        status = "[OK] SUCCESS" if result.returncode == 0 else f"[FAIL] FAILED (exit {result.returncode})"
+        output = (
+            result.stdout[-3000:]
+            if result.returncode == 0
+            else (result.stderr[-3000:] or result.stdout[-3000:])
+        )
+        status = (
+            "[OK] SUCCESS"
+            if result.returncode == 0
+            else f"[FAIL] FAILED (exit {result.returncode})"
+        )
         prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
         return f"{prefix}{status}\n{output}"
 
@@ -55,6 +65,7 @@ class TestTool(BaseTool):
         # Command injection guard
         try:
             from ..security.sanitize import sanitize_command
+
             cmd, err = sanitize_command(cmd, "test")
             if err:
                 return err
@@ -62,12 +73,17 @@ class TestTool(BaseTool):
             pass
         # Fix swift command to use Apple Swift (not OpenStack CLI)
         import os
+
         if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
             cmd = "/usr/bin/" + cmd.strip()
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
         output = result.stdout[-3000:] + result.stderr[-1000:]
-        status = "[OK] PASS" if result.returncode == 0 else f"[FAIL] FAIL (exit {result.returncode})"
+        status = (
+            "[OK] PASS"
+            if result.returncode == 0
+            else f"[FAIL] FAIL (exit {result.returncode})"
+        )
         prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
         return f"{prefix}{status}\n{output}"
 
@@ -85,6 +101,7 @@ class LintTool(BaseTool):
         # Command injection guard
         try:
             from ..security.sanitize import sanitize_command
+
             cmd, err = sanitize_command(cmd, "lint")
             if err:
                 return err
@@ -106,6 +123,7 @@ class BrowserScreenshotTool(BaseTool):
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         import os
         import asyncio
+
         cwd = params.get("cwd", ".")
         url = params.get("url", "")
         filename = params.get("filename", "screenshot.png")
@@ -122,7 +140,8 @@ class BrowserScreenshotTool(BaseTool):
                 if os.path.isfile(os.path.join(cwd, "index.html")):
                     server_proc = subprocess.Popen(
                         ["python3", "-m", "http.server", "8765", "--directory", cwd],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
                     )
                     await asyncio.sleep(1)
                     url = "http://localhost:8765"
@@ -132,9 +151,12 @@ class BrowserScreenshotTool(BaseTool):
             # Try Playwright
             try:
                 from playwright.async_api import async_playwright
+
                 async with async_playwright() as p:
                     browser = await p.chromium.launch(headless=True)
-                    page = await browser.new_page(viewport={"width": 1280, "height": 720})
+                    page = await browser.new_page(
+                        viewport={"width": 1280, "height": 720}
+                    )
                     await page.goto(url, wait_until="networkidle", timeout=15000)
                     if wait_ms > 0:
                         await asyncio.sleep(wait_ms / 1000)
@@ -142,14 +164,29 @@ class BrowserScreenshotTool(BaseTool):
                     title = await page.title()
                     # Check for console errors
                     console_errors = []
-                    page.on("console", lambda msg: console_errors.append(msg.text) if msg.type == "error" else None)
+                    page.on(
+                        "console",
+                        lambda msg: console_errors.append(msg.text)
+                        if msg.type == "error"
+                        else None,
+                    )
                     await browser.close()
                 return f"[OK] Screenshot saved: {filepath}\nPage title: {title}\nConsole errors: {len(console_errors)}"
             except ImportError:
                 # Fallback: use subprocess with node/playwright CLI
                 result = subprocess.run(
-                    ["npx", "playwright", "screenshot", url, filepath, "--viewport-size=1280,720"],
-                    capture_output=True, text=True, cwd=cwd, timeout=30,
+                    [
+                        "npx",
+                        "playwright",
+                        "screenshot",
+                        url,
+                        filepath,
+                        "--viewport-size=1280,720",
+                    ],
+                    capture_output=True,
+                    text=True,
+                    cwd=cwd,
+                    timeout=30,
                 )
                 if result.returncode == 0:
                     return f"[OK] Screenshot saved: {filepath}"
@@ -170,15 +207,29 @@ class CICDRunnerTool(BaseTool):
     category = "build"
 
     _STACK_CMDS = {
-        "Cargo.toml": [("cargo fmt -- --check", "lint"), ("cargo build --release", "build"), ("cargo test", "test")],
+        "Cargo.toml": [
+            ("cargo fmt -- --check", "lint"),
+            ("cargo build --release", "build"),
+            ("cargo test", "test"),
+        ],
         "pyproject.toml": [("ruff check .", "lint"), ("python -m pytest -q", "test")],
         "requirements.txt": [("python -m pytest -q", "test")],
-        "package.json": [("npm run lint", "lint"), ("npm run build", "build"), ("npm test", "test")],
-        "go.mod": [("go vet ./...", "lint"), ("go build ./...", "build"), ("go test ./...", "test")],
+        "package.json": [
+            ("npm run lint", "lint"),
+            ("npm run build", "build"),
+            ("npm test", "test"),
+        ],
+        "go.mod": [
+            ("go vet ./...", "lint"),
+            ("go build ./...", "build"),
+            ("go test ./...", "test"),
+        ],
     }
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import asyncio
         import os
+
         cwd = params.get("cwd", ".")
         if not os.path.isdir(cwd):
             return f"[FAIL] Directory not found: {cwd}"
@@ -193,8 +244,12 @@ class CICDRunnerTool(BaseTool):
 
         results, passed, failed = [], 0, 0
         sandbox = get_sandbox(cwd)
+        loop = asyncio.get_event_loop()
         for cmd, stage in steps:
-            r = sandbox.run(cmd, cwd=cwd, timeout=300)
+            # Run blocking subprocess in thread pool to avoid blocking event loop
+            r = await loop.run_in_executor(
+                None, lambda c=cmd: sandbox.run(c, cwd=cwd, timeout=300)
+            )
             ok = r.returncode == 0
             results.append(f"{'✓' if ok else '✗'} {stage}: {cmd}")
             if not ok:
@@ -203,8 +258,12 @@ class CICDRunnerTool(BaseTool):
             else:
                 passed += 1
 
-        status = "[OK] PIPELINE PASSED" if failed == 0 else f"[FAIL] {failed} stage(s) failed"
-        return f"{status} ({passed}/{passed+failed})\n" + "\n".join(results)
+        status = (
+            "[OK] PIPELINE PASSED"
+            if failed == 0
+            else f"[FAIL] {failed} stage(s) failed"
+        )
+        return f"{status} ({passed}/{passed + failed})\n" + "\n".join(results)
 
 
 def register_build_tools(registry):
