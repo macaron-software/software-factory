@@ -173,84 +173,56 @@ test("admin creates item, user sees it", async ({ browser }) => {
 
 ### Screenshot at Every Journey Step (MANDATORY)
 
-**ALWAYS** take a `page.screenshot()` at the end of every `test.step()` when testing user journeys.
-Screenshots document the full user journey with real data and must be saved to `screenshots/` in the project workspace.
+**ALWAYS** take a `page.screenshot()` at the end of every `test.step()`.
+Screenshots document the full user journey with real data. They must be saved to `screenshots/` in the project workspace.
 
-Naming convention: `NN-feature-state.png` (sequential, kebab-case, describes the UI state shown).
+**The steps to capture depend entirely on the project and its features.** Before writing tests, identify:
+1. What are the distinct features/screens of this app? (auth, dashboard, data views, forms, workflows…)
+2. What user journeys exist? (one journey per feature, one journey per user role if multi-user)
+3. What are the meaningful UI states within each journey? (initial state, form filled, after action, error state…)
+
+**Capture every meaningful UI state transition**, not a fixed list. Examples by project type:
+
+| Project type | Journey steps to capture |
+|---|---|
+| CRUD app | empty list → form filled → after create → detail → edit form → after update → after delete |
+| Auth app | login form → after login → profile → change password → logout → protected redirect |
+| Migration (PHP→new) | same pages as before migration, same data, same behavior — screenshot each route |
+| Dashboard/analytics | empty state → with data loaded → filtered view → exported result |
+| Real-time / WebSocket | before event → after event received → notification visible |
+| Multi-user | admin view → user view → shared state visible in both |
+| Wizard/multi-step form | each step → validation errors → summary → confirmation |
+
+Naming convention: `NN-[feature]-[state].png` (sequential, kebab-case).
 
 ```typescript
 import { test, expect } from "@playwright/test";
 import * as fs from "fs";
 
-// Ensure screenshots dir exists before tests run
 test.beforeAll(() => fs.mkdirSync("screenshots", { recursive: true }));
 
-test("full CRUD user journey", async ({ page }) => {
-  await test.step("Login", async () => {
-    await page.goto("/login");
-    await page.getByLabel("Email").fill("admin@demo.local");
-    await page.getByLabel("Password").fill("password123");
-    await page.getByRole("button", { name: "Sign in" }).click();
-    await expect(page.getByText("Dashboard")).toBeVisible();
-    await page.screenshot({ path: "screenshots/01-login-success.png", fullPage: true });
+// Adapt steps to THIS project's actual features and user journeys
+test("[feature name] — full user journey", async ({ page }) => {
+  let step = 0;
+  const shot = (name: string) =>
+    page.screenshot({ path: `screenshots/${String(++step).padStart(2, "0")}-${name}.png`, fullPage: true });
+
+  await test.step("[Step name reflecting actual feature]", async () => {
+    // ... interact with the app using real data (not lorem ipsum, not empty strings)
+    await expect(/* relevant element */).toBeVisible();
+    await shot("[feature]-[state]"); // e.g. "auth-login-success" or "invoices-list-empty"
   });
 
-  await test.step("List — empty state", async () => {
-    await page.goto("/items");
-    await expect(page.getByText(/no items|empty/i)).toBeVisible();
-    await page.screenshot({ path: "screenshots/02-list-empty.png", fullPage: true });
+  await test.step("[Next step]", async () => {
+    // ...
+    await shot("[feature]-[state]");
   });
 
-  await test.step("Create — fill form with real data", async () => {
-    await page.getByRole("link", { name: /new|create|add/i }).click();
-    await page.getByLabel(/name|title/i).fill("Test Item Alpha");
-    await page.getByLabel(/description/i).fill("Created by automated journey test");
-    await page.screenshot({ path: "screenshots/03-create-form-filled.png", fullPage: true });
-    await page.getByRole("button", { name: /save|create|submit/i }).click();
-    await expect(page.getByText("Test Item Alpha")).toBeVisible();
-    await page.screenshot({ path: "screenshots/04-after-create.png", fullPage: true });
-  });
-
-  await test.step("List — populated with real data", async () => {
-    await page.goto("/items");
-    await expect(page.getByText("Test Item Alpha")).toBeVisible();
-    await page.screenshot({ path: "screenshots/05-list-with-data.png", fullPage: true });
-  });
-
-  await test.step("Read — detail view", async () => {
-    await page.getByText("Test Item Alpha").click();
-    await expect(page.getByText("Created by automated journey test")).toBeVisible();
-    await page.screenshot({ path: "screenshots/06-detail-view.png", fullPage: true });
-  });
-
-  await test.step("Update — edit form with new data", async () => {
-    await page.getByRole("button", { name: /edit|update/i }).click();
-    await page.getByLabel(/name|title/i).clear();
-    await page.getByLabel(/name|title/i).fill("Test Item Alpha — Updated");
-    await page.screenshot({ path: "screenshots/07-edit-form-filled.png", fullPage: true });
-    await page.getByRole("button", { name: /save|update|submit/i }).click();
-    await expect(page.getByText("Test Item Alpha — Updated")).toBeVisible();
-    await page.screenshot({ path: "screenshots/08-after-update.png", fullPage: true });
-  });
-
-  await test.step("Delete — confirm and verify removal", async () => {
-    await page.getByRole("button", { name: /delete|remove/i }).click();
-    // Handle confirmation dialog if present
-    const dialog = page.getByRole("dialog");
-    if (await dialog.isVisible()) {
-      await page.screenshot({ path: "screenshots/09-delete-confirm-dialog.png", fullPage: true });
-      await dialog.getByRole("button", { name: /confirm|yes|delete/i }).click();
-    }
-    await expect(page.getByText("Test Item Alpha")).not.toBeVisible();
-    await page.screenshot({ path: "screenshots/10-after-delete-list-empty.png", fullPage: true });
-  });
+  // One test.step() + one shot() per distinct UI state in this journey
 });
 ```
 
-Screenshots must cover **every distinct UI state** of the journey:
-- Form (empty) → Form (filled with real data) → Success confirmation
-- List (empty) → List (with data) → List (after deletion)
-- Detail view → Edit view → Updated detail
+Screenshots must use **real, meaningful data** (names, emails, amounts, dates) — not `"test"`, `"foo"`, or lorem ipsum. The screenshot must be readable and demonstrate the feature works end-to-end.
 
 ### Screenshot on Failure (additionally)
 
@@ -271,17 +243,10 @@ test("page meets accessibility standards", async ({ page }) => {
 ## Output Format
 
 ```
-## User Journey: [Journey Name]
-Step 01 — Login:              ✅ [Expected result]  → screenshots/01-login-success.png
-Step 02 — List empty:         ✅ [Expected result]  → screenshots/02-list-empty.png
-Step 03 — Create form filled: ✅ [Expected result]  → screenshots/03-create-form-filled.png
-Step 04 — After create:       ✅ [Expected result]  → screenshots/04-after-create.png
-Step 05 — List with data:     ✅ [Expected result]  → screenshots/05-list-with-data.png
-Step 06 — Detail view:        ✅ [Expected result]  → screenshots/06-detail-view.png
-Step 07 — Edit form filled:   ✅ [Expected result]  → screenshots/07-edit-form-filled.png
-Step 08 — After update:       ✅ [Expected result]  → screenshots/08-after-update.png
-Step 09 — Delete confirm:     ✅ [Expected result]  → screenshots/09-delete-confirm-dialog.png
-Step 10 — After delete:       ✅ [Expected result]  → screenshots/10-after-delete-list-empty.png
+## User Journey: [Feature Name] — [Project Name]
+Step 01 — [feature]-[state]: ✅ [what was verified]  → screenshots/01-[feature]-[state].png
+Step 02 — [feature]-[state]: ✅ [what was verified]  → screenshots/02-[feature]-[state].png
+Step 03 — [feature]-[state]: ❌ FAILED [actual result]
 ```
 
 ## Anti-patterns
