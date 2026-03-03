@@ -11,6 +11,7 @@ name: Deploy → OVH Demo + Innovation
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read  # Minimal — pas d'écriture repo via GITHUB_TOKEN
