@@ -194,38 +194,40 @@ async def lifespan(app: FastAPI):
         logger.info("Seeded %d skills into DB", n)
 
     # Ensure every project has TMA + Security + Debt (+ MVP if applicable) missions
+    # Moved to background task to reduce startup/MTTR time
     from .projects.manager import get_project_store
+    import asyncio as _asyncio
 
     ps = get_project_store()
     ps.seed_from_registry()
 
-    _prov_count = 0
-    for proj in ps.list_all():
+    async def _bg_heal_and_seed():
+        import asyncio as _a
+        _loop = _a.get_event_loop()
+        _prov_count = 0
+        for proj in ps.list_all():
+            try:
+                created = await _loop.run_in_executor(None, ps.heal_epics, proj)
+                _prov_count += len(created)
+            except Exception as e:
+                logger.warning("heal_epics failed for %s: %s", proj.id, e)
+        if _prov_count:
+            logger.warning("heal_epics: created %d missions across all projects", _prov_count)
+
+        # Scaffold all projects: ensure workspace + git + docker + docs + code exist
+        from .projects.manager import heal_all_projects as _heal
+        await _loop.run_in_executor(None, _heal)
+
+        # Seed memory (global knowledge + project files)
+        from .memory.seeder import seed_all as seed_memories
         try:
-            created = ps.heal_epics(proj)
-            _prov_count += len(created)
-        except Exception as e:
-            logger.warning("heal_epics failed for %s: %s", proj.id, e)
-    if _prov_count:
-        logger.warning(
-            "heal_epics: created %d missions across all projects", _prov_count
-        )
+            n_mem = await _loop.run_in_executor(None, seed_memories)
+            if n_mem:
+                logger.info("Seeded %d memories", n_mem)
+        except Exception as _e:
+            logger.warning("Memory seeding skipped: %s", _e)
 
-    # Scaffold all projects: ensure workspace + git + docker + docs + code exist
-    from .projects.manager import heal_all_projects as _heal
-    import asyncio as _asyncio
-
-    _asyncio.get_event_loop().run_in_executor(None, _heal)
-
-    # Seed memory (global knowledge + project files)
-    from .memory.seeder import seed_all as seed_memories
-
-    try:
-        n_mem = seed_memories()
-        if n_mem:
-            logger.info("Seeded %d memories", n_mem)
-    except Exception as _e:
-        logger.warning("Memory seeding skipped: %s", _e)
+    _asyncio.create_task(_bg_heal_and_seed())
 
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
@@ -683,7 +685,7 @@ async def lifespan(app: FastAPI):
                     _db.close()
             except Exception as _e:
                 logger.debug("Node heartbeat failed: %s", _e)
-            await _aio.sleep(30)
+            await _aio.sleep(int(_os_hb.environ.get("SF_HEARTBEAT_INTERVAL_S", "10")))
 
     asyncio.create_task(_node_heartbeat_loop())
     logger.info("Node heartbeat started: %s (%s/%s)", _hb_node_id, _hb_role, _hb_mode)
