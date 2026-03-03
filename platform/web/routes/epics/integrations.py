@@ -15,15 +15,15 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/api/epics/{mission_id}/confluence/sync")
-@router.post("/api/missions/{mission_id}/confluence/sync")
-async def api_confluence_sync_all(mission_id: str):
+@router.post("/api/epics/{epic_id}/confluence/sync")
+@router.post("/api/missions/{epic_id}/confluence/sync")
+async def api_confluence_sync_all(epic_id: str):
     """Sync all mission tabs to Confluence."""
     try:
         from ....confluence.sync import get_sync_engine
 
         engine = get_sync_engine()
-        results = engine.sync_mission(mission_id)
+        results = engine.sync_mission(epic_id)
         return JSONResponse(results)
     except FileNotFoundError:
         return JSONResponse({"error": "Confluence PAT not configured"}, status_code=503)
@@ -32,15 +32,15 @@ async def api_confluence_sync_all(mission_id: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.post("/api/epics/{mission_id}/confluence/sync/{tab}")
-@router.post("/api/missions/{mission_id}/confluence/sync/{tab}")
-async def api_confluence_sync_tab(mission_id: str, tab: str):
+@router.post("/api/epics/{epic_id}/confluence/sync/{tab}")
+@router.post("/api/missions/{epic_id}/confluence/sync/{tab}")
+async def api_confluence_sync_tab(epic_id: str, tab: str):
     """Sync a single tab to Confluence."""
     try:
         from ....confluence.sync import get_sync_engine
 
         engine = get_sync_engine()
-        result = engine.sync_tab(mission_id, tab)
+        result = engine.sync_tab(epic_id, tab)
         return JSONResponse(result)
     except FileNotFoundError:
         return JSONResponse({"error": "Confluence PAT not configured"}, status_code=503)
@@ -49,15 +49,15 @@ async def api_confluence_sync_tab(mission_id: str, tab: str):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.get("/api/epics/{mission_id}/confluence/status")
-@router.get("/api/missions/{mission_id}/confluence/status")
-async def api_confluence_status(mission_id: str):
+@router.get("/api/epics/{epic_id}/confluence/status")
+@router.get("/api/missions/{epic_id}/confluence/status")
+async def api_confluence_status(epic_id: str):
     """Get Confluence sync status for a mission."""
     try:
         from ....confluence.sync import get_sync_engine
 
         engine = get_sync_engine()
-        status = engine.get_sync_status(mission_id)
+        status = engine.get_sync_status(epic_id)
         healthy = engine.client.health_check()
         return JSONResponse({"status": status, "connected": healthy})
     except FileNotFoundError:
@@ -69,14 +69,14 @@ async def api_confluence_status(mission_id: str):
 # ── Screenshots API ──
 
 
-@router.get("/api/epics/{mission_id}/screenshots")
-@router.get("/api/missions/{mission_id}/screenshots")
-async def api_mission_screenshots(mission_id: str):
+@router.get("/api/epics/{epic_id}/screenshots")
+@router.get("/api/missions/{epic_id}/screenshots")
+async def api_mission_screenshots(epic_id: str):
     """List screenshots from mission workspace."""
     from ....epics.store import get_epic_run_store
 
     store = get_epic_run_store()
-    mission = store.get(mission_id)
+    mission = store.get(epic_id)
     if not mission or not mission.workspace_path:
         return JSONResponse({"screenshots": [], "workspace": ""})
     ws = Path(mission.workspace_path)
@@ -92,7 +92,7 @@ async def api_mission_screenshots(mission_id: str):
                                 "name": img.name,
                                 "path": str(rel),
                                 "size_kb": round(img.stat().st_size / 1024, 1),
-                                "url": f"/workspace/{mission_id}/{rel}",
+                                "url": f"/workspace/{epic_id}/{rel}",
                             }
                         )
     return JSONResponse({"screenshots": screenshots[:20], "workspace": str(ws)})
@@ -101,9 +101,9 @@ async def api_mission_screenshots(mission_id: str):
 # ── Support Tickets API (TMA) ──
 
 
-@router.get("/api/epics/{mission_id}/tickets")
-@router.get("/api/missions/{mission_id}/tickets")
-async def api_list_tickets(mission_id: str, status: str = ""):
+@router.get("/api/epics/{epic_id}/tickets")
+@router.get("/api/missions/{epic_id}/tickets")
+async def api_list_tickets(epic_id: str, status: str = ""):
     from ....db.migrations import get_db
 
     db = get_db()
@@ -111,21 +111,21 @@ async def api_list_tickets(mission_id: str, status: str = ""):
         rows = db.execute(
             "SELECT * FROM support_tickets WHERE mission_id=? AND status=? ORDER BY "
             "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
-            (mission_id, status),
+            (epic_id, status),
         ).fetchall()
     else:
         rows = db.execute(
             "SELECT * FROM support_tickets WHERE mission_id=? ORDER BY "
             "CASE severity WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 WHEN 'P2' THEN 2 WHEN 'P3' THEN 3 ELSE 4 END, created_at DESC",
-            (mission_id,),
+            (epic_id,),
         ).fetchall()
     db.close()
     return JSONResponse([dict(r) for r in rows])
 
 
-@router.post("/api/epics/{mission_id}/tickets")
-@router.post("/api/missions/{mission_id}/tickets")
-async def api_create_ticket(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/tickets")
+@router.post("/api/missions/{epic_id}/tickets")
+async def api_create_ticket(request: Request, epic_id: str):
     import uuid
 
     from ....db.migrations import get_db
@@ -138,7 +138,7 @@ async def api_create_ticket(request: Request, mission_id: str):
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             tid,
-            mission_id,
+            epic_id,
             body.get("title", ""),
             body.get("description", ""),
             body.get("severity", "P3"),
@@ -153,9 +153,9 @@ async def api_create_ticket(request: Request, mission_id: str):
     return JSONResponse(dict(row), status_code=201)
 
 
-@router.patch("/api/epics/{mission_id}/tickets/{ticket_id}")
-@router.patch("/api/missions/{mission_id}/tickets/{ticket_id}")
-async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
+@router.patch("/api/epics/{epic_id}/tickets/{ticket_id}")
+@router.patch("/api/missions/{epic_id}/tickets/{ticket_id}")
+async def api_update_ticket(request: Request, epic_id: str, ticket_id: str):
     from ....db.migrations import get_db
 
     body = await request.json()
@@ -179,7 +179,7 @@ async def api_update_ticket(request: Request, mission_id: str, ticket_id: str):
     sets.append("updated_at=CURRENT_TIMESTAMP")
     if body.get("status") in ("resolved", "closed"):
         sets.append("resolved_at=CURRENT_TIMESTAMP")
-    vals.extend([ticket_id, mission_id])
+    vals.extend([ticket_id, epic_id])
     db.execute(
         f"UPDATE support_tickets SET {','.join(sets)} WHERE id=? AND mission_id=?", vals
     )

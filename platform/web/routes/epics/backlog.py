@@ -262,8 +262,8 @@ async def list_feature_deps(feature_id: str):
 # ── Sprint planning: assign stories to sprint ────────────────────
 
 
-@router.post("/api/missions/{mission_id}/wsjf", responses={200: {"model": OkResponse}})
-async def compute_wsjf(mission_id: str, request: Request):
+@router.post("/api/missions/{epic_id}/wsjf", responses={200: {"model": OkResponse}})
+async def compute_wsjf(epic_id: str, request: Request):
     """Compute and store WSJF score from components."""
     from ....db.migrations import get_db as _gdb
 
@@ -279,7 +279,7 @@ async def compute_wsjf(mission_id: str, request: Request):
     try:
         db.execute(
             "UPDATE epics SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
-            (wsjf, bv, tc, rr, jd, mission_id),
+            (wsjf, bv, tc, rr, jd, epic_id),
         )
         db.commit()
     finally:

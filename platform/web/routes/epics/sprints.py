@@ -10,23 +10,21 @@ from ...schemas import OkResponse, StoryOut
 router = APIRouter()
 
 
-@router.post(
-    "/api/missions/{mission_id}/sprints", responses={200: {"model": OkResponse}}
-)
-async def create_sprint(mission_id: str):
+@router.post("/api/missions/{epic_id}/sprints", responses={200: {"model": OkResponse}})
+async def create_sprint(epic_id: str):
     """Add a sprint to a mission."""
     from ....epics.store import SprintDef, get_epic_store
 
     store = get_epic_store()
-    existing = store.list_sprints(mission_id)
+    existing = store.list_sprints(epic_id)
     num = len(existing) + 1
-    s = SprintDef(mission_id=mission_id, number=num, name=f"Sprint {num}")
+    s = SprintDef(mission_id=epic_id, number=num, name=f"Sprint {num}")
     store.create_sprint(s)
     return JSONResponse({"ok": True})
 
 
-@router.post("/api/missions/{mission_id}/tasks")
-async def create_task(request: Request, mission_id: str):
+@router.post("/api/missions/{epic_id}/tasks")
+async def create_task(request: Request, epic_id: str):
     """Create a task in a mission sprint (inline kanban creation)."""
     from ....epics.store import TaskDef, get_epic_store
 
@@ -37,14 +35,14 @@ async def create_task(request: Request, mission_id: str):
     store = get_epic_store()
     sprint_id = data.get("sprint_id", "")
     if not sprint_id:
-        sprints = store.list_sprints(mission_id)
+        sprints = store.list_sprints(epic_id)
         if sprints:
             sprint_id = sprints[-1].id
         else:
             return JSONResponse({"error": "No sprint"}, status_code=400)
     task = TaskDef(
         sprint_id=sprint_id,
-        mission_id=mission_id,
+        mission_id=epic_id,
         title=title,
         type=data.get("type", "feature"),
         domain=data.get("domain", ""),
@@ -132,14 +130,14 @@ async def available_stories_for_sprint(sprint_id: str):
         ).fetchone()
         if not sprint:
             return JSONResponse({"error": "Sprint not found"}, status_code=404)
-        mission_id = sprint["mission_id"]
+        epic_id = sprint["mission_id"]
         rows = db.execute(
             """SELECT us.id, us.title, us.story_points, us.status, us.priority, f.name as feature_name
                FROM user_stories us
                JOIN features f ON us.feature_id = f.id
                WHERE f.epic_id = ? AND (us.sprint_id = '' OR us.sprint_id IS NULL)
                ORDER BY us.priority""",
-            (mission_id,),
+            (epic_id,),
         ).fetchall()
         return JSONResponse({"stories": [dict(r) for r in rows]})
     finally:

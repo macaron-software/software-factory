@@ -567,7 +567,7 @@ document.getElementById('step2').addEventListener('submit', async e => {
 
 async function runPhase(runId) {
     try {
-        const r = await fetch(`/api/missions/${runId}/run`, {method:'POST'});
+        const r = await fetch(`/api/epics/${runId}/run`, {method:'POST'});
         const j = await r.json();
         if (j.status === 'started' || j.status === 'running' || j.redirect) location.href = `/missions/${runId}/control`;
         else alert(j.error || j.message || 'Erreur');
@@ -595,7 +595,7 @@ async function deleteMission(missionId, missionName) {
         warning: 'Toutes les epics (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
         expectedName: missionName || missionId.slice(0,8),
         onConfirm: async () => {
-            const r = await fetch(`/api/missions/${missionId}`, {method:'DELETE'});
+            const r = await fetch(`/api/epics/${missionId}`, {method:'DELETE'});
             if (r.ok) location.reload();
             else { const j = await r.json(); throw j.error || 'Erreur'; }
         }

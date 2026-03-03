@@ -789,8 +789,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var path = (e.detail.requestConfig || {}).path || '';
     var method = ((e.detail.requestConfig || {}).verb || '').toUpperCase();
     if (method !== 'POST') return;
-    if (/\/missions\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
-    else if (/\/missions\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
+    if (/\/epics\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
+    else if (/\/epics\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
     else if (/\/sessions\/[^/]+\/run-pattern/.test(path)) sfTrack('run_pattern', {});
     else if (/\/sessions\/[^/]+\/run-workflow/.test(path)) sfTrack('run_workflow', {});
     else if (/\/api\/ideation/.test(path) || /\/mkt-ideation/.test(path)) sfTrack('ideation_submit', {});

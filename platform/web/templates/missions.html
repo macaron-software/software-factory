@@ -2,7 +2,7 @@
 
 {% block topbar_actions %}
 {% include "partials/view_switcher.html" %}
-<a href="/missions?action=new" class="btn btn-primary">
+<a href="/epics?action=new" class="btn btn-primary">
     <svg class="icon icon-sm"><use href="#icon-plus"/></svg> {{ _("new_mission") }}
 </a>
 {% endblock %}
@@ -37,12 +37,12 @@
 
 <!-- Filters -->
 <div class="mission-filters">
-    <a href="/missions" class="mission-filter {% if not filter_status and not filter_project %}active{% endif %}">{{ _("toutes") }}</a>
-    <a href="/missions?status=active" class="mission-filter {% if filter_status == 'active' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-play"/></svg> En cours</a>
-    <a href="/missions?status=planning" class="mission-filter {% if filter_status == 'planning' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-clipboard"/></svg> Planning</a>
-    <a href="/missions?status=completed" class="mission-filter {% if filter_status == 'completed' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-check"/></svg> Terminées</a>
+    <a href="/epics" class="mission-filter {% if not filter_status and not filter_project %}active{% endif %}">{{ _("toutes") }}</a>
+    <a href="/epics?status=active" class="mission-filter {% if filter_status == 'active' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-play"/></svg> En cours</a>
+    <a href="/epics?status=planning" class="mission-filter {% if filter_status == 'planning' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-clipboard"/></svg> Planning</a>
+    <a href="/epics?status=completed" class="mission-filter {% if filter_status == 'completed' %}active{% endif %}"><svg class="icon icon-xs"><use href="#icon-check"/></svg> Terminées</a>
     {% for pid in project_ids %}
-    <a href="/missions?project={{ pid }}" class="mission-filter {% if filter_project == pid %}active{% endif %}">{{ pid }}</a>
+    <a href="/epics?project={{ pid }}" class="mission-filter {% if filter_project == pid %}active{% endif %}">{{ pid }}</a>
     {% endfor %}
 </div>
 
@@ -89,13 +89,13 @@
     <div class="empty-state">
         <p>{{ _('no_epic') }}</p>
         <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_epics") }}</p>
-        <a href="/missions?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
+        <a href="/epics?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
     </div>
     {% endfor %}
 </div>
 
 {% if show_new_form %}
-<div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
+<div class="new-mission-overlay" onclick="if(event.target===this)location.href='/epics'">
     <form class="new-mission-form" id="newMissionForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _("new_mission") }}</h3>
         <div class="nmf-field">
@@ -119,7 +119,7 @@
             <textarea name="brief" placeholder="Décrivez le besoin métier, le contexte projet, et les objectifs à atteindre..." required style="min-height:80px"></textarea>
         </div>
         <div class="nmf-actions">
-            <a href="/missions" class="btn btn-ghost">{{ _("cancel") }}</a>
+            <a href="/epics" class="btn btn-ghost">{{ _("cancel") }}</a>
             <button type="submit" class="btn btn-primary">
                 <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
             </button>

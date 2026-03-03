@@ -252,7 +252,7 @@ async function replayMission() {
         const res = await fetch('/api/epics/' + MISSION_ID + '/replay', {method: 'POST'});
         const data = await res.json();
         if (data.new_run_id) {
-            window.location.href = '/missions/' + data.new_run_id + '/control';
+            window.location.href = '/epics/' + data.new_run_id + '/control';
         } else {
             alert('Replay failed: ' + JSON.stringify(data));
         }

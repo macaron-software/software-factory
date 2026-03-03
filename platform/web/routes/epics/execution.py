@@ -19,21 +19,21 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/api/epics/{mission_id}/start", responses={200: {"model": OkResponse}})
-@router.post("/api/missions/{mission_id}/start", responses={200: {"model": OkResponse}})
-async def start_mission(mission_id: str):
+@router.post("/api/epics/{epic_id}/start", responses={200: {"model": OkResponse}})
+@router.post("/api/missions/{epic_id}/start", responses={200: {"model": OkResponse}})
+async def start_mission(epic_id: str):
     """Activate a mission."""
     from ....epics.store import get_epic_store
 
-    get_epic_store().update_mission_status(mission_id, "active")
+    get_epic_store().update_mission_status(epic_id, "active")
     return JSONResponse({"ok": True})
 
 
 @router.post(
-    "/api/missions/{mission_id}/launch",
+    "/api/missions/{epic_id}/launch",
     responses={200: {"model": OkResponse}, 404: {"model": ErrorResponse}},
 )
-async def launch_mission_workflow(request: Request, mission_id: str):
+async def launch_mission_workflow(request: Request, epic_id: str):
     """Create a session from mission's workflow and redirect to live view."""
     from ....epics.store import get_epic_run_store, get_epic_store
     from ....models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
@@ -41,7 +41,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     from ....workflows.store import get_workflow_store
 
     epic_store = get_epic_store()
-    mission = epic_store.get_mission(mission_id)
+    mission = epic_store.get_mission(epic_id)
     if not mission:
         return JSONResponse({"error": "Mission not found"}, status_code=404)
 
@@ -63,7 +63,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         status="active",
         config={
             "workflow_id": wf_id,
-            "mission_id": mission_id,
+            "mission_id": epic_id,
         },
     )
     session = session_store.create(session)
@@ -96,7 +96,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
     )
     readme = workspace_root / "README.md"
     task_desc = mission.goal or mission.description or mission.name
-    readme.write_text(f"# {wf.name}\n\n{task_desc}\n\nMission ID: {mission_id}\n")
+    readme.write_text(f"# {wf.name}\n\n{task_desc}\n\nMission ID: {epic_id}\n")
     gitignore = workspace_root / ".gitignore"
     gitignore.write_text(
         "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
@@ -117,7 +117,7 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         try:
             from ....patterns.engine import _auto_extract_requirements
 
-            _auto_extract_requirements(mission.description, mission_id)
+            _auto_extract_requirements(mission.description, epic_id)
         except Exception:
             pass
 
@@ -138,9 +138,9 @@ async def launch_mission_workflow(request: Request, mission_id: str):
         brief=task_desc,
         status=EpicStatus.PENDING,
         phases=phases,
-        project_id=mission.project_id or mission_id,
+        project_id=mission.project_id or epic_id,
         session_id=session.id,
-        parent_epic_id=mission_id,
+        parent_epic_id=epic_id,
         workspace_path=str(workspace_root),
     )
     try:
@@ -264,14 +264,14 @@ async def api_mission_start(request: Request):
             )
         )
 
-    mission_id = uuid.uuid4().hex[:8]
+    epic_id = uuid.uuid4().hex[:8]
 
     # Create workspace directory for agent tools (code, git, docker)
     import subprocess
 
     from ....config import DATA_DIR
 
-    workspace_root = DATA_DIR / "workspaces" / mission_id
+    workspace_root = DATA_DIR / "workspaces" / epic_id
     workspace_root.mkdir(parents=True, exist_ok=True)
     # Init git repo + README with brief
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
@@ -286,7 +286,7 @@ async def api_mission_start(request: Request):
         capture_output=True,
     )
     readme = workspace_root / "README.md"
-    readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
+    readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {epic_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
     gitignore = workspace_root / ".gitignore"
     gitignore.write_text(
@@ -304,13 +304,13 @@ async def api_mission_start(request: Request):
     orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
 
     mission = EpicRun(
-        id=mission_id,
+        id=epic_id,
         workflow_id=workflow_id,
         workflow_name=wf.name,
         brief=brief,
         status=EpicStatus.RUNNING,
         phases=phases,
-        project_id=project_id or mission_id,
+        project_id=project_id or epic_id,
         workspace_path=workspace_path,
         cdp_agent_id=orchestrator_id,
     )
@@ -323,8 +323,8 @@ async def api_mission_start(request: Request):
         from ....epics.store import MissionDef, get_epic_store
 
         epic = MissionDef(
-            id=mission_id,
-            project_id=project_id or mission_id,
+            id=epic_id,
+            project_id=project_id or epic_id,
             name=brief[:80] if brief else wf.name,
             description=brief,
             goal=brief,
@@ -343,7 +343,7 @@ async def api_mission_start(request: Request):
         try:
             db.execute(
                 "UPDATE epics SET business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
-                (bv, tc, rr, jd, mission_id),
+                (bv, tc, rr, jd, epic_id),
             )
             db.commit()
         finally:
@@ -411,7 +411,7 @@ async def api_mission_start(request: Request):
     try:
         from .dispatch import maybe_dispatch
 
-        dispatched = await maybe_dispatch(mission_id, brief, project_id, workflow_id)
+        dispatched = await maybe_dispatch(epic_id, brief, project_id, workflow_id)
     except Exception as _de:
         logger.debug("Dispatch check failed (running locally): %s", _de)
 
@@ -419,31 +419,31 @@ async def api_mission_start(request: Request):
         # Worker node took over — return coordinator response with remote info
         return JSONResponse(
             {
-                "mission_id": mission_id,
+                "mission_id": epic_id,
                 "session_id": session_id,
-                "redirect": f"/missions/{mission_id}/control",
+                "redirect": f"/missions/{epic_id}/control",
                 "_dispatched_to": dispatched.get("_dispatched_to", ""),
             }
         )
 
     try:
-        await _launch_orchestrator(mission_id)
-        logger.warning("ORCH auto-launched for mission=%s", mission_id)
+        await _launch_orchestrator(epic_id)
+        logger.warning("ORCH auto-launched for mission=%s", epic_id)
     except Exception as e:
         logger.error("Failed to auto-launch orchestrator: %s", e)
 
     return JSONResponse(
         {
-            "mission_id": mission_id,
+            "mission_id": epic_id,
             "session_id": session_id,
-            "redirect": f"/missions/{mission_id}/control",
+            "redirect": f"/missions/{epic_id}/control",
         }
     )
 
 
-@router.post("/api/epics/{mission_id}/chat/stream")
-@router.post("/api/missions/{mission_id}/chat/stream")
-async def mission_chat_stream(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/chat/stream")
+@router.post("/api/missions/{epic_id}/chat/stream")
+async def mission_chat_stream(request: Request, epic_id: str):
     """Stream a conversation with the CDP agent in mission context."""
     from ....agents.executor import get_executor
     from ....agents.store import get_agent_store
@@ -457,7 +457,7 @@ async def mission_chat_stream(request: Request, mission_id: str):
         return HTMLResponse("")
 
     run_store = get_epic_run_store()
-    mission = run_store.get(mission_id)
+    mission = run_store.get(epic_id)
     if not mission:
         return HTMLResponse("Mission not found", status_code=404)
 
@@ -507,7 +507,7 @@ async def mission_chat_stream(request: Request, mission_id: str):
             ctx.project_context = epic_context + "\n\n" + (ctx.project_context or "")
             if mission.workspace_path:
                 ctx.project_path = mission.workspace_path
-            ctx.epic_run_id = mission_id
+            ctx.epic_run_id = epic_id
             ctx.tools_enabled = True
             # Base tools for all agents
             _platform_tools = [
@@ -659,9 +659,9 @@ async def mission_chat_stream(request: Request, mission_id: str):
     )
 
 
-@router.post("/api/epics/{mission_id}/exec")
-@router.post("/api/missions/{mission_id}/exec")
-async def api_mission_exec(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/exec")
+@router.post("/api/missions/{epic_id}/exec")
+async def api_mission_exec(request: Request, epic_id: str):
     """Execute a command in the mission workspace. Returns JSON {stdout, stderr, returncode}."""
     import os as _os
     import subprocess as _sp
@@ -675,7 +675,7 @@ async def api_mission_exec(request: Request, mission_id: str):
     from ....epics.store import get_epic_run_store
 
     store = get_epic_run_store()
-    mission = store.get(mission_id)
+    mission = store.get(epic_id)
     if not mission:
         return JSONResponse({"error": "Mission not found"}, status_code=404)
     ws = mission.workspace_path
@@ -732,9 +732,9 @@ async def api_mission_exec(request: Request, mission_id: str):
         return JSONResponse({"error": str(e), "command": cmd}, status_code=500)
 
 
-@router.post("/api/epics/{mission_id}/validate")
-@router.post("/api/missions/{mission_id}/validate")
-async def api_mission_validate(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/validate")
+@router.post("/api/missions/{epic_id}/validate")
+async def api_mission_validate(request: Request, epic_id: str):
     """Human validates a checkpoint (GO/NOGO/PIVOT)."""
     from ....a2a.bus import get_bus
     from ....epics.store import get_epic_run_store
@@ -745,7 +745,7 @@ async def api_mission_validate(request: Request, mission_id: str):
     decision = str(data.get("decision", "GO")).upper()
 
     run_store = get_epic_run_store()
-    mission = run_store.get(mission_id)
+    mission = run_store.get(epic_id)
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
@@ -798,9 +798,9 @@ async def api_mission_validate(request: Request, mission_id: str):
     return JSONResponse({"decision": decision, "phase": mission.current_phase})
 
 
-@router.post("/api/epics/{mission_id}/reset")
-@router.post("/api/missions/{mission_id}/reset")
-async def api_mission_reset(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/reset")
+@router.post("/api/missions/{epic_id}/reset")
+async def api_mission_reset(request: Request, epic_id: str):
     """Reset a mission: all phases back to pending, clear messages, ready to re-run."""
     from ....epics.store import get_epic_run_store
     from ....models import EpicStatus, PhaseStatus
@@ -808,15 +808,15 @@ async def api_mission_reset(request: Request, mission_id: str):
     from ....sessions.store import MessageDef, get_session_store
 
     run_store = get_epic_run_store()
-    mission = run_store.get(mission_id)
+    mission = run_store.get(epic_id)
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
     # Cancel any running asyncio task for this mission
-    existing_task = _active_mission_tasks.pop(mission_id, None)
+    existing_task = _active_mission_tasks.pop(epic_id, None)
     if existing_task and not existing_task.done():
         existing_task.cancel()
-        logger.info("Cancelled running task for mission %s", mission_id)
+        logger.info("Cancelled running task for mission %s", epic_id)
 
     # Reset all phases to pending
     for p in mission.phases:
@@ -856,17 +856,17 @@ async def api_mission_reset(request: Request, mission_id: str):
             mission.session_id,
             {
                 "type": "mission_reset",
-                "mission_id": mission_id,
+                "mission_id": epic_id,
             },
         )
 
-    return JSONResponse({"status": "reset", "mission_id": mission_id})
+    return JSONResponse({"status": "reset", "mission_id": epic_id})
 
 
 # ── Confluence Sync ──────────────────────────────────────────
 
 
-async def _launch_orchestrator(mission_id: str):
+async def _launch_orchestrator(epic_id: str):
     """Shared helper: launch the EpicOrchestrator as an asyncio task."""
 
     from ....agents.store import get_agent_store
@@ -877,11 +877,11 @@ async def _launch_orchestrator(mission_id: str):
     from ....workflows.store import get_workflow_store
 
     run_store = get_epic_run_store()
-    mission = run_store.get(mission_id)
+    mission = run_store.get(epic_id)
     if not mission:
-        raise ValueError(f"Mission {mission_id} not found")
+        raise ValueError(f"Mission {epic_id} not found")
 
-    existing_task = _active_mission_tasks.get(mission_id)
+    existing_task = _active_mission_tasks.get(epic_id)
     if existing_task and not existing_task.done():
         return  # Already running
 
@@ -913,16 +913,14 @@ async def _launch_orchestrator(mission_id: str):
     async def _safe_run():
         try:
             async with get_mission_semaphore():
-                logger.warning(
-                    "ORCH mission=%s acquired semaphore, starting", mission_id
-                )
+                logger.warning("ORCH mission=%s acquired semaphore, starting", epic_id)
                 await orchestrator.run_phases()
-                logger.warning("ORCH mission=%s completed normally", mission_id)
+                logger.warning("ORCH mission=%s completed normally", epic_id)
                 project_path = getattr(mission, "workspace_path", None)
                 if project_path:
                     asyncio.create_task(
                         _run_quality_scan_background(
-                            mission_id,
+                            epic_id,
                             getattr(mission, "project_id", "") or "",
                             project_path,
                             session_id,
@@ -933,7 +931,7 @@ async def _launch_orchestrator(mission_id: str):
                     from ....services.push import send_push_to_project
 
                     _pid = getattr(mission, "project_id", "") or ""
-                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _mname = getattr(mission, "name", epic_id) or epic_id
                     _wname = getattr(wf, "name", "") or ""
                     asyncio.create_task(
                         send_push_to_project(
@@ -952,7 +950,7 @@ async def _launch_orchestrator(mission_id: str):
 
             logger.error(
                 "ORCH mission=%s CRASHED: %s\n%s",
-                mission_id,
+                epic_id,
                 exc,
                 traceback.format_exc(),
             )
@@ -976,7 +974,7 @@ async def _launch_orchestrator(mission_id: str):
                     from ....services.push import send_push_to_project
 
                     _pid = getattr(mission, "project_id", "") or ""
-                    _mname = getattr(mission, "name", mission_id) or mission_id
+                    _mname = getattr(mission, "name", epic_id) or epic_id
                     _wname = getattr(wf, "name", "") or ""
                     asyncio.create_task(
                         send_push_to_project(
@@ -997,13 +995,13 @@ async def _launch_orchestrator(mission_id: str):
     run_store.update(mission)
 
     task = asyncio.create_task(_safe_run())
-    _active_mission_tasks[mission_id] = task
-    task.add_done_callback(lambda t: _active_mission_tasks.pop(mission_id, None))
+    _active_mission_tasks[epic_id] = task
+    task.add_done_callback(lambda t: _active_mission_tasks.pop(epic_id, None))
 
 
-@router.post("/api/epics/{mission_id}/run")
-@router.post("/api/missions/{mission_id}/run")
-async def api_epic_run(request: Request, mission_id: str):
+@router.post("/api/epics/{epic_id}/run")
+@router.post("/api/missions/{epic_id}/run")
+async def api_epic_run(request: Request, epic_id: str):
     """Drive mission execution: CDP orchestrates phases sequentially.
 
     Uses the REAL pattern engine (run_pattern) for each phase — agents
@@ -1012,18 +1010,18 @@ async def api_epic_run(request: Request, mission_id: str):
     from ....epics.store import get_epic_run_store
 
     run_store = get_epic_run_store()
-    mission = run_store.get(mission_id)
+    mission = run_store.get(epic_id)
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
 
-    existing_task = _active_mission_tasks.get(mission_id)
+    existing_task = _active_mission_tasks.get(epic_id)
     if existing_task and not existing_task.done():
         return JSONResponse(
-            {"status": "running", "mission_id": mission_id, "info": "already running"}
+            {"status": "running", "mission_id": epic_id, "info": "already running"}
         )
 
-    await _launch_orchestrator(mission_id)
-    return JSONResponse({"status": "running", "mission_id": mission_id})
+    await _launch_orchestrator(epic_id)
+    return JSONResponse({"status": "running", "mission_id": epic_id})
 
 
 async def _run_milestone_pipeline_background(
@@ -1107,7 +1105,7 @@ async def _run_milestone_pipeline_background(
 
 
 async def _run_quality_scan_background(
-    mission_id: str,
+    epic_id: str,
     project_id: str,
     project_path: str,
     session_id: str,
@@ -1124,7 +1122,7 @@ async def _run_quality_scan_background(
         if critic is None:
             logger.info(
                 "QualityScan: no code-critic agent found, skipping mission=%s",
-                mission_id,
+                epic_id,
             )
             return
 
@@ -1161,7 +1159,7 @@ async def _run_quality_scan_background(
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
                 (
                     project_id,
-                    mission_id,
+                    epic_id,
                     session_id,
                     "mission_completion",
                     "overall",
@@ -1175,16 +1173,16 @@ async def _run_quality_scan_background(
             conn.commit()
         except Exception as db_err:
             logger.warning(
-                "QualityScan: DB write failed mission=%s: %s", mission_id, db_err
+                "QualityScan: DB write failed mission=%s: %s", epic_id, db_err
             )
 
         logger.info(
             "QualityScan: mission=%s score=%s",
-            mission_id,
+            epic_id,
             score if score is not None else "n/a",
         )
     except Exception as exc:
-        logger.warning("QualityScan: failed mission=%s: %s", mission_id, exc)
+        logger.warning("QualityScan: failed mission=%s: %s", epic_id, exc)
 
 
 # ── Mission Debug & Replay ────────────────────────────────────────

@@ -141,7 +141,7 @@ async def dispatch_to_worker(worker_url: str, payload: dict) -> dict:
 
 
 async def maybe_dispatch(
-    mission_id: str, brief: str, project_id: str, workflow_id: str
+    epic_id: str, brief: str, project_id: str, workflow_id: str
 ) -> dict | None:
     """
     If worker nodes are configured, dispatch mission orchestration to a worker.
@@ -155,7 +155,7 @@ async def maybe_dispatch(
         "workflow_id": workflow_id,
         "brief": brief,
         "project_id": project_id,
-        "_coordinator_mission_id": mission_id,
+        "_coordinator_mission_id": epic_id,
     }
     result = await dispatch_to_worker(worker_url, payload)
     if "error" in result:

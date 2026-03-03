@@ -87,22 +87,22 @@ async def missions_page(request: Request):
     )
 
 
-@router.get("/epics/{mission_id}", response_class=HTMLResponse)
-@router.get("/missions/{mission_id}", response_class=HTMLResponse)
-async def mission_detail_page(request: Request, mission_id: str):
+@router.get("/epics/{epic_id}", response_class=HTMLResponse)
+@router.get("/missions/{epic_id}", response_class=HTMLResponse)
+async def mission_detail_page(request: Request, epic_id: str):
     """Mission cockpit — sprints, board, team."""
     from ....agents.store import get_agent_store
     from ....epics.store import get_epic_store
     from ....projects.manager import get_project_store
 
     epic_store = get_epic_store()
-    mission = epic_store.get_mission(mission_id)
+    mission = epic_store.get_mission(epic_id)
     if not mission:
         return RedirectResponse("/missions", status_code=303)
 
     project = get_project_store().get(mission.project_id)
-    sprints = epic_store.list_sprints(mission_id)
-    stats = epic_store.mission_stats(mission_id)
+    sprints = epic_store.list_sprints(epic_id)
+    stats = epic_store.mission_stats(epic_id)
 
     # Selected sprint (from query or active or last)
     sel_id = request.query_params.get("sprint")
@@ -127,7 +127,7 @@ async def mission_detail_page(request: Request, mission_id: str):
             tasks_by_status.setdefault(col, []).append(t)
 
     # Velocity history (live from DB)
-    velocity_history = epic_store.get_velocity_history(mission_id)
+    velocity_history = epic_store.get_velocity_history(epic_id)
     total_velocity = sum(v["velocity"] for v in velocity_history)
     total_planned = sum(v["planned_sp"] for v in velocity_history)
     avg_velocity = (
@@ -150,7 +150,7 @@ async def mission_detail_page(request: Request, mission_id: str):
     from ....missions.product import ProductBacklog
 
     backlog = ProductBacklog()
-    epic_features = backlog.list_features(mission_id)
+    epic_features = backlog.list_features(epic_id)
     epic_stories = {}
     for feat in epic_features:
         epic_stories[feat.id] = backlog.list_stories(feat.id)
@@ -267,22 +267,22 @@ async def list_missions_api(request: Request):
     return JSONResponse({"epics": result, "total": len(result)})
 
 
-@router.delete("/api/epics/{mission_id}", responses={200: {"model": OkResponse}})
-@router.delete("/api/missions/{mission_id}", responses={200: {"model": OkResponse}})
-async def delete_mission(mission_id: str):
+@router.delete("/api/epics/{epic_id}", responses={200: {"model": OkResponse}})
+@router.delete("/api/missions/{epic_id}", responses={200: {"model": OkResponse}})
+async def delete_mission(epic_id: str):
     """Delete a mission (epic) and ALL its runs + associated data."""
     from ....db.migrations import get_db
 
     conn = get_db()
     mission = conn.execute(
-        "SELECT id, name FROM epics WHERE id = ?", (mission_id,)
+        "SELECT id, name FROM epics WHERE id = ?", (epic_id,)
     ).fetchone()
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     # Delete all runs for this mission
     runs = conn.execute(
         "SELECT id, session_id FROM epic_runs WHERE parent_epic_id = ?",
-        (mission_id,),
+        (epic_id,),
     ).fetchall()
     for run_id, session_id in runs:
         if session_id:
@@ -296,74 +296,72 @@ async def delete_mission(mission_id: str):
         conn.execute("DELETE FROM llm_usage WHERE mission_id = ?", (run_id,))
         conn.execute("DELETE FROM platform_incidents WHERE mission_id = ?", (run_id,))
         conn.execute("DELETE FROM support_tickets WHERE mission_id = ?", (run_id,))
-    conn.execute("DELETE FROM epic_runs WHERE parent_epic_id = ?", (mission_id,))
+    conn.execute("DELETE FROM epic_runs WHERE parent_epic_id = ?", (epic_id,))
     # Delete features, stories, sprints, tasks linked to mission
     conn.execute(
         "DELETE FROM user_stories WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
-        (mission_id,),
+        (epic_id,),
     )
     try:
         conn.execute(
             "DELETE FROM feature_deps WHERE feature_id IN (SELECT id FROM features WHERE epic_id = ?)",
-            (mission_id,),
+            (epic_id,),
         )
         conn.execute(
             "DELETE FROM feature_deps WHERE depends_on IN (SELECT id FROM features WHERE epic_id = ?)",
-            (mission_id,),
+            (epic_id,),
         )
     except Exception:
         pass
-    conn.execute("DELETE FROM features WHERE epic_id = ?", (mission_id,))
-    conn.execute("DELETE FROM sprints WHERE mission_id = ?", (mission_id,))
-    conn.execute("DELETE FROM tasks WHERE mission_id = ?", (mission_id,))
+    conn.execute("DELETE FROM features WHERE epic_id = ?", (epic_id,))
+    conn.execute("DELETE FROM sprints WHERE mission_id = ?", (epic_id,))
+    conn.execute("DELETE FROM tasks WHERE mission_id = ?", (epic_id,))
     try:
         conn.execute(
             "DELETE FROM ideation_findings WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
-            (mission_id,),
+            (epic_id,),
         )
         conn.execute(
             "DELETE FROM ideation_messages WHERE session_id IN (SELECT id FROM ideation_sessions WHERE mission_id = ?)",
-            (mission_id,),
+            (epic_id,),
         )
-        conn.execute(
-            "DELETE FROM ideation_sessions WHERE mission_id = ?", (mission_id,)
-        )
+        conn.execute("DELETE FROM ideation_sessions WHERE mission_id = ?", (epic_id,))
     except Exception:
         pass
-    conn.execute("DELETE FROM epics WHERE id = ?", (mission_id,))
+    conn.execute("DELETE FROM epics WHERE id = ?", (epic_id,))
     conn.commit()
     return JSONResponse({"status": "deleted", "name": mission[1]})
 
 
 @router.get(
-    "/api/missions/{mission_id}",
+    "/api/missions/{epic_id}",
     responses={200: {"model": MissionDetail}, 404: {"model": ErrorResponse}},
 )
-async def api_mission_status(request: Request, mission_id: str):
+async def api_mission_status(request: Request, epic_id: str):
     """Get mission status as JSON."""
     from ....epics.store import get_epic_run_store
 
     store = get_epic_run_store()
-    mission = store.get(mission_id)
+    mission = store.get(epic_id)
     if not mission:
         return JSONResponse({"error": "Not found"}, status_code=404)
     return JSONResponse(mission.model_dump(mode="json"))
 
 
-@router.get("/api/epics/{mission_id}/children")
-@router.get("/api/missions/{mission_id}/children")
-async def api_mission_children(request: Request, mission_id: str):
+@router.get("/api/epics/{epic_id}/children")
+@router.get("/api/missions/{epic_id}/children")
+async def api_mission_children(request: Request, epic_id: str):
     """List sub-missions (Features) of a parent mission (Epic)."""
     from ....epics.store import get_epic_run_store, get_epic_store
 
     run_store = get_epic_run_store()
     epic_store = get_epic_store()
     # Get children from both stores
-    run_children = run_store.list_children_runs(mission_id)
-    def_children = epic_store.list_children(mission_id)
+    run_children = run_store.list_children_runs(epic_id)
+    def_children = epic_store.list_children(epic_id)
     return JSONResponse(
         {
-            "parent_id": mission_id,
+            "parent_id": epic_id,
             "sub_epic_runs": [r.model_dump(mode="json") for r in run_children],
             "sub_mission_defs": [
                 {
@@ -422,13 +420,13 @@ async def missions_list_page(request: Request):
     )
 
 
-@router.get("/epics/{mission_id}/control", response_class=HTMLResponse)
-@router.get("/missions/{mission_id}/control", response_class=HTMLResponse)
-async def mission_control_page(request: Request, mission_id: str):
+@router.get("/epics/{epic_id}/control", response_class=HTMLResponse)
+@router.get("/missions/{epic_id}/control", response_class=HTMLResponse)
+async def mission_control_page(request: Request, epic_id: str):
     """Mission Control dashboard — pipeline visualization + CDP activity."""
     from ....services.epic_context import EpicContextBuilder
 
-    builder = EpicContextBuilder(mission_id)
+    builder = EpicContextBuilder(epic_id)
     ctx = await builder.build_context()
     if ctx is None:
         return RedirectResponse("/pi", status_code=302)
@@ -437,15 +435,15 @@ async def mission_control_page(request: Request, mission_id: str):
     return _templates(request).TemplateResponse("mission_control.html", ctx)
 
 
-@router.get("/epics/{mission_id}/replay", response_class=HTMLResponse)
-@router.get("/missions/{mission_id}/replay", response_class=HTMLResponse)
-async def mission_replay_page(request: Request, mission_id: str):
+@router.get("/epics/{epic_id}/replay", response_class=HTMLResponse)
+@router.get("/missions/{epic_id}/replay", response_class=HTMLResponse)
+async def mission_replay_page(request: Request, epic_id: str):
     """Mission Replay — step-by-step timeline visualization."""
     return _templates(request).TemplateResponse(
         "mission_replay.html",
         {
             "request": request,
             "page_title": "Mission Replay",
-            "mission_id": mission_id,
+            "mission_id": epic_id,
         },
     )

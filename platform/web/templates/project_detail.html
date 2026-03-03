@@ -286,7 +286,7 @@
                 {% endif %}
             </a>
             {% endfor %}
-            <a href="/missions?project={{ project.id }}&action=new" class="btn btn-sm btn-ghost" style="width:100%;margin-top:0.5rem">
+            <a href="/epics?project={{ project.id }}&action=new" class="btn btn-sm btn-ghost" style="width:100%;margin-top:0.5rem">
                 <svg class="icon icon-xs"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
             </a>
         </div>
@@ -294,7 +294,7 @@
         <div class="ps-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
             <p class="ps-empty">{{ _('no_epic') }}</p>
-            <a href="/missions?project={{ project.id }}&action=new" class="btn btn-sm btn-primary" style="width:100%">
+            <a href="/epics?project={{ project.id }}&action=new" class="btn btn-sm btn-primary" style="width:100%">
                 <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Creer une epic
             </a>
         </div>

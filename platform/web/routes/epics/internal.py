@@ -2599,7 +2599,7 @@ _WEB_QA = {
 
 
 async def _extract_features_from_phase(
-    mission_id: str,
+    epic_id: str,
     session_id: str,
     phase_id: str,
     phase_name: str,
@@ -2666,7 +2666,7 @@ async def _extract_features_from_phase(
                 "INSERT OR IGNORE INTO features (id, epic_id, name, description, priority, status, story_points) VALUES (?,?,?,?,?,?,?)",
                 (
                     fid,
-                    mission_id,
+                    epic_id,
                     feat["name"][:120],
                     feat.get("description", "")[:500],
                     feat.get("priority", 5),
@@ -2690,7 +2690,7 @@ async def _extract_features_from_phase(
                 session_id,
                 {
                     "type": "backlog_update",
-                    "mission_id": mission_id,
+                    "mission_id": epic_id,
                     "phase_id": phase_id,
                     "features": inserted,
                 },

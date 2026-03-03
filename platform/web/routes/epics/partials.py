@@ -10,8 +10,8 @@ from ..helpers import _active_mission_tasks, _templates
 router = APIRouter()
 
 
-@router.get("/api/missions/{mission_id}/board", response_class=HTMLResponse)
-async def mission_board_partial(request: Request, mission_id: str):
+@router.get("/api/missions/{epic_id}/board", response_class=HTMLResponse)
+async def mission_board_partial(request: Request, epic_id: str):
     """HTMX partial — kanban board for a sprint."""
     from ....epics.store import get_epic_store
 

@@ -1,4 +1,4 @@
-"""Missions package — combines all mission sub-routers."""
+"""Epics package — combines all epic sub-routers."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from .sprints import router as sprints_router
 
 router = APIRouter()
 
-# Partials first (literal paths before {mission_id} parameter paths)
+# Partials first (literal paths before {epic_id} parameter paths)
 router.include_router(partials_router)
 router.include_router(crud_router)
 router.include_router(execution_router)
