@@ -78,7 +78,8 @@ html { background: var(--bg-0); }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-feature-settings: normal;
+  font-feature-settings: "tnum";
+  font-variant-numeric: tabular-nums;
   background: var(--bg-2);
   color: var(--text-1);
   -webkit-font-smoothing: antialiased;

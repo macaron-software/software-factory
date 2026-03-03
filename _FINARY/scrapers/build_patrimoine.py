@@ -8,6 +8,7 @@ Usage:
     python3 scrapers/build_patrimoine.py              # today's date
     python3 scrapers/build_patrimoine.py 2026-02-09   # specific date
 """
+
 import json
 import sys
 from datetime import date, datetime
@@ -125,10 +126,14 @@ def build(d: str) -> dict:
 
     # Static ISIN map (fallback for positions where click-scrape failed)
     TR_ISIN_MAP = {
-        "Allianz": "DE0008404005", "Exxon Mobil": "US30231G1022",
-        "Johnson & Johnson": "US4781601046", "Plug Power": "US72919P2020",
-        "Sanofi": "FR0000120578", "MercadoLibre": "US58733R1023",
-        "Soitec": "FR0013227113", "Sea (ADR)": "US81141R1005",
+        "Allianz": "DE0008404005",
+        "Exxon Mobil": "US30231G1022",
+        "Johnson & Johnson": "US4781601046",
+        "Plug Power": "US72919P2020",
+        "Sanofi": "FR0000120578",
+        "MercadoLibre": "US58733R1023",
+        "Soitec": "FR0013227113",
+        "Sea (ADR)": "US81141R1005",
         "Rheinmetall": "DE0007030009",
         "S&P 500 Information Tech USD (Acc)": "IE00B3WJKG14",
     }
@@ -167,23 +172,27 @@ def build(d: str) -> dict:
 
         invested = p["total_value"] - p["performance_eur"]
         avg_price = round(invested / p["shares"], 2) if p["shares"] else 0
-        tr_positions.append({
-            "name": p["name"],
-            "isin": p["isin"],
-            "shares": p["shares"],
-            "avg_price_eur": avg_price,
-            "current_value_eur": p["total_value"],
-            "unrealized_pnl_eur": p["performance_eur"],
-            "unrealized_pnl_pct": p["performance_pct"],
-            "portfolio_weight_pct": p["portfolio_pct"],
-            "pe_ratio": p.get("pe_ratio"),
-            "beta": p.get("beta"),
-            "dividend_yield_pct": p.get("dividend_yield_pct"),
-        })
+        tr_positions.append(
+            {
+                "name": p["name"],
+                "isin": p["isin"],
+                "shares": p["shares"],
+                "avg_price_eur": avg_price,
+                "current_value_eur": p["total_value"],
+                "unrealized_pnl_eur": p["performance_eur"],
+                "unrealized_pnl_pct": p["performance_pct"],
+                "portfolio_weight_pct": p["portfolio_pct"],
+                "pe_ratio": p.get("pe_ratio"),
+                "beta": p.get("beta"),
+                "dividend_yield_pct": p.get("dividend_yield_pct"),
+            }
+        )
 
     tr_portfolio = sum(p["current_value_eur"] for p in tr_positions)
     tr_cash = tr_deep["cash"] if tr_deep else 0
-    tr_invested = sum(p["shares"] * p["avg_price_eur"] for p in tr_positions if p["shares"] and p["avg_price_eur"])
+    tr_invested = sum(
+        p["shares"] * p["avg_price_eur"] for p in tr_positions if p["shares"] and p["avg_price_eur"]
+    )
     tr_pnl = sum(p["unrealized_pnl_eur"] for p in tr_positions)
 
     trade_republic = {
@@ -200,38 +209,54 @@ def build(d: str) -> dict:
 
     # ─── IBKR ─────────────────────────────────────────────────────
     ibkr_extras = ext.get("ibkr_extras", {})
-    ibkr_positions = []
-    for p in ext["ibkr_positions"]:
-        ibkr_positions.append({
-            "symbol": p["symbol"],
-            "isin": p["isin"],
-            "quantity": p["quantity"],
-            "last_price_usd": p["last_price_usd"],
-            "avg_price_usd": p["avg_price_usd"],
-            "cost_basis_usd": p["cost_basis_usd"],
-            "market_value_usd": p["market_value_usd"],
-            "unrealized_pnl_usd": p["unrealized_pnl_usd"],
-            "dividend_yield_pct": p.get("dividend_yield_pct"),
-            "ex_dividend_date": p.get("ex_dividend_date"),
-        })
+    ibkr_positions_raw = ext.get("ibkr_positions", [])
 
-    ibkr = {
-        "type": "cto_margin",
-        "account_id": "U13393818",
-        "currency_base": "EUR",
-        "net_liquidation_eur": ibkr_extras.get("net_liquidation_eur", 0),
-        "buying_power_eur": ibkr_extras.get("buying_power_eur", 0),
-        "maintenance_margin_eur": ibkr_extras.get("maintenance_margin", 0),
-        "excess_liquidity_eur": ibkr_extras.get("excess_liquidity", 0),
-        "cash": {
-            "total_eur": ibkr_extras.get("total_cash_eur", 0),
-            "eur": ibkr_extras.get("cash_eur", 0),
-            "usd": ibkr_extras.get("cash_usd", 0),
-        },
-        "margin_loan_usd": abs(ibkr_extras.get("cash_usd", 0)),
-        "margin_interest_rate": ibkr_extras.get("margin_interest_rate", "5.83%"),
-        "positions": ibkr_positions,
-    }
+    # Fallback to previous patrimoine if scraper returned empty IBKR data
+    if ibkr_extras.get("net_liquidation_eur", 0) == 0 and not ibkr_positions_raw and prev:
+        prev_ibkr = prev.get("ibkr", {})
+        if prev_ibkr.get("net_liquidation_eur", 0) != 0:
+            print(f"  ⚠️  IBKR scrape empty — using previous data ({prev.get('date', '?')})")
+            ibkr = prev_ibkr
+            ibkr["_fallback"] = prev.get("date", "?")
+        else:
+            ibkr = None
+    else:
+        ibkr = None
+
+    if ibkr is None:
+        ibkr_positions = []
+        for p in ibkr_positions_raw:
+            ibkr_positions.append(
+                {
+                    "symbol": p["symbol"],
+                    "isin": p["isin"],
+                    "quantity": p["quantity"],
+                    "last_price_usd": p["last_price_usd"],
+                    "avg_price_usd": p["avg_price_usd"],
+                    "cost_basis_usd": p["cost_basis_usd"],
+                    "market_value_usd": p["market_value_usd"],
+                    "unrealized_pnl_usd": p["unrealized_pnl_usd"],
+                    "dividend_yield_pct": p.get("dividend_yield_pct"),
+                    "ex_dividend_date": p.get("ex_dividend_date"),
+                }
+            )
+        ibkr = {
+            "type": "cto_margin",
+            "account_id": "U13393818",
+            "currency_base": "EUR",
+            "net_liquidation_eur": ibkr_extras.get("net_liquidation_eur", 0),
+            "buying_power_eur": ibkr_extras.get("buying_power_eur", 0),
+            "maintenance_margin_eur": ibkr_extras.get("maintenance_margin", 0),
+            "excess_liquidity_eur": ibkr_extras.get("excess_liquidity", 0),
+            "cash": {
+                "total_eur": ibkr_extras.get("total_cash_eur", 0),
+                "eur": ibkr_extras.get("cash_eur", 0),
+                "usd": ibkr_extras.get("cash_usd", 0),
+            },
+            "margin_loan_usd": abs(ibkr_extras.get("cash_usd", 0)),
+            "margin_interest_rate": ibkr_extras.get("margin_interest_rate", "5.83%"),
+            "positions": ibkr_positions,
+        }
 
     # ─── Boursobank ───────────────────────────────────────────────
     # Parse bourso accounts
@@ -244,16 +269,20 @@ def build(d: str) -> dict:
     if bourso:
         for acc in bourso.get("accounts", []):
             if isinstance(acc, dict):
-                if "pea_total" in acc: pea_balance = acc["pea_total"]
-                if "livret_a" in acc: livret_a = acc["livret_a"]
+                if "pea_total" in acc:
+                    pea_balance = acc["pea_total"]
+                if "livret_a" in acc:
+                    livret_a = acc["livret_a"]
 
         for loan in bourso.get("loans", []):
-            bourso_loans.append({
-                "name": loan.get("name", "Prêt personnel"),
-                "remaining": loan.get("remaining", 0),
-                "monthly_payment": loan.get("monthly_payment", 0),
-                "rate": loan.get("rate"),
-            })
+            bourso_loans.append(
+                {
+                    "name": loan.get("name", "Prêt personnel"),
+                    "remaining": loan.get("remaining", 0),
+                    "monthly_payment": loan.get("monthly_payment", 0),
+                    "rate": loan.get("rate"),
+                }
+            )
 
     # Fallback to known values if no loans in deep scrape
     if not bourso_loans:
@@ -269,11 +298,18 @@ def build(d: str) -> dict:
     boursobank = {
         "type": "bank",
         "accounts": {
-            "checking": {"label": "BOURSORAMA ESSENTIEL SYLVAIN", "balance": checking_balance, "type": "checking"},
+            "checking": {
+                "label": "BOURSORAMA ESSENTIEL SYLVAIN",
+                "balance": checking_balance,
+                "type": "checking",
+            },
             "pea": {"label": "PEA LEGLAND", "balance": pea_balance, "type": "PEA"},
         },
         "children_accounts": {
-            "checking_nathael": {"label": "BOURSORAMA ESSENTIEL NATHAEL", "balance": children_checking},
+            "checking_nathael": {
+                "label": "BOURSORAMA ESSENTIEL NATHAEL",
+                "balance": children_checking,
+            },
             "livret_a_nathael": {"label": "LIVRET A NATHAEL", "balance": livret_a},
         },
         "loans": bourso_loans,
@@ -296,34 +332,72 @@ def build(d: str) -> dict:
                 continue
             if c["name"].startswith("©"):
                 continue
-            ca_credits.append({
-                "name": c["name"],
-                "account": c.get("account_number", ""),
-                "type": "PTZ" if "0%" in c["name"] else "PAS" if "Accession" in c["name"] else "consumer",
-                "borrowed": c.get("borrowed", 0),
-                "remaining": c.get("remaining", 0),
-                "monthly_payment": c.get("monthly_payment", 0),
-                "rate": c.get("rate"),
-                "insurance_monthly": c.get("insurance_monthly", 0),
-                "start_date": c.get("start_date"),
-                "status": c.get("status"),
-            })
+            ca_credits.append(
+                {
+                    "name": c["name"],
+                    "account": c.get("account_number", ""),
+                    "type": "PTZ"
+                    if "0%" in c["name"]
+                    else "PAS"
+                    if "Accession" in c["name"]
+                    else "consumer",
+                    "borrowed": c.get("borrowed", 0),
+                    "remaining": c.get("remaining", 0),
+                    "monthly_payment": c.get("monthly_payment", 0),
+                    "rate": c.get("rate"),
+                    "insurance_monthly": c.get("insurance_monthly", 0),
+                    "start_date": c.get("start_date"),
+                    "status": c.get("status"),
+                }
+            )
 
     if not ca_credits:
         # Fallback
         ca_credits = [
-            {"name": "PTZ Ministère du Logement", "account": "00004690214", "type": "PTZ",
-             "borrowed": 102000, "remaining": 102000, "monthly_payment": 0, "rate": "0%",
-             "insurance_monthly": 0, "start_date": "08/2021", "status": "Différé total"},
-            {"name": "Prêt d'Accession Sociale 1", "account": "00004690213", "type": "PAS",
-             "borrowed": 10000, "remaining": 10000, "monthly_payment": 0,
-             "rate": "variable (indexé Euribor)", "insurance_monthly": 0, "start_date": "08/2021"},
-            {"name": "Prêt d'Accession Sociale 2", "account": "00004690212", "type": "PAS",
-             "borrowed": 138290, "remaining": 110594.85, "monthly_payment": 90.32,
-             "rate": "variable (indexé Euribor)", "insurance_monthly": 0, "start_date": "08/2021"},
-            {"name": "Prêt Conso Personnel (PACP)", "account": "73140424333", "type": "consumer",
-             "borrowed": 5000, "remaining": 1803.50, "monthly_payment": 73.69,
-             "rate": None, "insurance_monthly": 0},
+            {
+                "name": "PTZ Ministère du Logement",
+                "account": "00004690214",
+                "type": "PTZ",
+                "borrowed": 102000,
+                "remaining": 102000,
+                "monthly_payment": 0,
+                "rate": "0%",
+                "insurance_monthly": 0,
+                "start_date": "08/2021",
+                "status": "Différé total",
+            },
+            {
+                "name": "Prêt d'Accession Sociale 1",
+                "account": "00004690213",
+                "type": "PAS",
+                "borrowed": 10000,
+                "remaining": 10000,
+                "monthly_payment": 0,
+                "rate": "variable (indexé Euribor)",
+                "insurance_monthly": 0,
+                "start_date": "08/2021",
+            },
+            {
+                "name": "Prêt d'Accession Sociale 2",
+                "account": "00004690212",
+                "type": "PAS",
+                "borrowed": 138290,
+                "remaining": 110594.85,
+                "monthly_payment": 90.32,
+                "rate": "variable (indexé Euribor)",
+                "insurance_monthly": 0,
+                "start_date": "08/2021",
+            },
+            {
+                "name": "Prêt Conso Personnel (PACP)",
+                "account": "73140424333",
+                "type": "consumer",
+                "borrowed": 5000,
+                "remaining": 1803.50,
+                "monthly_payment": 73.69,
+                "rate": None,
+                "insurance_monthly": 0,
+            },
         ]
 
     ca_total_debt = -sum(c["remaining"] for c in ca_credits)
@@ -333,7 +407,11 @@ def build(d: str) -> dict:
         "type": "bank",
         "region": "Languedoc",
         "accounts": {
-            "checking": {"label": "COMPTE CHEQUE", "balance": ca_checking, "account": "00040636024"},
+            "checking": {
+                "label": "COMPTE CHEQUE",
+                "balance": ca_checking,
+                "account": "00040636024",
+            },
         },
         "credits": ca_credits,
         "total_debt": ca_total_debt,
@@ -360,7 +438,13 @@ def build(d: str) -> dict:
     # Exclude children accounts (Nathael) from user's patrimoine
     nathael_liquid = children_checking
     nathael_savings = livret_a
-    total_bank_liquid = boursobank["total_liquid"] - nathael_liquid + boursobank["total_savings"] - nathael_savings + ca_checking
+    total_bank_liquid = (
+        boursobank["total_liquid"]
+        - nathael_liquid
+        + boursobank["total_savings"]
+        - nathael_savings
+        + ca_checking
+    )
     total_real_estate = sca["your_share_property_value"]
     total_assets = total_investments + total_bank_liquid + total_real_estate
     total_debt = abs(ca_total_debt) + abs(total_loans)
@@ -394,7 +478,7 @@ def build(d: str) -> dict:
     print(f"✅ Saved {out_path.name}")
     print(f"   Net worth: {totals['net_worth']:,.2f}€")
     print(f"   Assets: {totals['total_assets']:,.2f}€  |  Debt: {totals['total_debt']:,.2f}€")
-    print(f"   Positions: {len(tr_positions)} TR + {len(ibkr_positions)} IBKR")
+    print(f"   Positions: {len(tr_positions)} TR + {len(ibkr.get('positions', []))} IBKR")
     return patrimoine
 
 
