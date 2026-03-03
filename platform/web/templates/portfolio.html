@@ -298,7 +298,7 @@
                 {% endif %}
 
                 <div class="pmc-missions">
-                    {% for m in p.missions[:3] %}
+                    {% for m in p.epics[:3] %}
                     <div class="pmc-mission">
                         <span class="pmc-mission-dot {{ m.run_status or m.status }}"></span>
                         <span class="pmc-mission-name">{{ m.name }}</span>
