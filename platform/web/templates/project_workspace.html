@@ -379,7 +379,7 @@ html,body{height:100%;overflow:hidden}
           <div class="ws-pane-content" style="flex-direction:column">
             <!-- Launch mission panel (hidden by default) -->
             <div id="wsLaunchMissionPanel" style="display:none;flex-direction:column;gap:.5rem;padding:.75rem;border-bottom:1px solid var(--border);background:var(--bg-secondary)">
-              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer une mission</div>
+              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer un epic</div>
               <select id="wsLaunchWorkflow" style="width:100%;padding:.3rem .5rem;font-size:.75rem;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px">
                 <option value="">Choisir un workflow…</option>
                 <option value="feature-sprint">Feature Sprint (TDD)</option>
@@ -1179,7 +1179,7 @@ function wsLaunchMission() {
   var status = document.getElementById('wsLaunchMissionStatus');
   if (!wfId || !brief) { if (status) status.textContent = '⚠ Workflow et brief requis'; return; }
   if (status) status.textContent = '⏳ Lancement…';
-  fetch('/api/missions/start', {
+  fetch('/api/epics/start', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ workflow_id: wfId, brief: brief, project_id: _wsProjectId })
   }).then(function(r){ return r.json(); })

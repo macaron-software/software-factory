@@ -143,7 +143,7 @@
     <!-- ═══ Orchestrator ═══ -->
     <div class="settings-panel" id="panel-orchestrator">
         <section class="settings-section">
-            <h3>Mission Queue</h3>
+            <h3>Epic Queue</h3>
             <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.2rem">
                 Control how missions are scheduled, throttled, and distributed across nodes.
                 Changes are applied live without restart.
@@ -154,7 +154,7 @@
               <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Concurrency</div>
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.8rem">
                 <div class="form-group">
-                  <label>Max concurrent missions</label>
+                  <label>Max concurrent epics</label>
                   <input type="number" id="oc-semaphore" name="mission_semaphore"
                     value="{{ config.orchestrator.mission_semaphore }}" min="1" max="10" step="1" style="width:80px">
                   <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">running in parallel</span>
@@ -163,7 +163,7 @@
                   <label>Startup batch max</label>
                   <input type="number" name="resume_batch_startup"
                     value="{{ config.orchestrator.resume_batch_startup }}" min="1" max="20" step="1" style="width:80px">
-                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">missions per boot pass</span>
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">epics per boot pass</span>
                 </div>
                 <div class="form-group">
                   <label>Startup stagger (s)</label>

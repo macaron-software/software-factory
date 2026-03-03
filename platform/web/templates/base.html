@@ -248,6 +248,11 @@
                          hx-trigger="load, every 30s"
                          hx-swap="innerHTML">
                     </div>
+                    <div class="cluster-nodes-wrapper"
+                         hx-get="/api/cluster/nodes-badge"
+                         hx-trigger="load, every 30s"
+                         hx-swap="innerHTML">
+                    </div>
                      <div class="notif-wrapper" id="notifWrapper">
                         <button class="topbar-bell" id="notifBell" aria-label="Notifications">
                             <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
@@ -428,6 +433,13 @@
     .tma-hb.alive svg{animation:hb-beat 1.2s ease-in-out infinite}
     .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
     .tma-hb.starting svg{opacity:.6;animation:hb-fade 2s ease-in-out infinite}
+    .cluster-nodes-wrapper{display:flex;align-items:center}
+    .cluster-nodes-inner{display:flex;align-items:center;gap:6px}
+    .cluster-node-badge{display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);cursor:default;font-size:0.65rem;color:var(--text-secondary);white-space:nowrap}
+    .cluster-node-badge:hover{border-color:var(--purple);color:var(--text-primary)}
+    .cluster-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:cluster-pulse 2s ease-in-out infinite}
+    .cluster-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.02em}
+    @keyframes cluster-pulse{0%,100%{opacity:1}50%{opacity:.6}}
     .tma-hb.stale svg{opacity:.4;animation:none}
     @keyframes hb-fade{0%,100%{opacity:.3}50%{opacity:.8}}
     @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}

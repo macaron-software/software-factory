@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block topbar_actions %}
-<a href="/missions?action=new" class="btn btn-primary">
+<a href="/epics?action=new" class="btn btn-primary">
     <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouvel Epic
 </a>
 {% endblock %}
@@ -295,7 +295,7 @@
                     {% for e in p.epics %}
                     <div class="pl-epic-row">
                         <span class="pl-epic-dot {{ e.status }}"></span>
-                        <span class="pl-epic-name"><a href="/missions/{{ e.id }}/control">{{ e.name }}</a></span>
+                        <span class="pl-epic-name"><a href="/epics/{{ e.id }}/control">{{ e.name }}</a></span>
                         <span class="pl-epic-features">{{ e.feature_count }} feat</span>
                         {% if e.story_count > 0 %}
                         <div class="pl-epic-progress-bar">

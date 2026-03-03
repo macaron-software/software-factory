@@ -8,7 +8,7 @@
 </a>
 {% endif %}
 {% endfor %}
-<a href="/missions?action=new" class="btn btn-ghost">
+<a href="/epics?action=new" class="btn btn-ghost">
     <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Mission
 </a>
 {% endblock %}
@@ -388,7 +388,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
                     <span class="dsi-col-count">{{ col.missions|length }}</span>
                 </div>
                 {% for m in col.missions %}
-                <a href="/missions/{{ m.id }}" class="dsi-card">
+                <a href="/epics/{{ m.id }}" class="dsi-card">
                     <div class="dsi-card-name">{{ m.name }}</div>
                     <div class="dsi-card-project">{{ m.project_name }}</div>
                     <div class="dsi-card-meta">

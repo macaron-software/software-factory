@@ -267,7 +267,7 @@ function toggleDebug(phaseId) {
 async function replayMission() {
     if (!confirm('Create a new replay run for this mission?')) return;
     try {
-        const res = await fetch('/api/missions/' + MISSION_ID + '/replay', {method: 'POST'});
+        const res = await fetch('/api/epics/' + MISSION_ID + '/replay', {method: 'POST'});
         const data = await res.json();
         if (data.new_run_id) {
             window.location.href = '/missions/' + data.new_run_id + '/control';

@@ -36,7 +36,13 @@ def import_time():
 @router.get("/api/health", responses={200: {"model": HealthResponse}})
 async def health_check():
     """Liveness/readiness probe for Docker healthcheck."""
+    import os
+    import socket
+
     from ....db.migrations import get_db
+
+    node_id = os.environ.get("SF_NODE_ID") or os.environ.get("HOSTNAME") or socket.gethostname()
+    mode = os.environ.get("PLATFORM_MODE", "full")
 
     try:
         db = get_db()
@@ -44,9 +50,141 @@ async def health_check():
             db.execute("SELECT 1")
         finally:
             db.close()
-        return JSONResponse({"status": "ok"})
+        return JSONResponse({"status": "ok", "node": node_id, "mode": mode})
     except Exception as e:
-        return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
+        return JSONResponse({"status": "error", "node": node_id, "mode": mode, "detail": str(e)}, status_code=503)
+
+
+@router.get("/api/cluster/nodes")
+async def cluster_nodes():
+    """List all cluster nodes with heartbeat status."""
+    import os
+    from datetime import timedelta
+
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version FROM platform_nodes ORDER BY role DESC, node_id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        db.close()
+
+    now = datetime.utcnow()
+    nodes = []
+    for r in rows:
+        try:
+            last_seen_dt = datetime.fromisoformat(str(r["last_seen"]).replace("Z", "").split(".")[0])
+            age_s = (now - last_seen_dt).total_seconds()
+        except Exception:
+            age_s = 9999
+        status = r["status"] if age_s < 60 else "stale"
+        nodes.append({
+            "node_id": r["node_id"],
+            "role": r["role"],
+            "mode": r["mode"],
+            "url": r["url"],
+            "last_seen": str(r["last_seen"]),
+            "age_s": int(age_s),
+            "status": status,
+            "cpu_pct": r["cpu_pct"],
+            "mem_pct": r["mem_pct"],
+            "version": r["version"],
+        })
+    return JSONResponse({"nodes": nodes, "count": len(nodes)})
+
+
+@router.post("/api/cluster/heartbeat")
+async def cluster_heartbeat(request: Request):
+    """Node self-registration and heartbeat update."""
+    import os
+
+    from ....db.migrations import get_db
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    node_id = body.get("node_id", "unknown")
+    role = body.get("role", "slave")
+    mode = body.get("mode", "slave")
+    url = body.get("url", "")
+    cpu_pct = body.get("cpu_pct", 0)
+    mem_pct = body.get("mem_pct", 0)
+    version = body.get("version", "")
+
+    db = get_db()
+    try:
+        db.execute("""
+            INSERT INTO platform_nodes (node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version)
+            VALUES (?, ?, ?, ?, NOW(), 'online', ?, ?, ?)
+            ON CONFLICT(node_id) DO UPDATE SET
+                role=EXCLUDED.role, mode=EXCLUDED.mode, url=EXCLUDED.url,
+                last_seen=NOW(), status='online',
+                cpu_pct=EXCLUDED.cpu_pct, mem_pct=EXCLUDED.mem_pct, version=EXCLUDED.version
+        """, (node_id, role, mode, url, cpu_pct, mem_pct, version))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    finally:
+        db.close()
+
+    return JSONResponse({"ok": True, "node_id": node_id})
+
+
+@router.get("/api/cluster/nodes-badge", response_class=None)
+async def cluster_nodes_badge():
+    """HTML fragment for topbar — compact list of cluster nodes with heartbeat dots."""
+    from datetime import timedelta
+
+    from fastapi.responses import HTMLResponse
+
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT node_id, role, mode, last_seen, status, cpu_pct, mem_pct FROM platform_nodes ORDER BY role DESC, node_id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        db.close()
+
+    if not rows:
+        return HTMLResponse("")
+
+    now = datetime.utcnow()
+    parts = []
+    for r in rows:
+        try:
+            last_seen_dt = datetime.fromisoformat(str(r["last_seen"]).replace("Z", "").split(".")[0])
+            age_s = int((now - last_seen_dt).total_seconds())
+        except Exception:
+            age_s = 9999
+        is_online = age_s < 60
+        dot_color = "#22c55e" if is_online else "#ef4444"
+        label = r["node_id"]
+        role = r["role"]
+        mode = r["mode"]
+        cpu = int(r["cpu_pct"] or 0)
+        mem = int(r["mem_pct"] or 0)
+        age_label = f"{age_s}s ago" if age_s < 120 else f"{age_s//60}m ago"
+        title = f"{label} | {role}/{mode} | CPU {cpu}% MEM {mem}% | {age_label}"
+        parts.append(
+            f'<span class="cluster-node-badge" title="{title}">'
+            f'<span class="cluster-dot" style="background:{dot_color}"></span>'
+            f'<span class="cluster-label">{label}</span>'
+            f'</span>'
+        )
+
+    html = '<div class="cluster-nodes-inner">' + "".join(parts) + "</div>"
+    return HTMLResponse(html)
 
 
 @router.get("/api/health/modules")

@@ -30,7 +30,7 @@
 
 {% block topbar_actions %}
 <div style="display:flex;gap:0.5rem;align-items:center">
-    <a href="/missions/{{ mission_id }}" class="btn btn-sm btn-ghost">← Mission</a>
+    <a href="/epics/{{ mission_id }}" class="btn btn-sm btn-ghost">← Mission</a>
     <button class="btn btn-sm btn-primary" onclick="replayMission()">
         <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Re-lancer
     </button>
@@ -107,7 +107,7 @@ function toggleText(el) {
 }
 
 async function loadReplay() {
-    const resp = await fetch(`/api/missions/${MISSION_ID}/debug`);
+    const resp = await fetch(`/api/epics/${MISSION_ID}/debug`);
     if (!resp.ok) {
         document.getElementById('replayTimeline').innerHTML =
             `<div class="replay-empty">Impossible de charger les données (${resp.status})</div>`;
@@ -187,7 +187,7 @@ async function replayMission() {
     btn.disabled = true;
     btn.textContent = 'Lancement…';
     try {
-        const resp = await fetch(`/api/missions/${MISSION_ID}/replay`, {method: 'POST'});
+        const resp = await fetch(`/api/epics/${MISSION_ID}/replay`, {method: 'POST'});
         if (resp.ok) {
             const data = await resp.json();
             const newId = data.run_id || data.id;

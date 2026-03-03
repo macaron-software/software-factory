@@ -96,12 +96,32 @@ def init_db(db_path: Path = DB_PATH):
 
 
 def _init_pg():
-    """Initialize PostgreSQL schema."""
+    """Initialize PostgreSQL schema.
+
+    Uses a PostgreSQL advisory lock (id=20260301) so that when multiple nodes
+    start simultaneously they serialize schema migrations instead of racing.
+    """
+    import logging as _logging
+
+    _log = _logging.getLogger(__name__)
     conn = get_connection()
-    schema = SCHEMA_PG_PATH.read_text()
-    conn.executescript(schema)
-    conn.commit()
-    _migrate_pg(conn)
+    # Acquire exclusive advisory lock — other nodes block here until migration done
+    try:
+        conn.execute("SELECT pg_advisory_lock(20260301)")
+        _log.info("DB migration: advisory lock acquired")
+    except Exception:
+        pass  # non-fatal if advisory locks not supported
+
+    try:
+        schema = SCHEMA_PG_PATH.read_text()
+        conn.executescript(schema)
+        conn.commit()
+        _migrate_pg(conn)
+    finally:
+        try:
+            conn.execute("SELECT pg_advisory_unlock(20260301)")
+        except Exception:
+            pass
     return conn
 
 
@@ -146,22 +166,22 @@ def _migrate(conn):
         ]:
             if col not in m_cols:
                 conn.execute(
-                    f"ALTER TABLE missions ADD COLUMN {col} REAL DEFAULT {default}"
+                    f"ALTER TABLE epics ADD COLUMN {col} REAL DEFAULT {default}"
                 )
     except Exception:
         pass
 
     try:
         mr_cols = {
-            r[1] for r in conn.execute("PRAGMA table_info(mission_runs)").fetchall()
+            r[1] for r in conn.execute("PRAGMA table_info(epic_runs)").fetchall()
         }
         if mr_cols and "workspace_path" not in mr_cols:
             conn.execute(
-                "ALTER TABLE mission_runs ADD COLUMN workspace_path TEXT DEFAULT ''"
+                "ALTER TABLE epic_runs ADD COLUMN workspace_path TEXT DEFAULT ''"
             )
-        if mr_cols and "parent_mission_id" not in mr_cols:
+        if mr_cols and "parent_epic_id" not in mr_cols:
             conn.execute(
-                "ALTER TABLE mission_runs ADD COLUMN parent_mission_id TEXT DEFAULT ''"
+                "ALTER TABLE epic_runs ADD COLUMN parent_epic_id TEXT DEFAULT ''"
             )
     except Exception:
         pass
@@ -242,10 +262,10 @@ def _migrate(conn):
         m_cols2 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols2 and "kanban_status" not in m_cols2:
             conn.execute(
-                "ALTER TABLE missions ADD COLUMN kanban_status TEXT DEFAULT 'funnel'"
+                "ALTER TABLE epics ADD COLUMN kanban_status TEXT DEFAULT 'funnel'"
             )
         if m_cols2 and "jira_key" not in m_cols2:
-            conn.execute("ALTER TABLE missions ADD COLUMN jira_key TEXT")
+            conn.execute("ALTER TABLE epics ADD COLUMN jira_key TEXT")
     except Exception:
         pass
 
@@ -391,10 +411,10 @@ def _migrate(conn):
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_artifacts_type ON artifacts(type)")
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_mission_runs_parent ON mission_runs(parent_mission_id)"
+        "CREATE INDEX IF NOT EXISTS idx_epic_runs_parent ON epic_runs(parent_epic_id)"
     )
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_mission_runs_session ON mission_runs(session_id)"
+        "CREATE INDEX IF NOT EXISTS idx_epic_runs_session ON epic_runs(session_id)"
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to)")
     conn.execute(
@@ -1793,23 +1813,23 @@ def _migrate_pg(conn):
     # Missions: category + active_phases (added 2026-02)
     try:
         conn.execute(
-            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'functional'"
+            "ALTER TABLE epics ADD COLUMN IF NOT EXISTS category TEXT DEFAULT 'functional'"
         )
     except Exception:
         pass
     try:
         conn.execute(
-            "ALTER TABLE missions ADD COLUMN IF NOT EXISTS active_phases_json TEXT DEFAULT '[]'"
+            "ALTER TABLE epics ADD COLUMN IF NOT EXISTS active_phases_json TEXT DEFAULT '[]'"
         )
     except Exception:
         pass
     # Backfill: mark auto-provisioned system missions as category='system'
     try:
         conn.execute(
-            "UPDATE missions SET category='system' WHERE type IN ('program','security','debt') AND config_json LIKE '%auto_provisioned%' AND category='functional'"
+            "UPDATE epics SET category='system' WHERE type IN ('program','security','debt') AND config_json LIKE '%auto_provisioned%' AND category='functional'"
         )
         conn.execute(
-            "UPDATE missions SET category='system' WHERE name LIKE 'Self-Healing %' AND config_json LIKE '%auto_heal%' AND category='functional'"
+            "UPDATE epics SET category='system' WHERE name LIKE 'Self-Healing %' AND config_json LIKE '%auto_heal%' AND category='functional'"
         )
     except Exception:
         pass
@@ -1876,7 +1896,7 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver)"
     )
-    # mission_runs: missing columns added post-launch (added 2026-03)
+    # epic_runs: missing columns added post-launch (added 2026-03)
     for col, defn in [
         ("resume_attempts", "INTEGER DEFAULT 0"),
         ("last_resume_at", "TEXT"),
@@ -1884,9 +1904,7 @@ def _migrate_pg(conn):
         ("llm_cost_usd", "DOUBLE PRECISION DEFAULT 0.0"),
     ]:
         try:
-            conn.execute(
-                f"ALTER TABLE mission_runs ADD COLUMN IF NOT EXISTS {col} {defn}"
-            )
+            conn.execute(f"ALTER TABLE epic_runs ADD COLUMN IF NOT EXISTS {col} {defn}")
         except Exception:
             pass
     # platform_incidents: deduplication fields (added 2026-03)
@@ -2139,6 +2157,25 @@ def _migrate_pg(conn):
         )
     """)
 
+    # ── platform_nodes: cluster node registry + heartbeat ──────────────────
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS platform_nodes (
+            node_id TEXT PRIMARY KEY,
+            role TEXT NOT NULL DEFAULT 'slave',
+            mode TEXT NOT NULL DEFAULT 'slave',
+            url TEXT NOT NULL DEFAULT '',
+            last_seen TIMESTAMPTZ DEFAULT NOW(),
+            status TEXT NOT NULL DEFAULT 'online',
+            cpu_pct DOUBLE PRECISION DEFAULT 0,
+            mem_pct DOUBLE PRECISION DEFAULT 0,
+            version TEXT DEFAULT '',
+            registered_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_pnodes_status ON platform_nodes(status)"
+    )
+
     conn.commit()
 
 
@@ -2288,11 +2325,11 @@ def _ensure_darwin_tables(conn) -> None:
         m_cols3 = {r[1] for r in conn.execute("PRAGMA table_info(missions)").fetchall()}
         if m_cols3 and "category" not in m_cols3:
             conn.execute(
-                "ALTER TABLE missions ADD COLUMN category TEXT DEFAULT 'functional'"
+                "ALTER TABLE epics ADD COLUMN category TEXT DEFAULT 'functional'"
             )
         if m_cols3 and "active_phases_json" not in m_cols3:
             conn.execute(
-                "ALTER TABLE missions ADD COLUMN active_phases_json TEXT DEFAULT '[]'"
+                "ALTER TABLE epics ADD COLUMN active_phases_json TEXT DEFAULT '[]'"
             )
     except Exception:
         pass

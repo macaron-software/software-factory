@@ -47,7 +47,7 @@
 .hub-mission{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.7rem .85rem;margin-bottom:.5rem;cursor:pointer;transition:border-color .15s,box-shadow .15s}
 .hub-mission:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
 .hub-mission-name{font-size:.82rem;font-weight:600;color:var(--text-primary);margin-bottom:.25rem}
-.hub-mission-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+.hub-epic-meta{display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
 .hub-m-status{font-size:.68rem;padding:.15rem .45rem;border-radius:99px;font-weight:600}
 .hub-m-status.active{background:#1a4a1a;color:var(--green)}
 .hub-m-status.planning{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
@@ -156,7 +156,7 @@
       {% for m in system_missions %}
       <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
         <div class="hub-mission-name">{{ m.name }}</div>
-        <div class="hub-mission-meta">
+        <div class="hub-epic-meta">
           <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
           <span class="hub-m-type">{{ m.type }}</span>
           {% if m.active_phases %}
@@ -181,7 +181,7 @@
       {% for m in functional_missions %}
       <div class="hub-mission" onclick="location.href='/missions/{{ m.id }}'">
         <div class="hub-mission-name">{{ m.name }}</div>
-        <div class="hub-mission-meta">
+        <div class="hub-epic-meta">
           <span class="hub-m-status {{ m.status }}">{{ m.status }}</span>
           <span class="hub-m-type">{{ m.type }}</span>
           <span class="hub-m-wsjf">WSJF {{ m.wsjf_score }}</span>

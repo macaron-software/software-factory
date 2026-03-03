@@ -13,7 +13,7 @@
 <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
     <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-activity"/></svg>
     <span style="font-weight:600">Pipeline Health</span>
-    <span style="color:var(--text-secondary)">— Mission pipelines, agent performance, queue depth</span>
+    <span style="color:var(--text-secondary)">— Epic pipelines, agent performance, queue depth</span>
 </div>
 {% elif p == 'qa_security' %}
 <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;margin-bottom:1rem;font-size:0.82rem">
@@ -102,7 +102,7 @@
             <h3><svg class="icon"><use href="#icon-briefcase"/></svg> Epics & Sprints</h3>
             <div class="mon-section">
                 <div class="mon-section-label">{{ _("missions") }}</div>
-                <div id="monMissions" class="mon-badges-row"><span class="mon-empty">{{ _("no_missions") }}</span></div>
+                <div id="monMissions" class="mon-badges-row"><span class="mon-empty">{{ _("no_epics") }}</span></div>
             </div>
             <div class="mon-section">
                 <div class="mon-section-label">{{ _("sprints") }}</div>
