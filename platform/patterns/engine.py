@@ -763,6 +763,24 @@ async def _execute_node(
         elif "devops" in role_lower or "sre" in role_lower or "pipeline" in role_lower:
             full_task += _CICD_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
+            # Auto-run CI/CD pipeline for devops agents (LLM can't call tools reliably)
+            if ctx.project_path:
+                try:
+                    from ..tools.build_tools import CICDRunnerTool
+
+                    cicd_tool = CICDRunnerTool()
+                    cicd_result = await cicd_tool.execute(
+                        {"cwd": ctx.project_path}, agent
+                    )
+                    full_task += (
+                        f"\n\n## CI/CD Pipeline Results (auto-executed)\n"
+                        f"```\n{cicd_result}\n```\n"
+                        f"These are REAL results from running the actual build and tests. "
+                        f"Report them honestly. If tests failed, diagnose and fix the code."
+                    )
+                    _auto_create_tickets_from_results(cicd_result, ctx, "devops")
+                except Exception as e:
+                    full_task += f"\n\n## CI/CD Auto-run: Error: {e}"
         elif (
             "dev" in role_lower
             or "fullstack" in role_lower

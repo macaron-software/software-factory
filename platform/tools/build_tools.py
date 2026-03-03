@@ -178,6 +178,7 @@ class CICDRunnerTool(BaseTool):
     }
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import asyncio
         import os
         cwd = params.get("cwd", ".")
         if not os.path.isdir(cwd):
@@ -193,8 +194,12 @@ class CICDRunnerTool(BaseTool):
 
         results, passed, failed = [], 0, 0
         sandbox = get_sandbox(cwd)
+        loop = asyncio.get_event_loop()
         for cmd, stage in steps:
-            r = sandbox.run(cmd, cwd=cwd, timeout=300)
+            # Run blocking subprocess in thread pool to avoid blocking event loop
+            r = await loop.run_in_executor(
+                None, lambda c=cmd: sandbox.run(c, cwd=cwd, timeout=300)
+            )
             ok = r.returncode == 0
             results.append(f"{'✓' if ok else '✗'} {stage}: {cmd}")
             if not ok:
