@@ -56,17 +56,6 @@ FACTORY_ROOT = _get_factory_root()
 DATA_DIR = FACTORY_ROOT / "data"
 KEYS_DIR = Path.home() / ".config" / "factory"
 
-# SQLite databases to back up
-SQLITE_DBS = [
-    "platform.db",
-    "factory.db",
-    "build_queue.db",
-    "metrics.db",
-    "project_context.db",
-    "rlm_cache.db",
-    "permissions_audit.db",
-]
-
 PG_URL = os.environ.get("DATABASE_URL", "")
 VM_HOST = os.getenv("AZURE_VM_IP", "localhost")
 VM_USER = "azureadmin"
@@ -107,40 +96,6 @@ def _tier_prefix(tier: str) -> str:
         return f"weekly/{ts[:8]}/"
     else:
         return f"daily/{ts[:8]}/"
-
-
-def backup_sqlite(tier: str = "daily") -> int:
-    """Back up all SQLite databases."""
-    print("📦 Backing up SQLite databases...")
-    prefix = _tier_prefix(tier)
-    count = 0
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for db_name in SQLITE_DBS:
-            db_path = DATA_DIR / db_name
-            if not db_path.exists():
-                continue
-
-            # Use SQLite backup API (safe, no WAL issues)
-            backup_path = Path(tmpdir) / db_name
-            _run(f'sqlite3 "{db_path}" ".backup \'{backup_path}\'"', check=False)
-
-            if not backup_path.exists():
-                # Fallback: copy
-                shutil.copy2(db_path, backup_path)
-
-            # Compress
-            gz_path = f"{backup_path}.gz"
-            with open(backup_path, "rb") as f_in, gzip.open(gz_path, "wb") as f_out:
-                shutil.copyfileobj(f_in, f_out)
-
-            blob_name = f"{prefix}{db_name}.gz"
-            if _az_upload(gz_path, "db-backups", blob_name):
-                size_mb = os.path.getsize(gz_path) / (1024 * 1024)
-                print(f"  ✅ {db_name} ({size_mb:.1f}MB) → db-backups/{blob_name}")
-                count += 1
-
-    return count
 
 
 def backup_postgresql(tier: str = "daily") -> bool:
@@ -325,7 +280,6 @@ def run_full_backup(tier: str = "daily"):
     print(f"{'=' * 60}\n")
 
     results = {}
-    results["sqlite"] = backup_sqlite(tier)
     results["pg"] = backup_postgresql(tier)
     results["secrets"] = backup_secrets(tier)
 
@@ -334,7 +288,6 @@ def run_full_backup(tier: str = "daily"):
 
     print(f"\n{'=' * 60}")
     print("📊 BACKUP SUMMARY")
-    print(f"  SQLite DBs: {results['sqlite']} files")
     print(f"  PostgreSQL: {'✅' if results.get('pg') else '❌'}")
     print(f"  Secrets: {'✅' if results.get('secrets') else '❌'}")
     if "snapshot" in results:
@@ -342,7 +295,7 @@ def run_full_backup(tier: str = "daily"):
     print(f"{'=' * 60}\n")
 
     # Return success/failure for alerting
-    all_ok = results["sqlite"] > 0 and results.get("secrets")
+    all_ok = results.get("pg") and results.get("secrets")
     return all_ok
 
 
@@ -351,15 +304,12 @@ def main():
     parser.add_argument(
         "--tier", choices=["daily", "weekly", "monthly"], default="daily"
     )
-    parser.add_argument("--sqlite-only", action="store_true")
     parser.add_argument("--pg-only", action="store_true")
     parser.add_argument("--secrets-only", action="store_true")
     parser.add_argument("--snapshot-only", action="store_true")
     args = parser.parse_args()
 
-    if args.sqlite_only:
-        backup_sqlite(args.tier)
-    elif args.pg_only:
+    if args.pg_only:
         backup_postgresql(args.tier)
     elif args.secrets_only:
         backup_secrets(args.tier)

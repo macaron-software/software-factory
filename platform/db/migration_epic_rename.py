@@ -39,22 +39,32 @@ def run_migration():
                 logger.info("PG Migrating: missions -> epics")
                 db.execute("ALTER TABLE missions RENAME TO epics")
                 db.commit()
-            if _pg_table_exists(db, "mission_runs") and not _pg_table_exists(db, "epic_runs"):
+            if _pg_table_exists(db, "mission_runs") and not _pg_table_exists(
+                db, "epic_runs"
+            ):
                 logger.info("PG Migrating: mission_runs -> epic_runs")
                 db.execute("ALTER TABLE mission_runs RENAME TO epic_runs")
                 db.commit()
             # Column renames
-            if _pg_table_exists(db, "epics") and _pg_column_exists(db, "epics", "parent_mission_id"):
-                db.execute("ALTER TABLE epics RENAME COLUMN parent_mission_id TO parent_epic_id")
+            if _pg_table_exists(db, "epics") and _pg_column_exists(
+                db, "epics", "parent_mission_id"
+            ):
+                db.execute(
+                    "ALTER TABLE epics RENAME COLUMN parent_mission_id TO parent_epic_id"
+                )
                 db.commit()
-            if _pg_table_exists(db, "epic_runs") and _pg_column_exists(db, "epic_runs", "parent_mission_id"):
-                db.execute("ALTER TABLE epic_runs RENAME COLUMN parent_mission_id TO parent_epic_id")
+            if _pg_table_exists(db, "epic_runs") and _pg_column_exists(
+                db, "epic_runs", "parent_mission_id"
+            ):
+                db.execute(
+                    "ALTER TABLE epic_runs RENAME COLUMN parent_mission_id TO parent_epic_id"
+                )
                 db.commit()
         else:
             tables = {
                 r[0]
                 for r in db.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public'"
                 ).fetchall()
             }
 
@@ -75,7 +85,9 @@ def run_migration():
                 logger.info("epic_runs table already exists — skipping")
 
             # Rename column parent_mission_id -> parent_epic_id in epics if needed
-            cols_epics = [r[1] for r in db.execute("PRAGMA table_info(epics)").fetchall()]
+            cols_epics = [
+                r[1] for r in db.execute("PRAGMA table_info(epics)").fetchall()
+            ]
             if "parent_mission_id" in cols_epics and "parent_epic_id" not in cols_epics:
                 db.execute(
                     "ALTER TABLE epics RENAME COLUMN parent_mission_id TO parent_epic_id"

@@ -6,9 +6,6 @@ Uses SQLite FTS5 for semantic search over memory entries.
 
 from __future__ import annotations
 
-import json
-import sqlite3
-from datetime import datetime
 from typing import Optional
 
 from ..models import A2AMessage
@@ -17,7 +14,7 @@ from ..models import A2AMessage
 class AgentMemory:
     """Memory system for agents: short-term buffer + long-term FTS5 store."""
 
-    def __init__(self, db_conn: sqlite3.Connection, window_size: int = 50):
+    def __init__(self, db_conn, window_size: int = 50):
         self.db = db_conn
         self.window_size = window_size
         # Short-term: per-agent sliding window of recent messages
@@ -48,7 +45,7 @@ class AgentMemory:
 
         # Sliding window
         if len(self._short_term[agent_id]) > self.window_size * 2:
-            self._short_term[agent_id] = self._short_term[agent_id][-self.window_size:]
+            self._short_term[agent_id] = self._short_term[agent_id][-self.window_size :]
 
     def get_context_summary(self, agent_id: str, max_chars: int = 3000) -> str:
         """Build a context summary from recent messages."""
@@ -82,6 +79,7 @@ class AgentMemory:
     async def search(self, agent_id: str, query: str, limit: int = 10) -> list[str]:
         """Search long-term memory using FTS5 or tsvector."""
         from ..db.adapter import is_postgresql
+
         if is_postgresql():
             rows = self.db.execute(
                 """SELECT m.value, m.key, m.importance
@@ -117,6 +115,7 @@ class AgentMemory:
     async def search_all(self, query: str, limit: int = 20) -> list[dict]:
         """Search across all agents' memories."""
         from ..db.adapter import is_postgresql
+
         if is_postgresql():
             rows = self.db.execute(
                 """SELECT m.agent_id, m.key, m.value, m.importance

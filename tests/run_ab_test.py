@@ -10,22 +10,17 @@ Captures generated code and compares.
 """
 
 import asyncio
-import json
-import os
 import sys
-import sqlite3
 import time
 from pathlib import Path
-from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.task_store import TaskStore, TaskStatus
+from core.task_store import TaskStore
 from core.wiggum_tdd import WiggumWorker
 from core.adversarial import AdversarialGate
 from core.fractal import FractalDecomposer
 from core.project_registry import get_project
-from tests.ab_fractal_test import analyze_code, print_comparison
 
 
 class DisabledDecomposer:
@@ -34,6 +29,7 @@ class DisabledDecomposer:
     def should_decompose(self, task_dict, current_depth):
         class FakeAnalysis:
             reason = "disabled for A/B test"
+
         return False, FakeAnalysis()
 
     async def decompose(self, task_dict, current_depth):
@@ -56,21 +52,20 @@ class ABTestRunner:
 
     def get_subtasks(self, parent_id: str) -> list:
         """Get subtasks by parent_id using direct SQL query."""
-        db_path = Path(__file__).parent.parent / "data" / "factory.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
+        from platform.db.adapter import get_connection
+
+        conn = get_connection()
         rows = conn.execute(
-            "SELECT * FROM tasks WHERE parent_id = ? ORDER BY created_at",
-            (parent_id,)
+            "SELECT * FROM tasks WHERE parent_id = ? ORDER BY created_at", (parent_id,)
         ).fetchall()
         conn.close()
         return [dict(row) for row in rows]
 
     async def run_single_task(self, task_id: str, mode: str) -> dict:
         """Run Wiggum on a single task and capture output."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Running {mode.upper()} mode on task: {task_id}")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         # Get task
         task = self.task_store.get_task(task_id)
@@ -122,6 +117,7 @@ class ABTestRunner:
         except Exception as e:
             print(f"ERROR in {mode}: {e}")
             import traceback
+
             traceback.print_exc()
             return {"task_id": task_id, "mode": mode, "error": str(e)}
 
@@ -172,7 +168,9 @@ class ABTestRunner:
                 if "error" in r:
                     print(f"{mode.upper()}: ERROR - {r['error']}")
                 else:
-                    print(f"{mode.upper()}: {r['status']} in {r.get('elapsed', 0):.1f}s, iterations={r.get('iterations', 0)}")
+                    print(
+                        f"{mode.upper()}: {r['status']} in {r.get('elapsed', 0):.1f}s, iterations={r.get('iterations', 0)}"
+                    )
 
 
 async def main():

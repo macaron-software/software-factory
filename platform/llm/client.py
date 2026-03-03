@@ -15,13 +15,14 @@ import asyncio
 import json
 import logging
 import os
-import sqlite3
 import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from ..db.adapter import get_connection
 
 import httpx
 
@@ -228,8 +229,6 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "m2.5": (0.50, 2.00),
 }
 _DEFAULT_PRICING = (1.00, 4.00)  # fallback for unknown models
-
-_USAGE_DB_PATH = Path(__file__).parent.parent.parent / "data" / "platform.db"
 
 
 class LLMClient:
@@ -1102,8 +1101,7 @@ class LLMClient:
         """Create llm_usage table if it doesn't exist (called once lazily)."""
         if self._usage_table_ready:
             return
-        _USAGE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_USAGE_DB_PATH))
+        conn = get_connection()
         try:
             conn.execute("""CREATE TABLE IF NOT EXISTS llm_usage (
                 id TEXT PRIMARY KEY,
@@ -1155,7 +1153,7 @@ class LLMClient:
 
             def _insert():
                 self._ensure_usage_table()
-                conn = sqlite3.connect(str(_USAGE_DB_PATH))
+                conn = get_connection()
                 try:
                     conn.execute(
                         "INSERT INTO llm_usage (id,ts,provider,model,tokens_in,tokens_out,"
@@ -1175,7 +1173,7 @@ class LLMClient:
 
         def _query():
             self._ensure_usage_table()
-            conn = sqlite3.connect(str(_USAGE_DB_PATH))
+            conn = get_connection()
             try:
                 cutoff = f"datetime('now', '-{days} days')"
                 by_day = conn.execute(

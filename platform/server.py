@@ -83,25 +83,8 @@ if os.environ.get("OTEL_ENABLED"):
 
 
 def _recover_db_lock():
-    """Checkpoint any stale WAL file left by a previously crashed process.
-
-    A container killed during a write leaves platform.db-wal / platform.db-shm
-    which cause 'database is locked' on the next startup. This runs *before*
-    init_db() so the migration never hits a lock.
-    """
-    import sqlite3 as _sqlite3
-    from .config import DB_PATH
-
-    if not DB_PATH.exists():
-        return
-    try:
-        conn = _sqlite3.connect(str(DB_PATH), timeout=5)
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-        logger.info("DB WAL checkpoint OK")
-    except Exception as exc:
-        logger.warning("DB WAL checkpoint failed (non-fatal): %s", exc)
+    """No-op: WAL checkpoint is SQLite-specific, not needed with current DB adapter."""
+    logger.debug("_recover_db_lock: skipped (managed by db adapter)")
 
 
 @asynccontextmanager
@@ -203,6 +186,7 @@ async def lifespan(app: FastAPI):
 
     async def _bg_heal_and_seed():
         import asyncio as _a
+
         _loop = _a.get_event_loop()
         _prov_count = 0
         for proj in ps.list_all():
@@ -212,14 +196,18 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning("heal_epics failed for %s: %s", proj.id, e)
         if _prov_count:
-            logger.warning("heal_epics: created %d missions across all projects", _prov_count)
+            logger.warning(
+                "heal_epics: created %d missions across all projects", _prov_count
+            )
 
         # Scaffold all projects: ensure workspace + git + docker + docs + code exist
         from .projects.manager import heal_all_projects as _heal
+
         await _loop.run_in_executor(None, _heal)
 
         # Seed memory (global knowledge + project files)
         from .memory.seeder import seed_all as seed_memories
+
         try:
             n_mem = await _loop.run_in_executor(None, seed_memories)
             if n_mem:
@@ -566,26 +554,6 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_mcp_watchdog())
 
-    # Periodic WAL checkpoint to prevent data loss on crash
-    async def _wal_checkpoint_loop():
-        import asyncio
-        import sqlite3
-
-        db_path = str(Path(__file__).parent.parent / "data" / "platform.db")
-        while True:
-            await asyncio.sleep(30)
-            try:
-                conn = sqlite3.connect(db_path, timeout=30)
-                conn.execute("PRAGMA busy_timeout=30000")
-                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
-                conn.close()
-            except Exception:
-                pass
-
-    import asyncio
-
-    asyncio.create_task(_wal_checkpoint_loop())
-
     # Auto-heal loop: scan incidents → create epics → launch TMA workflows
     try:
         from .ops.auto_heal import ENABLED as _ah_enabled
@@ -716,17 +684,16 @@ async def lifespan(app: FastAPI):
 
 def _record_incident(path: str, status_code: int, detail: str = ""):
     """Record a platform incident with deduplication: one open incident per (error_type, error_detail)."""
-    import sqlite3
     import uuid
 
-    from .config import DB_PATH
+    from .db.adapter import get_connection
 
     error_type = str(status_code)
     error_detail = detail or f"HTTP {status_code} on {path}"
     title = f"[Auto] {error_type} — {path}"
 
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=30)
+        conn = get_connection()
         # Deduplicate: increment existing open incident instead of creating a new one
         existing = conn.execute(
             "SELECT id FROM platform_incidents WHERE error_type=? AND error_detail=? AND status='open' LIMIT 1",

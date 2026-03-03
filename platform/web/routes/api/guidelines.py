@@ -11,6 +11,7 @@ from fastapi import APIRouter, BackgroundTasks
 from fastapi.responses import JSONResponse
 
 from .input_models import GuidelineSyncRequest
+from ....db.adapter import get_connection
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,13 +22,7 @@ _GL_DB_PATH = (
 
 
 def _get_gl_db():
-    import sqlite3
-
-    if not _GL_DB_PATH.exists():
-        return None
-    conn = sqlite3.connect(str(_GL_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    return conn
+    return get_connection()
 
 
 @router.get("/api/guidelines/domains")
@@ -172,11 +167,8 @@ async def sync_guidelines(
     conn = _get_gl_db()
     if not conn:
         # Create DB
-        import sqlite3
-
         _GL_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_GL_DB_PATH))
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
         conn.execute("""CREATE TABLE IF NOT EXISTS guideline_pages (
             id TEXT PRIMARY KEY, project TEXT, title TEXT, category TEXT,
             url TEXT DEFAULT '', content TEXT DEFAULT '', summary TEXT DEFAULT '',

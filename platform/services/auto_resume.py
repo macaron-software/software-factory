@@ -1007,7 +1007,6 @@ async def _cleanup_disk() -> None:
             db.commit()
             logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
 
-        # 4. SQLite VACUUM to reclaim space after mass deletes
         if deleted_traces + deleted_runs > 100:
             db.execute("VACUUM")
             logger.warning(

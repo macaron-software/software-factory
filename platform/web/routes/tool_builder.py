@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 import subprocess
 import uuid
 
@@ -12,6 +11,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...db.migrations import get_db
+from ...db.adapter import get_connection
 from .helpers import _templates
 
 router = APIRouter()
@@ -154,10 +154,8 @@ def _test_sql(config: dict) -> dict:
     # Read-only guard
     if not query.lower().lstrip().startswith("select"):
         return {"error": "Only SELECT queries are allowed"}
-    from ...db.migrations import DB_PATH
 
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     try:
         rows = conn.execute(query).fetchmany(50)
         return {"rows": [dict(r) for r in rows], "count": len(rows)}

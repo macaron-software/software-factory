@@ -109,10 +109,9 @@ class IncidentLoggingHandler(logging.Handler):
 
     def _upsert(self, title: str, detail: str):
         try:
-            import sqlite3
-            from .config import DB_PATH
+            from .db.adapter import get_connection
 
-            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn = get_connection()
             existing = conn.execute(
                 "SELECT id FROM platform_incidents WHERE error_detail=? AND status='open' LIMIT 1",
                 (detail,),

@@ -441,9 +441,9 @@ async def cmd_db_status() -> SFCommandResponse:
 
         # Query table stats
         tables_query = """
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            ORDER BY name
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='public' AND table_name NOT LIKE 'pg_%'
+            ORDER BY table_name
         """
         tables = db.execute(tables_query).fetchall()
 

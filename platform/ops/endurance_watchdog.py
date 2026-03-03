@@ -17,10 +17,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import sqlite3
 import time
 from datetime import datetime, timezone
 from typing import Optional
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,6 @@ PHASE_STALL_THRESHOLD = int(os.environ.get("WATCHDOG_STALL_THRESHOLD", "900"))  
 DISK_ALERT_PCT = int(os.environ.get("WATCHDOG_DISK_ALERT", "90"))
 ENABLED = os.environ.get("WATCHDOG_ENABLED", "1") == "1"
 HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8099/api/health")
-DB_PATH = os.environ.get("WATCHDOG_DB_PATH", "")
-
-
-def _db_path() -> str:
-    if DB_PATH:
-        return DB_PATH
-    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(base, "data", "platform.db")
 
 
 def _get_db():
@@ -47,10 +40,8 @@ def _get_db():
 
         return get_db()
     except Exception:
-        # Fallback to direct SQLite (standalone mode)
-        conn = sqlite3.connect(_db_path())
-        conn.row_factory = sqlite3.Row
-        return conn
+        # Fallback to direct connection (standalone mode)
+        return get_connection()
 
 
 def _ensure_table():
@@ -644,7 +635,8 @@ def _table_exists(db, name: str) -> bool:
     except Exception:
         pass
     r = db.execute(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", (name,)
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+        (name,),
     ).fetchone()
     return bool(r and r[0] > 0)
 

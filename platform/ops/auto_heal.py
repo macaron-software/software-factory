@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from ..db.adapter import get_connection
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
@@ -34,6 +36,9 @@ ENABLED = os.environ.get("AUTOHEAL_ENABLED", "1") == "1"
 
 # Severity ordering for filtering
 _SEV_ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+
+# Map P0-P3 → S1-S4 (used for suppression logic in ErrorStateManager)
+_P_TO_S = {"P0": "S1", "P1": "S2", "P2": "S3", "P3": "S4"}
 
 # Workflow ID for TMA missions
 TMA_WORKFLOW_ID = "tma-autoheal"
@@ -50,6 +55,8 @@ class IncidentGroup:
     count: int
     severity: str
     source: str
+    signature: str = ""  # natural-language cluster signature (from ErrorClusterer)
+    error_status: str = ""  # NEW / REGRESSION / ONGOING (from ErrorStateManager)
 
 
 def _get_db():
@@ -59,14 +66,8 @@ def _get_db():
 
         return get_db()
     except (ImportError, ValueError):
-        # Standalone mode — direct SQLite
-        import sqlite3
-        from pathlib import Path
-
-        db_path = Path(__file__).parent.parent.parent / "data" / "platform.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+        # Standalone mode
+        return get_connection()
 
 
 def scan_open_incidents() -> list[IncidentGroup]:
@@ -369,6 +370,90 @@ _last_cycle_ok: float = 0.0  # timestamp of last successful cycle
 _last_cycle_error: str = ""  # last error message if any
 
 
+async def _cluster_and_filter(groups: list[IncidentGroup]) -> list[IncidentGroup]:
+    """
+    Re-cluster incident groups using ErrorClusterer + apply suppression logic.
+
+    Falls back to original groups on any error so auto-heal is never broken.
+    """
+    try:
+        from .error_clustering import ErrorClusterer
+        from .error_state import get_error_state_manager
+
+        state = get_error_state_manager()
+        clusterer = ErrorClusterer()
+
+        # Build flat incident-like dicts for the clusterer
+        inc_dicts = [
+            {
+                "id": g.incident_ids[0] if g.incident_ids else "",
+                "error_type": g.error_type,
+                "error_detail": g.error_detail_sample,
+                "title": g.error_type,
+                "source": g.source,
+                "severity": g.severity,
+            }
+            for g in groups
+        ]
+
+        clusters = await clusterer.cluster(inc_dicts)
+
+        # Generate LLM signatures for clusters with >1 incident
+        result: list[IncidentGroup] = []
+        for cluster in clusters:
+            original_ids = cluster["incident_ids"]
+            # Collect all incident_ids from matched source groups
+            all_ids: list[str] = []
+            for gid in original_ids:
+                for g in groups:
+                    if gid in g.incident_ids:
+                        all_ids.extend(g.incident_ids)
+            all_ids = list(dict.fromkeys(all_ids))  # dedupe, preserve order
+
+            # Get a natural-language signature
+            if len(cluster.get("incident_ids", [])) > 1:
+                sig = await clusterer.generate_signature(inc_dicts)
+            else:
+                sig = cluster["signature"]
+
+            severity = cluster["severity"]
+            sev_s = _P_TO_S.get(severity, "S3")
+            error_status = state.determine_status(sig)
+
+            # Suppression check
+            should_alert, reason = state.should_alert(
+                signature=sig,
+                status=error_status,
+                severity=sev_s,
+            )
+            if not should_alert:
+                logger.info("Auto-heal suppressed cluster '%s': %s", sig[:60], reason)
+                continue
+
+            result.append(
+                IncidentGroup(
+                    error_type=cluster.get("error_class", groups[0].error_type),
+                    error_detail_sample=cluster["sample_messages"][0]
+                    if cluster["sample_messages"]
+                    else "",
+                    incident_ids=all_ids,
+                    count=len(all_ids),
+                    severity=severity,
+                    source=cluster["sources"][0] if cluster.get("sources") else "auto",
+                    signature=sig,
+                    error_status=error_status,
+                )
+            )
+
+        return result
+
+    except Exception as exc:
+        logger.warning(
+            "Auto-heal: cluster_and_filter failed (%s) — using original groups", exc
+        )
+        return groups
+
+
 async def heal_cycle():
     """One scan-create-launch cycle."""
     global _active_heals
@@ -394,6 +479,12 @@ async def heal_cycle():
     if not groups:
         return
 
+    # 4b. Cluster + suppression filtering (via ErrorClusterer + ErrorStateManager)
+    groups = await _cluster_and_filter(groups)
+    if not groups:
+        logger.info("Auto-heal: all incident groups suppressed — nothing to heal")
+        return
+
     logger.info(
         "Auto-heal: found %d incident groups (%d active heals)",
         len(groups),
@@ -405,8 +496,10 @@ async def heal_cycle():
         from ..services.notifications import emit_notification
 
         for g in groups:
+            status_tag = g.error_status if hasattr(g, "error_status") else ""
+            label = f"[{status_tag}] " if status_tag else ""
             emit_notification(
-                f"Auto-heal: {g.count} new {g.error_type} incident(s)",
+                f"Auto-heal: {label}{g.count} new {g.error_type} incident(s)",
                 type="autoheal",
                 message=g.error_detail_sample[:100],
                 severity="warning" if g.severity in ("P0", "P1") else "info",
@@ -431,6 +524,13 @@ async def heal_cycle():
             session_id = await launch_tma_workflow(mission_id)
             if session_id:
                 _active_heals.add(mission_id)
+                # Mark alerted in error state tracker
+                try:
+                    from .error_state import get_error_state_manager
+
+                    get_error_state_manager().mark_alerted(group.signature)
+                except Exception:
+                    pass
 
 
 async def _recover_interrupted_heals():

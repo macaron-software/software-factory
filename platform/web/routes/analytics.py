@@ -425,7 +425,7 @@ async def get_system_health() -> SystemHealthResponse:
 
         db = get_db()
 
-        # Database size (only meaningful for SQLite)
+        # Database size
         db_path = "platform.db"
         db_size_mb = (
             os.path.getsize(db_path) / (1024 * 1024) if os.path.exists(db_path) else 0
@@ -438,7 +438,7 @@ async def get_system_health() -> SystemHealthResponse:
             ).fetchall()
         else:
             tables_raw = db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE 'pg_%'"
             ).fetchall()
 
         table_stats = []
@@ -675,7 +675,6 @@ async def get_failure_analysis() -> dict[str, Any]:
         from ...db.migrations import get_db
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         # 1. Error category classification (Python-based for accuracy)
         all_failed = db.execute(
@@ -821,7 +820,6 @@ async def resume_all_paused() -> dict[str, Any]:
         from ...workflows.store import get_workflow_store, run_workflow
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         paused = db.execute("""
             SELECT mr.session_id, mr.id, s.config_json
@@ -936,7 +934,6 @@ async def get_agent_scores() -> dict[str, Any]:
         from ...db.migrations import get_db
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         # Ensure agent_scores table exists
         db.execute("""

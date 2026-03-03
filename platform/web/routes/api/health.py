@@ -507,7 +507,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             tables = [
                 r[0]
                 for r in db.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE 'pg_%' ORDER BY table_name"
                 ).fetchall()
             ]
             # Single query for all table counts via UNION ALL
@@ -601,32 +601,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             rlm_cache = (
                 pathlib.Path(__file__).resolve().parents[4] / "data" / "rlm_cache.db"
             )
-        if rlm_cache.exists():
-            import sqlite3
-
-            cdb = sqlite3.connect(str(rlm_cache))
-            cdb.row_factory = sqlite3.Row
-            try:
-                cc = cdb.execute("SELECT COUNT(*) as cnt FROM rlm_cache").fetchone()
-                # Anonymization stats from RLM cache
-                anon_stats = {}
-                try:
-                    anon_rows = cdb.execute(
-                        "SELECT COALESCE(scope, 'default') as scope, COUNT(*) as cnt "
-                        "FROM rlm_cache GROUP BY scope"
-                    ).fetchall()
-                    anon_stats = {r["scope"]: r["cnt"] for r in anon_rows}
-                except Exception:
-                    pass
-                mcp_status["rlm_cache"] = {
-                    "status": "ok",
-                    "entries": cc["cnt"] if cc else 0,
-                    "size_mb": round(rlm_cache.stat().st_size / 1024 / 1024, 2),
-                    "by_scope": anon_stats,
-                }
-            except Exception:
-                mcp_status["rlm_cache"] = {"status": "empty", "entries": 0}
-            cdb.close()
+        # rlm_cache is a SQLite file (out of scope for platform DB)
     except Exception as e:
         mcp_status["error"] = str(e)
 
@@ -1022,7 +997,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             "storage_account": "macaronbackups",
             "replication": "GRS (francesouth)",
             "containers": ["db-backups", "pg-dumps", "secrets"],
-            "sqlite_dbs": 7,
+            "sqlite_dbs": 0,
             "retention": {"daily": "90d", "weekly": "365d", "monthly": "forever"},
         }
         # Servers running on VM (probe ports)

@@ -2,13 +2,9 @@
 
 from __future__ import annotations
 
-import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Optional
 
-
-FACTORY_DB = "/Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/data/factory.db"
+from ..db.adapter import get_connection
 
 
 @dataclass
@@ -34,19 +30,16 @@ class TaskInfo:
     task_type: str = ""
 
 
-def _get_db(db_path: str = FACTORY_DB) -> Optional[sqlite3.Connection]:
-    if not Path(db_path).exists():
-        return None
+def _get_db():
     try:
-        conn = sqlite3.connect(db_path, timeout=5)
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
         return conn
-    except sqlite3.Error:
+    except Exception:
         return None
 
 
-def get_task_summary(project_id: str, db_path: str = FACTORY_DB) -> TaskSummary:
-    conn = _get_db(db_path)
+def get_task_summary(project_id: str) -> TaskSummary:
+    conn = _get_db()
     if not conn:
         return TaskSummary()
     try:
@@ -61,16 +54,14 @@ def get_task_summary(project_id: str, db_path: str = FACTORY_DB) -> TaskSummary:
             if hasattr(summary, s):
                 setattr(summary, s, cnt)
         return summary
-    except sqlite3.Error:
+    except Exception:
         return TaskSummary()
     finally:
         conn.close()
 
 
-def get_recent_tasks(
-    project_id: str, limit: int = 20, db_path: str = FACTORY_DB
-) -> list[TaskInfo]:
-    conn = _get_db(db_path)
+def get_recent_tasks(project_id: str, limit: int = 20) -> list[TaskInfo]:
+    conn = _get_db()
     if not conn:
         return []
     try:
@@ -87,13 +78,16 @@ def get_recent_tasks(
         )
         return [
             TaskInfo(
-                id=row["id"], title=row["title"], domain=row["domain"],
-                status=row["status"], priority=row["priority"] or 0,
+                id=row["id"],
+                title=row["title"],
+                domain=row["domain"],
+                status=row["status"],
+                priority=row["priority"] or 0,
                 task_type=row["type"] if "type" in row.keys() else "",
             )
             for row in cursor
         ]
-    except sqlite3.Error:
+    except Exception:
         return []
     finally:
         conn.close()

@@ -1,5 +1,5 @@
 """
-MCP Store — CRUD for external MCP server registry.
+MCP Store — PostgreSQL CRUD for external MCP server registry.
 ====================================================
 Persists in `mcps` table. Each MCP has:
 - command (python3 -m mcp_server_fetch, npx @playwright/mcp, etc.)
@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
-from ..config import DB_PATH
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ class MCPServer:
     updated_at: str = ""
 
 
-def _row_to_mcp(row: sqlite3.Row) -> MCPServer:
+def _row_to_mcp(row) -> MCPServer:
     return MCPServer(
         id=row["id"],
         name=row["name"],
@@ -56,13 +54,11 @@ def _row_to_mcp(row: sqlite3.Row) -> MCPServer:
 class MCPStore:
     """SQLite CRUD for MCP server registry."""
 
-    def __init__(self, db_path: Path = DB_PATH):
-        self._db_path = db_path
+    def __init__(self):
+        pass
 
-    def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _conn(self):
+        return get_connection()
 
     def _ensure_table(self, conn) -> None:
         conn.execute("""

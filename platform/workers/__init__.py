@@ -1,4 +1,4 @@
-"""SQLite-backed async job queue — deports phase execution from the FastAPI process.
+"""PostgreSQL-backed async job queue — deports phase execution from the FastAPI process.
 
 No Redis needed. Uses SQLite atomic UPDATE with WHERE for claim semantics.
 
@@ -13,16 +13,14 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 import time
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
-
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "platform.db"
 
 # Job statuses
 PENDING = "pending"
@@ -58,7 +56,7 @@ class Job:
             self.created_at = time.time()
 
 
-def _ensure_table(db: sqlite3.Connection) -> None:
+def _ensure_table(db) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS job_queue (
             id           TEXT PRIMARY KEY,
@@ -76,20 +74,19 @@ def _ensure_table(db: sqlite3.Connection) -> None:
             retry_count  INTEGER DEFAULT 0
         )
     """)
-    db.execute("CREATE INDEX IF NOT EXISTS idx_job_status ON job_queue(status, priority DESC, created_at)")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_job_status ON job_queue(status, priority DESC, created_at)"
+    )
 
 
 class JobQueue:
-    """SQLite-backed job queue with atomic claim semantics."""
+    """PostgreSQL-backed job queue with atomic claim semantics."""
 
-    def __init__(self, db_path: Path | str | None = None):
-        self._db_path = Path(db_path) if db_path else _DB_PATH
+    def __init__(self):
         self._initialized = False
 
-    def _db(self) -> sqlite3.Connection:
-        db = sqlite3.connect(str(self._db_path))
-        db.row_factory = sqlite3.Row
-        db.execute("PRAGMA journal_mode=WAL")
+    def _db(self):
+        db = get_connection()
         if not self._initialized:
             _ensure_table(db)
             self._initialized = True
@@ -103,13 +100,26 @@ class JobQueue:
         max_retries: int = 3,
     ) -> str:
         """Add a job to the queue. Returns job ID."""
-        job = Job(job_type=job_type, payload=payload or {}, priority=priority, max_retries=max_retries)
+        job = Job(
+            job_type=job_type,
+            payload=payload or {},
+            priority=priority,
+            max_retries=max_retries,
+        )
         db = self._db()
         try:
             db.execute(
                 "INSERT INTO job_queue (id, job_type, payload, status, priority, created_at, max_retries) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (job.id, job.job_type, json.dumps(job.payload), PENDING, priority, job.created_at, max_retries),
+                (
+                    job.id,
+                    job.job_type,
+                    json.dumps(job.payload),
+                    PENDING,
+                    priority,
+                    job.created_at,
+                    max_retries,
+                ),
             )
             db.commit()
             return job.id
@@ -145,7 +155,9 @@ class JobQueue:
             db.commit()
 
             # Re-read the full job
-            full = db.execute("SELECT * FROM job_queue WHERE id = ?", (row["id"],)).fetchone()
+            full = db.execute(
+                "SELECT * FROM job_queue WHERE id = ?", (row["id"],)
+            ).fetchone()
             if full is None or full["status"] != CLAIMED:
                 return None  # Race condition: another worker claimed it
 
@@ -169,7 +181,9 @@ class JobQueue:
         """Mark a job as failed. Returns True if it should be retried."""
         db = self._db()
         try:
-            row = db.execute("SELECT retry_count, max_retries FROM job_queue WHERE id = ?", (job_id,)).fetchone()
+            row = db.execute(
+                "SELECT retry_count, max_retries FROM job_queue WHERE id = ?", (job_id,)
+            ).fetchone()
             if row and row["retry_count"] < row["max_retries"]:
                 db.execute(
                     "UPDATE job_queue SET status = 'pending', retry_count = retry_count + 1, "
@@ -204,7 +218,9 @@ class JobQueue:
         """Get a job by ID."""
         db = self._db()
         try:
-            row = db.execute("SELECT * FROM job_queue WHERE id = ?", (job_id,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM job_queue WHERE id = ?", (job_id,)
+            ).fetchone()
             return self._row_to_job(row) if row else None
         finally:
             db.close()
@@ -213,7 +229,9 @@ class JobQueue:
         """Queue statistics."""
         db = self._db()
         try:
-            rows = db.execute("SELECT status, COUNT(*) FROM job_queue GROUP BY status").fetchall()
+            rows = db.execute(
+                "SELECT status, COUNT(*) FROM job_queue GROUP BY status"
+            ).fetchall()
             by_status = dict(rows)
             total = sum(by_status.values())
             return {"total": total, **by_status}
@@ -235,7 +253,7 @@ class JobQueue:
             db.close()
 
     @staticmethod
-    def _row_to_job(row: sqlite3.Row) -> Job:
+    def _row_to_job(row) -> Job:
         return Job(
             id=row["id"],
             job_type=row["job_type"],

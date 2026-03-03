@@ -34,6 +34,8 @@ from pathlib import Path
 # Add parent paths for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from ..db.adapter import get_connection
+
 from aiohttp import web
 from aiohttp_sse import sse_response
 
@@ -527,9 +529,7 @@ def _handle_missions(args: dict) -> str:
             }
         )
     # List all — query DB directly for efficiency
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     rows = conn.execute(
         "SELECT id, brief, status, workflow_id, session_id FROM epic_runs ORDER BY created_at DESC LIMIT 20"
     ).fetchall()
@@ -703,11 +703,9 @@ async def _handle_code(args: dict) -> str:
 
 
 def _handle_metrics(args: dict) -> str:
-    import sqlite3
-
     if not DB_PATH.exists():
         return json.dumps({"error": "platform.db not found"})
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
 
     def _count(table):
         try:
@@ -731,10 +729,7 @@ def _handle_metrics(args: dict) -> str:
 
 
 def _handle_projects(args: dict) -> str:
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     project_id = args.get("project_id")
     if project_id:
         row = conn.execute(
@@ -753,10 +748,7 @@ def _handle_projects(args: dict) -> str:
 
 
 def _handle_features(args: dict) -> str:
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     epic_id = args.get("epic_id", "")
     action = args.get("action", "list")
 
@@ -781,10 +773,7 @@ def _handle_features(args: dict) -> str:
 
 
 def _handle_sprints(args: dict) -> str:
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     mission_id = args.get("mission_id", "")
     rows = conn.execute(
         "SELECT id, number, name, status, velocity, planned_sp FROM sprints WHERE mission_id=? ORDER BY number",
@@ -795,10 +784,7 @@ def _handle_sprints(args: dict) -> str:
 
 
 def _handle_incidents(args: dict) -> str:
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
     action = args.get("action", "list")
 
     if action == "create":
@@ -821,9 +807,7 @@ def _handle_incidents(args: dict) -> str:
 
 
 def _handle_llm(args: dict) -> str:
-    import sqlite3
-
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = get_connection()
     try:
         traces = conn.execute(
             "SELECT provider, model, COUNT(*) as calls, SUM(tokens_in) as tokens_in, SUM(tokens_out) as tokens_out "
@@ -850,11 +834,8 @@ def _handle_llm(args: dict) -> str:
 
 
 def _handle_search(args: dict) -> str:
-    import sqlite3
-
     query = args.get("query", "")
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = get_connection()
 
     results = {}
     # Search projects

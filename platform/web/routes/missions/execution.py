@@ -365,7 +365,7 @@ async def api_mission_start(request: Request):
                     description=brief[:200],
                 )
             )
-        if project_id:
+        if project_id and not project_id.startswith("marathon-"):
             _ps.auto_provision(project_id, brief[:60] or wf.name)
     except Exception as _prov_err:
         logger.warning("auto_provision failed for %s: %s", project_id, _prov_err)
@@ -1239,7 +1239,8 @@ async def mission_debug(run_id: str):
 
 def _table_exists(conn, table: str) -> bool:
     row = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+        (table,),
     ).fetchone()
     return bool(row)
 
