@@ -786,6 +786,16 @@ async def lifespan(app: FastAPI):
                         ),
                     )
                     _db.commit()
+                    # Purge stale nodes (not seen in 5 min) every heartbeat cycle
+                    try:
+                        _db2 = _get_db()
+                        _db2.execute(
+                            "DELETE FROM platform_nodes WHERE last_seen < NOW() - INTERVAL '5 minutes'"
+                        )
+                        _db2.commit()
+                        _db2.close()
+                    except Exception:
+                        pass
                 finally:
                     _db.close()
             except Exception as _e:
