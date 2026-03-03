@@ -345,6 +345,89 @@ BUILTIN_MCPS = [
         status="available",
         is_builtin=True,
     ),
+    MCPServer(
+        id="mcp-jira",
+        name="Jira (La Poste)",
+        description="Accès anonymisé au Jira La Poste (RGPD Art. 25). Recherche JQL, backlog, sprints, épics.",
+        command="python3",
+        args=["-m", "mcp_jira.server"],
+        env={
+            "JIRA_URL": "https://jira.net.extra.laposte.fr/jira",
+            "JIRA_PROJECT": "VELIGO",
+        },
+        tools=[
+            {
+                "name": "jira_search",
+                "description": "Recherche JQL (résultats anonymisés)",
+                "params": {
+                    "jql": "string (required)",
+                    "project": "string",
+                    "max_results": "int",
+                },
+            },
+            {
+                "name": "jira_get_issue",
+                "description": "Détails d'une issue par clé (anonymisé)",
+                "params": {"issue_key": "string (required)"},
+            },
+            {
+                "name": "jira_get_backlog",
+                "description": "Backlog du projet (anonymisé)",
+                "params": {"project": "string", "max_results": "int"},
+            },
+            {
+                "name": "jira_get_sprints",
+                "description": "Sprints actifs/futurs du board",
+                "params": {"board_id": "string"},
+            },
+            {
+                "name": "jira_get_epics",
+                "description": "Épics du projet (anonymisé)",
+                "params": {"project": "string"},
+            },
+        ],
+        status="available",
+        is_builtin=True,
+    ),
+    MCPServer(
+        id="mcp-confluence",
+        name="Confluence (La Poste)",
+        description="Accès anonymisé au Confluence La Poste (RGPD Art. 25). Pages, espaces, recherche full-text.",
+        command="python3",
+        args=["-m", "mcp_confluence.server"],
+        env={
+            "CONFLUENCE_URL": "https://wiki.net.extra.laposte.fr/confluence",
+            "CONFLUENCE_SPACE": "VELIGO",
+        },
+        tools=[
+            {
+                "name": "confluence_get_page",
+                "description": "Contenu d'une page par ID ou titre (anonymisé)",
+                "params": {"page_id": "string", "title": "string", "space": "string"},
+            },
+            {
+                "name": "confluence_search",
+                "description": "Recherche full-text CQL (anonymisé)",
+                "params": {
+                    "query": "string (required)",
+                    "space": "string",
+                    "max_results": "int",
+                },
+            },
+            {
+                "name": "confluence_get_space",
+                "description": "Pages d'un espace (anonymisé)",
+                "params": {"space": "string", "max_results": "int"},
+            },
+            {
+                "name": "confluence_get_children",
+                "description": "Sous-pages d'une page",
+                "params": {"page_id": "string (required)"},
+            },
+        ],
+        status="available",
+        is_builtin=True,
+    ),
 ]
 
 
