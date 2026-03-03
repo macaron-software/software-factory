@@ -240,10 +240,46 @@ test("page meets accessibility standards", async ({ page }) => {
 });
 ```
 
+## SF Platform — feature-e2e Phase Rules
+
+When running as `ft-e2e-ihm` in the `feature-e2e` phase:
+
+### STEP 1: Start the container BEFORE any test
+
+```python
+# ❌ WRONG — server not running, tests will produce failedTests=[] (false success)
+playwright_test(spec="tests/e2e/smoke.spec.ts", cwd=workspace)
+
+# ✅ CORRECT — start container, get URL, then test
+deploy_result = docker_deploy(cwd=workspace, mission_id=mission_id)
+# deploy_result must contain a URL like http://127.0.0.1:9100
+playwright_test(spec="tests/e2e/smoke.spec.ts", cwd=workspace, base_url="http://127.0.0.1:9100")
+```
+
+### Detecting false-positives (critical)
+
+A result `{"status": "failed", "failedTests": []}` means **ZERO tests ran** — the server wasn't reachable.  
+This is **NOT a success**. Treat it as VETO and report "server not running".
+
+```
+# Real pass looks like:
+{"status": "passed", "failedTests": [], "passedTests": ["test 1", "test 2"]}
+
+# False-positive to reject:
+{"status": "failed", "failedTests": []}   ← ZERO tests ran = FAIL
+```
+
+### Screenshot requirements
+
+Every user journey **must** produce screenshots saved to `workspace/screenshots/`.  
+Use `screenshot(url=<running_url>, cwd=workspace)` to capture states.  
+3 minimum: initial state, mid-interaction, final state (or game-over for games).
+
 ## Output Format
 
 ```
 ## User Journey: [Feature Name] — [Project Name]
+Container: http://127.0.0.1:9100 ✅ running
 Step 01 — [feature]-[state]: ✅ [what was verified]  → screenshots/01-[feature]-[state].png
 Step 02 — [feature]-[state]: ✅ [what was verified]  → screenshots/02-[feature]-[state].png
 Step 03 — [feature]-[state]: ❌ FAILED [actual result]
@@ -251,13 +287,13 @@ Step 03 — [feature]-[state]: ❌ FAILED [actual result]
 
 ## Anti-patterns
 
+- **NEVER** run Playwright tests without starting the container first (`docker_deploy`)
+- **NEVER** treat `{"status":"failed","failedTests":[]}` as success — it means zero tests ran
+- **NEVER** hardcode `localhost:8080` — always use the URL returned by `docker_deploy`
 - **NEVER** use `page.waitForTimeout()` — always wait for specific conditions
 - **NEVER** use CSS selectors when role/label/text locators work
 - **NEVER** write tests that depend on other tests' state
-- **NEVER** hardcode URLs — use relative paths and base URL config
 - **NEVER** ignore flaky tests — fix the root cause (usually missing waits)
 - **NEVER** test implementation details through the UI — test user-visible behavior
-- **NEVER** skip cleanup (created data should be cleaned up)
-- **NEVER** write mega-tests — keep each test focused on one journey
-- **NEVER** skip screenshots on CRUD journey steps — every UI state must be captured
-- **NEVER** use generic screenshot names — always use sequential numbered names that describe the UI state
+- **NEVER** skip screenshots on journey steps — every UI state must be captured
+- **NEVER** use generic screenshot names — always use sequential numbered names

@@ -234,11 +234,36 @@ interface ApiError {
 }
 ```
 
+## SF Platform — feature-e2e Phase Rules (API)
+
+When running as `ft-e2e-api` in the `feature-e2e` phase:
+
+### STEP 1: Start the container BEFORE testing
+
+```python
+# ❌ WRONG — API not running, all requests will fail with connection refused
+# Tests may silently return 0 results (false success)
+
+# ✅ CORRECT
+deploy_result = docker_deploy(cwd=workspace, mission_id=mission_id)
+# Use the returned URL as BASE_URL for all API tests
+# e.g. http://127.0.0.1:9100/api/...
+```
+
+Set `BASE_URL = process.env.API_URL` in tests (not hardcoded `localhost:3000`).  
+Pass `base_url` to `playwright_test()` so `process.env.PLAYWRIGHT_BASE_URL` is set.
+
+### False-positive detection
+
+`{"status":"failed","failedTests":[]}` = zero tests ran = server not running = **FAIL**, not success.
+
 ## Output Format
 
 For each endpoint tested, produce:
 
 ```
+## API Tests — [Project Name]
+Container: http://127.0.0.1:9100 ✅ running
 ## Endpoint: [METHOD] /api/path
 ✅ Happy path — [status code] [description]
 ✅ Validation — [status code] [missing/invalid field]
@@ -250,6 +275,9 @@ For each endpoint tested, produce:
 
 ## Anti-patterns
 
+- **NEVER** run API tests without starting the container first (`docker_deploy`)
+- **NEVER** treat `{"status":"failed","failedTests":[]}` as success — it means zero tests ran
+- **NEVER** hardcode `localhost:3000` — use `process.env.API_URL` set from docker_deploy URL
 - **NEVER** hardcode auth tokens in test files — use setup/fixtures
 - **NEVER** depend on test execution order — each test must be independent
 - **NEVER** skip testing error responses — they're as important as success

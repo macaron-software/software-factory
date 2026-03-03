@@ -397,8 +397,47 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 2. [Improvement]
 ```
 
+## SF Platform — env-setup Phase Rules
+
+When running as `ft-infra-lead` in the `env-setup` phase of a feature-sprint:
+
+### MANDATORY: Use `docker_deploy`, not `build()`
+
+```
+# ❌ WRONG — only tests native compile, not Docker
+build(command="cargo build", cwd=workspace)
+build(command="npm install", cwd=workspace)
+
+# ✅ CORRECT — tests the full Docker build + run + health check
+docker_deploy(cwd=workspace, mission_id=mission_id)
+```
+
+### Dockerfile version rules (avoid silent failures)
+- Rust WASM projects: always use `rust:latest` (NOT `rust:1.77` — macroquad 0.4+ needs Rust 1.82+)
+- Rust native: `rust:latest` or `rust:1.83-slim`
+- Node: `node:20-slim` minimum
+- Python: `python:3.12-slim`
+- Never use `|| true` on critical build steps — it hides compilation errors
+
+### Success criteria for env-setup
+`docker_deploy` must return `[OK]` AND a valid URL before the phase is complete.
+If it returns `[FAIL]`, fix the Dockerfile/code errors and retry — **do not proceed to tdd-sprint**.
+
+### Output format for env-setup
+```
+## Environment Setup — [Project Name]
+Stack: [detected stack]
+Dockerfile: [path] — [key decisions, e.g. rust:latest for WASM]
+docker_deploy: ✅ OK — http://127.0.0.1:9100
+Health check: ✅ HTTP 200
+Ready for tdd-sprint: YES
+```
+
 ## Anti-patterns
 
+- **NEVER** use `build()` alone in env-setup — always `docker_deploy()`
+- **NEVER** use `|| true` on compilation steps in Dockerfile (hides errors)
+- **NEVER** pin old Rust/Node versions without checking compatibility with dependencies
 - **NEVER** deploy without health checks
 - **NEVER** run containers as root
 - **NEVER** store secrets in Docker images or Compose files
