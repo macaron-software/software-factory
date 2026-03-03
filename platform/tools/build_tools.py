@@ -266,6 +266,57 @@ class CICDRunnerTool(BaseTool):
         return f"{status} ({passed}/{passed + failed})\n" + "\n".join(results)
 
 
+class DockerBuildVerifyTool(BaseTool):
+    name = "docker_build_verify"
+    description = (
+        "Verify a project builds successfully as a Docker image. "
+        "Runs 'docker build' in the workspace directory and returns SUCCESS or FAIL with compiler errors. "
+        "Use this in env-setup phase to gate the TDD sprint. "
+        "Unlike docker_deploy, does NOT start a container — just verifies the build compiles."
+    )
+    category = "build"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import asyncio
+        import os
+
+        cwd = params.get("cwd", ".")
+        mission_id = params.get("mission_id", os.path.basename(os.path.abspath(cwd)))
+        tag = f"macaron-verify-{mission_id[:12]}"
+
+        if not os.path.isdir(cwd):
+            return f"[FAIL] Directory not found: {cwd}"
+
+        if not os.path.isfile(os.path.join(cwd, "Dockerfile")):
+            return "[FAIL] No Dockerfile found in workspace — create one before calling docker_build_verify"
+
+        loop = asyncio.get_event_loop()
+        r = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                ["docker", "build", "-t", tag, "."],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            ),
+        )
+
+        # Cleanup image regardless of result
+        subprocess.run(["docker", "rmi", "-f", tag], capture_output=True, timeout=15)
+
+        if r.returncode == 0:
+            lines = [ln for ln in (r.stdout + r.stderr).splitlines() if ln.strip()]
+            summary = "\n".join(lines[-5:]) if lines else "Build succeeded"
+            return f"[OK] Docker build SUCCESS\n{summary}"
+        else:
+            error_output = (r.stderr or r.stdout)[-3000:]
+            return (
+                f"[FAIL] Docker build FAILED (exit {r.returncode})\n"
+                f"Fix these errors before proceeding to tdd-sprint:\n{error_output}"
+            )
+
+
 def register_build_tools(registry):
     """Register all build tools."""
     registry.register(BuildTool())
@@ -273,3 +324,4 @@ def register_build_tools(registry):
     registry.register(LintTool())
     registry.register(BrowserScreenshotTool())
     registry.register(CICDRunnerTool())
+    registry.register(DockerBuildVerifyTool())

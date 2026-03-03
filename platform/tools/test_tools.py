@@ -56,7 +56,10 @@ const {{ chromium }} = require('playwright');
         try:
             r = subprocess.run(
                 ["node", "-e", script],
-                capture_output=True, text=True, cwd=cwd, timeout=60,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=60,
             )
             if r.returncode == 0 and out_path.exists():
                 title = ""
@@ -101,9 +104,12 @@ class SimulatorScreenshotTool(BaseTool):
             try:
                 subprocess.run(
                     ["xcrun", "simctl", "launch", device, app_bundle],
-                    capture_output=True, text=True, timeout=15,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
                 )
                 import asyncio
+
                 await asyncio.sleep(3)
             except Exception:
                 pass
@@ -112,14 +118,18 @@ class SimulatorScreenshotTool(BaseTool):
         try:
             r = subprocess.run(
                 ["xcrun", "simctl", "io", device, "screenshot", str(out_path)],
-                capture_output=True, text=True, timeout=15,
+                capture_output=True,
+                text=True,
+                timeout=15,
             )
             if r.returncode == 0 and out_path.exists():
                 size_kb = out_path.stat().st_size // 1024
                 # Get device info
                 info = subprocess.run(
                     ["xcrun", "simctl", "list", "devices", "booted"],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 device_name = "Simulator"
                 for line in info.stdout.split("\n"):
@@ -149,42 +159,94 @@ class PlaywrightTestTool(BaseTool):
     name = "playwright_test"
     description = (
         "Run Playwright E2E tests. Executes a test spec file and returns "
-        "pass/fail results with screenshot paths on failure."
+        "pass/fail results with screenshot paths on failure. "
+        "IMPORTANT: the app server must be running BEFORE calling this tool. "
+        "Use docker_deploy first to start the container and get the URL, "
+        "then pass base_url so tests connect to the right server. "
+        "A result with status=failed and failedTests=[] means the server was NOT running — this is a FAILURE."
     )
     category = "test"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
         spec = params.get("spec", "")
         cwd = params.get("cwd", ".")
+        base_url = params.get("base_url", "")  # URL of running app from docker_deploy
         if not spec:
             return "Error: spec file path required"
 
         screenshots_dir = Path(cwd) / "screenshots"
         screenshots_dir.mkdir(parents=True, exist_ok=True)
 
-        # Run Playwright test with JSON reporter for structured output
+        # Pre-flight: if base_url provided, verify server is reachable before launching tests
+        if base_url:
+            import urllib.request
+
+            try:
+                urllib.request.urlopen(base_url, timeout=5)
+            except Exception as e:
+                return (
+                    f"[FAIL] Server not reachable at {base_url} before tests: {e}\n"
+                    "Make sure to call docker_deploy first and use the returned URL."
+                )
+
+        env = {**os.environ, "CI": "true"}
+        if base_url:
+            env["BASE_URL"] = base_url
+            env["PLAYWRIGHT_BASE_URL"] = base_url
+
         cmd = (
             f"npx playwright test {spec} "
-            f"--reporter=line "
+            f"--reporter=json,line "
             f"--output={screenshots_dir} "
             f"--screenshot on "
             f"--retries=0"
         )
         try:
             r = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True,
-                cwd=cwd, timeout=120,
-                env={**os.environ, "CI": "true"},
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=cwd,
+                timeout=120,
+                env=env,
             )
             output = r.stdout[-3000:] + r.stderr[-1000:]
-            status = "[OK] PASS" if r.returncode == 0 else f"[FAIL] FAIL (exit {r.returncode})"
+
+            # Detect false-positive: test runner failed to start (no server, missing deps)
+            # When status=failed + failedTests=[] it means zero tests ran — this is NOT a pass
+            import json
+
+            json_result = None
+            for line in r.stdout.splitlines():
+                if line.strip().startswith("{") and "failedTests" in line:
+                    try:
+                        json_result = json.loads(line)
+                    except Exception:
+                        pass
+
+            if (
+                json_result
+                and json_result.get("status") == "failed"
+                and not json_result.get("failedTests")
+            ):
+                return (
+                    f"[FAIL] ZERO TESTS RAN — server was likely not running or Playwright not installed.\n"
+                    f"This is a FAILURE, not a success. Start the container first with docker_deploy.\n"
+                    f"Output:\n{output}"
+                )
+
+            status = (
+                "[OK] PASS"
+                if r.returncode == 0
+                else f"[FAIL] FAIL (exit {r.returncode})"
+            )
 
             # List any screenshots produced
             screenshots = list(screenshots_dir.glob("*.png"))
             if screenshots:
                 shot_list = "\n".join(
-                    f"[SCREENSHOT:{s.relative_to(Path(cwd))}]"
-                    for s in screenshots[-5:]
+                    f"[SCREENSHOT:{s.relative_to(Path(cwd))}]" for s in screenshots[-5:]
                 )
                 output += f"\n\nScreenshots:\n{shot_list}"
 
