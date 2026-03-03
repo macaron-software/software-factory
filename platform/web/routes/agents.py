@@ -633,6 +633,36 @@ async def reload_skills():
     return {"reloaded": count}
 
 
+@router.post("/api/admin/skills/update")
+async def update_skill_file(request: Request):
+    """Overwrite a skill markdown file and invalidate the library cache.
+    Body: {"name": "devops-pipeline", "content": "...markdown..."}
+    """
+    from ...config import LEGACY_SKILLS_DIR
+    from ...skills.library import get_skill_library
+
+    body = await request.json()
+    name = str(body.get("name", "")).strip()
+    content = str(body.get("content", ""))
+
+    # Validate: alphanumeric + hyphens/underscores only, no path traversal
+    import re
+
+    if not re.match(r"^[\w\-]+$", name):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse({"error": "invalid skill name"}, status_code=400)
+
+    path = LEGACY_SKILLS_DIR / f"{name}.md"
+    path.write_text(content, encoding="utf-8")
+
+    # Invalidate cache so next agent run picks up new content
+    lib = get_skill_library()
+    lib._cache.clear()
+
+    return {"status": "ok", "skill": name, "bytes": len(content)}
+
+
 @router.post("/api/skills/github/add")
 async def add_github_skill_source(request: Request):
     """Add a GitHub repo as skill source."""
