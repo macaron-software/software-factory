@@ -77,6 +77,8 @@ class Project:
         default_factory=list
     )  # [{id, name, icon, mission_types_active[]}]
     owner_id: str = ""  # User ID of the owner (empty = shared/admin-only)
+    starred: bool = False  # Pinned/featured project
+    container_url: str = ""  # Live URL (production VPS / container)
     created_at: str = ""
     updated_at: str = ""
 
@@ -704,8 +706,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id, starred, container_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -724,6 +726,8 @@ class ProjectStore:
                 p.current_phase or "",
                 json.dumps(p.phases),
                 p.owner_id or "",
+                int(p.starred),
+                p.container_url or "",
             ),
         )
         conn.commit()
@@ -1105,7 +1109,8 @@ class ProjectStore:
             UPDATE projects SET
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
-                active_pattern_id=?, status=?, updated_at=CURRENT_TIMESTAMP
+                active_pattern_id=?, status=?, starred=?, container_url=?,
+                updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """,
             (
@@ -1120,6 +1125,8 @@ class ProjectStore:
                 json.dumps(p.agents),
                 p.active_pattern_id,
                 p.status,
+                int(p.starred),
+                p.container_url or "",
                 p.id,
             ),
         )
@@ -1429,6 +1436,8 @@ class ProjectStore:
             phases=json.loads(row["phases_json"] if "phases_json" in keys else "[]")
             or [],
             owner_id=row["owner_id"] if "owner_id" in keys else "",
+            starred=bool(row["starred"]) if "starred" in keys else False,
+            container_url=row["container_url"] if "container_url" in keys else "",
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
             arch_domain=arch_domain,

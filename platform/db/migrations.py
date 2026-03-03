@@ -543,6 +543,19 @@ def _migrate_pg(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_pnodes_status ON platform_nodes(status)"
     )
+    # Projects: starred + container_url (added 2026-03)
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS starred BOOLEAN DEFAULT FALSE"
+        )
+    except Exception:
+        pass
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS container_url TEXT DEFAULT ''"
+        )
+    except Exception:
+        pass
 
     conn.commit()
 

@@ -337,16 +337,17 @@ def _get_llm_status() -> list[dict]:
 
 def _get_projects(db) -> list[dict]:
     rows = db.execute(
-        "SELECT p.id, p.name,"
+        "SELECT p.id, p.name, COALESCE(p.starred, FALSE) AS starred,"
+        "  COALESCE(p.container_url, '') AS container_url,"
         "  COUNT(m.id) AS total_missions,"
         "  COUNT(m.id) FILTER (WHERE m.status IN ('active','running')) AS active_missions,"
         "  COUNT(m.id) FILTER (WHERE m.status='completed') AS done_missions,"
         "  MAX(m.created_at) AS last_activity"
         " FROM projects p"
         " LEFT JOIN epics m ON m.project_id = p.id"
-        " GROUP BY p.id, p.name"
-        " ORDER BY last_activity DESC NULLS LAST"
-        " LIMIT 8"
+        " GROUP BY p.id, p.name, p.starred, p.container_url"
+        " ORDER BY p.starred DESC NULLS LAST, last_activity DESC NULLS LAST"
+        " LIMIT 12"
     ).fetchall()
     result = []
     for r in rows:
@@ -357,6 +358,8 @@ def _get_projects(db) -> list[dict]:
             {
                 "id": r["id"],
                 "name": r["name"],
+                "starred": bool(r["starred"]),
+                "container_url": r["container_url"] or "",
                 "total_missions": total,
                 "active_missions": r["active_missions"] or 0,
                 "done_missions": done,
