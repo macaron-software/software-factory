@@ -108,7 +108,7 @@ def _coerce_params(params: tuple) -> tuple:
     return tuple(result)
 
 
-
+def _translate_sql(sql: str) -> str:
     """Convert SQLite ? placeholders to PostgreSQL %s.
 
     Also escapes any literal % (e.g. in LIKE patterns) to %% so psycopg3
