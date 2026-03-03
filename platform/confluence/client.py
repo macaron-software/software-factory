@@ -6,6 +6,7 @@ PAT auth, CRUD pages, attachment upload.
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -22,10 +23,15 @@ HOMEPAGE_ID = "1330822346"  # Accueil IA NATIVE
 
 
 def _load_pat() -> str:
-    """Load PAT from config file."""
+    """Load PAT from env var (CONFLUENCE_TOKEN) or config file."""
+    if tok := os.environ.get("CONFLUENCE_TOKEN"):
+        return tok.strip()
     if _PAT_PATH.exists():
         return _PAT_PATH.read_text().strip()
-    raise FileNotFoundError(f"Confluence PAT not found at {_PAT_PATH}")
+    raise FileNotFoundError(
+        "Confluence PAT not found. Set CONFLUENCE_TOKEN env var "
+        f"or place token in {_PAT_PATH}"
+    )
 
 
 def _headers() -> dict:
