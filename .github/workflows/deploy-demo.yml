@@ -237,9 +237,13 @@ jobs:
       - name: Blue-Green swap Innovation Node 1
         run: |
           ssh sfadmin@${{ secrets.SF_NODE1_IP }} '
-            sudo systemctl restart sf-platform 2>/dev/null || \
-              systemctl restart sf-platform 2>/dev/null || true
-            sleep 5
+            pkill -f "uvicorn platform.server" 2>/dev/null || true
+            sleep 2
+            cd /home/sfadmin
+            nohup /home/sfadmin/.venv/bin/python3 -m uvicorn platform.server:app \
+              --host 0.0.0.0 --port 8090 --ws none --log-level warning \
+              >> /home/sfadmin/uvicorn.log 2>&1 &
+            sleep 6
             HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
             echo "Innovation Node 1 health: ${HTTP}"
           ' || echo "WARNING: Innovation Node 1 deploy failed — continuing"
