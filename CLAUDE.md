@@ -60,22 +60,27 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 ┌────────────────┬─────────────────────────┬──────────────────────────────────┐
 │ Environment    │ URL / Access            │ Details                          │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
-│ Azure Prod     │ http://<AZURE_VM_IP>    │ D4as_v5 4CPU/16GB, francecentral │
-│                │ SSH: macaron@<VM>       │ LLM: azure-openai / gpt-5-mini  │
-│                │ nginx basic auth        │ Container: deploy-platform-1     │
-│                │                         │ Compose: deploy/docker-compose-  │
-│                │                         │   vm.yml (context: /opt/macaron) │
-│                │                         │ Module: macaron_platform         │
-│                │                         │ Patches: /opt/macaron/patches/   │
+│ Azure Innov    │ http://52.143.158.19    │ D4as_v5 4CPU/16GB, francecentral │
+│ Node 1         │ SSH: sfadmin@52.143.…   │ LLM: azure-openai / gpt-5-mini  │
+│                │ ⚠️ SSH bloqué NSG ext.  │ Service: systemd sf-platform     │
+│                │ → az vm run-command     │ WorkDir: /home/sfadmin/          │
+│                │                         │ Module: platform.server:app      │
+│                │                         │ Port: 8090                       │
 │                │                         │ OTEL → Jaeger :16686             │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
-│ OVH Demo       │ http://<OVH_IP>         │ VPS OVH, Debian                  │
-│                │ SSH: debian@<OVH_IP>    │ LLM: demo (mock, no key)        │
-│                │                         │ Container: software-factory-     │
-│                │                         │   platform-1                     │
-│                │                         │ Code: /opt/software-factory/     │
-│                │                         │ Image: software-factory-         │
-│                │                         │   platform:v2                    │
+│ Azure Innov    │ http://40.89.174.75     │ D4as_v5 4CPU/16GB, francecentral │
+│ Node 2         │ SSH: sfadmin@40.89.…    │ LLM: azure-openai / gpt-5-mini  │
+│                │ ⚠️ SSH bloqué NSG ext.  │ Service: systemd sf-platform     │
+│                │ → az vm run-command     │ WorkDir: /home/sfadmin/          │
+├────────────────┼─────────────────────────┼──────────────────────────────────┤
+│ OVH Demo       │ http://54.36.183.124    │ VPS OVH, Debian                  │
+│                │ SSH: debian@54.36.…     │ LLM: minimax / MiniMax-M2.5     │
+│                │                         │ Blue-green: platform-blue-1 ou   │
+│                │                         │   platform-green-1               │
+│                │                         │ Slots: /opt/software-factory/    │
+│                │                         │   slots/{blue,green}/            │
+│                │                         │ Active: /opt/software-factory/   │
+│                │                         │   active-slot                    │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
 │ Local Dev      │ http://localhost:8099    │ macOS, Python 3.12               │
 │                │ Dashboard: :8080        │ LLM: minimax / MiniMax-M2.5     │
@@ -120,30 +125,41 @@ Fallback: minimax → azure-openai → azure-ai. Cooldown 90s on 429.
 Keys: `~/.config/factory/*.key` — NEVER `*_API_KEY=dummy`
 MiniMax: <think> consume tokens (min 16K). GPT-5-mini: NO temperature, max_completion_tokens≥8K.
 
-## AZURE
+## AZURE (Innovation Nodes)
 
 ```
-VM:  <AZURE_VM_IP> (D4as_v5 4CPU/16GB, francecentral) — SSH macaron@<VM>, nginx basic auth
-     Container: deploy-platform-1, path /app/macaron_platform/, volume deploy_platform-data at /app/data
-     Active compose: /opt/macaron/platform/deploy/docker-compose-vm.yml (context: /opt/macaron)
-     Patches: /opt/macaron/patches/ → copied at container start via start-with-patches.sh
-     ⚠️ Module name = macaron_platform (NOT platform). Package maps platform/ → macaron_platform/.
-PG:  macaron-platform-pg.postgres.database.azure.com — B1ms PG17 32GB, pgvector, pg_trgm
-     DB: macaron_platform, user: macaron, SSL required, dual adapter (adapter.py)
-LLM: ascii-ui-openai (francecentral) — gpt-5-mini, 100req/min, 100K tok/min
-DR:  L3 full 14/14 — blob GRS (macaronbackups), snapshots, PG PITR 7d
-     RPO: PG 24h+PITR 7d, SQLite 24h, VM 7d, secrets 24h, code 0 (git)
-     RTO: PG 15min, SQLite 5min, VM 30min
-     Cron: daily 3h, weekly dimanche 2h. Runbook: ops/RUNBOOK.md
+Node 1:  52.143.158.19 (D4as_v5 4CPU/16GB, francecentral)
+Node 2:  40.89.174.75  (D4as_v5 4CPU/16GB, francecentral)
+SSH:     sfadmin@<IP> avec ~/.ssh/sf_innovation_ed25519
+         ⚠️ NSG bloque SSH depuis externe — utiliser az vm run-command invoke
+         Ex: az vm run-command invoke --resource-group RG-SOFTWARE-FACTORY --name sf-node-1 \
+                --command-id RunShellScript --scripts "systemctl status sf-platform"
+Service: systemd sf-platform.service
+         WorkingDirectory=/home/sfadmin
+         ExecStart=/home/sfadmin/.venv/bin/python3 -m uvicorn platform.server:app \
+           --host 0.0.0.0 --port 8090 --ws none --log-level warning
+         User=sfadmin, Restart=always, EnvironmentFile=/etc/sf-platform/secrets
+Deploy:  rsync platform/ sfadmin@<IP>:/home/sfadmin/platform/
+         ssh sfadmin@<IP> "sudo systemctl restart sf-platform"
+PG:      macaron-platform-pg.postgres.database.azure.com — B1ms PG17 32GB, pgvector, pg_trgm
+         DB: macaron_platform, user: macaron, SSL required, dual adapter (adapter.py)
+LLM:     ascii-ui-openai (francecentral) — gpt-5-mini, 100req/min, 100K tok/min
+DR:      L3 full 14/14 — blob GRS (macaronbackups), snapshots, PG PITR 7d
+         RPO: PG 24h+PITR 7d, SQLite 24h, VM 7d, secrets 24h, code 0 (git)
+         RTO: PG 15min, SQLite 5min, VM 30min
+         Cron: daily 3h, weekly dimanche 2h. Runbook: ops/RUNBOOK.md
 ```
 
 ## DEPLOY WORKFLOW
 
 ```
-rsync /tmp → sudo cp (perms). Ou: docker exec -i CID tee /app/macaron_platform/PATH
-After: clear __pycache__ → docker restart → wait 15s → health check
-⚠️ Package = macaron_platform (NOT platform). Templates: no restart (Jinja2 re-reads).
-Auto-resume: lifespan restarts running missions on container restart.
+OVH:     rsync → blue-green slot swap (slots/blue/ ou slots/green/). Active slot dans active-slot.
+         Container restart: docker stop/rm old → docker run new → health check → switch active-slot
+Azure:   rsync platform/ sfadmin@<IP>:/home/sfadmin/platform/
+         → sudo systemctl restart sf-platform → wait 5s → health check
+         ⚠️ Module = platform (NOT macaron_platform)
+After:   clear __pycache__ → service restart → wait 15s → health check
+Auto-resume: lifespan restarts running missions on service restart.
 ```
 
 ## SECURITY
