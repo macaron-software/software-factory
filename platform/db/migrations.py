@@ -333,6 +333,55 @@ def _migrate_pg(conn):
         "CREATE INDEX IF NOT EXISTS idx_qs_ts ON quality_snapshots(created_at)"
     )
     _bump_schema_version(conn, _SCHEMA_VERSION)
+    # memory_project / memory_global: access tracking columns (added 2026-03)
+    for col, defn in [
+        ("access_count", "INTEGER DEFAULT 0"),
+        ("last_read_at", "TIMESTAMP"),
+        ("agent_role", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            conn.execute(
+                f"ALTER TABLE memory_project ADD COLUMN IF NOT EXISTS {col} {defn}"
+            )
+        except Exception:
+            pass
+        try:
+            conn.execute(
+                f"ALTER TABLE memory_global ADD COLUMN IF NOT EXISTS {col} {defn}"
+            )
+        except Exception:
+            pass
+    # support_tickets: rename epic_id → mission_id (added 2026-03)
+    try:
+        conn.execute("ALTER TABLE support_tickets RENAME COLUMN epic_id TO mission_id")
+    except Exception:
+        pass  # already renamed or doesn't exist
+    # confluence_pages: create with correct schema (added 2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS confluence_pages (
+            mission_id TEXT NOT NULL,
+            tab TEXT NOT NULL,
+            confluence_page_id TEXT NOT NULL,
+            last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (mission_id, tab)
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_confluence_mission ON confluence_pages(mission_id)"
+    )
+    # team_fitness: unique constraint needed for ON CONFLICT (added 2026-03)
+    try:
+        conn.execute(
+            "ALTER TABLE team_fitness ADD CONSTRAINT team_fitness_agent_pattern_tech_phase_key UNIQUE(agent_id, pattern_id, technology, phase_type)"
+        )
+    except Exception:
+        pass  # already exists
+    try:
+        conn.execute(
+            "ALTER TABLE team_fitness_history ADD CONSTRAINT team_fitness_history_key UNIQUE(agent_id, pattern_id, technology, phase_type, snapshot_date)"
+        )
+    except Exception:
+        pass  # already exists
 
     # ── GitHub OSS tool integrations ──
     # Ensure columns exist first (SQLite path added them in _migrate)
