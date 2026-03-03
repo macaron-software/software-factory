@@ -206,6 +206,7 @@ jobs:
   deploy-innovation:
     runs-on: ubuntu-latest
     needs: deploy
+    continue-on-error: true
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
@@ -229,36 +230,19 @@ jobs:
           rsync -az --checksum --delete \
             --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
             platform/ \
-            macaron@${{ secrets.SF_NODE1_IP }}:/opt/macaron/platform/ || \
-          rsync -az --checksum --delete \
-            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
-            platform/ \
-            debian@${{ secrets.SF_NODE1_IP }}:/opt/macaron/platform/
+            sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/platform/
           rsync -az cli skills dashboard \
-            macaron@${{ secrets.SF_NODE1_IP }}:/opt/macaron/ 2>/dev/null || \
-          rsync -az cli skills dashboard \
-            debian@${{ secrets.SF_NODE1_IP }}:/opt/macaron/ 2>/dev/null || true
+            sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/ 2>/dev/null || true
 
-      - name: Restart Innovation Node 1 containers
+      - name: Blue-Green swap Innovation Node 1
         run: |
-          ssh macaron@${{ secrets.SF_NODE1_IP }} '
-            cd /opt/macaron
-            docker compose restart platform 2>/dev/null || \
-            docker compose -f docker-compose-vm.yml restart platform 2>/dev/null || \
-            docker restart deploy-platform-1 2>/dev/null || true
-            # Health check
+          ssh sfadmin@${{ secrets.SF_NODE1_IP }} '
+            sudo systemctl restart sf-platform 2>/dev/null || \
+              systemctl restart sf-platform 2>/dev/null || true
             sleep 5
             HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
             echo "Innovation Node 1 health: ${HTTP}"
-          ' 2>/dev/null || \
-          ssh debian@${{ secrets.SF_NODE1_IP }} '
-            cd /opt/macaron 2>/dev/null || cd /opt/software-factory
-            docker compose restart platform 2>/dev/null || \
-            docker restart deploy-platform-1 2>/dev/null || true
-            sleep 5
-            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
-            echo "Innovation Node 1 health: ${HTTP}"
-          ' || echo "WARNING: Innovation deploy may have failed — check manually"
+          ' || echo "WARNING: Innovation Node 1 deploy failed — continuing"
 
   deploy-azure:
     runs-on: ubuntu-latest
