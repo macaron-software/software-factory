@@ -87,7 +87,28 @@ def _translate_datetime(sql: str) -> str:
     return _DATETIME_RE.sub(_replace, sql)
 
 
-def _translate_sql(sql: str) -> str:
+def _coerce_params(params: tuple) -> tuple:
+    """Convert SQLite-style param values to PostgreSQL-compatible types.
+
+    - int 0/1 that map to boolean columns must stay as Python bool.
+      psycopg3 maps bool → pg boolean, but int → pg smallint, causing
+      DatatypeMismatch when the column is BOOLEAN.
+    We detect this by checking if the value is exactly 0 or 1 *and* of
+    type int (not bool — Python True/False are already bool subclass).
+    We leave the conversion to bool so psycopg3 sends the right type.
+    """
+    result = []
+    for v in params:
+        # Convert bare Python int(0)/int(1) to bool so psycopg3
+        # sends them as PostgreSQL BOOLEAN, not SMALLINT.
+        if type(v) is int and v in (0, 1):
+            result.append(bool(v))
+        else:
+            result.append(v)
+    return tuple(result)
+
+
+
     """Convert SQLite ? placeholders to PostgreSQL %s.
 
     Also escapes any literal % (e.g. in LIKE patterns) to %% so psycopg3
@@ -340,7 +361,7 @@ class PgConnectionWrapper:
 
         cur = self._conn.cursor()
         try:
-            cur.execute(translated, params)
+            cur.execute(translated, _coerce_params(params))
         except (psycopg.errors.Error, psycopg.OperationalError):
             self._conn.rollback()
             raise
