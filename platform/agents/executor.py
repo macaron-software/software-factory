@@ -664,6 +664,43 @@ class AgentExecutor:
                                 logger.warning("Auto-verify error: %s", _ve)
                                 break
 
+                        # ── SAST: run after lint loop completes ──────────────────────────
+                        _written_path = tc.arguments.get("path", "")
+                        if _written_path:
+                            try:
+                                sast_tool = self._registry.get("sast_check")
+                                if sast_tool:
+                                    _sast_result = await sast_tool.execute(
+                                        {"path": _written_path}, agent
+                                    )
+                                    if "CRITICAL" in _sast_result:
+                                        logger.warning(
+                                            "Agent %s: SAST critical issues in %s",
+                                            agent.id, _written_path,
+                                        )
+                                        messages.append(
+                                            LLMMessage(
+                                                role="user",
+                                                content=(
+                                                    "[SAST] Critical security/quality issues detected. "
+                                                    "Fix ALL critical issues before proceeding:\n\n"
+                                                    f"{_sast_result[:2000]}"
+                                                ),
+                                            )
+                                        )
+                                    elif _sast_result and "no issues" not in _sast_result.lower():
+                                        messages.append(
+                                            LLMMessage(
+                                                role="user",
+                                                content=(
+                                                    "[SAST] Quality warnings (fix if possible):\n\n"
+                                                    f"{_sast_result[:1000]}"
+                                                ),
+                                            )
+                                        )
+                            except Exception as _se:
+                                logger.debug("SAST check error (non-fatal): %s", _se)
+
                 # After deep_search, disable tools to force synthesis
                 if deep_search_used:
                     tools = None

@@ -32,6 +32,11 @@ def _get_tool_registry():
     register_git_tools(reg)
     register_build_tools(reg)
     try:
+        from ..tools.sast_tools import register_sast_tools
+        register_sast_tools(reg)
+    except Exception:
+        pass
+    try:
         from ..tools.mcp_bridge import register_mcp_tools
 
         register_mcp_tools(reg)

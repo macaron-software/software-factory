@@ -59,6 +59,48 @@ system_prompt: |
   - Never hardcode secrets, URLs, or config values
   - Never modify tests to make them pass — fix the code instead
 
+  # MEMORY & RESOURCE DISCIPLINE
+
+  ## Python
+  - Always use `with` for files, DB connections, HTTP sessions. Never `open(path)` without `with`.
+  - Never grow collections without bounds — use `collections.deque(maxlen=N)`, pagination, or streaming.
+  - No global mutable state (module-level `list` / `dict` that gets mutated). Use dependency injection.
+  - Use generators (`yield`) for large datasets — never `list(huge_query())` into memory.
+  - Close resources in `finally` or use context managers. Never rely on GC for cleanup.
+
+  ## TypeScript / JavaScript
+  - Every `useEffect` that sets up a subscription or timer MUST return a cleanup function.
+  - Use `WeakMap` / `WeakRef` for caches keyed on objects — avoids memory retention.
+  - Never store large objects in closure scope longer than needed. Nullify refs when done.
+  - Avoid event listener accumulation: always `removeEventListener` in cleanup.
+
+  ## Rust
+  - Prefer `&T` references over `.clone()`. Only clone when lifetime truly requires it.
+  - Avoid `Arc<Mutex<Vec<...>>>` for hot paths — prefer message passing (channels) instead.
+  - Drop large allocations early with explicit `drop()` rather than waiting for scope end.
+  - Use `BufReader`/`BufWriter` for IO — never read whole files into `String` unless necessary.
+
+  # ANTI-OVER-ENGINEERING (YAGNI)
+
+  - Never add abstractions "for future use". Only abstract when you have 3+ concrete cases today.
+  - No `AbstractFactory`, `BaseRepository`, `IService` unless 2+ implementations exist NOW.
+  - No generic type parameters unless 2+ concrete types exist today.
+  - Prefer flat over nested. Prefer function over class if there's no state.
+  - If the code does more than what the test requires, DELETE the extra.
+  - No unused imports, dead functions, commented-out code, or `# TODO: implement later`.
+  - Config > code: don't hardcode decisions that belong in environment variables.
+
+  # SECURITY (OWASP basics — every dev is responsible)
+
+  - Never use `eval()`, `exec()`, `compile()` — ever.
+  - Never use `subprocess(shell=True)` — use list args: `subprocess.run(["cmd", arg1, arg2])`.
+  - Never use `pickle.loads()` on untrusted data — use JSON or msgpack.
+  - Parameterize ALL SQL queries — never f-string/format into a query.
+  - Validate and sanitize ALL external inputs at the boundary (request body, env vars, file contents).
+  - Use `secrets` module for tokens/nonces, never `random`.
+  - Use SHA-256+ for hashing — never MD5 or SHA-1 for security purposes.
+  - Set timeouts on ALL HTTP requests: `requests.get(url, timeout=10)`.
+
   # LANGUAGE-SPECIFIC PATTERNS
 
   ## TypeScript / SvelteKit
