@@ -202,6 +202,63 @@ jobs:
           echo "=== Deploy complete: active=$INACTIVE ==="
           ENDSSH
 
+  deploy-innovation:
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Set up SSH (Innovation)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
+          chmod 600 ~/.ssh/id_innovation
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_innovation
+            IdentitiesOnly yes
+          EOF
+
+      - name: Rsync platform to Innovation Node 1
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          SHA=$(git rev-parse --short HEAD)
+          echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ \
+            macaron@${{ secrets.SF_NODE1_IP }}:/opt/macaron/platform/ || \
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ \
+            debian@${{ secrets.SF_NODE1_IP }}:/opt/macaron/platform/
+          rsync -az cli skills dashboard \
+            macaron@${{ secrets.SF_NODE1_IP }}:/opt/macaron/ 2>/dev/null || \
+          rsync -az cli skills dashboard \
+            debian@${{ secrets.SF_NODE1_IP }}:/opt/macaron/ 2>/dev/null || true
+
+      - name: Restart Innovation Node 1 containers
+        run: |
+          ssh macaron@${{ secrets.SF_NODE1_IP }} '
+            cd /opt/macaron
+            docker compose restart platform 2>/dev/null || \
+            docker compose -f docker-compose-vm.yml restart platform 2>/dev/null || \
+            docker restart deploy-platform-1 2>/dev/null || true
+            # Health check
+            sleep 5
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
+            echo "Innovation Node 1 health: ${HTTP}"
+          ' 2>/dev/null || \
+          ssh debian@${{ secrets.SF_NODE1_IP }} '
+            cd /opt/macaron 2>/dev/null || cd /opt/software-factory
+            docker compose restart platform 2>/dev/null || \
+            docker restart deploy-platform-1 2>/dev/null || true
+            sleep 5
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
+            echo "Innovation Node 1 health: ${HTTP}"
+          ' || echo "WARNING: Innovation deploy may have failed — check manually"
+
   deploy-azure:
     runs-on: ubuntu-latest
     needs: deploy
