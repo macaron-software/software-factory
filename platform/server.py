@@ -30,8 +30,12 @@ STATIC_DIR = WEB_DIR / "static"
 
 # ── OpenTelemetry setup (module-level, before create_app) ──────────────────
 _otel_provider = None
+_otel_meter_provider = None
 if os.environ.get("OTEL_ENABLED"):
     try:
+        import atexit
+
+        from opentelemetry import metrics as otel_metrics
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
@@ -44,17 +48,19 @@ if os.environ.get("OTEL_ENABLED"):
                 "deployment.environment": os.environ.get("PLATFORM_ENV", "production"),
             }
         )
-        _otel_provider = TracerProvider(resource=_otel_resource)
 
+        # ── Traces ─────────────────────────────────────────────────────────
+        _otel_provider = TracerProvider(resource=_otel_resource)
         _otlp_endpoint = os.environ.get(
             "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
         )
+        _http_ep = _otlp_endpoint.replace(":4317", ":4318")
+
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
 
-            _http_ep = _otlp_endpoint.replace(":4317", ":4318")
             _traces_ep = _http_ep + "/v1/traces"
             _otel_provider.add_span_processor(
                 BatchSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
@@ -70,10 +76,140 @@ if os.environ.get("OTEL_ENABLED"):
             logger.warning("OTEL: OTLP exporter not available, using console")
 
         trace.set_tracer_provider(_otel_provider)
-
-        import atexit
-
         atexit.register(_otel_provider.shutdown)
+
+        # ── Metrics ────────────────────────────────────────────────────────
+        try:
+            from opentelemetry.sdk.metrics import MeterProvider
+            from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+            from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+                OTLPMetricExporter,
+            )
+
+            _metric_reader = PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=_http_ep + "/v1/metrics"),
+                export_interval_millis=15_000,
+            )
+            _otel_meter_provider = MeterProvider(
+                resource=_otel_resource, metric_readers=[_metric_reader]
+            )
+            otel_metrics.set_meter_provider(_otel_meter_provider)
+            atexit.register(_otel_meter_provider.shutdown)
+
+            # Register observable gauges bridging MetricsCollector → OTEL
+            _meter = otel_metrics.get_meter("macaron-platform")
+
+            def _obs_http_requests(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["total_requests"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_http_errors(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["total_errors"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_http_avg_ms(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["avg_ms"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_mcp_calls(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["mcp"]["total_calls"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_llm_cost(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["llm_costs"]["total_usd"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_db_queries(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["db_queries"]["total"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_uptime(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["uptime_seconds"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            _meter.create_observable_gauge(
+                "macaron_http_requests_total",
+                callbacks=[_obs_http_requests],
+                description="Total HTTP requests",
+            )
+            _meter.create_observable_gauge(
+                "macaron_http_errors_total",
+                callbacks=[_obs_http_errors],
+                description="Total HTTP errors (4xx+5xx)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_http_latency_avg_ms",
+                callbacks=[_obs_http_avg_ms],
+                description="Avg HTTP latency (ms)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_mcp_calls_total",
+                callbacks=[_obs_mcp_calls],
+                description="Total MCP tool calls",
+            )
+            _meter.create_observable_gauge(
+                "macaron_llm_cost_usd_total",
+                callbacks=[_obs_llm_cost],
+                description="Cumulative LLM cost (USD)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_db_queries_total",
+                callbacks=[_obs_db_queries],
+                description="Total DB queries",
+            )
+            _meter.create_observable_gauge(
+                "macaron_uptime_seconds",
+                callbacks=[_obs_uptime],
+                description="Process uptime (seconds)",
+            )
+
+            logger.warning(
+                "OTEL: MeterProvider ready, OTLP push + /metrics scrape endpoint"
+            )
+        except ImportError as e:
+            logger.warning("OTEL: metrics exporter not available (%s)", e)
 
         logger.warning(
             "OpenTelemetry tracing enabled (service: %s)",
@@ -919,6 +1055,7 @@ def create_app() -> FastAPI:
                 "/setup",
                 "/onboarding",
                 "/health",
+                "/metrics",
                 "/favicon.ico",
                 "/manifest.json",
                 "/sw.js",
@@ -1268,6 +1405,45 @@ def create_app() -> FastAPI:
 
             app.add_middleware(OpenTelemetryMiddleware, tracer_provider=_otel_provider)
         except ImportError:
+            pass
+
+    # Mount Prometheus /metrics endpoint if meter provider initialized
+    if _otel_meter_provider is not None:
+        try:
+            from .metrics.collector import get_collector as _get_collector
+            from fastapi import Response as _Response
+
+            @app.get("/metrics", include_in_schema=False)
+            async def prometheus_metrics():
+                """Live Prometheus scrape endpoint — reads MetricsCollector snapshot."""
+                snap = _get_collector().snapshot()
+                lines = [
+                    "# HELP macaron_http_requests_total Total HTTP requests",
+                    "# TYPE macaron_http_requests_total gauge",
+                    f"macaron_http_requests_total {snap['http']['total_requests']}",
+                    "# HELP macaron_http_errors_total Total HTTP errors (4xx+5xx)",
+                    "# TYPE macaron_http_errors_total gauge",
+                    f"macaron_http_errors_total {snap['http']['total_errors']}",
+                    "# HELP macaron_http_latency_avg_ms Average HTTP latency ms",
+                    "# TYPE macaron_http_latency_avg_ms gauge",
+                    f"macaron_http_latency_avg_ms {snap['http']['avg_ms']}",
+                    "# HELP macaron_mcp_calls_total Total MCP tool calls",
+                    "# TYPE macaron_mcp_calls_total gauge",
+                    f"macaron_mcp_calls_total {snap['mcp']['total_calls']}",
+                    "# HELP macaron_llm_cost_usd_total Cumulative LLM cost USD",
+                    "# TYPE macaron_llm_cost_usd_total gauge",
+                    f"macaron_llm_cost_usd_total {snap['llm_costs']['total_usd']}",
+                    "# HELP macaron_db_queries_total Total DB queries",
+                    "# TYPE macaron_db_queries_total gauge",
+                    f"macaron_db_queries_total {snap['db_queries']['total']}",
+                    "# HELP macaron_uptime_seconds Process uptime seconds",
+                    "# TYPE macaron_uptime_seconds gauge",
+                    f"macaron_uptime_seconds {snap['uptime_seconds']}",
+                ]
+                return _Response(
+                    "\n".join(lines) + "\n", media_type="text/plain; version=0.0.4"
+                )
+        except Exception:
             pass
 
     app.state.templates = templates if _mode != "factory" else None

@@ -238,6 +238,7 @@ PUBLIC_PATHS = {
     "/favicon.ico",
     "/manifest.json",
     "/health",
+    "/metrics",
     "/docs",
     "/openapi.json",
     "/js-error",
