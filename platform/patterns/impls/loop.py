@@ -26,10 +26,25 @@ async def run_loop(engine, run, task: str):
             to_agent_id=reviewer_agent,
         )
 
+        # After each writer iteration: auto-run build/tests (stack-agnostic)
+        # so the reviewer sees real results, not just the writer's claims
+        cicd_context = ""
+        if run.project_path:
+            try:
+                from ..tools.build_tools import CICDRunnerTool
+                cicd_tool = CICDRunnerTool()
+                cicd_result = await cicd_tool.execute({"cwd": run.project_path}, None)
+                cicd_context = (
+                    f"\n\n## Build/Test Results (auto-executed after writer)\n"
+                    f"```\n{cicd_result}\n```\n"
+                )
+            except Exception:
+                pass
+
         # Reviewer evaluates → sends to writer
         review_output = await engine._execute_node(
             run, reviewer_id,
-            f"Review the following work and either APPROVE or provide specific feedback:\n{writer_output}",
+            f"Review the following work and either APPROVE or provide specific feedback:\n{writer_output}{cicd_context}",
             to_agent_id=writer_agent,
         )
 
@@ -37,6 +52,8 @@ async def run_loop(engine, run, task: str):
         state = run.nodes[reviewer_id]
         if state.status == NodeStatus.VETOED:
             prev_output = f"[Reviewer feedback, iteration {i+1}]:\n{review_output}"
+            if cicd_context:
+                prev_output += f"\n[Build/test output from last iteration]:\n{cicd_context}"
             state.status = NodeStatus.PENDING
             run.nodes[writer_id].status = NodeStatus.PENDING
         else:
