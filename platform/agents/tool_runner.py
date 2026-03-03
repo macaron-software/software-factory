@@ -127,6 +127,13 @@ def _get_tool_registry():
         register_plan_tools(reg)
     except Exception:
         pass
+    # Pentest / offensive tools
+    try:
+        from ..tools.security_pentest_tools import register_pentest_tools
+
+        register_pentest_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -1903,6 +1910,41 @@ async def _execute_tool(
         "infra_check",
     ):
         return await _tool_security_chaos(name, args, ctx)
+
+    # ── Pentest / offensive tools ──
+    if name in (
+        "recon_portscan",
+        "recon_subdomain",
+        "recon_fingerprint",
+        "pentest_fuzz_api",
+        "pentest_inject",
+        "pentest_auth",
+        "pentest_ssrf",
+    ):
+        from ..tools.security_pentest_tools import (
+            PortScanTool,
+            SubdomainScanTool,
+            FingerprintTool,
+            ApiFuzzTool,
+            InjectTestTool,
+            AuthBypassTool,
+            SsrfTestTool,
+        )
+
+        _PENTEST_MAP = {
+            "recon_portscan": PortScanTool,
+            "recon_subdomain": SubdomainScanTool,
+            "recon_fingerprint": FingerprintTool,
+            "pentest_fuzz_api": ApiFuzzTool,
+            "pentest_inject": InjectTestTool,
+            "pentest_auth": AuthBypassTool,
+            "pentest_ssrf": SsrfTestTool,
+        }
+        if "cwd" not in args and ctx.workspace_path:
+            if os.path.isdir(ctx.workspace_path):
+                args["cwd"] = ctx.workspace_path
+        tool = _PENTEST_MAP[name]()
+        return await tool.execute(args)
 
     # ── Ticket/Incident management ──
     if name == "create_ticket":

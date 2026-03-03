@@ -1467,6 +1467,149 @@ def _build_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Pentest / Offensive security tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_portscan",
+                "description": "nmap port scan — detect open ports and service versions on a target host.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "description": "Hostname or IP to scan",
+                        },
+                        "ports": {
+                            "type": "string",
+                            "description": "Port range, e.g. '1-1000' or '80,443,8080'",
+                        },
+                    },
+                    "required": ["target"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_subdomain",
+                "description": "Enumerate subdomains of a domain using subfinder (passive recon).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "domain": {
+                            "type": "string",
+                            "description": "Target domain, e.g. example.com",
+                        },
+                    },
+                    "required": ["domain"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_fingerprint",
+                "description": "Identify tech stack, framework, CMS, server software on a URL using whatweb.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_fuzz_api",
+                "description": "Fuzz API endpoints using schemathesis — finds 5xx errors, injection vectors in OpenAPI/GraphQL APIs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "API base URL"},
+                        "schema": {
+                            "type": "string",
+                            "description": "Path to OpenAPI schema file or URL (default: /openapi.json)",
+                        },
+                        "max_examples": {
+                            "type": "integer",
+                            "description": "Max test cases per endpoint (default: 10)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_inject",
+                "description": "Test a URL parameter for SQL/command injection. Sends payloads and analyzes error responses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                        "param": {
+                            "type": "string",
+                            "description": "Parameter name to test",
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": ["GET", "POST"],
+                            "description": "HTTP method",
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["sqli", "cmd", "ldap"],
+                            "description": "Injection type",
+                        },
+                    },
+                    "required": ["url", "param"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_auth",
+                "description": "Test authentication bypass: default credentials, forced browsing, missing security headers.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target base URL"},
+                        "auth_url": {
+                            "type": "string",
+                            "description": "Login endpoint URL",
+                        },
+                        "protected_url": {
+                            "type": "string",
+                            "description": "URL that should require authentication",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_ssrf",
+                "description": "Test a URL parameter for Server-Side Request Forgery (SSRF). Probes internal addresses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                        "param": {
+                            "type": "string",
+                            "description": "Parameter that accepts a URL (default: 'url')",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
         # ── Ticket/Incident management tools ──
         {
             "type": "function",
@@ -2807,6 +2950,13 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "sast_scan",
         "dependency_audit",
         "secrets_scan",
+        "recon_portscan",
+        "recon_subdomain",
+        "recon_fingerprint",
+        "pentest_fuzz_api",
+        "pentest_inject",
+        "pentest_auth",
+        "pentest_ssrf",
         "get_si_blueprint",
         "lrm_guidelines_summary",
         "lrm_guidelines_search",

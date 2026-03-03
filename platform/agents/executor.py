@@ -462,6 +462,42 @@ class AgentExecutor:
     def __init__(self, llm: LLMClient | None = None):
         self._llm = llm or get_llm_client()
         self._registry = _get_tool_registry()
+        self._heartbeat_tasks: dict[str, asyncio.Task] = {}
+
+    def _start_heartbeat(self, epic_run_id: str) -> None:
+        """Start a background heartbeat task that updates epic_runs.updated_at every 30s.
+
+        Allows external monitoring to detect stuck/crashed workflows.
+        Inspired by Temporal activity heartbeating.
+        """
+        if not epic_run_id or epic_run_id in self._heartbeat_tasks:
+            return
+
+        async def _beat():
+            try:
+                while True:
+                    await asyncio.sleep(30)
+                    try:
+                        from ..db.migrations import get_db
+
+                        with get_db() as db:
+                            db.execute(
+                                "UPDATE epic_runs SET updated_at=NOW() WHERE id=?",
+                                (epic_run_id,),
+                            )
+                    except Exception:
+                        pass
+            except asyncio.CancelledError:
+                pass
+
+        task = asyncio.create_task(_beat(), name=f"heartbeat_{epic_run_id[:8]}")
+        self._heartbeat_tasks[epic_run_id] = task
+
+    def _stop_heartbeat(self, epic_run_id: str) -> None:
+        """Cancel heartbeat task for a completed/failed epic run."""
+        task = self._heartbeat_tasks.pop(epic_run_id, None)
+        if task and not task.done():
+            task.cancel()
 
     async def _push_mission_sse(self, session_id: str, event: dict):
         """Push SSE event for mission control updates."""
@@ -961,9 +997,13 @@ class AgentExecutor:
                     ),
                     name=f"mem_extract_{ctx.session_id[:8]}",
                 )
+            if ctx.epic_run_id:
+                self._stop_heartbeat(ctx.epic_run_id)
             return result
 
         except Exception as exc:
+            if ctx.epic_run_id:
+                self._stop_heartbeat(ctx.epic_run_id)
             err_str = str(exc)
             if isinstance(exc, BudgetExceededError):
                 elapsed = int((time.monotonic() - t0) * 1000)
