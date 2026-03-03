@@ -940,3 +940,18 @@ CREATE TABLE IF NOT EXISTS deploy_targets (
     updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver);
+
+-- Cluster node registry + heartbeat
+CREATE TABLE IF NOT EXISTS platform_nodes (
+    node_id TEXT PRIMARY KEY,
+    role TEXT NOT NULL DEFAULT 'slave',
+    mode TEXT NOT NULL DEFAULT 'slave',
+    url TEXT NOT NULL DEFAULT '',
+    last_seen TIMESTAMPTZ DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'online',
+    cpu_pct DOUBLE PRECISION DEFAULT 0,
+    mem_pct DOUBLE PRECISION DEFAULT 0,
+    version TEXT DEFAULT '',
+    registered_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_pnodes_status ON platform_nodes(status);

@@ -614,6 +614,71 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Failed to load push subscriptions: %s", exc)
 
+    # Node heartbeat: register this node in platform_nodes every 30s
+    import os as _os_hb
+    import socket as _socket_hb
+
+    _hb_node_id = (
+        _os_hb.environ.get("SF_NODE_ID")
+        or _os_hb.environ.get("HOSTNAME")
+        or _socket_hb.gethostname()
+    )
+    _hb_mode = os.environ.get("PLATFORM_MODE", "full").lower()
+    _hb_role = "master" if _hb_mode == "full" else "slave"
+    _hb_url = _os_hb.environ.get("SF_NODE_URL", "")
+    try:
+        import subprocess as _sp
+
+        _hb_version = (
+            _sp.check_output(
+                ["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL
+            )
+            .decode()
+            .strip()
+        )
+    except Exception:
+        _hb_version = ""
+
+    async def _node_heartbeat_loop():
+        import asyncio as _aio
+        import psutil as _psu
+        from .db.migrations import get_db as _get_db
+
+        while True:
+            try:
+                _cpu = _psu.cpu_percent(interval=None)
+                _mem = _psu.virtual_memory().percent
+                _db = _get_db()
+                try:
+                    _db.execute(
+                        """
+                        INSERT INTO platform_nodes (node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version)
+                        VALUES (?, ?, ?, ?, NOW(), 'online', ?, ?, ?)
+                        ON CONFLICT(node_id) DO UPDATE SET
+                            role=EXCLUDED.role, mode=EXCLUDED.mode, url=EXCLUDED.url,
+                            last_seen=NOW(), status='online',
+                            cpu_pct=EXCLUDED.cpu_pct, mem_pct=EXCLUDED.mem_pct, version=EXCLUDED.version
+                    """,
+                        (
+                            _hb_node_id,
+                            _hb_role,
+                            _hb_mode,
+                            _hb_url,
+                            _cpu,
+                            _mem,
+                            _hb_version,
+                        ),
+                    )
+                    _db.commit()
+                finally:
+                    _db.close()
+            except Exception as _e:
+                logger.debug("Node heartbeat failed: %s", _e)
+            await _aio.sleep(30)
+
+    asyncio.create_task(_node_heartbeat_loop())
+    logger.info("Node heartbeat started: %s (%s/%s)", _hb_node_id, _hb_role, _hb_mode)
+
     yield
 
     # Stop MCP servers
