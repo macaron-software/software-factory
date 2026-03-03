@@ -434,7 +434,7 @@ class EpicOrchestrator:
         from ..patterns.store import PatternDef
 
         # Late imports to avoid circular deps
-        from ..web.routes.missions.internal import (
+        from ..web.routes.epics.internal import (
             _auto_retrospective,
             _build_phase_prompt,
             _detect_project_platform,

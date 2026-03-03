@@ -27,7 +27,7 @@ class EpicContextBuilder:
         from ..epics.store import get_epic_run_store
         from ..sessions.store import get_session_store
         from ..web.routes.helpers import _agent_map_for_template
-        from ..web.routes.missions import _detect_project_platform
+        from ..web.routes.epics import _detect_project_platform
         from ..workflows.store import get_workflow_store
 
         mission_id = self.mission_id
