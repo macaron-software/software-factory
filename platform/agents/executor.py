@@ -41,7 +41,7 @@ _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
 MAX_REPAIR_ROUNDS = 3
 
 # Secrets detection patterns (block hardcoded credentials in code writes)
-import re as _re_secrets
+import re as _re_secrets  # noqa: E402
 
 _SECRET_PATTERNS = [
     _re_secrets.compile(
@@ -285,6 +285,175 @@ def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
                 db.commit()
     except Exception:
         pass
+
+
+# Number of recent messages preserved intact during context summarization
+_CTX_KEEP_RECENT = 6
+# Summarize when message count exceeds this
+_CTX_SUMMARIZE_THRESHOLD = 20
+
+
+async def _summarize_context(
+    messages: list, llm: "LLMClient", provider: str, model: str
+) -> list:
+    """Summarize old messages to compress context while preserving recent ones.
+
+    Keeps: system messages (first 2) + last _CTX_KEEP_RECENT messages.
+    Summarizes: everything in between via a cheap LLM call.
+    Falls back to simple truncation if LLM call fails.
+    """
+    if len(messages) <= _CTX_SUMMARIZE_THRESHOLD:
+        return messages
+
+    # Separate system header (first 1-2 msgs) from the body
+    header = [m for m in messages[:2] if getattr(m, "role", "") == "system"]
+    tail = messages[-_CTX_KEEP_RECENT:]
+    # Don't start tail with orphaned tool results
+    while tail and getattr(tail[0], "role", "") == "tool":
+        tail = tail[1:]
+    middle = messages[len(header) : len(messages) - len(tail)]
+
+    if not middle:
+        return header + tail
+
+    # Build compact text of middle messages to summarize
+    middle_text = []
+    for m in middle:
+        role = getattr(m, "role", "")
+        content = getattr(m, "content", "") or ""
+        if isinstance(content, list):
+            content = " ".join(
+                p.get("text", "") for p in content if isinstance(p, dict)
+            )
+        if role in ("user", "assistant") and content:
+            middle_text.append(f"[{role}] {str(content)[:400]}")
+        elif role == "tool" and content:
+            middle_text.append(f"[tool_result] {str(content)[:200]}")
+
+    if not middle_text:
+        return header + tail
+
+    summary_prompt = (
+        "Summarize the following conversation history in a concise paragraph "
+        "(max 300 words). Focus on decisions made, actions taken, and key findings. "
+        "Preserve technical details (file names, error messages, values).\n\n"
+        + "\n".join(middle_text)
+    )
+    try:
+        summary_resp = await llm.complete(
+            messages=[LLMMessage(role="user", content=summary_prompt)],
+            provider=provider,
+            model=model,
+            tools=None,
+            stream=False,
+        )
+        summary_text = (summary_resp.content or "").strip()
+        if summary_text:
+            summary_msg = LLMMessage(
+                role="system",
+                content=f"[Context summary — earlier conversation]\n{summary_text}",
+            )
+            return header + [summary_msg] + tail
+    except Exception:
+        pass
+
+    # Fallback: simple truncation
+    return header + tail
+
+
+# Minimum messages before memory extraction runs (avoid trivial exchanges)
+_MEM_EXTRACT_MIN_MSGS = 4
+# Throttle: don't extract more than once per N seconds for the same session
+_mem_extract_last: dict[str, float] = {}
+_MEM_EXTRACT_COOLDOWN = 120  # 2 minutes
+
+
+async def _extract_session_memory(
+    ctx: "ExecutionContext", messages: list, llm: "LLMClient", provider: str, model: str
+) -> None:
+    """Background task: extract structured facts from a session into project memory.
+
+    Extracts: tech stack decisions, coding preferences, architecture choices,
+    recurring patterns, key constraints. Stored in memory_project for future sessions.
+    Inspired by DeerFlow v2 memory extraction pipeline.
+    """
+    import time as _time
+
+    session_id = ctx.session_id
+    now = _time.monotonic()
+    if now - _mem_extract_last.get(session_id, 0) < _MEM_EXTRACT_COOLDOWN:
+        return
+    _mem_extract_last[session_id] = now
+
+    # Build compact conversation digest (last 10 exchanges max)
+    relevant = [m for m in messages if getattr(m, "role", "") in ("user", "assistant")][
+        -10:
+    ]
+    if len(relevant) < _MEM_EXTRACT_MIN_MSGS:
+        return
+
+    digest = []
+    for m in relevant:
+        role = getattr(m, "role", "")
+        content = getattr(m, "content", "") or ""
+        if isinstance(content, list):
+            content = " ".join(
+                p.get("text", "") for p in content if isinstance(p, dict)
+            )
+        digest.append(f"[{role}] {str(content)[:300]}")
+
+    extract_prompt = (
+        "Extract structured facts from this conversation that would be useful for future sessions. "
+        "Return a JSON array of objects with keys: key (short label), value (the fact), category "
+        "(one of: tech_stack | architecture | preference | constraint | pattern | decision). "
+        "Only include facts with lasting value. Return [] if nothing notable.\n\n"
+        "Conversation:\n" + "\n".join(digest)
+    )
+    try:
+        resp = await llm.complete(
+            messages=[LLMMessage(role="user", content=extract_prompt)],
+            provider=provider,
+            model=model,
+            tools=None,
+            stream=False,
+        )
+        raw = (resp.content or "").strip()
+        # Strip markdown fences if any
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+        import json as _json
+
+        facts = _json.loads(raw)
+        if not isinstance(facts, list):
+            return
+        from ..memory.manager import get_memory_manager
+        from .tool_schemas import _classify_agent_role
+
+        mem = get_memory_manager()
+        agent_role = _classify_agent_role(ctx.agent)
+        stored = 0
+        for fact in facts[:10]:  # cap at 10 facts per session
+            key = str(fact.get("key", ""))[:80]
+            value = str(fact.get("value", ""))[:500]
+            category = str(fact.get("category", "fact"))[:40]
+            if key and value:
+                mem.project_store(
+                    ctx.project_id,
+                    key,
+                    value,
+                    category=category,
+                    source=ctx.agent.id,
+                    agent_role=agent_role,
+                )
+                stored += 1
+        if stored:
+            logger.debug(
+                "Memory extraction: stored %d facts for project %s",
+                stored,
+                ctx.project_id,
+            )
+    except Exception as e:
+        logger.debug("Memory extraction failed (non-critical): %s", e)
 
 
 class AgentExecutor:
@@ -676,7 +845,8 @@ class AgentExecutor:
                                     if "CRITICAL" in _sast_result:
                                         logger.warning(
                                             "Agent %s: SAST critical issues in %s",
-                                            agent.id, _written_path,
+                                            agent.id,
+                                            _written_path,
                                         )
                                         messages.append(
                                             LLMMessage(
@@ -688,7 +858,10 @@ class AgentExecutor:
                                                 ),
                                             )
                                         )
-                                    elif _sast_result and "no issues" not in _sast_result.lower():
+                                    elif (
+                                        _sast_result
+                                        and "no issues" not in _sast_result.lower()
+                                    ):
                                         messages.append(
                                             LLMMessage(
                                                 role="user",
@@ -730,13 +903,12 @@ class AgentExecutor:
                     partial_content="",
                 )
 
-                # Limit message window to prevent OOM (keep first 2 + last 15)
+                # Context summarization: when history grows large, summarize old messages
+                # instead of simply truncating (inspired by DeerFlow v2)
                 if len(messages) > 20:
-                    tail = messages[-15:]
-                    # Don't start tail with orphaned tool results
-                    while tail and getattr(tail[0], "role", "") == "tool":
-                        tail = tail[1:]
-                    messages = messages[:2] + tail
+                    messages = await _summarize_context(
+                        messages, self._llm, use_provider, use_model
+                    )
 
                 # On penultimate round, disable tools to force synthesis next iteration
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
@@ -781,6 +953,14 @@ class AgentExecutor:
                 _debit_project_wallet(ctx.project_id, _cost, ctx.session_id)
             except Exception:
                 pass
+            # Background: extract structured memory facts from this interaction
+            if ctx.project_id and len(messages) >= 4:
+                asyncio.create_task(
+                    _extract_session_memory(
+                        ctx, messages, self._llm, use_provider, use_model
+                    ),
+                    name=f"mem_extract_{ctx.session_id[:8]}",
+                )
             return result
 
         except Exception as exc:

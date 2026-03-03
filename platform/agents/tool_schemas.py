@@ -198,6 +198,59 @@ def _core_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "plan_create",
+                "description": "Create an execution plan before tackling a complex task. Use this to break down multi-step work into trackable steps.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Short plan title"},
+                        "steps": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Ordered list of steps to execute",
+                        },
+                    },
+                    "required": ["title", "steps"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_update",
+                "description": "Update a step status in the current plan.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "step": {
+                            "type": "integer",
+                            "description": "Step number (1-based)",
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": ["in_progress", "done", "blocked", "skipped"],
+                            "description": "New status for the step",
+                        },
+                        "result": {
+                            "type": "string",
+                            "description": "Optional short result/note",
+                        },
+                    },
+                    "required": ["step", "status"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_get",
+                "description": "Get the current plan and progress.",
+                "parameters": {"type": "object", "properties": {}},
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "list_files",
                 "description": "List files and directories at a given path.",
                 "parameters": {
@@ -2485,6 +2538,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         # Memory
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         # Project context (read-only, no filesystem browsing)
         "get_project_context",
         # Git read (on explicit user request with workspace context)
@@ -2523,6 +2579,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "create_feature",
         "create_story",
@@ -2555,6 +2614,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_log",
         "git_diff",
@@ -2587,6 +2649,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "screenshot",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "create_feature",
         "figma_get_node",
@@ -2611,6 +2676,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "list_files",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "build",
         "test",
@@ -2659,6 +2727,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "run_e2e_tests",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_diff",
         "git_log",
@@ -2704,6 +2775,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "browser_screenshot",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "lrm_build",
         "github_actions",
@@ -2722,6 +2796,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_log",
         "git_diff",
@@ -2738,6 +2815,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "cdp": [
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "list_files",
         "deep_search",
@@ -2774,6 +2854,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_issues",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
     ],
 }

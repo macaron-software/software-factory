@@ -33,6 +33,7 @@ def _get_tool_registry():
     register_build_tools(reg)
     try:
         from ..tools.sast_tools import register_sast_tools
+
         register_sast_tools(reg)
     except Exception:
         pass
@@ -117,6 +118,13 @@ def _get_tool_registry():
         from ..tools.project_tools import register_project_tools
 
         register_project_tools(reg)
+    except Exception:
+        pass
+    # Agent plan tools (TodoList middleware)
+    try:
+        from ..tools.plan_tools import register_plan_tools
+
+        register_plan_tools(reg)
     except Exception:
         pass
     return reg
@@ -1843,6 +1851,18 @@ async def _execute_tool(
         return await _tool_memory_search(args, ctx)
     if name == "memory_store":
         return await _tool_memory_store(args, ctx)
+    if name in ("plan_create", "plan_update", "plan_get"):
+        from ..tools.plan_tools import (
+            _tool_plan_create,
+            _tool_plan_update,
+            _tool_plan_get,
+        )
+
+        if name == "plan_create":
+            return await _tool_plan_create(args, ctx)
+        if name == "plan_update":
+            return await _tool_plan_update(args, ctx)
+        return await _tool_plan_get(args, ctx)
     if name == "deep_search":
         return await _tool_deep_search(args, ctx)
     # Phase orchestration tools (mission control)

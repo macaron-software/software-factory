@@ -135,6 +135,42 @@ async def lifespan(app: FastAPI):
     except Exception as _me:
         logger.warning("Epic rename migration failed (non-fatal): %s", _me)
 
+    # Agent plan tables (TodoList middleware)
+    try:
+        from .db.migrations import get_db as _gdb_plans
+
+        with _gdb_plans() as _pdb:
+            _pdb.execute("""
+                CREATE TABLE IF NOT EXISTS agent_plans (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    project_id TEXT,
+                    agent_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            _pdb.execute("""
+                CREATE TABLE IF NOT EXISTS agent_plan_steps (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL REFERENCES agent_plans(id) ON DELETE CASCADE,
+                    step_num INTEGER NOT NULL,
+                    description TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    result TEXT,
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            _pdb.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans(session_id)"
+            )
+            _pdb.execute(
+                "CREATE INDEX IF NOT EXISTS idx_plan_steps_plan ON agent_plan_steps(plan_id)"
+            )
+    except Exception as _pe:
+        logger.warning("Agent plan tables migration failed (non-fatal): %s", _pe)
+
     # Seed built-in agents
     from .agents.store import get_agent_store
 

@@ -664,6 +664,63 @@ async def api_daemon_stop(project_id: str, daemon: str):
         return {"error": str(e)}
 
 
+@app.get("/api/agent-plans")
+async def api_agent_plans(
+    session_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    limit: int = Query(20, le=100),
+):
+    """Get recent agent plans (TodoList middleware)."""
+    try:
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from platform.db.migrations import get_db
+
+        with get_db() as db:
+            query = "SELECT p.*, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id AND s.status='done') as done_count, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id) as total_count FROM agent_plans p WHERE 1=1"
+            params: list = []
+            if session_id:
+                query += " AND p.session_id=?"
+                params.append(session_id)
+            if project_id:
+                query += " AND p.project_id=?"
+                params.append(project_id)
+            query += " ORDER BY p.updated_at DESC LIMIT ?"
+            params.append(limit)
+            plans = db.execute(query, params).fetchall()
+            result = []
+            for plan in plans:
+                steps = db.execute(
+                    "SELECT * FROM agent_plan_steps WHERE plan_id=? ORDER BY step_num",
+                    (plan["id"],),
+                ).fetchall()
+                result.append(
+                    {
+                        "id": plan["id"],
+                        "session_id": plan["session_id"],
+                        "project_id": plan["project_id"],
+                        "agent_id": plan["agent_id"],
+                        "title": plan["title"],
+                        "done": plan["done_count"],
+                        "total": plan["total_count"],
+                        "updated_at": str(plan["updated_at"]),
+                        "steps": [
+                            {
+                                "num": s["step_num"],
+                                "desc": s["description"],
+                                "status": s["status"],
+                                "result": s.get("result"),
+                            }
+                            for s in steps
+                        ],
+                    }
+                )
+            return {"plans": result}
+    except Exception as e:
+        return {"plans": [], "error": str(e)}
+
+
 @app.get("/api/tasks")
 async def api_tasks(
     project: Optional[str] = None,
