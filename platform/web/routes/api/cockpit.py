@@ -159,61 +159,68 @@ def _get_pipeline(db) -> dict:
 
 
 def _get_environments() -> list[dict]:
-    import httpx
+    """Read cluster nodes from platform_nodes registry instead of hardcoded envs."""
+    from datetime import datetime
 
-    # Local env — we're running on this server, mark as online directly
-    local_version = None
+    from ...db.migrations import get_db
+
+    db = get_db()
     try:
-        import importlib.metadata
-
-        local_version = importlib.metadata.version("macaron-platform")
+        rows = db.execute(
+            "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version"
+            " FROM platform_nodes ORDER BY role DESC, node_id"
+        ).fetchall()
     except Exception:
-        pass
+        rows = []
+    finally:
+        db.close()
 
-    envs_remote = [
-        {
-            "id": "ovh",
-            "name": "OVH Demo",
-            "url": os.environ.get("OVH_PLATFORM_URL", ""),
-        },
-        {
-            "id": "azure",
-            "name": "Azure Prod",
-            "url": os.environ.get("AZURE_PLATFORM_URL", ""),
-        },
-    ]
-    results = [
-        {
-            "id": "local",
-            "name": "Local Dev",
-            "url": "http://localhost:8099",
-            "status": "online",
-            "version": local_version,
-        },
-    ]
-    for env in envs_remote:
-        url = env["url"]
-        if not url:
-            results.append({**env, "status": "not_configured", "version": None})
-            continue
+    if not rows:
+        # Fallback: no nodes registered yet — show static config if env vars set
+        results = []
+        for id_, name, env_var in [
+            ("ovh", "OVH Demo", "OVH_PLATFORM_URL"),
+            ("azure", "Azure Prod", "AZURE_PLATFORM_URL"),
+        ]:
+            url = os.environ.get(env_var, "")
+            if url:
+                results.append(
+                    {
+                        "id": id_,
+                        "name": name,
+                        "url": url,
+                        "status": "not_configured",
+                        "version": None,
+                    }
+                )
+        return results
+
+    now = datetime.utcnow()
+    results = []
+    for r in rows:
         try:
-            r = httpx.get(f"{url}/api/health", timeout=2.0)
-            data = (
-                r.json()
-                if r.headers.get("content-type", "").startswith("application/json")
-                else {}
+            last_seen_dt = datetime.fromisoformat(
+                str(r["last_seen"]).replace("Z", "").split(".")[0]
             )
-            results.append(
-                {
-                    **env,
-                    "status": "online"
-                    if r.status_code == 200 and data.get("status") == "ok"
-                    else "degraded",
-                    "version": data.get("version"),
-                }
-            )
+            age_s = int((now - last_seen_dt).total_seconds())
         except Exception:
-            results.append({**env, "status": "offline", "version": None})
+            age_s = 9999
+        is_online = age_s < 60
+        role = r["role"] or ""
+        mode = r["mode"] or ""
+        name = f"{r['node_id']} ({role}/{mode})"
+        results.append(
+            {
+                "id": r["node_id"],
+                "name": name,
+                "url": r["url"] or "",
+                "status": "online" if is_online else "offline",
+                "version": r["version"],
+                "cpu_pct": round(r["cpu_pct"] or 0, 1),
+                "mem_pct": round(r["mem_pct"] or 0, 1),
+                "age_s": age_s,
+            }
+        )
     return results
 
 

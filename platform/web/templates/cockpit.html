@@ -133,11 +133,11 @@
   <!-- 2. Infrastructure 3 cols -->
   <div class="cockpit-grid">
 
-    <!-- Environments -->
+    <!-- Environments / Cluster Nodes -->
     <div class="ck-card">
       <div class="ck-card-title">
-        <svg class="icon icon-xs"><use href="#icon-globe"/></svg>
-        Environnements
+        <svg class="icon icon-xs"><use href="#icon-server"/></svg>
+        Nodes Cluster
       </div>
       <div id="envList">
         <div class="ck-row"><span class="ck-row-name" style="color:var(--text-secondary);font-style:italic;font-size:0.75rem">Chargement…</span></div>
@@ -286,7 +286,7 @@
           <div class="ck-row-left">
             <span class="ck-row-name">${e.name}</span>
             ${e.url ? `<span class="ck-row-sub"><a href="${e.url}" target="_blank" style="color:var(--purple)">${e.url}</a></span>` : ''}
-            ${e.version ? `<span class="ck-row-sub">v${e.version.substring(0,8)}</span>` : ''}
+            ${e.cpu_pct != null ? `<span class="ck-row-sub">CPU ${e.cpu_pct}% · MEM ${e.mem_pct}%</span>` : (e.version ? `<span class="ck-row-sub">v${e.version.substring(0,8)}</span>` : '')}
           </div>
           ${badge(e.status)}
         </div>`).join('')
@@ -323,12 +323,12 @@
     document.getElementById('projList').innerHTML = projs.length
       ? projs.map(proj => {
         const pct = proj.progress || 0;
-        const barCls = proj.active_epics > 0 ? 'prog-active' : '';
+        const barCls = proj.active_missions > 0 ? 'prog-active' : '';
         return `
         <div class="proj-item" onclick="location.href='/projects/${proj.id}'">
           <div class="proj-header">
             <span class="proj-name">${proj.name}</span>
-            <span class="proj-meta">${proj.active_epics} actives · ${proj.total_missions} total</span>
+            <span class="proj-meta">${proj.active_missions} actives · ${proj.total_missions} total</span>
           </div>
           <div class="prog-bar"><div class="prog-fill ${barCls}" style="width:${pct}%"></div></div>
           <div style="display:flex;justify-content:space-between;margin-top:0.2rem">
