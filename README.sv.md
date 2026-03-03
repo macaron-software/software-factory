@@ -54,11 +54,12 @@ Föreställ dig en **virtuell mjukvarifabrik** där 191 AI-agenter samarbetar ge
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **LLM-feltålighet** — multi-provider-fallback, jitter-retry, rate-limit-hantering; gpt-5.2 för resonemang/arkitektur, gpt-5.2-codex för kod/TDD, gpt-5-mini för dokumentation/diskussion
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Kluster med flera noder** — master/slave-topologi, delad PostgreSQL, passiv failover, levande nod-märken i topbaren
 
 ## Skärmbilder
 
@@ -1067,6 +1068,36 @@ Ett inbyggt visuellt anteckningsskikt som förvandlar varje SF-sida till en sama
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Nyheter i v3.1.0 (mars 2026)
+
+### Kluster med flera noder
+
+- **Master/slave-topologi** — IHM + SSE exklusivt på mastern; API-anrop lastbalanseras över alla noder via nginx `least_conn`
+- **Delad PostgreSQL** — 100% PostgreSQL, noll SQLite; alla noder delar samma databas; advisory lock förhindrar schema-race conditions vid simultan start
+- **Passiv failover** — nginx markerar en nod som nere efter 3 konsekutiva fel; trafik dirigeras automatiskt till friska noder, återhämtning efter 10 s
+- **Klusternodregister** — tabellen `platform_nodes` spårar varje nod: roll, läge, URL, CPU%, MEM%, version, heartbeat-ålder
+- **Levande topbar-märken** — varje nod visas som ett färgat prick-märke; grönt = online (< 60 s), rött = föråldrat; avsökning var 30:e s via HTMX
+- **Klicka-popover-detaljer** — klicka på valfritt nodmärke för fullständig diagnostik: roll/läge, URL, CPU, MEM, senast sedd, version
+- **Agentverktyget `platform_cluster`** — Jarvis och alla agenter kan fråga om klustrets hälsa och lastfördelning på naturligt språk
+
+### Säkerhet & Sandbox
+
+- **Landlock filsystemssandbox** — agentens skalexekvering begränsad till arbetsytemappen med Linux Landlock LSM (kärna 5.13+); noll påverkan på icke-Linux-värdar
+- **Fliken säkerhetsinställningar** — slå på/av sandbox, visa Landlock-kärnans stöd från Inställningar → Säkerhet
+- **Pentest-agentverktyg** — nmap-portskanning, subfinder subdomänsuppräkning, whatweb teknikfingeravtryckning, schemathesis API-fuzzing, SQL-injektion, auth-bypass, SSRF-detektion
+
+### Kodkvalitet & LLM
+
+- **LLM-kodkvalitetshärdning** — SAST (bandit/semgrep) + cyklomatisk komplexitetsanalys injiceras i agentens kontext före varje kodgranskningsfas
+- **DeerFlow kontextsammanfattning** — rekursiv kontextkomprimering + automatisk minnesextraktion (arXiv:2503.09516); minskar tokenförbrukning vid långvariga agentsessioner
+- **Förbättrad flermods-routing** — `gpt-5.2` för resonemang/arkitektur, `gpt-5.2-codex` för kod/TDD, `gpt-5-mini` för diskussion/dokumentation; rollbaserad, konfigurerbar via `AZURE_CODEX_MODEL`
+
+### Plattform & SAFe
+
+- **SAFe-terminologi** — uppdrag omdöpta till epics på alla UI-sidor; portföljstatistik visar SAFe-termer (Epics / Features / Stories / Tasks)
+- **Infraeskalering** — när en sprint inte hittar nödvändiga byggverktyg, skapas `ft-infra-lead` automatiskt för att installera dem innan nytt försök
+- **Agentplanverktyg** — agenter skapar strukturerade planer med milstolpar och deluppgifter, lagrade i minnet för kontinuitet mellan faser
 
 ## Bidra
 

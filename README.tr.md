@@ -54,11 +54,12 @@ Software Factory, birlikte calisan uzmanlasmis yapay zeka ajanlari kullanarak ya
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **LLM dayanıklılığı** — çok sağlayıcılı fallback, jitter'lı retry, rate-limit yönetimi; gpt-5.2 akıl yürütme/mimari için, gpt-5.2-codex kod/TDD için, gpt-5-mini belgeler/tartışma için
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Çok düğümlü küme** — ana/yedek topoloji, paylaşımlı PostgreSQL, pasif yük devretme, topbar'da canlı düğüm rozetleri
 
 ## Ekran Goruntuleri
 
@@ -1067,6 +1068,36 @@ Her SF sayfasını işbirlikçi bir inceleme tuvaline dönüştüren yerleşik g
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## v3.1.0'daki Yenilikler (Mart 2026)
+
+### Çok Düğümlü Küme
+
+- **Ana/yedek topoloji** — IHM + SSE yalnızca ana düğümde; API çağrıları nginx `least_conn` ile tüm düğümlere yük dengeleme
+- **Paylaşımlı PostgreSQL** — %100 PostgreSQL, sıfır SQLite; tüm düğümler aynı veritabanını paylaşır; advisory lock eş zamanlı başlatmada şema yarış koşullarını önler
+- **Pasif yük devretme** — nginx 3 ardışık başarısızlık sonrası düğümü çevrimdışı işaretler; trafik otomatik olarak sağlıklı düğümlere yönlendirilir, 10 saniye sonra toparlanır
+- **Küme düğüm kaydı** — `platform_nodes` tablosu her düğümü izler: rol, mod, URL, CPU%, MEM%, sürüm, heartbeat yaşı
+- **Canlı topbar rozetleri** — her düğüm renkli nokta rozeti olarak gösterilir; yeşil = çevrimiçi (< 60 sn), kırmızı = eski; HTMX ile her 30 sn'de bir sorgu
+- **Tıkla-popover detaylar** — tam tanılama bilgisi için herhangi bir düğüm rozetine tıklayın: rol/mod, URL, CPU, MEM, son görülme, sürüm
+- **`platform_cluster` ajan aracı** — Jarvis ve tüm ajanlar küme sağlığını ve yük dağılımını doğal dilde sorgulayabilir
+
+### Güvenlik & Sandbox
+
+- **Landlock dosya sistemi sandbox'ı** — Linux Landlock LSM (çekirdek 5.13+) kullanılarak ajan kabuk yürütmesi çalışma alanı diziniyle sınırlandırıldı; Linux olmayan sistemlerde sıfır etki
+- **Güvenlik ayarları sekmesi** — Ayarlar → Güvenlik'ten sandbox'ı açın/kapatın, Landlock çekirdek destek durumunu görüntüleyin
+- **Pentest ajan araçları** — nmap port tarama, subfinder alt alan adı listeleme, whatweb teknoloji parmak izi, schemathesis API fuzzing, SQL enjeksiyonu, kimlik doğrulama atlama, SSRF tespiti
+
+### Kod Kalitesi & LLM
+
+- **LLM kod kalitesi güçlendirmesi** — SAST (bandit/semgrep) + döngüsel karmaşıklık analizi her kod inceleme aşamasından önce ajan bağlamına eklenir
+- **DeerFlow bağlam özetleme** — özyinelemeli bağlam sıkıştırma + otomatik bellek çıkarma (arXiv:2503.09516); uzun süreli ajan oturumlarında token tüketimini azaltır
+- **Çok modelli yönlendirme yükseltildi** — akıl yürütme/mimari için `gpt-5.2`, kod/TDD için `gpt-5.2-codex`, tartışma/belgeler için `gpt-5-mini`; rol tabanlı, `AZURE_CODEX_MODEL` ile yapılandırılabilir
+
+### Platform & SAFe
+
+- **SAFe terminolojisi** — tüm UI sayfalarında görevler epic olarak yeniden adlandırıldı; portföy istatistikleri SAFe terimlerini gösteriyor (Epics / Features / Stories / Tasks)
+- **Altyapı eskalasyonu** — bir sprint gerekli derleme araçlarını bulamazsa, `ft-infra-lead` yeniden denemeden önce bunları kurmak için otomatik olarak başlatılır
+- **Ajan plan araçları** — ajanlar kilometre taşları ve alt görevlerle yapılandırılmış planlar oluşturur, aşamalar arası süreklilik için bellekte saklanır
 
 ## Katki
 

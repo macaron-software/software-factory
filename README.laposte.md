@@ -14,13 +14,14 @@ Cette plateforme permet l'orchestration d'agents IA autonomes pour accompagner l
 
 Elle s'inscrit dans le cadre de la demarche **UDD IA Native** et suit la methodologie SAFe (Scaled Agile Framework).
 
-### Chiffres cles v3.0.0
+### Chiffres cles v3.1.0
 
 - 191 agents IA specialises
 - 33 equipes agents
 - 10 ARTs (Agile Release Trains)
 - 8 groupes d'ideation sur la page d'accueil
 - 36 workflows de ceremonie
+- Cluster multi-noeuds PostgreSQL (master/slave)
 
 ---
 
@@ -333,6 +334,36 @@ LLM_API_KEY=...
 LLM_ENDPOINT=https://<endpoint-interne>/
 DATABASE_URL=postgresql://user:password@localhost:5432/software_factory
 ```
+
+---
+
+## Nouveautes v3.1.0 (mars 2026)
+
+### Cluster multi-noeuds
+
+- **Topologie master/slave** — IHM + SSE sur le master uniquement ; appels API repartis via nginx `least_conn`
+- **PostgreSQL partage** — 100 % PostgreSQL, zero SQLite ; tous les noeuds partagent la meme base de donnees
+- **Failover passif** — nginx marque un noeud HS apres 3 echecs ; basculement automatique sur les noeuds sains
+- **Registre de noeuds** — table `platform_nodes` : role, mode, URL, CPU%, MEM%, version, heartbeat
+- **Badges live topbar** — chaque noeud affiche comme badge colore (vert = en ligne, rouge = inactif) avec popover diagnostics au clic
+- **Outil `platform_cluster`** — Jarvis peut interroger la sante du cluster et la repartition de charge
+
+### Securite & Sandbox
+
+- **Sandbox Landlock** — execution shell des agents confinee au workspace via Linux Landlock LSM
+- **Onglet Securite** — activer/desactiver la sandbox depuis Parametres → Securite
+- **Outils pentest** — nmap, subfinder, whatweb, schemathesis, injection SQL, detection SSRF
+
+### Qualite & LLM
+
+- **Durcissement qualite code** — SAST + complexite cyclomatique injectes dans le contexte avant chaque revue
+- **Resume de contexte DeerFlow** — compression recursive + extraction memoire (arXiv:2503.09516)
+- **Routage multi-modeles** — `gpt-5.2` raisonnement, `gpt-5.2-codex` code/TDD, `gpt-5-mini` discussion/docs
+
+### Plateforme & SAFe
+
+- **Terminologie SAFe** — missions renommees en epics dans l'interface ; stats portfolio en termes SAFe
+- **Escalade infra** — `ft-infra-lead` lance automatiquement si outils de build manquants
 
 ---
 

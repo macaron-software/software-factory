@@ -54,11 +54,12 @@ Wyobraz sobie **wirtualna fabryke oprogramowania**, gdzie 191 agentow AI wspolpr
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **Odporność LLM** — wieloproviderowy fallback, retry z jitterem, zarządzanie rate-limitem; gpt-5.2 dla wnioskowania/architektury, gpt-5.2-codex dla kodu/TDD, gpt-5-mini dla dokumentacji/dyskusji
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Klaster wielowęzłowy** — topologia master/slave, współdzielone PostgreSQL, pasywny failover, żywe plakietki węzłów na topbarze
 
 ## Zrzuty ekranu
 
@@ -1067,6 +1068,36 @@ Wbudowana warstwa adnotacji wizualnych, która zamienia każdą stronę SF w kol
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Nowości w v3.1.0 (marzec 2026)
+
+### Klaster wielowęzłowy
+
+- **Topologia master/slave** — IHM + SSE wyłącznie na masterze; wywołania API rozkładane na wszystkie węzły przez nginx `least_conn`
+- **Współdzielone PostgreSQL** — 100% PostgreSQL, zero SQLite; wszystkie węzły korzystają z tej samej bazy danych; advisory lock zapobiega wyścigom schematu przy jednoczesnym uruchamianiu
+- **Pasywny failover** — nginx oznacza węzeł jako niedostępny po 3 kolejnych błędach; ruch automatycznie kierowany do zdrowych węzłów, odzyskiwanie po 10 s
+- **Rejestr węzłów klastra** — tabela `platform_nodes` śledzi każdy węzeł: rola, tryb, URL, CPU%, MEM%, wersja, wiek heartbeat
+- **Żywe plakietki w topbarze** — każdy węzeł wyświetlany jako kolorowa kropka; zielony = online (< 60 s), czerwony = nieaktualne; odpytywanie co 30 s przez HTMX
+- **Szczegóły popover po kliknięciu** — kliknij plakietkę węzła, aby zobaczyć pełną diagnostykę: rola/tryb, URL, CPU, MEM, ostatnie widzenie, wersja
+- **Narzędzie agenta `platform_cluster`** — Jarvis i wszyscy agenci mogą odpytywać kondycję klastra i rozkład obciążenia w języku naturalnym
+
+### Bezpieczeństwo i Sandbox
+
+- **Piaskownica systemu plików Landlock** — wykonywanie powłoki agenta ograniczone do katalogu workspace za pomocą Linux Landlock LSM (jądro 5.13+); zerowy wpływ na hosty inne niż Linux
+- **Zakładka ustawień bezpieczeństwa** — włącz/wyłącz piaskownicę, sprawdź stan obsługi jądra Landlock w Ustawieniach → Bezpieczeństwo
+- **Narzędzia agenta Pentest** — skanowanie portów nmap, wyliczanie subdomen subfinder, fingerprinting technologii whatweb, fuzzing API schemathesis, SQL injection, bypass uwierzytelnienia, wykrywanie SSRF
+
+### Jakość kodu i LLM
+
+- **Wzmocnienie jakości kodu LLM** — SAST (bandit/semgrep) + analiza złożoności cyklomatycznej wstrzykiwana do kontekstu agenta przed każdą fazą przeglądu kodu
+- **Podsumowanie kontekstu DeerFlow** — rekurencyjna kompresja kontekstu + automatyczna ekstrakcja pamięci (arXiv:2503.09516); zmniejsza zużycie tokenów w długotrwałych sesjach agentów
+- **Ulepszone routowanie wielomodelowe** — `gpt-5.2` dla wnioskowania/architektury, `gpt-5.2-codex` dla kodu/TDD, `gpt-5-mini` dla dyskusji/dokumentacji; oparte na rolach, konfigurowane przez `AZURE_CODEX_MODEL`
+
+### Platforma i SAFe
+
+- **Terminologia SAFe** — misje przemianowane na epic we wszystkich stronach UI; statystyki portfolio wyświetlają terminy SAFe (Epics / Features / Stories / Tasks)
+- **Eskalacja infra** — gdy sprint nie może znaleźć wymaganych narzędzi budowania, `ft-infra-lead` jest automatycznie uruchamiany, aby je zainstalować przed ponowną próbą
+- **Narzędzia planu agenta** — agenci tworzą ustrukturyzowane plany z kamieniami milowymi i podzadaniami, przechowywane w pamięci dla ciągłości między fazami
 
 ## Wspolpraca
 

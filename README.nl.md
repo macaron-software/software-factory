@@ -54,11 +54,12 @@ Stel je een **virtuele softwarefabriek** voor waar 191 AI-agenten samenwerken vi
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **LLM-veerkracht** — multi-provider fallback, jitter-retry, rate-limit beheer; gpt-5.2 voor redeneren/architectuur, gpt-5.2-codex voor code/TDD, gpt-5-mini voor docs/discussie
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Multi-node cluster** — master/slave-topologie, gedeelde PostgreSQL, passieve failover, live knooppuntbadges in de topbar
 
 ## Screenshots
 
@@ -1067,6 +1068,36 @@ Een ingebouwde visuele annotatielaag die elke SF-pagina omzet in een collaborati
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Nieuw in v3.1.0 (maart 2026)
+
+### Multi-node cluster
+
+- **Master/slave-topologie** — IHM + SSE uitsluitend op de master; API-aanroepen worden via nginx `least_conn` over alle nodes verdeeld
+- **Gedeelde PostgreSQL** — 100% PostgreSQL, geen SQLite; alle nodes delen dezelfde database; advisory lock voorkomt schema-race conditions bij gelijktijdig opstarten
+- **Passieve failover** — nginx markeert een node als neer na 3 opeenvolgende fouten; verkeer wordt automatisch naar gezonde nodes geleid, herstelt na 10 s
+- **Clusternode-register** — tabel `platform_nodes` registreert elke node: rol, modus, URL, CPU%, MEM%, versie, heartbeat-leeftijd
+- **Live topbar-badges** — elke node getoond als gekleurde punt-badge; groen = online (< 60 s), rood = verouderd; polling elke 30 s via HTMX
+- **Klik-popover-details** — klik op een node-badge voor volledige diagnostiek: rol/modus, URL, CPU, MEM, laatste gezien, versie
+- **Agentgereedschap `platform_cluster`** — Jarvis en alle agenten kunnen clustergezondheid en lastvedeling in natuurlijke taal opvragen
+
+### Beveiliging & Sandbox
+
+- **Landlock bestandssysteem-sandbox** — agentshell-uitvoering beperkt tot werkruimtemap via Linux Landlock LSM (kernel 5.13+); geen impact op niet-Linux hosts
+- **Tab beveiligingsinstellingen** — sandbox in-/uitschakelen, Landlock-kernelondersteuningsstatus bekijken via Instellingen → Beveiliging
+- **Pentest-agentgereedschappen** — nmap poortscanning, subfinder subdomain-opsomming, whatweb tech-fingerprinting, schemathesis API-fuzzing, SQL-injectie, auth-bypass, SSRF-detectie
+
+### Codekwaliteit & LLM
+
+- **LLM-codekwaliteitsversterking** — SAST (bandit/semgrep) + cyclomatische complexiteitsanalyse vóór elke codereviefase in de agentcontext geïnjecteerd
+- **DeerFlow-contextsammenvatting** — recursieve contextcompressie + automatische geheugenextractie (arXiv:2503.09516); vermindert tokenverbruik bij langlopende agentsessies
+- **Multi-model routing verbeterd** — `gpt-5.2` voor redeneren/architectuur, `gpt-5.2-codex` voor code/TDD, `gpt-5-mini` voor discussie/documentatie; rolgebaseerd, configureerbaar via `AZURE_CODEX_MODEL`
+
+### Platform & SAFe
+
+- **SAFe-terminologie** — missies hernoemd naar epics op alle UI-pagina's; portfoliostatistieken tonen SAFe-termen (Epics / Features / Stories / Tasks)
+- **Infra-escalatie** — wanneer een sprint de benodigde buildgereedschappen niet kan vinden, wordt `ft-infra-lead` automatisch aangemaakt om ze te installeren voor een nieuwe poging
+- **Agentplangereedschappen** — agenten maken gestructureerde plannen met mijlpalen en subtaken, opgeslagen in het geheugen voor continuïteit tussen fasen
 
 ## Bijdragen
 

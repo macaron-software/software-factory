@@ -48,6 +48,7 @@ Think of it as a **virtual software factory** where 191 AI agents collaborate th
 - **191 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
 - **36 built-in workflows** — SAFe ceremonies, quality gates, nightly maintenance, security, knowledge management
 - **8 home ideation groups** — CTO Jarvis, Business, Project, Knowledge, Architecture, Security, Data & AI, PI Planning
+- **Multi-node cluster** — master/slave topology with shared PostgreSQL; nginx `least_conn` load balancing; live topbar heartbeat badges with click-to-popover diagnostics
 - **Agent Marketplace** — discover and launch agents from `/marketplace`; filter by ART, role, or skills
 - **Mission Replay** — step-by-step timeline with tokens, cost, and duration per agent (`/missions/{id}/replay`)
 - **LLM Metrics Dashboard** — real-time cost/latency/provider monitoring at `/metrics`
@@ -59,7 +60,7 @@ Think of it as a **virtual software factory** where 191 AI agents collaborate th
 - **10 orchestration patterns** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
 - **SAFe-aligned lifecycle** — Portfolio → Epic → Feature → Story with PI cadence
 - **Auto-heal** — autonomous incident detection, triage, and self-repair
-- **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware, env-driven model config
+- **LLM resilience** — multi-provider fallback, jittered retry, rate-limit aware, env-driven model config; `gpt-5.2` for reasoning, `gpt-5.2-codex` for code/TDD, `gpt-5-mini` for discussion/docs
 - **OpenTelemetry observability** — distributed tracing with Jaeger, pipeline analytics dashboard
 - **Continuous watchdog** — auto-resume paused runs, stale session recovery, failed cleanup
 - **Security-first** — prompt injection guard, RBAC, secret scrubbing, connection pooling
@@ -1253,6 +1254,37 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 ### YAML Agents Hot-Reload
 - **Live agent updates** — edit agent YAML files and reload without restarting the platform
 - **No downtime** — in-flight missions continue with the previous agent definition
+
+## What's New in v3.1.0 (March 2026)
+
+### Multi-Node Cluster
+
+- **Master/slave topology** — IHM + SSE exclusively on master; API calls load-balanced across all nodes via nginx `least_conn`
+- **Shared PostgreSQL** — 100% PostgreSQL, zero SQLite; all nodes share the same database; advisory lock prevents schema race conditions on simultaneous startup
+- **Passive failover** — nginx marks a node down after 3 consecutive failures; traffic routes automatically to healthy nodes, recovers after 10 s
+- **Cluster node registry** — `platform_nodes` table tracks every node: role, mode, URL, CPU%, MEM%, version, heartbeat age
+- **Live topbar badges** — each node shown as a colored dot badge; green = online (< 60 s), red = stale; polls every 30 s via HTMX
+- **Click-to-popover details** — click any node badge to see full diagnostics: role/mode, URL, CPU, MEM, last seen, version
+- **`platform_cluster` agent tool** — Jarvis and all agents can query cluster health and load distribution in natural language
+
+### Security & Sandbox
+
+- **Landlock filesystem sandbox** — agent shell execution confined to workspace directory using Linux Landlock LSM (kernel 5.13+); zero impact on non-Linux hosts
+- **Security settings tab** — toggle sandbox on/off, view Landlock kernel support status from Settings → Security
+- **Pentest agent tools** — nmap port scanning, subfinder subdomain enumeration, whatweb tech fingerprinting, schemathesis API fuzzing, SQL injection, auth bypass, SSRF detection
+
+### Code Quality & LLM
+
+- **LLM code quality hardening** — SAST (bandit/semgrep) + cyclomatic complexity analysis injected into agent context before every code review phase
+- **DeerFlow context summarization** — recursive context compression + automatic memory extraction (arXiv:2503.09516); reduces token consumption on long-running agent sessions
+- **Executor heartbeat** — periodic heartbeat during agent execution prevents watchdog false-positive termination on long tasks
+- **Multi-model routing upgraded** — `gpt-5.2` for reasoning/architecture, `gpt-5.2-codex` for code/TDD, `gpt-5-mini` for discussion/docs; role-based, configurable via `AZURE_CODEX_MODEL`
+
+### Platform & SAFe
+
+- **SAFe terminology** — missions renamed to epics in all UI pages; portfolio stats display SAFe terms (Epics / Features / Stories / Tasks)
+- **Infra escalation** — when a sprint cannot find required build tools, `ft-infra-lead` is automatically spawned to install them before retrying
+- **Agent plan tools** — agents create structured plans with milestones and sub-tasks, stored in memory for cross-phase continuity
 
 ## Ecosystem & Related Tools
 

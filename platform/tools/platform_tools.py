@@ -1058,6 +1058,68 @@ class PlatformTmaTool(BaseTool):
         )
 
 
+class PlatformClusterTool(BaseTool):
+    name = "platform_cluster"
+    description = (
+        "List all cluster nodes with their status (online/stale), role (master/slave), "
+        "mode, URL, CPU%, MEM%, last_seen age, and version. "
+        "Use this to check cluster health, see which nodes are active, and report on load distribution."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from datetime import datetime
+
+        from ..db.migrations import get_db
+
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version "
+                "FROM platform_nodes ORDER BY role DESC, node_id"
+            ).fetchall()
+        except Exception as e:
+            return json.dumps({"error": str(e), "nodes": []})
+        finally:
+            db.close()
+
+        now = datetime.utcnow()
+        nodes = []
+        for r in rows:
+            try:
+                last_seen_dt = datetime.fromisoformat(
+                    str(r["last_seen"]).replace("Z", "").split(".")[0]
+                )
+                age_s = int((now - last_seen_dt).total_seconds())
+            except Exception:
+                age_s = 9999
+            nodes.append(
+                {
+                    "node_id": r["node_id"],
+                    "role": r["role"],
+                    "mode": r["mode"],
+                    "url": r["url"] or "",
+                    "status": "online" if age_s < 60 else "stale",
+                    "age_seconds": age_s,
+                    "cpu_pct": round(r["cpu_pct"] or 0, 1),
+                    "mem_pct": round(r["mem_pct"] or 0, 1),
+                    "version": r["version"] or "unknown",
+                }
+            )
+
+        online = sum(1 for n in nodes if n["status"] == "online")
+        return json.dumps(
+            {
+                "nodes": nodes,
+                "summary": {
+                    "total": len(nodes),
+                    "online": online,
+                    "stale": len(nodes) - online,
+                },
+            }
+        )
+
+
 def register_platform_tools(registry):
     """Register all platform introspection tools."""
     registry.register(PlatformAgentsTool())
@@ -1075,3 +1137,4 @@ def register_platform_tools(registry):
     registry.register(LaunchIdeationTool())
     registry.register(LaunchMktIdeationTool())
     registry.register(LaunchGroupIdeationTool())
+    registry.register(PlatformClusterTool())

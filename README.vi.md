@@ -54,11 +54,12 @@ Hãy tưởng tượng một **nhà máy phần mềm ảo** nơi 191 tác nhân
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **Khả năng phục hồi LLM** — fallback đa nhà cung cấp, retry với jitter, quản lý rate-limit; gpt-5.2 cho suy luận/kiến trúc, gpt-5.2-codex cho mã/TDD, gpt-5-mini cho tài liệu/thảo luận
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Cụm đa nút** — cấu trúc master/slave, PostgreSQL dùng chung, chuyển đổi dự phòng thụ động, badge nút trực tiếp trên topbar
 
 ## Ảnh chụp màn hình
 
@@ -1067,6 +1068,36 @@ Lớp chú thích trực quan tích hợp biến mỗi trang SF thành canvas đ
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Tính năng mới trong v3.1.0 (Tháng 3/2026)
+
+### Cụm đa nút
+
+- **Cấu trúc master/slave** — IHM + SSE chỉ trên master; các lời gọi API được cân bằng tải qua tất cả các nút via nginx `least_conn`
+- **PostgreSQL dùng chung** — 100% PostgreSQL, không dùng SQLite; tất cả các nút dùng chung cơ sở dữ liệu; advisory lock ngăn điều kiện race schema khi khởi động đồng thời
+- **Chuyển đổi dự phòng thụ động** — nginx đánh dấu nút là ngoại tuyến sau 3 lần thất bại liên tiếp; lưu lượng tự động chuyển đến các nút lành mạnh, phục hồi sau 10 giây
+- **Sổ đăng ký nút cụm** — bảng `platform_nodes` theo dõi mỗi nút: vai trò, chế độ, URL, CPU%, MEM%, phiên bản, tuổi heartbeat
+- **Badge nút trực tiếp trên topbar** — mỗi nút hiển thị dưới dạng badge chấm màu; xanh = trực tuyến (< 60 giây), đỏ = cũ; thăm dò mỗi 30 giây qua HTMX
+- **Chi tiết popover khi nhấp** — nhấp vào badge nút bất kỳ để xem chẩn đoán đầy đủ: vai trò/chế độ, URL, CPU, MEM, lần cuối thấy, phiên bản
+- **Công cụ tác nhân `platform_cluster`** — Jarvis và tất cả các tác nhân có thể truy vấn tình trạng cụm và phân phối tải bằng ngôn ngữ tự nhiên
+
+### Bảo mật & Sandbox
+
+- **Sandbox hệ thống tệp Landlock** — thực thi shell tác nhân giới hạn trong thư mục workspace sử dụng Linux Landlock LSM (kernel 5.13+); không ảnh hưởng đến host không phải Linux
+- **Tab cài đặt bảo mật** — bật/tắt sandbox, xem trạng thái hỗ trợ kernel Landlock từ Cài đặt → Bảo mật
+- **Công cụ tác nhân Pentest** — quét cổng nmap, liệt kê subdomain subfinder, fingerprinting công nghệ whatweb, fuzzing API schemathesis, SQL injection, bypass xác thực, phát hiện SSRF
+
+### Chất lượng mã & LLM
+
+- **Tăng cường chất lượng mã LLM** — SAST (bandit/semgrep) + phân tích độ phức tạp cyclomatic được chèn vào ngữ cảnh tác nhân trước mỗi giai đoạn đánh giá mã
+- **Tóm tắt ngữ cảnh DeerFlow** — nén ngữ cảnh đệ quy + trích xuất bộ nhớ tự động (arXiv:2503.09516); giảm tiêu thụ token trong các phiên tác nhân chạy dài
+- **Định tuyến đa mô hình nâng cấp** — `gpt-5.2` cho suy luận/kiến trúc, `gpt-5.2-codex` cho mã/TDD, `gpt-5-mini` cho thảo luận/tài liệu; dựa trên vai trò, có thể cấu hình qua `AZURE_CODEX_MODEL`
+
+### Nền tảng & SAFe
+
+- **Thuật ngữ SAFe** — nhiệm vụ được đổi tên thành epic trên tất cả các trang UI; thống kê danh mục hiển thị thuật ngữ SAFe (Epics / Features / Stories / Tasks)
+- **Leo thang hạ tầng** — khi sprint không thể tìm thấy công cụ build cần thiết, `ft-infra-lead` được tự động tạo để cài đặt chúng trước khi thử lại
+- **Công cụ kế hoạch tác nhân** — các tác nhân tạo kế hoạch có cấu trúc với các mốc và nhiệm vụ con, lưu trong bộ nhớ để duy trì tính liên tục giữa các giai đoạn
 
 ## Đóng Góp
 

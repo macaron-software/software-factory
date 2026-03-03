@@ -48,6 +48,7 @@ Imaginez une **usine logicielle virtuelle** où 191 agents IA collaborent à tra
 - **191 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
 - **36 workflows intégrés** — cérémonies SAFe, quality gates, maintenance nocturne, sécurité, gestion des connaissances
 - **8 groupes d'idéation** — CTO Jarvis, Business, Projet, Knowledge, Architecture, Sécurité, Data & IA, PI Planning
+- **Cluster multi-nœuds** — topologie master/slave sur PostgreSQL partagé ; load balancing nginx `least_conn` ; badges heartbeat live dans la topbar avec popover diagnostics au clic
 - **Marketplace d'agents** — découvrir et lancer des agents depuis `/marketplace` ; filtrer par ART, rôle ou compétences
 - **Replay de mission** — timeline pas-à-pas avec tokens, coût et durée par agent (`/missions/{id}/replay`)
 - **Dashboard Métriques LLM** — monitoring coût/latence/provider en temps réel à `/metrics`
@@ -59,10 +60,10 @@ Imaginez une **usine logicielle virtuelle** où 191 agents IA collaborent à tra
 - **10 patterns d'orchestration** — solo, séquentiel, parallèle, hiérarchique, réseau, boucle, routeur, agrégateur, vague, human-in-the-loop
 - **Cycle de vie SAFe** — Portfolio → Epic → Feature → Story avec cadence PI
 - **Auto-réparation** — détection autonome d'incidents, triage et auto-réparation
-- **Résilience LLM** — fallback multi-provider, retry avec jitter, gestion rate-limit, config modèle par env
+- **Résilience LLM** — fallback multi-provider, retry avec jitter ; `gpt-5.2` pour raisonnement/archi, `gpt-5.2-codex` pour code/TDD, `gpt-5-mini` pour discussion/docs
 - **Observabilité OpenTelemetry** — tracing distribué avec Jaeger, dashboard analytics pipeline
 - **Watchdog continu** — auto-reprise des runs en pause, récupération sessions bloquées, nettoyage échecs
-- **Sécurité prioritaire** — garde injection de prompt, RBAC, masquage secrets, connection pooling
+- **Sécurité prioritaire** — garde injection de prompt, RBAC, masquage secrets, Landlock sandbox
 - **Métriques DORA** — fréquence déploiement, lead time, MTTR, taux échec changements
 
 ## Captures d'écran
@@ -1232,6 +1233,37 @@ AZURE_AD_CLIENT_ID=...               # Azure AD OAuth
 JIRA_URL=https://votre-jira.atlassian.net
 SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ```
+
+## Nouveautés v3.1.0 (mars 2026)
+
+### Cluster multi-nœuds
+
+- **Topologie master/slave** — IHM + SSE exclusivement sur le master ; appels API répartis sur tous les nœuds via nginx `least_conn`
+- **PostgreSQL partagé** — 100 % PostgreSQL, zéro SQLite ; tous les nœuds partagent la même base ; verrou consultatif pour éviter les conflits de schema au démarrage simultané
+- **Failover passif** — nginx marque un nœud hors service après 3 échecs consécutifs ; le trafic bascule automatiquement sur les nœuds sains, récupération après 10 s
+- **Registre de nœuds** — table `platform_nodes` suit chaque nœud : rôle, mode, URL, CPU%, MEM%, version, âge du heartbeat
+- **Badges live dans la topbar** — chaque nœud affiché comme un badge coloré ; vert = en ligne (< 60 s), rouge = inactif ; polling toutes les 30 s via HTMX
+- **Popover diagnostics au clic** — cliquer sur un badge affiche les détails complets : rôle/mode, URL, CPU, MEM, dernière vue, version
+- **Outil `platform_cluster`** — Jarvis et tous les agents peuvent interroger la santé du cluster et la répartition de charge en langage naturel
+
+### Sécurité & Sandbox
+
+- **Sandbox Landlock** — exécution shell des agents confinée au répertoire workspace via Linux Landlock LSM (noyau 5.13+) ; sans impact sur les hôtes non-Linux
+- **Onglet Paramètres Sécurité** — activer/désactiver la sandbox, voir le statut Landlock depuis Paramètres → Sécurité
+- **Outils pentest agents** — nmap, subfinder, whatweb, schemathesis, injection SQL, bypass auth, détection SSRF
+
+### Qualité & LLM
+
+- **Durcissement qualité code LLM** — SAST (bandit/semgrep) + analyse de complexité cyclomatique injectés dans le contexte agent avant chaque phase de revue de code
+- **Résumé de contexte DeerFlow** — compression récursive du contexte + extraction mémoire automatique (arXiv:2503.09516) ; réduit la consommation de tokens sur les agents de longue durée
+- **Heartbeat executeur** — heartbeat périodique pendant l'exécution prévient les faux-positifs du watchdog sur les longues tâches
+- **Routage multi-modèles mis à jour** — `gpt-5.2` pour raisonnement/architecture, `gpt-5.2-codex` pour code/TDD, `gpt-5-mini` pour discussion/docs ; basé sur le rôle, configurable via `AZURE_CODEX_MODEL`
+
+### Plateforme & SAFe
+
+- **Terminologie SAFe** — les missions sont renommées en épics dans toutes les pages UI ; les stats portfolio affichent les termes SAFe (Epics / Features / Stories / Tasks)
+- **Escalade infra** — lorsqu'un sprint ne trouve pas les outils de build requis, `ft-infra-lead` est lancé automatiquement pour les installer avant de relancer
+- **Outils de plan agents** — les agents créent des plans structurés avec jalons et sous-tâches, stockés en mémoire pour la continuité inter-phases
 
 ## Contribuer
 

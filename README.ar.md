@@ -54,11 +54,12 @@ Software Factory هي **منصة متعددة الوكلاء المستقلة** 
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **مرونة LLM** — تراجع متعدد المزودين، إعادة المحاولة مع جيتر، إدارة حد المعدل؛ gpt-5.2 للاستدلال/البنية، gpt-5.2-codex للكود/TDD، gpt-5-mini للتوثيق/النقاش
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **نظام متعدد العقد** — طوبولوجيا رئيسي/تابع، PostgreSQL مشترك، تحويل تلقائي سلبي، شارات العقد الحية في شريط التنقل
 
 ## لقطات الشاشة
 
@@ -1067,6 +1068,36 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## الجديد في v3.1.0 (مارس 2026)
+
+### نظام متعدد العقد
+
+- **طوبولوجيا رئيسي/تابع** — IHM + SSE حصرياً على العقدة الرئيسية؛ توزيع أحمال استدعاءات API عبر جميع العقد عبر nginx `least_conn`
+- **PostgreSQL مشترك** — 100% PostgreSQL، بدون SQLite؛ جميع العقد تشترك في نفس قاعدة البيانات؛ advisory lock يمنع تعارض المخطط عند بدء التشغيل المتزامن
+- **Failover سلبي** — يضع nginx علامة على العقدة بعد 3 إخفاقات متتالية؛ يتم توجيه الحركة تلقائياً إلى العقد السليمة، ويتعافى بعد 10 ثوانٍ
+- **سجل عقد الكلاستر** — جدول `platform_nodes` يتتبع كل عقدة: الدور، الوضع، URL، CPU%، MEM%، الإصدار، عمر النبضة
+- **شارات الشريط العلوي الحية** — كل عقدة تظهر كنقطة ملونة؛ أخضر = متصل (< 60 ث)، أحمر = قديم؛ يتم الاستطلاع كل 30 ث عبر HTMX
+- **تفاصيل النافذة المنبثقة عند النقر** — انقر على أي شارة عقدة لرؤية التشخيص الكامل: الدور/الوضع، URL، CPU، MEM، آخر ظهور، الإصدار
+- **أداة وكيل `platform_cluster`** — يمكن لـ Jarvis وجميع الوكلاء الاستعلام عن صحة الكلاستر وتوزيع الحمل بلغة طبيعية
+
+### الأمان والبيئة المعزولة
+
+- **بيئة معزولة لنظام الملفات Landlock** — تنفيذ shell الوكيل محدود بدليل مساحة العمل باستخدام Linux Landlock LSM (نواة 5.13+)؛ لا تأثير على المضيفين غير Linux
+- **تبويب إعدادات الأمان** — تشغيل/إيقاف البيئة المعزولة، عرض حالة دعم نواة Landlock من الإعدادات ← الأمان
+- **أدوات وكيل Pentest** — فحص المنافذ nmap، تعداد النطاقات الفرعية subfinder، بصمات التقنيات whatweb، فحص API schemathesis، حقن SQL، تجاوز المصادقة، اكتشاف SSRF
+
+### جودة الكود وLLM
+
+- **تحسين جودة كود LLM** — يتم حقن SAST (bandit/semgrep) + تحليل التعقيد الدوري في سياق الوكيل قبل كل مرحلة مراجعة كود
+- **تلخيص سياق DeerFlow** — ضغط سياق متكرر + استخراج ذاكرة تلقائي (arXiv:2503.09516)؛ يقلل استهلاك التوكن في جلسات الوكيل الطويلة
+- **ترقية توجيه النماذج المتعددة** — `gpt-5.2` للاستدلال/البنية، `gpt-5.2-codex` للكود/TDD، `gpt-5-mini` للنقاش/التوثيق؛ مبني على الأدوار، يمكن تهيئته عبر `AZURE_CODEX_MODEL`
+
+### المنصة و SAFe
+
+- **مصطلحات SAFe** — إعادة تسمية المهام إلى Epics في جميع صفحات UI؛ إحصاءات المحفظة تعرض مصطلحات SAFe (Epics / Features / Stories / Tasks)
+- **تصعيد البنية التحتية** — عندما لا يتمكن Sprint من إيجاد أدوات البناء المطلوبة، يتم إطلاق `ft-infra-lead` تلقائياً لتثبيتها قبل إعادة المحاولة
+- **أدوات خطة الوكيل** — يُنشئ الوكلاء خططاً منظمة بمعالم ومهام فرعية، مخزنة في الذاكرة للاستمرارية عبر المراحل
 
 ## المساهمة
 

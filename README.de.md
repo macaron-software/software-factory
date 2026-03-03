@@ -54,11 +54,12 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 191 KI-Agenten ue
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management; gpt-5.2 für Reasoning/Architektur, gpt-5.2-codex für Code/TDD, gpt-5-mini für Docs/Diskussionen
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Multi-Node-Cluster** — Master/Slave-Topologie, gemeinsames PostgreSQL, passives Failover, Live-Knoten-Badges in der Topbar
 
 ## Screenshots
 
@@ -1067,6 +1068,36 @@ Eine eingebaute visuelle Annotationsschicht, die jede SF-Seite in ein kollaborat
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Neuheiten in v3.1.0 (März 2026)
+
+### Multi-Node-Cluster
+
+- **Master/Slave-Topologie** — IHM + SSE exklusiv auf dem Master; API-Aufrufe werden per nginx `least_conn` über alle Knoten lastverteilt
+- **Gemeinsames PostgreSQL** — 100% PostgreSQL, kein SQLite; alle Knoten teilen dieselbe Datenbank; Advisory Lock verhindert Schema-Race-Conditions beim gleichzeitigen Start
+- **Passives Failover** — nginx markiert einen Knoten nach 3 aufeinanderfolgenden Fehlern als ausgefallen; Datenverkehr wird automatisch zu gesunden Knoten weitergeleitet, Erholung nach 10 Sek.
+- **Cluster-Knotenregister** — Tabelle `platform_nodes` trackt jeden Knoten: Rolle, Modus, URL, CPU%, MEM%, Version, Heartbeat-Alter
+- **Live-Topbar-Badges** — jeder Knoten als farbiger Punkt-Badge; grün = online (< 60 Sek.), rot = veraltet; alle 30 Sek. per HTMX abgefragt
+- **Klick-Popover-Details** — Knoten-Badge anklicken für vollständige Diagnose: Rolle/Modus, URL, CPU, MEM, zuletzt gesehen, Version
+- **Agent-Tool `platform_cluster`** — Jarvis und alle Agenten können Cluster-Gesundheit und Lastverteilung in natürlicher Sprache abfragen
+
+### Sicherheit & Sandbox
+
+- **Landlock-Dateisystem-Sandbox** — Agent-Shell-Ausführung auf Workspace-Verzeichnis beschränkt via Linux Landlock LSM (Kernel 5.13+); kein Einfluss auf Nicht-Linux-Hosts
+- **Sicherheitseinstellungen-Tab** — Sandbox ein-/ausschalten, Landlock-Kernel-Unterstützungsstatus unter Einstellungen → Sicherheit einsehen
+- **Pentest-Agent-Tools** — nmap-Portscanning, subfinder-Subdomain-Enumeration, whatweb-Tech-Fingerprinting, schemathesis-API-Fuzzing, SQL-Injection, Auth-Bypass, SSRF-Erkennung
+
+### Code-Qualität & LLM
+
+- **LLM-Code-Qualitätshärtung** — SAST (bandit/semgrep) + zyklomatische Komplexitätsanalyse vor jeder Code-Review-Phase in den Agenten-Kontext injiziert
+- **DeerFlow-Kontextkomprimierung** — rekursive Kontextkompression + automatische Speicherextraktion (arXiv:2503.09516); reduziert Token-Verbrauch bei lang laufenden Agenten-Sessions
+- **Multi-Modell-Routing verbessert** — `gpt-5.2` für Reasoning/Architektur, `gpt-5.2-codex` für Code/TDD, `gpt-5-mini` für Diskussionen/Dokumentation; rollenbasiert, konfigurierbar via `AZURE_CODEX_MODEL`
+
+### Plattform & SAFe
+
+- **SAFe-Terminologie** — Missionen auf allen UI-Seiten in Epics umbenannt; Portfolio-Statistiken zeigen SAFe-Begriffe (Epics / Features / Stories / Tasks)
+- **Infra-Eskalation** — wenn ein Sprint die erforderlichen Build-Tools nicht findet, wird `ft-infra-lead` automatisch gestartet, um sie vor dem erneuten Versuch zu installieren
+- **Agenten-Plan-Tools** — Agenten erstellen strukturierte Pläne mit Meilensteinen und Unteraufgaben, die im Speicher für phasenübergreifende Kontinuität gespeichert werden
 
 ## Mitwirken
 

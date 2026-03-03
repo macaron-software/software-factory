@@ -54,11 +54,12 @@ Software Factory एक **स्वायत्त बहु-एजेंट प
 - **10 ऑर्केस्ट्रेशन पैटर्न** — Solo, Sequential, Parallel, Hierarchical, Network, Loop, Router, Aggregator, Wave, Human-in-the-Loop
 - **SAFe-संरेखित जीवनचक्र** — Portfolio -> Epic -> Feature -> Story, PI Cadence के साथ
 - **स्व-उपचार** — स्वायत्त घटना पहचान, ट्राइएज और स्व-मरम्मत
-- **LLM लचीलापन** — Multi-Provider Fallback, Jitter-Retry, Rate-Limit प्रबंधन, पर्यावरण चर-नियंत्रित मॉडल कॉन्फ़िगरेशन
+- **LLM लचीलापन** — Multi-Provider Fallback, Jitter-Retry, Rate-Limit प्रबंधन; gpt-5.2 Reasoning/Architecture के लिए, gpt-5.2-codex Code/TDD के लिए, gpt-5-mini Docs/Discussion के लिए
 - **OpenTelemetry ऑब्जर्वेबिलिटी** — Jaeger के साथ Distributed Tracing, Pipeline Analytics Dashboard
 - **निरंतर Watchdog** — रुके हुए Runs की स्वत: पुनर्शुरुआत, सत्र पुनर्प्राप्ति, विफल Runs की सफाई
 - **सुरक्षा प्रथम** — Prompt Injection Guard, RBAC, Secret Scrubbing, Connection Pooling
 - **DORA मेट्रिक्स** — Deployment Frequency, Lead Time, MTTR, Change Failure Rate
+- **Multi-Node Cluster** — Master/Slave Topology, साझा PostgreSQL, Passive Failover, Topbar में Live Node Badges
 
 ## स्क्रीनशॉट
 
@@ -1067,6 +1068,36 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ### YAML Agent Hot-Reload
 - **Live Agent Updates** — YAML Files edit करें और Platform restart किए बिना reload करें
 - **Zero Downtime** — running Missions previous Agent Definition use करती रहती हैं
+
+## v3.1.0 में नया (मार्च 2026)
+
+### Multi-Node Cluster
+
+- **Master/Slave Topology** — IHM + SSE केवल Master पर; API Calls nginx `least_conn` के माध्यम से सभी Nodes में Load-Balanced
+- **साझा PostgreSQL** — 100% PostgreSQL, शून्य SQLite; सभी Nodes एक ही Database साझा करते हैं; Advisory Lock एक साथ Startup पर Schema Race Conditions को रोकता है
+- **Passive Failover** — nginx 3 लगातार Failures के बाद Node को Down mark करता है; Traffic स्वचालित रूप से Healthy Nodes पर Route होती है, 10 सेकंड में Recovery
+- **Cluster Node Registry** — `platform_nodes` Table हर Node track करती है: Role, Mode, URL, CPU%, MEM%, Version, Heartbeat Age
+- **Live Topbar Badges** — हर Node एक रंगीन Dot Badge के रूप में दिखाया जाता है; हरा = Online (< 60 सेकंड), लाल = Stale; HTMX के माध्यम से हर 30 सेकंड में Poll
+- **Click-to-Popover Details** — किसी भी Node Badge पर Click करें पूर्ण Diagnostics देखने के लिए: Role/Mode, URL, CPU, MEM, Last Seen, Version
+- **`platform_cluster` Agent Tool** — Jarvis और सभी Agents प्राकृतिक भाषा में Cluster Health और Load Distribution query कर सकते हैं
+
+### Security और Sandbox
+
+- **Landlock Filesystem Sandbox** — Linux Landlock LSM (Kernel 5.13+) का उपयोग करके Agent Shell Execution को Workspace Directory तक सीमित; Non-Linux Hosts पर शून्य प्रभाव
+- **Security Settings Tab** — Settings → Security से Sandbox on/off toggle करें, Landlock Kernel Support Status देखें
+- **Pentest Agent Tools** — nmap Port Scanning, subfinder Subdomain Enumeration, whatweb Tech Fingerprinting, schemathesis API Fuzzing, SQL Injection, Auth Bypass, SSRF Detection
+
+### Code Quality और LLM
+
+- **LLM Code Quality Hardening** — हर Code Review Phase से पहले SAST (bandit/semgrep) + Cyclomatic Complexity Analysis Agent Context में inject किया जाता है
+- **DeerFlow Context Summarization** — Recursive Context Compression + Automatic Memory Extraction (arXiv:2503.09516); लंबे Agent Sessions में Token Consumption कम करता है
+- **Multi-Model Routing Upgraded** — Reasoning/Architecture के लिए `gpt-5.2`, Code/TDD के लिए `gpt-5.2-codex`, Discussion/Docs के लिए `gpt-5-mini`; Role-Based, `AZURE_CODEX_MODEL` के माध्यम से Configurable
+
+### Platform और SAFe
+
+- **SAFe Terminology** — सभी UI Pages में Missions को Epics के रूप में Rename किया गया; Portfolio Stats SAFe Terms प्रदर्शित करती हैं (Epics / Features / Stories / Tasks)
+- **Infra Escalation** — जब Sprint आवश्यक Build Tools नहीं ढूंढ सकता, `ft-infra-lead` स्वचालित रूप से Retry से पहले उन्हें Install करने के लिए Spawn किया जाता है
+- **Agent Plan Tools** — Agents Milestones और Sub-tasks के साथ Structured Plans बनाते हैं, Cross-Phase Continuity के लिए Memory में Stored
 
 ## योगदान
 

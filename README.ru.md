@@ -54,11 +54,12 @@ Software Factory — это **автономная многоагентная п
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **Устойчивость LLM** — многопровайдерный fallback, retry с джиттером, контроль rate-limit; gpt-5.2 для рассуждений/архитектуры, gpt-5.2-codex для кода/TDD, gpt-5-mini для документации/обсуждений
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Многоузловой кластер** — топология мастер/слейв, общий PostgreSQL, пассивный failover, живые значки узлов в топбаре
 
 ## Скриншоты
 
@@ -1067,6 +1068,36 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Новое в v3.1.0 (март 2026)
+
+### Многоузловой кластер
+
+- **Топология мастер/слейв** — IHM + SSE только на мастере; вызовы API балансируются по всем узлам через nginx `least_conn`
+- **Общий PostgreSQL** — 100% PostgreSQL, без SQLite; все узлы используют одну базу данных; advisory lock предотвращает гонку схем при одновременном запуске
+- **Пассивный failover** — nginx помечает узел как недоступный после 3 последовательных отказов; трафик автоматически перенаправляется на исправные узлы, восстановление через 10 с
+- **Реестр узлов кластера** — таблица `platform_nodes` отслеживает каждый узел: роль, режим, URL, CPU%, MEM%, версию, возраст heartbeat
+- **Живые значки в топбаре** — каждый узел отображается цветной точкой; зелёный = в сети (< 60 с), красный = устарел; обновление каждые 30 с через HTMX
+- **Всплывающая детализация по клику** — нажмите на значок узла для просмотра полной диагностики: роль/режим, URL, CPU, MEM, последняя активность, версия
+- **Инструмент агента `platform_cluster`** — Jarvis и все агенты могут запрашивать состояние кластера и распределение нагрузки на естественном языке
+
+### Безопасность и изолированная среда
+
+- **Landlock-песочница файловой системы** — выполнение оболочки агента ограничено рабочим каталогом с использованием Linux Landlock LSM (ядро 5.13+); не влияет на не-Linux-хосты
+- **Вкладка настроек безопасности** — включение/отключение песочницы, просмотр статуса поддержки Landlock в Настройках → Безопасность
+- **Инструменты агента Pentest** — сканирование портов nmap, перечисление поддоменов subfinder, отпечатки технологий whatweb, фаззинг API schemathesis, SQL-инъекция, обход авторизации, обнаружение SSRF
+
+### Качество кода и LLM
+
+- **Улучшение качества кода LLM** — SAST (bandit/semgrep) + анализ цикломатической сложности вводятся в контекст агента перед каждой фазой проверки кода
+- **Суммаризация контекста DeerFlow** — рекурсивное сжатие контекста + автоматическое извлечение памяти (arXiv:2503.09516); снижает потребление токенов в длительных сессиях агентов
+- **Улучшенная маршрутизация мультимодели** — `gpt-5.2` для рассуждений/архитектуры, `gpt-5.2-codex` для кода/TDD, `gpt-5-mini` для обсуждений/документации; ролевая маршрутизация, настраивается через `AZURE_CODEX_MODEL`
+
+### Платформа и SAFe
+
+- **Терминология SAFe** — задачи переименованы в эпики на всех страницах UI; статистика портфолио использует термины SAFe (Epics / Features / Stories / Tasks)
+- **Инфра-эскалация** — если спринт не может найти необходимые инструменты сборки, автоматически запускается `ft-infra-lead` для их установки перед повторной попыткой
+- **Инструменты плана агента** — агенты создают структурированные планы с этапами и подзадачами, хранящимися в памяти для межфазной непрерывности
 
 ## Участие
 

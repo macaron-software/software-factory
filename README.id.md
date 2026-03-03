@@ -54,11 +54,12 @@ Bayangkan sebuah **pabrik perangkat lunak virtual** di mana 191 agen AI berkolab
 - **10 Orchestrierungsmuster** — Solo, Sequentiell, Parallel, Hierarchisch, Netzwerk, Schleife, Router, Aggregator, Welle, Human-in-the-Loop
 - **SAFe-ausgerichteter Lebenszyklus** — Portfolio → Epic → Feature → Story mit PI-Kadenz
 - **Selbstheilung** — autonome Vorfallserkennung, Triage und Selbstreparatur
-- **LLM-Resilienz** — Multi-Provider-Fallback, Jitter-Retry, Rate-Limit-Management, umgebungsvariablengesteuerte Modellkonfiguration
+- **Ketahanan LLM** — fallback multi-penyedia, retry dengan jitter, manajemen rate-limit; gpt-5.2 untuk penalaran/arsitektur, gpt-5.2-codex untuk kode/TDD, gpt-5-mini untuk dokumentasi/diskusi
 - **OpenTelemetry-Observabilitaet** — Distributed Tracing mit Jaeger, Pipeline-Analytics-Dashboard
 - **Kontinuierlicher Watchdog** — Auto-Wiederaufnahme pausierter Runs, Sitzungswiederherstellung, Bereinigung fehlgeschlagener Runs
 - **Sicherheit zuerst** — Prompt-Injection-Guard, RBAC, Secret-Scrubbing, Connection-Pooling
 - **DORA-Metriken** — Bereitstellungshaeufigkeit, Lead Time, MTTR, Change Failure Rate
+- **Kluster multi-node** — topologi master/slave, PostgreSQL bersama, failover pasif, lencana node langsung di topbar
 
 ## Tangkapan Layar
 
@@ -1067,6 +1068,36 @@ Lapisan anotasi visual bawaan yang mengubah setiap halaman SF menjadi kanvas ula
 ### YAML-Agenten-Hot-Reload
 - **Live-Agenten-Updates** — YAML-Dateien bearbeiten und ohne Neustart der Plattform nachladen
 - **Kein Ausfall** — laufende Missionen nutzen weiterhin die vorherige Agentendefinition
+
+## Fitur Baru v3.1.0 (Maret 2026)
+
+### Kluster Multi-Node
+
+- **Topologi master/slave** — IHM + SSE eksklusif di master; panggilan API di-load-balance ke semua node via nginx `least_conn`
+- **PostgreSQL bersama** — 100% PostgreSQL, nol SQLite; semua node berbagi database yang sama; advisory lock mencegah kondisi balapan skema saat startup bersamaan
+- **Failover pasif** — nginx menandai node sebagai down setelah 3 kegagalan berturut-turut; traffic secara otomatis dialihkan ke node yang sehat, pulih setelah 10 detik
+- **Registri node kluster** — tabel `platform_nodes` melacak setiap node: peran, mode, URL, CPU%, MEM%, versi, usia heartbeat
+- **Badge topbar langsung** — setiap node ditampilkan sebagai badge titik berwarna; hijau = online (< 60 detik), merah = kadaluwarsa; polling setiap 30 detik via HTMX
+- **Detail popover saat diklik** — klik badge node mana pun untuk melihat diagnostik lengkap: peran/mode, URL, CPU, MEM, terakhir terlihat, versi
+- **Alat agen `platform_cluster`** — Jarvis dan semua agen dapat mengkueri kesehatan kluster dan distribusi beban dalam bahasa natural
+
+### Keamanan & Sandbox
+
+- **Sandbox filesystem Landlock** — eksekusi shell agen dibatasi ke direktori workspace menggunakan Linux Landlock LSM (kernel 5.13+); tidak berpengaruh pada host non-Linux
+- **Tab pengaturan keamanan** — aktifkan/nonaktifkan sandbox, lihat status dukungan kernel Landlock dari Pengaturan → Keamanan
+- **Alat agen Pentest** — pemindaian port nmap, enumerasi subdomain subfinder, fingerprinting teknologi whatweb, fuzzing API schemathesis, injeksi SQL, bypass autentikasi, deteksi SSRF
+
+### Kualitas Kode & LLM
+
+- **Penguatan kualitas kode LLM** — SAST (bandit/semgrep) + analisis kompleksitas siklomatik diinjeksikan ke konteks agen sebelum setiap fase tinjauan kode
+- **Ringkasan konteks DeerFlow** — kompresi konteks rekursif + ekstraksi memori otomatis (arXiv:2503.09516); mengurangi konsumsi token pada sesi agen yang berjalan lama
+- **Routing multi-model ditingkatkan** — `gpt-5.2` untuk penalaran/arsitektur, `gpt-5.2-codex` untuk kode/TDD, `gpt-5-mini` untuk diskusi/dokumentasi; berbasis peran, dapat dikonfigurasi via `AZURE_CODEX_MODEL`
+
+### Platform & SAFe
+
+- **Terminologi SAFe** — misi diubah nama menjadi epics di semua halaman UI; statistik portofolio menampilkan istilah SAFe (Epics / Features / Stories / Tasks)
+- **Eskalasi infra** — ketika sprint tidak dapat menemukan alat build yang diperlukan, `ft-infra-lead` secara otomatis di-spawn untuk menginstalnya sebelum mencoba lagi
+- **Alat rencana agen** — agen membuat rencana terstruktur dengan tonggak dan sub-tugas, disimpan dalam memori untuk kesinambungan lintas fase
 
 ## Kontribusi
 

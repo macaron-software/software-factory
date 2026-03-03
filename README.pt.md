@@ -54,11 +54,12 @@ Pense nela como uma **fábrica de software virtual** onde 191 agentes de IA cola
 - **10 padrões de orquestração** — solo, sequencial, paralelo, hierárquico, rede, loop, roteador, agregador, onda, human-in-the-loop
 - **Ciclo de vida alinhado ao SAFe** — Portfolio → Epic → Feature → Story com cadência de PI
 - **Auto-correção** — detecção autônoma de incidentes, triagem e auto-reparo
-- **Resiliência LLM** — fallback multi-provedor, retry com jitter, controle de rate-limit, configuração de modelo via variáveis de ambiente
+- **Resiliência LLM** — fallback multi-provedor, retry com jitter, controle de rate-limit; gpt-5.2 para raciocínio/arquitetura, gpt-5.2-codex para código/TDD, gpt-5-mini para documentação/discussão
 - **Observabilidade OpenTelemetry** — rastreamento distribuído com Jaeger, dashboard de analytics do pipeline
 - **Watchdog contínuo** — retomada automática de execuções pausadas, recuperação de sessões obsoletas, limpeza de falhas
 - **Segurança em primeiro lugar** — proteção contra injeção de prompt, RBAC, sanitização de segredos, connection pooling
 - **Métricas DORA** — frequência de deploy, lead time, MTTR, taxa de falha de mudanças
+- **Cluster multi-nó** — topologia mestre/escravo, PostgreSQL compartilhado, failover passivo, badges de nós em tempo real na topbar
 
 ## Capturas de Tela
 
@@ -1067,6 +1068,36 @@ Uma camada de anotação visual integrada que transforma qualquer página da SF 
 ### Recarga Automática de Agentes YAML
 - **Atualizações de agentes ao vivo** — edite arquivos YAML de agentes e recarregue sem reiniciar a plataforma
 - **Sem tempo de inatividade** — missões em andamento continuam com a definição anterior do agente
+
+## Novidades na v3.1.0 (março 2026)
+
+### Cluster multi-nó
+
+- **Topologia mestre/escravo** — IHM + SSE exclusivamente no mestre; chamadas de API balanceadas em todos os nós via nginx `least_conn`
+- **PostgreSQL compartilhado** — 100% PostgreSQL, zero SQLite; todos os nós partilham a mesma base de dados; advisory lock evita condições de corrida de esquema no arranque simultâneo
+- **Failover passivo** — nginx marca um nó como inativo após 3 falhas consecutivas; o tráfego é encaminhado automaticamente para nós saudáveis, recuperação após 10 s
+- **Registo de nós do cluster** — tabela `platform_nodes` rastreia cada nó: papel, modo, URL, CPU%, MEM%, versão, idade do heartbeat
+- **Badges ao vivo na topbar** — cada nó exibido como um ponto colorido; verde = online (< 60 s), vermelho = obsoleto; sondagem a cada 30 s via HTMX
+- **Detalhes em popover ao clicar** — clique em qualquer badge de nó para ver diagnóstico completo: papel/modo, URL, CPU, MEM, última vez visto, versão
+- **Ferramenta de agente `platform_cluster`** — Jarvis e todos os agentes podem consultar a saúde do cluster e a distribuição de carga em linguagem natural
+
+### Segurança e Sandbox
+
+- **Sandbox de sistema de ficheiros Landlock** — execução de shell do agente confinada ao diretório workspace usando Linux Landlock LSM (kernel 5.13+); zero impacto em hosts não Linux
+- **Separador de configurações de segurança** — ativar/desativar sandbox, ver estado de suporte do kernel Landlock em Definições → Segurança
+- **Ferramentas de agente Pentest** — scanning de portas nmap, enumeração de subdomínios subfinder, fingerprinting de tecnologias whatweb, fuzzing de API schemathesis, injeção SQL, bypass de autenticação, deteção de SSRF
+
+### Qualidade de Código e LLM
+
+- **Reforço da qualidade de código LLM** — SAST (bandit/semgrep) + análise de complexidade ciclomática injetados no contexto do agente antes de cada fase de revisão de código
+- **Sumarização de contexto DeerFlow** — compressão recursiva de contexto + extração automática de memória (arXiv:2503.09516); reduz o consumo de tokens em sessões de agente de longa duração
+- **Roteamento multi-modelo melhorado** — `gpt-5.2` para raciocínio/arquitetura, `gpt-5.2-codex` para código/TDD, `gpt-5-mini` para discussão/documentação; baseado em papéis, configurável via `AZURE_CODEX_MODEL`
+
+### Plataforma e SAFe
+
+- **Terminologia SAFe** — missões renomeadas para epics em todas as páginas de UI; estatísticas do portfólio exibem termos SAFe (Epics / Features / Stories / Tasks)
+- **Escalada de infra** — quando um sprint não consegue encontrar as ferramentas de build necessárias, `ft-infra-lead` é automaticamente instanciado para as instalar antes de nova tentativa
+- **Ferramentas de plano de agente** — os agentes criam planos estruturados com marcos e sub-tarefas, armazenados na memória para continuidade entre fases
 
 ## Contribuindo
 
