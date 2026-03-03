@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from datetime import datetime
 
 from fastapi import APIRouter, Request
@@ -36,17 +37,26 @@ def import_time():
 @router.get("/api/health", responses={200: {"model": HealthResponse}})
 async def health_check():
     """Liveness/readiness probe for Docker healthcheck."""
+    import socket
+
     from ....db.migrations import get_db
 
+    node_id = os.environ.get(
+        "SF_NODE_ID", os.environ.get("HOSTNAME", socket.gethostname())
+    )
+    mode = os.environ.get("PLATFORM_MODE", "full")
     try:
         db = get_db()
         try:
             db.execute("SELECT 1")
         finally:
             db.close()
-        return JSONResponse({"status": "ok"})
+        return JSONResponse({"status": "ok", "node": node_id, "mode": mode})
     except Exception as e:
-        return JSONResponse({"status": "error", "detail": str(e)}, status_code=503)
+        return JSONResponse(
+            {"status": "error", "detail": str(e), "node": node_id, "mode": mode},
+            status_code=503,
+        )
 
 
 @router.get("/api/health/modules")

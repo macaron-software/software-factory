@@ -111,9 +111,9 @@ async def lifespan(app: FastAPI):
 
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
 
-    # PLATFORM_MODE: full (default) | factory (headless) | ui (web-only)
+    # PLATFORM_MODE: full (default) | factory (headless) | ui (web-only) | slave (API-only, no IHM)
     _mode = os.environ.get("PLATFORM_MODE", "full").lower()
-    if _mode not in ("full", "factory", "ui"):
+    if _mode not in ("full", "factory", "ui", "slave"):
         logger.warning("Unknown PLATFORM_MODE=%r — falling back to 'full'", _mode)
         _mode = "full"
     if _mode != "full":
@@ -1236,11 +1236,13 @@ def create_app() -> FastAPI:
     from .web.routes.api.health import router as health_router
 
     app.include_router(health_router)
-    if _mode != "factory":
+    # slave mode: API-only, no IHM (web UI), no SSE write endpoints
+    if _mode not in ("factory", "slave"):
         from .web.routes import router as web_router
 
         app.include_router(web_router)
-    app.include_router(sse_router, prefix="/sse")
+    if _mode != "slave":
+        app.include_router(sse_router, prefix="/sse")
 
     # Routes — optional (safe mode: import failures are logged, not fatal)
     _loaded_modules: list[str] = []
