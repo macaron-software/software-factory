@@ -162,18 +162,25 @@ def _get_environments() -> list[dict]:
     """Read cluster nodes from platform_nodes registry instead of hardcoded envs."""
     from datetime import datetime
 
-    from ...db.migrations import get_db
-
-    db = get_db()
+    db = None
+    rows = []
     try:
+        from ....db.migrations import get_db
+
+        db = get_db()
         rows = db.execute(
             "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version"
             " FROM platform_nodes ORDER BY role DESC, node_id"
         ).fetchall()
-    except Exception:
+    except Exception as _exc:
+        logger.warning("_get_environments DB error: %s", _exc)
         rows = []
     finally:
-        db.close()
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
     if not rows:
         # Fallback: no nodes registered yet — show static config if env vars set
@@ -198,14 +205,17 @@ def _get_environments() -> list[dict]:
     now = datetime.utcnow()
     results = []
     for r in rows:
+        db_status = r["status"] or "unknown"
         try:
             last_seen_dt = datetime.fromisoformat(
                 str(r["last_seen"]).replace("Z", "").split(".")[0]
             )
             age_s = int((now - last_seen_dt).total_seconds())
+            # Consider online if DB says so AND heartbeat within last 3 minutes
+            is_online = db_status == "online" and age_s < 180
         except Exception:
             age_s = 9999
-        is_online = age_s < 60
+            is_online = db_status == "online"
         role = r["role"] or ""
         mode = r["mode"] or ""
         name = f"{r['node_id']} ({role}/{mode})"
