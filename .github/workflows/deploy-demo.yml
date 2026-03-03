@@ -1,4 +1,4 @@
-name: Deploy → OVH Demo
+name: Deploy → OVH Demo + Innovation
 
 # SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
 # - permissions: contents: read — GITHUB_TOKEN ne peut pas modifier le repo
@@ -201,3 +201,35 @@ jobs:
 
           echo "=== Deploy complete: active=$INACTIVE ==="
           ENDSSH
+
+  deploy-azure:
+    runs-on: ubuntu-latest
+    needs: deploy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Set up SSH (Azure)
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AZURE_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa 2>/dev/null || exit 0
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy skills + platform to Azure
+        env:
+          AZURE_IP: ${{ secrets.AZURE_IP }}
+          AZURE_USER: ${{ secrets.AZURE_SSH_USER }}
+        run: |
+          [ -z "$AZURE_IP" ] && echo "AZURE_IP secret not set, skipping" && exit 0
+          [ -z "$AZURE_USER" ] && AZURE_USER="macaron"
+          # Rsync skills and platform code
+          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/skills/ || exit 0
+          rsync -az --checksum platform/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/platform/ || exit 0
+          # Copy skills into running container and clear cache
+          ssh ${AZURE_USER}@${AZURE_IP} "
+            docker cp /opt/macaron/skills/. deploy-platform-1:/app/skills/ 2>/dev/null && \
+            echo 'skills copied to container' || echo 'docker cp skipped'
+            echo 'Azure deploy complete'
+          "
+          echo "=== Azure deploy done ==="
