@@ -1,6 +1,85 @@
 """Mission orchestrator — core mission execution logic.
 
 Extracted from web/routes/epics.py to keep route handlers thin.
+
+═══════════════════════════════════════════════════════════════════════════════
+DECISIONS ET CORRECTIFS (historique, ordre chronologique)
+═══════════════════════════════════════════════════════════════════════════════
+
+[Fix #2] quality_score jamais assigné (2026-02)
+  Symptôme : toutes les phases retournaient Q=None même quand les agents avaient
+  produit du code et des tests.
+  Cause    : _compute_quality_score() n'était pas appelé en fin de phase.
+  Fix      : appel systématique après chaque phase, score stocké en DB.
+
+[Fix #3] done_with_issues accepté comme succès silencieux (2026-02)
+  Symptôme : une phase marquée "done_with_issues" passait à la suivante sans alerte.
+  Décision : done_with_issues = échec pour les phases critiques (tdd-sprint, env-setup).
+  Fix      : critical_phase = True → reloop si done_with_issues.
+
+[Fix #4] adversarial review sans contexte code (2026-02)
+  Symptôme : l'agent adversarial critiquait du "code imaginaire" car il n'avait pas
+  accès aux fichiers du workspace.
+  Fix      : injection des fichiers workspace dans le prompt adversarial.
+
+[Fix #5] feature-deploy = simulation LLM (2026-02)
+  Symptôme : la phase feature-deploy ne lançait pas de vrai build — l'agent décrivait
+  juste ce qu'il "ferait" sans exécuter cargo build / npm test.
+  Fix      : prompts explicites avec commandes build/test réelles à exécuter via tool.
+
+[Fix #6a] Sprint N+1 lancé même si cargo test PASSE (2026-02)
+  Symptôme : after a sprint success (cargo test OK), the orchestrator launched sprint 2.
+  Cause    : le break sur phase_success=True était absent.
+  Fix      : break immédiat dès que phase_success=True. Commit commentaire ~1288.
+
+[Fix #6b] Stack confusion — agents écrivent TypeScript dans un projet Rust (2026-02)
+  Symptôme : sur OVH M01 (Rust), ft-auth-dev2 créait src/index.ts (TypeScript).
+  Cause    : le stack fingerprint (lecture Cargo.toml/package.json) n'était injecté
+  que pour le sprint N+1, pas pour le sprint 1.
+  Fix      : injection du fingerprint dès le sprint 1 via phase_task. Voir ~872.
+
+[Fix #7] Infra escalation — cargo/docker-compose not found (2026-02, commit 491b0bf91)
+  Symptôme : le sprint échouait silencieusement avec "cargo: not found" (exit 127).
+  L'agent relançait le sprint N+1 identique → boucle infinie.
+  Décision architecturale : les agents DEV ne peuvent pas installer des outils.
+  C'est le rôle de ft-infra-lead (équipe infra). Flux :
+    sprint fail + _detect_tool_not_found() → run ft-infra-lead solo-phase →
+    ft-infra-lead met à jour docker-compose.project.yml + écrit BUILD_INSTRUCTIONS.md →
+    prev_context injecté avec les bonnes commandes → sprint retry.
+  Règle : toujours "docker compose" (v2, intégré Docker CLI), jamais "docker-compose"
+  (v1, binaire séparé, absent des containers SF).
+
+[Fix #8] Briefs longs → escaping SSH cassé (2026-03)
+  Symptôme : les briefs v9 (~1500 chars) contenaient ', ", \n, # etc.
+  Les tentatives d'échappement shell (.replace('"', '\\"') etc.) étaient fragiles.
+  Fix : base64.b64encode(brief) → string safe [A-Za-z0-9+/=] → passée en SSH →
+  base64.b64decode() dans le container Python → string originale intacte.
+
+═══════════════════════════════════════════════════════════════════════════════
+PRINCIPES D'ORCHESTRATION (décisions structurelles)
+═══════════════════════════════════════════════════════════════════════════════
+
+[P1] Métaworkflow NON linéaire
+  Les missions ne suivent pas un pipeline fixe "dev → test → deploy".
+  Si un outil manque (cargo, mvn, node) → escalade INFRA avant de continuer DEV.
+  L'équipe infra est une équipe comme les autres, appelable mid-sprint.
+
+[P2] Stack fingerprint = source de vérité
+  L'orchestrateur lit Cargo.toml / package.json / go.mod / pom.xml / pyproject.toml
+  pour détecter le vrai stack du projet. Ce fingerprint est injecté dans CHAQUE
+  sprint (pas juste le N+1) pour éviter la confusion cross-stack des agents.
+
+[P3] Version lock dans les briefs
+  Chaque brief spécifie les versions exactes (ex: "TypeScript: 5.4.5", "Axum: 0.7").
+  Sans ça, les agents choisissent les dernières versions → incompatibilités,
+  breaking changes, comportements non testés par la SF.
+
+[P4] Quality score = signal composite (pas juste "passe/échoue")
+  Q = combinaison de : nb messages agents, durée phase, succès build/tests,
+  réponse adversarial. Permet de détecter les phases "complétées trop vite"
+  (agents qui feignent le succès sans vraiment travailler).
+
+═══════════════════════════════════════════════════════════════════════════════
 """
 
 from __future__ import annotations
