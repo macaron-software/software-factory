@@ -194,7 +194,266 @@
     </div>
   </div>
 
-  <!-- 4. Footer KPIs -->
+  <!-- 4. Architecture interne SF -->
+  <div class="ck-card" style="padding:1rem 1.25rem">
+    <div class="ck-card-title" style="margin-bottom:1rem">
+      <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
+      Architecture interne — Software Factory
+    </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <svg id="sf-arch-diagram" viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;min-width:700px;max-width:900px;display:block;margin:0 auto;font-family:inherit">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#6b7280"/>
+          </marker>
+          <marker id="arr-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#a855f7"/>
+          </marker>
+          <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6"/>
+          </marker>
+          <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#22c55e"/>
+          </marker>
+        </defs>
+
+        <!-- ── Row 1: User / External ── -->
+        <!-- Browser/User -->
+        <rect x="20" y="20" width="110" height="44" rx="6" fill="rgba(99,102,241,.12)" stroke="#6366f1" stroke-width="1.2"/>
+        <text x="75" y="37" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="700">BROWSER / CLI</text>
+        <text x="75" y="52" text-anchor="middle" fill="#6b7280" font-size="8">HTTP · SSE · WS</text>
+
+        <!-- GitHub / CI -->
+        <rect x="160" y="20" width="110" height="44" rx="6" fill="rgba(99,102,241,.12)" stroke="#6366f1" stroke-width="1.2"/>
+        <text x="215" y="37" text-anchor="middle" fill="#a5b4fc" font-size="9" font-weight="700">GITHUB ACTIONS</text>
+        <text x="215" y="52" text-anchor="middle" fill="#6b7280" font-size="8">CI / CD · Quality Gates</text>
+
+        <!-- LLM Providers (top right) -->
+        <rect x="620" y="10" width="260" height="64" rx="6" fill="rgba(168,85,247,.08)" stroke="#a855f7" stroke-width="1.2" stroke-dasharray="4,2"/>
+        <text x="750" y="28" text-anchor="middle" fill="#a855f7" font-size="8" font-weight="700">LLM PROVIDERS</text>
+        <rect x="630" y="35" width="60" height="28" rx="4" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1"/>
+        <text x="660" y="53" text-anchor="middle" fill="#d8b4fe" font-size="8" font-weight="600">MiniMax</text>
+        <rect x="698" y="35" width="70" height="28" rx="4" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1"/>
+        <text x="733" y="53" text-anchor="middle" fill="#d8b4fe" font-size="8" font-weight="600">Azure OpenAI</text>
+        <rect x="776" y="35" width="60" height="28" rx="4" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1"/>
+        <text x="806" y="53" text-anchor="middle" fill="#d8b4fe" font-size="8" font-weight="600">Codex</text>
+
+        <!-- ── Row 2: FastAPI Platform ── -->
+        <rect x="20" y="100" width="560" height="110" rx="8" fill="rgba(30,30,46,.6)" stroke="#334155" stroke-width="1.5"/>
+        <text x="300" y="118" text-anchor="middle" fill="#94a3b8" font-size="8" font-weight="700" letter-spacing="2">FASTAPI PLATFORM  ·  8090</text>
+
+        <!-- Auth/Security -->
+        <rect x="35" y="126" width="100" height="68" rx="5" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1"/>
+        <text x="85" y="142" text-anchor="middle" fill="#fca5a5" font-size="8" font-weight="700">AUTH</text>
+        <text x="85" y="155" text-anchor="middle" fill="#6b7280" font-size="7">JWT · API Keys</text>
+        <text x="85" y="166" text-anchor="middle" fill="#6b7280" font-size="7">Roles: admin</text>
+        <text x="85" y="177" text-anchor="middle" fill="#6b7280" font-size="7">developer · viewer</text>
+
+        <!-- Routes -->
+        <rect x="145" y="126" width="100" height="68" rx="5" fill="rgba(59,130,246,.1)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="195" y="142" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="700">ROUTES (10)</text>
+        <text x="195" y="155" text-anchor="middle" fill="#6b7280" font-size="7">projects · agents</text>
+        <text x="195" y="166" text-anchor="middle" fill="#6b7280" font-size="7">missions · epics</text>
+        <text x="195" y="177" text-anchor="middle" fill="#6b7280" font-size="7">patterns · cockpit</text>
+
+        <!-- Middlewares -->
+        <rect x="255" y="126" width="100" height="68" rx="5" fill="rgba(245,158,11,.1)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="305" y="142" text-anchor="middle" fill="#fcd34d" font-size="8" font-weight="700">MIDDLEWARE</text>
+        <text x="305" y="155" text-anchor="middle" fill="#6b7280" font-size="7">Auth enforce</text>
+        <text x="305" y="166" text-anchor="middle" fill="#6b7280" font-size="7">OTEL · I18n</text>
+        <text x="305" y="177" text-anchor="middle" fill="#6b7280" font-size="7">Onboarding</text>
+
+        <!-- SSE / Streams -->
+        <rect x="365" y="126" width="100" height="68" rx="5" fill="rgba(34,197,94,.1)" stroke="#22c55e" stroke-width="1"/>
+        <text x="415" y="142" text-anchor="middle" fill="#86efac" font-size="8" font-weight="700">SSE / STREAM</text>
+        <text x="415" y="155" text-anchor="middle" fill="#6b7280" font-size="7">Agent events</text>
+        <text x="415" y="166" text-anchor="middle" fill="#6b7280" font-size="7">Live updates</text>
+        <text x="415" y="177" text-anchor="middle" fill="#6b7280" font-size="7">Bus A2A</text>
+
+        <!-- Services -->
+        <rect x="475" y="126" width="90" height="68" rx="5" fill="rgba(168,85,247,.1)" stroke="#a855f7" stroke-width="1"/>
+        <text x="520" y="142" text-anchor="middle" fill="#d8b4fe" font-size="8" font-weight="700">SERVICES</text>
+        <text x="520" y="155" text-anchor="middle" fill="#6b7280" font-size="7">Notifications</text>
+        <text x="520" y="166" text-anchor="middle" fill="#6b7280" font-size="7">Analytics</text>
+        <text x="520" y="177" text-anchor="middle" fill="#6b7280" font-size="7">Webhooks</text>
+
+        <!-- ── Row 3: Core Engine ── -->
+        <!-- Agent System -->
+        <rect x="20" y="245" width="280" height="130" rx="8" fill="rgba(168,85,247,.07)" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="160" y="263" text-anchor="middle" fill="#a855f7" font-size="8" font-weight="700" letter-spacing="2">AGENT SYSTEM  ·  156 agents</text>
+
+        <rect x="35" y="272" width="75" height="50" rx="5" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1"/>
+        <text x="72" y="288" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="700">ROUTER</text>
+        <text x="72" y="300" text-anchor="middle" fill="#6b7280" font-size="7">Intent</text>
+        <text x="72" y="311" text-anchor="middle" fill="#6b7280" font-size="7">dispatch</text>
+
+        <rect x="120" y="272" width="75" height="50" rx="5" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1"/>
+        <text x="157" y="288" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="700">LOOP</text>
+        <text x="157" y="300" text-anchor="middle" fill="#6b7280" font-size="7">ReAct cycle</text>
+        <text x="157" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Tool calls</text>
+
+        <rect x="205" y="272" width="80" height="50" rx="5" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width="1"/>
+        <text x="245" y="288" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">SAFETY</text>
+        <text x="245" y="300" text-anchor="middle" fill="#6b7280" font-size="7">A2A Veto</text>
+        <text x="245" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Guardrails</text>
+
+        <!-- Skill/Agent store -->
+        <rect x="35" y="333" width="250" height="30" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="160" y="352" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skill Library · Agent Store · YAML specs</text>
+
+        <!-- Pattern Engine -->
+        <rect x="320" y="245" width="260" height="130" rx="8" fill="rgba(59,130,246,.07)" stroke="#2563eb" stroke-width="1.5"/>
+        <text x="450" y="263" text-anchor="middle" fill="#3b82f6" font-size="8" font-weight="700" letter-spacing="2">PATTERN ENGINE  ·  15 patterns</text>
+
+        <rect x="335" y="272" width="68" height="50" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="369" y="288" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">SEQUENTIAL</text>
+        <text x="369" y="300" text-anchor="middle" fill="#6b7280" font-size="7">Waterfall</text>
+        <text x="369" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Chain</text>
+
+        <rect x="413" y="272" width="68" height="50" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="447" y="288" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">PARALLEL</text>
+        <text x="447" y="300" text-anchor="middle" fill="#6b7280" font-size="7">Fanout</text>
+        <text x="447" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Consensus</text>
+
+        <rect x="491" y="272" width="74" height="50" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="528" y="288" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">ADVERSARIAL</text>
+        <text x="528" y="300" text-anchor="middle" fill="#6b7280" font-size="7">Critic loop</text>
+        <text x="528" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Auto-heal</text>
+
+        <rect x="335" y="333" width="230" height="30" rx="4" fill="rgba(59,130,246,.08)" stroke="#2563eb" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="450" y="352" text-anchor="middle" fill="#3b82f6" font-size="7.5" font-weight="600">SAFe Missions · Epics · Features · Stories</text>
+
+        <!-- ── Row 4: Data + Tools + Ops ── -->
+        <!-- Data layer -->
+        <rect x="20" y="405" width="185" height="110" rx="8" fill="rgba(16,185,129,.07)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="112" y="422" text-anchor="middle" fill="#10b981" font-size="8" font-weight="700" letter-spacing="2">DATA LAYER</text>
+
+        <rect x="35" y="432" width="70" height="36" rx="4" fill="rgba(16,185,129,.15)" stroke="#10b981" stroke-width="1"/>
+        <text x="70" y="447" text-anchor="middle" fill="#6ee7b7" font-size="7.5" font-weight="700">PostgreSQL</text>
+        <text x="70" y="459" text-anchor="middle" fill="#6b7280" font-size="7">prod (Azure)</text>
+
+        <rect x="115" y="432" width="70" height="36" rx="4" fill="rgba(16,185,129,.15)" stroke="#10b981" stroke-width="1"/>
+        <text x="150" y="447" text-anchor="middle" fill="#6ee7b7" font-size="7.5" font-weight="700">SQLite</text>
+        <text x="150" y="459" text-anchor="middle" fill="#6b7280" font-size="7">dev / local</text>
+
+        <rect x="35" y="476" width="150" height="28" rx="4" fill="rgba(16,185,129,.08)" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="110" y="494" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="600">Memory · Vector · MCP</text>
+
+        <!-- Tools layer -->
+        <rect x="220" y="405" width="185" height="110" rx="8" fill="rgba(245,158,11,.07)" stroke="#d97706" stroke-width="1.5"/>
+        <text x="312" y="422" text-anchor="middle" fill="#f59e0b" font-size="8" font-weight="700" letter-spacing="2">TOOLS</text>
+
+        <rect x="235" y="432" width="65" height="36" rx="4" fill="rgba(245,158,11,.15)" stroke="#d97706" stroke-width="1"/>
+        <text x="267" y="447" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="700">Code</text>
+        <text x="267" y="459" text-anchor="middle" fill="#6b7280" font-size="7">read/write/run</text>
+
+        <rect x="310" y="432" width="65" height="36" rx="4" fill="rgba(245,158,11,.15)" stroke="#d97706" stroke-width="1"/>
+        <text x="342" y="447" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="700">Git / Deploy</text>
+        <text x="342" y="459" text-anchor="middle" fill="#6b7280" font-size="7">CI · Docker</text>
+
+        <rect x="235" y="476" width="140" height="28" rx="4" fill="rgba(245,158,11,.08)" stroke="#d97706" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="305" y="494" text-anchor="middle" fill="#f59e0b" font-size="7.5" font-weight="600">Browser · Security · MCP Bridge</text>
+
+        <!-- Ops layer -->
+        <rect x="420" y="405" width="160" height="110" rx="8" fill="rgba(239,68,68,.07)" stroke="#dc2626" stroke-width="1.5"/>
+        <text x="500" y="422" text-anchor="middle" fill="#ef4444" font-size="8" font-weight="700" letter-spacing="2">OPS</text>
+
+        <rect x="435" y="432" width="60" height="36" rx="4" fill="rgba(239,68,68,.15)" stroke="#dc2626" stroke-width="1"/>
+        <text x="465" y="447" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">Auto-Heal</text>
+        <text x="465" y="459" text-anchor="middle" fill="#6b7280" font-size="7">watchdog</text>
+
+        <rect x="505" y="432" width="60" height="36" rx="4" fill="rgba(239,68,68,.15)" stroke="#dc2626" stroke-width="1"/>
+        <text x="535" y="447" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">Chaos</text>
+        <text x="535" y="459" text-anchor="middle" fill="#6b7280" font-size="7">endurance</text>
+
+        <rect x="435" y="476" width="130" height="28" rx="4" fill="rgba(239,68,68,.08)" stroke="#dc2626" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="500" y="494" text-anchor="middle" fill="#ef4444" font-size="7.5" font-weight="600">Backup · Restore · OTEL</text>
+
+        <!-- Infrastructure nodes (right) -->
+        <rect x="600" y="245" width="280" height="270" rx="8" fill="rgba(51,65,85,.4)" stroke="#334155" stroke-width="1.5"/>
+        <text x="740" y="263" text-anchor="middle" fill="#94a3b8" font-size="8" font-weight="700" letter-spacing="2">INFRASTRUCTURE</text>
+
+        <rect x="615" y="272" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
+        <text x="672" y="288" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="700">Azure sf-node-1</text>
+        <text x="672" y="300" text-anchor="middle" fill="#6b7280" font-size="7">52.143.158.19</text>
+        <text x="672" y="311" text-anchor="middle" fill="#6b7280" font-size="7">systemd · full</text>
+        <text x="672" y="322" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">● master</text>
+
+        <rect x="748" y="272" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
+        <text x="805" y="288" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="700">Azure sf-node-2</text>
+        <text x="805" y="300" text-anchor="middle" fill="#6b7280" font-size="7">40.89.174.75</text>
+        <text x="805" y="311" text-anchor="middle" fill="#6b7280" font-size="7">systemd · full</text>
+        <text x="805" y="322" text-anchor="middle" fill="#94a3b8" font-size="7">○ worker</text>
+
+        <rect x="615" y="340" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
+        <text x="672" y="356" text-anchor="middle" fill="#6ee7b7" font-size="8" font-weight="700">OVH Demo</text>
+        <text x="672" y="368" text-anchor="middle" fill="#6b7280" font-size="7">54.36.183.124</text>
+        <text x="672" y="379" text-anchor="middle" fill="#6b7280" font-size="7">Docker blue-green</text>
+        <text x="672" y="390" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">● active</text>
+
+        <rect x="748" y="340" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
+        <text x="805" y="356" text-anchor="middle" fill="#a5b4fc" font-size="8" font-weight="700">Local Dev</text>
+        <text x="805" y="368" text-anchor="middle" fill="#6b7280" font-size="7">localhost:8099</text>
+        <text x="805" y="379" text-anchor="middle" fill="#6b7280" font-size="7">Python · SQLite</text>
+        <text x="805" y="390" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="600">● dev</text>
+
+        <rect x="615" y="408" width="248" height="30" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="739" y="421" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Nginx · OTEL/Jaeger :16686</text>
+        <text x="739" y="432" text-anchor="middle" fill="#6b7280" font-size="7">GitHub Actions CI/CD (deploy-demo.yml)</text>
+
+        <rect x="615" y="446" width="248" height="56" rx="5" fill="rgba(16,185,129,.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="739" y="461" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="700">PostgreSQL Cluster</text>
+        <text x="739" y="473" text-anchor="middle" fill="#6b7280" font-size="7">10.0.1.6:5432 · sfplatform DB</text>
+        <text x="739" y="485" text-anchor="middle" fill="#6b7280" font-size="7">projects · agents · missions · epics</text>
+        <text x="739" y="497" text-anchor="middle" fill="#6b7280" font-size="7">patterns · skills · workflows · api_keys</text>
+
+        <!-- ── Arrows ── -->
+        <!-- Browser → Platform -->
+        <line x1="75" y1="64" x2="200" y2="100" stroke="#6b7280" stroke-width="1" marker-end="url(#arr)"/>
+        <!-- Browser → Platform (direct) -->
+        <line x1="130" y1="42" x2="145" y2="130" stroke="#6366f1" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+        <!-- GitHub → Platform -->
+        <line x1="215" y1="64" x2="250" y2="100" stroke="#6b7280" stroke-width="1" marker-end="url(#arr)"/>
+
+        <!-- Platform → Agent System -->
+        <line x1="160" y1="210" x2="160" y2="245" stroke="#a855f7" stroke-width="1.2" marker-end="url(#arr-purple)"/>
+        <!-- Platform → Pattern Engine -->
+        <line x1="390" y1="210" x2="430" y2="245" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr-blue)"/>
+
+        <!-- Agent System ↔ Pattern Engine -->
+        <line x1="300" y1="305" x2="320" y2="305" stroke="#7c3aed" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#arr-purple)"/>
+
+        <!-- Agent System → LLM -->
+        <path d="M 300 270 Q 580 200 620 60" stroke="#a855f7" stroke-width="1.2" fill="none" marker-end="url(#arr-purple)"/>
+        <!-- Pattern Engine → LLM -->
+        <path d="M 580 260 Q 620 180 630 74" stroke="#3b82f6" stroke-width="1" fill="none" stroke-dasharray="4,2" marker-end="url(#arr-blue)"/>
+
+        <!-- Agent System → Data -->
+        <line x1="112" y1="375" x2="112" y2="405" stroke="#10b981" stroke-width="1.2" marker-end="url(#arr-green)"/>
+        <!-- Agent System → Tools -->
+        <line x1="240" y1="375" x2="275" y2="405" stroke="#f59e0b" stroke-width="1" marker-end="url(#arr)"/>
+        <!-- Pattern Engine → Ops -->
+        <line x1="420" y1="375" x2="470" y2="405" stroke="#ef4444" stroke-width="1" marker-end="url(#arr)"/>
+
+        <!-- Platform → Infra -->
+        <line x1="580" y1="155" x2="620" y2="280" stroke="#334155" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arr)"/>
+
+        <!-- Légende -->
+        <text x="25" y="530" fill="#6b7280" font-size="7">→ flow de données</text>
+        <line x1="75" y1="527" x2="100" y2="527" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="103" y="530" fill="#6b7280" font-size="7">agent/LLM</text>
+        <line x1="140" y1="527" x2="165" y2="527" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="168" y="530" fill="#6b7280" font-size="7">orchestration</text>
+        <line x1="215" y1="527" x2="240" y2="527" stroke="#10b981" stroke-width="1.5"/>
+        <text x="243" y="530" fill="#6b7280" font-size="7">données</text>
+        <line x1="275" y1="527" x2="300" y2="527" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="303" y="530" fill="#6b7280" font-size="7">dépendance</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 5. Footer KPIs -->
   <div class="kpi-bar" id="kpiBar">
     <div class="kpi-item">
       <span class="kpi-label">TMA Tickets</span>
