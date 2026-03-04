@@ -577,7 +577,7 @@ async function runPhase(runId) {
 async function deleteRun(runId, runName) {
     openDeleteModal({
         title: 'Supprimer cet epic',
-        subtitle: 'Supprime l'epic et toutes les données associées',
+        subtitle: 'Supprime l\'epic et toutes les données associées',
         warning: 'Sprints, tâches, sessions, messages, traces LLM et artefacts seront définitivement supprimés.',
         expectedName: runName || runId.slice(0,8),
         onConfirm: async () => {
