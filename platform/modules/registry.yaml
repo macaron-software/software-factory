@@ -27,6 +27,28 @@ modules:
     data_file: "data/component_gallery.db"
     builtin: true
 
+  - id: laws-of-ux
+    name: "Laws of UX"
+    description: "30 evidence-based cognitive and psychological principles for UI/UX design (Jon Yablonski, MIT). Injected into agent context for user story writing, UX audit, and design critique. Covers Hick's Law, Miller's Law, Fitts's Law, Cognitive Load, Peak-End Rule, Doherty Threshold, Pareto, Tesler, and 22 more."
+    category: ux-design
+    icon: "book"
+    source_url: "https://lawsofux.com"
+    repo_url: "https://github.com/nicedoc/lawsofux"
+    license: "MIT"
+    tools:
+      - lrm_ux_laws_list
+      - lrm_ux_laws_get
+      - lrm_ux_laws_for_context
+    install: "python -m mcp_lrm.ux_laws_scraper"
+    update: "python -m mcp_lrm.ux_laws_scraper --update"
+    data_file: "data/ux_laws.db"
+    builtin: false
+    skill: "skills/ux-laws.md"
+    # SOURCE: Jon Yablonski — https://lawsofux.com (MIT)
+    # WHY: 30 cognitive laws directly applicable to US acceptance criteria,
+    #      UX audit checklists, and design critique prompts. Agents use these
+    #      to validate UI proposals against cognitive science before shipping.
+
   # ── DEVELOPMENT ────────────────────────────────────────────────────────────
 
   - id: npm-registry
@@ -138,6 +160,25 @@ modules:
     requires:
       - "INFISICAL_TOKEN"
       - "INFISICAL_PROJECT_ID"
+
+  - id: landlock
+    name: "Landlock — Kernel Filesystem Sandbox"
+    description: "Linux Landlock LSM (kernel ≥5.13): filesystem-level isolation for agent shell commands. Restricts read/write paths per agent run. Implemented in platform/tools/sandbox.py + bundled landlock-runner binary. Enabled via Settings → Security → security.landlock_enabled."
+    category: security
+    icon: "shield-off"
+    source_url: "https://landlock.io"
+    repo_url: "https://github.com/landlock-lsm/rust-landlock"
+    license: "MIT"
+    tools:
+      - sandbox_run
+      - sandbox_check
+    install: "# bundled — Linux kernel ≥5.13 required. macOS: sandboxed via subprocess only."
+    check_cmd: "python3 -c \"from platform_module.tools.sandbox import is_landlock_available; print(is_landlock_available())\""
+    builtin: true
+    # SOURCE: https://landlock.io — Linux security module for sandboxing
+    # WHY: agent shell commands must be scoped to project directory.
+    #      Landlock provides kernel-enforced path restriction with near-zero overhead.
+    #      On macOS dev: falls back to process-level containment (no kernel support).
 
   # ── DEVOPS / INFRA ─────────────────────────────────────────────────────────
 
