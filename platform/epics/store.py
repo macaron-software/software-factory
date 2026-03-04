@@ -64,12 +64,15 @@ class SprintDef:
     number: int = 1
     name: str = ""
     goal: str = ""
-    status: str = "planning"  # planning|active|review|completed|failed
+    status: str = "planning"  # planning|active|review|completed|failed|rejected
     retro_notes: str = ""
     velocity: int = 0  # SAFe: story points completed
     planned_sp: int = 0  # SAFe: story points planned
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
+    type: str = "tdd"  # inception|infra|tdd|adversarial|qa|deploy
+    quality_score: int = 0
+    team_agents: str = "[]"  # JSON list of agent ids
 
 
 @dataclass
@@ -112,7 +115,14 @@ def _row_to_mission(row) -> MissionDef:
         time_criticality=row["time_criticality"] if "time_criticality" in keys else 0,
         risk_reduction=row["risk_reduction"] if "risk_reduction" in keys else 0,
         job_duration=row["job_duration"] if "job_duration" in keys else 1,
-        category=row["category"] if "category" in keys else "functional",
+        category=row["category"]
+        if "category" in keys
+        else (
+            "system"
+            if (row["type"] or "")
+            in ("tma", "security", "debt", "architecture", "program", "audit", "sast")
+            else "functional"
+        ),
         active_phases=json.loads(
             row["active_phases_json"] if "active_phases_json" in keys else "[]"
         )
@@ -137,6 +147,13 @@ def _row_to_sprint(row) -> SprintDef:
         planned_sp=row["planned_sp"] if "planned_sp" in cols else 0,
         started_at=row["started_at"],
         completed_at=row["completed_at"],
+        type=row["type"] if "type" in cols and row["type"] else "tdd",
+        quality_score=row["quality_score"]
+        if "quality_score" in cols and row["quality_score"]
+        else 0,
+        team_agents=row["team_agents"]
+        if "team_agents" in cols and row["team_agents"]
+        else "[]",
     )
 
 
@@ -511,8 +528,9 @@ class EpicStore:
         try:
             db.execute(
                 """INSERT INTO sprints (id, mission_id, number, name, goal, status,
-                   retro_notes, velocity, planned_sp, started_at, completed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                   retro_notes, velocity, planned_sp, started_at, completed_at,
+                   type, quality_score, team_agents)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     s.id,
                     s.mission_id,
@@ -525,6 +543,9 @@ class EpicStore:
                     s.planned_sp,
                     s.started_at,
                     s.completed_at,
+                    s.type,
+                    s.quality_score,
+                    s.team_agents,
                 ),
             )
             db.commit()

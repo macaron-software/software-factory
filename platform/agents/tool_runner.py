@@ -1995,9 +1995,14 @@ async def _execute_tool(
     if name == "create_ticket":
         return await _tool_create_ticket(args, ctx)
 
-    # ── Backlog tools (create_feature, create_story) — handled by platform_tools registry ──
+    # ── Backlog tools (create_feature, create_story, create_sprint) — handled by platform_tools registry ──
     if name in ("create_feature", "create_story"):
         return await _tool_platform_backlog(name, args, ctx)
+
+    if name == "create_sprint":
+        from ..tools.platform_tools import PlatformCreateSprintTool
+
+        return await PlatformCreateSprintTool().execute(args, ctx.agent)
 
     # ── Local CI pipeline ──
     if name == "local_ci":

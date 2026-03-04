@@ -344,6 +344,44 @@ class PlatformCreateStoryTool(BaseTool):
         return json.dumps({"ok": True, "story_id": story.id, "title": story.title})
 
 
+class PlatformCreateSprintTool(BaseTool):
+    name = "create_sprint"
+    description = (
+        "Create a sprint record for an epic (mission). "
+        "Params: epic_id (required), name, goal, type (inception|infra|tdd|adversarial|qa|deploy), "
+        "number (sprint number), planned_sp (story points planned), team_agents (list of agent ids). "
+        "Returns sprint_id and number."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+        from ..epics.store import get_epic_run_store, SprintDef
+
+        epic_id = params.get("epic_id", "")
+        if not epic_id:
+            return _json.dumps({"error": "epic_id is required"})
+        store = get_epic_run_store()
+        # Auto-compute sprint number
+        existing = store.list_sprints(epic_id)
+        number = params.get("number", len(existing) + 1)
+        team = params.get("team_agents", [])
+        sprint = SprintDef(
+            mission_id=epic_id,
+            number=number,
+            name=params.get("name", f"Sprint {number}"),
+            goal=params.get("goal", ""),
+            type=params.get("type", "tdd"),
+            planned_sp=params.get("planned_sp", 0),
+            team_agents=_json.dumps(team) if isinstance(team, list) else team,
+            status="active",
+        )
+        sprint = store.create_sprint(sprint)
+        return _json.dumps(
+            {"ok": True, "sprint_id": sprint.id, "number": sprint.number}
+        )
+
+
 class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
@@ -1272,6 +1310,7 @@ def register_platform_tools(registry):
     registry.register(PlatformWorkflowsTool())
     registry.register(PlatformCreateFeatureTool())
     registry.register(PlatformCreateStoryTool())
+    registry.register(PlatformCreateSprintTool())
     registry.register(PlatformCreateProjectTool())
     registry.register(PlatformCreateDomainTool())
     registry.register(PlatformCreateMissionTool())
