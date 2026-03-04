@@ -967,14 +967,7 @@ function showSettingsTab(id) {
     event.target.closest('.settings-tab').classList.add('active');
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
-    if (id === 'orchestrator') {
-        refreshLoad();
-        clearInterval(_loadPollTimer);
-        _loadPollTimer = setInterval(refreshLoad, 30000);
-    } else {
-        clearInterval(_loadPollTimer);
-        _loadPollTimer = null;
-    }
+    if (id === 'orchestrator') refreshLoad();
     if (id === 'modules') loadModulesTab();
 }
 // Restore last tab
