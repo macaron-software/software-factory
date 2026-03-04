@@ -61,17 +61,14 @@ deploy-node1:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     - *setup_ssh
-    - NODE2="${NODE2_IP:-40.89.174.75}"
-    - NODE1="${NODE1_IP:-52.143.158.19}"
-    - ssh-keyscan -H "$NODE2" >> ~/.ssh/known_hosts 2>/dev/null || true
-    - echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
     - |
-      cat > ~/.ssh/config << EOF
-      Host ${NODE1}
-        ProxyCommand ssh -W %h:%p -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@${NODE2}
-        IdentityFile ~/.ssh/id_ed25519
-        StrictHostKeyChecking no
-      EOF
+      NODE2="${NODE2_IP:-40.89.174.75}"
+      NODE1="${NODE1_IP:-52.143.158.19}"
+      ssh-keyscan -H "$NODE2" >> ~/.ssh/known_hosts 2>/dev/null || true
+      echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
+      printf 'Host %s\n  ProxyCommand ssh -W %%h:%%p -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@%s\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking no\n' \
+        "$NODE1" "$NODE2" > ~/.ssh/config
+      echo "--- SSH config ---" && cat ~/.ssh/config
   script:
     - |
       NODE1="${NODE1_IP:-52.143.158.19}"
