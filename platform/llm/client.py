@@ -1,39 +1,7 @@
 """LLM Client — unified async interface for all providers.
 
 All providers use OpenAI-compatible chat/completions API:
-- Azure AI Foundry (azure-openai) — PRIMARY on SF Innovation cluster
-- MiniMax M2.5 (api.minimax.io) — FALLBACK when Azure rate limits hit
-
-# ──────────────────────────────────────────────────────────────────
-# SF INNOVATION CLUSTER — INTENDED MODEL ROUTING
-# ──────────────────────────────────────────────────────────────────
-# Provider: azure-openai (Azure AI Foundry endpoint)
-# Endpoint: AZURE_OPENAI_ENDPOINT=https://ascii-ui-openai.openai.azure.com
-# Key:      AZURE_OPENAI_API_KEY  (Azure AI Foundry key — refresh from portal if 401)
-#
-# Model routing by use-case:
-#   gpt-5.2         → reasoning, architecture, deep analysis (AZURE_DEPLOY_GPT52=gpt-52)
-#   gpt-5.2-codex   → code generation, TDD, refactoring    (AZURE_DEPLOY_CODEX2=gpt-5.2-codex)
-#   gpt-5-mini      → small talk, documentation, summaries (AZURE_DEPLOY_GPT5_MINI=gpt-5-mini)
-#
-# Fallback chain (AZURE_DEPLOY must be 0 to allow MiniMax fallback):
-#   azure-openai → minimax (rate-limit overflow / 429) → azure-ai → openai
-#
-# Why MiniMax as fallback? Azure AI Foundry rate limits are low (~6 req/min).
-# MiniMax M2.5 handles overflow. Set PLATFORM_LLM_PROVIDER=azure-openai,
-# AZURE_DEPLOY=0 (NOT 1 — AZURE_DEPLOY=1 was legacy azure-only, breaks fallback).
-#
-# /etc/sf-platform/secrets on SF Innovation nodes:
-#   AZURE_DEPLOY=0                         ← allows MiniMax fallback
-#   PLATFORM_LLM_PROVIDER=azure-openai     ← Azure AI Foundry as primary
-#   AZURE_OPENAI_API_KEY=<foundry key>     ← refresh from Azure portal if 401
-#   AZURE_OPENAI_ENDPOINT=https://ascii-ui-openai.openai.azure.com
-#   MINIMAX_API_KEY=<minimax key>          ← fallback (must NOT have JIRA token appended)
-#
-# Pitfall: JIRA_API_TOKEN was concatenated to MINIMAX_API_KEY by an agent (corrupts key).
-#   Symptom: minimax key length 169 chars (correct = 125, starts with sk-cp-).
-# ──────────────────────────────────────────────────────────────────
-
+- Azure AI Foundry GPT-5.2 (swedencentral) — leaders, control, architecture
 - NVIDIA/Kimi K2 (integrate.api.nvidia.com) — fast production workers
 - MiniMax M2.5 (api.minimaxi.chat) — fallback, thinking model
 - Claude CLI / Copilot CLI — offline headless (slow, 10-12s)
@@ -146,12 +114,8 @@ _PROVIDERS = {
     },
 }
 
-# Fallback order:
-#   SF Innovation: azure-openai (AI Foundry) → minimax → azure-ai → openai
-#   Local dev:     minimax → azure-openai → azure-ai → openai
-#
-# IMPORTANT: AZURE_DEPLOY must be 0 on SF Innovation to allow MiniMax fallback.
-#   AZURE_DEPLOY=1 was legacy "azure-only" mode — do not use (breaks MiniMax fallback).
+# Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
+# Auto-detect Azure when AZURE_DEPLOY=1 (not just from key presence)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
