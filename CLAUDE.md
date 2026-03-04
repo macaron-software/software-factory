@@ -36,6 +36,63 @@ _SOFTWARE_FACTORY/     # Agent Platform + Dashboard
 
 Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — archived)
 
+## GAME SPRINT v2 (game-sprint workflow — Innovation server)
+
+```
+Workflow: game-sprint (is_builtin=0, PostgreSQL)
+6 phases: game-inception → env-setup → tdd-sprint (loop) → adversarial-review → feature-e2e → feature-deploy
+
+Agents game (PostgreSQL):
+  game-architect (David Rousseau) — tools: code_write, read_file, list_files, create_feature, create_story, create_sprint
+  game-dev-lead  (Alex Martin)    — tools: code_read, code_write, code_edit, list_files, run_tests
+  game-dev-js    (Sofia Chen)     — tools: code_read, code_write, code_edit, list_files
+  game-qa        (Marco Rivera)   — tools: generic
+  game-critic    (Jordan Kim)     — tools: read_file, list_files, code_read (adversarial reviewer)
+  game-designer  (Emma Larsson)   — tools: code_write, read_file
+
+Tool create_sprint: PlatformCreateSprintTool (platform/tools/platform_tools.py)
+  → tool_runner.py dispatch: name=="create_sprint"
+  → SprintDef: +type, +quality_score, +team_agents (ALTER TABLE done on PG)
+
+Pac-Man run: epic=pac-epic-c1722e87, last_run=546ddd29 (paused, needs resume)
+Old stuck run a9628f7f → cancelled
+```
+
+## PROBLÈME ORCHESTRATION — À IMPLÉMENTER (PRIORITÉ HAUTE)
+
+```
+CONSTAT: tout ce qui devrait être fait par Jarvis/RTE/PO est fait manuellement.
+Le flow cible autonome:
+  Brief → [Jarvis] → délègue à [PO] → create_feature/create_story/create_sprint
+                   → délègue à [RTE] → launch_epic_run / monitor / resume / escalate
+                   → [RTE] surveille phases → re-trigger si paused → rapporte dans Hub
+
+MANQUANT:
+  1. Agent "jarvis" — top-level orchestrateur (reçoit brief, délègue PO+RTE)
+  2. Tools RTE: launch_epic_run, resume_run, check_run_status (dans platform_tools.py)
+  3. Auto-resume watchdog: reset paused→paused au lieu de relancer réellement
+  4. PO (product/Laura Vidal) non branché au lancement workflow
+
+AGENTS EXISTANTS MAIS NON CONNECTÉS:
+  rte (Marc Delacroix) — Release Train Engineer
+  release_train_engineer (Bastien Clément) — RTE
+  product (Laura Vidal) — Product Owner
+  product-manager-art (Isabelle Renaud) — Product Manager
+
+SPRINT TYPES (sprints.type column, PG):
+  inception | infra | tdd | adversarial | qa | deploy
+```
+
+## LLM METRICS FIX (commit 0dac8744b)
+
+```
+Problème: stream() n'appelait jamais _trace() → metrics page 0 data
+Fix 1: LLMStreamChunk +tokens_in +tokens_out; _do_stream() capture data.usage SSE
+Fix 2: stream() accumule content+tokens → appelle _trace()+_persist_usage() post-stream
+Fix 3: observability.stats() _coerce() Decimal→float (PG AVG retourne NUMERIC)
+Résultat: 4540 calls/24h, $7.72/24h visible en metrics
+```
+
 ## REPOSITORIES (2 dépôts séparés)
 
 ```
