@@ -119,6 +119,26 @@ modules:
     requires:
       - "SNYK_TOKEN (optional)"
 
+  - id: infisical
+    name: "Infisical — Secrets Vault"
+    description: "Open-source secrets manager. Agents can read, list, rotate secrets via Infisical. All agent secret access goes through platform/tools/infisical_tools.py — write ops require 'secrets_manager' role."
+    category: security
+    icon: "🔐"
+    source_url: "https://infisical.com"
+    repo_url: "https://github.com/Infisical/infisical"
+    license: "MIT"
+    tools:
+      - get_secret
+      - list_secrets
+      - set_secret
+      - rotate_secret
+    install: "pip install infisical-python"
+    check_cmd: "python3 -c \"import infisical\""
+    builtin: false
+    requires:
+      - "INFISICAL_TOKEN"
+      - "INFISICAL_PROJECT_ID"
+
   # ── DEVOPS / INFRA ─────────────────────────────────────────────────────────
 
   - id: rtk
@@ -135,6 +155,21 @@ modules:
     check_cmd: "rtk --version"
     builtin: true
 
+  - id: redis
+    name: "Redis — Cache & Queue"
+    description: "In-memory data store used by the platform as cache backend and rate-limit store. Agents can use redis for fast state sharing, pub/sub messaging, and job queues."
+    category: infra
+    icon: "🔴"
+    source_url: "https://redis.io"
+    repo_url: "https://github.com/redis/redis"
+    license: "BSD-3-Clause"
+    tools: []
+    install: "pip install redis  # server: brew install redis"
+    check_cmd: "python3 -c \"import redis\""
+    builtin: false
+    requires:
+      - "REDIS_URL (default: redis://localhost:6379)"
+
   - id: error-monitoring
     name: "Error Monitoring Pipeline"
     description: "Airweave-inspired error clustering and triage pipeline. Groups similar errors by fingerprint, auto-assigns severity, triggers agent remediation. Implements ops/error_clustering.py + error_state.py."
@@ -144,7 +179,41 @@ modules:
     license: "MIT (ported concepts)"
     tools: []
     install: "# bundled — no install needed"
-    check_cmd: "python3 -c \"from platform.ops.error_clustering import ErrorClusteringPipeline\""
+    builtin: true
+
+  # ── BROWSER ────────────────────────────────────────────────────────────────
+
+  - id: browser-cli
+    name: "agent-browser (browser-cli)"
+    description: "Rust CLI wrapping Playwright/Chromium for headless browser automation. Agents get accessibility tree snapshots (@refs), can click, fill, screenshot — LLM-friendly, no fragile CSS selectors."
+    category: browser
+    icon: "🌐"
+    source_url: "https://github.com/vercel-labs/agent-browser"
+    license: "MIT"
+    tools:
+      - browser_snapshot
+      - browser_click
+      - browser_fill
+      - browser_screenshot
+      - browser_get_text
+    install: "npm install -g agent-browser && agent-browser install"
+    check_cmd: "agent-browser"
+    builtin: false
+
+  - id: playwright-mcp
+    name: "Playwright MCP"
+    description: "Playwright as MCP server for browser automation. Provides accessibility snapshot tools via the MCP LRM bus. Bundled in platform/mcps/store.py."
+    category: browser
+    icon: "🎭"
+    source_url: "https://github.com/microsoft/playwright-mcp"
+    license: "Apache-2.0"
+    tools:
+      - playwright_navigate
+      - playwright_screenshot
+      - playwright_click
+      - playwright_fill
+    install: "npm install -g @playwright/mcp@latest && npx playwright install"
+    check_cmd: "npx @playwright/mcp --version"
     builtin: true
 
   # ── AI / LLM ───────────────────────────────────────────────────────────────
