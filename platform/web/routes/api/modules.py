@@ -162,6 +162,22 @@ async def toggle_module(module_id: str):
         now_enabled = True
 
     _set_enabled_ids(enabled)
+
+    # If disabling a module that has a running MCP, stop it immediately
+    if not now_enabled:
+        _MCP_FOR_MODULE = {"playwright-mcp": "mcp-playwright"}
+        mcp_id = _MCP_FOR_MODULE.get(module_id)
+        if mcp_id:
+            try:
+                from platform.mcps.manager import get_mcp_manager
+
+                mgr = get_mcp_manager()
+                import asyncio
+
+                asyncio.create_task(mgr.stop(mcp_id))
+            except Exception:
+                pass
+
     return JSONResponse({"ok": True, "id": module_id, "enabled": now_enabled})
 
 

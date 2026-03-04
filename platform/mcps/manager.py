@@ -4,6 +4,7 @@ MCP Manager — Launch, stop, and proxy to stdio-based MCP servers.
 Each MCP server runs as a subprocess with JSON-RPC over stdin/stdout.
 The manager maintains a process pool and routes tool calls to the right server.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -17,6 +18,41 @@ from pathlib import Path
 from .store import MCPServer, get_mcp_store
 
 logger = logging.getLogger(__name__)
+
+# Map MCP store IDs → optional module registry IDs.
+# None = always allowed (core platform MCP, not gated by module toggle).
+_MCP_MODULE_MAP: dict[str, str | None] = {
+    "mcp-playwright": "playwright-mcp",
+    "mcp-fetch": None,
+    "mcp-memory": None,
+    "mcp-github": None,
+    "mcp-solaris": None,
+    "mcp-jira": None,
+    "mcp-confluence": None,
+}
+
+
+def _mcp_module_enabled(mcp_id: str) -> bool:
+    """Return False if this MCP's module is explicitly disabled in settings."""
+    module_id = _MCP_MODULE_MAP.get(mcp_id)
+    if module_id is None:
+        return True  # not gated
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM settings WHERE key='enabled_modules'"
+        ).fetchone()
+        if row:
+            import json as _json
+
+            return module_id in _json.loads(row[0])
+    except Exception:
+        pass
+    # Default: playwright-mcp is builtin → enabled
+    return True
+
 
 # JSON-RPC message IDs
 _msg_counter = 0
@@ -59,29 +95,40 @@ class MCPProcess:
 
         try:
             self.proc = await asyncio.create_subprocess_exec(
-                resolved, *args,
+                resolved,
+                *args,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=env,
             )
-            logger.info("MCP %s started (PID %d): %s %s",
-                        self.mcp.id, self.proc.pid, resolved, " ".join(args))
+            logger.info(
+                "MCP %s started (PID %d): %s %s",
+                self.mcp.id,
+                self.proc.pid,
+                resolved,
+                " ".join(args),
+            )
 
             # Send initialize request
-            init_result = await self._send_jsonrpc("initialize", {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "macaron-platform", "version": "1.0.0"},
-            })
+            init_result = await self._send_jsonrpc(
+                "initialize",
+                {
+                    "protocolVersion": "2024-11-05",
+                    "capabilities": {},
+                    "clientInfo": {"name": "macaron-platform", "version": "1.0.0"},
+                },
+            )
             if init_result:
                 # Send initialized notification
                 await self._send_notification("notifications/initialized", {})
                 logger.info("MCP %s initialized OK", self.mcp.id)
                 return True
             else:
-                logger.warning("MCP %s: initialize failed, server may not support JSON-RPC",
-                               self.mcp.id)
+                logger.warning(
+                    "MCP %s: initialize failed, server may not support JSON-RPC",
+                    self.mcp.id,
+                )
                 return True  # Some servers work without init
         except Exception as e:
             logger.error("MCP %s failed to start: %s", self.mcp.id, e)
@@ -99,15 +146,21 @@ class MCPProcess:
                 pass
             logger.info("MCP %s stopped", self.mcp.id)
 
-    async def call_tool(self, tool_name: str, arguments: dict, timeout: float = 30) -> str:
+    async def call_tool(
+        self, tool_name: str, arguments: dict, timeout: float = 30
+    ) -> str:
         """Call a tool on the MCP server via JSON-RPC."""
         if not self.proc or self.proc.returncode is not None:
             return f"MCP {self.mcp.id} not running"
 
-        result = await self._send_jsonrpc("tools/call", {
-            "name": tool_name,
-            "arguments": arguments,
-        }, timeout=timeout)
+        result = await self._send_jsonrpc(
+            "tools/call",
+            {
+                "name": tool_name,
+                "arguments": arguments,
+            },
+            timeout=timeout,
+        )
 
         if result is None:
             return f"MCP {self.mcp.id}: no response for {tool_name}"
@@ -123,19 +176,32 @@ class MCPProcess:
                     elif isinstance(item, dict) and item.get("type") == "image":
                         # Save screenshot to workspace
                         import base64
+
                         b64 = item.get("data", "")
                         if b64:
-                            img_name = arguments.get("name", f"mcp_screenshot_{tool_name}")
-                            _default_ws = "/app/workspace" if os.path.isdir("/app") else os.path.join(os.getcwd(), "workspace")
+                            img_name = arguments.get(
+                                "name", f"mcp_screenshot_{tool_name}"
+                            )
+                            _default_ws = (
+                                "/app/workspace"
+                                if os.path.isdir("/app")
+                                else os.path.join(os.getcwd(), "workspace")
+                            )
                             ws = os.environ.get("WORKSPACE_ROOT", _default_ws)
                             ss_dir = Path(ws) / "screenshots"
                             ss_dir.mkdir(parents=True, exist_ok=True)
-                            ext = "png" if "png" in item.get("mimeType", "png") else "jpg"
+                            ext = (
+                                "png" if "png" in item.get("mimeType", "png") else "jpg"
+                            )
                             fpath = ss_dir / f"{img_name}.{ext}"
                             fpath.write_bytes(base64.b64decode(b64))
-                            texts.append(f"[SCREENSHOT:{fpath}] ({fpath.stat().st_size // 1024}KB)")
+                            texts.append(
+                                f"[SCREENSHOT:{fpath}] ({fpath.stat().st_size // 1024}KB)"
+                            )
                         else:
-                            texts.append(f"[image: {item.get('mimeType', 'image/png')}]")
+                            texts.append(
+                                f"[image: {item.get('mimeType', 'image/png')}]"
+                            )
                     else:
                         texts.append(str(item))
                 return "\n".join(texts) if texts else str(result)
@@ -151,8 +217,9 @@ class MCPProcess:
             return result.get("tools", [])
         return []
 
-    async def _send_jsonrpc(self, method: str, params: dict,
-                            timeout: float = 10) -> Optional[dict]:
+    async def _send_jsonrpc(
+        self, method: str, params: dict, timeout: float = 10
+    ) -> Optional[dict]:
         """Send JSON-RPC request and wait for response."""
         async with self._lock:
             if not self.proc or not self.proc.stdin or not self.proc.stdout:
@@ -173,7 +240,8 @@ class MCPProcess:
 
                 # Read response with timeout
                 response_line = await asyncio.wait_for(
-                    self.proc.stdout.readline(), timeout=timeout)
+                    self.proc.stdout.readline(), timeout=timeout
+                )
 
                 if not response_line:
                     return None
@@ -220,6 +288,12 @@ class MCPManager:
 
     async def start(self, mcp_id: str) -> tuple[bool, str]:
         """Start an MCP server by ID."""
+        if not _mcp_module_enabled(mcp_id):
+            return (
+                False,
+                f"MCP '{mcp_id}' is disabled — enable the module in Settings → Modules",
+            )
+
         store = get_mcp_store()
         mcp = store.get(mcp_id)
         if not mcp:
@@ -258,8 +332,9 @@ class MCPManager:
         store.update_status(mcp_id, "stopped")
         return True, f"MCP {mcp_id} stopped"
 
-    async def call_tool(self, mcp_id: str, tool_name: str,
-                        arguments: dict, timeout: float = 30) -> str:
+    async def call_tool(
+        self, mcp_id: str, tool_name: str, arguments: dict, timeout: float = 30
+    ) -> str:
         """Call a tool on a running MCP server."""
         proc = self._processes.get(mcp_id)
         if not proc or not proc.is_running:
@@ -290,14 +365,22 @@ class MCPManager:
 
             # Quick test call for fetch
             if mcp_id == "mcp-fetch" and tools:
-                test_result = await proc.call_tool("fetch", {
-                    "url": "https://example.com", "max_length": 500,
-                })
-                result["test_call"] = test_result[:200] if test_result else "no response"
+                test_result = await proc.call_tool(
+                    "fetch",
+                    {
+                        "url": "https://example.com",
+                        "max_length": 500,
+                    },
+                )
+                result["test_call"] = (
+                    test_result[:200] if test_result else "no response"
+                )
                 result["ok"] = bool(test_result and "Example" in test_result)
             elif mcp_id == "mcp-memory" and tools:
                 test_result = await proc.call_tool("read_graph", {})
-                result["test_call"] = test_result[:200] if test_result else "no response"
+                result["test_call"] = (
+                    test_result[:200] if test_result else "no response"
+                )
                 result["ok"] = True
             else:
                 result["ok"] = len(tools) > 0
@@ -313,14 +396,16 @@ class MCPManager:
             proc = self._processes.get(mcp.id)
             running = proc.is_running if proc else False
             pid = proc.proc.pid if proc and proc.proc else None
-            statuses.append({
-                "id": mcp.id,
-                "name": mcp.name,
-                "status": "running" if running else mcp.status,
-                "pid": pid,
-                "tools_count": len(mcp.tools),
-                "is_builtin": mcp.is_builtin,
-            })
+            statuses.append(
+                {
+                    "id": mcp.id,
+                    "name": mcp.name,
+                    "status": "running" if running else mcp.status,
+                    "pid": pid,
+                    "tools_count": len(mcp.tools),
+                    "is_builtin": mcp.is_builtin,
+                }
+            )
         return statuses
 
     async def stop_all(self):

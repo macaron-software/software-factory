@@ -700,9 +700,6 @@
                     <h3 style="margin:0">Optional Modules</h3>
                     <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
                 </div>
-                <button class="btn btn-sm" onclick="document.getElementById('modules-container').dataset.loaded='';loadModulesTab()">
-                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
-                </button>
             </div>
             <div id="modules-container">
                 <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
@@ -780,17 +777,26 @@ const _CAT_LABELS = {
   'infra':'⚙️ Infra / DevOps','browser':'🌐 Browser','ai-llm':'🤖 AI / LLM','knowledge':'📚 Knowledge','legal':'⚖️ Legal','marketing-seo':'📣 Marketing','data':'🗄️ Data'
 };
 
-async function loadModulesTab() {
+async function loadModulesTab(force) {
     const container = document.getElementById('modules-container');
-    if (!container || container.dataset.loaded) return;
+    if (!container || (container.dataset.loaded && !force)) return;
     container.dataset.loaded = '1';
     try {
         const r = await fetch('/api/modules');
         const modules = await r.json();
         renderModules(modules);
     } catch(e) {
-        container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
+        if (!force) container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
     }
+}
+
+let _modulesPoller = null;
+function _startModulesPoller() {
+    if (_modulesPoller) return;
+    _modulesPoller = setInterval(() => loadModulesTab(true), 30000);
+}
+function _stopModulesPoller() {
+    if (_modulesPoller) { clearInterval(_modulesPoller); _modulesPoller = null; }
 }
 
 function renderModules(modules) {
@@ -878,7 +884,7 @@ async function installModule(id, btn) {
             btn.textContent = '✓ Done';
             btn.style.color = 'var(--green)';
             // Reload to refresh installed status
-            setTimeout(() => { document.getElementById('modules-container').dataset.loaded=''; loadModulesTab(); }, 1000);
+            setTimeout(() => loadModulesTab(true), 1000);
         } else {
             btn.textContent = '✗ Failed';
             btn.style.color = 'var(--red)';
@@ -898,7 +904,8 @@ function showSettingsTab(id) {
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
     if (id === 'orchestrator') refreshLoad();
-    if (id === 'modules') loadModulesTab();
+    if (id === 'modules') { loadModulesTab(); _startModulesPoller(); }
+    else _stopModulesPoller();
 }
 // Restore last tab
 try {

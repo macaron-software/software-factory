@@ -19,6 +19,27 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Module IDs that are enabled by default (builtin modules).
+_BUILTIN_MODULE_IDS = {"component-gallery", "rtk", "error-monitoring", "playwright-mcp"}
+
+
+def _is_module_enabled(module_id: str) -> bool:
+    """Check if an optional module is enabled in DB settings (live, per call)."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM settings WHERE key='enabled_modules'"
+        ).fetchone()
+        if row:
+            import json as _json
+
+            return module_id in _json.loads(row[0])
+    except Exception:
+        pass
+    return module_id in _BUILTIN_MODULE_IDS
+
 
 def _get_tool_registry():
     """Lazy import to avoid circular imports."""
@@ -32,9 +53,10 @@ def _get_tool_registry():
     register_git_tools(reg)
     register_build_tools(reg)
     try:
-        from ..tools.sast_tools import register_sast_tools
+        if _is_module_enabled("trivy"):
+            from ..tools.sast_tools import register_sast_tools
 
-        register_sast_tools(reg)
+            register_sast_tools(reg)
     except Exception:
         pass
     try:
@@ -134,24 +156,27 @@ def _get_tool_registry():
         register_pentest_tools(reg)
     except Exception:
         pass
-    # Browser exploration tools (agent-browser / headless Chromium)
+    # Browser exploration tools (agent-browser / headless Chromium) — guarded by browser-cli module
     try:
-        from ..tools.browser_tools import register_browser_tools
+        if _is_module_enabled("browser-cli"):
+            from ..tools.browser_tools import register_browser_tools
 
-        register_browser_tools(reg)
+            register_browser_tools(reg)
     except Exception:
         pass
     try:
-        from ..tools.infisical_tools import register_infisical_tools
+        if _is_module_enabled("infisical"):
+            from ..tools.infisical_tools import register_infisical_tools
 
-        register_infisical_tools(reg)
+            register_infisical_tools(reg)
     except Exception:
         pass
-    # Error monitoring tools (monitoring-ops agent: scan, cluster, alert, mute, heal)
+    # Error monitoring tools — guarded by error-monitoring module
     try:
-        from ..tools.monitoring_tools import register_monitoring_tools
+        if _is_module_enabled("error-monitoring"):
+            from ..tools.monitoring_tools import register_monitoring_tools
 
-        register_monitoring_tools(reg)
+            register_monitoring_tools(reg)
     except Exception:
         pass
     return reg
