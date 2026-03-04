@@ -101,6 +101,18 @@ class SessionStore:
         finally:
             db.close()
 
+    def list_by_config_type(self, type_value: str, limit: int = 50) -> list[SessionDef]:
+        """Return sessions filtered by config->>'type', bypassing list_all(limit) cap."""
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT * FROM sessions WHERE config LIKE ? ORDER BY created_at DESC LIMIT ?",
+                (f'%"{type_value}"%', limit),
+            ).fetchall()
+            return [_row_to_session(r) for r in rows]
+        finally:
+            db.close()
+
     def search(
         self, q: str = "", status: str = "", limit: int = 30, offset: int = 0
     ) -> tuple[list[SessionDef], int]:

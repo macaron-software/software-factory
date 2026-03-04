@@ -30,9 +30,9 @@ def _list_cto_sessions(limit: int = 50):
     from ...sessions.store import get_session_store
 
     store = get_session_store()
-    all_sessions = store.list_all(limit=200)
-    cto = [s for s in all_sessions if (s.config or {}).get("type") == _CTO_SESSION_TYPE]
-    return cto[:limit]
+    # Use list_by_config_type to avoid the list_all(limit=200) cap that could
+    # miss CTO sessions when many agent sessions exist.
+    return store.list_by_config_type(_CTO_SESSION_TYPE, limit=limit)
 
 
 def _create_cto_session(title: str = "") -> object:
