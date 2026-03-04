@@ -6,6 +6,7 @@ POST /api/modules/{id}/toggle → enable/disable a module
 POST /api/modules/{id}/install → run install command
 GET  /api/modules/categories → list categories
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -17,18 +18,18 @@ import yaml
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from platform.web.routes.helpers import _parse_body
 
 try:
-    from platform.agents.store import get_db
+    from platform.db.migrations import get_db
+
     _has_db = True
 except Exception:
     _has_db = False
 
 router = APIRouter()
 
-REGISTRY_PATH = Path(__file__).parent.parent.parent / "modules" / "registry.yaml"
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+REGISTRY_PATH = Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
+DATA_DIR = Path(__file__).parent.parent.parent.parent.parent / "data"
 
 
 def _load_registry() -> list[Dict]:
@@ -50,6 +51,7 @@ def _get_enabled_ids() -> set[str]:
         ).fetchone()
         if rows:
             import json
+
             return set(json.loads(rows[0]))
     except Exception:
         pass
@@ -61,10 +63,12 @@ def _set_enabled_ids(ids: set[str]) -> None:
         return
     try:
         import json
+
         db = get_db()
         db.execute(
-            "INSERT OR REPLACE INTO settings(key, value) VALUES('enabled_modules', ?)",
-            (json.dumps(sorted(ids)),)
+            "INSERT INTO settings(key, value) VALUES('enabled_modules', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+            (json.dumps(sorted(ids)),),
         )
         db.commit()
     except Exception:
@@ -89,6 +93,7 @@ def _enrich(module: Dict, enabled_ids: set[str]) -> Dict:
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/modules")
 async def list_modules():
@@ -137,20 +142,26 @@ async def install_module(module_id: str):
 
     install_cmd = module.get("install", "")
     if not install_cmd or install_cmd.startswith("#"):
-        return JSONResponse({"ok": True, "message": "No install required", "already_installed": True})
+        return JSONResponse(
+            {"ok": True, "message": "No install required", "already_installed": True}
+        )
 
     try:
         result = subprocess.run(
             [sys.executable] + install_cmd.split()[1:],  # strip "python -m ..."
-            capture_output=True, text=True, timeout=300,
-            cwd=str(DATA_DIR.parent)
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=str(DATA_DIR.parent),
         )
-        return JSONResponse({
-            "ok": result.returncode == 0,
-            "stdout": result.stdout[-3000:] if result.stdout else "",
-            "stderr": result.stderr[-2000:] if result.stderr else "",
-            "returncode": result.returncode,
-        })
+        return JSONResponse(
+            {
+                "ok": result.returncode == 0,
+                "stdout": result.stdout[-3000:] if result.stdout else "",
+                "stderr": result.stderr[-2000:] if result.stderr else "",
+                "returncode": result.returncode,
+            }
+        )
     except subprocess.TimeoutExpired:
         return JSONResponse({"ok": False, "error": "Install timed out (300s)"})
     except Exception as e:
