@@ -237,16 +237,28 @@ jobs:
       - name: Blue-Green swap Innovation Node 1
         run: |
           ssh sfadmin@${{ secrets.SF_NODE1_IP }} '
-            pkill -f "uvicorn platform.server" 2>/dev/null || true
-            sleep 2
+            set -e
             cd /home/sfadmin
-            nohup /home/sfadmin/.venv/bin/python3 -m uvicorn platform.server:app \
-              --host 0.0.0.0 --port 8090 --ws none --log-level warning \
-              >> /home/sfadmin/uvicorn.log 2>&1 &
-            sleep 6
-            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8090/api/health 2>/dev/null || echo 000)
-            echo "Innovation Node 1 health: ${HTTP}"
+            bash deploy.sh
           ' || echo "WARNING: Innovation Node 1 deploy failed — continuing"
+
+      - name: Rsync platform to Innovation Node 2
+        run: |
+          ssh-keyscan -H "${{ secrets.SF_NODE2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ \
+            sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/platform/
+          rsync -az cli skills dashboard \
+            sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/ 2>/dev/null || true
+
+      - name: Blue-Green swap Innovation Node 2
+        run: |
+          ssh sfadmin@${{ secrets.SF_NODE2_IP }} '
+            set -e
+            cd /home/sfadmin
+            bash deploy.sh
+          ' || echo "WARNING: Innovation Node 2 deploy failed — continuing"
 
   deploy-azure:
     runs-on: ubuntu-latest

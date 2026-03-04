@@ -72,6 +72,13 @@ class AgentDef:
     updated_at: str = ""
 
 
+def _safe_json(val: str | None, default) -> list | dict:
+    try:
+        return json.loads(val) if val else default
+    except (json.JSONDecodeError, ValueError):
+        return default
+
+
 def _row_to_agent(row) -> AgentDef:
     keys = row.keys() if hasattr(row, "keys") else []
     return AgentDef(
@@ -84,11 +91,11 @@ def _row_to_agent(row) -> AgentDef:
         model=row["model"] or DEFAULT_MODEL,
         temperature=row["temperature"],
         max_tokens=row["max_tokens"],
-        skills=json.loads(row["skills_json"] or "[]"),
-        tools=json.loads(row["tools_json"] or "[]"),
-        mcps=json.loads(row["mcps_json"] or "[]"),
-        permissions=json.loads(row["permissions_json"] or "{}"),
-        tags=json.loads(row["tags_json"] or "[]"),
+        skills=_safe_json(row["skills_json"], []),
+        tools=_safe_json(row["tools_json"], []),
+        mcps=_safe_json(row["mcps_json"], []),
+        permissions=_safe_json(row["permissions_json"], {}),
+        tags=_safe_json(row["tags_json"], []),
         icon=row["icon"] or "bot",
         color=row["color"] or "#f78166",
         avatar=row["avatar"] if "avatar" in keys else "",

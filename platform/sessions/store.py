@@ -106,7 +106,7 @@ class SessionStore:
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT * FROM sessions WHERE config LIKE ? ORDER BY created_at DESC LIMIT ?",
+                "SELECT * FROM sessions WHERE config_json LIKE ? ORDER BY created_at DESC LIMIT ?",
                 (f'%"{type_value}"%', limit),
             ).fetchall()
             return [_row_to_session(r) for r in rows]
