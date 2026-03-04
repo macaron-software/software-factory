@@ -2004,6 +2004,22 @@ async def _execute_tool(
 
         return await PlatformCreateSprintTool().execute(args, ctx.agent)
 
+    # ── Orchestration tools (Jarvis/RTE: launch, resume, check runs) ──
+    if name == "launch_epic_run":
+        from ..tools.platform_tools import PlatformLaunchEpicRunTool
+
+        return await PlatformLaunchEpicRunTool().execute(args, ctx.agent)
+
+    if name == "resume_run":
+        from ..tools.platform_tools import PlatformResumeRunTool
+
+        return await PlatformResumeRunTool().execute(args, ctx.agent)
+
+    if name == "check_run_status":
+        from ..tools.platform_tools import PlatformCheckRunTool
+
+        return await PlatformCheckRunTool().execute(args, ctx.agent)
+
     # ── Local CI pipeline ──
     if name == "local_ci":
         return await _tool_local_ci(args, ctx)

@@ -382,6 +382,216 @@ class PlatformCreateSprintTool(BaseTool):
         )
 
 
+class PlatformLaunchEpicRunTool(BaseTool):
+    name = "launch_epic_run"
+    description = (
+        "Launch a workflow execution for an epic. Creates a session and starts the workflow. "
+        "Params: epic_id (required), workflow_id (optional, uses epic's default if omitted). "
+        "Returns session_id, workflow_id, run status. "
+        "Use this to start or restart an epic run autonomously."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        epic_id = params.get("epic_id", "")
+        if not epic_id:
+            return _json.dumps({"error": "epic_id is required"})
+        workflow_id = params.get("workflow_id", "")
+
+        try:
+            from ..epics.store import get_epic_store, get_epic_run_store
+            from ..workflows.store import get_workflow_store
+            from ..models import EpicRun, PhaseRun, PhaseStatus
+            from ..sessions.store import SessionDef, MessageDef, get_session_store
+            import uuid
+
+            epic_store = get_epic_store()
+            mission = epic_store.get_mission(epic_id)
+            if not mission:
+                return _json.dumps({"error": f"Epic '{epic_id}' not found"})
+
+            wf_id = workflow_id or mission.workflow_id
+            if not wf_id:
+                return _json.dumps({"error": "No workflow_id for this epic"})
+
+            wf = get_workflow_store().get(wf_id)
+            if not wf:
+                return _json.dumps({"error": f"Workflow '{wf_id}' not found"})
+
+            # Build phase runs
+            phases = wf.phases_json if isinstance(wf.phases_json, list) else []
+            phase_runs = [
+                PhaseRun(
+                    phase_id=p["id"],
+                    phase_name=p.get("name", p["id"]),
+                    pattern_id=p.get("pattern_id", "sequential"),
+                    status=PhaseStatus.PENDING,
+                )
+                for p in phases
+            ]
+
+            run_id = str(uuid.uuid4())[:8]
+            session_id = run_id
+            run = EpicRun(
+                id=run_id,
+                session_id=session_id,
+                workflow_id=wf_id,
+                workflow_name=wf.name,
+                project_id=mission.project_id,
+                parent_epic_id=epic_id,
+                status="paused",
+                phases_json=phase_runs,
+            )
+            run_store = get_epic_run_store()
+            run_store.create_run(run)
+
+            # Create session
+            ss = get_session_store()
+            s = SessionDef(
+                id=session_id,
+                project_id=mission.project_id,
+                title=f"{mission.name} — {wf.name}",
+                messages=[
+                    MessageDef(
+                        role="user",
+                        content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
+                    )
+                ],
+            )
+            ss.create_session(s)
+
+            # Resume immediately
+            from ..workflows.store import run_workflow
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                asyncio.to_thread(
+                    run_workflow, wf, session_id, mission.name, mission.project_id
+                )
+            )
+
+            return _json.dumps(
+                {
+                    "ok": True,
+                    "run_id": run_id,
+                    "session_id": session_id,
+                    "workflow_id": wf_id,
+                    "epic_id": epic_id,
+                    "phases": [p["id"] for p in phases],
+                }
+            )
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
+class PlatformResumeRunTool(BaseTool):
+    name = "resume_run"
+    description = (
+        "Resume a paused or stuck epic run. "
+        "Params: run_id or session_id (required). "
+        "Returns status. Use to unblock stuck workflows."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        run_id = params.get("run_id") or params.get("session_id", "")
+        if not run_id:
+            return _json.dumps({"error": "run_id or session_id required"})
+
+        try:
+            from ..epics.store import get_epic_run_store
+
+            run_store = get_epic_run_store()
+            run = run_store.get(run_id)
+            if not run:
+                return _json.dumps({"error": f"Run '{run_id}' not found"})
+            if run.status == "cancelled":
+                return _json.dumps({"error": "Run is cancelled, cannot resume"})
+
+            from ..workflows.store import get_workflow_store, run_workflow
+            import asyncio
+
+            wf = get_workflow_store().get(run.workflow_id)
+            if not wf:
+                return _json.dumps({"error": f"Workflow '{run.workflow_id}' not found"})
+
+            run_store.update_run_status(run_id, "running")
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                asyncio.to_thread(
+                    run_workflow, wf, run_id, run.workflow_name or "", run.project_id
+                )
+            )
+            return _json.dumps({"ok": True, "run_id": run_id, "status": "resuming"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
+class PlatformCheckRunTool(BaseTool):
+    name = "check_run_status"
+    description = (
+        "Check status of an epic run (workflow execution). "
+        "Params: run_id or session_id. Or project_id to list all runs for a project. "
+        "Returns status, current_phase, phases progress, sprint count."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        run_id = params.get("run_id") or params.get("session_id", "")
+        project_id = params.get("project_id", "")
+
+        try:
+            from ..epics.store import get_epic_run_store
+
+            store = get_epic_run_store()
+            if run_id:
+                run = store.get(run_id)
+                if not run:
+                    return _json.dumps({"error": f"Run '{run_id}' not found"})
+                phases = run.phases_json if isinstance(run.phases_json, list) else []
+                sprints = store.list_sprints(run.parent_epic_id or run_id)
+                return _json.dumps(
+                    {
+                        "run_id": run.id,
+                        "status": run.status,
+                        "current_phase": run.current_phase,
+                        "workflow_id": run.workflow_id,
+                        "project_id": run.project_id,
+                        "phases": [
+                            {"id": p.phase_id, "status": p.status} for p in phases
+                        ]
+                        if phases
+                        else [],
+                        "sprint_count": len(sprints),
+                        "resume_attempts": getattr(run, "resume_attempts", 0),
+                    }
+                )
+            elif project_id:
+                runs = store.list_runs(project_id=project_id, limit=10)
+                return _json.dumps(
+                    [
+                        {
+                            "run_id": r.id,
+                            "status": r.status,
+                            "current_phase": r.current_phase,
+                            "workflow_id": r.workflow_id,
+                        }
+                        for r in runs
+                    ]
+                )
+            else:
+                return _json.dumps({"error": "run_id or project_id required"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
@@ -1311,6 +1521,9 @@ def register_platform_tools(registry):
     registry.register(PlatformCreateFeatureTool())
     registry.register(PlatformCreateStoryTool())
     registry.register(PlatformCreateSprintTool())
+    registry.register(PlatformLaunchEpicRunTool())
+    registry.register(PlatformResumeRunTool())
+    registry.register(PlatformCheckRunTool())
     registry.register(PlatformCreateProjectTool())
     registry.register(PlatformCreateDomainTool())
     registry.register(PlatformCreateMissionTool())
