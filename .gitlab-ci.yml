@@ -1,66 +1,48 @@
 stages:
   - deploy
 
-# Innovation cluster blue-green deploy
-# Triggers on commits from Macaron sync (author = macaron-software.com)
+# Deploy to Azure prod (sf-node-1) — mirrors GitHub Actions deploy-azure job
 #
-# Required GitLab CI/CD variables (Settings → CI/CD → Variables):
-#   SSH_DEPLOY_KEY  — private key (file type) for sfadmin@node-1 and node-2
-#   NODE1_IP        — 52.143.158.19
-#   NODE2_IP        — 40.89.174.75
+# Required GitLab CI/CD variables (Settings -> CI/CD -> Variables):
+#   SSH_DEPLOY_KEY  -- private key (file, chmod 600) for macaron@AZURE_IP
+#   AZURE_IP        -- 52.143.158.19
+#   AZURE_USER      -- macaron  (optional, default: macaron)
 
-.deploy_node: &deploy_node
+deploy-azure:
   stage: deploy
   image: alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
     - apk add --no-cache openssh-client rsync
     - mkdir -p ~/.ssh && chmod 700 ~/.ssh
     - cp "$SSH_DEPLOY_KEY" ~/.ssh/id_ed25519
     - chmod 600 ~/.ssh/id_ed25519
-    - echo "StrictHostKeyChecking no" > ~/.ssh/config
-    - |
-      # TAG + short SHA for VERSION file
-      echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
-
-deploy-node1:
-  <<: *deploy_node
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_AUTHOR =~ /macaron-software/'
+    - ssh-keyscan -H "$AZURE_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
+    - echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
   script:
     - |
-      echo "=== Deploying to node-1 ($NODE1_IP) via jump ($NODE2_IP) ==="
-      # node-1 SSH is only accessible via node-2 internal VNet
-      PROXY="ssh -W %h:%p -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@${NODE2_IP}"
+      AZURE_USER="${AZURE_USER:-macaron}"
+      echo "=== Deploying to Azure $AZURE_IP as $AZURE_USER ==="
 
-      rsync -az --checksum --delete \
+      rsync -az --checksum \
         --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
-        -e "ssh -o ProxyCommand='$PROXY' -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
-        platform/ \
-        sfadmin@10.0.1.4:/home/sfadmin/platform/
+        -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+        skills/ \
+        ${AZURE_USER}@${AZURE_IP}:/opt/macaron/skills/
 
-      ssh -o "ProxyCommand=$PROXY" -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no \
-        sfadmin@10.0.1.4 \
-        "cd /home/sfadmin && bash deploy.sh"
-
-      echo "=== node-1 deploy complete ==="
-
-deploy-node2:
-  <<: *deploy_node
-  needs: [deploy-node1]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_AUTHOR =~ /macaron-software/'
-  script:
-    - |
-      echo "=== Deploying to node-2 ($NODE2_IP) ==="
-
-      rsync -az --checksum --delete \
+      rsync -az --checksum \
         --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
         -e "ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
         platform/ \
-        sfadmin@${NODE2_IP}:/home/sfadmin/platform/
+        ${AZURE_USER}@${AZURE_IP}:/opt/macaron/platform/
 
       ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no \
-        sfadmin@${NODE2_IP} \
-        "cd /home/sfadmin && bash deploy.sh"
+        ${AZURE_USER}@${AZURE_IP} "
+          docker cp /opt/macaron/skills/. deploy-platform-1:/app/skills/ 2>/dev/null \
+            && echo 'skills copied to container' || echo 'docker cp skipped'
+          sudo systemctl restart sf-platform || true
+          echo 'Azure deploy complete'
+        "
 
-      echo "=== node-2 deploy complete ==="
+      echo "=== Azure deploy done ==="
