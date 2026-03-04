@@ -376,13 +376,16 @@ def _get_projects(db) -> list[dict]:
 
 
 def _get_activity(db) -> list[dict]:
-    """Last 12 messages from active sessions (agent tool calls + system events)."""
+    """Last 12 messages from active sessions with full agent info."""
     rows = db.execute(
         "SELECT m.from_agent, m.content, m.timestamp, s.project_id,"
-        "  p.name AS project_name"
+        "  p.name AS project_name,"
+        "  a.name AS agent_name, a.avatar AS agent_avatar, a.color AS agent_color,"
+        "  a.role AS agent_role"
         " FROM messages m"
         " LEFT JOIN sessions s ON s.id = m.session_id"
         " LEFT JOIN projects p ON p.id = s.project_id"
+        " LEFT JOIN agents a ON a.id = m.from_agent"
         " WHERE m.from_agent NOT IN ('user','system')"
         " AND m.timestamp >= NOW() - INTERVAL '1 hour'"
         " ORDER BY m.timestamp DESC"
@@ -391,10 +394,20 @@ def _get_activity(db) -> list[dict]:
     result = []
     for r in rows:
         content = str(r["content"] or "")[:120]
+        agent_id = r["from_agent"] or ""
+        agent_name = r["agent_name"] or agent_id
+        agent_avatar = r["agent_avatar"] or (
+            agent_name[:2].upper() if agent_name else agent_id[:2].upper()
+        )
+        agent_color = r["agent_color"] or "#a855f7"
         result.append(
             {
                 "ts": str(r["timestamp"]),
-                "agent": r["from_agent"],
+                "agent": agent_id,
+                "agent_name": agent_name,
+                "agent_avatar": agent_avatar,
+                "agent_color": agent_color,
+                "agent_role": r["agent_role"] or "",
                 "label": content,
                 "project_id": r["project_id"],
                 "project_name": r["project_name"],

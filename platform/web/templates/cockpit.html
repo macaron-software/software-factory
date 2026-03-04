@@ -54,11 +54,12 @@
 
 /* Activity feed */
 .activity-feed{display:flex;flex-direction:column;gap:0}
-.af-item{display:flex;align-items:flex-start;gap:0.5rem;padding:0.35rem 0;border-bottom:1px solid var(--border);min-width:0}
+.af-item{display:flex;align-items:flex-start;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid var(--border);min-width:0}
 .af-item:last-child{border-bottom:none}
-.af-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);flex-shrink:0;margin-top:0.35rem}
+.af-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.58rem;font-weight:700;color:#fff;flex-shrink:0;margin-top:0.05rem;letter-spacing:-0.02em}
 .af-body{flex:1;min-width:0}
 .af-agent{font-size:0.72rem;font-weight:700;color:var(--purple)}
+.af-role{font-size:0.6rem;color:var(--text-secondary);margin-left:0.3rem;font-weight:400}
 .af-text{font-size:0.7rem;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .af-project{font-size:0.62rem;color:var(--text-secondary)}
 .af-time{font-size:0.6rem;color:var(--text-secondary);flex-shrink:0;margin-top:0.1rem}
@@ -1199,10 +1200,10 @@
     document.getElementById('activityFeed').innerHTML = acts.length
       ? acts.map(a => `
         <div class="af-item">
-          <div class="af-dot"></div>
+          <div class="af-avatar" style="background:${a.agent_color||'#7c3aed'}">${escHtml(a.agent_avatar||a.agent.slice(0,2).toUpperCase())}</div>
           <div class="af-body">
-            <span class="af-agent">${a.agent}</span>
-            ${a.project_name ? `<span class="af-project"> · ${a.project_name}</span>` : ''}
+            <span class="af-agent">${escHtml(a.agent_name||a.agent)}</span>${a.agent_role ? `<span class="af-role">${escHtml(a.agent_role)}</span>` : ''}
+            ${a.project_name ? `<span class="af-project"> · ${escHtml(a.project_name)}</span>` : ''}
             <div class="af-text">${escHtml(a.label)}</div>
           </div>
           <span class="af-time">${timeAgo(a.ts)}</span>
