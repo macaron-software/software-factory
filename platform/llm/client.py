@@ -218,6 +218,8 @@ class LLMStreamChunk:
     done: bool = False
     model: str = ""
     finish_reason: str = ""
+    tokens_in: int = 0
+    tokens_out: int = 0
 
 
 # Cost estimation: $/1M tokens (input, output) per model
@@ -849,6 +851,10 @@ class LLMClient:
                             logger.debug(
                                 "RTK stream compressor error (skipped): %s", _ce
                             )
+                    _stream_tokens_in = 0
+                    _stream_tokens_out = 0
+                    _stream_accumulated = ""
+                    _stream_t0 = time.monotonic()
                     async for chunk in self._do_stream(
                         pcfg,
                         prov,
@@ -858,8 +864,37 @@ class LLMClient:
                         max_tokens,
                         _stream_system,
                     ):
+                        if chunk.delta:
+                            _stream_accumulated += chunk.delta
+                        if chunk.tokens_in:
+                            _stream_tokens_in = chunk.tokens_in
+                        if chunk.tokens_out:
+                            _stream_tokens_out = chunk.tokens_out
                         yield chunk
+                    # Estimate tokens if API didn't report them
+                    if not _stream_tokens_in:
+                        _stream_tokens_in = (
+                            sum(len(m.content or "") for m in _stream_messages) // 4
+                        )
+                    if not _stream_tokens_out:
+                        _stream_tokens_out = len(_stream_accumulated) // 4
                     self._cb_record_success(prov)
+                    self._stats["calls"] += 1
+                    self._stats["tokens_in"] += _stream_tokens_in
+                    self._stats["tokens_out"] += _stream_tokens_out
+                    # Trace streaming call for observability
+                    _stream_result = LLMResponse(
+                        content=_stream_accumulated,
+                        model=use_model,
+                        provider=prov,
+                        tokens_in=_stream_tokens_in,
+                        tokens_out=_stream_tokens_out,
+                        duration_ms=int((time.monotonic() - _stream_t0) * 1000),
+                    )
+                    self._trace(_stream_result, _stream_messages)
+                    await self._persist_usage(
+                        prov, use_model, _stream_tokens_in, _stream_tokens_out
+                    )
                     return
                 except Exception as exc:
                     err_str = repr(exc)
@@ -1007,15 +1042,24 @@ class LLMClient:
                     text = await resp.aread()
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
                 logger.warning("LLM stream %s/%s connected", provider, model)
+                _stream_usage: dict = {}
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue
                     payload = line[6:]
                     if payload.strip() == "[DONE]":
-                        yield LLMStreamChunk(delta="", done=True, model=model)
+                        yield LLMStreamChunk(
+                            delta="",
+                            done=True,
+                            model=model,
+                            tokens_in=_stream_usage.get("prompt_tokens", 0),
+                            tokens_out=_stream_usage.get("completion_tokens", 0),
+                        )
                         return
                     try:
                         data = json.loads(payload)
+                        if data.get("usage"):
+                            _stream_usage = data["usage"]
                         choices = data.get("choices") or [{}]
                         if not choices:
                             continue
@@ -1026,7 +1070,12 @@ class LLMClient:
                             yield LLMStreamChunk(delta=content, model=model)
                         if finish:
                             yield LLMStreamChunk(
-                                delta="", done=True, model=model, finish_reason=finish
+                                delta="",
+                                done=True,
+                                model=model,
+                                finish_reason=finish,
+                                tokens_in=_stream_usage.get("prompt_tokens", 0),
+                                tokens_out=_stream_usage.get("completion_tokens", 0),
                             )
                             return  # MiniMax doesn't send [DONE], exit on finish_reason
                     except json.JSONDecodeError:

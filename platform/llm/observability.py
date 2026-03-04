@@ -257,16 +257,30 @@ class LLMTracer:
             except Exception:
                 return "executor"
 
+        def _coerce(v):
+            """Convert PostgreSQL Decimal to float for JSON serialization."""
+            from decimal import Decimal
+
+            if isinstance(v, Decimal):
+                return float(v)
+            return v
+
         return {
-            "total_calls": row["total_calls"],
-            "total_tokens_in": row["total_tokens_in"],
-            "total_tokens_out": row["total_tokens_out"],
-            "total_cost_usd": round(row["total_cost_usd"], 4),
-            "avg_duration_ms": round(row["avg_duration_ms"]),
-            "error_count": row["error_count"],
-            "by_provider": [dict(r) for r in by_provider],
+            "total_calls": int(row["total_calls"] or 0),
+            "total_tokens_in": int(row["total_tokens_in"] or 0),
+            "total_tokens_out": int(row["total_tokens_out"] or 0),
+            "total_cost_usd": round(float(row["total_cost_usd"] or 0), 4),
+            "avg_duration_ms": int(row["avg_duration_ms"] or 0),
+            "error_count": int(row["error_count"] or 0),
+            "by_provider": [
+                {k: _coerce(v) for k, v in dict(r).items()} for r in by_provider
+            ],
             "by_agent": [
-                {**dict(r), "capability_grade": _grade(r["agent_id"])} for r in by_agent
+                {
+                    **{k: _coerce(v) for k, v in dict(r).items()},
+                    "capability_grade": _grade(r["agent_id"]),
+                }
+                for r in by_agent
             ],
         }
 
