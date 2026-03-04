@@ -139,6 +139,58 @@
                 </a>
             </div>
         </section>
+        <section class="settings-section">
+            <h3>
+                <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg>
+                Distributed Infrastructure
+            </h3>
+            <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1rem">
+                Read-only. Configure via env vars on each node (.env or Infisical).
+            </p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;font-size:0.82rem">
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Database</div>
+                    <span style="font-weight:600;color:{% if infra.db_type == 'postgresql' %}#4ade80{% else %}#facc15{% endif %}">{{ infra.db_type }}</span>
+                    {% if infra.pg_dsn %}<div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem;font-family:var(--font-mono)">{{ infra.pg_dsn }}</div>{% endif %}
+                </div>
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Redis</div>
+                    {% if infra.redis_url %}
+                    <span style="font-weight:600;color:#4ade80">connected</span>
+                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem;font-family:var(--font-mono)">{{ infra.redis_url }}</div>
+                    {% else %}
+                    <span style="font-weight:600;color:#facc15">not configured</span>
+                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">Rate limit: in-memory only</div>
+                    {% endif %}
+                </div>
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Node ID</div>
+                    <span style="font-weight:600;font-family:var(--font-mono)">{{ infra.node_id }}</span>
+                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">Set SF_NODE_ID env var to override</div>
+                </div>
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Graceful Drain</div>
+                    <span style="font-weight:600">{{ infra.drain_timeout }}s</span>
+                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">SF_DRAIN_TIMEOUT_S · <a href="/api/ready" target="_blank" style="color:var(--purple-light)">/api/ready</a></div>
+                </div>
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Secrets (Infisical)</div>
+                    {% if infra.infisical %}
+                    <span style="font-weight:600;color:#4ade80">active</span>
+                    {% else %}
+                    <span style="font-weight:600;color:var(--text-secondary)">.env only</span>
+                    {% endif %}
+                </div>
+                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Dist. Patterns</div>
+                    <div style="display:flex;flex-direction:column;gap:0.15rem;margin-top:0.1rem">
+                        <span style="font-size:0.72rem">{% if infra.db_type == 'postgresql' %}<span style="color:#4ade80">PG advisory lock</span>{% else %}<span style="color:#6b7280">advisory lock (SQLite)</span>{% endif %}</span>
+                        <span style="font-size:0.72rem">{% if infra.redis_url %}<span style="color:#4ade80">Redis rate limit</span>{% else %}<span style="color:#6b7280">in-memory rate limit</span>{% endif %}</span>
+                        <span style="font-size:0.72rem">{% if infra.redis_url %}<span style="color:#4ade80">leader election</span>{% else %}<span style="color:#6b7280">no leader election</span>{% endif %}</span>
+                    </div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- ═══ Orchestrator ═══ -->
@@ -291,10 +343,10 @@
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
               <!-- Worker nodes -->
-              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes (optional)</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
-                Missions are dispatched to the least-loaded node. Each node must expose <code>/api/metrics/load</code>.
-                Leave empty to run everything locally.
+                Optional: missions dispatched to least-loaded node via <code>/api/metrics/load</code>.
+                In HA clusters (SF Innovation), nginx handles routing — leave empty and configure upstream health checks in nginx instead.
               </div>
               <div class="form-group">
                 <label>Node URLs (one per line)</label>
@@ -1440,7 +1492,7 @@ async function loadLLMABTests() {
 </div>
 
 <!-- Deploy Target Modal -->
-<div id="dt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center">
+<div id="dt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
     <div style="background:var(--bg-card);border-radius:12px;padding:1.5rem;width:500px;max-width:95vw;max-height:80vh;overflow-y:auto">
         <h3 id="dt-modal-title" style="margin:0 0 1rem">Add Deploy Target</h3>
         <form id="dt-form" onsubmit="dtSave(event)">
