@@ -4,9 +4,23 @@ stages:
 # Deploy to Innovation cluster — sf-node-1 (52.143.158.19) + sf-node-2 (40.89.174.75)
 #
 # Required GitLab CI/CD variables (Settings -> CI/CD -> Variables):
-#   SSH_DEPLOY_KEY  -- private key (file, chmod 600) for sfadmin@NODE_IP
-#   NODE1_IP        -- 52.143.158.19 (sf-node-1)
-#   NODE2_IP        -- 40.89.174.75  (sf-node-2, direct SSH)
+#   SSH_DEPLOY_KEY  -- private key content OR file path (type: File OR Variable)
+#                      Content of ~/.ssh/sf_innovation_ed25519 (sfadmin on both nodes)
+#   NODE1_IP        -- 52.143.158.19 (sf-node-1, behind VNet — accessed via node-2 proxy)
+#   NODE2_IP        -- 40.89.174.75  (sf-node-2, direct public SSH)
+
+.setup_ssh: &setup_ssh |
+  apk add --no-cache openssh-client rsync
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  # Support both "File" type (var = path) and "Variable" type (var = key content)
+  if [ -f "${SSH_DEPLOY_KEY}" ]; then
+    cp "${SSH_DEPLOY_KEY}" ~/.ssh/id_ed25519
+  else
+    printf '%s\n' "${SSH_DEPLOY_KEY}" > ~/.ssh/id_ed25519
+  fi
+  chmod 600 ~/.ssh/id_ed25519
+  # Validate key loaded properly
+  ssh-keygen -y -f ~/.ssh/id_ed25519 > /dev/null && echo "SSH key OK" || { echo "ERROR: invalid SSH key in SSH_DEPLOY_KEY"; exit 1; }
 
 deploy-node2:
   stage: deploy
@@ -14,10 +28,7 @@ deploy-node2:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - cp "$SSH_DEPLOY_KEY" ~/.ssh/id_ed25519
-    - chmod 600 ~/.ssh/id_ed25519
+    - *setup_ssh
     - ssh-keyscan -H "${NODE2_IP:-40.89.174.75}" >> ~/.ssh/known_hosts 2>/dev/null || true
     - echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
   script:
@@ -37,30 +48,27 @@ deploy-node2:
         sfadmin@${NODE2}:/home/sfadmin/skills/ 2>/dev/null || true
 
       ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no \
-        sfadmin@${NODE2} "
-          cd /home/sfadmin && bash deploy.sh
-        " || echo "WARNING: node-2 deploy.sh failed (non-fatal)"
+        sfadmin@${NODE2} "cd /home/sfadmin && bash deploy.sh" \
+        || echo "WARNING: node-2 deploy.sh failed (non-fatal)"
 
       echo "=== node-2 deploy done ==="
 
 deploy-node1:
   stage: deploy
   image: alpine
+  needs: [deploy-node2]
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
   before_script:
-    - apk add --no-cache openssh-client rsync
-    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-    - cp "$SSH_DEPLOY_KEY" ~/.ssh/id_ed25519
-    - chmod 600 ~/.ssh/id_ed25519
+    - *setup_ssh
     - NODE2="${NODE2_IP:-40.89.174.75}"
     - NODE1="${NODE1_IP:-52.143.158.19}"
     - ssh-keyscan -H "$NODE2" >> ~/.ssh/known_hosts 2>/dev/null || true
     - echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
     - |
       cat > ~/.ssh/config << EOF
-      Host $NODE1
-        ProxyCommand ssh -W %h:%p -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@$NODE2
+      Host ${NODE1}
+        ProxyCommand ssh -W %h:%p -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@${NODE2}
         IdentityFile ~/.ssh/id_ed25519
         StrictHostKeyChecking no
       EOF
@@ -80,8 +88,8 @@ deploy-node1:
         skills/ \
         sfadmin@${NODE1}:/home/sfadmin/skills/ 2>/dev/null || true
 
-      ssh -F ~/.ssh/config sfadmin@${NODE1} "
-        cd /home/sfadmin && bash deploy.sh
-      " || echo "WARNING: node-1 deploy.sh failed (non-fatal)"
+      ssh -F ~/.ssh/config sfadmin@${NODE1} \
+        "cd /home/sfadmin && bash deploy.sh" \
+        || echo "WARNING: node-1 deploy.sh failed (non-fatal)"
 
       echo "=== node-1 deploy done ==="
