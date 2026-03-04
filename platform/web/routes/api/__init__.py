@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from .modules import router as modules_router
 from .analytics import router as analytics_router
 from .cockpit import router as cockpit_router
 from .screens import router as screens_router
@@ -40,5 +41,6 @@ router.include_router(events_router)
 router.include_router(settings_router)
 router.include_router(simplify_router)
 router.include_router(teams_router)
+router.include_router(modules_router)
 router.include_router(cockpit_router)
 router.include_router(screens_router)
