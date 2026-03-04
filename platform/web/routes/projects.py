@@ -280,6 +280,80 @@ async def project_overview(request: Request, project_id: str):
     )
 
 
+@router.get("/projects/{project_id}/hub", response_class=HTMLResponse)
+async def project_hub(request: Request, project_id: str):
+    """Project Hub — unified lifecycle view with phases, epics by category, active agents."""
+    from ...projects.manager import get_project_store
+    from ...epics.store import get_epic_store
+    from ...sessions.store import get_session_store
+
+    ps = get_project_store()
+    project = ps.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    epic_store = get_epic_store()
+    proj_epics = epic_store.list_missions(project_id=project_id)
+
+    system_epics = sorted(
+        [e for e in proj_epics if e.category == "system"],
+        key=lambda e: e.wsjf_score,
+        reverse=True,
+    )
+    functional_epics = sorted(
+        [e for e in proj_epics if e.category != "system"],
+        key=lambda e: e.wsjf_score,
+        reverse=True,
+    )
+
+    sess_store = get_session_store()
+    recent_sessions = (
+        sess_store.list_sessions(project_id=project_id, limit=5)
+        if hasattr(sess_store, "list_sessions")
+        else []
+    )
+
+    phases = project.phases if hasattr(project, "phases") and project.phases else []
+
+    active_count = sum(1 for e in proj_epics if e.status == "active")
+    completed_count = sum(1 for e in proj_epics if e.status == "completed")
+    blocked_count = sum(1 for e in proj_epics if e.status == "blocked")
+    total = len(proj_epics) or 1
+    health = max(
+        0,
+        min(
+            100,
+            int(
+                (active_count / total) * 40
+                + (completed_count / total) * 50
+                - (blocked_count / total) * 30
+                + (20 if project.exists else 0)
+                + (10 if project.has_git else 0)
+            ),
+        ),
+    )
+
+    return _templates(request).TemplateResponse(
+        "project_hub.html",
+        {
+            "request": request,
+            "page_title": f"{project.name} — Hub",
+            "project": project,
+            "phases": phases,
+            "system_missions": system_epics,
+            "functional_missions": functional_epics,
+            "health": health,
+            "recent_sessions": recent_sessions,
+            "stats": {
+                "total": len(proj_epics),
+                "active": active_count,
+                "completed": completed_count,
+                "blocked": blocked_count,
+            },
+        },
+    )
+
+
 @router.get("/projects/{project_id}", response_class=HTMLResponse)
 async def project_detail(request: Request, project_id: str):
     """Single project detail view with vision, agents, sessions."""

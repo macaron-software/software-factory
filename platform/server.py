@@ -1058,7 +1058,6 @@ def create_app() -> FastAPI:
             or path.startswith("/api/")
             or path.startswith("/auth/")
             or path.startswith("/projects/")
-            and "/preview/" in path
             or path
             in (
                 "/login",
