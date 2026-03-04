@@ -904,9 +904,16 @@ function renderModules(modules) {
 function moduleCard(m) {
     const tools = (m.tools || []).map(t => `<code>${t}</code>`).join(' ');
     const needsInstall = m.data_file && !m.installed;
-    const installBtn = needsInstall
-        ? `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`
-        : (m.installed && m.data_file ? `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>` : `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`);
+    let installBtn;
+    if (!m.install_ready) {
+        installBtn = `<span style="font-size:0.72rem;color:var(--text-secondary);opacity:.6" title="Scraper not yet implemented">🚧 Coming soon</span>`;
+    } else if (needsInstall) {
+        installBtn = `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`;
+    } else if (m.installed && m.data_file) {
+        installBtn = `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>`;
+    } else {
+        installBtn = `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`;
+    }
     const repoLink = m.repo_url ? `<a href="${m.repo_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">GitHub ↗</a>` : '';
     const srcLink = m.source_url ? `<a href="${m.source_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">${m.name} ↗</a>` : '';
     return `

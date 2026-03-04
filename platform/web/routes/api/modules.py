@@ -84,11 +84,23 @@ def _is_installed(module: Dict) -> bool:
     return path.exists()
 
 
+def _is_install_ready(module: Dict) -> bool:
+    """Return False for scrapers that haven't been written yet."""
+    install = module.get("install", "")
+    if not install or install.startswith("#"):
+        return True
+    # platform.modules.scrapers.* don't exist yet
+    if "platform.modules.scrapers" in install:
+        return False
+    return True
+
+
 def _enrich(module: Dict, enabled_ids: set[str]) -> Dict:
     return {
         **module,
         "enabled": module["id"] in enabled_ids,
         "installed": _is_installed(module),
+        "install_ready": _is_install_ready(module),
     }
 
 
@@ -144,6 +156,14 @@ async def install_module(module_id: str):
     if not install_cmd or install_cmd.startswith("#"):
         return JSONResponse(
             {"ok": True, "message": "No install required", "already_installed": True}
+        )
+    if not _is_install_ready(module):
+        return JSONResponse(
+            {
+                "ok": False,
+                "error": "Scraper not yet implemented for this module — coming soon.",
+            },
+            status_code=501,
         )
 
     try:
