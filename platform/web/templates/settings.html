@@ -772,6 +772,20 @@
                 </div>
             </div>
         </section>
+
+        <section class="settings-section" style="margin-top:1.5rem">
+            <div style="margin-bottom:0.5rem">
+                <h3 style="margin:0">MCP LRM Servers</h3>
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Built-in MCP servers available to agents. Toggle to start/stop in real time.</p>
+            </div>
+            <div id="rlm-container">
+                <div class="modules-grid">
+                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:55%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:40%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
+                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:45%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:35%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
+                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:60%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:30%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
+                </div>
+            </div>
+        </section>
     </div>
 
     <!-- ═══ Security ═══ -->
@@ -841,7 +855,9 @@
 <script>
 const _CAT_LABELS = {
   'ux-design':'🎨 UX / Design','development':'💻 Development','security':'🔒 Security',
-  'legal':'⚖️ Legal / Compliance','marketing-seo':'📣 Marketing / SEO','data':'🗄️ Data','ai-llm':'🤖 AI / LLM'
+  'legal':'⚖️ Legal / Compliance','marketing-seo':'📣 Marketing / SEO','data':'🗄️ Data',
+  'ai-llm':'🤖 AI / LLM','infra':'🏗️ Infrastructure','browser':'🌐 Browser / Automation',
+  'knowledge':'📐 Knowledge','other':'📦 Other'
 };
 
 async function loadModulesTab() {
@@ -849,9 +865,14 @@ async function loadModulesTab() {
     if (!container || container.dataset.loaded) return;
     container.dataset.loaded = '1';
     try {
-        const r = await fetch('/api/modules');
-        const modules = await r.json();
+        const [modRes, mcpRes] = await Promise.all([
+            fetch('/api/modules'),
+            fetch('/api/mcps/status'),
+        ]);
+        const modules = await modRes.json();
+        const mcpData = await mcpRes.json();
         renderModules(modules);
+        renderRlmSection(mcpData.mcps || []);
     } catch(e) {
         container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
     }
@@ -867,7 +888,7 @@ function renderModules(modules) {
         byCat[c].push(m);
     });
 
-    const catOrder = ['ux-design','development','security','legal','marketing-seo','data','ai-llm','other'];
+    const catOrder = ['ux-design','development','security','legal','marketing-seo','data','ai-llm','infra','browser','knowledge','other'];
     let html = '';
     catOrder.filter(c => byCat[c]).forEach(cat => {
         const label = _CAT_LABELS[cat] || cat;
@@ -915,6 +936,57 @@ function moduleCard(m) {
             ${repoLink}
         </div>
     </div>`;
+}
+
+function renderRlmSection(mcps) {
+    const el = document.getElementById('rlm-container');
+    if (!el) return;
+    if (!mcps.length) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">No MCP servers found.</p>'; return; }
+    const icons = {'mcp-fetch':'🌐','mcp-memory':'🧠','mcp-playwright':'🎭','mcp-github':'🐙','mcp-solaris':'☀️','mcp-jira':'📋','mcp-confluence':'📚'};
+    let h = '<div class="modules-grid">';
+    for (const m of mcps) {
+        const running = m.status === 'running';
+        h += `<div class="module-card ${running?'enabled':''}" id="mcp-card-${m.id}">
+            <div class="module-card-header">
+                <span class="module-icon">${icons[m.id]||'⚙️'}</span>
+                <div class="module-info">
+                    <div class="module-name">${m.name}</div>
+                    <div class="module-desc">${m.tools_count} tool${m.tools_count!==1?'s':''} · ${m.is_builtin?'built-in':''}</div>
+                    <div class="module-meta">
+                        <span class="module-cat-badge" style="background:${running?'rgba(34,197,94,.1)':'rgba(255,255,255,.05)'};color:${running?'var(--green)':'var(--text-secondary)'};border-color:${running?'var(--green)':'var(--border)'}">
+                            ${running?'● running':'○ stopped'}
+                        </span>
+                        ${m.pid?`<span class="module-cat-badge">pid ${m.pid}</span>`:''}
+                    </div>
+                </div>
+                <label style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleMcp(event,'${m.id}','${m.status}')">
+                    <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${running?'var(--green)':'var(--border)'};transition:background .2s" id="mcp-track-${m.id}">
+                        <span style="position:absolute;top:2px;left:${running?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mcp-thumb-${m.id}"></span>
+                    </span>
+                </label>
+            </div>
+        </div>`;
+    }
+    h += '</div>';
+    el.innerHTML = h;
+}
+
+async function toggleMcp(event, id, currentStatus) {
+    event.preventDefault();
+    const running = currentStatus === 'running';
+    const track = document.getElementById('mcp-track-'+id);
+    const thumb = document.getElementById('mcp-thumb-'+id);
+    const card  = document.getElementById('mcp-card-'+id);
+    const action = running ? 'stop' : 'start';
+    try {
+        track.style.background = 'var(--border)'; thumb.style.left = '2px'; // optimistic
+        const r = await fetch(`/api/mcps/${id}/${action}`, {method:'POST'});
+        const d = await r.json();
+        // Refresh MCP section
+        const mcpRes = await fetch('/api/mcps/status');
+        const mcpData = await mcpRes.json();
+        renderRlmSection(mcpData.mcps || []);
+    } catch(e) { console.error(e); }
 }
 
 async function toggleModule(event, id) {
