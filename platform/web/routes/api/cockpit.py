@@ -381,7 +381,7 @@ def _get_activity(db) -> list[dict]:
         "SELECT m.from_agent, m.content, m.timestamp, s.project_id,"
         "  p.name AS project_name,"
         "  a.name AS agent_name, a.avatar AS agent_avatar, a.color AS agent_color,"
-        "  a.role AS agent_role"
+        "  a.role AS agent_role, a.is_builtin AS agent_is_builtin"
         " FROM messages m"
         " LEFT JOIN sessions s ON s.id = m.session_id"
         " LEFT JOIN projects p ON p.id = s.project_id"
@@ -408,6 +408,7 @@ def _get_activity(db) -> list[dict]:
                 "agent_avatar": agent_avatar,
                 "agent_color": agent_color,
                 "agent_role": r["agent_role"] or "",
+                "agent_is_builtin": bool(r["agent_is_builtin"]),
                 "label": content,
                 "project_id": r["project_id"],
                 "project_name": r["project_name"],
