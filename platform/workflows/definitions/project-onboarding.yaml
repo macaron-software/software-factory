@@ -1,0 +1,151 @@
+id: project-onboarding
+name: Project Onboarding
+description: >
+  Onboard an existing project into the Software Factory:
+  clone the repo, analyze the codebase, populate project memory,
+  generate wiki documentation, and push to Confluence.
+icon: 🚀
+is_builtin: true
+phases:
+- id: clone-setup
+  pattern_id: sequential
+  name: Clone & Setup
+  description: >
+    Create the project on the platform (git_url provided → clone existing repo).
+    Verify workspace is accessible, detect tech stack, read README/CLAUDE.md/SPECS.md.
+  gate: Workspace cloned and tech stack identified
+  config:
+    agents:
+    - strat-cto
+
+- id: codebase-analysis
+  pattern_id: hierarchical
+  name: Codebase Analysis
+  description: >
+    Deep analysis of the codebase: architecture, dependencies, entry points,
+    API surface, data models, CI/CD config. Store findings in project memory.
+    Lead decomposes into parallel sub-tasks (architecture, security, docs).
+  gate: memory_project populated with architecture/stack/dependencies findings
+  config:
+    agents:
+    - architecte
+    - tech_lead_mobile
+    - lead_backend
+
+- id: memory-population
+  pattern_id: parallel
+  name: Memory & Context Population
+  description: >
+    Populate project memory layers: conventions, patterns, stack decisions,
+    known issues, team contacts. Read existing docs (CLAUDE.md, SPECS.md, VISION.md,
+    README, .github/copilot-instructions.md). Store structured memory entries.
+  gate: All key memory categories populated (stack, conventions, architecture, risks)
+  config:
+    agents:
+    - doc-writer
+    - architecte
+
+- id: wiki-generation
+  pattern_id: sequential
+  name: Wiki Generation
+  description: >
+    Generate comprehensive project wiki pages:
+    - Architecture Overview (components, data flow, deployment)
+    - Developer Onboarding (setup, run, test, contribute)
+    - API Reference (endpoints, auth, errors)
+    - ADR log (key architecture decisions)
+    - Runbook (ops, monitoring, incident response)
+  gate: All 5 wiki pages generated and reviewed
+  config:
+    agents:
+    - doc-writer
+    - architecte
+
+- id: confluence-publish
+  pattern_id: sequential
+  name: Confluence Publish
+  description: >
+    Push all generated wiki pages to Confluence under the project space.
+    Create page hierarchy: {ProjectName}/Architecture, /Onboarding, /API, /ADRs, /Runbook.
+    Update existing pages if already present.
+  gate: All pages published to Confluence with valid page IDs
+  config:
+    agents:
+    - doc-writer
+
+- id: onboarding-review
+  pattern_id: adversarial-pair
+  name: Onboarding Review
+  description: >
+    Validate the onboarding quality: a new-developer persona tries to follow
+    the generated onboarding guide and reports gaps. The doc-writer fixes issues.
+  gate: A new developer can set up and run the project within 30 minutes
+  config:
+    agents:
+    - doc-writer
+    - architecte
+
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: strat-cto
+      x: 50
+      y: 150
+      label: Clone & Setup
+      phase: clone-setup
+    - id: n2
+      agent_id: architecte
+      x: 220
+      y: 100
+      label: Codebase Analysis
+      phase: codebase-analysis
+    - id: n3
+      agent_id: doc-writer
+      x: 400
+      y: 150
+      label: Memory Population
+      phase: memory-population
+    - id: n4
+      agent_id: doc-writer
+      x: 580
+      y: 100
+      label: Wiki Generation
+      phase: wiki-generation
+    - id: n5
+      agent_id: doc-writer
+      x: 580
+      y: 200
+      label: Confluence Publish
+      phase: confluence-publish
+    - id: n6
+      agent_id: architecte
+      x: 760
+      y: 150
+      label: Review
+      phase: onboarding-review
+    edges:
+    - from: n1
+      to: n2
+      label: workspace ready
+      color: '#a855f7'
+    - from: n2
+      to: n3
+      label: analysis done
+      color: '#06b6d4'
+    - from: n3
+      to: n4
+      label: memory ready
+      color: '#a855f7'
+    - from: n4
+      to: n5
+      label: docs generated
+      color: '#f59e0b'
+    - from: n4
+      to: n6
+      label: review
+      color: '#06b6d4'
+    - from: n5
+      to: n6
+      label: published
+      color: '#f59e0b'

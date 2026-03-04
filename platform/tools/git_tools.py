@@ -531,9 +531,83 @@ class GitPostPRReviewTool(BaseTool):
             return f"Error: {e}"
 
 
+class GitCloneTool(BaseTool):
+    name = "git_clone"
+    description = (
+        "Clone a remote git repository into a local directory. "
+        "Params: url (required) — HTTPS or SSH remote URL; "
+        "dest (optional) — local destination path (default: auto-derived from repo name); "
+        "branch (optional) — branch/tag to checkout after clone. "
+        "Returns: local path where the repo was cloned."
+    )
+    category = "git"
+    allowed_roles = []
+
+    async def execute(self, params: dict, agent=None) -> str:
+        import json as _json
+
+        url = (params.get("url") or "").strip()
+        if not url:
+            return _json.dumps({"error": "url is required"})
+
+        # Determine destination path
+        dest = (params.get("dest") or "").strip()
+        if not dest:
+            repo_name = url.rstrip("/").split("/")[-1]
+            if repo_name.endswith(".git"):
+                repo_name = repo_name[:-4]
+            workspaces_root = os.path.join(
+                os.path.dirname(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                ),
+                "workspace",
+            )
+            os.makedirs(workspaces_root, exist_ok=True)
+            dest = os.path.join(workspaces_root, repo_name)
+
+        if os.path.isdir(os.path.join(dest, ".git")):
+            # Already cloned — pull latest instead
+            try:
+                r = subprocess.run(
+                    ["git", "pull", "--ff-only"],
+                    cwd=dest,
+                    capture_output=True,
+                    text=True,
+                    timeout=120,
+                )
+                return _json.dumps(
+                    {
+                        "ok": True,
+                        "path": dest,
+                        "action": "pulled",
+                        "output": r.stdout.strip(),
+                    }
+                )
+            except Exception as e:
+                return _json.dumps({"error": f"pull failed: {e}"})
+
+        cmd = ["git", "clone", url, dest]
+        branch = (params.get("branch") or "").strip()
+        if branch:
+            cmd += ["--branch", branch]
+
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if r.returncode != 0:
+                return _json.dumps({"error": r.stderr.strip() or "clone failed"})
+            return _json.dumps(
+                {"ok": True, "path": dest, "action": "cloned", "url": url}
+            )
+        except subprocess.TimeoutExpired:
+            return _json.dumps({"error": "git clone timed out after 300s"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 def register_git_tools(registry):
     """Register all git tools."""
     registry.register(GitInitTool())
+    registry.register(GitCloneTool())
     registry.register(GitStatusTool())
     registry.register(GitDiffTool())
     registry.register(GitLogTool())

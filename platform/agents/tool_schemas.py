@@ -107,6 +107,31 @@ def _core_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "git_clone",
+                "description": "Clone a remote git repository into a local workspace. Use to onboard existing projects.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "HTTPS or SSH git remote URL (required)",
+                        },
+                        "dest": {
+                            "type": "string",
+                            "description": "Local destination path (default: auto-derived from repo name in workspace/)",
+                        },
+                        "branch": {
+                            "type": "string",
+                            "description": "Branch or tag to checkout (default: default branch)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "git_status",
                 "description": "Show git status of the project.",
                 "parameters": {
@@ -2000,7 +2025,7 @@ def _platform_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "create_project",
-                "description": "Create a new project on the platform. Returns the project id and name.",
+                "description": "Create a new project on the platform. If git_url is provided, clones the existing repo as workspace. Otherwise scaffolds from scratch. Returns the project id and workspace path.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -2008,9 +2033,17 @@ def _platform_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Project name (required)",
                         },
+                        "git_url": {
+                            "type": "string",
+                            "description": "HTTPS or SSH URL of existing repo to clone as workspace (optional — leave empty to scaffold new project)",
+                        },
                         "description": {
                             "type": "string",
                             "description": "Project description",
+                        },
+                        "vision": {
+                            "type": "string",
+                            "description": "Project vision / long-term goal",
                         },
                         "factory_type": {
                             "type": "string",
@@ -2649,6 +2682,35 @@ def _platform_schemas() -> list[dict]:
                 },
             },
         },
+        {
+            "type": "function",
+            "function": {
+                "name": "confluence_write_page",
+                "description": "Create or update a Confluence wiki page with markdown content. Use to publish documentation, architecture notes, project wiki, onboarding guides.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (required)",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Page content in Markdown (required)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key (default: VELIGO)",
+                        },
+                        "parent_title": {
+                            "type": "string",
+                            "description": "Title of parent page for hierarchy (optional)",
+                        },
+                    },
+                    "required": ["title", "content"],
+                },
+            },
+        },
     ]
 
 
@@ -2691,6 +2753,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_log",
         "git_diff",
         # Git write ops (explicit user requests only)
+        "git_clone",
         "git_init",
         "git_commit",
         "git_push",
@@ -2714,6 +2777,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         # Web / fetch
         "mcp_fetch_fetch",
         "deep_search",
+        # Confluence write
+        "confluence_write_page",
     ],
     "product": [
         "code_read",
@@ -2739,6 +2804,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_add_comment",
         "jira_sync_from_platform",
         "confluence_read",
+        "confluence_write_page",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
@@ -2775,6 +2841,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_sub_mission",
         "list_sub_missions",
         "set_constraints",
+        "confluence_write_page",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
@@ -2814,6 +2881,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_status",
         "git_log",
         "git_diff",
+        "git_clone",
         "git_commit",
         "git_create_pr",
         "list_files",

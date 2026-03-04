@@ -347,15 +347,18 @@ class PlatformCreateStoryTool(BaseTool):
 class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
-        "Create a new project on the platform with full setup: workspace dir, git init, Dockerfile, docker-compose, "
-        "README, docs/spec.md, docs/security.md, and standard missions (TMA/MCO, Security, Tech Debt + Legal). "
-        "Params: name (required), description, vision, stack (tech stack string), "
-        "factory_type ('software'|'data'|'security'|'standalone'). "
+        "Create a new project on the platform. "
+        "If git_url is provided, clones the existing repository as the workspace. "
+        "Otherwise scaffolds a new project (git init, Dockerfile, README, docs/spec.md). "
+        "Standard missions (TMA/MCO, Security, Tech Debt + Legal) are always provisioned. "
+        "Params: name (required), git_url (existing repo URL to clone), description, vision, "
+        "stack (tech stack string), factory_type ('software'|'data'|'security'|'standalone'). "
         "Returns the created project id, name, workspace path, scaffold actions, and mission ids."
     )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import subprocess as _sp
         from ..projects.manager import get_project_store, Project, scaffold_project
 
         name = params.get("name", "").strip()
@@ -363,6 +366,8 @@ class PlatformCreateProjectTool(BaseTool):
             return json.dumps({"error": "name is required"})
         import uuid
         import datetime
+
+        git_url = (params.get("git_url") or "").strip()
 
         store = get_project_store()
         proj = Project(
@@ -372,16 +377,47 @@ class PlatformCreateProjectTool(BaseTool):
             description=params.get("description", ""),
             vision=params.get("vision", params.get("description", "")),
             factory_type=params.get("factory_type", "software"),
+            git_url=git_url,
             created_at=datetime.datetime.utcnow().isoformat(),
         )
         proj = store.create(proj)
 
-        # Scaffold workspace: git init + Dockerfile + docker-compose + README + docs/spec.md + src/
         scaffold_result = {}
-        try:
-            scaffold_result = scaffold_project(proj)
-        except Exception as _e:
-            scaffold_result = {"error": str(_e)}
+        if git_url:
+            # Clone existing repo into workspace
+            import os as _os
+
+            workspace_root = (
+                _os.path.dirname(proj.path)
+                if proj.path
+                else _os.path.join(_os.getcwd(), "workspace")
+            )
+            dest = proj.path or _os.path.join(workspace_root, proj.id)
+            try:
+                r = _sp.run(
+                    ["git", "clone", git_url, dest],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if r.returncode == 0:
+                    # Update project path to the cloned directory
+                    proj.path = dest
+                    store.update(proj)
+                    scaffold_result = {"actions": [f"cloned {git_url} → {dest}"]}
+                else:
+                    scaffold_result = {
+                        "error": r.stderr.strip() or "clone failed",
+                        "actions": [],
+                    }
+            except Exception as _e:
+                scaffold_result = {"error": str(_e), "actions": []}
+        else:
+            # Scaffold workspace: git init + Dockerfile + docker-compose + README + docs/spec.md + src/
+            try:
+                scaffold_result = scaffold_project(proj)
+            except Exception as _e:
+                scaffold_result = {"error": str(_e)}
 
         # List missions provisioned by store.create() → heal_epics()
         missions_created = []
@@ -1120,6 +1156,57 @@ class PlatformClusterTool(BaseTool):
         )
 
 
+class ConfluenceWritePageTool(BaseTool):
+    name = "confluence_write_page"
+    description = (
+        "Create or update a Confluence page with markdown content. "
+        "Params: title (required), content (markdown, required), "
+        "space (Confluence space key, default from CONFLUENCE_SPACE env), "
+        "parent_title (optional parent page title for hierarchy). "
+        "Returns the page URL and ID."
+    )
+    category = "platform"
+    allowed_roles = []
+
+    async def execute(self, params: dict, agent=None) -> str:
+        import json as _json
+
+        title = (params.get("title") or "").strip()
+        content = (params.get("content") or "").strip()
+        if not title or not content:
+            return _json.dumps({"error": "title and content are required"})
+
+        space = (params.get("space") or "").strip() or None
+        parent_title = (params.get("parent_title") or "").strip() or None
+
+        try:
+            from ..confluence.client import get_confluence_client
+            from ..confluence.converter import md_to_confluence
+
+            client = get_confluence_client()
+            if space:
+                client.space_key = space
+
+            parent_id = None
+            if parent_title:
+                parent_page = client.find_page(parent_title, space_key=space)
+                if parent_page:
+                    parent_id = parent_page["id"]
+
+            body_xhtml = md_to_confluence(content)
+            page = client.create_or_update(
+                title=title,
+                body_xhtml=body_xhtml,
+                parent_id=parent_id,
+            )
+            url = f"{client.base_url}/pages/{page.get('id', '')}"
+            return _json.dumps(
+                {"ok": True, "page_id": page.get("id"), "title": title, "url": url}
+            )
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 def register_platform_tools(registry):
     """Register all platform introspection tools."""
     registry.register(PlatformAgentsTool())
@@ -1138,3 +1225,4 @@ def register_platform_tools(registry):
     registry.register(LaunchMktIdeationTool())
     registry.register(LaunchGroupIdeationTool())
     registry.register(PlatformClusterTool())
+    registry.register(ConfluenceWritePageTool())
