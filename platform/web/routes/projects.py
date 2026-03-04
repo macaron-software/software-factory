@@ -742,6 +742,30 @@ async def create_project(request: Request):
     return RedirectResponse(f"/projects/{p.id}", status_code=303)
 
 
+@router.patch("/api/projects/{project_id}")
+async def patch_project(request: Request, project_id: str):
+    """Update project metadata (client_domain, name, description, starred…)."""
+    from ...projects.manager import get_project_store
+
+    data = await _parse_body(request)
+    store = get_project_store()
+    p = store.get(project_id)
+    if not p:
+        return JSONResponse({"error": "not found"}, status_code=404)
+    if "client_domain" in data:
+        p.client_domain = str(data["client_domain"]).strip()
+    if "name" in data:
+        p.name = str(data["name"]).strip()
+    if "description" in data:
+        p.description = str(data["description"]).strip()
+    if "starred" in data:
+        p.starred = bool(data["starred"])
+    store.update(p)
+    return JSONResponse(
+        {"ok": True, "project": {"id": p.id, "client_domain": p.client_domain}}
+    )
+
+
 @router.post("/api/projects/{project_id}/vision")
 async def update_vision(request: Request, project_id: str):
     """Update project vision."""
