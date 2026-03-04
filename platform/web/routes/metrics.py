@@ -216,3 +216,103 @@ async def api_metrics_tests_record(body: TestRunRecord):
     )
     conn.commit()
     return JSONResponse({"ok": True})
+
+
+# ── Modules metrics tab ───────────────────────────────────────────────────────
+
+
+@router.get("/metrics/tab/modules", response_class=HTMLResponse)
+async def metrics_tab_modules(request: Request):
+    """Modules usage metrics tab partial (HTMX)."""
+    return _templates.TemplateResponse("metrics_modules.html", {"request": request})
+
+
+@router.get("/api/metrics/modules")
+async def api_metrics_modules():
+    """Aggregated module usage stats (RTK + module activation overview)."""
+    import yaml
+    from pathlib import Path
+
+    conn = _get_db()
+
+    # RTK compression stats
+    rtk_total = conn.execute(
+        "SELECT COUNT(*) as n, COALESCE(SUM(original_tokens),0) as orig, "
+        "COALESCE(SUM(compressed_tokens),0) as comp, COALESCE(AVG(savings_pct),0) as avg_pct "
+        "FROM rtk_compression_stats"
+    ).fetchone()
+
+    rtk_24h = conn.execute(
+        "SELECT COUNT(*) as calls, COALESCE(AVG(savings_pct),0) as avg_pct, "
+        "COALESCE(SUM(original_tokens - compressed_tokens),0) as tokens_saved "
+        "FROM rtk_compression_stats WHERE ts > NOW() - INTERVAL '24 hours'"
+    ).fetchone()
+
+    rtk_by_provider = conn.execute(
+        "SELECT provider, COUNT(*) as calls, "
+        "COALESCE(SUM(original_tokens),0) as orig_tokens, "
+        "COALESCE(SUM(compressed_tokens),0) as comp_tokens, "
+        "COALESCE(AVG(savings_pct),0) as avg_pct "
+        "FROM rtk_compression_stats GROUP BY provider ORDER BY calls DESC"
+    ).fetchall()
+
+    rtk_daily = conn.execute(
+        "SELECT DATE(ts) as day, COUNT(*) as calls, "
+        "COALESCE(SUM(original_tokens - compressed_tokens),0) as tokens_saved "
+        "FROM rtk_compression_stats WHERE ts > NOW() - INTERVAL '7 days' "
+        "GROUP BY DATE(ts) ORDER BY day"
+    ).fetchall()
+
+    # Module activation status from registry
+    registry_path = (
+        Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
+    )
+    modules_list = []
+    if registry_path.exists():
+        with open(registry_path) as f:
+            all_modules = yaml.safe_load(f) or []
+        # Get enabled status from DB
+        enabled_ids = set()
+        try:
+            rows = conn.execute(
+                "SELECT value FROM settings WHERE key = 'enabled_modules'"
+            ).fetchone()
+            if rows:
+                import json
+
+                enabled_ids = set(json.loads(rows["value"]) or [])
+        except Exception:
+            pass
+        modules_list = [
+            {
+                "id": m.get("id"),
+                "name": m.get("name"),
+                "category": m.get("category", "other"),
+                "icon": m.get("icon", "🔧"),
+                "enabled": m.get("id") in enabled_ids,
+            }
+            for m in all_modules
+        ]
+
+    return JSONResponse(
+        {
+            "rtk": {
+                "total_calls": rtk_total["n"] or 0,
+                "total_tokens_original": rtk_total["orig"] or 0,
+                "total_tokens_compressed": rtk_total["comp"] or 0,
+                "total_tokens_saved": (rtk_total["orig"] or 0)
+                - (rtk_total["comp"] or 0),
+                "avg_savings_pct": round(rtk_total["avg_pct"] or 0, 1),
+                "last_24h": {
+                    "calls": rtk_24h["calls"] or 0,
+                    "avg_pct": round(rtk_24h["avg_pct"] or 0, 1),
+                    "tokens_saved": rtk_24h["tokens_saved"] or 0,
+                },
+                "by_provider": [dict(r) for r in rtk_by_provider],
+                "daily_7d": [dict(r) for r in rtk_daily],
+            },
+            "modules": modules_list,
+            "enabled_count": sum(1 for m in modules_list if m["enabled"]),
+            "total_count": len(modules_list),
+        }
+    )

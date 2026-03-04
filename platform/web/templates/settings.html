@@ -757,14 +757,9 @@
     <!-- ═══ Modules ═══ -->
     <div class="settings-panel" id="panel-modules">
         <section class="settings-section">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
-                <div>
-                    <h3 style="margin:0">Optional Modules</h3>
-                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
-                </div>
-                <button class="btn btn-sm" onclick="document.getElementById('modules-container').dataset.loaded='';loadModulesTab()">
-                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
-                </button>
+            <div style="margin-bottom:0.5rem">
+                <h3 style="margin:0">Optional Modules</h3>
+                <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
             </div>
             <div id="modules-container">
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:0.5rem">
