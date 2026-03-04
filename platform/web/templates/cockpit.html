@@ -823,7 +823,233 @@
     </div>
   </div>
 
-  <!-- 6. Footer KPIs -->
+  <!-- 6. Intégrations tierces -->
+  <div class="ck-card" style="padding:1rem 1.25rem">
+    <div class="ck-card-title" style="margin-bottom:1rem">
+      <svg class="icon icon-xs"><use href="#icon-settings"/></svg>
+      Écosystème Tiers — Intégrations &amp; Modules Externes
+    </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <svg id="sf-integrations-diagram" viewBox="0 0 1000 580" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;min-width:750px;max-width:1000px;display:block;margin:0 auto;font-family:inherit">
+        <!-- Background -->
+        <rect width="1000" height="580" fill="#0f172a" rx="10"/>
+
+        <!-- === TOP: Security / Infrastructure / AI === -->
+
+        <!-- Security (col1) -->
+        <rect x="10" y="10" width="305" height="178" rx="6" fill="none" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="10" y="10" width="305" height="22" rx="6" fill="#dc2626"/>
+        <text x="162" y="25" text-anchor="middle" fill="white" font-size="10" font-weight="bold">🔐 SÉCURITÉ</text>
+        <rect x="20" y="40" width="130" height="42" rx="4" fill="#1e293b" stroke="#dc2626" stroke-width="1"/>
+        <text x="85" y="58" text-anchor="middle" fill="#f87171" font-size="9" font-weight="bold">Trivy</text>
+        <text x="85" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Container &amp; dep scanning</text>
+        <circle cx="142" cy="43" r="4" fill="#f59e0b"/>
+        <rect x="165" y="40" width="140" height="42" rx="4" fill="#1e293b" stroke="#dc2626" stroke-width="1"/>
+        <text x="235" y="58" text-anchor="middle" fill="#f87171" font-size="9" font-weight="bold">Landlock</text>
+        <text x="235" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Linux sandbox (Rust)</text>
+        <circle cx="297" cy="43" r="4" fill="#3b82f6"/>
+        <rect x="20" y="92" width="285" height="42" rx="4" fill="#1e293b" stroke="#dc2626" stroke-width="1"/>
+        <text x="162" y="110" text-anchor="middle" fill="#f87171" font-size="9" font-weight="bold">Infisical / Coffre Fort</text>
+        <text x="162" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Secrets · API keys · Env vars</text>
+        <circle cx="297" cy="95" r="4" fill="#f59e0b"/>
+        <text x="20" y="150" fill="#64748b" font-size="8">→ CI/CD Quality Gate (scan images)</text>
+        <text x="20" y="163" fill="#64748b" font-size="8">→ Agent Executor (sandbox FS)</text>
+        <text x="20" y="176" fill="#64748b" font-size="8">→ Config ~/.config/factory/*.key</text>
+
+        <!-- Infrastructure (col2) -->
+        <rect x="327" y="10" width="305" height="178" rx="6" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="327" y="10" width="305" height="22" rx="6" fill="#ea580c"/>
+        <text x="479" y="25" text-anchor="middle" fill="white" font-size="10" font-weight="bold">🏗️ INFRASTRUCTURE</text>
+        <rect x="337" y="40" width="140" height="42" rx="4" fill="#1e293b" stroke="#ea580c" stroke-width="1"/>
+        <text x="407" y="58" text-anchor="middle" fill="#fb923c" font-size="9" font-weight="bold">Redis</text>
+        <text x="407" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Cache · Pub/Sub · Sessions</text>
+        <circle cx="469" cy="43" r="4" fill="#f59e0b"/>
+        <rect x="490" y="40" width="132" height="42" rx="4" fill="#1e293b" stroke="#ea580c" stroke-width="1"/>
+        <text x="556" y="58" text-anchor="middle" fill="#fb923c" font-size="9" font-weight="bold">PostgreSQL</text>
+        <text x="556" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Primary DB (actif)</text>
+        <circle cx="614" cy="43" r="4" fill="#10b981"/>
+        <rect x="337" y="92" width="285" height="42" rx="4" fill="#1e293b" stroke="#ea580c" stroke-width="1"/>
+        <text x="479" y="110" text-anchor="middle" fill="#fb923c" font-size="9" font-weight="bold">Docker / Compose</text>
+        <text x="479" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Project workspaces · Agent containers · CI</text>
+        <circle cx="614" cy="95" r="4" fill="#10b981"/>
+        <text x="337" y="150" fill="#64748b" font-size="8">→ LLM response cache (Redis)</text>
+        <text x="337" y="163" fill="#64748b" font-size="8">→ SSE / Real-time events</text>
+        <text x="337" y="176" fill="#64748b" font-size="8">→ Agent job queue</text>
+
+        <!-- AI Ecosystem (col3) -->
+        <rect x="644" y="10" width="350" height="178" rx="6" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="644" y="10" width="350" height="22" rx="6" fill="#7c3aed"/>
+        <text x="819" y="25" text-anchor="middle" fill="white" font-size="10" font-weight="bold">🤖 IA / LLM ECOSYSTEM</text>
+        <rect x="654" y="40" width="155" height="42" rx="4" fill="#1e293b" stroke="#7c3aed" stroke-width="1"/>
+        <text x="731" y="58" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">Shannon (Keygraph)</text>
+        <text x="731" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Knowledge graph · LLM context</text>
+        <circle cx="800" cy="43" r="4" fill="#3b82f6"/>
+        <rect x="824" y="40" width="160" height="42" rx="4" fill="#1e293b" stroke="#7c3aed" stroke-width="1"/>
+        <text x="904" y="58" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">mflux</text>
+        <text x="904" y="70" text-anchor="middle" fill="#94a3b8" font-size="7.5">Image gen (Flux / Apple Silicon)</text>
+        <circle cx="976" cy="43" r="4" fill="#3b82f6"/>
+        <rect x="654" y="92" width="155" height="42" rx="4" fill="#1e293b" stroke="#7c3aed" stroke-width="1"/>
+        <text x="731" y="110" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">Agentation.dev</text>
+        <text x="731" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Agent marketplace · registry</text>
+        <circle cx="800" cy="95" r="4" fill="#3b82f6"/>
+        <rect x="824" y="92" width="160" height="42" rx="4" fill="#1e293b" stroke="#7c3aed" stroke-width="1"/>
+        <text x="904" y="110" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">ralph-claude-code</text>
+        <text x="904" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Claude coding agent tool</text>
+        <circle cx="976" cy="95" r="4" fill="#3b82f6"/>
+        <text x="654" y="150" fill="#64748b" font-size="8">→ Memory / context enrichment (Shannon)</text>
+        <text x="654" y="163" fill="#64748b" font-size="8">→ Agentation skill marketplace</text>
+        <text x="654" y="176" fill="#64748b" font-size="8">→ Dev assistant tools (mflux · claude)</text>
+
+        <!-- === CENTER BAND === -->
+        <rect x="0" y="203" width="1000" height="118" fill="#1e293b"/>
+        <rect x="0" y="203" width="1000" height="3" fill="#3b82f6"/>
+        <rect x="0" y="318" width="1000" height="3" fill="#3b82f6"/>
+        <text x="500" y="219" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="bold">SOFTWARE FACTORY PLATFORM — Couche d'intégration</text>
+
+        <!-- 6 integration boxes -->
+        <rect x="10" y="226" width="150" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="85" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">CI/CD</text>
+        <text x="85" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">Quality Gate</text>
+        <text x="85" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">GitHub Actions</text>
+        <text x="85" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">Trivy scan</text>
+        <text x="85" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">Deploy automation</text>
+        <text x="85" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">GSD tasks</text>
+
+        <rect x="175" y="226" width="155" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="252" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Agent Executor</text>
+        <text x="252" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">+ Sandbox</text>
+        <text x="252" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">Landlock (isolation)</text>
+        <text x="252" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">Tool execution</text>
+        <text x="252" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">Docker workspaces</text>
+        <text x="252" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">Scrapy (data tools)</text>
+
+        <rect x="345" y="226" width="155" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="422" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Secrets &amp;</text>
+        <text x="422" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">Config Manager</text>
+        <text x="422" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">Infisical vault</text>
+        <text x="422" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">*.key files</text>
+        <text x="422" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">RTK token audit</text>
+        <text x="422" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">Env injection</text>
+
+        <rect x="515" y="226" width="155" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="592" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Cache &amp; Queue</text>
+        <text x="592" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">Layer</text>
+        <text x="592" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">Redis (LLM cache)</text>
+        <text x="592" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">SSE real-time</text>
+        <text x="592" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">Agent job queue</text>
+        <text x="592" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">Airweave monitor</text>
+
+        <rect x="685" y="226" width="155" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="762" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">LLM &amp; Knowledge</text>
+        <text x="762" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">Layer</text>
+        <text x="762" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">Shannon (graph)</text>
+        <text x="762" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">Agentation registry</text>
+        <text x="762" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">MiniMax / Azure OAI</text>
+        <text x="762" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">Context enrichment</text>
+
+        <rect x="855" y="226" width="137" height="87" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1"/>
+        <text x="923" y="244" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">Dashboard</text>
+        <text x="923" y="257" text-anchor="middle" fill="#60a5fa" font-size="8.5">&amp; UI Layer</text>
+        <text x="923" y="271" text-anchor="middle" fill="#64748b" font-size="7.5">D3.js (charts)</text>
+        <text x="923" y="283" text-anchor="middle" fill="#64748b" font-size="7.5">Component Gallery</text>
+        <text x="923" y="295" text-anchor="middle" fill="#64748b" font-size="7.5">mflux (media)</text>
+        <text x="923" y="307" text-anchor="middle" fill="#64748b" font-size="7.5">claude-code (dev)</text>
+
+        <!-- === BOTTOM === -->
+
+        <!-- Dev Tooling (col1) -->
+        <rect x="10" y="330" width="305" height="165" rx="6" fill="none" stroke="#1d4ed8" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="10" y="330" width="305" height="22" rx="6" fill="#1d4ed8"/>
+        <text x="162" y="345" text-anchor="middle" fill="white" font-size="10" font-weight="bold">🛠️ DEV TOOLING</text>
+        <rect x="20" y="360" width="130" height="45" rx="4" fill="#1e293b" stroke="#1d4ed8" stroke-width="1"/>
+        <text x="85" y="380" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">RTK</text>
+        <text x="85" y="392" text-anchor="middle" fill="#94a3b8" font-size="7.5">Rust Token Killer</text>
+        <text x="85" y="402" text-anchor="middle" fill="#64748b" font-size="6.5">60–90% token savings</text>
+        <circle cx="142" cy="363" r="4" fill="#10b981"/>
+        <rect x="165" y="360" width="140" height="45" rx="4" fill="#1e293b" stroke="#1d4ed8" stroke-width="1"/>
+        <text x="235" y="380" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">get-shit-done (GSD)</text>
+        <text x="235" y="392" text-anchor="middle" fill="#94a3b8" font-size="7.5">Dev task automation</text>
+        <text x="235" y="402" text-anchor="middle" fill="#64748b" font-size="6.5">Build · Deploy · Run</text>
+        <circle cx="297" cy="363" r="4" fill="#3b82f6"/>
+        <rect x="20" y="415" width="285" height="40" rx="4" fill="#1e293b" stroke="#1d4ed8" stroke-width="1"/>
+        <text x="162" y="432" text-anchor="middle" fill="#60a5fa" font-size="9" font-weight="bold">ralph-claude-code</text>
+        <text x="162" y="446" text-anchor="middle" fill="#94a3b8" font-size="7.5">CLI agent · coding tasks · PR review</text>
+        <circle cx="297" cy="418" r="4" fill="#3b82f6"/>
+        <text x="20" y="470" fill="#64748b" font-size="8">→ Agent tool runner intégration</text>
+        <text x="20" y="484" fill="#64748b" font-size="8">→ CLI toolchain SF (sf cmd)</text>
+
+        <!-- Data &amp; Monitoring (col2) -->
+        <rect x="327" y="330" width="305" height="165" rx="6" fill="none" stroke="#b45309" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="327" y="330" width="305" height="22" rx="6" fill="#b45309"/>
+        <text x="479" y="345" text-anchor="middle" fill="white" font-size="10" font-weight="bold">📊 DATA &amp; MONITORING</text>
+        <rect x="337" y="360" width="130" height="45" rx="4" fill="#1e293b" stroke="#b45309" stroke-width="1"/>
+        <text x="402" y="380" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">Scrapy</text>
+        <text x="402" y="392" text-anchor="middle" fill="#94a3b8" font-size="7.5">Web scraping</text>
+        <text x="402" y="402" text-anchor="middle" fill="#64748b" font-size="6.5">Data collection agent</text>
+        <circle cx="459" cy="363" r="4" fill="#f59e0b"/>
+        <rect x="482" y="360" width="140" height="45" rx="4" fill="#1e293b" stroke="#b45309" stroke-width="1"/>
+        <text x="552" y="378" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">Airweave</text>
+        <text x="552" y="390" text-anchor="middle" fill="#94a3b8" font-size="7.5">Error monitoring agent</text>
+        <text x="552" y="400" text-anchor="middle" fill="#64748b" font-size="6.5">LLM-based alerting</text>
+        <circle cx="614" cy="363" r="4" fill="#3b82f6"/>
+        <rect x="337" y="415" width="285" height="40" rx="4" fill="#1e293b" stroke="#b45309" stroke-width="1"/>
+        <text x="479" y="432" text-anchor="middle" fill="#fbbf24" font-size="9" font-weight="bold">Trivy · SBOM · CVE reports</text>
+        <text x="479" y="446" text-anchor="middle" fill="#94a3b8" font-size="7.5">CI pipeline · Registry scan · Deps audit</text>
+        <text x="337" y="470" fill="#64748b" font-size="8">→ Agent scraping tool</text>
+        <text x="337" y="484" fill="#64748b" font-size="8">→ Observabilité / alertes ops</text>
+
+        <!-- Visualisation &amp; UI (col3) -->
+        <rect x="644" y="330" width="350" height="165" rx="6" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="4,2"/>
+        <rect x="644" y="330" width="350" height="22" rx="6" fill="#059669"/>
+        <text x="819" y="345" text-anchor="middle" fill="white" font-size="10" font-weight="bold">🎨 VISUALISATION &amp; UI</text>
+        <rect x="654" y="360" width="155" height="45" rx="4" fill="#1e293b" stroke="#059669" stroke-width="1"/>
+        <text x="731" y="380" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">D3.js</text>
+        <text x="731" y="392" text-anchor="middle" fill="#94a3b8" font-size="7.5">Data visualization</text>
+        <text x="731" y="402" text-anchor="middle" fill="#64748b" font-size="6.5">Charts · Graphs · Diagrams</text>
+        <circle cx="800" cy="363" r="4" fill="#f59e0b"/>
+        <rect x="824" y="360" width="160" height="45" rx="4" fill="#1e293b" stroke="#059669" stroke-width="1"/>
+        <text x="904" y="378" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">Component Gallery</text>
+        <text x="904" y="390" text-anchor="middle" fill="#94a3b8" font-size="7.5">UI design system ref</text>
+        <text x="904" y="400" text-anchor="middle" fill="#64748b" font-size="6.5">Accessibility · Patterns</text>
+        <circle cx="976" cy="363" r="4" fill="#3b82f6"/>
+        <rect x="654" y="415" width="330" height="40" rx="4" fill="#1e293b" stroke="#059669" stroke-width="1"/>
+        <text x="819" y="432" text-anchor="middle" fill="#34d399" font-size="9" font-weight="bold">mflux (Flux — Apple Silicon)</text>
+        <text x="819" y="446" text-anchor="middle" fill="#94a3b8" font-size="7.5">Image &amp; media generation · SeedVR2 · Local inference</text>
+        <circle cx="976" cy="418" r="4" fill="#3b82f6"/>
+        <text x="654" y="470" fill="#64748b" font-size="8">→ Dashboard cockpit charts</text>
+        <text x="654" y="484" fill="#64748b" font-size="8">→ Agent media/image tool · UI DS reference</text>
+
+        <!-- Legend -->
+        <rect x="0" y="505" width="1000" height="70" fill="#0f172a"/>
+        <line x1="0" y1="505" x2="1000" y2="505" stroke="#1e293b" stroke-width="1.5"/>
+        <text x="15" y="522" fill="#64748b" font-size="8.5" font-weight="bold">LÉGENDE :</text>
+        <rect x="75" y="512" width="10" height="10" rx="2" fill="#dc2626"/>
+        <text x="91" y="522" fill="#94a3b8" font-size="8">Sécurité</text>
+        <rect x="155" y="512" width="10" height="10" rx="2" fill="#ea580c"/>
+        <text x="171" y="522" fill="#94a3b8" font-size="8">Infrastructure</text>
+        <rect x="265" y="512" width="10" height="10" rx="2" fill="#7c3aed"/>
+        <text x="281" y="522" fill="#94a3b8" font-size="8">IA / LLM Ecosystem</text>
+        <rect x="395" y="512" width="10" height="10" rx="2" fill="#1d4ed8"/>
+        <text x="411" y="522" fill="#94a3b8" font-size="8">Dev Tooling</text>
+        <rect x="490" y="512" width="10" height="10" rx="2" fill="#b45309"/>
+        <text x="506" y="522" fill="#94a3b8" font-size="8">Data &amp; Monitoring</text>
+        <rect x="625" y="512" width="10" height="10" rx="2" fill="#059669"/>
+        <text x="641" y="522" fill="#94a3b8" font-size="8">Visualisation &amp; UI</text>
+        <text x="15" y="548" fill="#64748b" font-size="8.5" font-weight="bold">STATUS :</text>
+        <circle cx="68" cy="544" r="5" fill="#10b981"/>
+        <text x="78" y="548" fill="#94a3b8" font-size="8">Actif / intégré</text>
+        <circle cx="155" cy="544" r="5" fill="#f59e0b"/>
+        <text x="165" y="548" fill="#94a3b8" font-size="8">En cours d'intégration</text>
+        <circle cx="290" cy="544" r="5" fill="#3b82f6"/>
+        <text x="300" y="548" fill="#94a3b8" font-size="8">Planifié / à intégrer</text>
+        <text x="400" y="548" fill="#475569" font-size="7.5">Actifs : RTK · PostgreSQL · Docker · GitHub Actions · Scrapy (partiel) · D3 (partiel)</text>
+        <text x="400" y="562" fill="#475569" font-size="7.5">En cours : Redis · Trivy · Infisical · Airweave · D3 dashboard  |  Planifiés : Shannon · mflux · Landlock · Agentation · GSD · CompGallery</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 7. Footer KPIs -->
   <div class="kpi-bar" id="kpiBar">
     <div class="kpi-item">
       <span class="kpi-label">TMA Tickets</span>
