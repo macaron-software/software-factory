@@ -3,8 +3,14 @@ Software Factory - Configuration
 =======================================
 100% local platform. LLM providers: Anthropic, MiniMax, GLM, Azure Foundry.
 Loads from ~/.config/factory/platform.yaml with env var overrides.
+
+Secret management (priority order):
+  1. Infisical vault  — if INFISICAL_TOKEN + INFISICAL_SITE_URL are set
+  2. .env file        — fallback / local dev bootstrap
+  3. os.environ       — always wins (shell overrides)
 """
 
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,9 +19,77 @@ from typing import Optional
 import yaml
 from dotenv import load_dotenv
 
-# Load .env from project root (before any os.environ access)
+log = logging.getLogger(__name__)
+
+# Load .env first (provides bootstrap vars like INFISICAL_TOKEN for local dev)
 _env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(_env_path, override=True)
+
+
+def _load_infisical() -> bool:
+    """Inject secrets from Infisical vault into os.environ via REST API.
+
+    Uses httpx (already a platform dependency) — no infisical SDK needed.
+
+    Requires in environment (or minimal .env bootstrap):
+      INFISICAL_TOKEN       — service token st.xxxx (mandatory)
+      INFISICAL_SITE_URL    — self-hosted URL or https://app.infisical.com (default)
+      INFISICAL_ENVIRONMENT — dev / staging / prod (default: prod)
+      INFISICAL_PROJECT_ID  — Infisical project UUID (mandatory for REST API)
+      INFISICAL_PATH        — secret path (default: /)
+
+    Secrets are injected with setdefault → explicit env vars always win.
+    Returns True if secrets were loaded, False if skipped/failed.
+    """
+    token = os.environ.get("INFISICAL_TOKEN")
+    if not token:
+        return False  # not configured — skip silently
+
+    site_url = os.environ.get("INFISICAL_SITE_URL", "https://app.infisical.com").rstrip(
+        "/"
+    )
+    environment = os.environ.get("INFISICAL_ENVIRONMENT", "prod")
+    path = os.environ.get("INFISICAL_PATH", "/")
+    project_id = os.environ.get("INFISICAL_PROJECT_ID", "")
+
+    try:
+        import httpx
+
+        headers = {"Authorization": f"Bearer {token}"}
+        params: dict = {"environment": environment, "secretPath": path}
+        if project_id:
+            params["workspaceId"] = project_id
+
+        resp = httpx.get(
+            f"{site_url}/api/v3/secrets/raw",
+            headers=headers,
+            params=params,
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        secrets = data.get("secrets", [])
+        injected = 0
+        for s in secrets:
+            key = s.get("secretKey") or s.get("key", "")
+            val = s.get("secretValue") or s.get("value", "")
+            if key and key not in os.environ:
+                os.environ[key] = val
+                injected += 1
+        log.info(
+            "Infisical: loaded %d secrets (env=%s, path=%s)",
+            injected,
+            environment,
+            path,
+        )
+        return True
+    except Exception as e:
+        log.warning("Infisical: failed to load secrets — %s (falling back to .env)", e)
+    return False
+
+
+# Inject vault secrets after .env bootstrap
+_infisical_active = _load_infisical()
 
 # Paths
 PLATFORM_ROOT = Path(__file__).parent
