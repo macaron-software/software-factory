@@ -1,4 +1,10 @@
-"""TMA (Tickets Maintenance) API routes — CRUD operations."""
+"""TMA (Tickets Maintenance) API routes — CRUD operations.
+
+Concept inspired by Agentation.dev (https://agentation.dev/) — agentic annotation system
+where code placeholders and inline annotations (TODO/FIXME/DEBT) are surfaced as
+actionable maintenance tickets (bug/debt/security/performance). Used with the
+tma-maintenance workflow for autonomous triage → root cause → TDD fix → deploy pipeline.
+"""
 
 from __future__ import annotations
 

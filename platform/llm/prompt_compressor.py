@@ -12,6 +12,11 @@ Compression strategies (in order):
 
 Rough token estimate: 1 token ≈ 4 chars (English prose).
 For code/JSON, closer to 3 chars/token — we use 3.5 as conservative estimate.
+
+Dual inspiration:
+- RTK (https://github.com/macaron-software/rtk) — token compression CLI, same philosophy
+- Ralph (https://github.com/frankbria/ralph-claude-code) — context rot prevention in agent loops
+  The _summarize_context() function in agents/executor.py is the Ralph-inspired counterpart.
 """
 
 from __future__ import annotations

@@ -288,6 +288,7 @@ def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
 
 
 # Number of recent messages preserved intact during context summarization
+# Context rot prevention inspired by Ralph (https://github.com/frankbria/ralph-claude-code)
 _CTX_KEEP_RECENT = 6
 # Summarize when message count exceeds this
 _CTX_SUMMARIZE_THRESHOLD = 20
@@ -965,6 +966,7 @@ class AgentExecutor:
             content = re.sub(r"<think>[\s\S]*?</think>\s*", "", content).strip()
             if "<think>" in content and "</think>" not in content:
                 content = content[: content.index("<think>")].strip()
+
             delegations = self._parse_delegations(content)
 
             _update_mission_cost(ctx.session_id, ctx.epic_run_id)

@@ -630,3 +630,42 @@ platform/web/templates/
   _partial_analytics.html  Thompson Sampling section (LIVE)
   partials/workflows_list.html  Evolution proposals tab (PLANNED)
 ```
+
+---
+
+## EXTERNAL INSPIRATIONS — Ce qu'on a intégré et d'où ça vient
+
+Télégraphique. Sources → implémentations. MAJ: 2026-03. Détail: `platform/modules/REFERENCES.md`
+
+### ✅ INTÉGRÉ (code live)
+
+**Pentagi** (vxcontrol/pentagi) → `workflows/definitions/security-hacking.yaml` + 12 agents RSSI
+- Pattern: Orchestrator→Researcher→Developer→Executor adapté en: Red Team → Threat Model → Exploitation → Report → CISO Gate → Remediation TDD → Verification → Deploy
+- Agents: pentester-lead(Karim), security-researcher, exploit-dev, security-architect, threat-analyst, secops-engineer, ciso(Rachid), compliance_officer, security-dev-lead, security-backend-dev, security-frontend-dev, qa-security
+- Workflow YAML dit explicitement "Inspiré PentAGI"
+
+**Shannon** (KeygraphHQ/shannon) → `tools/security_pentest_tools.py`
+- Autonomous pentest tools: recon_portscan (nmap), recon_subdomain (subfinder), recon_fingerprint (whatweb), pentest_fuzz_api (schemathesis), pentest_inject (SQLi/XSS/SSTI), pentest_auth (auth bypass), pentest_ssrf
+- Pas le Docker Shannon complet — les outils offensifs autonomes portés à la main
+
+**Ralph** (frankbria/ralph-claude-code) → `agents/executor.py:_summarize_context()` + `llm/prompt_compressor.py`
+- Context rot prevention: keep system header + last 6 msgs, summarize middle via cheap LLM
+- Threshold: 20 msgs → trigger compression. Fallback: simple truncation
+- prompt_compressor.py: whitespace norm + code block truncation + tool output truncation (RTK-inspired aussi)
+
+**Agentation.dev** → `web/routes/tma.py` + `workflows/definitions/tma-maintenance.yaml` + quality scanner
+- Concept: annotations code → tickets TMA (bug/debt/security/performance)
+- TMA workflow: triage → diagnostic root cause → correctif TDD → validation → deploy hotfix
+- `metrics/quality.py`: scan code quality 10 dimensions → génère recommandations/tickets
+
+**Airweave error-monitoring-agent** → `ops/error_clustering.py` + `ops/error_state.py` + `skills/error-monitoring.md`
+- Error fingerprinting, clustering par similarité, severity auto-triage, agent remediation trigger
+
+**Landlock** (landlock.io) → `tools/sandbox.py` + `tools/sandbox/landlock-runner` (binary)
+- Kernel sandbox LSM pour isolation shell agents. Config: security.landlock_enabled
+
+### 🔭 WATCH LIST (pas encore intégré)
+
+**D3.js** — lib dataviz frontend. Candidat pour graphes metrics/cockpit.
+**SeedVR2** — vidéo gen Apple Silicon (extension mflux). Post-mflux.
+**Semgrep** — déjà appelé dans sast_tools.py `_run_semgrep()` si installé. Pas en registry officiel.
