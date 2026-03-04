@@ -427,7 +427,7 @@
                         <div class="integ-field">
                             <label>{{ key|replace('_',' ')|title }}</label>
                             {% if 'token' in key or 'secret' in key or 'password' in key or 'api_key' in key or 'key_id' in key or 'client_secret' in key %}
-                            <input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            <input type="password" placeholder="••••••••" autocomplete="new-password" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif 'url' in key or key == 'instance' or key == 'domain' %}
                             <input type="url" placeholder="https://..." value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif val is sameas true or val is sameas false %}
@@ -1755,7 +1755,7 @@ window.showSettingsTab = function(tab) {
                 </label>
                 <label style="display:block">
                     <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Client Secret *</span>
-                    <input id="prov-client-secret" type="password" class="settings-input" required style="width:100%;margin-top:0.2rem">
+                    <input id="prov-client-secret" type="password" class="settings-input" autocomplete="new-password" required style="width:100%;margin-top:0.2rem">
                 </label>
                 <label style="display:block">
                     <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Resource Group</span>
