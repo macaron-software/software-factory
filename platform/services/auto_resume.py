@@ -51,7 +51,7 @@ async def pg_run_lock(run_id: str) -> AsyncGenerator[bool, None]:
         row = await loop.run_in_executor(
             None,
             lambda: conn.execute(
-                "SELECT pg_try_advisory_lock(%s)", (lock_key,)
+                "SELECT pg_try_advisory_lock(?)", (lock_key,)
             ).fetchone(),
         )
         acquired = bool(row and row[0])
@@ -65,7 +65,7 @@ async def pg_run_lock(run_id: str) -> AsyncGenerator[bool, None]:
             try:
                 await loop.run_in_executor(
                     None,
-                    lambda: conn.execute("SELECT pg_advisory_unlock(%s)", (lock_key,)),
+                    lambda: conn.execute("SELECT pg_advisory_unlock(?)", (lock_key,)),
                 )
             except Exception:
                 pass
