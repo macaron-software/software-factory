@@ -453,7 +453,377 @@
     </div>
   </div>
 
-  <!-- 5. Footer KPIs -->
+  <!-- 5. Agents / Skills / Tools / Teams / Workflows / Workspace -->
+  <div class="ck-card" style="padding:1rem 1.25rem">
+    <div class="ck-card-title" style="margin-bottom:1rem">
+      <svg class="icon icon-xs"><use href="#icon-users"/></svg>
+      Agents · Skills · Teams · Workflows · Workspace
+    </div>
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+      <svg id="sf-agents-diagram" viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg"
+           style="width:100%;min-width:780px;max-width:960px;display:block;margin:0 auto;font-family:inherit">
+        <defs>
+          <marker id="a2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#6b7280"/></marker>
+          <marker id="a2p" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#a855f7"/></marker>
+          <marker id="a2b" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#3b82f6"/></marker>
+          <marker id="a2g" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#22c55e"/></marker>
+          <marker id="a2o" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#f59e0b"/></marker>
+        </defs>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE A — SKILL LIBRARY (top-left)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="10" y="10" width="290" height="180" rx="8" fill="rgba(168,85,247,.06)" stroke="#7c3aed" stroke-width="1.5"/>
+        <text x="155" y="28" text-anchor="middle" fill="#a855f7" font-size="8" font-weight="700" letter-spacing="2">SKILL LIBRARY  ·  120+ rôles YAML</text>
+
+        <!-- Dev cluster -->
+        <rect x="22" y="38" width="80" height="140" rx="5" fill="rgba(99,102,241,.12)" stroke="#6366f1" stroke-width="1"/>
+        <text x="62" y="53" text-anchor="middle" fill="#a5b4fc" font-size="7.5" font-weight="700">DEV</text>
+        <text x="62" y="65" text-anchor="middle" fill="#6b7280" font-size="6.5">lead_dev</text>
+        <text x="62" y="75" text-anchor="middle" fill="#6b7280" font-size="6.5">dev_backend</text>
+        <text x="62" y="85" text-anchor="middle" fill="#6b7280" font-size="6.5">dev_frontend</text>
+        <text x="62" y="95" text-anchor="middle" fill="#6b7280" font-size="6.5">dev_fullstack</text>
+        <text x="62" y="105" text-anchor="middle" fill="#6b7280" font-size="6.5">dev_mobile</text>
+        <text x="62" y="115" text-anchor="middle" fill="#6b7280" font-size="6.5">data_engineer</text>
+        <text x="62" y="125" text-anchor="middle" fill="#6b7280" font-size="6.5">ml_engineer</text>
+        <text x="62" y="135" text-anchor="middle" fill="#6b7280" font-size="6.5">dba</text>
+        <text x="62" y="148" text-anchor="middle" fill="#a5b4fc" font-size="6" font-style="italic">+ mobile, platform…</text>
+
+        <!-- Quality/Sec cluster -->
+        <rect x="112" y="38" width="80" height="140" rx="5" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1"/>
+        <text x="152" y="53" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">QA / SEC</text>
+        <text x="152" y="65" text-anchor="middle" fill="#6b7280" font-size="6.5">qa_lead</text>
+        <text x="152" y="75" text-anchor="middle" fill="#6b7280" font-size="6.5">test_automation</text>
+        <text x="152" y="85" text-anchor="middle" fill="#6b7280" font-size="6.5">security_arch</text>
+        <text x="152" y="95" text-anchor="middle" fill="#6b7280" font-size="6.5">ciso</text>
+        <text x="152" y="105" text-anchor="middle" fill="#6b7280" font-size="6.5">devsecops</text>
+        <text x="152" y="115" text-anchor="middle" fill="#6b7280" font-size="6.5">pentester</text>
+        <text x="152" y="125" text-anchor="middle" fill="#6b7280" font-size="6.5">sre</text>
+        <text x="152" y="135" text-anchor="middle" fill="#6b7280" font-size="6.5">devops</text>
+        <text x="152" y="148" text-anchor="middle" fill="#fca5a5" font-size="6" font-style="italic">+ RSE, compliance…</text>
+
+        <!-- Strategy/Management cluster -->
+        <rect x="202" y="38" width="87" height="140" rx="5" fill="rgba(245,158,11,.1)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="245" y="53" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="700">STRAT / MGT</text>
+        <text x="245" y="65" text-anchor="middle" fill="#6b7280" font-size="6.5">product_manager</text>
+        <text x="245" y="75" text-anchor="middle" fill="#6b7280" font-size="6.5">scrum_master</text>
+        <text x="245" y="85" text-anchor="middle" fill="#6b7280" font-size="6.5">strat-cto</text>
+        <text x="245" y="95" text-anchor="middle" fill="#6b7280" font-size="6.5">strat-cpo</text>
+        <text x="245" y="105" text-anchor="middle" fill="#6b7280" font-size="6.5">epic_owner</text>
+        <text x="245" y="115" text-anchor="middle" fill="#6b7280" font-size="6.5">ux_designer</text>
+        <text x="245" y="125" text-anchor="middle" fill="#6b7280" font-size="6.5">agile_coach</text>
+        <text x="245" y="135" text-anchor="middle" fill="#6b7280" font-size="6.5">tech_writer</text>
+        <text x="245" y="148" text-anchor="middle" fill="#fde68a" font-size="6" font-style="italic">+ mkt, RSE, RTE…</text>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE B — AGENT (instance) centrale
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="320" y="50" width="165" height="140" rx="8" fill="rgba(168,85,247,.12)" stroke="#a855f7" stroke-width="2"/>
+        <text x="402" y="69" text-anchor="middle" fill="#a855f7" font-size="8" font-weight="700" letter-spacing="1">AGENT (instance)</text>
+
+        <rect x="332" y="76" width="141" height="22" rx="4" fill="rgba(168,85,247,.2)" stroke="#a855f7" stroke-width="1"/>
+        <text x="402" y="91" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="600">Skill YAML → System Prompt</text>
+
+        <rect x="332" y="104" width="141" height="22" rx="4" fill="rgba(168,85,247,.12)" stroke="#7c3aed" stroke-width="1"/>
+        <text x="402" y="119" text-anchor="middle" fill="#c4b5fd" font-size="7.5">Context + Mémoire + Outils</text>
+
+        <rect x="332" y="132" width="141" height="22" rx="4" fill="rgba(168,85,247,.12)" stroke="#7c3aed" stroke-width="1"/>
+        <text x="402" y="147" text-anchor="middle" fill="#c4b5fd" font-size="7.5">Loop ReAct → LLM Call</text>
+
+        <rect x="332" y="160" width="141" height="20" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1"/>
+        <text x="402" y="174" text-anchor="middle" fill="#fca5a5" font-size="7">Safety Guardrails · A2A Veto</text>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE C — TOOLS (right of agent)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="510" y="10" width="435" height="200" rx="8" fill="rgba(245,158,11,.06)" stroke="#d97706" stroke-width="1.5"/>
+        <text x="727" y="28" text-anchor="middle" fill="#f59e0b" font-size="8" font-weight="700" letter-spacing="2">TOOLS  ·  27 modules</text>
+
+        <!-- Code tools -->
+        <rect x="522" y="38" width="95" height="65" rx="5" fill="rgba(99,102,241,.12)" stroke="#6366f1" stroke-width="1"/>
+        <text x="569" y="52" text-anchor="middle" fill="#a5b4fc" font-size="7.5" font-weight="700">CODE</text>
+        <text x="569" y="63" text-anchor="middle" fill="#6b7280" font-size="6.5">read · write · run</text>
+        <text x="569" y="73" text-anchor="middle" fill="#6b7280" font-size="6.5">AST · lint · tests</text>
+        <text x="569" y="83" text-anchor="middle" fill="#6b7280" font-size="6.5">quality · dead_code</text>
+        <text x="569" y="93" text-anchor="middle" fill="#6b7280" font-size="6.5">type_check · perf</text>
+
+        <!-- Build/Deploy tools -->
+        <rect x="625" y="38" width="95" height="65" rx="5" fill="rgba(34,197,94,.12)" stroke="#22c55e" stroke-width="1"/>
+        <text x="672" y="52" text-anchor="middle" fill="#86efac" font-size="7.5" font-weight="700">BUILD / DEPLOY</text>
+        <text x="672" y="63" text-anchor="middle" fill="#6b7280" font-size="6.5">git · build · deploy</text>
+        <text x="672" y="73" text-anchor="middle" fill="#6b7280" font-size="6.5">docker · compose</text>
+        <text x="672" y="83" text-anchor="middle" fill="#6b7280" font-size="6.5">IaC · ansible</text>
+        <text x="672" y="93" text-anchor="middle" fill="#6b7280" font-size="6.5">azure · cloud</text>
+
+        <!-- Security tools -->
+        <rect x="728" y="38" width="95" height="65" rx="5" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1"/>
+        <text x="775" y="52" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">SECURITY</text>
+        <text x="775" y="63" text-anchor="middle" fill="#6b7280" font-size="6.5">sast · pentest</text>
+        <text x="775" y="73" text-anchor="middle" fill="#6b7280" font-size="6.5">security_tools</text>
+        <text x="775" y="83" text-anchor="middle" fill="#6b7280" font-size="6.5">chaos · infisical</text>
+        <text x="775" y="93" text-anchor="middle" fill="#6b7280" font-size="6.5">sandbox isolé</text>
+
+        <!-- Integration/Platform tools -->
+        <rect x="831" y="38" width="100" height="65" rx="5" fill="rgba(168,85,247,.1)" stroke="#a855f7" stroke-width="1"/>
+        <text x="881" y="52" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="700">INTÉGRATION</text>
+        <text x="881" y="63" text-anchor="middle" fill="#6b7280" font-size="6.5">browser · web</text>
+        <text x="881" y="73" text-anchor="middle" fill="#6b7280" font-size="6.5">jira · memory</text>
+        <text x="881" y="83" text-anchor="middle" fill="#6b7280" font-size="6.5">MCP bridge</text>
+        <text x="881" y="93" text-anchor="middle" fill="#6b7280" font-size="6.5">platform_tools</text>
+
+        <!-- Skills injection strip -->
+        <rect x="522" y="115" width="409" height="28" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="726" y="128" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skills Injection (skills_integration.py)</text>
+        <text x="726" y="138" text-anchor="middle" fill="#6b7280" font-size="7">Anthropic Plugins · Fabric Patterns · Antigravity · AI System Prompts → enrichit chaque prompt agent</text>
+
+        <!-- Context/Memory strip -->
+        <rect x="522" y="153" width="409" height="44" rx="4" fill="rgba(16,185,129,.08)" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="726" y="167" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="600">Mémoire & Contexte</text>
+        <text x="726" y="179" text-anchor="middle" fill="#6b7280" font-size="7">Short-term (session) · Long-term (vector store) · Project memory</text>
+        <text x="726" y="190" text-anchor="middle" fill="#6b7280" font-size="7">Workspace files · Git history · Test results · Deploy logs</text>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE D — PATTERNS + ÉQUIPES (middle row)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="10" y="215" width="480" height="180" rx="8" fill="rgba(59,130,246,.06)" stroke="#2563eb" stroke-width="1.5"/>
+        <text x="250" y="233" text-anchor="middle" fill="#3b82f6" font-size="8" font-weight="700" letter-spacing="2">PATTERNS D'EXÉCUTION + ÉQUIPES</text>
+
+        <!-- Each pattern -->
+        <rect x="22" y="242" width="68" height="62" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="56" y="258" text-anchor="middle" fill="#93c5fd" font-size="7.5" font-weight="700">SOLO</text>
+        <text x="56" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">1 agent</text>
+        <text x="56" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">tâche simple</text>
+        <text x="56" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">→ LLM direct</text>
+
+        <rect x="98" y="242" width="68" height="62" rx="5" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="132" y="258" text-anchor="middle" fill="#93c5fd" font-size="7.5" font-weight="700">SEQUENTIAL</text>
+        <text x="132" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">pipeline</text>
+        <text x="132" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">A→B→C→D</text>
+        <text x="132" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">sprint/feature</text>
+
+        <rect x="174" y="242" width="68" height="62" rx="5" fill="rgba(99,102,241,.15)" stroke="#6366f1" stroke-width="1"/>
+        <text x="208" y="258" text-anchor="middle" fill="#a5b4fc" font-size="7.5" font-weight="700">PARALLEL</text>
+        <text x="208" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">fanout</text>
+        <text x="208" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">N agents sync</text>
+        <text x="208" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">consensus</text>
+
+        <rect x="250" y="242" width="68" height="62" rx="5" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width="1"/>
+        <text x="284" y="258" text-anchor="middle" fill="#fca5a5" font-size="7.5" font-weight="700">ADVERSARIAL</text>
+        <text x="284" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">critic loop</text>
+        <text x="284" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">A↔Critic</text>
+        <text x="284" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">auto-heal</text>
+
+        <rect x="326" y="242" width="68" height="62" rx="5" fill="rgba(16,185,129,.12)" stroke="#10b981" stroke-width="1"/>
+        <text x="360" y="258" text-anchor="middle" fill="#6ee7b7" font-size="7.5" font-weight="700">HIERARCHICAL</text>
+        <text x="360" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">supervisor</text>
+        <text x="360" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">→ workers</text>
+        <text x="360" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">ART org</text>
+
+        <rect x="402" y="242" width="68" height="62" rx="5" fill="rgba(168,85,247,.12)" stroke="#a855f7" stroke-width="1"/>
+        <text x="436" y="258" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="700">NETWORK</text>
+        <text x="436" y="270" text-anchor="middle" fill="#6b7280" font-size="6.5">mesh P2P</text>
+        <text x="436" y="280" text-anchor="middle" fill="#6b7280" font-size="6.5">A2A bus</text>
+        <text x="436" y="293" text-anchor="middle" fill="#6b7280" font-size="6.5">négociation</text>
+
+        <!-- Team compositions -->
+        <rect x="22" y="316" width="448" height="66" rx="5" fill="rgba(30,30,46,.6)" stroke="#334155" stroke-width="1"/>
+        <text x="246" y="331" text-anchor="middle" fill="#94a3b8" font-size="7.5" font-weight="700">ÉQUIPES TYPE (composition pattern + rôles)</text>
+        <!-- Team Sprint -->
+        <rect x="30" y="338" width="100" height="36" rx="4" fill="rgba(59,130,246,.15)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="80" y="351" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">Sprint Team</text>
+        <text x="80" y="362" text-anchor="middle" fill="#6b7280" font-size="6.5">PO · lead_dev · dev×3</text>
+        <text x="80" y="372" text-anchor="middle" fill="#6b7280" font-size="6.5">qa · devops (SEQUENTIAL)</text>
+        <!-- Team Security -->
+        <rect x="138" y="338" width="100" height="36" rx="4" fill="rgba(239,68,68,.12)" stroke="#ef4444" stroke-width="1"/>
+        <text x="188" y="351" text-anchor="middle" fill="#fca5a5" font-size="7" font-weight="700">Security Team</text>
+        <text x="188" y="362" text-anchor="middle" fill="#6b7280" font-size="6.5">ciso · pentester · sast</text>
+        <text x="188" y="372" text-anchor="middle" fill="#6b7280" font-size="6.5">devsecops (PARALLEL)</text>
+        <!-- Team Strategy -->
+        <rect x="246" y="338" width="100" height="36" rx="4" fill="rgba(245,158,11,.12)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="296" y="351" text-anchor="middle" fill="#fde68a" font-size="7" font-weight="700">Strategy ART</text>
+        <text x="296" y="362" text-anchor="middle" fill="#6b7280" font-size="6.5">cto · cpo · architect</text>
+        <text x="296" y="372" text-anchor="middle" fill="#6b7280" font-size="6.5">RTE · PM (HIERARCHICAL)</text>
+        <!-- Team Critic -->
+        <rect x="354" y="338" width="106" height="36" rx="4" fill="rgba(168,85,247,.12)" stroke="#a855f7" stroke-width="1"/>
+        <text x="407" y="351" text-anchor="middle" fill="#d8b4fe" font-size="7" font-weight="700">Adversarial Review</text>
+        <text x="407" y="362" text-anchor="middle" fill="#6b7280" font-size="6.5">author · critic · judge</text>
+        <text x="407" y="372" text-anchor="middle" fill="#6b7280" font-size="6.5">veto guard (ADVERSARIAL)</text>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE E — MÉTA-WORKFLOWS (middle-right)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="510" y="215" width="435" height="180" rx="8" fill="rgba(16,185,129,.06)" stroke="#059669" stroke-width="1.5"/>
+        <text x="727" y="233" text-anchor="middle" fill="#10b981" font-size="8" font-weight="700" letter-spacing="2">MÉTA-WORKFLOWS  ·  44 built-in</text>
+
+        <!-- Orchestrator -->
+        <rect x="522" y="242" width="130" height="80" rx="6" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="587" y="258" text-anchor="middle" fill="#a855f7" font-size="8" font-weight="700">ORCHESTRATEUR</text>
+        <text x="587" y="271" text-anchor="middle" fill="#6b7280" font-size="7">goal → pattern select</text>
+        <text x="587" y="282" text-anchor="middle" fill="#6b7280" font-size="7">agent spawn</text>
+        <text x="587" y="293" text-anchor="middle" fill="#6b7280" font-size="7">session state machine</text>
+        <text x="587" y="304" text-anchor="middle" fill="#6b7280" font-size="7">scheduler · router</text>
+        <text x="587" y="315" text-anchor="middle" fill="#6b7280" font-size="7">WIP limits · capacity</text>
+
+        <!-- Workflow categories -->
+        <rect x="662" y="242" width="270" height="80" rx="5" fill="rgba(16,185,129,.1)" stroke="#10b981" stroke-width="1"/>
+        <text x="797" y="257" text-anchor="middle" fill="#6ee7b7" font-size="7.5" font-weight="700">CATÉGORIES DE WORKFLOWS</text>
+        <!-- col 1 -->
+        <text x="685" y="270" fill="#6b7280" font-size="6.5">🔄 CI/CD pipeline</text>
+        <text x="685" y="281" fill="#6b7280" font-size="6.5">⚡ Feature sprint</text>
+        <text x="685" y="292" fill="#6b7280" font-size="6.5">🚀 Ideation→prod</text>
+        <text x="685" y="303" fill="#6b7280" font-size="6.5">📱 Mobile (iOS/Android)</text>
+        <text x="685" y="314" fill="#6b7280" font-size="6.5">🔒 Security/SAST</text>
+        <!-- col 2 -->
+        <text x="797" y="270" fill="#6b7280" font-size="6.5">📊 PI Planning</text>
+        <text x="797" y="281" fill="#6b7280" font-size="6.5">🔁 TMA auto-heal</text>
+        <text x="797" y="292" fill="#6b7280" font-size="6.5">📋 Epic decompose</text>
+        <text x="797" y="303" fill="#6b7280" font-size="6.5">♻ Tech debt reduce</text>
+        <text x="797" y="314" fill="#6b7280" font-size="6.5">🛡 RSE compliance</text>
+
+        <!-- Méta-workflow strip -->
+        <rect x="522" y="332" width="409" height="50" rx="5" fill="rgba(16,185,129,.1)" stroke="#059669" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="726" y="348" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="700">MÉTA-WORKFLOW = Workflow-of-Workflows</text>
+        <text x="726" y="360" text-anchor="middle" fill="#6b7280" font-size="7">Orchestrateur sélectionne Pattern → invoque Workflow → spawne Équipe → chaque agent exécute Tools</text>
+        <text x="726" y="372" text-anchor="middle" fill="#6b7280" font-size="7">SAFe: Epic → Features → Stories → Tasks  |  ART: Portfolio → Program → Team</text>
+
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE F — WORKSPACE (bottom)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="10" y="415" width="935" height="170" rx="8" fill="rgba(99,102,241,.06)" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="477" y="433" text-anchor="middle" fill="#6366f1" font-size="8" font-weight="700" letter-spacing="2">WORKSPACE PROJET</text>
+
+        <!-- Project card -->
+        <rect x="22" y="445" width="155" height="126" rx="6" fill="rgba(30,30,46,.7)" stroke="#334155" stroke-width="1.2"/>
+        <text x="99" y="461" text-anchor="middle" fill="#94a3b8" font-size="7.5" font-weight="700">PROJECT</text>
+        <text x="99" y="474" text-anchor="middle" fill="#6b7280" font-size="6.5">id · name · path</text>
+        <text x="99" y="484" text-anchor="middle" fill="#6b7280" font-size="6.5">factory_type · domains</text>
+        <text x="99" y="494" text-anchor="middle" fill="#6b7280" font-size="6.5">vision · lead_agent</text>
+        <text x="99" y="504" text-anchor="middle" fill="#6b7280" font-size="6.5">client_domain · status</text>
+        <text x="99" y="514" text-anchor="middle" fill="#6b7280" font-size="6.5">phases: discovery</text>
+        <text x="99" y="524" text-anchor="middle" fill="#6b7280" font-size="6.5">→ mvp → v1 → run</text>
+        <text x="99" y="534" text-anchor="middle" fill="#6b7280" font-size="6.5">→ maintenance</text>
+        <text x="99" y="547" text-anchor="middle" fill="#a5b4fc" font-size="6" font-weight="600">Lean values · WSJF</text>
+        <text x="99" y="558" text-anchor="middle" fill="#a5b4fc" font-size="6">starred · container_url</text>
+
+        <!-- Workspace Git -->
+        <rect x="190" y="445" width="140" height="126" rx="6" fill="rgba(16,185,129,.1)" stroke="#10b981" stroke-width="1.2"/>
+        <text x="260" y="461" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="700">GIT WORKSPACE</text>
+        <text x="260" y="474" text-anchor="middle" fill="#6b7280" font-size="6.5">clone · pull · commit</text>
+        <text x="260" y="484" text-anchor="middle" fill="#6b7280" font-size="6.5">branch · PR · merge</text>
+        <text x="260" y="494" text-anchor="middle" fill="#6b7280" font-size="6.5">auto-init repo</text>
+        <text x="260" y="504" text-anchor="middle" fill="#6b7280" font-size="6.5">generate CI/CD</text>
+        <text x="260" y="514" text-anchor="middle" fill="#6b7280" font-size="6.5">gitignore · hooks</text>
+        <text x="260" y="527" text-anchor="middle" fill="#10b981" font-size="7" font-weight="700">FILES</text>
+        <text x="260" y="538" text-anchor="middle" fill="#6b7280" font-size="6.5">read · write · diff</text>
+        <text x="260" y="548" text-anchor="middle" fill="#6b7280" font-size="6.5">tree · search · save</text>
+        <text x="260" y="558" text-anchor="middle" fill="#6b7280" font-size="6.5">packages install</text>
+
+        <!-- Workspace Docker -->
+        <rect x="343" y="445" width="140" height="126" rx="6" fill="rgba(59,130,246,.1)" stroke="#3b82f6" stroke-width="1.2"/>
+        <text x="413" y="461" text-anchor="middle" fill="#3b82f6" font-size="7.5" font-weight="700">DOCKER / DEPLOY</text>
+        <text x="413" y="474" text-anchor="middle" fill="#6b7280" font-size="6.5">build image</text>
+        <text x="413" y="484" text-anchor="middle" fill="#6b7280" font-size="6.5">run · stop · logs</text>
+        <text x="413" y="494" text-anchor="middle" fill="#6b7280" font-size="6.5">exec · shell</text>
+        <text x="413" y="504" text-anchor="middle" fill="#6b7280" font-size="6.5">docker-compose</text>
+        <text x="413" y="514" text-anchor="middle" fill="#6b7280" font-size="6.5">health check</text>
+        <text x="413" y="527" text-anchor="middle" fill="#3b82f6" font-size="7" font-weight="700">TERMINAL</text>
+        <text x="413" y="538" text-anchor="middle" fill="#6b7280" font-size="6.5">WebSocket shell</text>
+        <text x="413" y="548" text-anchor="middle" fill="#6b7280" font-size="6.5">live stdout/stderr</text>
+        <text x="413" y="558" text-anchor="middle" fill="#6b7280" font-size="6.5">secrets vault</text>
+
+        <!-- Workspace Quality -->
+        <rect x="496" y="445" width="140" height="126" rx="6" fill="rgba(168,85,247,.1)" stroke="#a855f7" stroke-width="1.2"/>
+        <text x="566" y="461" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="700">QUALITY GATES</text>
+        <text x="566" y="474" text-anchor="middle" fill="#6b7280" font-size="6.5">tests: unit/integ/e2e</text>
+        <text x="566" y="484" text-anchor="middle" fill="#6b7280" font-size="6.5">coverage · lint · SAST</text>
+        <text x="566" y="494" text-anchor="middle" fill="#6b7280" font-size="6.5">perf · accessibility</text>
+        <text x="566" y="504" text-anchor="middle" fill="#6b7280" font-size="6.5">dashboard badge</text>
+        <text x="566" y="514" text-anchor="middle" fill="#6b7280" font-size="6.5">pass/warn/fail</text>
+        <text x="566" y="527" text-anchor="middle" fill="#a855f7" font-size="7" font-weight="700">IHM / UX</text>
+        <text x="566" y="538" text-anchor="middle" fill="#6b7280" font-size="6.5">screenshots Playwright</text>
+        <text x="566" y="548" text-anchor="middle" fill="#6b7280" font-size="6.5">user journeys</text>
+        <text x="566" y="558" text-anchor="middle" fill="#6b7280" font-size="6.5">a11y · WCAG</text>
+
+        <!-- Workspace SAFe Backlog -->
+        <rect x="649" y="445" width="280" height="126" rx="6" fill="rgba(245,158,11,.1)" stroke="#d97706" stroke-width="1.2"/>
+        <text x="789" y="461" text-anchor="middle" fill="#f59e0b" font-size="7.5" font-weight="700">SAFe BACKLOG DU PROJET</text>
+        <!-- Epic -->
+        <rect x="658" y="470" width="55" height="90" rx="4" fill="rgba(245,158,11,.2)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="685" y="484" text-anchor="middle" fill="#fde68a" font-size="7" font-weight="700">EPIC</text>
+        <text x="685" y="495" text-anchor="middle" fill="#6b7280" font-size="6.5">goal</text>
+        <text x="685" y="505" text-anchor="middle" fill="#6b7280" font-size="6.5">WSJF</text>
+        <text x="685" y="515" text-anchor="middle" fill="#6b7280" font-size="6.5">kanban</text>
+        <text x="685" y="525" text-anchor="middle" fill="#6b7280" font-size="6.5">funnel</text>
+        <text x="685" y="535" text-anchor="middle" fill="#6b7280" font-size="6.5">→backlog</text>
+        <text x="685" y="545" text-anchor="middle" fill="#6b7280" font-size="6.5">→done</text>
+        <!-- arrow -->
+        <line x1="713" y1="510" x2="725" y2="510" stroke="#f59e0b" stroke-width="1" marker-end="url(#a2o)"/>
+        <!-- Feature -->
+        <rect x="726" y="470" width="55" height="90" rx="4" fill="rgba(59,130,246,.2)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="753" y="484" text-anchor="middle" fill="#93c5fd" font-size="7" font-weight="700">FEATURE</text>
+        <text x="753" y="495" text-anchor="middle" fill="#6b7280" font-size="6.5">criteria</text>
+        <text x="753" y="505" text-anchor="middle" fill="#6b7280" font-size="6.5">priority</text>
+        <text x="753" y="515" text-anchor="middle" fill="#6b7280" font-size="6.5">points</text>
+        <text x="753" y="525" text-anchor="middle" fill="#6b7280" font-size="6.5">assigned</text>
+        <text x="753" y="535" text-anchor="middle" fill="#6b7280" font-size="6.5">sprint_id</text>
+        <text x="753" y="545" text-anchor="middle" fill="#6b7280" font-size="6.5">status</text>
+        <!-- arrow -->
+        <line x1="781" y1="510" x2="793" y2="510" stroke="#3b82f6" stroke-width="1" marker-end="url(#a2b)"/>
+        <!-- Story -->
+        <rect x="794" y="470" width="55" height="90" rx="4" fill="rgba(34,197,94,.2)" stroke="#22c55e" stroke-width="1"/>
+        <text x="821" y="484" text-anchor="middle" fill="#86efac" font-size="7" font-weight="700">STORY</text>
+        <text x="821" y="495" text-anchor="middle" fill="#6b7280" font-size="6.5">As a…</text>
+        <text x="821" y="505" text-anchor="middle" fill="#6b7280" font-size="6.5">I want…</text>
+        <text x="821" y="515" text-anchor="middle" fill="#6b7280" font-size="6.5">Gherkin</text>
+        <text x="821" y="525" text-anchor="middle" fill="#6b7280" font-size="6.5">points</text>
+        <text x="821" y="535" text-anchor="middle" fill="#6b7280" font-size="6.5">assignee</text>
+        <text x="821" y="545" text-anchor="middle" fill="#6b7280" font-size="6.5">sprint</text>
+        <!-- arrow -->
+        <line x1="849" y1="510" x2="861" y2="510" stroke="#22c55e" stroke-width="1" marker-end="url(#a2g)"/>
+        <!-- Task -->
+        <rect x="862" y="470" width="55" height="90" rx="4" fill="rgba(168,85,247,.2)" stroke="#a855f7" stroke-width="1"/>
+        <text x="889" y="484" text-anchor="middle" fill="#d8b4fe" font-size="7" font-weight="700">TASK</text>
+        <text x="889" y="495" text-anchor="middle" fill="#6b7280" font-size="6.5">agent</text>
+        <text x="889" y="505" text-anchor="middle" fill="#6b7280" font-size="6.5">tool_call</text>
+        <text x="889" y="515" text-anchor="middle" fill="#6b7280" font-size="6.5">status</text>
+        <text x="889" y="525" text-anchor="middle" fill="#6b7280" font-size="6.5">result</text>
+        <text x="889" y="535" text-anchor="middle" fill="#6b7280" font-size="6.5">log</text>
+        <text x="889" y="545" text-anchor="middle" fill="#6b7280" font-size="6.5">duration</text>
+
+        <!-- ── Arrows between zones ── -->
+        <!-- Skill Library → Agent -->
+        <line x1="300" y1="110" x2="320" y2="115" stroke="#a855f7" stroke-width="1.2" marker-end="url(#a2p)"/>
+        <!-- Agent → Tools -->
+        <line x1="485" y1="110" x2="510" y2="85" stroke="#f59e0b" stroke-width="1.2" marker-end="url(#a2o)"/>
+        <!-- Agent → Patterns -->
+        <line x1="402" y1="190" x2="330" y2="270" stroke="#3b82f6" stroke-width="1" stroke-dasharray="4,2" marker-end="url(#a2b)"/>
+        <!-- Patterns → Meta-workflows -->
+        <line x1="490" y1="290" x2="510" y2="290" stroke="#10b981" stroke-width="1.2" marker-end="url(#a2g)"/>
+        <!-- Meta-workflows → Workspace -->
+        <line x1="727" y1="395" x2="727" y2="415" stroke="#4f46e5" stroke-width="1.2" marker-end="url(#a2)"/>
+        <!-- Patterns → Workspace -->
+        <line x1="250" y1="395" x2="250" y2="415" stroke="#4f46e5" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a2)"/>
+
+        <!-- ── A2A Bus annotation ── -->
+        <rect x="332" y="195" width="170" height="18" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="417" y="207" text-anchor="middle" fill="#fca5a5" font-size="7">A2A Bus · VETO · ESCALATE · NEGOTIATE</text>
+
+        <!-- Legend -->
+        <line x1="15" y1="607" x2="40" y2="607" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="43" y="610" fill="#6b7280" font-size="7">agent flow</text>
+        <line x1="95" y1="607" x2="120" y2="607" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="123" y="610" fill="#6b7280" font-size="7">tool call</text>
+        <line x1="170" y1="607" x2="195" y2="607" stroke="#10b981" stroke-width="1.5"/>
+        <text x="198" y="610" fill="#6b7280" font-size="7">orchestration</text>
+        <line x1="260" y1="607" x2="285" y2="607" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="288" y="610" fill="#6b7280" font-size="7">workspace</text>
+        <line x1="340" y1="607" x2="365" y2="607" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="368" y="610" fill="#6b7280" font-size="7">dépendance</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 6. Footer KPIs -->
   <div class="kpi-bar" id="kpiBar">
     <div class="kpi-item">
       <span class="kpi-label">TMA Tickets</span>
