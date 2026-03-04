@@ -58,29 +58,46 @@ Pac-Man run: epic=pac-epic-c1722e87, last_run=546ddd29 (paused, needs resume)
 Old stuck run a9628f7f → cancelled
 ```
 
-## PROBLÈME ORCHESTRATION — À IMPLÉMENTER (PRIORITÉ HAUTE)
+## PROBLÈME ORCHESTRATION — RÉSOLU (commit ab8b4bd18)
 
 ```
-CONSTAT: tout ce qui devrait être fait par Jarvis/RTE/PO est fait manuellement.
-Le flow cible autonome:
-  Brief → [Jarvis] → délègue à [PO] → create_feature/create_story/create_sprint
-                   → délègue à [RTE] → launch_epic_run / monitor / resume / escalate
-                   → [RTE] surveille phases → re-trigger si paused → rapporte dans Hub
+CONSTAT: tout ce qui devrait être fait par Jarvis/RTE/PO était fait manuellement.
+SOLUTION: nouveaux tools + reconfiguration agents
 
-MANQUANT:
-  1. Agent "jarvis" — top-level orchestrateur (reçoit brief, délègue PO+RTE)
-  2. Tools RTE: launch_epic_run, resume_run, check_run_status (dans platform_tools.py)
-  3. Auto-resume watchdog: reset paused→paused au lieu de relancer réellement
-  4. PO (product/Laura Vidal) non branché au lancement workflow
+TOOLS AJOUTÉS (platform/tools/platform_tools.py + tool_runner.py):
+  launch_epic_run(epic_id, workflow_id?)  → créer + démarrer un run
+  resume_run(run_id)                      → débloquer un run paused/stuck
+  check_run_status(run_id | project_id)   → status/phases/sprint_count
+  create_sprint(epic_id, name, type, goal) → déjà ajouté précédemment
 
-AGENTS EXISTANTS MAIS NON CONNECTÉS:
-  rte (Marc Delacroix) — Release Train Engineer
-  release_train_engineer (Bastien Clément) — RTE
-  product (Laura Vidal) — Product Owner
-  product-manager-art (Isabelle Renaud) — Product Manager
+AGENTS RECONFIGURÉS (PostgreSQL Innovation):
+  strat-cto "Jarvis" (Karim Benali)
+    → CTO/responsable SF, délègue à RTE/PO/PM
+    → tools ajoutés: launch_epic_run, resume_run, check_run_status, create_sprint
+    → tools existants: create_project, create_mission, platform_workflows... (full set)
 
-SPRINT TYPES (sprints.type column, PG):
-  inception | infra | tdd | adversarial | qa | deploy
+  rte (Marc Delacroix) + release_train_engineer (Bastien Clément)
+    → AVANT: tools [] — ne pouvaient RIEN faire
+    → APRÈS: platform_missions, launch_epic_run, resume_run, check_run_status,
+             create_sprint, create_feature, create_story, platform_workflows...
+    → prompt RTE: section "Orchestration Tools" avec workflow: brief→check→launch/resume→poll→escalate
+
+  product/Laura Vidal (PO)
+    → AVANT: tools [] — ne pouvait RIEN faire
+    → APRÈS: create_feature, create_story, create_sprint, platform_missions, web_search
+
+  scrum_master/Inès Bellanger
+    → AVANT: code_read, code_search seulement
+    → APRÈS: platform_missions, create_sprint, check_run_status, resume_run, memory_store
+
+FLOW CIBLE AUTONOME (maintenant possible):
+  Brief → [Jarvis/strat-cto]
+    → délègue à [product/PO] → create_feature + create_story (AC GIVEN/WHEN/THEN)
+    → délègue à [rte] → launch_epic_run → poll check_run_status → resume_run si paused
+    → [game-architect] phase game-inception → create_sprint
+    → [game-dev-lead/js/qa] tdd-sprint loop
+    → [game-critic] adversarial-review → VETO→loop | APPROVE→next
+    → [rte] reporte statut à [Jarvis]
 ```
 
 ## LLM METRICS FIX (commit 0dac8744b)
