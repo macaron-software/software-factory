@@ -20,7 +20,7 @@ def _db():
 
 
 def _screens_dir(project_id: str) -> Path:
-    base = Path(__file__).resolve().parents[5] / "data" / "screens" / project_id
+    base = Path(__file__).resolve().parents[4] / "data" / "screens" / project_id
     base.mkdir(parents=True, exist_ok=True)
     return base
 

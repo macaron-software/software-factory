@@ -304,7 +304,7 @@ async def api_metrics_modules():
 
         # Module activation status from registry
         registry_path = (
-            Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
+            Path(__file__).parent.parent.parent / "modules" / "registry.yaml"
         )
         modules_list = []
         if registry_path.exists():
