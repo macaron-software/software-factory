@@ -396,6 +396,27 @@ async def project_hub(request: Request, project_id: str):
         ),
     )
 
+    # Build agents for personas tab
+    _av_dir = Path(__file__).parent.parent / "static" / "avatars"
+    lead_agents_for_personas = []
+    for agent_id in project.agents or []:
+        a = agent_store.get(agent_id)
+        if not a:
+            continue
+        av_url = ""
+        for ext in ("jpg", "svg"):
+            if (_av_dir / f"{a.id}.{ext}").exists():
+                av_url = f"/static/avatars/{a.id}.{ext}"
+                break
+        lead_agents_for_personas.append(
+            {
+                "name": a.name,
+                "role": getattr(a, "role", ""),
+                "color": getattr(a, "color", "#333"),
+                "avatar_url": av_url,
+            }
+        )
+
     return _templates(request).TemplateResponse(
         "project_hub.html",
         {
@@ -413,6 +434,7 @@ async def project_hub(request: Request, project_id: str):
             "messages": messages,
             "lead_agent": lead,
             "lead_avatar_url": lead_avatar_url,
+            "lead_agents_for_personas": lead_agents_for_personas,
             "stats": {
                 "total": len(proj_epics),
                 "active": active_count,

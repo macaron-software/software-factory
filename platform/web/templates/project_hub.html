@@ -148,6 +148,7 @@
       <div class="hub-health-bar"><div class="hub-health-fill {% if health >= 70 %}{% elif health >= 40 %}med{% else %}low{% endif %}" style="width:{{ health }}%"></div></div>
       <span class="hub-health-score">{{ health }}%</span>
     </div>
+    <button onclick="location.reload()" title="Actualiser" style="padding:.35rem .5rem;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:.3rem;font-size:.78rem"><svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg></button>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap">
       <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost">Board</a>
       <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost">Workspace</a>
@@ -168,8 +169,9 @@
   <div class="hub-tabs">
     <div class="hub-tab active" onclick="hubTab(this,'overview')">Vue d'ensemble</div>
     <div class="hub-tab" onclick="hubTab(this,'safe')">SAFe <span class="hub-tab-badge">{{ stats.total }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'personas')">Personas <span class="hub-tab-badge">{{ (project.config or {}).get('personas', []) | length if project.config else 0 }}</span></div>
     <div class="hub-tab" onclick="hubTab(this,'backlog')">Backlog <span class="hub-tab-badge">{{ stats.stories }}</span></div>
-    <div class="hub-tab" onclick="hubTab(this,'chat')">💬 Chat Agent</div>
+    <div class="hub-tab" onclick="hubTab(this,'chat')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-message-circle"/></svg>Chat Agent</div>
   </div>
 
   <!-- ═══════════════════════════════ TAB: OVERVIEW ═══════════════════════════ -->
@@ -211,7 +213,7 @@
         {% else %}
         <div class="hub-empty">Aucun epic système — <a href="#" onclick="hubHealEpics();return false">Générer</a></div>
         {% endfor %}
-        <button onclick="hubHealEpics()" style="width:100%;margin-top:.25rem;padding:.4rem;font-size:.72rem;background:none;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-tertiary);cursor:pointer">↻ Synchroniser</button>
+  
       </div>
 
       <!-- Functional Epics -->
@@ -258,8 +260,8 @@
         </div>
         <div style="margin-top:.6rem;display:flex;flex-direction:column;gap:.3rem">
           <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border)" onclick="hubSuggestChat('Analyse l\\'état du projet et propose les prochaines actions')">📊 Analyser l'état</button>
-          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border)" onclick="hubSuggestChat('Quelle est la prochaine étape recommandée pour ce projet ?')">🎯 Prochaine étape</button>
-          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border)" onclick="hubSuggestChat('Génère les features et stories manquantes pour ce projet')">⚡ Générer stories</button>
+          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border)" onclick="hubSuggestChat('Quelle est la prochaine étape recommandée pour ce projet ?')">Prochaine étape</button>
+          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border)" onclick="hubSuggestChat('Génère les features et stories manquantes pour ce projet')">Générer stories</button>
         </div>
       </div>
     </div>
@@ -269,7 +271,7 @@
   <div class="hub-panel" id="panel-safe">
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
       <span style="font-size:.8rem;color:var(--text-secondary)">Hiérarchie SAFe : Epics → Features → Stories</span>
-      <button onclick="hubSuggestChat('Génère la hiérarchie complète SAFe pour ce projet : features et user stories pour chaque epic')" style="font-size:.72rem;padding:.3rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-left:auto">⚡ Générer hiérarchie</button>
+      <button onclick="hubSuggestChat('Génère la hiérarchie complète SAFe pour ce projet : features et user stories pour chaque epic')" style="font-size:.72rem;padding:.3rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-left:auto">Générer hiérarchie</button>
     </div>
     <div class="safe-tree">
       {% for ep in epics_tree %}
@@ -324,11 +326,62 @@
     </div>
   </div>
 
-  <!-- ═══════════════════════════════ TAB: BACKLOG ══════════════════════════ -->
+  <!-- ═══════════════════════════════ TAB: PERSONAS ══════════════════════ -->
+  <div class="hub-panel" id="panel-personas">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <span style="font-size:.8rem;color:var(--text-secondary)">Utilisateurs cibles &amp; personas du projet</span>
+      <button onclick="hubSuggestChat('Génère les personas utilisateurs pour ce projet avec leurs besoins et cas d\'usage SAFe')" style="font-size:.72rem;padding:.3rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:.3rem"><svg class="icon icon-xs"><use href="#icon-users"/></svg> Générer personas</button>
+    </div>
+    {% set personas = (project.config or {}).get('personas', []) if project.config else [] %}
+    {% if personas %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem">
+      {% for p in personas %}
+      <div class="hub-card" style="cursor:default">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0">{{ p.get('initials', p.get('name','?')[:1] | upper) }}</div>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)">{{ p.get('name', '?') }}</div>
+            <div style="font-size:.72rem;color:var(--text-secondary)">{{ p.get('role', '') }}</div>
+          </div>
+        </div>
+        {% if p.get('needs') %}
+        <div style="font-size:.76rem;color:var(--text-secondary);margin-bottom:.3rem"><strong>Besoins :</strong> {{ p.get('needs') }}</div>
+        {% endif %}
+        {% if p.get('pain_points') %}
+        <div style="font-size:.76rem;color:var(--text-secondary)"><strong>Frustrations :</strong> {{ p.get('pain_points') }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="hub-empty">
+      <svg class="icon" style="width:32px;height:32px;margin-bottom:.5rem;opacity:.3"><use href="#icon-users"/></svg>
+      <div>Aucun persona défini</div>
+      <div style="margin-top:.5rem;font-size:.75rem">Demandez à l'agent de générer les personas utilisateurs pour ce projet</div>
+    </div>
+    {% endif %}
+
+    {% if lead_agents_for_personas %}
+    <div style="margin-top:1.25rem">
+      <div class="hub-col-title"><svg class="icon icon-xs"><use href="#icon-users"/></svg> Équipe agents</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem">
+        {% for a in lead_agents_for_personas %}
+        <div class="hub-card" style="cursor:default;display:flex;align-items:center;gap:.6rem">
+          {% if a.avatar_url %}<img src="{{ a.avatar_url }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">{% else %}
+          <div style="width:28px;height:28px;border-radius:50%;background:{{ a.color or 'var(--accent)' }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700">{{ a.name[:2] | upper }}</div>{% endif %}
+          <div><div style="font-size:.78rem;font-weight:600;color:var(--text-primary)">{{ a.name }}</div><div style="font-size:.68rem;color:var(--text-secondary)">{{ a.role }}</div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+    <!-- ═══════════════════════════════ TAB: BACKLOG ══════════════════════════ -->
   <div class="hub-panel" id="panel-backlog">
     <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
       <span style="font-size:.8rem;color:var(--text-secondary)">{{ backlog_stories|length }} stories en attente</span>
-      <a href="/backlog?project={{ project.id }}" style="font-size:.72rem;padding:.3rem .7rem;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);text-decoration:none;margin-left:auto">Voir backlog complet →</a>
+
     </div>
     {% if backlog_stories %}
     <div style="overflow-x:auto">
@@ -403,9 +456,9 @@
             <div style="font-size:2rem;margin-bottom:.5rem">💬</div>
             <div>Démarrez la conversation avec l'agent du projet</div>
             <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center">
-              <button onclick="hubFullSuggest('Présente-toi et donne un résumé de l\\'état du projet')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">👋 Présentation</button>
-              <button onclick="hubFullSuggest('Quelle est la prochaine action prioritaire ?')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">🎯 Prochaine action</button>
-              <button onclick="hubFullSuggest('Génère le backlog complet du projet avec user stories')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">📋 Créer backlog</button>
+              <button onclick="hubFullSuggest('Présente-toi et donne un résumé de l\\'état du projet')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Présentation</button>
+              <button onclick="hubFullSuggest('Quelle est la prochaine action prioritaire ?')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Prochaine action</button>
+              <button onclick="hubFullSuggest('Génère le backlog complet du projet avec user stories')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Créer backlog</button>
             </div>
           </div>
           {% endif %}
