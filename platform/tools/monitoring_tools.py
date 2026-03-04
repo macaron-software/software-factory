@@ -29,6 +29,24 @@ ARCHITECTURE
   Le clustering sémantique des orphelins (Stage 3 dans Airweave) est fait
   par l'agent directement avec son LLM : il reçoit les orphelins et groupe
   naturellement par cause racine dans son raisonnement.
+
+SECURITY — SBD-09 vs SBD-10 conflict resolution (SecureByDesign v1.1):
+-----------------------------------------------------------------------
+  SBD-09 (Data Minimization) CONFLICTS with SBD-10 (Security Logging).
+  Resolution applied here: LOG THE EVENT, NEVER THE CONTENT.
+
+  CORRECT:
+    {"event": "error.incident_created", "error_type": "...", "count": 5,
+     "severity": "HIGH", "outcome": "heal_epic_triggered"}
+    — log THAT the incident happened, not the raw error payload
+
+  NEVER:
+    {"event": "error.incident_created", "payload": <full exception trace with PII>}
+    — raw traces may contain user data, tokens, internal paths
+
+  Retention: security/ops logs 90 days minimum.
+  PII in logs: pseudonymize user_id → hash after 30 days.
+  Source: https://github.com/Yems221/securebydesign-llmskill SBD-09/SBD-10
 """
 
 from __future__ import annotations

@@ -8,6 +8,33 @@ Two-layer Swiss Cheese model:
 
 Runs INSIDE _execute_node() after agent produces output, BEFORE storing in memory.
 Rejects output with a reason; the pattern engine can retry or flag.
+
+SCOPE — what this guard covers (OUTPUT quality):
+-------------------------------------------------
+  ✓ Slop / filler / placeholder text
+  ✓ Mock/stub implementations (NotImplementedError, TODO, pass)
+  ✓ Fake build scripts (echo "BUILD SUCCESS")
+  ✓ Hallucination — claims actions without tool evidence
+  ✓ Stack mismatch — wrong language for declared project tech stack
+  ✓ Missing tests when source files are written
+  ✓ L1: semantic review via a *different* LLM than the producer
+
+SCOPE — what is NOT here (see skills/qa-adversarial-llm.md):
+--------------------------------------------------------------
+  ✗ Prompt injection attacks on the platform itself (SBD-02)
+  ✗ System prompt leakage resistance (SBD-17)
+  ✗ RAG data isolation — cross-user retrieval (SBD-18)
+  ✗ LLM output → exec/DB injection (SBD-19)
+  ✗ Jailbreak / role-play bypasses
+  Those are in the qa-adversarial-llm skill and the security-hacking workflow.
+
+INSPIRATION:
+------------
+  Swiss Cheese model: James Reason (1990) — each layer catches what others miss.
+  L1 adversarial reviewer idea: inspired by Constitutional AI (Anthropic, 2022)
+  and adversarial collaboration pattern in GoodAI / Pentagi red-team workflows
+  (https://github.com/vxcontrol/pentagi). Our RSSI team (security-hacking.yaml)
+  is the offensive counterpart — agents actively attack the system they built.
 """
 
 from __future__ import annotations
@@ -202,19 +229,6 @@ def check_l0(
         tool_names
         & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"}
     )
-    has_test_tool = bool(
-        tool_names
-        & {
-            "test",
-            "build",
-            "playwright_test",
-            "android_build",
-            "android_test",
-            "android_lint",
-            "android_emulator_test",
-        }
-    )
-
     # Check stack mismatch — wrong language for declared project stack
     stack_issues = _check_stack_mismatch(tool_calls, task)
     for si in stack_issues:
@@ -343,7 +357,7 @@ def check_l0(
 
     # Check for copy-paste of task (agent echoing the prompt)
     # Heuristic: if >70% of content is a quote block, it's probably echo
-    quote_lines = sum(1 for l in content.split("\n") if l.strip().startswith(">"))
+    quote_lines = sum(1 for line in content.split("\n") if line.strip().startswith(">"))
     total_lines = max(len(content.split("\n")), 1)
     if quote_lines / total_lines > 0.7 and total_lines > 5:
         issues.append("ECHO: Agent mostly quoted the task back")
@@ -351,11 +365,11 @@ def check_l0(
 
     # Check for suspicious repeated blocks (copy-paste slop)
     # Use higher threshold for structured content (tables, org charts)
-    lines = [l.strip() for l in content.split("\n") if len(l.strip()) > 20]
+    lines = [line.strip() for line in content.split("\n") if len(line.strip()) > 20]
     if len(lines) > 10:
         seen = {}
-        for l in lines:
-            seen[l] = seen.get(l, 0) + 1
+        for line in lines:
+            seen[line] = seen.get(line, 0) + 1
         repeated = sum(1 for c in seen.values() if c > 3)
         if repeated > 5:
             issues.append(f"REPETITION: {repeated} lines repeated >3 times")

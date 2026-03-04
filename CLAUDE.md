@@ -14,21 +14,23 @@ _SOFTWARE_FACTORY/     # Agent Platform + Dashboard
     server.py          # Port 8090 (prod) / 8099 (dev)
     web/routes/        # 10 sub-modules (helpers.py: _parse_body dual JSON/form)
     a2a/               # Agent-to-Agent: bus, negotiation, veto
-    agents/            # Loop, executor, store (156 agents)
+    agents/            # Loop, executor, store (192 agents)
     patterns/          # 15 orchestration patterns (12 DB + 3 engine-only)
     missions/          # SAFe lifecycle + ProductBacklog
     workflows/         # 36 builtin workflows
     llm/               # Multi-provider client + observability
-    tools/             # code, git, deploy, memory, security, browser, MCP bridge
+    tools/             # code, git, deploy, memory, security, browser, infisical, MCP bridge
     ops/               # Auto-heal, chaos, endurance, backup/restore
     services/          # Notification (Slack/Email/Webhook)
     mcps/              # MCP server manager (fetch, memory, playwright)
+    modules/           # registry.yaml — 25 optional modules (knowledge + CLI tools)
     deploy/            # Dockerfile + docker-compose (Azure VM)
   mcp_lrm/             # MCP LRM server (port 9500)
-  skills/              # Agent YAML definitions
+  skills/              # Agent YAML definitions + skill .md files
   projects/            # Per-project configs
-  data/                # SQLite DBs (platform.db)
+  data/                # Runtime data (PG uniquement — plus de SQLite)
   tests/               # pytest + Playwright E2E
+  scripts/             # Utility scripts (enrich_agents, migrate_env_to_infisical...)
   deploy/              # Helm charts
 ```
 
@@ -85,7 +87,8 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 │ Local Dev      │ http://localhost:8099    │ macOS, Python 3.12               │
 │                │ Dashboard: :8080        │ LLM: minimax / MiniMax-M2.5     │
 │                │                         │ Module: platform                 │
-│                │                         │ DB: data/platform.db (SQLite)    │
+│                │                         │ DB: PostgreSQL localhost:5432     │
+│                │                         │   (DATABASE_URL dans .env)        │
 │                │                         │ No Docker, direct uvicorn        │
 └────────────────┴─────────────────────────┴──────────────────────────────────┘
 ```
@@ -171,20 +174,56 @@ XSS: Jinja2 autoescaping, CSP connect-src 'self'
 SQL: parameterized queries (? placeholders, zero f-strings)
 Prompt injection: L0+L1 adversarial guards
 Docker: non-root 'macaron', minimal image
-Secrets: externalized ~/.config/factory/*.key, chmod 600
+Secrets: Infisical vault (config.py._load_infisical()) — .env = bootstrap only (INFISICAL_TOKEN)
+         Fallback: ~/.config/factory/*.key. NEVER *_API_KEY=dummy
 Rate limit: PG-backed per-IP+token, survives restart
+```
+
+## SECRETS MANAGEMENT (Infisical)
+
+```
+Flow: .env → INFISICAL_TOKEN → vault injects os.environ → platform reads normally
+Config: INFISICAL_TOKEN + INFISICAL_SITE_URL + INFISICAL_ENVIRONMENT in .env
+Self-host: docker run -p 80:8080 infisical/infisical:latest
+Migrate: python3 scripts/migrate_env_to_infisical.py --dry-run
+Agent tools: infisical_get_secret, infisical_list_secrets, infisical_set_secret
+Skill: skills/secrets-management.md (35 secrets cataloguées par catégorie)
+Write ops require agent role: secrets_manager | devops | security | admin
+35 secret vars categorisées: llm_providers, infrastructure, integrations,
+  notifications, infra_ssh, oauth — reste dans .env: PLATFORM_*, LOG_*, feature flags
+```
+
+## MODULES vs INTEGRATIONS
+
+```
+Integrations (/settings tab) = services EXTERNES avec clé API (Jira, GitHub, fal.ai...)
+  → table integrations en DB, status connected/disconnected, config_json avec token
+Modules (/settings tab) = capacités LOCALES optionnelles (CLI tools, bases de connaissance)
+  → platform/modules/registry.yaml (25 modules), enabled_ids dans settings table (JSON)
+
+25 modules (registry.yaml):
+  ux-design:      component-gallery, mdn-web-docs, can-i-use, wcag-guidelines
+  development:    npm-registry, pypi-registry, github-trending
+  security:       infisical, cve-nvd, owasp-top10, snyk-vuln
+  legal:          spdx-licenses, gdpr-knowledge
+  marketing-seo:  lighthouse-patterns, schema-org, og-protocol
+  data:           sql-patterns, regex-library
+  infra:          redis, docker
+  browser:        browser-cli (agent-browser), playwright-mcp
+  ai-llm:         prompt-patterns, huggingface-models
+  knowledge:      wiki-guidelines
 ```
 
 ## PLATFORM ARCHITECTURE
 
 ```
-FastAPI + HTMX + Jinja2 + SSE | Dark purple | SQLite/PostgreSQL dual
+FastAPI + HTMX + Jinja2 + SSE | Dark purple | PostgreSQL uniquement (plus de SQLite)
 AgentLoop ←→ MessageBus (per-agent queues) → SSE → Frontend
 AgentExecutor → LLM → tool calls → route via bus
 Dual SSE: _push_sse() → _sse_queues (runner) + bus._sse_listeners (broadcast)
 ```
 
-### 156 AGENTS (store.py + skills/definitions/\*.yaml)
+### 192 AGENTS (store.py + skills/definitions/\*.yaml) — 100% enrichis
 
 ```
 Dev (35+):     brain, lead_dev, dev_backend/frontend, workers, mobile_ios/android
@@ -306,7 +345,7 @@ Analytics `/analytics` — Chart.js: skills, missions, agents leaderboard, syste
 ## KEY FILES (all under platform/)
 
 ```
-server.py, models.py, config.py
+server.py, models.py, config.py (+ _load_infisical() vault bootstrap)
 llm/client.py, llm/observability.py
 a2a/bus.py, a2a/negotiation.py, a2a/veto.py
 agents/loop.py, agents/executor.py, agents/store.py, agents/tool_schemas.py
@@ -317,16 +356,27 @@ workflows/builtins.py, workflows/store.py
 memory/manager.py, memory/vectors.py
 db/adapter.py, db/migrations.py, db/schema_pg.sql
 tools/tool_runner.py, tools/code_tools.py, tools/mcp_bridge.py
+tools/browser_tools.py (agent-browser: 7 tools)
+tools/infisical_tools.py (vault: get/list/set secret)
 web/routes/{helpers,pages,missions,projects,agents,sessions,patterns,workflows,metrics,settings}.py
-ops/auto_heal.py, ops/chaos_endurance.py, ops/run_backup.py
+ops/auto_heal.py, ops/chaos_endurance.py (+ SCENARIOS_MODULES), ops/run_backup.py
 mcps/manager.py
+modules/registry.yaml (25 modules)
 cli/sf.py, cli/_api.py, cli/_db.py, cli/_output.py, cli/_stream.py
+scripts/migrate_env_to_infisical.py
+skills/browser-exploration.md, skills/secrets-management.md
 ```
 
 ## DB
 
-`data/platform.db` (racine \_SOFTWARE_FACTORY). Dual: `DATABASE_URL` → PG, absent → SQLite.
-⚠️ NEVER `rm -f data/platform.db`. ⚠️ NEVER `*_API_KEY=dummy`.
+## DB
+
+PostgreSQL partout — `DATABASE_URL` obligatoire dans chaque env.
+Local: `postgresql://macaron:macaron@localhost:5432/macaron_platform`
+OVH: `postgresql://macaron:macaron_pg_ovh_2024@postgres:5432/macaron_platform` (container interne)
+Azure: `macaron-platform-pg.postgres.database.azure.com` (PaaS, SSL required)
+⚠️ NEVER `*_API_KEY=dummy`. `cli/_db.py` garde une couche SQLite offline-only pour le CLI `sf` (lecture locale).
+
 
 ## CONVENTIONS
 
@@ -335,35 +385,89 @@ cli/sf.py, cli/_api.py, cli/_db.py, cli/_output.py, cli/_stream.py
 - HTMX: readyState check (not DOMContentLoaded). Enum: `_s(val)` helper.
 - Process cleanup: start_new_session=True + os.killpg() on timeout
 
-## EXTERNAL TOOLS WATCHLIST
+## EXTERNAL TOOLS INTÉGRÉS
 
-Outils tiers à suivre pour intégration future dans la SF :
+| Outil | Statut | Fichier | Notes |
+|-------|--------|---------|-------|
+| **rtk** (Rust Token Killer) | ✅ intégré | `tools/sandbox.py` | 15 auto-rewrites, 60-90% token savings |
+| **agent-browser** (Vercel Labs) | ✅ intégré | `tools/browser_tools.py` | 7 tools, accessibility tree @refs, npm -g |
+| **Infisical** (secrets vault) | ✅ intégré | `tools/infisical_tools.py` + `config.py` | MIT, self-hosted, remplace .env |
+| **Playwright MCP** | ✅ intégré | `mcps/store.py` + `tool_runner.py` | 3 shortcuts navigate/screenshot/snapshot |
 
-| Outil | Repo | Pourquoi | Statut |
-|-------|------|----------|--------|
-| **rtk** (Rust Token Killer) | [rtk-ai/rtk](https://github.com/rtk-ai/rtk) | CLI proxy, réduit 60-90% tokens LLM — **intégré** dans `platform/tools/sandbox.py` | ✅ intégré |
+### Playwright dans la SF — 3 rôles
+
+```
+1. QA nightly (ops/e2e_scheduler.py) → lance platform/tests/e2e/*.spec.ts à 05h UTC
+2. Tool agent (tools/test_tools.py) → playwright_test(spec=), playwright_screenshot(url=)
+3. MCP browser (mcps/store.py mcp-playwright) → navigate/snapshot temps réel via MCP
+   agent-browser = plus structuré (accessibility tree), playwright MCP = screenshots + DOM
+```
 
 ### rtk — intégration SF (v0.22.2)
 
 **Statut** : proxy actif dans `platform/tools/sandbox.py` — toutes les commandes des agents passent par `_rtk_wrap()`.
+**Seeded en DB** : `integrations` table (id=rtk-compression) via `_ensure_darwin_tables()` → appelée depuis `_migrate_pg()`.
 
 **Commandes auto-rewrites** (15 règles) :
-- `git status/diff/log/push/pull` → `rtk git …`
-- `grep / rg` → `rtk grep …`
-- `ls` → `rtk ls …`
-- `cat` → `rtk read …`
-- `pytest` / `python3 -m pytest` → `rtk pytest …`
-- `docker logs/ps/images` → `rtk docker …`
-- `cargo test/check/build` → `rtk cargo …`
-- `go test/build/vet` → `rtk go …`
-- `npm run/test` → `rtk npm …`
-- `npx playwright` → `rtk playwright …`
-- `curl` → `rtk curl …`
-- `gh pr/issue/run` → `rtk gh …`
+`git/grep/ls/cat/pytest/docker/cargo/go/npm/playwright/curl/gh` → `rtk <cmd>`
 
-**Config** : `RTK_ENABLED=auto` (auto-détecte si `rtk` est dans PATH), `RTK_PATH=/chemin/vers/rtk`.
-**Désactiver** : `RTK_ENABLED=false` dans `.env`.
+**Config** : `RTK_ENABLED=auto` (auto-détecte PATH), `RTK_PATH=/chemin/vers/rtk`. Désactiver: `RTK_ENABLED=false`.
 **Install** : `curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/refs/heads/master/install.sh | sh`
+
+## SÉCURITÉ — INSPIRATIONS & CHOIX
+
+### SecureByDesign v1.1 (MIT, Abdoulaye Sylla)
+Source : https://github.com/Yems221/securebydesign-llmskill
+
+**Ce qu'on a intégré** (concepts, pas le fichier complet — trop lourd en tokens) :
+- Tiered enforcement LOW/STANDARD/REGULATED → `skills/security-audit.md` STEP A
+- Security theater detection → `skills/security-audit.md` STEP B
+- OWASP LLM Top 10 section (SBD-02/SBD-17/SBD-18/SBD-19) → `skills/security-audit.md`
+- Scope-of-assurance closing statement → output format de security-audit + qa-adversarial-llm
+- SBD-09/SBD-10 conflict resolution (log event, never content) → `tools/monitoring_tools.py`
+
+**Ce qu'on n'a PAS intégré** (et pourquoi) :
+- STEP 0 version check : LLM self-fetching = anti-pattern (token cost + injection vector)
+- STEP 1 language detection : géré au niveau LLM client, pas dans chaque skill
+- Les 25 contrôles complets en system prompt : trop lourd (25 contrôles × tous les agents)
+- Exemples de code Argon2/bcrypt en prompt : déjà implémentés dans sast_tools.py
+
+### Adversarial Guard (agents/adversarial.py)
+**Couverture** : qualité OUTPUT des agents (slop, hallucination, mock, stack mismatch).
+**Swiss Cheese model** (James Reason 1990) : L0 déterministe (0ms) + L1 LLM reviewer.
+**L1 pattern** : inspiré de Constitutional AI (Anthropic 2022) — reviewer LLM différent du producteur.
+**Inspirations** : Pentagi red-team loops (vxcontrol/pentagi), adversarial collaboration GoodAI.
+**Ne couvre PAS** : prompt injection, system prompt leakage, RAG isolation → voir ci-dessous.
+
+### QA Adversarial LLM (skills/qa-adversarial-llm.md)
+Red-team offensif du système LLM lui-même (7 suites de tests) :
+- Suite 1 : Prompt injection (direct + indirect via RAG/tools)
+- Suite 2 : System prompt leakage (8 payloads SBD-17)
+- Suite 3 : Jailbreak / role-play bypass
+- Suite 4 : RAG cross-user data isolation (LLM08/SBD-18)
+- Suite 5 : LLM output → exec injection (LLM05/SBD-19)
+- Suite 6 : Token DoS / runaway agent loops (LLM10/SBD-11)
+- Suite 7 : Excessive agent agency (LLM06/SBD-06)
+- + Tests du guard adversarial.py lui-même (peut-il être bypassé ?)
+Sources : OWASP LLM Top 10:2025 + SecureByDesign SBD-02/17/18/19 + Pentagi
+
+### RSSI Team (workflows/definitions/security-hacking.yaml)
+Équipe offensive complète : 8 phases (recon → exploit → post-exploit → rapport).
+Inspirée de Pentagi (vxcontrol) — mais adaptée au meta-workflow teams/agents/patterns de la SF,
+sans LangChain. Les agents utilisent les outils SF natifs (sast_tools, pentest_tools, trivy).
+
+
+## CHAOS MONKEY (ops/chaos_endurance.py)
+
+```
+SCENARIOS_VM1: container_restart, cpu_stress_30s, network_latency_200ms,
+               wal_checkpoint_truncate, memory_pressure_85pct, disk_fill_500mb
+SCENARIOS_VM2: kill_app, network_partition_30s, disk_fill_200mb
+SCENARIOS_MODULES: module_browser_cli, module_redis_down, module_rtk_missing, module_docker_down
+  → non-destructif: rename temporaire du binaire → health check → restore (finally)
+Loop: 80% infra (VM1×4) + 20% module health. Max 3/day. Interval: 2-6h random.
+Trigger manuel: python3 -m platform.ops.chaos_endurance --once [--scenario <name>]
+```
 
 ## AUDIT COVERAGE (46/46 = 100%)
 
