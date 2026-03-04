@@ -9,6 +9,7 @@ GET  /api/modules/categories → list categories
 
 from __future__ import annotations
 
+import importlib.util
 import shutil
 import subprocess
 import sys
@@ -76,26 +77,32 @@ def _set_enabled_ids(ids: set[str]) -> None:
 
 
 def _is_installed(module: Dict) -> bool:
-    """Check whether a module is installed.
+    """Check whether a module is installed — synchronous, instant (no subprocess).
 
-    Priority:
-    1. check_cmd → run it; exit 0 = installed
-    2. data_file → check file exists
-    3. No check → assume True (live API / static)
+    Logic:
+    - builtin: True  → always installed (bundled with SF)
+    - check_cmd starts with "python3 -c import X" → importlib.util.find_spec(X)
+    - check_cmd is a binary → shutil.which(binary)
+    - data_file  → check file exists
+    - otherwise  → True (live API, no install needed)
     """
+    if module.get("builtin"):
+        return True
+
     check_cmd = module.get("check_cmd", "")
     if check_cmd:
-        # Fast path: single binary in PATH
+        # python3 -c "import pkg" or "from pkg import ..."
+        if check_cmd.startswith("python"):
+            import re
+
+            m = re.search(r"import\s+([\w.]+)", check_cmd)
+            if m:
+                pkg = m.group(1).split(".")[0]
+                return importlib.util.find_spec(pkg) is not None
+            return True  # can't parse → assume ok
+        # binary check
         binary = check_cmd.split()[0]
-        if not check_cmd.startswith("python") and shutil.which(binary):
-            return True
-        try:
-            result = subprocess.run(
-                check_cmd, shell=True, capture_output=True, timeout=5
-            )
-            return result.returncode == 0
-        except Exception:
-            return False
+        return shutil.which(binary) is not None
 
     data_file = module.get("data_file")
     if not data_file:

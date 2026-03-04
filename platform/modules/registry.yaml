@@ -119,20 +119,6 @@ modules:
     requires:
       - "SNYK_TOKEN (optional)"
 
-  - id: landlock
-    name: "Landlock Sandbox"
-    description: "Linux kernel sandboxing (Landlock LSM) for agent tool isolation. Restricts filesystem and network access per-agent. Binary bundled at platform/tools/sandbox/landlock-runner."
-    category: security
-    icon: "🔒"
-    source_url: "https://landlock.io"
-    repo_url: "https://github.com/landlock-lsm/go-landlock"
-    license: "MIT"
-    tools: []
-    install: "# bundled — no install needed"
-    check_cmd: "platform/tools/sandbox/landlock-runner --version"
-    builtin: true
-    config_key: "security.landlock_enabled"
-
   # ── DEVOPS / INFRA ─────────────────────────────────────────────────────────
 
   - id: rtk
