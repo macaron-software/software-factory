@@ -1,22 +1,47 @@
 """
 Multi-stage error clustering for the platform auto-heal engine.
 
-Groups similar incidents into clusters to reduce alert noise.
-Three-stage approach (ported from airweave-ai/error-monitoring-agent, MIT):
-  1. Strict  — exact (error_type, source) match
-  2. Regex   — error_type prefix / HTTP code / exception class
-  3. LLM     — semantic similarity for remaining unclustered errors
+WHY
+---
+Sans clustering, 20 erreurs "HTTP 429" identiques génèrent 20 epics TMA séparés.
+Le clustering réduit ce bruit en regroupant les erreurs par cause racine avant
+de décider si on doit agir.
 
-The LLM stage uses the platform LLMClient (no external dependency).
+WHAT
+----
+Regroupe les incidents en clusters homogènes via 3 étapes successives :
+
+  Étape 1 — Strict   : même error_type ET même source → regroupement immédiat, 0 LLM
+  Étape 2 — Regex    : même classe d'erreur extraite (HTTP_429, TimeoutError…) → 0 LLM
+  Étape 3 — LLM      : pour les incidents restants, on demande au LLM de regrouper
+                        par similarité sémantique (cause racine)
+
+L'étape LLM est un filet de sécurité : elle ne se déclenche que si les étapes 1 et 2
+n'ont pas tout regroupé, et elle ne consomme des tokens que pour les incidents "orphelins".
+
+Exemple : 20 incidents → étape 1 : 15 regroupés (3 clusters) → étape 2 : 3 regroupés
+(1 cluster) → étape 3 : 2 incidents restants → 1 cluster LLM = 5 clusters au total.
+
+SOURCE
+------
+Porté et adapté de airweave-ai/error-monitoring-agent (MIT License)
+https://github.com/airweave-ai/error-monitoring-agent/blob/main/backend/pipeline/clustering.py
+
+ADAPTATIONS
+-----------
+- Suppression de LangChain → appels directs via platform LLMClient
+- Input = dicts d'incidents platform (id, error_type, error_detail, source, severity)
+  au lieu des RawError Pydantic du repo source
+- Pas de ClusterSummary Pydantic : JSON brut parsé avec fallback
+- generate_signature() en méthode séparée (appelée après cluster() si besoin)
 """
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from collections import defaultdict
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +94,7 @@ class ErrorClusterer:
     """
 
     def __init__(self) -> None:
-        self._llm: Any = None  # lazy-loaded
+        pass
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,20 +127,10 @@ class ErrorClusterer:
             len(remaining),
         )
 
-        # Stage 3: LLM (only if ≥2 unclustered incidents)
-        if len(remaining) >= 2:
-            try:
-                llm_clusters = await self._llm_cluster(remaining)
-                logger.debug("Clustering stage3 (LLM): %d clusters", len(llm_clusters))
-            except Exception as exc:
-                logger.warning(
-                    "LLM clustering failed (%s) — fallback to single clusters", exc
-                )
-                llm_clusters = [self._make_cluster([inc]) for inc in remaining]
-        elif remaining:
-            llm_clusters = [self._make_cluster([inc]) for inc in remaining]
-        else:
-            llm_clusters = []
+        # Stage 3: orphans → one cluster per incident.
+        # Semantic grouping of remaining incidents is handled by the monitoring-ops
+        # agent using its LLM loop (monitoring_cluster_incidents tool returns orphans).
+        llm_clusters = [self._make_cluster([inc]) for inc in remaining]
 
         return strict_clusters + regex_clusters + llm_clusters
 
@@ -152,93 +167,6 @@ class ErrorClusterer:
             else:
                 remaining.extend(members)
         return clusters, remaining
-
-    # ------------------------------------------------------------------
-    # Stage 3 — LLM semantic clustering
-    # ------------------------------------------------------------------
-
-    async def _llm_cluster(self, incidents: list[dict]) -> list[dict]:
-        llm = await self._get_llm()
-        if llm is None:
-            return [self._make_cluster([inc]) for inc in incidents]
-
-        from ..llm.client import LLMMessage
-
-        summaries = []
-        for i, inc in enumerate(incidents[:20]):  # cap at 20 for context
-            msg = inc.get("error_detail") or inc.get("title") or "unknown"
-            summaries.append(f"{i}: [{inc.get('error_type', '?')}] {msg[:120]}")
-
-        prompt = (
-            "You are grouping error incidents by root cause.\n"
-            "Given these incidents (index: description), output a JSON object with key 'groups':\n"
-            "a list of lists of indices that belong together.\n"
-            "Each index must appear exactly once. Similar errors (same root cause) go in the same group.\n"
-            'Example: {"groups": [[0,2,5],[1,3],[4]]}\n\n'
-            "Incidents:\n" + "\n".join(summaries)
-        )
-        response = await llm.chat(
-            messages=[LLMMessage(role="user", content=prompt)],
-            temperature=0.0,
-            max_tokens=512,
-        )
-        try:
-            raw = response.content.strip()
-            # strip ```json fences if present
-            raw = re.sub(r"^```json\s*", "", raw)
-            raw = re.sub(r"\s*```$", "", raw)
-            data = json.loads(raw)
-            groups_indices: list[list[int]] = data.get("groups", [])
-        except Exception as exc:
-            logger.warning("LLM cluster JSON parse failed (%s)", exc)
-            return [self._make_cluster([inc]) for inc in incidents]
-
-        # Validate indices
-        seen: set[int] = set()
-        result = []
-        for group in groups_indices:
-            valid = [i for i in group if 0 <= i < len(incidents) and i not in seen]
-            if valid:
-                seen.update(valid)
-                result.append(self._make_cluster([incidents[i] for i in valid]))
-
-        # Any index not covered → solo cluster
-        for i, inc in enumerate(incidents):
-            if i not in seen:
-                result.append(self._make_cluster([inc]))
-
-        return result
-
-    # ------------------------------------------------------------------
-    # Signature generation
-    # ------------------------------------------------------------------
-
-    async def generate_signature(self, incidents: list[dict]) -> str:
-        """Generate a natural-language signature for a cluster using the LLM."""
-        llm = await self._get_llm()
-        if llm is None:
-            return self._fallback_signature(incidents[0])
-
-        from ..llm.client import LLMMessage
-
-        msgs = [
-            (inc.get("error_detail") or inc.get("title") or "unknown")[:120]
-            for inc in incidents[:5]
-        ]
-        prompt = (
-            "Create a short natural-language signature (50–120 chars) for this group of errors.\n"
-            "Focus on the root cause, not specific variable data.\n"
-            "Examples: 'Rate limiting (HTTP 429) during file downloads', "
-            "'DB connection timeouts in sync worker'\n\n"
-            "Errors:\n" + "\n".join(f"- {m}" for m in msgs) + "\n\nSignature:"
-        )
-        response = await llm.chat(
-            messages=[LLMMessage(role="user", content=prompt)],
-            temperature=0.0,
-            max_tokens=128,
-        )
-        sig = response.content.strip().strip('"').strip("'")
-        return sig[:150] if sig else self._fallback_signature(incidents[0])
 
     def _fallback_signature(self, inc: dict) -> str:
         msg = inc.get("error_detail") or inc.get("title") or "Unknown error"
@@ -293,22 +221,3 @@ class ErrorClusterer:
             "sample_messages": sample_msgs,
             "sources": sources,
         }
-
-    # ------------------------------------------------------------------
-    # LLM lazy loader
-    # ------------------------------------------------------------------
-
-    async def _get_llm(self) -> Any:
-        if self._llm is not None:
-            return self._llm
-        try:
-            from ..llm.client import LLMClient, get_llm_client
-
-            try:
-                self._llm = get_llm_client()
-            except Exception:
-                self._llm = LLMClient()
-        except Exception as exc:
-            logger.warning("Could not load LLMClient for clustering: %s", exc)
-            self._llm = None
-        return self._llm

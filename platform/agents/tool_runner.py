@@ -134,6 +134,26 @@ def _get_tool_registry():
         register_pentest_tools(reg)
     except Exception:
         pass
+    # Browser exploration tools (agent-browser / headless Chromium)
+    try:
+        from ..tools.browser_tools import register_browser_tools
+
+        register_browser_tools(reg)
+    except Exception:
+        pass
+    try:
+        from ..tools.infisical_tools import register_infisical_tools
+
+        register_infisical_tools(reg)
+    except Exception:
+        pass
+    # Error monitoring tools (monitoring-ops agent: scan, cluster, alert, mute, heal)
+    try:
+        from ..tools.monitoring_tools import register_monitoring_tools
+
+        register_monitoring_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

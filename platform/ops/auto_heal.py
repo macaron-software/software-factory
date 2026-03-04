@@ -31,7 +31,9 @@ logger = logging.getLogger(__name__)
 
 SCAN_INTERVAL = int(os.environ.get("AUTOHEAL_INTERVAL", "60"))  # seconds
 SEVERITY_THRESHOLD = os.environ.get("AUTOHEAL_SEVERITY", "P3")  # P0,P1,P2,P3
-MAX_CONCURRENT_HEALS = int(os.environ.get("AUTOHEAL_MAX_CONCURRENT", "3"))
+MAX_CONCURRENT_HEALS = int(
+    os.environ.get("AUTOHEAL_MAX_CONCURRENT", "2")
+)  # cap to 2 to preserve semaphore slots
 ENABLED = os.environ.get("AUTOHEAL_ENABLED", "1") == "1"
 
 # Severity ordering for filtering
@@ -410,17 +412,14 @@ async def _cluster_and_filter(groups: list[IncidentGroup]) -> list[IncidentGroup
                         all_ids.extend(g.incident_ids)
             all_ids = list(dict.fromkeys(all_ids))  # dedupe, preserve order
 
-            # Get a natural-language signature
-            if len(cluster.get("incident_ids", [])) > 1:
-                sig = await clusterer.generate_signature(inc_dicts)
-            else:
-                sig = cluster["signature"]
+            # Signature: use the cluster's built-in fallback signature
+            sig = cluster["signature"]
 
             severity = cluster["severity"]
             sev_s = _P_TO_S.get(severity, "S3")
             error_status = state.determine_status(sig)
 
-            # Suppression check
+            # Suppression check (sync — semantic mute matching via monitoring-ops agent)
             should_alert, reason = state.should_alert(
                 signature=sig,
                 status=error_status,

@@ -1,13 +1,40 @@
 """
 Error signature state management — SQLite-backed.
 
-Tracks error pattern history to enable intelligent suppression:
-- NEW: first time we see this signature
-- REGRESSION: was resolved, came back
-- ONGOING: known open issue
+WHY
+---
+auto_heal.py groupait les incidents par simple `error_type` et relançait un TMA
+epic à chaque cycle, sans mémoire : un même bug connu pouvait déclencher des dizaines
+d'epics et de notifications. Ce module apporte la mémoire qui manquait.
 
-Ported and adapted from airweave-ai/error-monitoring-agent (MIT License).
-Replaces JSON file storage with platform SQLite (platform.db).
+WHAT
+----
+Persiste l'historique de chaque "signature d'erreur" (empreinte naturelle d'un cluster)
+pour permettre trois décisions intelligentes :
+
+  NEW        → première occurrence → on alerte et on lance le heal
+  REGRESSION → le bug était résolu (ticket fermé) et revient → on ré-alerte
+  ONGOING    → bug connu avec ticket ouvert → on supprime le spam
+
+Règles de suppression (méthode should_alert) :
+  1. Signature mutée → toujours supprimer
+  2. Sévérité S1/S2 → toujours alerter (override tout)
+  3. NEW ou REGRESSION → alerter
+  4. ONGOING + ticket ouvert → supprimer
+  5. Alerté depuis < 24h → supprimer
+  6. Sinon → alerter
+
+SOURCE
+------
+Porté et adapté de airweave-ai/error-monitoring-agent (MIT License)
+https://github.com/airweave-ai/error-monitoring-agent/blob/main/backend/state.py
+
+ADAPTATIONS
+-----------
+- Stockage JSON → SQLite (platform.db, tables error_signatures + error_mutes)
+- Suppression de la dépendance filelock
+- Matching sémantique des mutes délégué à monitoring-ops agent (tool loop)
+- Typage Python natif, pas de Pydantic PreviousErrorState
 """
 
 from __future__ import annotations
@@ -170,13 +197,15 @@ class ErrorStateManager:
         Returns (should_alert, suppression_reason).
 
         Rules (in priority order):
-        1. Muted → suppress
+        1. Muted (exact) → suppress
         2. S1/S2 → always alert
         3. NEW → alert
         4. REGRESSION → alert
         5. ONGOING + open ticket → suppress
         6. Alerted within suppress_window_hours → suppress
         7. Default → alert
+
+        For semantic mute matching, use the monitoring_should_alert tool via the monitoring-ops agent.
         """
         if self.is_muted(signature):
             mute = self.get_mute_info(signature)
