@@ -827,7 +827,7 @@ function moduleCard(m) {
     return `
     <div class="module-card ${m.enabled?'enabled':''}" id="module-card-${m.id}">
         <div class="module-card-header">
-            <span class="module-icon">${m.icon||'🔧'}</span>
+            <span class="module-icon"><svg class="icon" style="width:20px;height:20px;opacity:.8"><use href="#icon-${m.icon||'plug'}"/></svg></span>
             <div class="module-info">
                 <div class="module-name">${m.name}</div>
                 <div class="module-desc">${m.description}</div>
@@ -838,7 +838,7 @@ function moduleCard(m) {
                 </div>
                 ${tools?`<div class="module-tools">Tools: ${tools}</div>`:''}
             </div>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
+            <label title="${m.builtin?'Built-in — always loaded at startup':'Toggle to enable/disable in MCP LRM (restart required)'}" style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
                 <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${m.enabled?'var(--purple)':'var(--border)'};transition:background .2s" id="mod-track-${m.id}">
                     <span style="position:absolute;top:2px;left:${m.enabled?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mod-thumb-${m.id}"></span>
                 </span>

@@ -43,9 +43,14 @@ def _load_registry() -> list[Dict]:
 
 
 def _get_enabled_ids() -> set[str]:
-    """Read enabled module IDs from DB settings table."""
+    """Read enabled module IDs from DB settings table.
+    Default: all builtin modules are enabled.
+    NOTE: toggling from UI persists preference in DB but does NOT yet enforce
+    at agent runtime — tool registration happens at startup unconditionally.
+    """
+    builtin_defaults = {m["id"] for m in _load_registry() if m.get("builtin")}
     if not _has_db:
-        return {"component-gallery"}  # default
+        return builtin_defaults
     try:
         db = get_db()
         rows = db.execute(
@@ -57,7 +62,7 @@ def _get_enabled_ids() -> set[str]:
             return set(json.loads(rows[0]))
     except Exception:
         pass
-    return {"component-gallery"}
+    return builtin_defaults
 
 
 def _set_enabled_ids(ids: set[str]) -> None:
