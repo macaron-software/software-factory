@@ -1074,7 +1074,11 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
-        if path.startswith("/api/analytics") or path.startswith("/api/health"):
+        if (
+            path.startswith("/api/analytics")
+            or path.startswith("/api/health")
+            or path == "/api/ready"
+        ):
             return await call_next(request)
 
         # Skip auth in test mode
