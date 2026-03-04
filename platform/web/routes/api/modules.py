@@ -30,8 +30,8 @@ except Exception:
 
 router = APIRouter()
 
-REGISTRY_PATH = Path(__file__).parent.parent.parent / "modules" / "registry.yaml"
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+REGISTRY_PATH = Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
+DATA_DIR = Path(__file__).parent.parent.parent.parent.parent / "data"
 
 
 def _load_registry() -> list[Dict]:
