@@ -786,8 +786,11 @@ async def ops_page(request: Request):
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     import json as _json
+    import os
+    import socket
 
     from ...config import get_config
+    from ...db.adapter import is_postgresql
     from ...db.migrations import get_db
     from ...llm.providers import list_providers
 
@@ -807,6 +810,20 @@ async def settings_page(request: Request):
         integrations = []
     finally:
         db.close()
+
+    # Distributed infra status (read-only, shown in General tab)
+    infra = {
+        "db_type": "postgresql" if is_postgresql() else "sqlite",
+        "redis_url": os.environ.get("REDIS_URL") or "",
+        "node_id": os.environ.get("SF_NODE_ID")
+        or os.environ.get("HOSTNAME")
+        or socket.gethostname(),
+        "drain_timeout": int(os.environ.get("SF_DRAIN_TIMEOUT_S", "30")),
+        "pg_dsn": (os.environ.get("PG_DSN") or "")[:40]
+        + ("…" if len(os.environ.get("PG_DSN", "")) > 40 else ""),
+        "infisical": bool(os.environ.get("INFISICAL_TOKEN")),
+    }
+
     return _templates(request).TemplateResponse(
         "settings.html",
         {
@@ -815,6 +832,7 @@ async def settings_page(request: Request):
             "config": cfg,
             "providers": list_providers(),
             "integrations": integrations,
+            "infra": infra,
         },
     )
 
