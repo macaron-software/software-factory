@@ -179,6 +179,56 @@ def _get_tool_registry():
             register_monitoring_tools(reg)
     except Exception:
         pass
+    # Sandbox / Landlock tools — builtin, always loaded
+    try:
+        from ..tools.sandbox_tools import register_sandbox_tools
+
+        register_sandbox_tools(reg)
+    except Exception:
+        pass
+    # RTK token compression tools — builtin, always loaded
+    try:
+        from ..tools.rtk_tools import register_rtk_tools
+
+        register_rtk_tools(reg)
+    except Exception:
+        pass
+    # mflux image generation — guarded by mflux module (macOS Apple Silicon)
+    try:
+        if _is_module_enabled("mflux"):
+            from ..tools.mflux_tools import register_mflux_tools
+
+            register_mflux_tools(reg)
+    except Exception:
+        pass
+    # Package registry tools (npm, PyPI) — guarded by their modules
+    try:
+        if _is_module_enabled("npm-registry") or _is_module_enabled("pypi-registry"):
+            from ..tools.package_tools import register_package_tools
+
+            register_package_tools(reg)
+    except Exception:
+        pass
+    # Knowledge tools (snyk, HuggingFace, scrapy) — guarded by their modules
+    try:
+        if (
+            _is_module_enabled("snyk-vuln")
+            or _is_module_enabled("huggingface-models")
+            or _is_module_enabled("scrapy")
+        ):
+            from ..tools.knowledge_tools import register_knowledge_tools
+
+            register_knowledge_tools(reg)
+    except Exception:
+        pass
+    # GSD context engineering tools — guarded by gsd module
+    try:
+        if _is_module_enabled("gsd"):
+            from ..tools.gsd_tools import register_gsd_tools
+
+            register_gsd_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

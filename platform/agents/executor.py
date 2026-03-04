@@ -334,10 +334,17 @@ async def _summarize_context(
     if not middle_text:
         return header + tail
 
+    # GSD structured summarization — preserve decisions/progress/blockers/data
+    # Pattern: Get Shit Done (https://github.com/gsd-build/get-shit-done, MIT)
+    # WHY: flat paragraph summaries lose the decision trail and blockers. A
+    #      structured format lets the agent resume work without re-deriving state.
     summary_prompt = (
-        "Summarize the following conversation history in a concise paragraph "
-        "(max 300 words). Focus on decisions made, actions taken, and key findings. "
-        "Preserve technical details (file names, error messages, values).\n\n"
+        "Summarize the following agent conversation history using this EXACT format:\n\n"
+        "DECISIONS: (bullet list — architectural/technical choices made; max 5)\n"
+        "PROGRESS: (bullet list — what was completed; max 5)\n"
+        "BLOCKERS: (bullet list — errors, failures, unknowns; max 3; NONE if empty)\n"
+        "KEY DATA: (bullet list — file names, values, IDs, error messages to remember; max 5)\n\n"
+        "Rules: be telegraphic. Preserve exact names, values, paths. No fluff.\n\n"
         + "\n".join(middle_text)
     )
     try:
@@ -352,7 +359,7 @@ async def _summarize_context(
         if summary_text:
             summary_msg = LLMMessage(
                 role="system",
-                content=f"[Context summary — earlier conversation]\n{summary_text}",
+                content=f"[Context summary — earlier work]\n{summary_text}",
             )
             return header + [summary_msg] + tail
     except Exception:
