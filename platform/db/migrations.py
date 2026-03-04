@@ -569,7 +569,7 @@ def _migrate_pg(conn):
     }
     for iid, icon_url in _icon_fixes.items():
         conn.execute(
-            "UPDATE integrations SET icon=%s WHERE id=%s AND icon LIKE %s",
+            "UPDATE integrations SET icon=? WHERE id=? AND icon LIKE ?",
             (icon_url, iid, "%simpleicons.org%"),
         )
 
