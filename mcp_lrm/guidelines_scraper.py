@@ -30,13 +30,36 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
-import sqlite3
 import sys
 import time
 from pathlib import Path
 
+import psycopg
+from psycopg.rows import dict_row
+
 DB_PATH = Path(__file__).parent.parent / "data" / "guidelines.db"
+
+
+def _get_pg_url() -> str:
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        for candidate in [
+            Path(__file__).resolve().parents[1] / ".env",
+            Path.home() / ".sf" / ".env",
+        ]:
+            if candidate.exists():
+                for line in candidate.read_text().splitlines():
+                    if line.startswith("DATABASE_URL="):
+                        url = line.split("=", 1)[1].strip()
+                        break
+            if url:
+                break
+    if not url:
+        raise RuntimeError("DATABASE_URL not set")
+    return url
+
 
 # ── Keywords for auto-categorization ─────────────────────────────────────────
 
@@ -153,16 +176,15 @@ _CONSTRAINT_PATTERNS = [
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 
-def get_db(project: str = "default") -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+def get_db(project: str = "default"):
+    conn = psycopg.connect(_get_pg_url(), row_factory=dict_row)
+    conn.autocommit = True
     _ensure_schema(conn)
     return conn
 
 
-def _ensure_schema(conn: sqlite3.Connection) -> None:
-    conn.executescript(
+def _ensure_schema(conn) -> None:
+    conn.execute(
         """
         CREATE TABLE IF NOT EXISTS guideline_pages (
             id          TEXT PRIMARY KEY,
@@ -174,19 +196,29 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             content     TEXT,
             summary     TEXT,
             tags        TEXT,
-            updated_at  TEXT
-        );
-
+            updated_at  TEXT,
+            tsv         TSVECTOR GENERATED ALWAYS AS (
+                to_tsvector('simple',
+                    coalesce(title,'') || ' ' || coalesce(content,'') || ' ' || coalesce(summary,''))
+            ) STORED
+        )
+        """
+    )
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS guideline_items (
-            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            id              BIGSERIAL PRIMARY KEY,
             project         TEXT NOT NULL DEFAULT 'default',
             category        TEXT,
             topic           TEXT,
             constraint_text TEXT,
             source_page_id  TEXT,
             source_title    TEXT
-        );
-
+        )
+        """
+    )
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS guideline_meta (
             project     TEXT PRIMARY KEY,
             source      TEXT,
@@ -195,23 +227,16 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
             page_count  INTEGER DEFAULT 0,
             item_count  INTEGER DEFAULT 0,
             config_json TEXT
-        );
+        )
         """
     )
-    # FTS5 for full-text search
-    try:
-        conn.execute(
-            "CREATE VIRTUAL TABLE IF NOT EXISTS guideline_fts USING fts5("
-            "title, content, summary, "
-            "content='guideline_pages', content_rowid='rowid')"
-        )
-    except Exception:
-        pass
-    conn.commit()
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_guideline_pages_tsv ON guideline_pages USING GIN(tsv)"
+    )
 
 
 def _upsert_page(
-    conn: sqlite3.Connection,
+    conn,
     page_id: str,
     project: str,
     space: str,
@@ -224,9 +249,13 @@ def _upsert_page(
     updated_at: str = "",
 ) -> None:
     conn.execute(
-        """INSERT OR REPLACE INTO guideline_pages
+        """INSERT INTO guideline_pages
            (id, project, space, title, url, category, content, summary, tags, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+           ON CONFLICT (id) DO UPDATE SET
+               project=EXCLUDED.project, space=EXCLUDED.space, title=EXCLUDED.title,
+               url=EXCLUDED.url, category=EXCLUDED.category, content=EXCLUDED.content,
+               summary=EXCLUDED.summary, tags=EXCLUDED.tags, updated_at=EXCLUDED.updated_at""",
         (
             page_id,
             project,
@@ -240,27 +269,20 @@ def _upsert_page(
             updated_at,
         ),
     )
-    # Refresh FTS
-    conn.execute("INSERT INTO guideline_fts(guideline_fts) VALUES('delete-all')", ())
-    conn.execute(
-        "INSERT INTO guideline_fts(rowid, title, content, summary) "
-        "SELECT rowid, title, content, summary FROM guideline_pages WHERE project = ?",
-        (project,),
-    )
 
 
 def _insert_items(
-    conn: sqlite3.Connection,
+    conn,
     project: str,
     page_id: str,
     page_title: str,
     items: list[tuple],
 ) -> None:
     """items: list of (category, topic, constraint_text)"""
-    conn.execute("DELETE FROM guideline_items WHERE source_page_id = ?", (page_id,))
+    conn.execute("DELETE FROM guideline_items WHERE source_page_id = %s", (page_id,))
     conn.executemany(
         "INSERT INTO guideline_items (project, category, topic, constraint_text, source_page_id, source_title) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "VALUES (%s, %s, %s, %s, %s, %s)",
         [
             (project, cat, topic, text, page_id, page_title)
             for cat, topic, text in items
@@ -413,9 +435,8 @@ def scrape_confluence(
     import urllib.request
 
     conn = get_db(project)
-    conn.execute("DELETE FROM guideline_pages WHERE project = ?", (project,))
-    conn.execute("DELETE FROM guideline_items WHERE project = ?", (project,))
-    conn.commit()
+    conn.execute("DELETE FROM guideline_pages WHERE project = %s", (project,))
+    conn.execute("DELETE FROM guideline_items WHERE project = %s", (project,))
 
     start = 0
     total = 0
@@ -484,16 +505,16 @@ def scrape_confluence(
         start += 50
         time.sleep(0.2)  # be nice to Confluence
 
-    conn.commit()
     item_count = conn.execute(
-        "SELECT COUNT(*) FROM guideline_items WHERE project = ?", (project,)
-    ).fetchone()[0]
+        "SELECT COUNT(*) FROM guideline_items WHERE project = %s", (project,)
+    ).fetchone()["count"]
     conn.execute(
-        "INSERT OR REPLACE INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
-        "VALUES (?, 'confluence', ?, datetime('now'), ?, ?)",
+        "INSERT INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
+        "VALUES (%s, 'confluence', %s, NOW(), %s, %s) "
+        "ON CONFLICT (project) DO UPDATE SET source=EXCLUDED.source, space=EXCLUDED.space, "
+        "last_sync=EXCLUDED.last_sync, page_count=EXCLUDED.page_count, item_count=EXCLUDED.item_count",
         (project, space, total, item_count),
     )
-    conn.commit()
     conn.close()
     return total
 
@@ -511,9 +532,8 @@ def scrape_markdown_dir(
         return 0
 
     conn = get_db(project)
-    conn.execute("DELETE FROM guideline_pages WHERE project = ?", (project,))
-    conn.execute("DELETE FROM guideline_items WHERE project = ?", (project,))
-    conn.commit()
+    conn.execute("DELETE FROM guideline_pages WHERE project = %s", (project,))
+    conn.execute("DELETE FROM guideline_items WHERE project = %s", (project,))
 
     total = 0
     for md_file in sorted(root.rglob("*.md")):
@@ -548,16 +568,16 @@ def scrape_markdown_dir(
         if verbose:
             print(f"  ✓ [{category:10}] {title[:60]}")
 
-    conn.commit()
     item_count = conn.execute(
-        "SELECT COUNT(*) FROM guideline_items WHERE project = ?", (project,)
-    ).fetchone()[0]
+        "SELECT COUNT(*) FROM guideline_items WHERE project = %s", (project,)
+    ).fetchone()["count"]
     conn.execute(
-        "INSERT OR REPLACE INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
-        "VALUES (?, 'markdown', ?, datetime('now'), ?, ?)",
+        "INSERT INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
+        "VALUES (%s, 'markdown', %s, NOW(), %s, %s) "
+        "ON CONFLICT (project) DO UPDATE SET source=EXCLUDED.source, space=EXCLUDED.space, "
+        "last_sync=EXCLUDED.last_sync, page_count=EXCLUDED.page_count, item_count=EXCLUDED.item_count",
         (project, space, total, item_count),
     )
-    conn.commit()
     conn.close()
     return total
 
@@ -573,9 +593,8 @@ def scrape_gitlab_wiki(
     import urllib.request
 
     conn = get_db(project)
-    conn.execute("DELETE FROM guideline_pages WHERE project = ?", (project,))
-    conn.execute("DELETE FROM guideline_items WHERE project = ?", (project,))
-    conn.commit()
+    conn.execute("DELETE FROM guideline_pages WHERE project = %s", (project,))
+    conn.execute("DELETE FROM guideline_items WHERE project = %s", (project,))
 
     base = gitlab_url.rstrip("/")
     url = (
@@ -619,16 +638,16 @@ def scrape_gitlab_wiki(
         if verbose:
             print(f"  ✓ [{category:10}] {title[:60]}")
 
-    conn.commit()
     item_count = conn.execute(
-        "SELECT COUNT(*) FROM guideline_items WHERE project = ?", (project,)
-    ).fetchone()[0]
+        "SELECT COUNT(*) FROM guideline_items WHERE project = %s", (project,)
+    ).fetchone()["count"]
     conn.execute(
-        "INSERT OR REPLACE INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
-        "VALUES (?, 'gitlab', ?, datetime('now'), ?, ?)",
+        "INSERT INTO guideline_meta (project, source, space, last_sync, page_count, item_count) "
+        "VALUES (%s, 'gitlab', %s, NOW(), %s, %s) "
+        "ON CONFLICT (project) DO UPDATE SET source=EXCLUDED.source, space=EXCLUDED.space, "
+        "last_sync=EXCLUDED.last_sync, page_count=EXCLUDED.page_count, item_count=EXCLUDED.item_count",
         (project, "gitlab-wiki", total, item_count),
     )
-    conn.commit()
     conn.close()
     return total
 
@@ -654,14 +673,15 @@ def build_guidelines_summary(
     if not DB_PATH.exists():
         return ""
 
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    try:
+        conn = get_db()
+    except Exception:
+        return ""
 
-    # Check project exists
     meta = conn.execute(
-        "SELECT page_count FROM guideline_meta WHERE project = ?", (project,)
+        "SELECT page_count FROM guideline_meta WHERE project = %s", (project,)
     ).fetchone()
-    if not meta or meta[0] == 0:
+    if not meta or meta["page_count"] == 0:
         conn.close()
         return ""
 
@@ -670,7 +690,7 @@ def build_guidelines_summary(
     # Tech stack items
     must_use = conn.execute(
         "SELECT topic, constraint_text FROM guideline_items "
-        "WHERE project = ? AND category = 'must_use' ORDER BY topic LIMIT 20",
+        "WHERE project = %s AND category = 'must_use' ORDER BY topic LIMIT 20",
         (project,),
     ).fetchall()
     if must_use:
@@ -680,7 +700,7 @@ def build_guidelines_summary(
     # Forbidden items
     forbidden = conn.execute(
         "SELECT constraint_text FROM guideline_items "
-        "WHERE project = ? AND category = 'forbidden' ORDER BY topic LIMIT 15",
+        "WHERE project = %s AND category = 'forbidden' ORDER BY topic LIMIT 15",
         (project,),
     ).fetchall()
     if forbidden:
@@ -690,7 +710,7 @@ def build_guidelines_summary(
     # Standards
     standards = conn.execute(
         "SELECT topic, constraint_text FROM guideline_items "
-        "WHERE project = ? AND category IN ('standard', 'pattern') ORDER BY topic LIMIT 15",
+        "WHERE project = %s AND category IN ('standard', 'pattern') ORDER BY topic LIMIT 15",
         (project,),
     ).fetchall()
     if standards:
@@ -712,13 +732,13 @@ def build_guidelines_summary(
 
 
 def _print_stats(project: str) -> None:
-    if not DB_PATH.exists():
+    try:
+        conn = get_db()
+    except Exception:
         print("DB not found")
         return
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
     meta = conn.execute(
-        "SELECT * FROM guideline_meta WHERE project = ?", (project,)
+        "SELECT * FROM guideline_meta WHERE project = %s", (project,)
     ).fetchone()
     if not meta:
         print(f"No data for project '{project}'")
@@ -730,14 +750,14 @@ def _print_stats(project: str) -> None:
     print(f"Pages:      {meta['page_count']}")
     print(f"Items:      {meta['item_count']}")
     cats = conn.execute(
-        "SELECT category, COUNT(*) as n FROM guideline_pages WHERE project=? GROUP BY category ORDER BY n DESC",
+        "SELECT category, COUNT(*) as n FROM guideline_pages WHERE project=%s GROUP BY category ORDER BY n DESC",
         (project,),
     ).fetchall()
     print("\nPages by category:")
     for r in cats:
         print(f"  {r['category']:15} {r['n']}")
     cat_items = conn.execute(
-        "SELECT category, COUNT(*) as n FROM guideline_items WHERE project=? GROUP BY category ORDER BY n DESC",
+        "SELECT category, COUNT(*) as n FROM guideline_items WHERE project=%s GROUP BY category ORDER BY n DESC",
         (project,),
     ).fetchall()
     print("\nItems by category:")
@@ -787,10 +807,11 @@ def main():
         return
 
     if args.list_projects:
-        if not DB_PATH.exists():
+        try:
+            conn = get_db()
+        except Exception:
             print("DB not found")
             return
-        conn = sqlite3.connect(str(DB_PATH))
         rows = conn.execute(
             "SELECT project, source, space, last_sync, page_count, item_count FROM guideline_meta ORDER BY project"
         ).fetchall()
@@ -798,15 +819,15 @@ def main():
             f"{'Project':20} {'Source':12} {'Space':15} {'Last sync':20} {'Pages':6} {'Items':6}"
         )
         for r in rows:
-            print(f"{r[0]:20} {r[1]:12} {r[2]:15} {r[3]:20} {r[4]:6} {r[5]:6}")
+            print(
+                f"{r['project']:20} {r['source']:12} {r['space']:15} {r['last_sync']:20} {r['page_count']:6} {r['item_count']:6}"
+            )
         conn.close()
         return
 
     if not args.source:
         parser.print_help()
         return
-
-    import os
 
     if args.source == "confluence":
         url = args.url or os.environ.get("CONFLUENCE_URL", "")

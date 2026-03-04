@@ -17,7 +17,7 @@ import asyncio
 import json
 import os
 import platform
-import sqlite3
+import sqlite3  # kept only for RTK history DB (external tool)
 import subprocess
 import sys
 import time
@@ -102,12 +102,68 @@ def cached(ttl: float):
 # DATABASE HELPERS
 # ============================================================================
 
+_PG_URL: str | None = None
 
-def get_db(db_name: str = "factory.db") -> sqlite3.Connection:
-    """Get database connection."""
-    conn = sqlite3.connect(DATA_DIR / db_name)
-    conn.row_factory = sqlite3.Row
+
+def _get_pg_url() -> str:
+    global _PG_URL
+    if _PG_URL:
+        return _PG_URL
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        for candidate in [BASE_DIR / ".env", Path.home() / ".sf" / ".env"]:
+            if candidate.exists():
+                for line in candidate.read_text().splitlines():
+                    if line.startswith("DATABASE_URL="):
+                        url = line.split("=", 1)[1].strip()
+                        break
+            if url:
+                break
+    if not url:
+        raise RuntimeError("DATABASE_URL not set — cannot connect to PostgreSQL")
+    _PG_URL = url
+    return url
+
+
+def get_db():
+    """Get PostgreSQL connection (replaces old SQLite get_db)."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    conn = psycopg.connect(_get_pg_url(), row_factory=dict_row)
+    conn.autocommit = True
     return conn
+
+
+def _ensure_dashboard_tables(conn) -> None:
+    """Create legacy dashboard tables in PostgreSQL if they don't exist."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                project_id TEXT,
+                title TEXT,
+                status TEXT DEFAULT 'pending',
+                domain TEXT,
+                wsjf_score REAL DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS critic_metrics (
+                id SERIAL PRIMARY KEY,
+                project_id TEXT,
+                layer TEXT,
+                result TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_critic_project_layer ON critic_metrics(project_id, layer)"
+        )
 
 
 # ============================================================================
@@ -222,7 +278,7 @@ def get_project_stats(project_id: str) -> Dict[str, int]:
             """
             SELECT status, COUNT(*) as cnt
             FROM tasks
-            WHERE project_id = ?
+            WHERE project_id = %s
             GROUP BY status
         """,
             (project_id,),
@@ -458,61 +514,56 @@ def get_worker_count(project_id: str) -> int:
 @cached(ttl=30)
 def get_metrics(project_id: str) -> Dict:
     """Get Team of Rivals metrics for a project."""
-    metrics_db = DATA_DIR / "metrics.db"
-    if not metrics_db.exists():
-        return {"l0": {}, "l1_code": {}, "l1_security": {}, "l2_arch": {}, "final": {}}
-
-    # Map project_id to potential names
     project_names = [project_id]
     config = load_project_config(project_id)
     if config and config.get("project", {}).get("name"):
         project_names.append(config["project"]["name"])
 
-    with sqlite3.connect(metrics_db) as conn:
-        conn.row_factory = sqlite3.Row
+    try:
+        with get_db() as conn:
+            metrics = {}
+            for layer in ["l0", "l1_code", "l1_security", "l2_arch"]:
+                placeholders = ",".join(["%s"] * len(project_names))
+                row = conn.execute(
+                    f"""
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                        SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved
+                    FROM critic_metrics
+                    WHERE project_id IN ({placeholders}) AND layer = %s
+                """,
+                    (*project_names, layer),
+                ).fetchone()
 
-        metrics = {}
-        for layer in ["l0", "l1_code", "l1_security", "l2_arch"]:
-            placeholders = ",".join("?" * len(project_names))
-            row = conn.execute(
+                total = (row["total"] or 0) if row else 0
+                rejected = (row["rejected"] or 0) if row else 0
+                metrics[layer] = {
+                    "total": total,
+                    "rejected": rejected,
+                    "approved": (row["approved"] or 0) if row else 0,
+                    "catch_rate": round(rejected / total * 100, 1) if total > 0 else 0,
+                }
+
+            placeholders = ",".join(["%s"] * len(project_names))
+            final = conn.execute(
                 f"""
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) as rejected,
-                    SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved
-                FROM critic_metrics
-                WHERE project_id IN ({placeholders}) AND layer = ?
+                SELECT COUNT(*) as cnt FROM critic_metrics
+                WHERE project_id IN ({placeholders}) AND layer = 'final' AND result = 'approved'
             """,
-                (*project_names, layer),
+                tuple(project_names),
             ).fetchone()
 
-            total = row["total"] or 0
-            rejected = row["rejected"] or 0
-            metrics[layer] = {
-                "total": total,
-                "rejected": rejected,
-                "approved": row["approved"] or 0,
-                "catch_rate": round(rejected / total * 100, 1) if total > 0 else 0,
+            total_started = metrics["l0"]["total"]
+            final_approved = (final["cnt"] or 0) if final else 0
+            metrics["final"] = {
+                "approved": final_approved,
+                "success_rate": round(final_approved / total_started * 100, 1)
+                if total_started > 0
+                else 0,
             }
-
-        # Final approved
-        placeholders = ",".join("?" * len(project_names))
-        final = conn.execute(
-            f"""
-            SELECT COUNT(*) as cnt FROM critic_metrics
-            WHERE project_id IN ({placeholders}) AND layer = 'final' AND result = 'approved'
-        """,
-            project_names,
-        ).fetchone()
-
-        total_started = metrics["l0"]["total"]
-        final_approved = final["cnt"] or 0
-        metrics["final"] = {
-            "approved": final_approved,
-            "success_rate": round(final_approved / total_started * 100, 1)
-            if total_started > 0
-            else 0,
-        }
+    except Exception:
+        return {"l0": {}, "l1_code": {}, "l1_security": {}, "l2_arch": {}, "final": {}}
 
     return metrics
 
@@ -535,18 +586,18 @@ def get_tasks(
         params = []
 
         if project_id:
-            query += " AND project_id = ?"
+            query += " AND project_id = %s"
             params.append(project_id)
 
         if status:
-            query += " AND status = ?"
+            query += " AND status = %s"
             params.append(status)
 
         if domain:
-            query += " AND domain = ?"
+            query += " AND domain = %s"
             params.append(domain)
 
-        query += " ORDER BY wsjf_score DESC, created_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY wsjf_score DESC, created_at DESC LIMIT %s OFFSET %s"
         params.extend([limit, offset])
 
         rows = conn.execute(query, params).fetchall()
@@ -681,18 +732,18 @@ async def api_agent_plans(
             query = "SELECT p.*, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id AND s.status='done') as done_count, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id) as total_count FROM agent_plans p WHERE 1=1"
             params: list = []
             if session_id:
-                query += " AND p.session_id=?"
+                query += " AND p.session_id=%s"
                 params.append(session_id)
             if project_id:
-                query += " AND p.project_id=?"
+                query += " AND p.project_id=%s"
                 params.append(project_id)
-            query += " ORDER BY p.updated_at DESC LIMIT ?"
+            query += " ORDER BY p.updated_at DESC LIMIT %s"
             params.append(limit)
             plans = db.execute(query, params).fetchall()
             result = []
             for plan in plans:
                 steps = db.execute(
-                    "SELECT * FROM agent_plan_steps WHERE plan_id=? ORDER BY step_num",
+                    "SELECT * FROM agent_plan_steps WHERE plan_id=%s ORDER BY step_num",
                     (plan["id"],),
                 ).fetchall()
                 result.append(
@@ -881,61 +932,61 @@ async def tasks_page(
 
 
 def _get_live_activity(since_ts: str | None = None) -> dict:
-    """Fetch recent platform activity from platform.db."""
-    db_path = DATA_DIR / "platform.db"
-    if not db_path.exists():
-        return {"tool_calls": [], "messages": [], "llm_cost": 0.0, "active_agents": []}
+    """Fetch recent platform activity from PostgreSQL."""
     try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
+        import datetime
+
+        conn = get_db()
         # Default: last 30 seconds
         if not since_ts:
             since_ts = (
-                __import__("datetime").datetime.utcnow()
-                - __import__("datetime").timedelta(seconds=30)
+                datetime.datetime.utcnow() - datetime.timedelta(seconds=30)
             ).strftime("%Y-%m-%d %H:%M:%S")
 
         tool_calls = conn.execute(
             "SELECT agent_id, tool_name, success, timestamp FROM tool_calls "
-            "WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 50",
+            "WHERE timestamp >= %s ORDER BY timestamp DESC LIMIT 50",
             (since_ts,),
         ).fetchall()
 
         messages = conn.execute(
             "SELECT from_agent, to_agent, substr(content,1,120) as preview, timestamp "
-            "FROM messages WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 30",
+            "FROM messages WHERE timestamp >= %s ORDER BY timestamp DESC LIMIT 30",
             (since_ts,),
         ).fetchall()
 
         # Active agents (sessions active last 5 min)
         active = conn.execute(
             "SELECT DISTINCT from_agent as agent_id FROM messages "
-            "WHERE timestamp >= datetime('now','-5 minutes') LIMIT 20",
+            "WHERE timestamp >= NOW() - INTERVAL '5 minutes' LIMIT 20",
         ).fetchall()
 
         # LLM cost (last hour)
         cost_row = conn.execute(
-            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= datetime('now','-1 hour')",
+            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= NOW() - INTERVAL '1 hour'",
         ).fetchone()
-        cost = float(cost_row[0] or 0.0)
+        cost = float((cost_row.get("sum") or 0.0) if cost_row else 0.0)
 
         # Commits (today)
         commits = conn.execute(
             "SELECT agent_id, tool_name, timestamp FROM tool_calls "
-            "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
+            "WHERE tool_name='git_commit' AND timestamp >= CURRENT_DATE ORDER BY timestamp DESC LIMIT 10",
         ).fetchall()
 
-        # RTK proxy stats — sandbox cmd counts from platform.db
-        rtk_row = conn.execute(
-            "SELECT cmds_total, cmds_proxied FROM rtk_stats WHERE id=1",
-        ).fetchone()
-        rtk = dict(rtk_row) if rtk_row else {"cmds_total": 0, "cmds_proxied": 0}
+        # RTK proxy stats
+        try:
+            rtk_row = conn.execute(
+                "SELECT cmds_total, cmds_proxied FROM rtk_stats WHERE id=1"
+            ).fetchone()
+            rtk = dict(rtk_row) if rtk_row else {"cmds_total": 0, "cmds_proxied": 0}
+        except Exception:
+            rtk = {"cmds_total": 0, "cmds_proxied": 0}
         rtk["proxied_pct"] = (
             round(100 * rtk["cmds_proxied"] / rtk["cmds_total"], 1)
             if rtk["cmds_total"]
             else 0
         )
-        # Real token savings from RTK's own history DB
+        # Real token savings from RTK's own history DB (still SQLite — external tool)
         rtk["tokens_saved"] = 0
         rtk["tokens_input"] = 0
         if _RTK_HISTORY_DB:

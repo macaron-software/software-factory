@@ -31,12 +31,11 @@ import asyncio
 import json
 import os
 import re
-import sqlite3
 import sys
 import signal
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 from datetime import datetime
 
 # Add parent to path for imports
@@ -1031,12 +1030,13 @@ class MCPLRMServer:
 
     _GL_DB_PATH = Path(__file__).parent.parent / "data" / "guidelines.db"
 
-    def _gl_db(self) -> Optional[sqlite3.Connection]:
-        if not self._GL_DB_PATH.exists():
+    def _gl_db(self):
+        from .guidelines_scraper import get_db
+
+        try:
+            return get_db()
+        except Exception:
             return None
-        conn = sqlite3.connect(str(self._GL_DB_PATH))
-        conn.row_factory = sqlite3.Row
-        return conn
 
     async def _tool_guidelines_summary(self, args: Dict) -> Dict:
         project = args.get("project", "default")
@@ -1065,19 +1065,18 @@ class MCPLRMServer:
         try:
             rows = conn.execute(
                 "SELECT id, title, url, category, summary FROM guideline_pages "
-                "WHERE project = ? AND (title LIKE ? OR content LIKE ? OR summary LIKE ?) LIMIT ?",
+                "WHERE project = %s AND (title LIKE %s OR content LIKE %s OR summary LIKE %s) LIMIT %s",
                 (project, f"%{query}%", f"%{query}%", f"%{query}%", limit),
             ).fetchall()
         except Exception:
             rows = []
-        # Also try FTS
+        # Also try full-text search
         if not rows:
             try:
                 rows = conn.execute(
-                    "SELECT p.id, p.title, p.url, p.category, p.summary "
-                    "FROM guideline_fts f JOIN guideline_pages p ON f.rowid = p.rowid "
-                    "WHERE f MATCH ? AND p.project = ? LIMIT ?",
-                    (query, project, limit),
+                    "SELECT id, title, url, category, summary FROM guideline_pages "
+                    "WHERE project = %s AND tsv @@ plainto_tsquery('simple', %s) LIMIT %s",
+                    (project, query, limit),
                 ).fetchall()
             except Exception:
                 pass
@@ -1107,12 +1106,12 @@ class MCPLRMServer:
             return {"error": "Guidelines DB not found"}
         if page_id:
             row = conn.execute(
-                "SELECT * FROM guideline_pages WHERE id = ? AND project = ?",
+                "SELECT * FROM guideline_pages WHERE id = %s AND project = %s",
                 (page_id, project),
             ).fetchone()
         elif title:
             row = conn.execute(
-                "SELECT * FROM guideline_pages WHERE project = ? AND title LIKE ? LIMIT 1",
+                "SELECT * FROM guideline_pages WHERE project = %s AND title LIKE %s LIMIT 1",
                 (project, f"%{title}%"),
             ).fetchone()
         else:
@@ -1123,7 +1122,7 @@ class MCPLRMServer:
                 "error": f"Page not found for title='{title}' page_id='{page_id}' project='{project}'"
             }
         items = conn.execute(
-            "SELECT category, topic, constraint_text FROM guideline_items WHERE source_page_id = ?",
+            "SELECT category, topic, constraint_text FROM guideline_items WHERE source_page_id = %s",
             (row["id"],),
         ).fetchall()
         conn.close()
@@ -1150,10 +1149,10 @@ class MCPLRMServer:
         conn = self._gl_db()
         if not conn:
             return {"error": "Guidelines DB not found"}
-        q = "SELECT category, topic, constraint_text, source_title FROM guideline_items WHERE project = ? AND category IN ('must_use', 'forbidden', 'standard')"
+        q = "SELECT category, topic, constraint_text, source_title FROM guideline_items WHERE project = %s AND category IN ('must_use', 'forbidden', 'standard')"
         params: list = [project]
         if topic_filter:
-            q += " AND topic LIKE ?"
+            q += " AND topic LIKE %s"
             params.append(f"%{topic_filter}%")
         q += " ORDER BY category, topic"
         rows = conn.execute(q, params).fetchall()
@@ -1180,14 +1179,13 @@ class MCPLRMServer:
     _CG_DB_PATH = Path(__file__).parent.parent / "data" / "component_gallery.db"
 
     def _cg_db(self):
-        """Open component gallery SQLite connection."""
-        import sqlite3
+        """Open component gallery PostgreSQL connection."""
+        from .component_gallery_scraper import get_db
 
-        if not self._CG_DB_PATH.exists():
+        try:
+            return get_db()
+        except Exception:
             return None
-        conn = sqlite3.connect(str(self._CG_DB_PATH))
-        conn.row_factory = sqlite3.Row
-        return conn
 
     async def _tool_component_gallery_list(self, args: Dict) -> Dict:
         conn = self._cg_db()
@@ -1226,31 +1224,32 @@ class MCPLRMServer:
                 "error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"
             }
         row = conn.execute(
-            "SELECT * FROM components WHERE slug = ?", (slug,)
+            "SELECT * FROM components WHERE slug = %s", (slug,)
         ).fetchone()
         if not row:
             row = conn.execute(
-                "SELECT * FROM components WHERE slug LIKE ? OR name LIKE ? LIMIT 1",
+                "SELECT * FROM components WHERE slug LIKE %s OR name LIKE %s LIMIT 1",
                 (f"%{slug}%", f"%{slug}%"),
             ).fetchone()
         if not row:
             available = [
-                r[0] for r in conn.execute("SELECT slug FROM components ORDER BY slug")
+                r["slug"]
+                for r in conn.execute("SELECT slug FROM components ORDER BY slug")
             ]
             conn.close()
             return {"error": f"Component '{slug}' not found", "available": available}
         real_slug = row["slug"]
-        query = "SELECT component_name, ds_name, url, tech, features FROM implementations WHERE component_slug = ?"
+        query = "SELECT component_name, ds_name, url, tech, features FROM implementations WHERE component_slug = %s"
         params: list = [real_slug]
         if tech_filter:
-            query += " AND tech LIKE ?"
+            query += " AND tech LIKE %s"
             params.append(f"%{tech_filter}%")
         query += f" ORDER BY ds_name LIMIT {limit}"
         impls = conn.execute(query, params).fetchall()
         total = conn.execute(
-            "SELECT COUNT(*) FROM implementations WHERE component_slug = ?",
+            "SELECT COUNT(*) FROM implementations WHERE component_slug = %s",
             (real_slug,),
-        ).fetchone()[0]
+        ).fetchone()["count"]
         conn.close()
         return {
             "slug": real_slug,
@@ -1283,13 +1282,14 @@ class MCPLRMServer:
             }
         try:
             rows = conn.execute(
-                "SELECT slug, name, description, aliases FROM components_fts WHERE components_fts MATCH ? LIMIT 10",
+                "SELECT slug, name, description, aliases FROM components "
+                "WHERE tsv @@ plainto_tsquery('simple', %s) LIMIT 10",
                 (query,),
             ).fetchall()
         except Exception:
             rows = conn.execute(
                 "SELECT slug, name, description, aliases FROM components "
-                "WHERE slug LIKE ? OR name LIKE ? OR aliases LIKE ? OR description LIKE ? LIMIT 10",
+                "WHERE slug LIKE %s OR name LIKE %s OR aliases LIKE %s OR description LIKE %s LIMIT 10",
                 (f"%{query}%",) * 4,
             ).fetchall()
         conn.close()
@@ -1317,12 +1317,12 @@ class MCPLRMServer:
                 "error": "Component Gallery DB not found. Run: python -m mcp_lrm.component_gallery_scraper"
             }
         rows = conn.execute(
-            "SELECT component_slug, component_name, url, tech FROM implementations WHERE ds_name LIKE ? ORDER BY component_slug",
+            "SELECT component_slug, component_name, url, tech FROM implementations WHERE ds_name LIKE %s ORDER BY component_slug",
             (f"%{ds_name}%",),
         ).fetchall()
         if not rows:
             ds_list = [
-                r[0]
+                r["ds_name"]
                 for r in conn.execute(
                     "SELECT DISTINCT ds_name FROM implementations ORDER BY ds_name"
                 )
@@ -1333,9 +1333,9 @@ class MCPLRMServer:
                 "available": ds_list,
             }
         actual_ds = conn.execute(
-            "SELECT DISTINCT ds_name FROM implementations WHERE ds_name LIKE ? LIMIT 1",
+            "SELECT DISTINCT ds_name FROM implementations WHERE ds_name LIKE %s LIMIT 1",
             (f"%{ds_name}%",),
-        ).fetchone()[0]
+        ).fetchone()["ds_name"]
         conn.close()
         return {
             "design_system": actual_ds,
