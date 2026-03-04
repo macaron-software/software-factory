@@ -27,49 +27,6 @@ modules:
     data_file: "data/component_gallery.db"
     builtin: true
 
-  - id: mdn-web-docs
-    name: "MDN Web Docs"
-    description: "Mozilla Developer Network reference for HTML, CSS, JavaScript APIs, Web APIs. Browser compatibility tables, syntax, examples, ARIA attributes."
-    category: ux-design
-    icon: "📖"
-    source_url: "https://developer.mozilla.org"
-    repo_url: "https://github.com/mdn/content"
-    license: "CC-BY-SA 2.5"
-    tools:
-      - mdn_search
-      - mdn_get_api
-      - mdn_compat
-    install: "python -m platform.modules.scrapers.mdn_scraper"
-    data_file: "data/mdn.db"
-
-  - id: can-i-use
-    name: "Can I Use"
-    description: "Browser support tables for HTML5, CSS3, JavaScript features. Essential for cross-browser compatibility decisions."
-    category: ux-design
-    icon: "🌐"
-    source_url: "https://caniuse.com"
-    repo_url: "https://github.com/nicehash/caniuse.com"
-    license: "CC-BY 4.0"
-    tools:
-      - caniuse_search
-      - caniuse_feature
-    install: "python -m platform.modules.scrapers.caniuse_scraper"
-    data_file: "data/caniuse.db"
-
-  - id: wcag-guidelines
-    name: "WCAG 2.1 / 2.2"
-    description: "Full Web Content Accessibility Guidelines (WCAG 2.1 + 2.2). Success criteria, techniques, failures. Essential for accessibility audits and a11y compliance."
-    category: ux-design
-    icon: "♿"
-    source_url: "https://www.w3.org/WAI/WCAG21/quickref/"
-    license: "W3C Document License"
-    tools:
-      - wcag_search
-      - wcag_criterion
-      - wcag_techniques
-    install: "python -m platform.modules.scrapers.wcag_scraper"
-    data_file: "data/wcag.db"
-
   # ── DEVELOPMENT ────────────────────────────────────────────────────────────
 
   - id: npm-registry
@@ -101,55 +58,56 @@ modules:
     requires:
       - "internet access"
 
-  - id: github-trending
-    name: "GitHub Trending"
-    description: "Trending repositories, developers, and topics on GitHub. Useful for technology watch, stack decisions, and finding best-of-breed libraries."
+  - id: scrapy
+    name: "Scrapy"
+    description: "Industrial-strength web scraping framework. Agents can use Scrapy spiders to harvest structured data from any website. Foundation for building custom knowledge scrapers."
     category: development
-    icon: "🔥"
-    source_url: "https://github.com/trending"
-    license: "Public scraping"
+    icon: "🕷️"
+    source_url: "https://scrapy.org"
+    repo_url: "https://github.com/scrapy/scrapy"
+    license: "BSD-3-Clause"
     tools:
-      - github_trending_repos
-      - github_trending_devs
-    install: "python -m platform.modules.scrapers.github_trending_scraper"
-    data_file: "data/github_trending.db"
+      - scrapy_run_spider
+      - scrapy_fetch_url
+    install: "pip install scrapy"
+    check_cmd: "python3 -c \"import scrapy\""
+    requires: []
+
+  - id: gsd
+    name: "GSD — Get Shit Done"
+    description: "Context engineering toolkit: prevents context rot, meta-prompting strategies, progressive summarization. Helps agents stay focused across long sessions without losing critical context."
+    category: development
+    icon: "🎯"
+    source_url: "https://github.com/gsd-build/get-shit-done"
+    license: "MIT"
+    tools:
+      - gsd_summarize_context
+      - gsd_apply_patterns
+    install: "npm install -g get-shit-done-cc"
+    check_cmd: "gsd --version"
+    requires: []
 
   # ── SECURITY ───────────────────────────────────────────────────────────────
 
-  - id: cve-nvd
-    name: "CVE / NVD Database"
-    description: "NIST National Vulnerability Database. Search CVEs by keyword, package, severity (CVSS). Agents can check dependencies for known vulnerabilities."
+  - id: trivy
+    name: "Trivy — Container & Repo Scanner"
+    description: "Aqua Security's open-source vulnerability scanner. Scans containers, repos, filesystems, and IaC for CVEs, misconfigs, and secrets. Integrates with sast_check workflow."
     category: security
-    icon: "🔒"
-    source_url: "https://nvd.nist.gov"
-    license: "Public domain (US Gov)"
+    icon: "🔍"
+    source_url: "https://trivy.dev"
+    repo_url: "https://github.com/aquasecurity/trivy"
+    license: "Apache-2.0"
     tools:
-      - cve_search
-      - cve_get
-      - cve_by_package
-    install: "python -m platform.modules.scrapers.nvd_scraper"
-    data_file: "data/nvd.db"
-    requires:
-      - "NVD_API_KEY (optional, for higher rate limits)"
-
-  - id: owasp-top10
-    name: "OWASP Top 10"
-    description: "OWASP Top 10 Web Application Security Risks (2021 + API Security 2023). Includes attack descriptions, prevention techniques, code examples."
-    category: security
-    icon: "🛡️"
-    source_url: "https://owasp.org/Top10/"
-    repo_url: "https://github.com/OWASP/Top10"
-    license: "CC-BY-SA 3.0"
-    tools:
-      - owasp_list
-      - owasp_get_risk
-      - owasp_prevention
-    install: "python -m platform.modules.scrapers.owasp_scraper"
-    data_file: "data/owasp.db"
+      - trivy_scan_repo
+      - trivy_scan_image
+      - trivy_scan_fs
+    install: "brew install trivy  # or: apt-get install trivy"
+    check_cmd: "trivy --version"
+    requires: []
 
   - id: snyk-vuln
     name: "Snyk Vulnerability DB"
-    description: "Snyk open-source vulnerability database for npm, PyPI, Maven, Go packages. Richer than NVD for library-level CVEs."
+    description: "Snyk open-source vulnerability database for npm, PyPI, Maven, Go packages. Richer than NVD for library-level CVEs. Free tier API."
     category: security
     icon: "🐛"
     source_url: "https://security.snyk.io"
@@ -161,125 +119,49 @@ modules:
     requires:
       - "SNYK_TOKEN (optional)"
 
-  # ── LEGAL / COMPLIANCE ─────────────────────────────────────────────────────
+  - id: landlock
+    name: "Landlock Sandbox"
+    description: "Linux kernel sandboxing (Landlock LSM) for agent tool isolation. Restricts filesystem and network access per-agent. Binary bundled at platform/tools/sandbox/landlock-runner."
+    category: security
+    icon: "🔒"
+    source_url: "https://landlock.io"
+    repo_url: "https://github.com/landlock-lsm/go-landlock"
+    license: "MIT"
+    tools: []
+    install: "# bundled — no install needed"
+    check_cmd: "platform/tools/sandbox/landlock-runner --version"
+    builtin: true
+    config_key: "security.landlock_enabled"
 
-  - id: spdx-licenses
-    name: "SPDX License Catalog"
-    description: "Full SPDX open source license catalog (700+ licenses). Agents can check license compatibility, copyleft implications, and suggest SPDX identifiers."
-    category: legal
-    icon: "⚖️"
-    source_url: "https://spdx.org/licenses/"
-    repo_url: "https://github.com/spdx/spdx-spec"
-    license: "CC0 1.0"
-    tools:
-      - license_search
-      - license_get
-      - license_compatible
-    install: "python -m platform.modules.scrapers.spdx_scraper"
-    data_file: "data/spdx.db"
+  # ── DEVOPS / INFRA ─────────────────────────────────────────────────────────
 
-  - id: gdpr-knowledge
-    name: "GDPR Knowledge Base"
-    description: "GDPR articles, recitals, EDPB guidelines, CNIL guidelines (FR). Agents can assess data processing compliance, consent requirements, retention policies."
-    category: legal
-    icon: "🇪🇺"
-    source_url: "https://gdpr-info.eu"
-    license: "Public data"
-    tools:
-      - gdpr_search
-      - gdpr_article
-      - gdpr_checklist
-    install: "python -m platform.modules.scrapers.gdpr_scraper"
-    data_file: "data/gdpr.db"
-
-  # ── MARKETING / SEO ────────────────────────────────────────────────────────
-
-  - id: lighthouse-patterns
-    name: "Lighthouse / Core Web Vitals"
-    description: "Google Lighthouse audit rules, Core Web Vitals thresholds (LCP, FID, CLS, INP), and performance optimization patterns."
-    category: marketing-seo
+  - id: rtk
+    name: "RTK — Rust Token Killer"
+    description: "Token compression CLI for LLM pipelines. Reduces tokens by 40-90% via diff-style output, aggressive log filtering, signature extraction. Tracks savings per command and provider."
+    category: infra
     icon: "⚡"
-    source_url: "https://developer.chrome.com/docs/lighthouse/overview/"
-    license: "Apache 2.0"
-    tools:
-      - lighthouse_audit_rules
-      - cwv_thresholds
-      - performance_patterns
-    install: "python -m platform.modules.scrapers.lighthouse_scraper"
-    data_file: "data/lighthouse.db"
-
-  - id: schema-org
-    name: "Schema.org Structured Data"
-    description: "Schema.org vocabulary for structured data (JSON-LD). 900+ types including Product, Article, Person, Organization, FAQPage. SEO + rich snippets."
-    category: marketing-seo
-    icon: "📊"
-    source_url: "https://schema.org"
-    license: "CC-BY-SA 4.0"
-    tools:
-      - schema_search
-      - schema_type_get
-      - schema_example
-    install: "python -m platform.modules.scrapers.schema_scraper"
-    data_file: "data/schema_org.db"
-
-  - id: og-protocol
-    name: "Open Graph + Twitter Card"
-    description: "Open Graph Protocol and Twitter/X Card meta tags spec. Agents can generate complete OG markup for any page type (article, product, video, website)."
-    category: marketing-seo
-    icon: "🔗"
-    source_url: "https://ogp.me"
+    source_url: "https://github.com/macaron-software/rtk"
     license: "MIT"
     tools:
-      - og_generate
-      - og_validate
-    install: "# no install — static knowledge"
-    data_file: null
+      - rtk_run
+      - rtk_wrap
+    install: "# bundled — available at ~/.local/bin/rtk"
+    check_cmd: "rtk --version"
+    builtin: true
 
-  # ── DATA / ANALYTICS ───────────────────────────────────────────────────────
-
-  - id: sql-patterns
-    name: "SQL Patterns & Anti-patterns"
-    description: "Common SQL optimization patterns, anti-patterns, index strategies, window functions, CTE recipes. Covers PostgreSQL, SQLite, MySQL."
-    category: data
-    icon: "🗄️"
-    source_url: "https://use-the-index-luke.com"
-    license: "CC-BY-NC-ND 4.0"
-    tools:
-      - sql_pattern_search
-      - sql_antipattern_check
-    install: "python -m platform.modules.scrapers.sql_patterns_scraper"
-    data_file: "data/sql_patterns.db"
-
-  - id: regex-library
-    name: "Regex Library"
-    description: "Curated library of 200+ production-tested regex patterns for email, URL, IP, phone, postal codes, dates, credit cards. With test cases."
-    category: data
-    icon: "🔤"
-    source_url: "https://ihateregex.io"
-    repo_url: "https://github.com/nicehash/ihateregex"
-    license: "MIT"
-    tools:
-      - regex_search
-      - regex_get
-      - regex_test
-    install: "python -m platform.modules.scrapers.regex_scraper"
-    data_file: "data/regex_library.db"
+  - id: error-monitoring
+    name: "Error Monitoring Pipeline"
+    description: "Airweave-inspired error clustering and triage pipeline. Groups similar errors by fingerprint, auto-assigns severity, triggers agent remediation. Implements ops/error_clustering.py + error_state.py."
+    category: infra
+    icon: "🚨"
+    source_url: "https://github.com/airweave-ai/error-monitoring-agent"
+    license: "MIT (ported concepts)"
+    tools: []
+    install: "# bundled — no install needed"
+    check_cmd: "python3 -c \"from platform.ops.error_clustering import ErrorClusteringPipeline\""
+    builtin: true
 
   # ── AI / LLM ───────────────────────────────────────────────────────────────
-
-  - id: prompt-patterns
-    name: "Prompt Engineering Patterns"
-    description: "Catalog of LLM prompt engineering patterns: Chain-of-Thought, ReAct, Tree-of-Thought, few-shot, RAG patterns. With examples and failure modes."
-    category: ai-llm
-    icon: "🤖"
-    source_url: "https://www.promptingguide.ai"
-    repo_url: "https://github.com/dair-ai/Prompt-Engineering-Guide"
-    license: "MIT"
-    tools:
-      - prompt_pattern_list
-      - prompt_pattern_get
-    install: "python -m platform.modules.scrapers.prompt_patterns_scraper"
-    data_file: "data/prompt_patterns.db"
 
   - id: huggingface-models
     name: "HuggingFace Model Hub"
@@ -295,6 +177,23 @@ modules:
     install: "# live API — set HF_TOKEN for private models"
     requires:
       - "HF_TOKEN (optional)"
+
+  - id: mflux
+    name: "mflux — Apple Silicon Image Gen"
+    description: "Local image generation on Apple Silicon (M1/M2/M3/M4) via MLX. Run FLUX models locally without API keys. Requires macOS + Apple Silicon."
+    category: ai-llm
+    icon: "🍎"
+    source_url: "https://github.com/filipstrand/mflux"
+    license: "MIT"
+    tools:
+      - mflux_generate
+    install: "pip install mflux"
+    check_cmd: "python3 -c \"import mflux\""
+    requires:
+      - "Apple Silicon (M1/M2/M3/M4)"
+      - "macOS"
+
+  # ── KNOWLEDGE ──────────────────────────────────────────────────────────────
 
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"

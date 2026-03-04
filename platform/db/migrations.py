@@ -270,7 +270,6 @@ def _migrate_pg(conn):
         ("last_resume_at", "TEXT"),
         ("human_input_required", "INTEGER DEFAULT 0"),
         ("llm_cost_usd", "DOUBLE PRECISION DEFAULT 0.0"),
-        ("context_json", "TEXT DEFAULT '{}'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE epic_runs ADD COLUMN IF NOT EXISTS {col} {defn}")
@@ -450,7 +449,7 @@ def _migrate_pg(conn):
             "Semgrep",
             "github_tool",
             "security",
-            "https://avatars.githubusercontent.com/u/12060499?s=48",
+            "https://cdn.simpleicons.org/semgrep/white",
             "Semgrep is a fast, lightweight static analysis engine with 2000+ ready-made rules for OWASP Top 10, secrets detection, and code quality across 30+ languages. Security agents run Semgrep on every code change and block deployments when critical security findings are detected.",
             '{"repo_url":"https://github.com/returntocorp/semgrep","ruleset":"auto"}',
             '["security","dev","qa","reviewer"]',
@@ -480,7 +479,7 @@ def _migrate_pg(conn):
             "Renovate",
             "github_tool",
             "devops",
-            "https://avatars.githubusercontent.com/u/38629047?s=48",
+            "https://cdn.simpleicons.org/renovatebot/white",
             "Renovate automatically opens pull requests to keep all project dependencies up to date across npm, pip, Maven, Gradle, Docker, and more. DevOps agents use it to enforce patch-level auto-merge policies and flag major version upgrades for human review in the sprint backlog.",
             '{"repo_url":"https://github.com/renovatebot/renovate","auto_merge":"patch"}',
             '["dev","architecture","security"]',
@@ -510,7 +509,7 @@ def _migrate_pg(conn):
             "Mermaid",
             "github_tool",
             "architecture",
-            "https://avatars.githubusercontent.com/u/57169982?s=48",
+            "https://cdn.simpleicons.org/mermaidjs/white",
             "Mermaid.js is the leading diagrams-as-code library for flowcharts, sequence diagrams, ER models, Gantt charts, and C4 architecture. Architecture agents generate Mermaid diagrams automatically in documentation and ADRs to keep visual representations in sync with code.",
             '{"repo_url":"https://github.com/mermaid-js/mermaid"}',
             '["architecture","dev","product"]',
@@ -562,17 +561,6 @@ def _migrate_pg(conn):
             "VALUES (?,?,?,?,?,?,?,?)",
             (iid, name, itype, category, icon, desc, cfg, roles),
         )
-    # Fix broken simpleicons URLs that return 404 → GitHub avatars
-    _icon_fixes = {
-        "semgrep": "https://avatars.githubusercontent.com/u/12060499?s=48",
-        "renovate": "https://avatars.githubusercontent.com/u/38629047?s=48",
-        "mermaid": "https://avatars.githubusercontent.com/u/57169982?s=48",
-    }
-    for iid, icon_url in _icon_fixes.items():
-        conn.execute(
-            "UPDATE integrations SET icon=? WHERE id=? AND icon LIKE ?",
-            (icon_url, iid, "%simpleicons.org%"),
-        )
 
     # ── user_project_roles (RBAC per-project) ──────────────────────────────
     conn.execute("""
@@ -618,7 +606,6 @@ def _migrate_pg(conn):
     except Exception:
         pass
 
-    _ensure_darwin_tables(conn)
     conn.commit()
 
 
@@ -940,6 +927,15 @@ def _ensure_darwin_tables(conn) -> None:
             "🔁",
             "Access to all open image models (Flux, SDXL, custom LoRAs). Good for style-consistent asset libraries. Set REPLICATE_API_TOKEN.",
             '{"env_key": "REPLICATE_API_TOKEN", "base_url": "https://api.replicate.com/v1", "models": ["black-forest-labs/flux-1.1-pro", "stability-ai/sdxl"]}',
+        ),
+        (
+            "image-gen-mflux",
+            "mflux — Apple Silicon",
+            "image-gen",
+            "ai-llm",
+            "🍎",
+            "Local FLUX image generation on Apple Silicon (M1/M2/M3/M4) via MLX. No API key needed — runs fully offline. Install: pip install mflux. macOS only.",
+            '{"local": true, "models": ["flux-schnell", "flux-dev"], "requires": "Apple Silicon + macOS"}',
         ),
     ]:
         conn.execute(

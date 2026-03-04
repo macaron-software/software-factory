@@ -9,6 +9,7 @@ GET  /api/modules/categories → list categories
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,7 +21,7 @@ from fastapi.responses import JSONResponse
 
 
 try:
-    from platform.db.migrations import get_db
+    from platform.agents.store import get_db
 
     _has_db = True
 except Exception:
@@ -28,8 +29,8 @@ except Exception:
 
 router = APIRouter()
 
-REGISTRY_PATH = Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
-DATA_DIR = Path(__file__).parent.parent.parent.parent.parent / "data"
+REGISTRY_PATH = Path(__file__).parent.parent.parent / "modules" / "registry.yaml"
+DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
 
 
 def _load_registry() -> list[Dict]:
@@ -66,8 +67,7 @@ def _set_enabled_ids(ids: set[str]) -> None:
 
         db = get_db()
         db.execute(
-            "INSERT INTO settings(key, value) VALUES('enabled_modules', ?) "
-            "ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value",
+            "INSERT OR REPLACE INTO settings(key, value) VALUES('enabled_modules', ?)",
             (json.dumps(sorted(ids)),),
         )
         db.commit()
@@ -76,7 +76,27 @@ def _set_enabled_ids(ids: set[str]) -> None:
 
 
 def _is_installed(module: Dict) -> bool:
-    """Check whether the module's data file exists (or no data file required)."""
+    """Check whether a module is installed.
+
+    Priority:
+    1. check_cmd → run it; exit 0 = installed
+    2. data_file → check file exists
+    3. No check → assume True (live API / static)
+    """
+    check_cmd = module.get("check_cmd", "")
+    if check_cmd:
+        # Fast path: single binary in PATH
+        binary = check_cmd.split()[0]
+        if not check_cmd.startswith("python") and shutil.which(binary):
+            return True
+        try:
+            result = subprocess.run(
+                check_cmd, shell=True, capture_output=True, timeout=5
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
     data_file = module.get("data_file")
     if not data_file:
         return True
@@ -84,23 +104,11 @@ def _is_installed(module: Dict) -> bool:
     return path.exists()
 
 
-def _is_install_ready(module: Dict) -> bool:
-    """Return False for scrapers that haven't been written yet."""
-    install = module.get("install", "")
-    if not install or install.startswith("#"):
-        return True
-    # platform.modules.scrapers.* don't exist yet
-    if "platform.modules.scrapers" in install:
-        return False
-    return True
-
-
 def _enrich(module: Dict, enabled_ids: set[str]) -> Dict:
     return {
         **module,
         "enabled": module["id"] in enabled_ids,
         "installed": _is_installed(module),
-        "install_ready": _is_install_ready(module),
     }
 
 
@@ -157,22 +165,27 @@ async def install_module(module_id: str):
         return JSONResponse(
             {"ok": True, "message": "No install required", "already_installed": True}
         )
-    if not _is_install_ready(module):
-        return JSONResponse(
-            {
-                "ok": False,
-                "error": "Scraper not yet implemented for this module — coming soon.",
-            },
-            status_code=501,
-        )
+
+    # Determine how to run the install command
+    first_token = install_cmd.split()[0]
+    if (
+        first_token == "python"
+        or first_token == "python3"
+        or first_token == sys.executable
+    ):
+        cmd = [sys.executable] + install_cmd.split()[1:]
+    elif first_token in ("pip", "pip3"):
+        cmd = [sys.executable, "-m", "pip"] + install_cmd.split()[1:]
+    elif first_token == "npm":
+        cmd = install_cmd.split()
+    elif first_token == "brew":
+        cmd = install_cmd.split()
+    else:
+        cmd = install_cmd.split()
 
     try:
         result = subprocess.run(
-            [sys.executable] + install_cmd.split()[1:],  # strip "python -m ..."
-            capture_output=True,
-            text=True,
-            timeout=300,
-            cwd=str(DATA_DIR.parent),
+            cmd, capture_output=True, text=True, timeout=300, cwd=str(DATA_DIR.parent)
         )
         return JSONResponse(
             {

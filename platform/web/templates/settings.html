@@ -64,10 +64,6 @@
 .llm-ab-badge.pending{background:rgba(234,179,8,.15);color:#eab308}
 .llm-ab-badge.won-a{background:rgba(34,197,94,.15);color:#22c55e}
 .llm-ab-badge.won-b{background:rgba(168,85,247,.15);color:#a855f7}
-@keyframes sk-pulse{0%,100%{opacity:.35}50%{opacity:.7}}
-.sk{background:var(--border);border-radius:4px;animation:sk-pulse 1.4s ease-in-out infinite}
-.sk-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem;display:flex;flex-direction:column;gap:.6rem}
-.sk-row{display:flex;align-items:center;gap:.8rem}
 </style>
 
 <div class="settings-page">
@@ -141,58 +137,6 @@
                     <svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;margin-right:3px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     Voir les annotations SF
                 </a>
-            </div>
-        </section>
-        <section class="settings-section">
-            <h3>
-                <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><polyline points="8 21 12 17 16 21"/></svg>
-                Distributed Infrastructure
-            </h3>
-            <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1rem">
-                Read-only. Configure via env vars on each node (.env or Infisical).
-            </p>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.6rem;font-size:0.82rem">
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Database</div>
-                    <span style="font-weight:600;color:{% if infra.db_type == 'postgresql' %}#4ade80{% else %}#facc15{% endif %}">{{ infra.db_type }}</span>
-                    {% if infra.pg_dsn %}<div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem;font-family:var(--font-mono)">{{ infra.pg_dsn }}</div>{% endif %}
-                </div>
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Redis</div>
-                    {% if infra.redis_url %}
-                    <span style="font-weight:600;color:#4ade80">connected</span>
-                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem;font-family:var(--font-mono)">{{ infra.redis_url }}</div>
-                    {% else %}
-                    <span style="font-weight:600;color:#facc15">not configured</span>
-                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">Rate limit: in-memory only</div>
-                    {% endif %}
-                </div>
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Node ID</div>
-                    <span style="font-weight:600;font-family:var(--font-mono)">{{ infra.node_id }}</span>
-                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">Set SF_NODE_ID env var to override</div>
-                </div>
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Graceful Drain</div>
-                    <span style="font-weight:600">{{ infra.drain_timeout }}s</span>
-                    <div style="color:var(--text-secondary);font-size:0.72rem;margin-top:0.2rem">SF_DRAIN_TIMEOUT_S · <a href="/api/ready" target="_blank" style="color:var(--purple-light)">/api/ready</a></div>
-                </div>
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Secrets (Infisical)</div>
-                    {% if infra.infisical %}
-                    <span style="font-weight:600;color:#4ade80">active</span>
-                    {% else %}
-                    <span style="font-weight:600;color:var(--text-secondary)">.env only</span>
-                    {% endif %}
-                </div>
-                <div style="padding:0.6rem 0.8rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
-                    <div style="color:var(--text-secondary);font-size:0.7rem;text-transform:uppercase;letter-spacing:.4px;margin-bottom:0.3rem">Dist. Patterns</div>
-                    <div style="display:flex;flex-direction:column;gap:0.15rem;margin-top:0.1rem">
-                        <span style="font-size:0.72rem">{% if infra.db_type == 'postgresql' %}<span style="color:#4ade80">PG advisory lock</span>{% else %}<span style="color:#6b7280">advisory lock (SQLite)</span>{% endif %}</span>
-                        <span style="font-size:0.72rem">{% if infra.redis_url %}<span style="color:#4ade80">Redis rate limit</span>{% else %}<span style="color:#6b7280">in-memory rate limit</span>{% endif %}</span>
-                        <span style="font-size:0.72rem">{% if infra.redis_url %}<span style="color:#4ade80">leader election</span>{% else %}<span style="color:#6b7280">no leader election</span>{% endif %}</span>
-                    </div>
-                </div>
             </div>
         </section>
     </div>
@@ -308,6 +252,7 @@
                 <span>RAM <strong id="li-ram">—</strong></span>
                 <span>Active missions <strong id="li-missions">—</strong></span>
                 <span>Score <strong id="li-score">—</strong></span>
+                <button type="button" onclick="refreshLoad()" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-secondary);padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.78rem">Refresh</button>
               </div>
 
               <hr style="border-color:var(--border);margin:0.2rem 0">
@@ -346,10 +291,10 @@
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
               <!-- Worker nodes -->
-              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes (optional)</div>
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
-                Optional: missions dispatched to least-loaded node via <code>/api/metrics/load</code>.
-                In HA clusters (SF Innovation), nginx handles routing — leave empty and configure upstream health checks in nginx instead.
+                Missions are dispatched to the least-loaded node. Each node must expose <code>/api/metrics/load</code>.
+                Leave empty to run everything locally.
               </div>
               <div class="form-group">
                 <label>Node URLs (one per line)</label>
@@ -430,7 +375,7 @@
                         <div class="integ-field">
                             <label>{{ key|replace('_',' ')|title }}</label>
                             {% if 'token' in key or 'secret' in key or 'password' in key or 'api_key' in key or 'key_id' in key or 'client_secret' in key %}
-                            <input type="password" placeholder="••••••••" autocomplete="new-password" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            <input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif 'url' in key or key == 'instance' or key == 'domain' %}
                             <input type="url" placeholder="https://..." value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif val is sameas true or val is sameas false %}
@@ -617,9 +562,7 @@
         <section class="settings-section">
             <h3>Providers</h3>
             <div id="llm-providers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem">
-                <div class="sk-card"><div class="sk-row"><div class="sk" style="width:40px;height:40px;border-radius:8px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:14px;width:60%;margin-bottom:6px"></div><div class="sk" style="height:11px;width:40%"></div></div></div><div class="sk" style="height:11px;width:80%"></div><div class="sk" style="height:32px;width:100%;border-radius:6px"></div></div>
-                <div class="sk-card"><div class="sk-row"><div class="sk" style="width:40px;height:40px;border-radius:8px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:14px;width:55%;margin-bottom:6px"></div><div class="sk" style="height:11px;width:35%"></div></div></div><div class="sk" style="height:11px;width:70%"></div><div class="sk" style="height:32px;width:100%;border-radius:6px"></div></div>
-                <div class="sk-card"><div class="sk-row"><div class="sk" style="width:40px;height:40px;border-radius:8px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:14px;width:65%;margin-bottom:6px"></div><div class="sk" style="height:11px;width:45%"></div></div></div><div class="sk" style="height:11px;width:75%"></div><div class="sk" style="height:32px;width:100%;border-radius:6px"></div></div>
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
             </div>
         </section>
 
@@ -644,9 +587,7 @@
                     </tr>
                 </thead>
                 <tbody id="routing-tbody">
-                    <tr><td style="padding:.5rem .8rem"><div class="sk" style="height:13px;width:120px"></div><div class="sk" style="height:10px;width:80px;margin-top:4px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td></tr>
-                    <tr><td style="padding:.5rem .8rem"><div class="sk" style="height:13px;width:100px"></div><div class="sk" style="height:10px;width:70px;margin-top:4px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td></tr>
-                    <tr><td style="padding:.5rem .8rem"><div class="sk" style="height:13px;width:130px"></div><div class="sk" style="height:10px;width:90px;margin-top:4px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td><td style="padding:.5rem .8rem"><div class="sk" style="height:28px;width:140px;border-radius:6px"></div></td></tr>
+                    <tr><td colspan="3" style="padding:1rem;color:var(--text-secondary)">Loading...</td></tr>
                 </tbody>
             </table>
             </div>
@@ -670,7 +611,7 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Best quality for general assets, backgrounds, concept art. ~$0.05/image.</p>
-                    <input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="new-password"
+                    <input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
                         oninput="markImageProviderDirty('falai')">
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('falai')" style="font-size:0.72rem">
@@ -690,7 +631,7 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Purpose-built for pixel art game assets. Sprite sheets, rotations, animation frames.</p>
-                    <input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="new-password"
+                    <input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
                         oninput="markImageProviderDirty('pixellab')">
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('pixellab')" style="font-size:0.72rem">
@@ -710,7 +651,7 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">UI mockups, screens & flows. Generate full interface designs from a prompt, then feed image to Claude to implement. Uses your existing GEMINI_API_KEY.</p>
-                    <input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="new-password"
+                    <input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
                         oninput="markImageProviderDirty('gemini-image')">
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('gemini-image')" style="font-size:0.72rem">
@@ -730,7 +671,7 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Access to all open models (Flux, SDXL + LoRAs). Good for experimentation and style-consistent asset libraries.</p>
-                    <input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="new-password"
+                    <input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
                         oninput="markImageProviderDirty('replicate')">
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('replicate')" style="font-size:0.72rem">
@@ -757,33 +698,17 @@
     <!-- ═══ Modules ═══ -->
     <div class="settings-panel" id="panel-modules">
         <section class="settings-section">
-            <div style="margin-bottom:0.5rem">
-                <h3 style="margin:0">Optional Modules</h3>
-                <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <div>
+                    <h3 style="margin:0">Optional Modules</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
+                </div>
+                <button class="btn btn-sm" onclick="document.getElementById('modules-container').dataset.loaded='';loadModulesTab()">
+                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
+                </button>
             </div>
             <div id="modules-container">
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-top:0.5rem">
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:55%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:80%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:65%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:75%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:50%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:70%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:60%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:85%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:45%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:65%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:70%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:60%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                </div>
-            </div>
-        </section>
-
-        <section class="settings-section" style="margin-top:1.5rem">
-            <div style="margin-bottom:0.5rem">
-                <h3 style="margin:0">MCP LRM Servers</h3>
-                <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Built-in MCP servers available to agents. Toggle to start/stop in real time.</p>
-            </div>
-            <div id="rlm-container">
-                <div class="modules-grid">
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:55%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:40%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:45%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:35%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                    <div class="sk-card"><div class="sk-row"><div class="sk" style="width:32px;height:32px;border-radius:6px;flex-shrink:0"></div><div style="flex:1"><div class="sk" style="height:13px;width:60%;margin-bottom:5px"></div><div class="sk" style="height:10px;width:30%"></div></div><div class="sk" style="width:34px;height:18px;border-radius:9px;flex-shrink:0"></div></div></div>
-                </div>
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
             </div>
         </section>
     </div>
@@ -855,9 +780,7 @@
 <script>
 const _CAT_LABELS = {
   'ux-design':'🎨 UX / Design','development':'💻 Development','security':'🔒 Security',
-  'legal':'⚖️ Legal / Compliance','marketing-seo':'📣 Marketing / SEO','data':'🗄️ Data',
-  'ai-llm':'🤖 AI / LLM','infra':'🏗️ Infrastructure','browser':'🌐 Browser / Automation',
-  'knowledge':'📐 Knowledge','other':'📦 Other'
+  'infra':'⚙️ Infra / DevOps','ai-llm':'🤖 AI / LLM','knowledge':'📚 Knowledge','legal':'⚖️ Legal','marketing-seo':'📣 Marketing','data':'🗄️ Data'
 };
 
 async function loadModulesTab() {
@@ -865,14 +788,9 @@ async function loadModulesTab() {
     if (!container || container.dataset.loaded) return;
     container.dataset.loaded = '1';
     try {
-        const [modRes, mcpRes] = await Promise.all([
-            fetch('/api/modules'),
-            fetch('/api/mcps/status'),
-        ]);
-        const modules = await modRes.json();
-        const mcpData = await mcpRes.json();
+        const r = await fetch('/api/modules');
+        const modules = await r.json();
         renderModules(modules);
-        renderRlmSection(mcpData.mcps || []);
     } catch(e) {
         container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
     }
@@ -888,7 +806,7 @@ function renderModules(modules) {
         byCat[c].push(m);
     });
 
-    const catOrder = ['ux-design','development','security','legal','marketing-seo','data','ai-llm','infra','browser','knowledge','other'];
+    const catOrder = ['ux-design','development','security','infra','ai-llm','knowledge','legal','marketing-seo','data','other'];
     let html = '';
     catOrder.filter(c => byCat[c]).forEach(cat => {
         const label = _CAT_LABELS[cat] || cat;
@@ -904,16 +822,9 @@ function renderModules(modules) {
 function moduleCard(m) {
     const tools = (m.tools || []).map(t => `<code>${t}</code>`).join(' ');
     const needsInstall = m.data_file && !m.installed;
-    let installBtn;
-    if (!m.install_ready) {
-        installBtn = `<span style="font-size:0.72rem;color:var(--text-secondary);opacity:.6" title="Scraper not yet implemented">🚧 Coming soon</span>`;
-    } else if (needsInstall) {
-        installBtn = `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`;
-    } else if (m.installed && m.data_file) {
-        installBtn = `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>`;
-    } else {
-        installBtn = `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`;
-    }
+    const installBtn = needsInstall
+        ? `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`
+        : (m.installed && m.data_file ? `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>` : `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`);
     const repoLink = m.repo_url ? `<a href="${m.repo_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">GitHub ↗</a>` : '';
     const srcLink = m.source_url ? `<a href="${m.source_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">${m.name} ↗</a>` : '';
     return `
@@ -943,57 +854,6 @@ function moduleCard(m) {
             ${repoLink}
         </div>
     </div>`;
-}
-
-function renderRlmSection(mcps) {
-    const el = document.getElementById('rlm-container');
-    if (!el) return;
-    if (!mcps.length) { el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">No MCP servers found.</p>'; return; }
-    const icons = {'mcp-fetch':'🌐','mcp-memory':'🧠','mcp-playwright':'🎭','mcp-github':'🐙','mcp-solaris':'☀️','mcp-jira':'📋','mcp-confluence':'📚'};
-    let h = '<div class="modules-grid">';
-    for (const m of mcps) {
-        const running = m.status === 'running';
-        h += `<div class="module-card ${running?'enabled':''}" id="mcp-card-${m.id}">
-            <div class="module-card-header">
-                <span class="module-icon">${icons[m.id]||'⚙️'}</span>
-                <div class="module-info">
-                    <div class="module-name">${m.name}</div>
-                    <div class="module-desc">${m.tools_count} tool${m.tools_count!==1?'s':''} · ${m.is_builtin?'built-in':''}</div>
-                    <div class="module-meta">
-                        <span class="module-cat-badge" style="background:${running?'rgba(34,197,94,.1)':'rgba(255,255,255,.05)'};color:${running?'var(--green)':'var(--text-secondary)'};border-color:${running?'var(--green)':'var(--border)'}">
-                            ${running?'● running':'○ stopped'}
-                        </span>
-                        ${m.pid?`<span class="module-cat-badge">pid ${m.pid}</span>`:''}
-                    </div>
-                </div>
-                <label style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleMcp(event,'${m.id}','${m.status}')">
-                    <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${running?'var(--green)':'var(--border)'};transition:background .2s" id="mcp-track-${m.id}">
-                        <span style="position:absolute;top:2px;left:${running?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mcp-thumb-${m.id}"></span>
-                    </span>
-                </label>
-            </div>
-        </div>`;
-    }
-    h += '</div>';
-    el.innerHTML = h;
-}
-
-async function toggleMcp(event, id, currentStatus) {
-    event.preventDefault();
-    const running = currentStatus === 'running';
-    const track = document.getElementById('mcp-track-'+id);
-    const thumb = document.getElementById('mcp-thumb-'+id);
-    const card  = document.getElementById('mcp-card-'+id);
-    const action = running ? 'stop' : 'start';
-    try {
-        track.style.background = 'var(--border)'; thumb.style.left = '2px'; // optimistic
-        const r = await fetch(`/api/mcps/${id}/${action}`, {method:'POST'});
-        const d = await r.json();
-        // Refresh MCP section
-        const mcpRes = await fetch('/api/mcps/status');
-        const mcpData = await mcpRes.json();
-        renderRlmSection(mcpData.mcps || []);
-    } catch(e) { console.error(e); }
 }
 
 async function toggleModule(event, id) {
@@ -1033,7 +893,6 @@ async function installModule(id, btn) {
 </script>
 
 <script>
-let _loadPollTimer = null;
 function showSettingsTab(id) {
     document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
@@ -1581,7 +1440,7 @@ async function loadLLMABTests() {
 </div>
 
 <!-- Deploy Target Modal -->
-<div id="dt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+<div id="dt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center">
     <div style="background:var(--bg-card);border-radius:12px;padding:1.5rem;width:500px;max-width:95vw;max-height:80vh;overflow-y:auto">
         <h3 id="dt-modal-title" style="margin:0 0 1rem">Add Deploy Target</h3>
         <form id="dt-form" onsubmit="dtSave(event)">
@@ -1840,11 +1699,11 @@ window.showSettingsTab = function(tab) {
                 </label>
                 <label style="display:block">
                     <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Client ID (SP) *</span>
-                    <input id="prov-client-id" type="text" class="settings-input" autocomplete="username" required style="width:100%;margin-top:0.2rem">
+                    <input id="prov-client-id" type="text" class="settings-input" required style="width:100%;margin-top:0.2rem">
                 </label>
                 <label style="display:block">
                     <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Client Secret *</span>
-                    <input id="prov-client-secret" type="password" class="settings-input" autocomplete="new-password" required style="width:100%;margin-top:0.2rem">
+                    <input id="prov-client-secret" type="password" class="settings-input" required style="width:100%;margin-top:0.2rem">
                 </label>
                 <label style="display:block">
                     <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Resource Group</span>
