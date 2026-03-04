@@ -384,12 +384,13 @@ class ProjectRLM:
         elif findings:
             urgency = f"\nYou have {len(findings)} findings. If you can answer the query, emit FINAL_ANSWER now.\n"
 
+        context_block = f"PROJECT CONTEXT:\n{context[:2000]}" if context else ""
         return f'''Project: "{self.project_name}" at {self.project_path}
 Iteration {iteration + 1}/{max_iterations}.
 {urgency}
 USER QUERY: {query}
 
-{f"PROJECT CONTEXT:\n{context[:2000]}" if context else ""}
+{context_block}
 
 FINDINGS SO FAR:
 {findings_text}
