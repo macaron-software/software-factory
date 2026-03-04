@@ -865,7 +865,7 @@ async function loadThompsonScores() {
 
         const tbody = document.getElementById('ts-tbody');
         if (!d.agents.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donnée — les scores s\'accumulent en cours d'epic</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donn\u00e9e \u2014 les scores s\'accumulent en cours d\'epic</td></tr>';
             return;
         }
         tbody.innerHTML = d.agents.map(a => {
