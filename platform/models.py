@@ -372,6 +372,7 @@ class EpicRun(BaseModel):
     phases: list[PhaseRun] = Field(default_factory=list)
     brief: str = ""
     llm_cost_usd: float = 0.0  # accumulated LLM cost for this mission
+    context: dict = Field(default_factory=dict)  # runtime context (e.g. target_branch)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
