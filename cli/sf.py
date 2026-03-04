@@ -2,7 +2,7 @@
 """sf — Software Factory CLI.
 
 Full-featured CLI mirroring all web dashboard functionality.
-Dual mode: API (server) or DB (offline/direct sqlite3).
+Dual mode: API (server) or DB (direct PostgreSQL via DATABASE_URL).
 
 Usage:
     sf status
@@ -69,11 +69,16 @@ def get_backend(args):
     try:
         from cli._db import DBBackend
 
-        db_path = getattr(args, "db_path", None) or os.environ.get("SF_DB_PATH")
-        return DBBackend(db_path)
-    except FileNotFoundError:
-        out.error(f"No server at {args.url} and no local DB found")
-        out.error("Use --url URL or --db-path PATH")
+        pg_url = (
+            getattr(args, "db_path", None)
+            or os.environ.get("SF_DB_PATH")
+            or os.environ.get("DATABASE_URL")
+        )
+        return DBBackend(pg_url)
+    except (RuntimeError, ImportError) as e:
+        out.error(f"No server at {args.url} and no PostgreSQL connection available")
+        out.error(str(e))
+        out.error("Set DATABASE_URL or use --url URL")
         sys.exit(1)
 
 
@@ -595,6 +600,7 @@ def cmd_ideation_list(args):
 
 # ── CTO / Jarvis ──
 
+
 def cmd_jarvis(args):
     """Send a message to Jarvis (CTO agent) via /api/cto/message — stored in Jarvis history."""
     b = get_backend(args)
@@ -602,7 +608,7 @@ def cmd_jarvis(args):
     session_id = getattr(args, "session_id", None) or ""
 
     if not message:
-        out.error("Usage: sf jarvis \"your question\"")
+        out.error('Usage: sf jarvis "your question"')
         sys.exit(1)
 
     url = b.cto_message_url()
@@ -617,7 +623,7 @@ def cmd_jarvis(args):
 
     out.info(f"Jarvis [{session_id[:8]}] — {message[:80]}...")
 
-    from cli._stream import print_stream, stream_sse
+    from cli._stream import print_stream
 
     auth_headers = b._auth_headers() if hasattr(b, "_auth_headers") else {}
 
@@ -1228,7 +1234,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--api", action="store_true", help="Force API mode")
     p.add_argument("--db", action="store_true", help="Force DB mode")
-    p.add_argument("--db-path", dest="db_path", help="SQLite DB path")
+    p.add_argument(
+        "--db-path", dest="db_path", help="PostgreSQL URL (or DATABASE_URL env var)"
+    )
     p.add_argument("--no-color", action="store_true", help="Disable colors")
     p.add_argument("-v", "--verbose", action="store_true")
 
@@ -1497,12 +1505,20 @@ def build_parser() -> argparse.ArgumentParser:
     # handled in main() below
 
     # ── jarvis ──
-    jar = sub.add_parser("jarvis", help="Chat with Jarvis (CTO agent) — stored in Jarvis history")
+    jar = sub.add_parser(
+        "jarvis", help="Chat with Jarvis (CTO agent) — stored in Jarvis history"
+    )
     jar_sub = jar.add_subparsers(dest="subcmd")
 
     jar_msg = jar_sub.add_parser("ask", help="Ask Jarvis a question")
     jar_msg.add_argument("message", nargs="+")
-    jar_msg.add_argument("--session", "-s", dest="session_id", default="", help="Reuse existing session ID")
+    jar_msg.add_argument(
+        "--session",
+        "-s",
+        dest="session_id",
+        default="",
+        help="Reuse existing session ID",
+    )
     jar_msg.set_defaults(func=cmd_jarvis)
 
     jar_list = jar_sub.add_parser("sessions", help="List Jarvis chat sessions")

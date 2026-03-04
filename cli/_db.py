@@ -1,56 +1,84 @@
-"""DB backend — direct sqlite3 access for offline mode."""
+"""DB backend — direct PostgreSQL access (psycopg3).
+
+Replaces the old SQLite offline backend. Uses DATABASE_URL env var.
+Same interface as APIBackend — read/write via direct SQL.
+"""
 
 import os
-import sqlite3
+from pathlib import Path
 from typing import Any
 
+try:
+    import psycopg
+    from psycopg.rows import dict_row
 
-def _find_db() -> str:
-    """Auto-detect platform.db location."""
-    candidates = [
-        "data/platform.db",
-        "../data/platform.db",
-        os.path.expanduser("~/.sf/platform.db"),
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-    return "data/platform.db"
+    _HAS_PSYCOPG = True
+except ImportError:
+    _HAS_PSYCOPG = False
+
+
+def _get_pg_url(pg_url: str | None = None) -> str:
+    """Resolve PostgreSQL connection URL (priority: arg > env > .env file)."""
+    if pg_url and not pg_url.startswith("sqlite"):
+        return pg_url
+    url = os.environ.get("DATABASE_URL", "")
+    if url:
+        return url
+    # Try loading from .env in repo root
+    for candidate in [
+        Path(".env"),
+        Path(__file__).parent.parent / ".env",
+        Path.home() / ".sf" / ".env",
+    ]:
+        if candidate.exists():
+            for line in candidate.read_text().splitlines():
+                if line.startswith("DATABASE_URL="):
+                    return line.split("=", 1)[1].strip()
+    raise RuntimeError(
+        "DATABASE_URL not set. Add it to .env or set the DATABASE_URL env var.\n"
+        "  Example: DATABASE_URL=postgresql://macaron:pass@localhost:5432/macaron_platform"
+    )
 
 
 class DBBackend:
-    """Direct SQLite access — same interface as APIBackend (read-only mostly)."""
+    """Direct PostgreSQL access — same interface as APIBackend."""
 
     def __init__(self, db_path: str | None = None):
-        self.db_path = db_path or _find_db()
-        if not os.path.exists(self.db_path):
-            raise FileNotFoundError(f"DB not found: {self.db_path}")
-        self.base_url = f"sqlite://{self.db_path}"
-        self._conn = sqlite3.connect(self.db_path, timeout=10)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA busy_timeout=5000")
+        if not _HAS_PSYCOPG:
+            raise ImportError(
+                "psycopg not installed. Run: pip3 install psycopg[binary]"
+            )
+        pg_url = _get_pg_url(db_path)
+        self._conn = psycopg.connect(pg_url, row_factory=dict_row)
+        self._conn.autocommit = False
+        self.base_url = pg_url.split("@")[-1] if "@" in pg_url else pg_url  # hide creds
 
     def close(self):
         self._conn.close()
 
     def _q(self, sql: str, params: tuple = ()) -> list[dict]:
-        rows = self._conn.execute(sql, params).fetchall()
-        return [dict(r) for r in rows]
+        with self._conn.cursor() as cur:
+            cur.execute(sql, params or None)
+            return cur.fetchall() or []
 
     def _q1(self, sql: str, params: tuple = ()) -> dict | None:
         rows = self._q(sql, params)
         return rows[0] if rows else None
 
+    def _exec(self, sql: str, params: tuple = ()):
+        with self._conn.cursor() as cur:
+            cur.execute(sql, params or None)
+        self._conn.commit()
+
     # ── Platform ──
 
     def health(self) -> dict:
-        return {"status": "ok", "mode": "offline/db", "db": self.db_path}
+        return {"status": "ok", "mode": "db/postgresql", "db": self.base_url}
 
     def monitoring(self) -> dict:
         agents = self._q("SELECT COUNT(*) as c FROM agents")[0]["c"]
         missions = self._q("SELECT COUNT(*) as c FROM epics")[0]["c"]
-        return {"agents_total": agents, "missions_total": missions, "mode": "offline"}
+        return {"agents_total": agents, "missions_total": missions, "mode": "db"}
 
     # ── Projects ──
 
@@ -65,55 +93,48 @@ class DBBackend:
         import uuid
 
         pid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO projects (id, name, description, path, factory_type, status) VALUES (?,?,?,?,?,?)",
+        self._exec(
+            "INSERT INTO projects (id, name, description, path, factory_type, status) VALUES (%s,%s,%s,%s,%s,%s)",
             (pid, name, desc, path, proj_type, "active"),
         )
-        self._conn.commit()
         return {"id": pid, "name": name, "status": "created"}
 
     def project_show(self, pid: str) -> dict:
         r = self._q1(
-            "SELECT * FROM projects WHERE id=? OR LOWER(name)=LOWER(?)", (pid, pid)
+            "SELECT * FROM projects WHERE id=%s OR LOWER(name)=LOWER(%s)", (pid, pid)
         )
         return r or {"error": f"Project {pid} not found"}
 
     def project_vision(self, pid: str, text: str | None = None) -> dict:
         if text:
-            self._conn.execute("UPDATE projects SET vision=? WHERE id=?", (text, pid))
-            self._conn.commit()
+            self._exec("UPDATE projects SET vision=%s WHERE id=%s", (text, pid))
             return {"status": "ok"}
         p = self.project_show(pid)
         return {"vision": p.get("vision", "")}
 
     def project_git_status(self, pid: str) -> dict:
         p = self.project_show(pid)
-        return {"path": p.get("path", ""), "note": "offline — run git status locally"}
+        return {"path": p.get("path", ""), "note": "db mode — run git status locally"}
 
     def project_chat_url(self, pid: str) -> str:
-        return ""  # not available offline
+        return ""
 
     def project_phase_get(self, pid: str) -> dict:
-        row = self._conn.execute(
-            "SELECT current_phase FROM projects WHERE id=?", (pid,)
-        ).fetchone()
+        row = self._q1("SELECT current_phase FROM projects WHERE id=%s", (pid,))
         if not row:
             return {"error": "not found"}
-        return {"project_id": pid, "current_phase": row[0] or "discovery"}
+        return {"project_id": pid, "current_phase": row["current_phase"] or "discovery"}
 
     def project_phase_set(self, pid: str, phase: str) -> dict:
-        self._conn.execute(
-            "UPDATE projects SET current_phase=? WHERE id=?", (phase, pid)
-        )
-        self._conn.commit()
+        self._exec("UPDATE projects SET current_phase=%s WHERE id=%s", (phase, pid))
         return {"project_id": pid, "current_phase": phase, "ok": True}
 
     def project_health(self, pid: str) -> dict:
-        rows = self._conn.execute(
-            "SELECT status, COUNT(*) as cnt FROM epics WHERE project_id=? GROUP BY status",
+        rows = self._q(
+            "SELECT status, COUNT(*) as cnt FROM epics WHERE project_id=%s GROUP BY status",
             (pid,),
-        ).fetchall()
-        counts = {r[0]: r[1] for r in rows}
+        )
+        counts = {r["status"]: r["cnt"] for r in rows}
         total = sum(counts.values())
         healthy = counts.get("completed", 0)
         score = round((healthy / total * 100) if total else 0)
@@ -125,15 +146,11 @@ class DBBackend:
         }
 
     def project_missions_suggest(self, pid: str) -> dict:
-        row = self._conn.execute(
-            "SELECT current_phase FROM projects WHERE id=?", (pid,)
-        ).fetchone()
-        phase = (row[0] or "discovery") if row else "discovery"
+        row = self._q1("SELECT current_phase FROM projects WHERE id=%s", (pid,))
+        phase = (row["current_phase"] or "discovery") if row else "discovery"
         existing = {
-            r[0].lower()
-            for r in self._conn.execute(
-                "SELECT name FROM epics WHERE project_id=?", (pid,)
-            ).fetchall()
+            r["name"].lower()
+            for r in self._q("SELECT name FROM epics WHERE project_id=%s", (pid,))
         }
         SUGGESTIONS = {
             "discovery": [
@@ -182,10 +199,10 @@ class DBBackend:
         sql = "SELECT id, project_id, name, status, type, wsjf_score, workflow_id, created_at FROM epics"
         conds, params = [], []
         if project:
-            conds.append("project_id=?")
+            conds.append("project_id=%s")
             params.append(project)
         if status:
-            conds.append("status=?")
+            conds.append("status=%s")
             params.append(status)
         if conds:
             sql += " WHERE " + " AND ".join(conds)
@@ -193,7 +210,7 @@ class DBBackend:
         return self._q(sql, tuple(params))
 
     def mission_show(self, mid: str) -> dict:
-        return self._q1("SELECT * FROM epics WHERE id=?", (mid,)) or {
+        return self._q1("SELECT * FROM epics WHERE id=%s", (mid,)) or {
             "error": "not found"
         }
 
@@ -203,39 +220,35 @@ class DBBackend:
         import uuid
 
         mid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO epics (id, name, project_id, type, status) VALUES (?,?,?,?,?)",
+        self._exec(
+            "INSERT INTO epics (id, name, project_id, type, status) VALUES (%s,%s,%s,%s,%s)",
             (mid, name, project_id, mission_type, "draft"),
         )
-        self._conn.commit()
         return {"id": mid, "name": name, "status": "draft"}
 
     def mission_start(self, mid: str) -> dict:
-        return {"error": "Cannot start missions in offline mode — server required"}
+        return {"error": "Cannot start missions in db mode — server required"}
 
     def epic_run(self, mid: str) -> dict:
-        return {"error": "Cannot run missions in offline mode — server required"}
+        return {"error": "Cannot run missions in db mode — server required"}
 
     def mission_reset(self, mid: str) -> dict:
-        self._conn.execute("UPDATE epics SET status='draft' WHERE id=?", (mid,))
-        self._conn.commit()
+        self._exec("UPDATE epics SET status='draft' WHERE id=%s", (mid,))
         return {"status": "reset"}
 
     def mission_wsjf(
         self, mid: str, bv: int = 5, tc: int = 5, rr: int = 5, jd: int = 5
     ) -> dict:
         score = round((bv + tc + rr) / max(jd, 1), 2)
-        self._conn.execute(
-            "UPDATE epics SET wsjf_score=?, business_value=?, time_criticality=?, risk_reduction=?, job_duration=? WHERE id=?",
+        self._exec(
+            "UPDATE epics SET wsjf_score=%s, business_value=%s, time_criticality=%s, risk_reduction=%s, job_duration=%s WHERE id=%s",
             (score, bv, tc, rr, jd, mid),
         )
-        self._conn.commit()
         return {"wsjf_score": score}
 
     def mission_children(self, mid: str) -> list:
         return self._q(
-            "SELECT id, name, status, type FROM epics WHERE parent_epic_id=?",
-            (mid,),
+            "SELECT id, name, status, type FROM epics WHERE parent_epic_id=%s", (mid,)
         )
 
     def mission_chat_url(self, mid: str) -> str:
@@ -248,80 +261,70 @@ class DBBackend:
 
     def features_list(self, epic_id: str) -> list:
         return self._q(
-            "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
+            "SELECT * FROM features WHERE epic_id=%s ORDER BY priority", (epic_id,)
         )
 
     def feature_create(self, epic_id: str, name: str, sp: int = 3) -> dict:
         import uuid
 
         fid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO features (id, epic_id, name, story_points, status) VALUES (?,?,?,?,?)",
+        self._exec(
+            "INSERT INTO features (id, epic_id, name, story_points, status) VALUES (%s,%s,%s,%s,%s)",
             (fid, epic_id, name, sp, "backlog"),
         )
-        self._conn.commit()
         return {"id": fid, "name": name}
 
     def feature_update(self, fid: str, **kwargs) -> dict:
-        sets = ", ".join(f"{k}=?" for k in kwargs)
-        self._conn.execute(
-            f"UPDATE features SET {sets} WHERE id=?", (*kwargs.values(), fid)
-        )
-        self._conn.commit()
+        sets = ", ".join(f"{k}=%s" for k in kwargs)
+        self._exec(f"UPDATE features SET {sets} WHERE id=%s", (*kwargs.values(), fid))
         return {"status": "ok"}
 
     def feature_deps(self, fid: str) -> list:
-        return self._q("SELECT * FROM feature_deps WHERE feature_id=?", (fid,))
+        return self._q("SELECT * FROM feature_deps WHERE feature_id=%s", (fid,))
 
     def feature_add_dep(
         self, fid: str, dep_id: str, dep_type: str = "blocked_by"
     ) -> dict:
-        self._conn.execute(
-            "INSERT INTO feature_deps (feature_id, depends_on, dep_type) VALUES (?,?,?)",
+        self._exec(
+            "INSERT INTO feature_deps (feature_id, depends_on, dep_type) VALUES (%s,%s,%s)",
             (fid, dep_id, dep_type),
         )
-        self._conn.commit()
         return {"status": "ok"}
 
     def feature_rm_dep(self, fid: str, dep_id: str) -> dict:
-        self._conn.execute(
-            "DELETE FROM feature_deps WHERE feature_id=? AND depends_on=?",
+        self._exec(
+            "DELETE FROM feature_deps WHERE feature_id=%s AND depends_on=%s",
             (fid, dep_id),
         )
-        self._conn.commit()
         return {"status": "ok"}
 
     # ── Stories ──
 
     def stories_list(self, feature_id: str | None = None) -> list:
         if feature_id:
-            rows = self._conn.execute(
-                "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=?",
+            return self._q(
+                "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories WHERE feature_id=%s",
                 (feature_id,),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
-            ).fetchall()
-        return [dict(r) for r in rows]
+            )
+        return self._q(
+            "SELECT id, feature_id, title, story_points, status, sprint_id FROM user_stories ORDER BY feature_id, id"
+        )
 
     def story_create(self, feature_id: str, title: str, sp: int = 2) -> dict:
         import uuid
 
         sid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO user_stories (id, feature_id, title, story_points, status) VALUES (?,?,?,?,?)",
+        self._exec(
+            "INSERT INTO user_stories (id, feature_id, title, story_points, status) VALUES (%s,%s,%s,%s,%s)",
             (sid, feature_id, title, sp, "backlog"),
         )
-        self._conn.commit()
         return {"id": sid, "title": title}
 
     def story_update(self, sid: str, **kwargs) -> dict:
-        sets = ", ".join(f"{k}=?" for k in kwargs)
-        self._conn.execute(
-            f"UPDATE user_stories SET {sets} WHERE id=?", (*kwargs.values(), sid)
+        sets = ", ".join(f"{k}=%s" for k in kwargs)
+        self._exec(
+            f"UPDATE user_stories SET {sets} WHERE id=%s", (*kwargs.values(), sid)
         )
-        self._conn.commit()
         return {"status": "ok"}
 
     # ── Sprints ──
@@ -330,36 +333,33 @@ class DBBackend:
         import uuid
 
         sid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO sprints (id, mission_id, name, number, status) VALUES (?,?,?,?,?)",
+        self._exec(
+            "INSERT INTO sprints (id, mission_id, name, number, status) VALUES (%s,%s,%s,%s,%s)",
             (sid, mission_id, name, number, "planned"),
         )
-        self._conn.commit()
         return {"id": sid, "name": name}
 
     def sprint_assign(self, sprint_id: str, story_ids: list[str]) -> dict:
         for sid in story_ids:
-            self._conn.execute(
-                "UPDATE user_stories SET sprint_id=? WHERE id=?", (sprint_id, sid)
+            self._exec(
+                "UPDATE user_stories SET sprint_id=%s WHERE id=%s", (sprint_id, sid)
             )
-        self._conn.commit()
         return {"assigned": len(story_ids)}
 
     def sprint_unassign(self, sprint_id: str, story_id: str) -> dict:
-        self._conn.execute(
-            "UPDATE user_stories SET sprint_id=NULL WHERE id=? AND sprint_id=?",
+        self._exec(
+            "UPDATE user_stories SET sprint_id=NULL WHERE id=%s AND sprint_id=%s",
             (story_id, sprint_id),
         )
-        self._conn.commit()
         return {"status": "ok"}
 
     def sprint_available(self, sprint_id: str) -> list:
-        sprint = self._q1("SELECT mission_id FROM sprints WHERE id=?", (sprint_id,))
+        sprint = self._q1("SELECT mission_id FROM sprints WHERE id=%s", (sprint_id,))
         if not sprint:
             return []
         return self._q(
             "SELECT us.* FROM user_stories us JOIN features f ON us.feature_id=f.id "
-            "WHERE f.epic_id=? AND us.sprint_id IS NULL",
+            "WHERE f.epic_id=%s AND us.sprint_id IS NULL",
             (sprint["mission_id"],),
         )
 
@@ -368,44 +368,41 @@ class DBBackend:
     def backlog_reorder(self, item_type: str, ids: list[str]) -> dict:
         tbl = "features" if item_type == "features" else "user_stories"
         for i, fid in enumerate(ids):
-            self._conn.execute(f"UPDATE {tbl} SET priority=? WHERE id=?", (i + 1, fid))
-        self._conn.commit()
+            self._exec(f"UPDATE {tbl} SET priority=%s WHERE id=%s", (i + 1, fid))
         return {"reordered": len(ids)}
 
     # ── Agents ──
 
     def agents_list(self, level: str | None = None) -> list:
-        rows = self._q(
+        return self._q(
             "SELECT id, name, role, provider, model, icon, color, tagline FROM agents ORDER BY name"
         )
-        # level filtering would need hierarchy_rank mapping
-        return rows
 
     def agent_show(self, aid: str) -> dict:
-        return self._q1("SELECT * FROM agents WHERE id=?", (aid,)) or {
+        return self._q1("SELECT * FROM agents WHERE id=%s", (aid,)) or {
             "error": "not found"
         }
 
     def agent_delete(self, aid: str) -> dict:
-        self._conn.execute("DELETE FROM agents WHERE id=?", (aid,))
-        self._conn.commit()
+        self._exec("DELETE FROM agents WHERE id=%s", (aid,))
         return {"status": "ok"}
 
     # ── Sessions ──
 
     def sessions_list(self, project: str | None = None) -> list:
-        sql = "SELECT id, name, status, project_id, goal, created_at FROM sessions ORDER BY created_at DESC"
-        rows = self._q(sql)
+        rows = self._q(
+            "SELECT id, name, status, project_id, goal, created_at FROM sessions ORDER BY created_at DESC"
+        )
         if project:
             rows = [r for r in rows if r.get("project_id") == project]
         return rows
 
     def session_show(self, sid: str) -> dict:
-        session = self._q1("SELECT * FROM sessions WHERE id=?", (sid,))
+        session = self._q1("SELECT * FROM sessions WHERE id=%s", (sid,))
         if not session:
             return {"error": "not found"}
         msgs = self._q(
-            "SELECT from_agent, content, timestamp FROM messages WHERE session_id=? ORDER BY timestamp",
+            "SELECT from_agent, content, timestamp FROM messages WHERE session_id=%s ORDER BY timestamp",
             (sid,),
         )
         session["messages"] = msgs
@@ -417,40 +414,40 @@ class DBBackend:
         agents: list[str] | None = None,
         pattern: str = "solo",
     ) -> dict:
-        return {"error": "Cannot create sessions in offline mode — server required"}
+        return {"error": "Cannot create sessions in db mode — server required"}
 
     def session_stop(self, sid: str) -> dict:
-        self._conn.execute("UPDATE sessions SET status='stopped' WHERE id=?", (sid,))
-        self._conn.commit()
+        self._exec("UPDATE sessions SET status='stopped' WHERE id=%s", (sid,))
         return {"status": "stopped"}
 
     def session_checkpoints(self, sid: str) -> dict:
-        has_table = self._conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='agent_step_checkpoints'"
-        ).fetchone()
+        has_table = self._q1(
+            "SELECT 1 FROM information_schema.tables WHERE table_name='agent_step_checkpoints'"
+        )
         if not has_table:
             return {"session_id": sid, "checkpoints": [], "agent_count": 0}
-        rows = self._conn.execute(
-            "SELECT agent_id, step_index, tool_calls, partial_content FROM agent_step_checkpoints WHERE session_id=? ORDER BY agent_id, step_index DESC",
+        rows = self._q(
+            "SELECT agent_id, step_index, tool_calls, partial_content FROM agent_step_checkpoints "
+            "WHERE session_id=%s ORDER BY agent_id, step_index DESC",
             (sid,),
-        ).fetchall()
+        )
         import json as _json
 
         seen: dict = {}
         for r in rows:
-            aid = r[0]
+            aid = r["agent_id"]
             if aid in seen:
                 continue
             try:
-                tools = _json.loads(r[2] or "[]")
+                tools = _json.loads(r["tool_calls"] or "[]")
                 last_tool = tools[-1].get("name", "") if tools else ""
             except Exception:
                 last_tool = ""
             seen[aid] = {
                 "agent_id": aid,
-                "step": r[1],
+                "step": r["step_index"],
                 "last_tool": last_tool,
-                "preview": (r[3] or "")[:100],
+                "preview": (r["partial_content"] or "")[:100],
             }
         checkpoints = list(seen.values())
         return {
@@ -465,13 +462,13 @@ class DBBackend:
     # ── Ideation ──
 
     def ideation_start(self, prompt: str, project_id: str | None = None) -> dict:
-        return {"error": "Cannot start ideation in offline mode — server required"}
+        return {"error": "Cannot start ideation in db mode — server required"}
 
     def ideation_start_url(self) -> str:
         return ""
 
     def ideation_create_epic(self, session_id: str) -> dict:
-        return {"error": "Cannot create epic in offline mode — server required"}
+        return {"error": "Cannot create epic in db mode — server required"}
 
     def ideation_list(self) -> list:
         return self._q(
@@ -481,13 +478,13 @@ class DBBackend:
     def ideation_session_url(self, session_id: str) -> str:
         return ""
 
-    # ── Metrics (computed from DB) ──
+    # ── Metrics ──
 
     def metrics_dora(self, project_id: str | None = None) -> dict:
         total = self._q("SELECT COUNT(*) as c FROM epics WHERE status='completed'")[0][
             "c"
         ]
-        return {"deployments": total, "note": "offline approximation"}
+        return {"deployments": total, "note": "db approximation"}
 
     def metrics_velocity(self) -> dict:
         rows = self._q(
@@ -498,14 +495,14 @@ class DBBackend:
     def metrics_burndown(self, epic_id: str | None = None) -> dict:
         if epic_id:
             features = self._q(
-                "SELECT status, COUNT(*) as c FROM features WHERE epic_id=? GROUP BY status",
+                "SELECT status, COUNT(*) as c FROM features WHERE epic_id=%s GROUP BY status",
                 (epic_id,),
             )
             return {"features": features}
         return {"note": "provide epic_id"}
 
     def metrics_cycle_time(self) -> dict:
-        return {"note": "offline — limited data"}
+        return {"note": "db mode — limited data"}
 
     # ── LLM ──
 
@@ -524,28 +521,26 @@ class DBBackend:
     def llm_traces(self, limit: int = 20) -> list:
         try:
             return self._q(
-                "SELECT * FROM llm_traces ORDER BY timestamp DESC LIMIT ?", (limit,)
+                "SELECT * FROM llm_traces ORDER BY timestamp DESC LIMIT %s", (limit,)
             )
         except Exception:
             return []
 
-    # ── Tasks (Copilot→SF delegation) ──
+    # ── Tasks ──
 
     def task_brief_submit(self, brief: dict) -> dict:
         import uuid
-        from datetime import datetime
 
         mid = f"tma-copilot-{uuid.uuid4().hex[:8]}"
         title = brief.get("title", "Untitled")
         goal = f"[Copilot brief] {brief.get('description', '')}"
         project_id = brief.get("project_id", "software-factory")
-        now = datetime.utcnow().isoformat()
         try:
-            self._conn.execute(
-                "INSERT INTO epics (id, project_id, name, status, type, goal, wsjf_score, created_at) VALUES (?, ?, ?, 'planning', 'program', ?, 5.0, ?)",
-                (mid, project_id, f"[Copilot] {title}", goal, now),
+            self._exec(
+                "INSERT INTO epics (id, project_id, name, status, type, goal, wsjf_score, created_at) "
+                "VALUES (%s, %s, %s, 'planning', 'program', %s, 5.0, NOW())",
+                (mid, project_id, f"[Copilot] {title}", goal),
             )
-            self._conn.commit()
             return {
                 "mission_id": mid,
                 "session_url": f"/missions/{mid}",
@@ -555,16 +550,16 @@ class DBBackend:
             return {"error": str(e)}
 
     def task_brief_status(self, mid: str) -> dict:
-        row = self._conn.execute(
-            "SELECT id, name, status, created_at FROM epics WHERE id=?", (mid,)
-        ).fetchone()
+        row = self._q1(
+            "SELECT id, name, status, created_at FROM epics WHERE id=%s", (mid,)
+        )
         if not row:
             return {"error": "not found"}
         return {
-            "mission_id": row[0],
-            "title": row[1],
-            "status": row[2],
-            "created_at": row[3],
+            "mission_id": row["id"],
+            "title": row["name"],
+            "status": row["status"],
+            "created_at": str(row["created_at"]),
         }
 
     # ── Memory ──
@@ -572,18 +567,18 @@ class DBBackend:
     def memory_search(self, query: str) -> list:
         try:
             return self._q(
-                "SELECT * FROM memory_project_fts WHERE memory_project_fts MATCH ? LIMIT 20",
+                "SELECT * FROM memory_project WHERE to_tsvector('french', content) @@ plainto_tsquery('french', %s) LIMIT 20",
                 (query,),
             )
         except Exception:
             return self._q(
-                "SELECT * FROM memory_project WHERE content LIKE ? LIMIT 20",
+                "SELECT * FROM memory_project WHERE content ILIKE %s LIMIT 20",
                 (f"%{query}%",),
             )
 
     def memory_project(self, pid: str) -> list:
         return self._q(
-            "SELECT * FROM memory_project WHERE project_id=? ORDER BY updated_at DESC",
+            "SELECT * FROM memory_project WHERE project_id=%s ORDER BY updated_at DESC",
             (pid,),
         )
 
@@ -591,11 +586,11 @@ class DBBackend:
         return self._q("SELECT * FROM memory_global ORDER BY updated_at DESC LIMIT 50")
 
     def memory_global_set(self, key: str, value: str) -> dict:
-        self._conn.execute(
-            "INSERT OR REPLACE INTO memory_global (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+        self._exec(
+            "INSERT INTO memory_global (key, value, updated_at) VALUES (%s, %s, NOW()) "
+            "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()",
             (key, value),
         )
-        self._conn.commit()
         return {"status": "ok"}
 
     # ── Chaos ──
@@ -607,7 +602,7 @@ class DBBackend:
             return []
 
     def chaos_trigger(self, scenario: str | None = None) -> dict:
-        return {"error": "Cannot trigger chaos in offline mode"}
+        return {"error": "Cannot trigger chaos in db mode — server required"}
 
     # ── Watchdog ──
 
@@ -630,11 +625,10 @@ class DBBackend:
         import uuid
 
         iid = str(uuid.uuid4())[:8]
-        self._conn.execute(
-            "INSERT INTO platform_incidents (id, title, severity, status, source, created_at) VALUES (?,?,?,?,?,datetime('now'))",
+        self._exec(
+            "INSERT INTO platform_incidents (id, title, severity, status, source, created_at) VALUES (%s,%s,%s,%s,%s,NOW())",
             (iid, title, severity, "open", source),
         )
-        self._conn.commit()
         return {"id": iid, "status": "created"}
 
     # ── Autoheal ──
@@ -647,20 +641,20 @@ class DBBackend:
         return {"healed": healed, "total": total}
 
     def autoheal_trigger(self) -> dict:
-        return {"error": "Cannot trigger autoheal in offline mode"}
+        return {"error": "Cannot trigger autoheal in db mode — server required"}
 
     # ── Search ──
 
     def search(self, query: str) -> dict:
         msgs = self._q(
-            "SELECT id, from_agent, content FROM messages WHERE content LIKE ? LIMIT 10",
+            "SELECT id, from_agent, content FROM messages WHERE content ILIKE %s LIMIT 10",
             (f"%{query}%",),
         )
         projs = self._q(
-            "SELECT id, name FROM projects WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+            "SELECT id, name FROM projects WHERE name ILIKE %s LIMIT 5", (f"%{query}%",)
         )
         missions = self._q(
-            "SELECT id, name FROM epics WHERE name LIKE ? LIMIT 5", (f"%{query}%",)
+            "SELECT id, name FROM epics WHERE name ILIKE %s LIMIT 5", (f"%{query}%",)
         )
         return {"messages": msgs, "projects": projs, "epics": missions}
 
@@ -680,17 +674,17 @@ class DBBackend:
 
     def releases(self, project_id: str) -> list:
         return self._q(
-            "SELECT * FROM epics WHERE project_id=? AND status='completed' ORDER BY completed_at DESC",
+            "SELECT * FROM epics WHERE project_id=%s AND status='completed' ORDER BY completed_at DESC",
             (project_id,),
         )
 
     # ── Notifications ──
 
     def notifications_status(self) -> dict:
-        return {"note": "offline — check integrations table"}
+        return {"note": "db mode — check integrations table"}
 
     def notifications_test(self) -> dict:
-        return {"error": "Cannot send notifications in offline mode"}
+        return {"error": "Cannot send notifications in db mode — server required"}
 
     # ── Darwin Teams ──
 
@@ -708,12 +702,12 @@ class DBBackend:
                       a.name as agent_name,
                       CASE WHEN tf.runs >= 5 AND tf.fitness_score >= 80 THEN 'champion'
                            WHEN tf.runs >= 3 AND tf.fitness_score >= 60 THEN 'rising'
-                           WHEN tf.retired = 1 THEN 'retired'
+                           WHEN tf.retired = TRUE THEN 'retired'
                            WHEN tf.runs >= 10 AND tf.fitness_score < 40 THEN 'declining'
                            ELSE 'active' END as badge
                FROM team_fitness tf LEFT JOIN agents a ON a.id = tf.agent_id
-               WHERE tf.technology = ? AND tf.phase_type = ?
-               ORDER BY tf.fitness_score DESC LIMIT ?""",
+               WHERE tf.technology = %s AND tf.phase_type = %s
+               ORDER BY tf.fitness_score DESC LIMIT %s""",
             (technology, phase_type, limit),
         )
         return {"data": rows, "technology": technology, "phase_type": phase_type}
@@ -723,10 +717,10 @@ class DBBackend:
         p: list = []
         filters = []
         if technology:
-            filters.append("technology = ?")
+            filters.append("technology = %s")
             p.append(technology)
         if phase_type:
-            filters.append("phase_type = ?")
+            filters.append("phase_type = %s")
             p.append(phase_type)
         if filters:
             q += " WHERE " + " AND ".join(filters)
@@ -746,10 +740,10 @@ class DBBackend:
             """SELECT tfh.agent_id, tfh.pattern_id, tfh.snapshot_date,
                       tfh.fitness_score, a.name as agent_name
                FROM team_fitness_history tfh LEFT JOIN agents a ON a.id = tfh.agent_id
-               WHERE tfh.technology = ? AND tfh.phase_type = ?
-                 AND tfh.snapshot_date >= date('now', ?)
+               WHERE tfh.technology = %s AND tfh.phase_type = %s
+                 AND tfh.snapshot_date >= NOW() - INTERVAL '%s days'
                ORDER BY tfh.agent_id, tfh.pattern_id, tfh.snapshot_date""",
-            (technology, phase_type, f"-{days} days"),
+            (technology, phase_type, days),
         )
         series: dict = {}
         for r in rows:
@@ -762,7 +756,7 @@ class DBBackend:
                     "dates": [],
                     "scores": [],
                 }
-            series[key]["dates"].append(r["snapshot_date"])
+            series[key]["dates"].append(str(r["snapshot_date"]))
             series[key]["scores"].append(round(r["fitness_score"], 1))
         return {
             "series": list(series.values()),
@@ -772,23 +766,24 @@ class DBBackend:
 
     def teams_selections(self, limit: int = 20) -> dict:
         rows = self._q(
-            """SELECT ts.*, a.name as agent_name FROM team_selections ts
-               LEFT JOIN agents a ON a.id = ts.agent_id
-               ORDER BY ts.selected_at DESC LIMIT ?""",
+            "SELECT ts.*, a.name as agent_name FROM team_selections ts "
+            "LEFT JOIN agents a ON a.id = ts.agent_id ORDER BY ts.selected_at DESC LIMIT %s",
             (limit,),
         )
         return {"data": rows}
 
     def teams_ab_tests(self, status: str = "", limit: int = 20) -> dict:
-        q = """SELECT tab.*, a1.name as team_a_name, a2.name as team_b_name
-               FROM team_ab_tests tab
-               LEFT JOIN agents a1 ON a1.id = tab.team_a_agent
-               LEFT JOIN agents a2 ON a2.id = tab.team_b_agent"""
+        q = (
+            "SELECT tab.*, a1.name as team_a_name, a2.name as team_b_name "
+            "FROM team_ab_tests tab "
+            "LEFT JOIN agents a1 ON a1.id = tab.team_a_agent "
+            "LEFT JOIN agents a2 ON a2.id = tab.team_b_agent"
+        )
         p: list = []
         if status:
-            q += " WHERE tab.status = ?"
+            q += " WHERE tab.status = %s"
             p.append(status)
-        q += " ORDER BY tab.started_at DESC LIMIT ?"
+        q += " ORDER BY tab.started_at DESC LIMIT %s"
         p.append(limit)
         return {"data": self._q(q, tuple(p))}
 
@@ -799,11 +794,11 @@ class DBBackend:
         technology: str = "generic",
         phase_type: str = "generic",
     ) -> dict:
-        self._conn.execute(
-            "UPDATE team_fitness SET retired=1, weight_multiplier=0.1 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
+        self._exec(
+            "UPDATE team_fitness SET retired=TRUE, weight_multiplier=0.1 "
+            "WHERE agent_id=%s AND pattern_id=%s AND technology=%s AND phase_type=%s",
             (agent_id, pattern_id, technology, phase_type),
         )
-        self._conn.commit()
         return {"ok": True}
 
     def teams_unretire(
@@ -813,9 +808,9 @@ class DBBackend:
         technology: str = "generic",
         phase_type: str = "generic",
     ) -> dict:
-        self._conn.execute(
-            "UPDATE team_fitness SET retired=0, weight_multiplier=1.0 WHERE agent_id=? AND pattern_id=? AND technology=? AND phase_type=?",
+        self._exec(
+            "UPDATE team_fitness SET retired=FALSE, weight_multiplier=1.0 "
+            "WHERE agent_id=%s AND pattern_id=%s AND technology=%s AND phase_type=%s",
             (agent_id, pattern_id, technology, phase_type),
         )
-        self._conn.commit()
         return {"ok": True}
