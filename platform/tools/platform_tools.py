@@ -591,7 +591,9 @@ class PlatformCreateMissionTool(BaseTool):
         "If project_id is omitted, a project is auto-created with full scaffold "
         "(workspace, git, README, docs/spec.md, Dockerfile, docker-compose) "
         "and standard missions (TMA/MCO, Security, Tech Debt). "
-        "Params: name (required), goal/description, project_id, workflow_id (optional). "
+        "Params: name (required), goal/description, project_id, workflow_id (optional), "
+        "target_branch (optional — git branch where agents will deliver code, e.g. 'feature/sav-parcours'; "
+        "auto-created in the project workspace if it doesn't exist). "
         "Returns the mission id and auto-created project_id if applicable."
     )
     category = "platform"
@@ -604,6 +606,7 @@ class PlatformCreateMissionTool(BaseTool):
             return json.dumps({"error": "name is required"})
 
         project_id = params.get("project_id", "").strip()
+        target_branch = (params.get("target_branch") or "").strip()
         auto_project: dict = {}
 
         # Rule: mission without project → auto-create project + scaffold
@@ -615,6 +618,17 @@ class PlatformCreateMissionTool(BaseTool):
                 "auto_created_project_name": proj_name,
             }
 
+        # Resolve workspace_path from project
+        workspace_path = ""
+        try:
+            from ..projects.manager import get_project_store
+
+            proj = get_project_store().get(project_id)
+            if proj and proj.path:
+                workspace_path = proj.path
+        except Exception:
+            pass
+
         store = get_epic_store()
         mission = MissionDef(
             name=name,
@@ -625,6 +639,43 @@ class PlatformCreateMissionTool(BaseTool):
             status="active",
         )
         mission = store.create_mission(mission)
+
+        # Create target branch in workspace if requested
+        branch_info = {}
+        if target_branch and workspace_path:
+            import subprocess as _sp
+            import os as _os
+
+            if _os.path.isdir(_os.path.join(workspace_path, ".git")):
+                try:
+                    existing = _sp.run(
+                        ["git", "rev-parse", "--verify", target_branch],
+                        cwd=workspace_path,
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    if existing.returncode == 0:
+                        branch_info = {
+                            "target_branch": target_branch,
+                            "branch_action": "exists",
+                        }
+                    else:
+                        r = _sp.run(
+                            ["git", "checkout", "-b", target_branch],
+                            cwd=workspace_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=15,
+                        )
+                        if r.returncode == 0:
+                            branch_info = {
+                                "target_branch": target_branch,
+                                "branch_action": "created",
+                            }
+                        else:
+                            branch_info = {"target_branch_error": r.stderr.strip()}
+                except Exception as _e:
+                    branch_info = {"target_branch_error": str(_e)}
 
         # Auto-launch orchestrator (create epic_run + start execution)
         run_info = {}
@@ -640,6 +691,8 @@ class PlatformCreateMissionTool(BaseTool):
                 mission_id=mission.id,
                 status=EpicStatus.PENDING,
                 project_id=mission.project_id or "",
+                workspace_path=workspace_path,
+                context={"target_branch": target_branch} if target_branch else {},
             )
             run = run_store.create(run)
             run_info = {"epic_run_id": run.id}
@@ -663,8 +716,10 @@ class PlatformCreateMissionTool(BaseTool):
                 "ok": True,
                 "mission_id": mission.id,
                 "name": mission.name,
+                "workspace_path": workspace_path or None,
                 **auto_project,
                 **run_info,
+                **branch_info,
             }
         )
 

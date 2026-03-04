@@ -794,6 +794,13 @@ def _row_to_epic_run(row) -> EpicRun:
         cost = float(row["llm_cost_usd"] or 0)
     except (IndexError, KeyError, TypeError, ValueError):
         pass
+    ctx: dict = {}
+    try:
+        raw_ctx = row["context_json"]
+        if raw_ctx:
+            ctx = json.loads(raw_ctx)
+    except (IndexError, KeyError, TypeError, ValueError):
+        pass
     return EpicRun(
         id=row["id"],
         workflow_id=row["workflow_id"],
@@ -808,6 +815,7 @@ def _row_to_epic_run(row) -> EpicRun:
         phases=phases,
         brief=row["brief"] or "",
         llm_cost_usd=cost,
+        context=ctx,
         created_at=row["created_at"]
         if isinstance(row["created_at"], datetime)
         else (
@@ -839,8 +847,8 @@ class EpicRunStore:
             db.execute(
                 """INSERT INTO epic_runs (id, workflow_id, workflow_name, session_id,
                    cdp_agent_id, project_id, workspace_path, parent_epic_id, status,
-                   current_phase, phases_json, brief, created_at, updated_at, completed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   current_phase, phases_json, brief, context_json, created_at, updated_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     run.id,
                     run.workflow_id,
@@ -854,6 +862,7 @@ class EpicRunStore:
                     run.current_phase,
                     json.dumps([p.model_dump() for p in run.phases]),
                     run.brief,
+                    json.dumps(run.context or {}),
                     run.created_at.isoformat(),
                     run.updated_at.isoformat(),
                     run.completed_at.isoformat() if run.completed_at else None,
@@ -907,7 +916,7 @@ class EpicRunStore:
                 pass
             cur = db.execute(
                 """UPDATE epic_runs SET status=?, current_phase=?, phases_json=?,
-                   session_id=?, workspace_path=?, updated_at=?, completed_at=?,
+                   session_id=?, workspace_path=?, context_json=?, updated_at=?, completed_at=?,
                    llm_cost_usd=? WHERE id=?""",
                 (
                     run.status.value,
@@ -915,6 +924,7 @@ class EpicRunStore:
                     json.dumps([p.model_dump() for p in run.phases], default=str),
                     run.session_id or "",
                     run.workspace_path or "",
+                    json.dumps(run.context or {}),
                     run.updated_at.isoformat(),
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.llm_cost_usd,

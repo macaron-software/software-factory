@@ -604,10 +604,91 @@ class GitCloneTool(BaseTool):
             return _json.dumps({"error": str(e)})
 
 
+class GitCreateBranchTool(BaseTool):
+    name = "git_create_branch"
+    description = (
+        "Create and checkout a named git branch in a workspace. "
+        "If the branch already exists, just checkouts it. "
+        "Params: branch (required) — branch name (e.g. 'feature/sav-parcours'); "
+        "cwd (optional) — workspace path (default: current dir); "
+        "from_branch (optional) — base branch to branch from (default: current HEAD). "
+        "Returns the active branch name."
+    )
+    category = "git"
+    allowed_roles = []
+
+    async def execute(self, params: dict, agent=None) -> str:
+        import json as _json
+
+        branch = (params.get("branch") or "").strip()
+        if not branch:
+            return _json.dumps({"error": "branch is required"})
+
+        cwd = (params.get("cwd") or "").strip() or os.getcwd()
+
+        # Ensure we're in a git repo
+        try:
+            r = subprocess.run(
+                ["git", "rev-parse", "--git-dir"],
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            if r.returncode != 0:
+                return _json.dumps({"error": "not a git repository"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+        # Check if branch already exists
+        existing = subprocess.run(
+            ["git", "rev-parse", "--verify", branch],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        try:
+            if existing.returncode == 0:
+                # Branch exists — checkout
+                r = subprocess.run(
+                    ["git", "checkout", branch],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                action = "checked_out"
+            else:
+                # Create from base branch or current HEAD
+                from_branch = (params.get("from_branch") or "").strip()
+                cmd = ["git", "checkout", "-b", branch]
+                if from_branch:
+                    cmd.append(from_branch)
+                r = subprocess.run(
+                    cmd, cwd=cwd, capture_output=True, text=True, timeout=15
+                )
+                action = "created"
+
+            if r.returncode != 0:
+                return _json.dumps(
+                    {"error": r.stderr.strip() or "branch operation failed"}
+                )
+
+            current = _current_branch(cwd)
+            return _json.dumps(
+                {"ok": True, "branch": current, "action": action, "cwd": cwd}
+            )
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 def register_git_tools(registry):
     """Register all git tools."""
     registry.register(GitInitTool())
     registry.register(GitCloneTool())
+    registry.register(GitCreateBranchTool())
     registry.register(GitStatusTool())
     registry.register(GitDiffTool())
     registry.register(GitLogTool())

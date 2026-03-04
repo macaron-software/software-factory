@@ -107,6 +107,31 @@ def _core_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "git_create_branch",
+                "description": "Create and checkout a named git branch. Use before starting feature work to ensure delivery lands on a clean named branch (e.g. 'feature/sav-parcours').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "branch": {
+                            "type": "string",
+                            "description": "Branch name to create (required), e.g. 'feature/sav-parcours'",
+                        },
+                        "cwd": {
+                            "type": "string",
+                            "description": "Workspace path (default: project root)",
+                        },
+                        "from_branch": {
+                            "type": "string",
+                            "description": "Base branch to branch from (default: current HEAD)",
+                        },
+                    },
+                    "required": ["branch"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "git_clone",
                 "description": "Clone a remote git repository into a local workspace. Use to onboard existing projects.",
                 "parameters": {
@@ -2083,6 +2108,10 @@ def _platform_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Workflow template ID (optional)",
                         },
+                        "target_branch": {
+                            "type": "string",
+                            "description": "Git branch where agents will deliver code (e.g. 'feature/sav-parcours'). Auto-created in the project workspace.",
+                        },
                     },
                     "required": ["name"],
                 },
@@ -2754,6 +2783,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_diff",
         # Git write ops (explicit user requests only)
         "git_clone",
+        "git_create_branch",
         "git_init",
         "git_commit",
         "git_push",
@@ -2882,6 +2912,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_log",
         "git_diff",
         "git_clone",
+        "git_create_branch",
         "git_commit",
         "git_create_pr",
         "list_files",

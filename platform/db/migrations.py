@@ -270,6 +270,7 @@ def _migrate_pg(conn):
         ("last_resume_at", "TEXT"),
         ("human_input_required", "INTEGER DEFAULT 0"),
         ("llm_cost_usd", "DOUBLE PRECISION DEFAULT 0.0"),
+        ("context_json", "TEXT DEFAULT '{}'"),
     ]:
         try:
             conn.execute(f"ALTER TABLE epic_runs ADD COLUMN IF NOT EXISTS {col} {defn}")

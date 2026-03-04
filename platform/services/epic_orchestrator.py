@@ -786,6 +786,14 @@ class EpicOrchestrator:
                 workspace_path=workspace,
             )
             phase_task += f"\nMISSION_ID: {mission.id}"
+            # Inject target branch if set
+            _target_branch = (mission.context or {}).get("target_branch", "")
+            if _target_branch:
+                phase_task += (
+                    f"\nTARGET_BRANCH: {_target_branch} — "
+                    "All code changes MUST be committed to this branch. "
+                    "Use git_create_branch to checkout this branch before any commit."
+                )
 
             # Sprint loop
             phase_key_check = (
