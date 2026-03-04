@@ -35,7 +35,7 @@ def import_time():
 
 @router.get("/api/health", responses={200: {"model": HealthResponse}})
 async def health_check():
-    """Liveness/readiness probe for Docker healthcheck."""
+    """Liveness probe — checks DB and Redis connectivity."""
     import os
     import socket
 
@@ -48,16 +48,85 @@ async def health_check():
     )
     mode = os.environ.get("PLATFORM_MODE", "full")
 
+    checks: dict[str, str] = {}
+    ok = True
+
+    # DB check
     try:
         db = get_db()
         try:
             db.execute("SELECT 1")
         finally:
             db.close()
-        return JSONResponse({"status": "ok", "node": node_id, "mode": mode})
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+        ok = False
+
+    # Redis check (non-fatal — Redis is optional)
+    redis_url = os.environ.get("REDIS_URL")
+    if redis_url:
+        try:
+            import redis.asyncio as aioredis
+
+            r = aioredis.from_url(redis_url, socket_connect_timeout=2)
+            await r.ping()
+            await r.aclose()
+            checks["redis"] = "ok"
+        except Exception as e:
+            checks["redis"] = f"error: {e}"
+            # Redis failure is non-fatal for liveness
+
+    status_code = 200 if ok else 503
+    return JSONResponse(
+        {
+            "status": "ok" if ok else "error",
+            "node": node_id,
+            "mode": mode,
+            "checks": checks,
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/api/ready")
+async def readiness_check():
+    """Readiness probe — verifies DB migrations done + agent store loaded.
+
+    nginx upstream health_check and k8s readinessProbe should use this endpoint.
+    Returns 503 when the node is draining (SIGTERM received) or not yet ready.
+    """
+    import os
+    import socket
+
+    from ....db.migrations import get_db
+
+    node_id = (
+        os.environ.get("SF_NODE_ID")
+        or os.environ.get("HOSTNAME")
+        or socket.gethostname()
+    )
+
+    # Check drain flag (set during graceful shutdown)
+    from ....server import _is_draining  # noqa: PLC0415
+
+    if _is_draining():
+        return JSONResponse(
+            {"status": "draining", "node": node_id},
+            status_code=503,
+        )
+
+    try:
+        db = get_db()
+        try:
+            # Verify core tables exist (proxy for migrations complete)
+            db.execute("SELECT COUNT(*) FROM agents")
+        finally:
+            db.close()
+        return JSONResponse({"status": "ready", "node": node_id})
     except Exception as e:
         return JSONResponse(
-            {"status": "error", "node": node_id, "mode": mode, "detail": str(e)},
+            {"status": "not_ready", "node": node_id, "detail": str(e)},
             status_code=503,
         )
 

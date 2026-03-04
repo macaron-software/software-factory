@@ -10,12 +10,70 @@ Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import shutil
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
+
+
+def _run_lock_key(run_id: str) -> int:
+    """Convert run_id to a stable positive int64 for PG advisory lock."""
+    return int(hashlib.md5(run_id.encode()).hexdigest()[:16], 16) & 0x7FFFFFFFFFFFFFFF
+
+
+@asynccontextmanager
+async def pg_run_lock(run_id: str) -> AsyncGenerator[bool, None]:
+    """Try to acquire a PG session-advisory lock for this run.
+
+    Yields True if the lock was acquired (safe to proceed), False if another
+    node already holds it (caller should skip).  No-op (yields True) when not
+    using PostgreSQL so existing SQLite/test setups are unaffected.
+    """
+    from ..db.adapter import is_postgresql
+
+    if not is_postgresql():
+        yield True
+        return
+
+    lock_key = _run_lock_key(run_id)
+    loop = asyncio.get_event_loop()
+
+    from ..db.adapter import get_connection
+
+    conn = await loop.run_in_executor(None, get_connection)
+    acquired = False
+    try:
+        row = await loop.run_in_executor(
+            None,
+            lambda: conn.execute(
+                "SELECT pg_try_advisory_lock(%s)", (lock_key,)
+            ).fetchone(),
+        )
+        acquired = bool(row and row[0])
+        if acquired:
+            logger.info("dist-lock: acquired run=%s key=%d", run_id, lock_key)
+        else:
+            logger.info("dist-lock: run=%s locked by another node — skip", run_id)
+        yield acquired
+    finally:
+        if acquired:
+            try:
+                await loop.run_in_executor(
+                    None,
+                    lambda: conn.execute("SELECT pg_advisory_unlock(%s)", (lock_key,)),
+                )
+            except Exception:
+                pass
+        try:
+            conn.close()
+        except Exception:
+            pass
+
 
 # Mission name/type patterns that should always be running
 _CONTINUOUS_KEYWORDS = (
@@ -532,24 +590,36 @@ async def _launch_run(run_id: str) -> None:
     )
 
     async def _safe_run():
-        try:
-            async with get_mission_semaphore():
-                logger.warning("auto_resume: epic_run=%s acquired semaphore", run_id)
-                await orchestrator.run_phases()
-        except Exception as exc:
-            import traceback
-
-            logger.error(
-                "auto_resume: run=%s CRASHED: %s\n%s",
-                run_id,
-                exc,
-                traceback.format_exc(),
-            )
+        async with pg_run_lock(run_id) as acquired:
+            if not acquired:
+                # Another node is running this — revert status to paused so it
+                # doesn't linger as RUNNING if the other node crashes first.
+                try:
+                    mission.status = EpicStatus.PAUSED
+                    run_store.update(mission)
+                except Exception:
+                    pass
+                return
             try:
-                mission.status = EpicStatus.FAILED
-                run_store.update(mission)
-            except Exception:
-                pass
+                async with get_mission_semaphore():
+                    logger.warning(
+                        "auto_resume: epic_run=%s acquired semaphore", run_id
+                    )
+                    await orchestrator.run_phases()
+            except Exception as exc:
+                import traceback
+
+                logger.error(
+                    "auto_resume: run=%s CRASHED: %s\n%s",
+                    run_id,
+                    exc,
+                    traceback.format_exc(),
+                )
+                try:
+                    mission.status = EpicStatus.FAILED
+                    run_store.update(mission)
+                except Exception:
+                    pass
 
     mission.status = EpicStatus.RUNNING
     run_store.update(mission)

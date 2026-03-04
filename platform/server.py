@@ -224,6 +224,17 @@ def _recover_db_lock():
     logger.debug("_recover_db_lock: skipped (managed by db adapter)")
 
 
+# ---------------------------------------------------------------------------
+# Graceful drain flag — set to True when SIGTERM is received so /api/ready
+# returns 503 and nginx stops routing new requests to this node.
+# ---------------------------------------------------------------------------
+_drain_flag = False
+
+
+def _is_draining() -> bool:
+    return _drain_flag
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
@@ -521,6 +532,14 @@ async def lifespan(app: FastAPI):
             _count = _db.execute("SELECT COUNT(*) FROM agent_scores").fetchone()[0]
             _db.close()
             if _count == 0:
+                # Leader election: only one node runs the cold-start seeder
+                from .agents.evolution_scheduler import _try_become_leader as _te
+
+                if not await _te("simulator-seed", ttl_secs=300):
+                    logger.info(
+                        "Simulator cold-start: another node is seeding, skipping"
+                    )
+                    return
                 from .agents.simulator import MissionSimulator
 
                 sim = MissionSimulator()
@@ -807,7 +826,37 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Stop MCP servers
+    # -----------------------------------------------------------------------
+    # Graceful shutdown: drain in-flight missions before killing the process.
+    # 1. Set drain flag → /api/ready returns 503 → nginx stops routing here.
+    # 2. Wait up to DRAIN_TIMEOUT_S (default 30) for active mission tasks to finish.
+    # 3. Then proceed with normal cleanup.
+    # -----------------------------------------------------------------------
+    global _drain_flag
+    _drain_flag = True
+    logger.warning("Graceful shutdown: drain flag set — /api/ready now returns 503")
+
+    drain_timeout = int(os.environ.get("SF_DRAIN_TIMEOUT_S", "30"))
+    try:
+        from .web.routes.helpers import _active_mission_tasks
+
+        if _active_mission_tasks:
+            pending = list(_active_mission_tasks.values())
+            logger.warning(
+                "Graceful shutdown: waiting up to %ds for %d active missions",
+                drain_timeout,
+                len(pending),
+            )
+            done, still_running = await asyncio.wait(pending, timeout=drain_timeout)
+            if still_running:
+                logger.warning(
+                    "Graceful shutdown: %d missions still running after timeout — forcing stop",
+                    len(still_running),
+                )
+            else:
+                logger.warning("Graceful shutdown: all missions completed cleanly")
+    except Exception as _drain_err:
+        logger.warning("Graceful shutdown drain error: %s", _drain_err)
     import os as _os
 
     for name, proc in _mcp_procs.items():
