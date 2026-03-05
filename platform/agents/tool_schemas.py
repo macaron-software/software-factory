@@ -3129,6 +3129,7 @@ _PLATFORM_TOOLS = [
     "platform_metrics",
     "platform_sessions",
     "platform_workflows",
+    "platform_guide",  # BMAD /bmad-help inspired — context-aware next-step guidance
 ]
 for _role_key in ROLE_TOOL_MAP:
     ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)

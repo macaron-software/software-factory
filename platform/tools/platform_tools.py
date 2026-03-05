@@ -283,6 +283,111 @@ class PlatformWorkflowsTool(BaseTool):
         )
 
 
+class PlatformGuideTool(BaseTool):
+    """Context-aware guidance on what to do next.
+
+    Inspired by BMAD /bmad-help (MIT) — adapted for SF autonomous agent platform.
+    Source: https://github.com/bmad-code-org/BMAD-METHOD
+    Reads current state (missions, projects) and recommends next steps.
+    Available to Jarvis (strat-cto) and all orchestrator agents.
+    """
+
+    name = "platform_guide"
+    description = (
+        "Context-aware guidance: reads current platform state (running missions, projects) "
+        "and recommends what to do next. Accepts optional context hint. "
+        "Inspired by BMAD /bmad-help pattern."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..epics.store import get_epic_store
+        from ..projects.manager import get_project_store
+
+        context = params.get("context", "")
+        try:
+            projects = get_project_store().list_all()
+            missions = get_epic_store().list_missions(limit=50)
+
+            running = [m for m in missions if m.status in ["running", "in_progress"]]
+            pending = [m for m in missions if m.status == "pending"]
+            done = [m for m in missions if m.status in ["completed", "done"]]
+
+            guide: dict = {
+                "state": {
+                    "projects": len(projects),
+                    "missions_running": len(running),
+                    "missions_pending": len(pending),
+                    "missions_done": len(done),
+                },
+                "running_missions": [
+                    {
+                        "id": m.id,
+                        "name": getattr(m, "name", getattr(m, "title", "untitled")),
+                        "status": m.status,
+                    }
+                    for m in running[:5]
+                ],
+                "recommendations": [],
+            }
+
+            recs = guide["recommendations"]
+            if not projects:
+                recs.append("Create a project: Projects → New Project")
+                recs.append("Pick a workflow: browse 46 workflows")
+            elif not missions:
+                recs.append(
+                    "Launch first mission via ideation-to-prod or feature-sprint workflow"
+                )
+                recs.append(
+                    "Use complexity=simple for quick tasks, complexity=enterprise for large projects"
+                )
+            elif running:
+                recs.append("Monitor running missions: platform_missions tool")
+                recs.append(
+                    "Check human-in-the-loop checkpoints if any mission is blocked"
+                )
+            else:
+                recs.append("Review completed missions for follow-up actions")
+                recs.append("Run skill-eval workflow to verify skill quality")
+                recs.append(
+                    "Consider skill-evolution workflow to improve underperforming agents"
+                )
+
+            if context:
+                guide["context"] = context
+                kw = context.lower()
+                if any(w in kw for w in ["architect", "design", "system"]):
+                    recs.append(
+                        "Architecture → feature-sprint workflow (phase: solutioning) + architecte agent"
+                    )
+                elif any(w in kw for w in ["test", "qa", "quality", "eval"]):
+                    recs.append(
+                        "QA → test-campaign or skill-eval workflow + qa agent + tdd.md skill"
+                    )
+                elif any(w in kw for w in ["deploy", "prod", "release", "ship"]):
+                    recs.append(
+                        "Deploy → canary-deployment workflow (1%→10%→50%→100% + HITL)"
+                    )
+                elif any(w in kw for w in ["security", "audit", "pentest"]):
+                    recs.append(
+                        "Security → security-hacking workflow (8 phases) + security-audit.md skill"
+                    )
+                elif any(w in kw for w in ["simple", "quick", "small", "bug", "fix"]):
+                    recs.append(
+                        "Simple task → launch workflow with complexity=simple (enterprise phases auto-skipped)"
+                    )
+                elif any(w in kw for w in ["enterprise", "large", "big", "complex"]):
+                    recs.append(
+                        "Large project → launch workflow with complexity=enterprise (all phases included)"
+                    )
+
+            return json.dumps(guide, ensure_ascii=False)
+        except Exception as e:
+            logger.exception("Error in platform_guide tool")
+            return json.dumps({"error": str(e)})
+
+
 class PlatformCreateFeatureTool(BaseTool):
     name = "create_feature"
     description = (
