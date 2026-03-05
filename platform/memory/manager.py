@@ -173,7 +173,8 @@ class MemoryManager:
         agent_role: str = "",
     ) -> list[dict]:
         conn = get_db()
-        q = "SELECT * FROM memory_project WHERE project_id=?"
+        _cols = "id, project_id, category, key, value, confidence, source, agent_role, relevance_score, access_count, created_at, updated_at, last_read_at"
+        q = f"SELECT {_cols} FROM memory_project WHERE project_id=?"
         params: list = [project_id]
         if category:
             q += " AND category=?"
@@ -196,7 +197,14 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [dict(r) for r in rows]
+        result = []
+        for r in rows:
+            row = dict(r)
+            for k, v in row.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+            result.append(row)
+        return result
 
     def project_search(
         self, project_id: str, query: str, limit: int = 20

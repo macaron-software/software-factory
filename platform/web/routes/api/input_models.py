@@ -20,6 +20,14 @@ class GlobalMemoryCreate(BaseModel):
     confidence: float = Field(default=0.8, ge=0.0, le=1.0)
 
 
+class ProjectMemoryCreate(BaseModel):
+    key: str = Field(min_length=1, max_length=200)
+    value: str = Field(min_length=1, max_length=500000)
+    category: str = Field(default="general", max_length=50)
+    source: str = Field(default="", max_length=200)
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+
+
 # ── Guidelines ────────────────────────────────────────────────────
 
 
