@@ -479,6 +479,41 @@ modules:
     #   error-monitoring read tools + perf-audit tools (if that module is enabled)
     #   → one agent can run a complete incident investigation without tool-hopping
 
+  - id: agent-reward
+    name: "Agent Reward Scoring"
+    description: "Reward function pattern inspired by ART (OpenPipe, Apache-2.0): assigns an explicit composite score (0-1) to every agent run based on outcome, spec-quality, anti-slop, tool efficiency, latency. Stores scores in agent_rewards table. Dual purpose: quality monitoring now + ART training data readiness later. Tools: reward_score_run, reward_get_history, reward_summary, reward_export_art."
+    category: quality
+    icon: "star"
+    builtin: true
+    tools:
+      - reward_score_run
+      - reward_get_history
+      - reward_summary
+      - reward_export_art
+    skill: "skills/agent-reward.md"
+    # SOURCE: Reward function design inspired by ART (OpenPipe, Apache-2.0)
+    # https://github.com/OpenPipe/ART
+    #
+    # WHY: SF agents have no explicit quality signal per run. Mission status (done/failed)
+    #      is binary and doesn't capture: "succeeded but sloppy", "failed cleanly",
+    #      "succeeded but took 15 retries". We need a numeric reward for two reasons:
+    #      1. NOW — quality monitoring: detect which agent roles are degrading
+    #      2. LATER — ART readiness: Qwen GRPO training needs (trajectory, reward) pairs.
+    #         We don't have GPU infra today (API-only: MiniMax/Azure), but collecting
+    #         reward-annotated trajectories NOW means zero rewrite when we do.
+    #
+    # WHY NOT full ART yet:
+    #      ART needs: local model weights + GPU (A100/H100) + vLLM server.
+    #      SF runs on API LLMs (4CPU/16GB Azure, OVH VPS). Not today.
+    #      But the data format is ART-compatible → reward_export_art() writes
+    #      {messages, reward, metadata} JSONL that ART TrainableModel can ingest directly.
+    #
+    # DESIGN:
+    #      composite = outcome×0.40 + quality×0.25 + slop×0.20 + tools×0.10 + latency×0.05
+    #      Weights emphasise task success (40%) over speed (5%).
+    #      All components optional — partial scoring still gives a useful composite.
+    #      agent_rewards table created lazily (no schema migration required).
+
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."

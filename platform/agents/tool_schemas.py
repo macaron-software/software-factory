@@ -3193,6 +3193,18 @@ for _prole in ("cdp", "architecture"):
         ROLE_TOOL_MAP[_prole].extend(_PROJECT_TOOLS)
 
 
+# Reward tools (agent-reward module) — qa, devops, cdp, diagnostic can score runs
+_REWARD_TOOLS = [
+    "reward_score_run",
+    "reward_get_history",
+    "reward_summary",
+    "reward_export_art",
+]
+for _rrole in ("qa", "devops", "cdp", "diagnostic"):
+    if _rrole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_rrole].extend(_REWARD_TOOLS)
+
+
 def _classify_agent_role(agent) -> str:
     """Classify an agent into a tool-mapping role category."""
     role = (agent.role or "").lower()

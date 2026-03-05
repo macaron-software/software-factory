@@ -265,6 +265,14 @@ def _get_tool_registry():
             register_diag_tools(reg)
     except Exception:
         pass
+    # Agent reward tools — guarded by agent-reward module
+    try:
+        if _is_module_enabled("agent-reward"):
+            from ..tools.reward_tools import register_reward_tools
+
+            register_reward_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
