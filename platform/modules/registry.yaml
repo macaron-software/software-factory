@@ -407,6 +407,41 @@ modules:
     # ADAPTATIONS: Constitution → PRINCIPLES.md, steps reference SF concepts
     #      (mission, backlog item, agent role), checklist runs inline.
 
+  - id: perf-auditor
+    name: "Performance Auditor"
+    description: "Performance audit agent using Chrome DevTools MCP (Apache-2.0): Lighthouse scores (perf/a11y/seo/best-practices), Core Web Vitals (LCP/CLS/INP), CDP traces, slow network analysis, console error detection, mobile emulation. Tools: perf_audit_lighthouse, perf_trace_start/stop, perf_analyze_insight, perf_network_slow, perf_console_errors, perf_emulate_mobile."
+    category: quality
+    icon: "gauge"
+    source_url: "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    repo_url: "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    license: "Apache-2.0"
+    builtin: true
+    tools:
+      - perf_audit_lighthouse
+      - perf_trace_start
+      - perf_trace_stop
+      - perf_analyze_insight
+      - perf_network_slow
+      - perf_console_errors
+      - perf_emulate_mobile
+    skill: "skills/perf-audit.md"
+    mcp: "mcp-chrome-devtools"
+    # SOURCE: Chrome DevTools team (Google) — chrome-devtools-mcp (Apache-2.0)
+    # https://github.com/ChromeDevTools/chrome-devtools-mcp
+    #
+    # WHY: playwright-mcp handles browser automation. chrome-devtools-mcp adds
+    #      what playwright can't: Lighthouse audits, CDP performance traces,
+    #      Core Web Vitals (LCP/CLS/INP), network request analysis, console errors.
+    #      SF agents that deploy features had no way to measure performance impact.
+    #      This fills the gap: a perf-auditor agent with the same tooling a developer
+    #      has in Chrome DevTools, wired into the TMA auto-heal loop for regressions.
+    #
+    # ARCHITECTURE: Two coexisting browser MCPs (not competing):
+    #   - mcp-playwright     → automation (click, fill, navigate, test execution)
+    #   - mcp-chrome-devtools → diagnostics (perf traces, Lighthouse, CWV, network)
+    # Tools: perf_audit_tools.py (BaseTool subclasses, not tool_runner functions)
+    # Routing: mcp_cdp_<tool> → _tool_mcp_dynamic → mcp-chrome-devtools MCP server
+
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."

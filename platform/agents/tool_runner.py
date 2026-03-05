@@ -249,6 +249,14 @@ def _get_tool_registry():
             register_gsd_tools(reg)
     except Exception:
         pass
+    # Performance audit tools (chrome-devtools-mcp) — guarded by perf-auditor module
+    try:
+        if _is_module_enabled("perf-auditor"):
+            from ..tools.perf_audit_tools import register_perf_audit_tools
+
+            register_perf_audit_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -1688,6 +1696,7 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
         "memory": "mcp-memory",
         "playwright": "mcp-playwright",
         "github": "mcp-github",
+        "cdp": "mcp-chrome-devtools",
     }
     mcp_id = mcp_id_map.get(server_short, f"mcp-{server_short}")
 

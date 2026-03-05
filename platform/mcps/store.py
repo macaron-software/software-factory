@@ -245,6 +245,76 @@ BUILTIN_MCPS = [
         is_builtin=True,
     ),
     MCPServer(
+        id="mcp-chrome-devtools",
+        name="Chrome DevTools",
+        description=(
+            "Performance auditing via Chrome DevTools Protocol: Lighthouse scores, "
+            "Core Web Vitals (LCP/CLS/INP), CDP performance traces, network analysis, "
+            "console error inspection. Use for perf audits and debugging — "
+            "playwright-mcp handles automation, this handles diagnostics."
+        ),
+        # SOURCE: Chrome DevTools team (Google) — https://github.com/ChromeDevTools/chrome-devtools-mcp
+        # WHY: playwright-mcp is automation-oriented. chrome-devtools-mcp adds perf/debug:
+        #   lighthouse_audit, performance_start/stop_trace, performance_analyze_insight,
+        #   list_network_requests, list_console_messages. Enables a perf-auditor agent
+        #   with the same tooling a developer has in Chrome DevTools.
+        command="npx",
+        args=[
+            "chrome-devtools-mcp@latest",
+            "--headless",
+        ],
+        env={},
+        tools=[
+            {
+                "name": "lighthouse_audit",
+                "description": "Run Lighthouse audit — perf/a11y/best-practices/SEO scores + suggestions",
+                "params": {"url": "string", "categories": "array of strings"},
+            },
+            {
+                "name": "performance_start_trace",
+                "description": "Start CDP performance trace (CPU, rendering, CWV)",
+                "params": {},
+            },
+            {
+                "name": "performance_stop_trace",
+                "description": "Stop trace and return LCP/CLS/INP Core Web Vitals",
+                "params": {},
+            },
+            {
+                "name": "performance_analyze_insight",
+                "description": "Drill into a specific perf insight from trace results",
+                "params": {"insight": "string"},
+            },
+            {
+                "name": "list_network_requests",
+                "description": "List all network requests with timing and status",
+                "params": {},
+            },
+            {
+                "name": "list_console_messages",
+                "description": "List console errors/warnings/logs from current page",
+                "params": {"level": "string: error|warning|all"},
+            },
+            {
+                "name": "navigate_page",
+                "description": "Navigate to a URL",
+                "params": {"url": "string"},
+            },
+            {
+                "name": "emulate",
+                "description": "Emulate mobile device with network throttling",
+                "params": {"device": "string", "network": "string"},
+            },
+            {
+                "name": "take_screenshot",
+                "description": "Take a screenshot of the current page",
+                "params": {},
+            },
+        ],
+        status="stopped",
+        is_builtin=True,
+    ),
+    MCPServer(
         id="mcp-github",
         name="GitHub",
         description="GitHub issues, PRs, code search, actions via gh CLI.",
