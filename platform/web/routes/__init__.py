@@ -25,6 +25,7 @@ from .notifications import router as notifications_router
 from .tma import router as tma_router
 from .wiki import router as wiki_router
 from .workflows import router as workflows_router
+from .a2a_server import router as a2a_router
 
 router = APIRouter()
 
@@ -48,6 +49,7 @@ router.include_router(evals_router)
 router.include_router(marketplace_router)
 router.include_router(metrics_router)
 router.include_router(tool_builder_router)
+router.include_router(a2a_router)
 
 # Workspace file serving (needs to be on the main router)
 router.add_api_route("/workspace/{path:path}", serve_workspace_file, methods=["GET"])

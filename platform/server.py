@@ -224,17 +224,6 @@ def _recover_db_lock():
     logger.debug("_recover_db_lock: skipped (managed by db adapter)")
 
 
-# ---------------------------------------------------------------------------
-# Graceful drain flag — set to True when SIGTERM is received so /api/ready
-# returns 503 and nginx stops routing new requests to this node.
-# ---------------------------------------------------------------------------
-_drain_flag = False
-
-
-def _is_draining() -> bool:
-    return _drain_flag
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
@@ -532,14 +521,6 @@ async def lifespan(app: FastAPI):
             _count = _db.execute("SELECT COUNT(*) FROM agent_scores").fetchone()[0]
             _db.close()
             if _count == 0:
-                # Leader election: only one node runs the cold-start seeder
-                from .agents.evolution_scheduler import _try_become_leader as _te
-
-                if not await _te("simulator-seed", ttl_secs=300):
-                    logger.info(
-                        "Simulator cold-start: another node is seeding, skipping"
-                    )
-                    return
                 from .agents.simulator import MissionSimulator
 
                 sim = MissionSimulator()
@@ -826,37 +807,7 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # -----------------------------------------------------------------------
-    # Graceful shutdown: drain in-flight missions before killing the process.
-    # 1. Set drain flag → /api/ready returns 503 → nginx stops routing here.
-    # 2. Wait up to DRAIN_TIMEOUT_S (default 30) for active mission tasks to finish.
-    # 3. Then proceed with normal cleanup.
-    # -----------------------------------------------------------------------
-    global _drain_flag
-    _drain_flag = True
-    logger.warning("Graceful shutdown: drain flag set — /api/ready now returns 503")
-
-    drain_timeout = int(os.environ.get("SF_DRAIN_TIMEOUT_S", "30"))
-    try:
-        from .web.routes.helpers import _active_mission_tasks
-
-        if _active_mission_tasks:
-            pending = list(_active_mission_tasks.values())
-            logger.warning(
-                "Graceful shutdown: waiting up to %ds for %d active missions",
-                drain_timeout,
-                len(pending),
-            )
-            done, still_running = await asyncio.wait(pending, timeout=drain_timeout)
-            if still_running:
-                logger.warning(
-                    "Graceful shutdown: %d missions still running after timeout — forcing stop",
-                    len(still_running),
-                )
-            else:
-                logger.warning("Graceful shutdown: all missions completed cleanly")
-    except Exception as _drain_err:
-        logger.warning("Graceful shutdown drain error: %s", _drain_err)
+    # Stop MCP servers
     import os as _os
 
     for name, proc in _mcp_procs.items():
@@ -972,10 +923,10 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
-                "img-src 'self' data: blob: https:; "
+                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com https://i.pravatar.cc; "
                 "connect-src 'self' https://analytics.macaron-software.com; "
                 "frame-ancestors 'none'"
             )
@@ -1074,12 +1025,11 @@ def create_app() -> FastAPI:
         # ── Phase 2: Auth enforcement ──
         from .auth.middleware import is_public_path
 
-        if (
-            path.startswith("/api/analytics")
-            or path.startswith("/api/health")
-            or path == "/api/ready"
-        ):
+        if path.startswith("/api/analytics") or path.startswith("/api/health"):
             return await call_next(request)
+
+        # A2A endpoints — require auth (cookie) but not onboarding
+        # The /.well-known path is fully public (no auth required)
 
         # Skip auth in test mode
         if os.environ.get("PLATFORM_ENV") == "test":
@@ -1110,7 +1060,10 @@ def create_app() -> FastAPI:
             path.startswith("/static")
             or path.startswith("/api/")
             or path.startswith("/auth/")
+            or path.startswith("/.well-known")
+            or path.startswith("/a2a/")
             or path.startswith("/projects/")
+            and "/preview/" in path
             or path
             in (
                 "/login",
@@ -1517,6 +1470,12 @@ def create_app() -> FastAPI:
     from .web.routes.api.health import router as health_router
 
     app.include_router(health_router)
+
+    # A2A (Agent-to-Agent) Protocol Server
+    from .web.routes.a2a_server import router as a2a_router
+
+    app.include_router(a2a_router)
+
     # slave mode: API-only, no IHM (web UI), no SSE write endpoints
     if _mode not in ("factory", "slave"):
         from .web.routes import router as web_router

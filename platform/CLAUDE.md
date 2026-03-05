@@ -1,671 +1,261 @@
 # MACARON AGENT PLATFORM
 
 ## WHAT
-
 Web multi-agent platform SAFe-aligned. Agents collaborate (debate/veto/delegate) autonomously.
-FastAPI + HTMX + SSE + SQLite. Dark purple theme. Port 8099.
+FastAPI + HTMX + SSE. PostgreSQL (primary) / SQLite (fallback). Dark purple. Port 8099/8090.
 
-## RUN
-
+## RUN (local dev — SQLite)
 ```bash
 cd _SOFTWARE_FACTORY
 python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none --log-level warning
-# NO --reload (conflicts stdlib `platform` module)
-# --ws none mandatory (SSE not WS)
-# DB: data/platform.db (parent dir, NOT platform/data/)
-# ⚠️ NEVER rm -f data/platform.db — persistent, contains missions/sessions/memory
+# NO --reload | --ws none mandatory | DB: data/platform.db (parent dir)
 ```
 
 ## ⚠️ CRITICAL RULES
-
-- **NEVER delete data/platform.db** — init_db() handles migrations idempotently
-- **NEVER set \*\_API_KEY=dummy** — real keys loaded from `~/.config/factory/*.key`
-- **NEVER `import platform`** at top-level (shadows stdlib)
-- **NEVER `--reload`** with uvicorn (same reason)
+- **NEVER delete data/platform.db** — init_db() idempotent migrations
+- **NEVER set \*\_API_KEY=dummy** — keys from ~/.config/factory/*.key or Infisical
+- **NEVER `import platform`** top-level (shadows stdlib)
+- **NEVER `--reload`** (same reason)
+- **NEVER kill -9 all python3** — kills platform too
 
 ## COPILOT CLI — SERVER LAUNCH
-
 ```
 ALWAYS: nohup + & (detached)
   nohup python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8099 --ws none > /tmp/macaron-platform.log 2>&1 &
-NEVER: mode="async" sans detach | mode="sync" pour serveur
 VERIFY: curl -s -o /dev/null -w "%{http_code}" http://localhost:8099/
 KILL:   lsof -ti:8099 | xargs kill -9
 ```
 
-## DEPLOY (Azure VM 4.233.64.30)
+## SF INNOVATION CLUSTER (prod)
+```
+node-2 (nginx lb) : sfadmin@40.89.174.75   SSH_KEY=~/.ssh/sf_innovation_ed25519
+node-1 (primary)  : sfadmin@10.0.1.4       via ProxyCommand through node-2
+node-3 (PG+Redis) : 10.0.1.6               PostgreSQL 16 + Redis 7
 
+nginx: sf.veligo.app → upstream sf_api_ha (node-1:8090 + node-2:8090)
+       sf_master_ha: node-1 primary, node-2 backup (SSE/pages)
+       zone 64k + proxy_next_upstream http_503 → auto-evicts draining node
+
+Deploy 5 files to node-2: scp -i KEY files sfadmin@40.89.174.75:/home/sfadmin/platform/<path>/
+Deploy to node-1: scp -o "ProxyCommand=ssh -W %h:%p -i KEY sfadmin@40.89.174.75" -i KEY files sfadmin@10.0.1.4:/home/sfadmin/platform/<path>/
+Kill stale: sudo ss -tlnp | grep 8090 → sudo kill -9 <PID>
+Restart: sudo systemctl restart macaron-platform-blue
+Verify: curl http://localhost:8090/api/health | curl http://localhost:8090/api/ready
+node .env: SF_NODE_ID=sf-node-1|2 · REDIS_URL=redis://10.0.1.4:6379 · PG_DSN=postgresql://...
+```
+
+## DISTRIBUTED PATTERNS (LIVE)
+```
+PG advisory lock   auto_resume.py   pg_run_lock() → pg_try_advisory_lock(int64)
+                   prevents double-execution across nodes (connection-scoped, non-blocking)
+                   falls back to no-op if not postgresql
+
+Redis rate limiter rate_limit.py    slowapi storage_uri=REDIS_URL → shared limits multi-node
+                   fallback: in-memory if REDIS_URL not set or Redis down
+
+Leader election    evolution_scheduler.py  Redis SET NX EX ttl → first node wins
+                   key=leader:{task_name} val=SF_NODE_ID ttl=3600s (evolution), 300s (simulator)
+                   server.py: leader election for simulator seed
+                   fallback: returns True if Redis unavailable
+
+Graceful drain     server.py        _drain_flag + asyncio.wait(tasks, timeout=SF_DRAIN_TIMEOUT_S)
+                   /api/ready returns 503 while draining → nginx proxy_next_upstream removes node
+
+Health probes      /api/health      DB+Redis checks, returns checks:{db, redis}
+                   /api/ready       503 on drain or DB fail — public (auth bypass)
+                   nginx: max_fails=2 fail_timeout=10s + proxy_next_upstream http_503
+```
+
+## DEPLOY (Azure VM 4.233.64.30 — Docker)
 ```bash
 SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-# FULL deploy (rsync local → VM → rebuild):
-rsync -azP --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' --exclude='tests/' \
+rsync -azP --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' \
   platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && docker compose --env-file .env -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
-# FAST hotpatch (no rebuild, preserves container state):
-tar cf /tmp/update.tar <files...>
-scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && docker restart deploy-platform-1"
-# ⚠️ Hotpatch is LOST on docker compose --build → always rsync BEFORE rebuild
-# Container code path: /app/macaron_platform/ (NOT /app/platform/)
-# Auth: admin@demo.local (Skip Demo button) | admin@macaron-software.com / macaron2026
-# Prod LLM: Azure OpenAI gpt-5-mini only (AZURE_DEPLOY=1, NO minimax fallback)
-# Custom domain: sf.macaron-software.com → 4.233.64.30:80 (nginx)
-# UID mismatch: /opt/macaron owned by 501 (macOS), azureadmin=1001 → use docker cp
+ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && docker compose --env-file .env \
+  -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
+# Hotpatch: tar + docker cp + docker restart (lost on --build → rsync BEFORE rebuild)
+# Container path: /app/macaron_platform/ | Auth: admin@macaron-software.com/macaron2026
+# Prod LLM: azure-openai gpt-5-mini (AZURE_DEPLOY=1 → no fallback)
 ```
 
-## GIT (2 repos séparés)
-
+## GIT (2 repos)
 ```
-~/_MACARON-SOFTWARE/                   ← .git → GitHub macaron-software/software-factory
-  platform/ cli/ dashboard/ ...        ← CODE tracké
-  _SOFTWARE_FACTORY/                   ← runtime local NON TRACKÉ (.gitignore)
-    platform/ data/ logs/ ...          ← instance dev (DB, logs, workspace)
+~/_MACARON-SOFTWARE/   .git → GitHub macaron-software/software-factory  (tracké)
+  _SOFTWARE_FACTORY/  runtime local NON tracké (.gitignore)
 
-~/_LAPOSTE/_SOFTWARE_FACTORY/          ← .git → GitLab udd-ia-native/software-factory
-  platform/ cli/ dashboard/ ...        ← squelette : skills/workflows/projects VIDES
-  SSH: ~/.ssh/gitlab_laposte_ed25519   ← ssh -T git@gitlab.azure... → ✅
+~/_LAPOSTE/            .git → GitLab udd-ia-native/software-factory (squelette vide)
+  sync: cd ~/_MACARON-SOFTWARE && ./sync-to-laposte.sh  (one-way, ⚠️ ne jamais éditer)
 ```
-
-Push GitHub : `cd ~/_MACARON-SOFTWARE && git push origin main`
-Sync La Poste (one-way) : `cd ~/_MACARON-SOFTWARE && ./sync-to-laposte.sh`
-⚠️ Ne jamais éditer `~/_LAPOSTE/_SOFTWARE_FACTORY/` — écrasé par sync.
 
 ## STACK
-
-- FastAPI + Jinja2 + HTMX + SSE (no WS). Zero build step. Zero emoji (SVG Feather only)
-- SQLite WAL + FTS5 (~35 tables)
-- LLM per environment (see LLM ENVIRONMENTS below)
-- Rate limit: 15 rpm (token-limited ~10-16 calls/min in practice, 100K tokens/60s)
-- **133+ agents** (95 YAML defs), 12 patterns, 19 workflows, 1271 skills
+FastAPI + Jinja2 + HTMX + SSE (no WS) · Zero build step · Zero emoji (SVG Feather only)
+PostgreSQL 16 WAL + FTS5 (~35 tables) — SQLite fallback for local dev
+Infisical REST API for secrets (INFISICAL_TOKEN) — .env fallback
+133+ agents (95 YAML defs) · 12 patterns · 19 workflows · 1271 skills
 
 ---
 
 ## SAFe VOCABULARY
-
-| SAFe              | Platform       | DB             |
-| ----------------- | -------------- | -------------- |
-| Epic              | `MissionDef`   | `missions`     |
-| Feature           | `FeatureDef`   | `features`     |
-| Story             | `UserStoryDef` | `user_stories` |
-| Task              | `TaskDef`      | `tasks`        |
-| PI                | `MissionRun`   | `mission_runs` |
-| Iteration         | `SprintDef`    | `sprints`      |
-| ART               | Agent teams    | `agents`       |
-| Ceremony          | `SessionDef`   | `sessions`     |
-| Ceremony Template | `WorkflowDef`  | `workflows`    |
-| Pattern           | `PatternDef`   | `patterns`     |
-
+Epic=MissionDef · Feature=FeatureDef · Story=UserStoryDef · Task=TaskDef
+PI=MissionRun · Iteration=SprintDef · ART=agent teams · Ceremony=SessionDef
 ```
 Portfolio → Epic (WSJF) → Feature → Story → Task
-ART → PI (mission_run) → Iteration (sprint) → Ceremony (session) → Pattern
+ART → PI → Iteration → Ceremony → Pattern
 ```
-
-DB names keep current (missions, sessions, workflows) — UI uses SAFe terms.
 
 ---
 
 ## MISSION ORCHESTRATION
-
-### Flow
-
 ```
-POST /api/missions/start → MissionRun created → asyncio.create_task(_safe_run)
-  → _mission_semaphore (1 concurrent) → MissionOrchestrator.run_phases()
-    → per phase: sprint loop (max_sprints) → run_pattern() → adversarial guard
-    → gate check (all_approved | no_veto | always) → next phase
+POST /api/missions/start → pg_run_lock(run_id) [PG advisory] → _safe_run()
+  → _mission_semaphore(N) → MissionOrchestrator.run_phases()
+    → sprint loop(max_sprints) → run_pattern() → adversarial guard
+    → gate (all_approved|no_veto|always) → next phase
 ```
-
-### Key params
-
-- `_mission_semaphore = Semaphore(1)` — 1 mission at a time
-- `MAX_LLM_RETRIES = 2` — rate-limit retries per phase
-- Non-dev phases: `max_sprints = 1` (try once, move on)
-- Gate `always` → phase passes even on failure (`DONE_WITH_ISSUES`)
-- Auto-resume on restart: finds ALL running/paused missions → re-launches
-
-### WSJF
-
-- Fields: `business_value`, `time_criticality`, `risk_reduction`, `job_duration`
-- Formula: `(BV + TC + RR) / JD`. Sliders in creation form.
-
-### Sprint Lifecycle
-
-- Auto-created at dev-sprint start. Status: `planning→active→review→completed→failed`
-- Velocity tracking: `velocity` + `planned_sp` columns
-- Retro auto-generated via LLM → `sprints.retro_notes` + `memory_global`
-- Retro lessons injected into sprint>1 prompts (learning loop)
-
-### Portfolio Kanban
-
-- 5 columns: Funnel→Analyzing→Backlog→Implementing→Done
-- WIP limit: 3 epics in Implementing
+- `_mission_semaphore`: configurable (default 1) — settings/orchestrator
+- `MAX_LLM_RETRIES=2` · non-dev phases: max_sprints=1 · gate `always` → DONE_WITH_ISSUES
+- Auto-resume on restart: ALL paused missions re-launched with stagger
+- WSJF: (BV + TC + RR) / JD · sliders in creation form
 
 ---
 
 ## ADVERSARIAL GUARD (agents/adversarial.py)
-
-### L0: Deterministic (0ms)
-
-- SLOP: lorem ipsum, placeholder, TBD, XXX
-- MOCK: TODO implement, NotImplementedError, pass+todo, fake/mock data
-- **FAKE_BUILD**: placeholder gradlew, hardcoded "BUILD SUCCESS", tiny scripts <50 chars (score +7)
-- HALLUCINATION: claims action without tool evidence
-- LIE: invented URLs/file paths
-- STACK_MISMATCH: Swift in Android, Kotlin in iOS (score +7)
-- **code_write content inspection**: scans actual file content for mock/stub/fake patterns
-- TOO_SHORT, ECHO, REPETITION
-
-### L1: LLM Semantic (skipped for discussion patterns)
-
-- Separate LLM reviews output quality
-- Skip for: network, debate, aggregator, human-in-the-loop
-
-### Scoring
-
-- `score < 5` → pass. `5-6` → soft-pass with warning. `7+` → reject
-- HALLUCINATION/SLOP/STACK_MISMATCH/FAKE_BUILD → always force reject (never soft-pass)
-- `MAX_ADVERSARIAL_RETRIES = 0` — rejection = warning only, no retry loop
+**L0 deterministic (0ms):** SLOP · MOCK · FAKE_BUILD(+7) · HALLUCINATION · LIE · STACK_MISMATCH(+7) · TOO_SHORT · ECHO · REPETITION
+**L1 LLM semantic:** skipped for network/debate/aggregator/HITL
+**Scoring:** <5=pass · 5-6=soft-pass · ≥7=reject · HALLUCINATION/SLOP/STACK_MISMATCH/FAKE_BUILD → force reject
+`MAX_ADVERSARIAL_RETRIES=0` — rejection = warning only
 
 ---
 
 ## AGENT PROTOCOLS (patterns/engine.py)
-
-### \_DECOMPOSE_PROTOCOL (Lead Dev)
-
-- ENVIRONMENT CHECK mandatory before decomposing
-- Must: `list_files` → `deep_search("build tools, SDK")` → subtasks
-- Android→`android_build()`, iOS→swiftc, Web→node/npm
-- No language mixing. Missing SDK → first subtask = setup.
-
-### \_EXEC_PROTOCOL (Dev)
-
-- EXPLORE FIRST: `list_files` → `deep_search` → `memory_search` → THEN `code_write`
-- NEVER create fake build scripts
-- Android: `android_build()` / `android_test()` / `android_lint()` / `android_emulator_test()`
-- Python: `build(command="python3 -m py_compile ...")`. Node: `build(command="npm ...")`
-- Generic `build()` REJECTS gradle/gradlew commands → redirects to `android_build()`
-
-### \_QA_PROTOCOL (QA)
-
-- Must call build/test tool at least once
-- Android: `android_build()` → `android_test()` → `android_lint()` (NEVER generic build)
-- Web: `browser_screenshot()` at least once
-- Verify REAL compilation output — empty output = fake wrapper
-
-### \_RESEARCH_PROTOCOL (Discussion)
-
-- Use `deep_search` and `memory_search` explicitly
-- Read/search only, no code writes
+**DECOMPOSE (Lead):** list_files → deep_search("build tools, SDK") → subtasks. No lang mixing.
+**EXEC (Dev):** list_files → deep_search → memory_search → THEN code_write. Never fake builds.
+**QA:** build/test tool mandatory. Android: android_build→test→lint. Web: browser_screenshot ≥1.
+**RESEARCH (Discussion):** deep_search + memory_search. Read only, no code_write.
 
 ---
-
-## SPECIALIZED LEADS PER TECHNO
-
-| Agent         | Role          | Stack                      | Special Tools                    |
-| ------------- | ------------- | -------------------------- | -------------------------------- |
-| Karim Benali  | Lead Android  | Kotlin/Compose/Gradle      | android_build/test/lint/emulator |
-| Sophie Durand | Lead iOS      | SwiftUI/async-await        | —                                |
-| Emma Laurent  | Lead Frontend | React/SvelteKit/TS/a11y    | browser_screenshot, playwright   |
-| Julien Moreau | Lead Backend  | Python/Rust/API/PostgreSQL | docker_build, deep_search        |
-| Thomas Dubois | Lead Dev      | Generic (fallback)         | all dev tools                    |
-
----
-
-## ANDROID BUILD PIPELINE
-
-```
-Agent code_write → android_build() → docker exec android-builder ./gradlew assembleDebug
-                                                    ↓
-                            android-builder container: JDK 17, Android SDK 35, API 34
-                            Shared volume: /workspace/workspaces/{mission_id}
-```
-
-- `build()` tool intercepts gradle commands → returns error → "use android_build()"
-- `tools/android_tools.py`: AndroidBuildTool, AndroidTestTool, AndroidLintTool, AndroidEmulatorTestTool
-- All run via `docker exec android-builder` with 600s/900s timeout
-
----
-
-## NAV (sidebar — 8 entries)
-
-```
-STRATEGY                     ENGINEERING
-  Portfolio /                  Ceremonies /ceremonies
-  Backlog /backlog             Live /live
-  PI Board /pi                 ART /art
-  Metrics /metrics             Toolbox /toolbox
-```
-
----
-
-## MODULES
-
-### Core
-
-- `server.py` — FastAPI app, lifespan (auto-resume missions), Jinja `_clean_llm()`
-- `config.py` — PlatformConfig (7 config classes)
-- `models.py` — 20+ Pydantic: A2AMessage, AgentStatus, MessageType, PhaseStatus, MissionStatus
-
-### Agents
-
-- `agents/executor.py` (545L) — LLM tool-calling loop (max 15 rounds)
-- `agents/loop.py` (516L) — AgentLoop autonomous + AgentLoopManager
-- `agents/store.py` (335L) — AgentDef CRUD + YAML seed (95 definitions)
-- `agents/rlm.py` (403L) — RLM deep search, accepts `workspace_path` fallback
-- `agents/adversarial.py` (435L) — L0 deterministic + L1 semantic guard
-- `agents/tool_runner.py` (1086L) — all tool dispatch, android redirect, path resolution
-- `agents/tool_schemas.py` (1135L) — ROLE_TOOL_MAP, role classification, schema cache
-
-### Patterns
-
-- `patterns/engine.py` (1144L) — run_pattern(), 8 types, protocols, adversarial guard
-- Gate: `all_approved` | `no_veto` | `always` | `checkpoint`
-- NodeStatus: PENDING, RUNNING, COMPLETED, VETOED, FAILED (NO "DONE")
-- Phase summaries LLM-generated from conversation
-
-### Services
-
-- `services/mission_orchestrator.py` (780L) — MissionOrchestrator, phase loop, sprint management
-
-### Missions
-
-- `missions/store.py` — MissionDef (WSJF fields), SprintDef, TaskDef, FeatureDef
-- `missions/product.py` — Product backlog (Epics→Features→Stories)
-
-### Workflows
-
-- `workflows/store.py` (440L) — WorkflowDef, WorkflowPhase, seed_builtins()
-- 19 templates: safe-{veligo,ppz,psy,yolo,ferv,sol,logs,factory}, migration-sharelook, security-hacking, product-lifecycle, etc.
-
-### A2A
-
-- `a2a/bus.py` — MessageBus, async queues (2000), SSE bridge, dead letter
-- `a2a/protocol.py` — 11 msg types, priority (VETO=10)
-- `a2a/veto.py` — ABSOLUTE/STRONG/ADVISORY
-- `a2a/negotiation.py` — propose→counter→vote
-
-### LLM
-
-- `llm/client.py` (~500L) — multi-provider, rate limiter (15 rpm), cooldown on 429
-- httpx: connect=30s, read=300s. MiniMax strips `<think>` auto
-- Azure: `max_completion_tokens` (NOT `max_tokens`)
 
 ## LLM ENVIRONMENTS
-
 ```
-┌──────────────────────┬──────────────┬─────────────┬──────────────────────┐
-│ Environment          │ Provider     │ Model       │ Fallback             │
-├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
-│ Azure VM (prod)      │ azure-openai │ gpt-5-mini  │ none (AZURE_DEPLOY=1)│
-│ 4.233.64.30          │              │             │                      │
-│ sf.macaron-software  │              │             │                      │
-├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
-│ Local dev            │ minimax      │ MiniMax-M2.5│ → azure-openai       │
-├──────────────────────┼──────────────┼─────────────┼──────────────────────┤
-│ VPS Macaron (future) │ minimax      │ MiniMax-M2.5│ → azure-openai       │
-└──────────────────────┴──────────────┴─────────────┴──────────────────────┘
-
-Config: PLATFORM_LLM_PROVIDER + PLATFORM_LLM_MODEL env vars
-Azure: AZURE_DEPLOY=1 → _FALLBACK_CHAIN=["azure-openai"] only
-Local: _FALLBACK_CHAIN=[minimax, azure-openai, azure-ai]
-Keys: ~/.config/factory/*.key (local) | .factory-keys/ volume (docker)
-NEVER set *_API_KEY=dummy — breaks all LLM calls
+SF Innovation (prod) │ azure-openai │ gpt-5-mini  │ no fallback (AZURE_DEPLOY=1)
+Azure VM (demo)      │ azure-openai │ gpt-5-mini  │ no fallback
+Local dev            │ minimax      │ MiniMax-M2.5│ → azure-openai
 ```
-
-### Memory
-
-- `memory/manager.py` — 4-layer: session/pattern/project/global (FTS5)
-- `memory/project_files.py` — auto-loads CLAUDE.md, SPECS.md, VISION.md (3K/file, 8K total)
-
-### Tools (18 modules in tools/)
-
-```
-code_tools.py    — code_read, code_write, code_edit, code_search
-build_tools.py   — build, test, lint (subprocess 120s)
-android_tools.py — android_build, android_test, android_lint, android_emulator_test (docker exec)
-git_tools.py     — git_status, git_log, git_diff, git_commit
-memory_tools.py  — memory_search, memory_store
-phase_tools.py   — run_phase, list_phases, request_validation (orchestrator only)
-platform_tools.py— platform_agents, platform_missions, platform_memory_search, platform_metrics
-web_tools.py     — browser_screenshot, playwright_test
-security_tools.py— sast_scan, dependency_audit, secrets_scan
-deploy_tools.py  — deploy_azure
-chaos_tools.py   — chaos_test, tmc_load_test
-azure_tools.py   — Azure-specific
-compose_tools.py — compose_workflow, create_team, create_sub_mission
-```
-
-### Generators
-
-- `generators/team.py` — LLM-driven team composition, \_ROLE_LAYERS (0-5)
-
-### Web
-
-- `web/routes/` — missions.py(3184L), pages.py(928L), sessions.py(924L), workflows.py(980L), projects.py(799L), agents.py, api.py, ideation.py, helpers.py
-- `web/ws.py` — SSE endpoints (bus.add_sse_listener, keepalive 30s)
-- `web/templates/` — 64 files (Jinja2)
-- `web/static/` — css/(3), js/(4+), avatars/
+Provider: PLATFORM_LLM_PROVIDER + PLATFORM_LLM_MODEL env vars
+Azure: max_completion_tokens (NOT max_tokens) · MiniMax: strips <think> auto
+Rate limit: 15 rpm (in-memory) or Redis-backed (REDIS_URL set)
+Keys: ~/.config/factory/*.key (local) | Infisical | .factory-keys/ volume (docker)
 
 ---
 
-## AGENT TEAMS (133+)
-
-| Category          | Agents                                                                                                                                                                                   |
-| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Strategic (4)     | strat-cpo (Julie), strat-cto (Karim), strat-dirprog (Thomas), strat-portfolio (Sofia)                                                                                                    |
-| Per-project ×8    | veligo-, ppz-, psy-, yolo-, ferv-, sol-, logs-, fact-: RTE, PO, Lead, Devs×2-3, QA, UX                                                                                                   |
-| Pool              | security, whitebox-hacker, adversarial, e2e-tester, chaos, perf, data, devops, dpo, techwriter, a11y                                                                                     |
-| Security (11)     | pentester-lead, security-researcher, exploit-dev, security-architect, threat-analyst, ciso, secops-engineer, security-dev-lead, security-backend-dev, security-frontend-dev, qa-security |
-| Specialized leads | mobile_android_lead, mobile_ios_lead, lead_frontend, lead_backend, tech_lead_mobile                                                                                                      |
-| 95 YAML defs      | `skills/definitions/*.yaml`                                                                                                                                                              |
-
-## PATTERNS (12 types)
-
-solo, sequential, parallel, loop, hierarchical, network, human-in-the-loop, wave, adversarial-pair, adversarial-cascade, router, aggregator
-
-Protocol-based (NOT hierarchy_rank):
-
-- DISCUSSION (network, HITL, debate, aggregator): RESEARCH_PROTOCOL
-- EXECUTION (hierarchical, sequential, parallel, loop): EXEC/QA/REVIEW/DECOMPOSE
+## DB ADAPTER (db/adapter.py)
+`is_postgresql()` → gates PG-specific features (advisory lock, NOTIFY/LISTEN)
+`get_connection()` → PgConnectionWrapper from pool
+`get_db()` → sqlite3 or psycopg3 cursor (same API via adapter)
+SQLite fallback: `PG_DSN` not set → uses data/platform.db
 
 ---
 
-## ROLE_TOOL_MAP (tool_schemas.py)
-
-| Role         | Key Tools                                                                             |
-| ------------ | ------------------------------------------------------------------------------------- |
-| dev          | code*\*, git*_, build, test, deep*search, fractal_code, android*_                     |
-| qa           | code*read, build, test, playwright_test, browser_screenshot, android*\*, chaos, tmc   |
-| devops       | code*\*, git*\*, docker_build, deploy_azure, infra_check                              |
-| security     | code_read, code_search, deep_search, sast_scan, dependency_audit, secrets_scan        |
-| product      | memory\_\*, deep_search, code_read, list_files                                        |
-| architecture | code*\*, deep_search, memory*_, git\__                                                |
-| cdp          | memory\_\*, deep_search, run_phase, compose_workflow, create_team, create_sub_mission |
-| ALL roles    | +platform_agents, +platform_missions, +platform_memory_search, +platform_metrics      |
-
-`_classify_agent_role(agent)` — keyword-based: role+name → category
-
----
-
-## CONVENTIONS
-
-### Imports (always relative)
-
-```python
-from ..db.migrations import get_db
-from ..agents.store import get_agent_store
-from ..llm.client import LLMMessage, get_llm_client
+## KEY FILES
 ```
-
-### Singletons
-
-`get_agent_store()`, `get_project_store()`, `get_session_store()`, `get_mission_store()`, `get_pattern_store()`, `get_memory_manager()`, `get_llm_client()`, `get_workflow_store()`, `get_mission_run_store()`
-
-### Templates
-
-Extend `base.html`, blocks: `topbar_actions`, `content`.
-Markdown: `{{ content | markdown | safe }}` (auto-strips `<think>`, `[TOOL_CALL]`).
-
-### CSS
-
-`--bg-primary:#0f0a1a`, `--purple:#a855f7`, `--accent:#f78166`. JetBrains Mono. Radius 10px. Sidebar 56px.
-
-### Rules
-
-- ZERO emoji — SVG Feather or text only
-- `cleanLLM()` JS + `_clean_llm()` Jinja
-- 4 view modes: card, card-simple, list, list-compact
-- SSE: `bus.add_sse_listener()`, keepalive 30s, queue 2000
-- No `--reload`. No `import platform` top-level. Run from parent dir.
-
----
-
-## DB TABLES (~35 real + FTS virtual)
-
+server.py              lifespan, _drain_flag, _is_draining(), auth middleware (/api/ready bypass)
+rate_limit.py          slowapi limiter, Redis storage_uri when REDIS_URL set
+services/auto_resume.py  _launch_run(), _safe_run(), pg_run_lock() ctx manager
+agents/evolution_scheduler.py  _try_become_leader(), _run_evolution_cycle()
+agents/selection.py    Thompson Sampling Beta bandit
+agents/executor.py     LLM tool-calling loop (max 15 rounds)
+agents/tool_runner.py  all tools dispatch + android redirect
+patterns/engine.py     run_pattern() 8 topologies, adversarial guard, RL hook
+web/routes/api/health.py  /api/health (DB+Redis) + /api/ready (drain probe)
+web/routes/pages.py    /settings (infra={db_type,redis_url,node_id,drain_timeout})
+db/adapter.py          is_postgresql(), get_connection(), PgConnectionWrapper
 ```
-agents, agent_instances, agent_scores, patterns, skills, mcps,
-missions, sprints, tasks, features, user_stories, feature_deps,
-sessions, messages, messages_fts, artifacts, tool_calls,
-memory_pattern, memory_project, memory_project_fts,
-memory_global, memory_global_fts,
-skill_github_sources, projects, workflows,
-mission_runs, org_portfolios, org_arts, org_teams, org_team_members,
-ideation_sessions, ideation_messages, ideation_findings,
-retrospectives, confluence_pages, support_tickets,
-program_increments, integrations, llm_traces, platform_incidents
-```
-
----
 
 ## FILE TREE
-
 ```
 platform/
-├── server.py, config.py, models.py, security.py
-├── agents/    executor.py, loop.py, store.py, rlm.py, adversarial.py, tool_runner.py, tool_schemas.py, permissions.py
-├── patterns/  engine.py(1144L), store.py
-├── missions/  store.py, product.py
-├── services/  mission_orchestrator.py(780L)
-├── workflows/ store.py(440L)
-├── sessions/  store.py, runner.py(672L)
+├── server.py, config.py, models.py, rate_limit.py
+├── agents/    executor.py, loop.py, store.py, rlm.py, adversarial.py,
+│              tool_runner.py, tool_schemas.py, selection.py,
+│              evolution.py, evolution_scheduler.py, simulator.py, rl_policy.py
+├── patterns/  engine.py, store.py
+├── services/  mission_orchestrator.py, auto_resume.py
+├── workflows/ store.py
+├── sessions/  store.py, runner.py
 ├── a2a/       bus.py, protocol.py, veto.py, negotiation.py
 ├── llm/       client.py, observability.py
 ├── memory/    manager.py, project_files.py
-├── generators/ team.py
-├── metrics/   dora.py
-├── tools/     android_tools.py, build_tools.py, code_tools.py, git_tools.py, web_tools.py, security_tools.py, deploy_tools.py, chaos_tools.py, phase_tools.py, platform_tools.py, compose_tools.py, azure_tools.py, memory_tools.py, mcp_bridge.py, registry.py, sandbox.py, test_tools.py
-├── projects/  manager.py, registry.py
-├── skills/    library.py, definitions/*.yaml (95)
-├── db/        schema.sql, migrations.py
-├── security/  __init__.py
-├── deploy/    Dockerfile, docker-compose-vm.yml, nginx-vm.conf
-├── web/
-│   ├── routes/ missions.py(3184L), pages.py, sessions.py, workflows.py, projects.py, agents.py, api.py, ideation.py, helpers.py
-│   ├── ws.py (SSE)
-│   ├── templates/ (64 files)
-│   └── static/ css/(3), js/(4+), avatars/
-└── data/ → ../data/platform.db
+├── db/        schema.sql, migrations.py, adapter.py
+├── tools/     android_*, build, code, git, web, security, deploy,
+│              chaos, phase, platform, compose, azure, memory, mcp_bridge
+├── web/routes/ missions.py, pages.py, sessions.py, workflows.py,
+│               projects.py, agents.py, api/{health,settings,analytics}.py
+│   ws.py · templates/(64) · static/css(3) js(4+) avatars/
+└── data/ → ../data/platform.db (SQLite local) or PostgreSQL via PG_DSN
+```
+
+---
+
+## JARVIS — A2A/ACP SERVER
+```
+Jarvis = strat-cto agent, executive CTO, délègue à RTE/PO/SM/teams
+RULE: NEVER insert DB records manually — toujours passer par Jarvis (/api/cto/message)
+
+A2A spec: Linux Foundation A2A v1.0 (ex-ACP BeeAI/IBM, merged Q3 2025)
+Endpoints (public, no auth):
+  GET  /.well-known/agent.json    → Agent Card (discovery)
+  POST /a2a/tasks                 → Submit task {"input":{"parts":[{"kind":"text","text":"..."}]}}
+  GET  /a2a/tasks/{id}            → Status + result
+  GET  /a2a/events?task_id={id}   → SSE streaming
+  POST /a2a/tasks/{id}/cancel     → Cancel
+
+Code: platform/web/routes/a2a_server.py
+Auth bypass: /.well-known/* + /a2a/* via auth/middleware.py PUBLIC_PATHS
+
+MCP Jarvis (stdio bridge → A2A): mcp_lrm/mcp_jarvis.py
+  Registered in: ~/.claude/settings.json · ~/.config/opencode/opencode.json
+                 ~/.config/github-copilot/copilot-cli/mcp.json
+  Tools: jarvis_ask(message) · jarvis_status(task_id) · jarvis_task_list() · jarvis_agent_card()
+
+LLM ROUTING (Azure, AZURE_DEPLOY=1):
+  PLATFORM_LLM_PROVIDER=azure-openai  PLATFORM_LLM_MODEL=gpt-5-mini  AZURE_DEPLOY=1
+  reasoning/leadership (CTO,PO,SM,arch) → gpt-5.2
+  code/tests/QA/devops                  → gpt-5.1-codex
+  tasks/generic                         → gpt-5-mini
+  Settings UI → LLM tab: DB routing config (session_state key=llm_routing)
+  routing.py _select_model_for_agent(): AZURE_DEPLOY=1 → use Settings DB routing
+                                        AZURE_DEPLOY unset → local dev hardcoded path
+
+ROLE_TOOL_MAP["cto"] = delegation tools only (NO developer tools)
+  create_project, create_mission(workflow_id REQUIRED+enum), launch_epic_run,
+  check_run_status, resume_run, create_sprint, create_feature, create_story,
+  web_search, web_fetch, memory_*, get_project_context, platform_*
+  YAML: skills/definitions/strat-cto.yaml (source of truth → overwrites DB on restart)
+  POST-RESTART: must re-run /tmp/fix_agent5.sql (tools_json+system_prompt update)
 ```
 
 ## KNOWN ISSUES / GOTCHAS
+- `NodeStatus`: PENDING/RUNNING/COMPLETED/VETOED/FAILED — **NO `DONE`**
+- HTTP 400 tool message ordering `role 'tool' must follow 'tool_calls'` — non-fatal
+- `_mission_semaphore` configurable now (settings → Orchestrator) — was hardcoded 1
+- Container path: `/app/macaron_platform/` (NOT `/app/platform/`)
+- UID mismatch Azure: /opt/macaron owned 501, azureadmin=1001 → docker cp
+- SF Innovation node restart: must kill stale PID on 8090 before systemctl start
+- `/api/ready` must be in auth bypass list (server.py middleware phase 2)
+- PG advisory lock: connection-scoped → dedicated conn kept open for mission duration
+- Leader election fallback=True if Redis down (GA/seeder are idempotent → safe)
 
-- `NodeStatus` enum: PENDING, RUNNING, COMPLETED, VETOED, FAILED — **NO** `DONE` value
-- HTTP 400 tool message ordering: `messages with role 'tool' must follow 'tool_calls'` — executor bug, non-fatal
-- UID mismatch on Azure: /opt/macaron owned by 501, azureadmin=1001 → docker cp workaround
-- `_mission_semaphore = Semaphore(1)` — only 1 mission runs at a time, others queue
-- Container path: `/app/macaron_platform/` (Dockerfile copies `platform/` as `macaron_platform/`)
-- curl inside container: use docker network IP, NOT localhost (nginx proxies port 80→8090)
+---
 
-## CI/CD SECRETS
-
-### GitHub Actions (deploy OVH Demo)
-File: `.github/workflows/deploy-demo.yml`
-Configure in: GitHub → Settings → Secrets → Actions
-| Secret | Value |
-|--------|-------|
-| `OVH_SSH_KEY` | Contenu de la clé privée SSH pour `debian@54.36.183.124` |
-| `OVH_IP` | `54.36.183.124` |
-
-### GitLab CI (deploy Azure Prod)
-File: `.gitlab-ci.yml`
-Configure in: GitLab → Settings → CI/CD → Variables
-| Variable | Value |
-|----------|-------|
-| `AZURE_SSH_KEY` | Contenu de la clé privée SSH pour `azureadmin@4.233.64.30` |
-| `AZURE_VM_IP` | `4.233.64.30` |
-| `AZURE_USER` | `azureadmin` |
-
-### Local deploy (manual)
-```bash
-# Azure: scp → docker cp → restart
-scp -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa <file> azureadmin@4.233.64.30:~/
-ssh -i ~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa azureadmin@4.233.64.30 \
-  "docker cp ~/<file> platform-platform-1:/app/<path>/ && docker restart platform-platform-1"
+## ADAPTIVE INTELLIGENCE
 ```
-
----
-
-## ADAPTIVE INTELLIGENCE — Thompson Sampling + GA + RL
-
-### Overview
-
-Three layers of adaptive intelligence optimize agent/workflow performance:
-
+Layer 1 LIVE   Thompson Sampling   agents/selection.py     per-agent-slot Beta bandit
+Layer 2 PLAN   Genetic Algorithm   agents/evolution.py     nightly workflow evolution
+Layer 3 PLAN   Reinforcement Learning agents/rl_policy.py  mid-mission pattern adapt
 ```
-Layer 1 (LIVE ✅)     Thompson Sampling     per-agent-slot runtime selection
-Layer 2 (PLANNED)     Genetic Algorithm     offline workflow template evolution
-Layer 3 (PLANNED)     Reinforcement Learning  mid-mission pattern adaptation
-```
+**Thompson:** Beta(accepted+1, rejected+1) · cold-start <5 iter → uniform [0.4,0.6]
+**GA:** genome=PhaseSpec[] · fitness=success_rate×quality · population=40 · nightly 02:00
+  leader election: only one node runs GA (Redis SETNX)
+**RL:** Q-learning · state=(wf_hash, phase_idx, reject_pct, quality) · ε=0.1
+**DB:** agent_scores · evolution_proposals · evolution_runs · rl_experience
 
----
-
-### Layer 1: Thompson Sampling (LIVE — platform/agents/selection.py)
-
-**What**: Beta-distribution bandit for agent selection per role-slot.
-
-**How**:
-```python
-score ~ Beta(accepted + 1, rejected + 1)  # Gamma trick, no scipy
-agent = argmax(score_i for i in candidates)
-```
-
-**Cold start**: iterations < 5 → uniform score [0.4, 0.6]
-**Escalation**: rejection_rate > 40% → force azure-openai provider
-
-**DB**: `agent_scores(agent_id, epic_id, accepted, rejected, iterations, quality_score)`
-
-**Quality score**:
-- On acceptance: `min(1.0, ratio + tools_used*0.02 + min(output_len/5000, 0.05))`
-- On rejection: `accepted / (accepted + rejected)`
-
-**P3 auto-close**: ≥3 open quality_rejection incidents → auto_closed (engine.py)
-
-**A/B dashboard**: `/art` → Thompson Sampling tab (Équipe A=minimax vs Équipe B=azure-openai)
-
-**Metrics endpoint**: `GET /api/analytics/agents/scores`
-
----
-
-### Layer 2: Genetic Algorithm — Workflow Evolution (platform/agents/evolution.py)
-
-**What**: Evolve workflow YAML templates offline using historical mission outcomes.
-
-**Genome**: list of PhaseSpec `{phase_id, pattern_id, agents[], gate}`
-**Fitness**: `success_rate × avg_quality_score` from agent_scores + mission outcomes
-**Operators**:
-- Crossover: 1-point on phase list (phases from wf_A + phases from wf_B)
-- Mutation: swap pattern_id, change gate, swap agent, add/remove phase
-**Selection**: tournament (k=3)
-**Config**: population=40, generations=30, mutation_rate=0.15
-**Schedule**: nightly at 02:00 (asyncio)
-
-**DB tables**:
-- `evolution_proposals(id, base_wf_id, genome_json, fitness, generation, status, created_at)`
-- `evolution_runs(id, wf_id, started_at, completed_at, generations, best_fitness)`
-
-**Cold start**: `platform/agents/simulator.py` generates N synthetic runs.
-Probability model: `P(phase_success) = base × f(pattern) × f(gate) × f(seniority) + σ`
-- Patterns: parallel+15%, hierarchical+10%, sequential=base, loop-5%
-- Gates: always=base, no_veto+5%, all_approved+8% (but +20% duration)
-
-**API**: `GET /api/evolution/proposals`, `POST /api/evolution/proposals/{id}/approve|reject`, `POST /api/evolution/run/{wf_id}`
-
-**UI**: `/workflows` → Evolution tab (diff base vs evolved, fitness score, approve/reject)
-
----
-
-### Layer 3: Reinforcement Learning — Mid-mission Adaptation (platform/agents/rl_policy.py)
-
-**What**: Q-learning policy to recommend pattern changes mid-mission.
-
-**State**: `(workflow_id_hash, phase_idx_bucket, rejection_pct_bucket, quality_bucket)` → discretized
-**Actions**: `keep | switch_parallel | switch_sequential | switch_hierarchical | add_agent | remove_agent`
-**Reward**: `+1.0` phase success, `-1.0` phase failure, `+0.1×quality_score` quality bonus
-**Algorithm**: Q-learning, offline batch, ε-greedy exploration (ε=0.1)
-**Training**: nightly on `rl_experience(state, action, reward, next_state)` table
-**Trigger**: engine.py calls `rl_policy.recommend()` at phase start if confidence > 0.7
-
-**DB table**: `rl_experience(id, state_json, action, reward, next_state_json, mission_id, created_at)`
-
----
-
-### OKRs
-
-**O1 — Maximize autonomous team quality**
-- KR1: avg quality_score > 0.75 across all agents (baseline: ~0.55)
-- KR2: rejection_rate < 20% per epic (baseline: ~35%)
-- KR3: P0/P1 incidents → 0 auto-escalation misses
-
-**O2 — Continuous workflow improvement via GA**
-- KR1: ≥2 workflow proposals approved/month after GA evolution
-- KR2: evolved workflows show +10% fitness vs base templates
-- KR3: cold-start simulator generates ≥500 synthetic runs/workflow
-
-**O3 — RL mid-mission adaptation**
-- KR1: RL recommend() called ≥100 times/week
-- KR2: RL-recommended pattern changes lead to +5% phase success rate
-- KR3: Q-table coverage ≥80% of observed state space
-
-**O4 — Observable & explainable AI decisions**
-- KR1: 100% of Thompson/GA/RL decisions logged with rationale
-- KR2: Metrics dashboard shows all 3 layers in real-time
-- KR3: Agent popover shows selection reason (Thompson score, RL recommendation)
-
----
-
-### Key Files
-
-```
-platform/agents/
-  selection.py         Thompson Sampling (LIVE)
-  evolution.py         GA engine (PLANNED)
-  evolution_scheduler.py  nightly GA runner (PLANNED)
-  simulator.py         synthetic data generator (PLANNED)
-  rl_policy.py         Q-learning policy (PLANNED)
-platform/patterns/
-  engine.py            RL hook at phase start (PLANNED)
-platform/web/routes/
-  evolution.py         GA API endpoints (PLANNED)
-platform/web/templates/
-  _partial_analytics.html  Thompson Sampling section (LIVE)
-  partials/workflows_list.html  Evolution proposals tab (PLANNED)
-```
-
----
-
-## EXTERNAL INSPIRATIONS — Ce qu'on a intégré et d'où ça vient
-
-Télégraphique. Sources → implémentations. MAJ: 2026-03. Détail: `platform/modules/REFERENCES.md`
-
-### ✅ INTÉGRÉ (code live)
-
-**Pentagi** (vxcontrol/pentagi) → `workflows/definitions/security-hacking.yaml` + 12 agents RSSI
-- Pattern: Orchestrator→Researcher→Developer→Executor adapté en: Red Team → Threat Model → Exploitation → Report → CISO Gate → Remediation TDD → Verification → Deploy
-- Agents: pentester-lead(Karim), security-researcher, exploit-dev, security-architect, threat-analyst, secops-engineer, ciso(Rachid), compliance_officer, security-dev-lead, security-backend-dev, security-frontend-dev, qa-security
-- Workflow YAML dit explicitement "Inspiré PentAGI"
-
-**Shannon** (KeygraphHQ/shannon) → `tools/security_pentest_tools.py`
-- Autonomous pentest tools: recon_portscan (nmap), recon_subdomain (subfinder), recon_fingerprint (whatweb), pentest_fuzz_api (schemathesis), pentest_inject (SQLi/XSS/SSTI), pentest_auth (auth bypass), pentest_ssrf
-- Pas le Docker Shannon complet — les outils offensifs autonomes portés à la main
-
-**Ralph** (frankbria/ralph-claude-code) → `agents/executor.py:_summarize_context()` + `llm/prompt_compressor.py`
-- Context rot prevention: keep system header + last 6 msgs, summarize middle via cheap LLM
-- Threshold: 20 msgs → trigger compression. Fallback: simple truncation
-- prompt_compressor.py: whitespace norm + code block truncation + tool output truncation (RTK-inspired aussi)
-
-**Agentation.dev** → `web/routes/tma.py` + `workflows/definitions/tma-maintenance.yaml` + quality scanner
-- Concept: annotations code → tickets TMA (bug/debt/security/performance)
-- TMA workflow: triage → diagnostic root cause → correctif TDD → validation → deploy hotfix
-- `metrics/quality.py`: scan code quality 10 dimensions → génère recommandations/tickets
-
-**Airweave error-monitoring-agent** → `ops/error_clustering.py` + `ops/error_state.py` + `skills/error-monitoring.md`
-- Error fingerprinting, clustering par similarité, severity auto-triage, agent remediation trigger
-
-**Landlock** (landlock.io) → `tools/sandbox.py` + `tools/sandbox/landlock-runner` (binary)
-- Kernel sandbox LSM pour isolation shell agents. Config: security.landlock_enabled
-
-### 🔭 WATCH LIST (pas encore intégré)
-
-**D3.js** — lib dataviz frontend. Candidat pour graphes metrics/cockpit.
-**SeedVR2** — vidéo gen Apple Silicon (extension mflux). Post-mflux.
-**Semgrep** — déjà appelé dans sast_tools.py `_run_semgrep()` si installé. Pas en registry officiel.

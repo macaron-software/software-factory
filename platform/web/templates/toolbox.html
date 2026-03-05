@@ -6,6 +6,7 @@
     <button class="tab" hx-get="/mcps" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("mcps") }}</button>
     <button class="tab" onclick="switchTab(this); showAPITab()">API</button>
     <button class="tab" onclick="switchTab(this); showCLITab()">CLI</button>
+    <button class="tab" onclick="switchTab(this); showA2ATab()">A2A</button>
     <button class="tab" hx-get="/design-system" hx-select=".main-area > *" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Design System</button>
     <button class="tab" hx-get="/wiki" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">
         <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-book-open"/></svg> Wiki
@@ -587,6 +588,158 @@ function _initSwagger() {
         filter: true,
         tryItOutEnabled: true,
     });
+}
+
+function showA2ATab() {
+    document.getElementById('tab-content').innerHTML = `
+        <div class="main-area" style="padding:2rem;max-width:960px">
+            <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.6rem">
+                <span style="font-size:1.6rem">🤝</span> A2A — Agent2Agent Protocol
+            </h1>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem;font-size:0.9rem">
+                Jarvis est exposé comme un agent A2A standard (Linux Foundation / A2A v1.0). 
+                Tout agent externe — GitHub Copilot, LangChain, CrewAI, Azure AI Foundry — peut lui déléguer des tâches.
+            </p>
+
+            <!-- Agent Card -->
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1.5rem">
+                <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1rem">
+                    <div style="width:42px;height:42px;border-radius:10px;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🧠</div>
+                    <div>
+                        <div style="font-weight:700;font-size:1rem">Jarvis — Software Factory CTO</div>
+                        <div style="font-size:0.75rem;color:var(--text-secondary)">urn:agent:software-factory:jarvis · A2A v1.0</div>
+                    </div>
+                    <span id="a2a-card-status" style="margin-left:auto;padding:3px 10px;border-radius:12px;font-size:0.72rem;font-weight:700;background:rgba(34,197,94,.15);color:#22c55e">Loading…</span>
+                </div>
+                <div style="display:flex;gap:0.5rem;flex-wrap:wrap" id="a2a-capabilities"></div>
+            </div>
+
+            <!-- Endpoints -->
+            <div style="margin-bottom:1.5rem">
+                <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Endpoints</div>
+                <div style="display:flex;flex-direction:column;gap:0.4rem" id="a2a-endpoints">
+                    ${[
+                        ['GET','/.well-known/agent.json','Agent Card — discovery'],
+                        ['POST','/a2a/tasks','Submit a task to Jarvis'],
+                        ['GET','/a2a/tasks/{id}','Get task status / result'],
+                        ['GET','/a2a/events?task_id={id}','SSE streaming (progress)'],
+                        ['POST','/a2a/tasks/{id}/cancel','Cancel a task'],
+                    ].map(([m,p,d]) => `
+                        <div style="display:flex;align-items:center;gap:0.8rem;padding:0.55rem 0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:7px;font-size:0.82rem">
+                            <span style="padding:2px 8px;border-radius:5px;font-size:0.7rem;font-weight:700;background:${m==='GET'?'rgba(34,197,94,.12)':'rgba(124,58,237,.12)'};color:${m==='GET'?'#22c55e':'#a78bfa'};font-family:monospace;min-width:40px;text-align:center">${m}</span>
+                            <code style="color:var(--text-primary);font-size:0.82rem;flex:1">${p}</code>
+                            <span style="color:var(--text-secondary)">${d}</span>
+                        </div>`).join('')}
+                </div>
+            </div>
+
+            <!-- Try it -->
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1.5rem">
+                <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.8rem">🧪 Try it — Submit a task to Jarvis</div>
+                <textarea id="a2a-message" placeholder="Ex: Crée un projet game-tetris-v3 HTML5 Canvas, lance l'epic et délègue au RTE." 
+                    style="width:100%;box-sizing:border-box;padding:0.7rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:7px;color:var(--text-primary);font-size:0.85rem;resize:vertical;min-height:80px;font-family:inherit"></textarea>
+                <div style="display:flex;gap:0.8rem;margin-top:0.7rem;align-items:center">
+                    <button onclick="a2aSubmitTask()" style="padding:0.5rem 1.2rem;background:var(--purple);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:0.85rem;font-weight:600">
+                        ▶ Submit Task
+                    </button>
+                    <span id="a2a-task-id" style="font-size:0.78rem;color:var(--text-secondary);font-family:monospace"></span>
+                </div>
+            </div>
+
+            <!-- Result -->
+            <div id="a2a-result" style="display:none;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem">
+                <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.6rem;display:flex;align-items:center;gap:0.5rem">
+                    <span>Result</span>
+                    <span id="a2a-result-state" style="padding:2px 8px;border-radius:12px;font-size:0.7rem;font-weight:700;background:rgba(251,191,36,.15);color:#fbbf24">working…</span>
+                </div>
+                <pre id="a2a-result-text" style="white-space:pre-wrap;word-break:break-word;font-size:0.82rem;color:var(--text-primary);margin:0;font-family:inherit"></pre>
+            </div>
+
+            <!-- Quick start -->
+            <div style="margin-top:1.5rem;padding:1rem 1.2rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px">
+                <div style="font-weight:600;font-size:0.85rem;margin-bottom:0.7rem">⚡ Quick Start (curl)</div>
+                <pre style="font-size:0.78rem;color:#d4d4d4;background:#1e1e1e;padding:0.8rem;border-radius:6px;overflow-x:auto;margin:0"># 1. Auth
+curl -c /tmp/sf.txt -X POST ${window.location.origin}/api/auth/demo
+
+# 2. Submit task
+TASK=$(curl -b /tmp/sf.txt -s -X POST ${window.location.origin}/a2a/tasks \\
+  -H 'Content-Type: application/json' \\
+  -d '{"input":{"parts":[{"kind":"text","text":"Crée le projet game-breakout-v1"}]}}')
+TASK_ID=$(echo $TASK | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+
+# 3. Stream events
+curl -b /tmp/sf.txt -N "${window.location.origin}/a2a/events?task_id=$TASK_ID"
+
+# 4. Get result
+curl -b /tmp/sf.txt "${window.location.origin}/a2a/tasks/$TASK_ID"</pre>
+            </div>
+        </div>
+    `;
+    _loadA2ACard();
+}
+
+async function _loadA2ACard() {
+    try {
+        const r = await fetch('/.well-known/agent.json');
+        const d = await r.json();
+        document.getElementById('a2a-card-status').textContent = '✓ Live';
+        const caps = document.getElementById('a2a-capabilities');
+        if (caps && d.capabilities) {
+            caps.innerHTML = d.capabilities.map(c =>
+                `<span style="padding:2px 8px;border-radius:12px;background:rgba(124,58,237,.12);color:#a78bfa;font-size:0.72rem;font-weight:600">${c}</span>`
+            ).join('');
+        }
+    } catch(e) {
+        const el = document.getElementById('a2a-card-status');
+        if (el) { el.textContent = 'unavailable'; el.style.color='#f87171'; el.style.background='rgba(248,113,113,.1)'; }
+    }
+}
+
+async function a2aSubmitTask() {
+    const msg = (document.getElementById('a2a-message').value || '').trim();
+    if (!msg) return;
+    const tidEl = document.getElementById('a2a-task-id');
+    const resEl = document.getElementById('a2a-result');
+    const resTxt = document.getElementById('a2a-result-text');
+    const resState = document.getElementById('a2a-result-state');
+
+    resEl.style.display = 'block';
+    resTxt.textContent = '';
+    resState.textContent = 'submitting…';
+    resState.style.color = '#fbbf24';
+
+    try {
+        const r = await fetch('/a2a/tasks', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({input: {parts: [{kind: 'text', text: msg}]}})
+        });
+        const task = await r.json();
+        if (!task.id) { resTxt.textContent = JSON.stringify(task, null, 2); return; }
+        tidEl.textContent = 'task: ' + task.id;
+        resState.textContent = 'working…';
+
+        // Stream via SSE
+        const evtSrc = new EventSource('/a2a/events?task_id=' + task.id);
+        evtSrc.onmessage = (e) => {
+            const ev = JSON.parse(e.data);
+            if (ev.event === 'task.delta') {
+                resTxt.textContent += ev.delta;
+            } else if (ev.event === 'task.tool') {
+                resTxt.textContent += '\\n[tool: ' + ev.tool + ']\\n';
+            } else if (ev.event === 'task.status') {
+                resState.textContent = ev.task?.status?.state || 'working';
+            } else if (ev.event === 'task.done') {
+                evtSrc.close();
+                resState.textContent = 'completed';
+                resState.style.color = '#22c55e';
+                resState.style.background = 'rgba(34,197,94,.12)';
+            }
+        };
+        evtSrc.onerror = () => { evtSrc.close(); resState.textContent = 'error'; resState.style.color='#f87171'; };
+    } catch(e) {
+        resTxt.textContent = 'Error: ' + e.message;
+    }
 }
 </script>
 {% endblock %}

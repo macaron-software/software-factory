@@ -244,6 +244,7 @@ PUBLIC_PATHS = {
     "/js-error",
     "/auth/github",
     "/auth/azure",
+    "/.well-known",
 }
 
 
