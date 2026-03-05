@@ -128,7 +128,11 @@ _FALLBACK_CHAIN = [_primary] + [
     for p in (
         (["local-mlx"] if _local_mlx_enabled else [])
         + (["ollama"] if _ollama_enabled else [])
-        + ["minimax", "azure-openai", "azure-ai", "openai"]
+        + (
+            ["minimax", "azure-openai", "azure-ai", "openai"]
+            if not _is_azure
+            else ["azure-openai", "azure-ai"]
+        )
     )
     if p != _primary
 ]
