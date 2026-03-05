@@ -2855,7 +2855,15 @@ def _build_phase_prompt(
 
     # Inject workspace path so agents know where to work
     if workspace_path:
-        prompt += f"\n\nWORKSPACE: {workspace_path}\nUtilisez ce chemin pour cwd dans vos outils (code_write, build, docker_deploy, etc.)."
+        prompt += (
+            f"\n\nWORKSPACE: {workspace_path}\n"
+            f"RÈGLES IMPÉRATIVES pour écrire du code:\n"
+            f"- code_write: path DOIT être absolu et commencer par {workspace_path}/ "
+            f"(ex: path='{workspace_path}/src/main.py'). "
+            f"NE JAMAIS utiliser un chemin relatif ou inventer un autre répertoire.\n"
+            f"- build/test: utiliser cwd='{workspace_path}'\n"
+            f"- list_files: utiliser path='{workspace_path}' pour lister les fichiers existants"
+        )
 
     return prompt
 

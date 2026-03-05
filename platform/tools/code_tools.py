@@ -101,7 +101,12 @@ class CodeWriteTool(BaseTool):
             _log_cw.getLogger(__name__).warning(
                 "code_write BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
             )
-            return f"Error: path '{path}' is outside allowed workspace directories"
+            allowed = ", ".join(str(r) for r in _ALLOWED_WRITE_ROOTS if r.exists())
+            return (
+                f"Error: path '{path}' is outside allowed workspace directories. "
+                f"You MUST use an absolute path starting with one of: {allowed}. "
+                f"Check your WORKSPACE variable and prefix all paths with it."
+            )
         try:
             p = Path(path)
             if p.exists():
@@ -133,7 +138,11 @@ class CodeEditTool(BaseTool):
             _log_ce.getLogger(__name__).warning(
                 "code_edit BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
             )
-            return f"Error: path '{path}' is outside allowed workspace directories"
+            allowed = ", ".join(str(r) for r in _ALLOWED_WRITE_ROOTS if r.exists())
+            return (
+                f"Error: path '{path}' is outside allowed workspace directories. "
+                f"Use an absolute path starting with one of: {allowed}."
+            )
         try:
             content = Path(path).read_text()
             if old not in content:
