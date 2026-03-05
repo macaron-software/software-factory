@@ -228,6 +228,20 @@ modules:
     install: "# bundled — no install needed"
     builtin: true
 
+  - id: chaos-endurance
+    name: "Chaos Endurance"
+    description: "Continuous resilience testing via periodic fault injection (container restart, CPU stress, network latency, disk fill, etc.). Runs every 2-6h, measures MTTR, logs to chaos_runs table. Disable to pause all chaos scenarios — acts as runtime killswitch alongside CHAOS_ENABLED env var."
+    category: infra
+    icon: "zap"
+    source_url: ""
+    license: "Internal"
+    tools: []
+    install: "# bundled — set CHAOS_ENABLED=1 to activate the loop"
+    builtin: true
+    # KILLSWITCH: disable this module in Settings → Modules to pause chaos runs
+    # without restarting the server. The chaos loop checks DB enabled state
+    # before each scenario execution (in addition to CHAOS_ENABLED env var).
+
   # ── BROWSER ────────────────────────────────────────────────────────────────
 
   - id: browser-cli

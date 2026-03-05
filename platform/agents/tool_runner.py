@@ -19,8 +19,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Module IDs that are enabled by default (builtin modules).
-_BUILTIN_MODULE_IDS = {"component-gallery", "rtk", "error-monitoring", "playwright-mcp"}
+
+# Module IDs that are enabled by default — derived from registry.yaml (builtin: true).
+# Used as fallback when DB settings table is empty (fresh install).
+# This set is computed once at import time; the authoritative source is the registry.
+def _load_builtin_ids() -> frozenset:
+    try:
+        import yaml
+        from pathlib import Path as _Path
+
+        reg = _Path(__file__).parent.parent / "modules" / "registry.yaml"
+        if reg.exists():
+            data = yaml.safe_load(reg.read_text())
+            return frozenset(
+                m["id"] for m in data.get("modules", []) if m.get("builtin")
+            )
+    except Exception:
+        pass
+    # Hard fallback if registry.yaml unreadable
+    return frozenset({"component-gallery", "rtk", "error-monitoring", "playwright-mcp"})
+
+
+_BUILTIN_MODULE_IDS: frozenset = _load_builtin_ids()
 
 
 def _is_module_enabled(module_id: str) -> bool:

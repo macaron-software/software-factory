@@ -269,8 +269,37 @@ async def _exec_scenario(scenario: str) -> ChaosRunResult:
 # ── Main Loop ────────────────────────────────────────────────────────
 
 
+def _is_module_enabled_db(module_id: str) -> bool:
+    """Live check against DB settings — used as runtime killswitch.
+
+    Mirrors platform/agents/tool_runner._is_module_enabled() but avoids circular
+    import (chaos_endurance is in ops/, not agents/).
+    """
+    try:
+        from ..db.adapter import get_connection as _gc
+
+        db = _gc()
+        row = db.execute(
+            "SELECT value FROM settings WHERE key='enabled_modules'"
+        ).fetchone()
+        db.close()
+        if row:
+            import json as _json
+
+            return module_id in _json.loads(row[0])
+    except Exception:
+        pass
+    return True  # default: enabled if DB not available
+
+
 async def chaos_loop():
-    """Main chaos loop — runs forever, triggers random scenarios."""
+    """Main chaos loop — runs forever, triggers random scenarios.
+
+    Two-layer killswitch:
+      1. CHAOS_ENABLED env var (hard gate, checked at loop start)
+      2. 'chaos-endurance' module in Settings → Modules (soft, checked per iteration)
+         Toggle in UI → takes effect before the next scenario fires, no restart needed.
+    """
     _ensure_table()
     logger.info(
         "Chaos endurance loop started (interval %.1f-%.1fh, max %d/day)",
@@ -283,6 +312,11 @@ async def chaos_loop():
         interval = random.uniform(MIN_INTERVAL_H * 3600, MAX_INTERVAL_H * 3600)
         logger.info("Chaos: sleeping %.0f minutes until next scenario", interval / 60)
         await asyncio.sleep(interval)
+
+        # Soft killswitch — check DB settings before each run (Settings → Modules toggle)
+        if not _is_module_enabled_db("chaos-endurance"):
+            logger.info("Chaos: module disabled in Settings — skipping run")
+            continue
 
         if _today_count() >= MAX_CHAOS_PER_DAY:
             logger.info("Chaos: max %d runs/day reached, skipping", MAX_CHAOS_PER_DAY)
