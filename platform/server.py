@@ -972,7 +972,7 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
                 "img-src 'self' data: blob: https:; "

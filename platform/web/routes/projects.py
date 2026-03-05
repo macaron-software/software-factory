@@ -132,6 +132,27 @@ async def projects_page(request: Request):
     )
 
 
+@router.get("/api/projects")
+async def api_list_projects(request: Request):
+    """JSON list of all projects."""
+    from ...projects.manager import get_project_store
+
+    projects = get_project_store().list_all()
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "status": p.status,
+            "factory_type": p.factory_type,
+            "lead_agent_id": p.lead_agent_id,
+            "client_domain": p.client_domain,
+            "container_url": p.container_url,
+        }
+        for p in projects
+    ]
+
+
 @router.get("/api/projects/{project_id}/git-status")
 async def project_git_status(project_id: str):
     """Lazy-load git status for a single project (called via HTMX)."""
