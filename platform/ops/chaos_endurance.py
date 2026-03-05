@@ -276,9 +276,7 @@ def _is_module_enabled_db(module_id: str) -> bool:
     import (chaos_endurance is in ops/, not agents/).
     """
     try:
-        from ..db.adapter import get_connection as _gc
-
-        db = _gc()
+        db = get_connection()
         row = db.execute(
             "SELECT value FROM settings WHERE key='enabled_modules'"
         ).fetchone()
