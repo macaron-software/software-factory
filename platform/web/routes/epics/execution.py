@@ -1006,8 +1006,13 @@ async def api_epic_run(request: Request, epic_id: str):
 
     Uses the REAL pattern engine (run_pattern) for each phase — agents
     think with LLM, stream their responses, and interact per pattern type.
+
+    Smart resume: phases already DONE are skipped; only FAILED/PENDING phases
+    are re-executed. This allows re-running a completed/failed run without
+    restarting from ideation.
     """
     from ....epics.store import get_epic_run_store
+    from ....models import EpicStatus, PhaseStatus
 
     run_store = get_epic_run_store()
     mission = run_store.get(epic_id)
@@ -1020,8 +1025,36 @@ async def api_epic_run(request: Request, epic_id: str):
             {"status": "running", "mission_id": epic_id, "info": "already running"}
         )
 
+    # Reset FAILED phases → PENDING so they are re-executed.
+    # DONE/DONE_WITH_ISSUES phases stay as-is and will be skipped by the orchestrator.
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    from_phase: int = int(body.get("from_phase", -1))
+
+    reset_count = 0
+    for idx, phase in enumerate(mission.phases):
+        if from_phase >= 0 and idx >= from_phase:
+            # Hard reset from a specific phase index
+            phase.status = PhaseStatus.PENDING
+            reset_count += 1
+        elif phase.status == PhaseStatus.FAILED:
+            phase.status = PhaseStatus.PENDING
+            reset_count += 1
+
+    # Also reset the run status itself so the orchestrator picks it up
+    if mission.status in ("completed", "failed", "paused"):
+        mission.status = "running"
+        run_store.update(mission)
+    elif reset_count:
+        run_store.update(mission)
+
     await _launch_orchestrator(epic_id)
-    return JSONResponse({"status": "running", "mission_id": epic_id})
+    return JSONResponse(
+        {"status": "running", "mission_id": epic_id, "phases_reset": reset_count}
+    )
 
 
 async def _run_milestone_pipeline_background(
