@@ -119,6 +119,52 @@ POST /api/missions/start → pg_run_lock(run_id) [PG advisory] → _safe_run()
 
 ---
 
+## BOUCLE SPRINT — Jarvis → Epic → Sprint → Feature
+
+```mermaid
+flowchart TD
+    J["🤖 Jarvis CTO"]
+    PM["📋 PO / Product Manager"]
+    RTE["🚂 RTE / Scrum Master"]
+    WF["📄 Workflow YAML\nPhases séquentielles"]
+
+    J -->|"create_project + create_epic"| PM
+    PM -->|"create_feature/story\nAC GIVEN/WHEN/THEN + WSJF"| RTE
+    RTE -->|"launch_epic_run"| WF
+
+    WF --> PN["Phase non-dev\ntriage / archi / deploy / QA\n→ 1 seul pass"]
+    WF --> PD["Phase dev / sprint / test\n→ for sprint_num in range(1, max+1)"]
+
+    PD --> S1["Sprint 1\n• MVP feature du backlog WSJF\n• features → in_progress"]
+    S1 --> R1["Rétrospective LLM auto"]
+    R1 --> SM["Sprint 2..N-1\n• Features WSJF suivantes\n• Code + mémoire projet injectés"]
+    SM --> R2["Rétrospective → contexte suivant"]
+    R2 --> SF["Sprint final\n• Finalisation + CI/CD handoff"]
+
+    SF -->|"✅ succès"| BRK["break — phase done"]
+    SF -->|"❌ échec"| RETRY["Retry + feedback correctif"]
+    RETRY --> SM
+    SF -->|"⚠️ max atteint\n(défaut: MAX_SPRINTS=20)"| CONT["continue — non-bloquant"]
+
+    BRK --> NXT["Phase suivante"]
+    CONT --> NXT
+
+    style J fill:#7c3aed,color:#fff
+    style PM fill:#7c3aed,color:#fff
+    style RTE fill:#7c3aed,color:#fff
+    style PD fill:#064e3b,color:#fff
+    style S1 fill:#065f46,color:#fff
+    style SM fill:#065f46,color:#fff
+    style SF fill:#065f46,color:#fff
+    style RETRY fill:#7f1d1d,color:#fff
+    style CONT fill:#78350f,color:#fff
+```
+
+**Feature pull :** `product_backlog.list_features(epic_id)` trié WSJF → injecté en tête de prompt chaque sprint.  
+**Limits :** `MAX_SPRINTS_GATED=20` (TDD) · `MAX_SPRINTS_DEV=20` (autres dev) · override YAML `config.max_iterations: N`
+
+---
+
 ## ADVERSARIAL GUARD (agents/adversarial.py)
 **L0 deterministic (0ms):** SLOP · MOCK · FAKE_BUILD(+7) · HALLUCINATION · LIE · STACK_MISMATCH(+7) · TOO_SHORT · ECHO · REPETITION
 **L1 LLM semantic:** skipped for network/debate/aggregator/HITL
