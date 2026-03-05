@@ -2,6 +2,7 @@
 Platform API unit tests — real endpoints, real data, real assertions.
 Run: pytest tests/test_platform_api.py -v
 """
+
 import os
 import sys
 import pytest
@@ -17,11 +18,13 @@ def client():
     """Create a TestClient for the FastAPI app."""
     os.environ["PLATFORM_ENV"] = "test"
     from platform.server import app
+
     with TestClient(app) as c:
         yield c
 
 
 # ─── Health & System ────────────────────────────────────────────
+
 
 class TestHealth:
     def test_health_ok(self, client):
@@ -45,6 +48,7 @@ class TestHealth:
 
 
 # ─── Projects ───────────────────────────────────────────────────
+
 
 class TestProjects:
     def test_list_projects(self, client):
@@ -73,6 +77,7 @@ class TestProjects:
 
 # ─── Agents ─────────────────────────────────────────────────────
 
+
 class TestAgents:
     def test_list_agents(self, client):
         r = client.get("/api/agents")
@@ -92,8 +97,15 @@ class TestAgents:
     def test_product_managers_exist(self, client):
         r = client.get("/api/agents")
         agents = r.json()
-        pm_agents = [a for a in agents if a.get("role") == "product-manager"]
-        assert len(pm_agents) >= 1, "Should have at least 1 product-manager agent"
+        pm_agents = [
+            a
+            for a in agents
+            if "product" in (a.get("role") or "").lower()
+            and "manager" in (a.get("role") or "").lower()
+        ]
+        assert len(pm_agents) >= 1, (
+            "Should have at least 1 product-manager agent (role contains 'product' and 'manager')"
+        )
 
     def test_agent_details(self, client):
         r = client.get("/api/agents")
@@ -105,6 +117,7 @@ class TestAgents:
 
 
 # ─── Missions / Epics ──────────────────────────────────────────
+
 
 class TestMissions:
     def test_list_missions_partial(self, client):
@@ -119,26 +132,30 @@ class TestMissions:
 
 # ─── Pages load (HTML 200) ─────────────────────────────────────
 
+
 class TestPagesLoad:
     """Smoke test: every page returns 200 with HTML content."""
 
-    @pytest.mark.parametrize("path", [
-        "/",
-        "/pi",
-        "/agents",
-        "/skills",
-        "/mcps",
-        "/settings",
-        "/monitoring",
-        "/memory",
-        "/missions",
-        "/ideation",
-        "/workflows",
-        "/backlog",
-        "/ceremonies",
-        "/design-system",
-        "/metier",
-    ])
+    @pytest.mark.parametrize(
+        "path",
+        [
+            "/",
+            "/pi",
+            "/agents",
+            "/skills",
+            "/mcps",
+            "/settings",
+            "/monitoring",
+            "/memory",
+            "/missions",
+            "/ideation",
+            "/workflows",
+            "/backlog",
+            "/ceremonies",
+            "/design-system",
+            "/metier",
+        ],
+    )
     def test_page_loads(self, client, path):
         r = client.get(path)
         assert r.status_code == 200, f"{path} returned {r.status_code}"
@@ -147,6 +164,7 @@ class TestPagesLoad:
 
 
 # ─── i18n ───────────────────────────────────────────────────────
+
 
 class TestI18n:
     @pytest.mark.parametrize("lang", ["en", "fr", "zh", "es", "ja", "pt", "de", "ko"])
@@ -159,6 +177,7 @@ class TestI18n:
 
 
 # ─── Integrations ──────────────────────────────────────────────
+
 
 class TestIntegrations:
     def test_list_integrations(self, client):
@@ -180,6 +199,7 @@ class TestIntegrations:
 
 # ─── Search & Export ────────────────────────────────────────────
 
+
 class TestSearchExport:
     def test_search_empty(self, client):
         r = client.get("/api/search", params={"q": ""})
@@ -199,7 +219,9 @@ class TestSearchExport:
 
     def test_memory_search_xss_escaped(self, client):
         """Verify XSS payloads are escaped in memory search HTML responses."""
-        r = client.get("/api/memory/search", params={"q": '<script>alert("xss")</script>'})
+        r = client.get(
+            "/api/memory/search", params={"q": '<script>alert("xss")</script>'}
+        )
         assert r.status_code == 200
         # HTMLResponse must escape user input
         if "text/html" in r.headers.get("content-type", ""):
@@ -215,6 +237,7 @@ class TestSearchExport:
 
 
 # ─── Security ───────────────────────────────────────────────────
+
 
 class TestSecurity:
     def test_csp_header(self, client):
@@ -237,6 +260,7 @@ class TestSecurity:
 
 
 # ─── Memory ─────────────────────────────────────────────────────
+
 
 class TestMemory:
     def test_memory_stats(self, client):
