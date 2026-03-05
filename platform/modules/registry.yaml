@@ -291,6 +291,27 @@ modules:
 
   # ── KNOWLEDGE ──────────────────────────────────────────────────────────────
 
+  # ── META / QUALITY ─────────────────────────────────────────────────────────
+
+  - id: skill-creator
+    name: "Anthropic Skill Creator"
+    description: "Eval loop for SF skills: draft → eval_cases → execute → grade → iterate. skill-creator.md guides skill authoring, skill-grader.md grades outputs PASS/FAIL with evidence, skill-eval workflow runs the full loop. Prevents skill quality drift — 44+ skills with no regression coverage."
+    category: meta
+    icon: "zap"
+    source_url: "https://github.com/anthropics/skills/tree/main/skills/skill-creator"
+    repo_url: "https://github.com/anthropics/skills"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/skill-creator.md"
+    # SOURCE: Anthropic skill-creator (MIT)
+    # WHY: Our 44 skills had no way to test if they work. The eval loop provides
+    #      a repeatable quality gate: write eval_cases in skill frontmatter, run
+    #      them via skill-eval workflow, grade with skill-grader (PASS/FAIL +
+    #      evidence), iterate until pass_rate >= 0.8.
+    # ADAPTATIONS: eval_cases in YAML frontmatter (not evals.json), no .skill
+    #      packaging, no claude -p CLI, grading via skill-grader.md skill.
+
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
