@@ -1416,6 +1416,22 @@ class EpicOrchestrator:
                             "options": ["GO", "NOGO", "PIVOT"],
                         },
                     )
+                    # Persist in-app notification so the bell shows GO/NOGO buttons
+                    try:
+                        from .notifications import emit_notification
+
+                        _proj_id = getattr(mission, "project_id", "") or ""
+                        emit_notification(
+                            f"⏸ GO/NOGO — {getattr(mission, 'name', mission.id)} — {wf_phase.name}",
+                            type="checkpoint",
+                            message="L'équipe attend votre décision pour continuer.",
+                            url=f"/missions/{mission.id}/control",
+                            severity="warning",
+                            source=phase.phase_id,
+                            ref_id=mission.id,
+                        )
+                    except Exception:
+                        pass
                     for _ in range(600):
                         await asyncio.sleep(1)
                         m = run_store.get(mission.id)
