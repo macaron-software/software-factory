@@ -36,8 +36,7 @@ import time
 import uuid
 from typing import Generator
 
-import urllib.request
-import urllib.error
+import httpx
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -55,23 +54,17 @@ def _login() -> str:
     global _token
     if _token:
         return _token
-    payload = json.dumps({"email": SF_EMAIL, "password": SF_PASSWORD}).encode()
-    req = urllib.request.Request(
+    resp = httpx.post(
         f"{SF_API_URL}/api/auth/login",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        json={"email": SF_EMAIL, "password": SF_PASSWORD},
+        timeout=20,
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        for header in resp.getheaders():
-            if header[0].lower() == "set-cookie" and "access_token=" in header[1]:
-                _token = header[1].split("access_token=")[1].split(";")[0]
-                return _token
-    raise RuntimeError("Login failed: no access_token cookie")
-
-
-def _cookie() -> str:
-    return f"access_token={_login()}"
+    resp.raise_for_status()
+    tok = resp.cookies.get("access_token", "")
+    if not tok:
+        raise RuntimeError("Login failed: no access_token cookie")
+    _token = tok
+    return _token
 
 
 # ── Sessions store (in-memory) ────────────────────────────────────────────────
@@ -90,25 +83,27 @@ def _stream_jarvis(
     project_id: str, message: str, session_id: str
 ) -> Generator[str, None, None]:
     """Stream text chunks from the Jarvis chat endpoint (SSE)."""
-    payload = json.dumps({"message": message, "session_id": session_id}).encode()
     url = f"{SF_API_URL}/api/projects/{project_id}/chat/stream"
+    payload = {"message": message, "session_id": session_id}
 
-    # Retry once on auth failure
     for attempt in range(2):
         try:
-            req = urllib.request.Request(
+            with httpx.stream(
+                "POST",
                 url,
-                data=payload,
+                json=payload,
                 headers={
-                    "Content-Type": "application/json",
-                    "Cookie": _cookie(),
+                    "Cookie": f"access_token={_login()}",
                     "Accept": "text/event-stream",
                 },
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=120) as resp:
-                for raw_line in resp:
-                    line = raw_line.decode("utf-8", errors="replace").rstrip("\r\n")
+                timeout=120,
+            ) as resp:
+                if resp.status_code == 401 and attempt == 0:
+                    global _token
+                    _token = ""
+                    continue
+                resp.raise_for_status()
+                for line in resp.iter_lines():
                     if line.startswith("data:"):
                         data_str = line[5:].strip()
                         try:
@@ -118,11 +113,10 @@ def _stream_jarvis(
                         text = evt_data.get("text", "")
                         if text:
                             yield text
-                return  # success
-        except urllib.error.HTTPError as e:
-            if e.code == 401 and attempt == 0:
-                global _token
-                _token = ""  # force re-login
+            return
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401 and attempt == 0:
+                _token = ""  # type: ignore[assignment]
                 continue
             raise
 
