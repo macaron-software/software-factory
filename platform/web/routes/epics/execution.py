@@ -1012,7 +1012,7 @@ async def api_epic_run(request: Request, epic_id: str):
     restarting from ideation.
     """
     from ....epics.store import get_epic_run_store
-    from ....models import EpicStatus, PhaseStatus
+    from ....models import PhaseStatus
 
     run_store = get_epic_run_store()
     mission = run_store.get(epic_id)
@@ -1325,6 +1325,36 @@ async def mission_replay(run_id: str, from_phase: int = 0):
     return JSONResponse(
         {"ok": True, "new_run_id": new_run.id, "from_phase": from_phase}
     )
+
+
+# ── Worker node: resume endpoint (used by multi-node dispatch) ────────────
+
+
+@router.post("/api/missions/runs/{run_id}/resume")
+async def worker_resume_run(run_id: str):
+    """Trigger local execution of a run dispatched from another node.
+
+    Called by auto_resume._try_dispatch_to_worker when this node is the
+    least-loaded worker. Equivalent to /api/missions/{id}/run but targeted
+    by run_id rather than epic_id and always resumes (no body required).
+    """
+    from ....epics.store import get_epic_run_store
+    from ....services.auto_resume import _launch_run
+
+    run_store = get_epic_run_store()
+    if not run_store.get(run_id):
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+
+    existing = _active_mission_tasks.get(run_id)
+    if existing and not existing.done():
+        return JSONResponse({"status": "already_running", "run_id": run_id})
+
+    try:
+        await _launch_run(run_id)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    return JSONResponse({"status": "launched", "run_id": run_id}, status_code=202)
 
 
 # ── Compliance Reports ────────────────────────────────────────────────

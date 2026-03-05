@@ -354,9 +354,44 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         len(continuous_failed),
     )
 
+    # Read max_active_projects once per batch (checked per-launch below)
+    try:
+        from ..config import get_config as _get_cfg_slots
+
+        _max_slots = _get_cfg_slots().orchestrator.max_active_projects
+    except Exception:
+        _max_slots = 0
+
+    def _count_active_containers() -> int:
+        """Count currently running macaron-app-* and proj-* containers."""
+        try:
+            import subprocess as _sp
+
+            r = _sp.run(
+                ["docker", "ps", "--format", "{{.Names}}"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return sum(
+                1
+                for ln in r.stdout.splitlines()
+                if ln.startswith("macaron-app-") or ln.startswith("proj-")
+            )
+        except Exception:
+            return 0
+
     resumed = 0
     skipped_load = 0
     for run_id in to_resume:
+        # Slot gate: don't exceed max_active_projects deployed containers
+        if _max_slots > 0 and _count_active_containers() >= _max_slots:
+            logger.warning(
+                "auto_resume: slot gate — %d active containers >= max_active_projects=%d — stopping batch",
+                _count_active_containers(),
+                _max_slots,
+            )
+            break
         # Backpressure: check CPU/RAM before each launch
         cpu, ram = _get_system_load()
         cpu_green, cpu_yellow, cpu_red, ram_red = _get_backpressure_config()
@@ -1211,5 +1246,23 @@ async def _enforce_container_ttl_and_slots() -> None:
             logger.warning(
                 "auto_resume: stopped deployed container %s (%s)", name, reason
             )
+            # Pause any still-running SF run whose mission maps to this container
+            try:
+                prefix = name.removeprefix("macaron-app-").removeprefix("proj-")
+                from ..db.migrations import get_db as _get_db2
+
+                _db2 = _get_db2()
+                try:
+                    _db2.execute(
+                        """UPDATE epic_runs SET status='paused', updated_at=datetime('now')
+                           WHERE status='running'
+                             AND session_id LIKE ? || '%'""",
+                        (prefix,),
+                    )
+                    _db2.commit()
+                finally:
+                    _db2.close()
+            except Exception as _e2:
+                logger.debug("auto_resume: could not pause run for %s: %s", name, _e2)
         except Exception as e:
             logger.warning("auto_resume: failed to stop %s: %s", name, e)
