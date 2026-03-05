@@ -312,6 +312,31 @@ modules:
     #      + skills/sf-guide.md for agent-level context navigation
     # NOT PORTED: .skill packaging, claude -p CLI, IDE-specific .claude/.augment configs
 
+  - id: claude-api-skill
+    name: "Claude API Integration Patterns"
+    description: "LLM integration guidance for agents that generate Anthropic SDK code: surface selection (direct/tool/batch/streaming/agent-sdk), Opus 4.6 behavioural changes, structured outputs, agentic loop patterns, tool use best practices. Activate for US that produce LLM integration code."
+    category: meta
+    icon: "cpu"
+    source_url: "https://github.com/anthropics/skills/tree/main/skills/claude-api"
+    repo_url: "https://github.com/anthropics/skills"
+    license: "Apache-2.0"
+    builtin: false
+    tools: []
+    skill: "skills/llm-integration.md"
+    # SOURCE: Anthropic skills/claude-api (Apache 2.0)
+    # WHY: Our code-gen agents produce Anthropic SDK code with 5 documented pitfalls:
+    #      (1) using budget_tokens instead of adaptive thinking on Opus 4.6,
+    #      (2) assistant prefill returning 400 on Opus 4.6,
+    #      (3) missing streaming for large max_tokens causing timeouts,
+    #      (4) using deprecated output_format param,
+    #      (5) raw string matching on tool inputs (breaks with Opus 4.6 JSON escaping).
+    #      This skill prevents all 5 at authoring time.
+    # WHAT WE KEPT: pitfalls, surface selection matrix, model catalog, tool use patterns,
+    #      structured outputs constraints, SDK anti-reimplementation rules.
+    # WHAT WE DROPPED: language detection (we're Python-centric), per-language dirs,
+    #      Agent SDK patterns (we have our own framework), WebFetch live-sources.
+    # OFF by default — activate only for missions that generate LLM integration code.
+
   - id: skill-creator
     name: "Anthropic Skill Creator"
     description: "Eval loop for SF skills: draft → eval_cases → execute → grade → iterate. skill-creator.md guides skill authoring, skill-grader.md grades outputs PASS/FAIL with evidence, skill-eval workflow runs the full loop. Prevents skill quality drift — 44+ skills with no regression coverage."
