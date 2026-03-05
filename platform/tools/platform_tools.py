@@ -725,6 +725,22 @@ class PlatformCreateProjectTool(BaseTool):
         git_url = (params.get("git_url") or "").strip()
 
         store = get_project_store()
+        # Idempotency: return existing active project if same name already exists
+        existing = store.list()
+        for p in existing:
+            if (
+                p.name.strip().lower() == name.lower()
+                and getattr(p, "status", "active") != "archived"
+            ):
+                return json.dumps(
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "path": p.path,
+                        "note": "project already exists, returning existing",
+                        "workspace": p.path,
+                    }
+                )
         proj = Project(
             id=str(uuid.uuid4())[:8],
             name=name,
