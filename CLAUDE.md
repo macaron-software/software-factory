@@ -531,6 +531,41 @@ Inspirée de Pentagi (vxcontrol) — mais adaptée au meta-workflow teams/agents
 sans LangChain. Les agents utilisent les outils SF natifs (sast_tools, pentest_tools, trivy).
 
 
+## SKILL QUALITY LOOP (skills/skill-creator.md + skill-grader.md + skill-eval workflow)
+
+Inspiré de Anthropic skill-creator (MIT) — https://github.com/anthropics/skills/tree/main/skills/skill-creator.
+Adaptations : pas de packaging .skill, pas de CLI claude -p, eval_cases dans le frontmatter YAML des skills.
+
+### Pourquoi
+44 skills sans aucun moyen de vérifier qu'ils fonctionnent. Un skill peut drifter (LLM change, plateforme évolue)
+sans qu'on le sache. La boucle eval résout ce problème.
+
+### Loop : Draft → Eval Cases → Execute → Grade → Iterate
+```
+skill-creator.md   → comment créer un skill + convention eval_cases dans frontmatter
+skill-grader.md    → grade chaque expectation PASS/FAIL + critique les assertions faibles
+skill-eval.yaml    → workflow 4 phases : write-eval-cases → execute-cases → grade-outputs → review-and-iterate
+```
+
+### eval_cases — convention frontmatter
+Chaque skill DOIT avoir eval_cases avec des expectations spécifiques et discriminantes :
+- **Discriminant** : un output correct passe, un output faux échoue, un stub/placeholder échoue
+- **Pas trivial** : `"output is non-empty"` est interdit — satisfait par n'importe quoi
+- **Vérifiable** : le grader peut vérifier sans subjectivité
+
+### Philosophie Grader (portée de Anthropic grader.md)
+- Grade PASS/FAIL avec evidence citée (pas de partiel)
+- Détecte la **compliance superficielle** : promise sans delivery → FAIL (même concept qu'adversarial.py mock detection)
+- Critique les assertions elles-mêmes : une assertion triviale crée une fausse confiance (pire qu'aucune assertion)
+- seuil de validation : pass_rate >= 0.8 pour shipper un skill
+
+### Choix d'implémentation
+- `eval_cases` dans le frontmatter YAML (pas dans un fichier evals.json séparé) → colocation skill + tests
+- grading.json comme output (même schema qu'Anthropic, adapté SF)
+- Pas de browser eval viewer — les résultats vont dans le dashboard SF
+- `skill-eval` est un workflow on-demand, pas un CI automatique (pour l'instant)
+
+
 ## CHAOS MONKEY (ops/chaos_endurance.py)
 
 ```
