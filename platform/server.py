@@ -670,18 +670,58 @@ async def lifespan(app: FastAPI):
         return proc
 
     try:
-        _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
+        # Acquire exclusive non-blocking lock so only ONE slot (blue/green)
+        # manages the MCP.  Prevents the two uvicorn processes on the same node
+        # from killing each other's MCP subprocess.
+        import fcntl as _fcntl
+
+        _mcp_lock_path = Path("/tmp/mcp_sf_manager.lock")
+        _mcp_lock_fd = None
+        try:
+            _mcp_lock_fd = open(_mcp_lock_path, "w")
+            _fcntl.flock(_mcp_lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+            _mcp_lock_fd.write(str(os.getpid()))
+            _mcp_lock_fd.flush()
+            _is_mcp_manager = True
+        except (BlockingIOError, OSError):
+            _is_mcp_manager = False
+            if _mcp_lock_fd:
+                _mcp_lock_fd.close()
+                _mcp_lock_fd = None
+
+        if _is_mcp_manager:
+            logger.info(
+                "MCP manager lock acquired (PID %d), starting MCP SF", os.getpid()
+            )
+            _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
+        else:
+            logger.info("MCP manager lock held by another slot, skipping MCP startup")
     except Exception as exc:
         logger.warning("MCP SF Server failed to start: %s", exc)
+        _is_mcp_manager = False
+        _mcp_lock_fd = None
 
     async def _mcp_watchdog():
-        """Auto-restart MCP server if it crashes."""
+        """Auto-restart MCP server if it crashes (manager slot only).
+        Re-checks the lock each iteration — if another slot took it over (restart race),
+        this watchdog exits gracefully to avoid double-manager conflicts.
+        """
+        if not _is_mcp_manager:
+            return
         while True:
-            await asyncio.sleep(30)
+            await asyncio.sleep(15)
+            # Verify we still hold the exclusive lock
+            if _mcp_lock_fd is not None:
+                try:
+                    _fcntl.flock(_mcp_lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                except (BlockingIOError, OSError):
+                    logger.warning(
+                        "MCP manager lock lost, stopping watchdog (another slot took over)"
+                    )
+                    return
             proc = _mcp_procs.get("sf")
             if proc and proc.poll() is not None:
                 logger.warning("MCP SF died (exit=%s), restarting...", proc.returncode)
-                await asyncio.sleep(3)  # wait for port to be released
                 try:
                     _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
                 except Exception as e:
