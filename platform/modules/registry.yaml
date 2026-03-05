@@ -378,6 +378,35 @@ modules:
     # ADAPTATIONS: eval_cases in YAML frontmatter (not evals.json), no .skill
     #      packaging, no claude -p CLI, grading via skill-grader.md skill.
 
+  - id: spec-driven-quality
+    name: "Spec-Driven Quality Gates"
+    description: "Pre-code quality gates ported from GitHub spec-kit (MIT): (1) Constitution — project governing principles as PRINCIPLES.md, (2) Clarify — surface ambiguities before planning with typed questions + defaults, (3) Checklist — 5-dimension requirements QA (completeness/clarity/consistency/testability/feasibility), (4) Analyze — cross-artifact consistency check (spec ↔ plan ↔ tasks). Activate for architect/PM agents on new missions."
+    category: meta
+    icon: "clipboard-check"
+    source_url: "https://github.com/github/spec-kit"
+    repo_url: "https://github.com/github/spec-kit"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/spec-driven-quality.md"
+    # SOURCE: GitHub spec-kit (MIT)
+    # https://github.com/github/spec-kit
+    #
+    # WHY: SF agents skip directly from user request → plan → code. spec-kit
+    #      formalises three quality gates we were missing:
+    #      (1) Clarify before planning — prevents rework from ambiguous requirements
+    #      (2) Checklist on requirements — catches gaps/contradictions before tasking
+    #      (3) Analyze after tasks — ensures spec/plan/tasks are mutually consistent
+    #      We also port Constitution: project governing principles as a first-class
+    #      artefact that anchors all decisions (maps to PRINCIPLES.md per project).
+    #
+    # WHAT WE KEPT: Constitution structure, Clarify protocol + ambiguity taxonomy,
+    #      Checklist 5 dimensions, Analyze cross-artifact matrix.
+    # WHAT WE DROPPED: specify/plan/implement commands (SF has missions + loops),
+    #      specify init CLI (SF has sf CLI), multi-framework scaffolding.
+    # ADAPTATIONS: Constitution → PRINCIPLES.md, steps reference SF concepts
+    #      (mission, backlog item, agent role), checklist runs inline.
+
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
