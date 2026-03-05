@@ -42,7 +42,7 @@ modules:
     install: "python -m mcp_lrm.ux_laws_scraper"
     update: "python -m mcp_lrm.ux_laws_scraper --update"
     data_file: "data/ux_laws.db"
-    builtin: false
+    builtin: true
     skill: "skills/ux-laws.md"
     # SOURCE: Jon Yablonski — https://lawsofux.com (MIT)
     # WHY: 30 cognitive laws directly applicable to US acceptance criteria,
@@ -58,6 +58,7 @@ modules:
     icon: "package"
     source_url: "https://registry.npmjs.org"
     license: "Public API"
+    builtin: true
     tools:
       - npm_search
       - npm_package_info
@@ -73,6 +74,7 @@ modules:
     icon: "code"
     source_url: "https://pypi.org"
     license: "Public API"
+    builtin: true
     tools:
       - pypi_search
       - pypi_package_info
@@ -88,6 +90,7 @@ modules:
     source_url: "https://scrapy.org"
     repo_url: "https://github.com/scrapy/scrapy"
     license: "BSD-3-Clause"
+    builtin: true
     tools:
       - scrapy_run_spider
       - scrapy_fetch_url
@@ -102,6 +105,7 @@ modules:
     icon: "target"
     source_url: "https://github.com/gsd-build/get-shit-done"
     license: "MIT"
+    builtin: true
     tools:
       - gsd_summarize_context
       - gsd_apply_patterns
@@ -119,6 +123,7 @@ modules:
     source_url: "https://trivy.dev"
     repo_url: "https://github.com/aquasecurity/trivy"
     license: "Apache-2.0"
+    builtin: true
     tools:
       - trivy_scan_repo
       - trivy_scan_image
@@ -134,6 +139,7 @@ modules:
     icon: "alert-triangle"
     source_url: "https://security.snyk.io"
     license: "Free tier API"
+    builtin: true
     tools:
       - snyk_search
       - snyk_vuln_get
@@ -156,7 +162,7 @@ modules:
       - rotate_secret
     install: "pip install infisical-python"
     check_cmd: "python3 -c \"import infisical\""
-    builtin: false
+    builtin: true
     requires:
       - "INFISICAL_TOKEN"
       - "INFISICAL_PROJECT_ID"
@@ -207,7 +213,7 @@ modules:
     tools: []
     install: "pip install redis  # server: brew install redis"
     check_cmd: "python3 -c \"import redis\""
-    builtin: false
+    builtin: true
     requires:
       - "REDIS_URL (default: redis://localhost:6379)"
 
@@ -239,7 +245,7 @@ modules:
       - browser_get_text
     install: "npm install -g agent-browser && agent-browser install"
     check_cmd: "agent-browser"
-    builtin: false
+    builtin: true
 
   - id: playwright-mcp
     name: "Playwright MCP"
@@ -266,6 +272,7 @@ modules:
     icon: "cpu"
     source_url: "https://huggingface.co/models"
     license: "HF API — free tier"
+    builtin: true
     tools:
       - hf_model_search
       - hf_model_get
@@ -281,6 +288,7 @@ modules:
     icon: "layers"
     source_url: "https://github.com/filipstrand/mflux"
     license: "MIT"
+    builtin: true
     tools:
       - mflux_generate
     install: "pip install mflux"
@@ -320,7 +328,7 @@ modules:
     source_url: "https://github.com/anthropics/skills/tree/main/skills/claude-api"
     repo_url: "https://github.com/anthropics/skills"
     license: "Apache-2.0"
-    builtin: false
+    builtin: true
     tools: []
     skill: "skills/llm-integration.md"
     # SOURCE: Anthropic skills/claude-api (Apache 2.0)
@@ -361,7 +369,7 @@ modules:
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
     category: knowledge
     icon: "book-open"
-    builtin: false
+    builtin: true
     source_url: ""
     license: "Internal — your org's wiki"
     tools:
