@@ -14,6 +14,8 @@ SCOPE — what this guard covers (OUTPUT quality):
   ✓ Slop / filler / placeholder text
   ✓ Mock/stub implementations (NotImplementedError, TODO, pass)
   ✓ Fake build scripts (echo "BUILD SUCCESS")
+  ✓ Test cheating — skip/xtest/empty body/assert True/except:pass/coverage=0
+  ✓ Code slop — @ts-ignore, # type:ignore, !important, dead vendor prefixes
   ✓ Hallucination — claims actions without tool evidence
   ✓ Stack mismatch — wrong language for declared project tech stack
   ✓ Missing tests when source files are written
@@ -112,7 +114,81 @@ _FAKE_BUILD_PATTERNS = [
     (r"#!/bin/sh\s*\n\s*(?:echo|true|:)\s", "Empty shell script — does nothing"),
 ]
 
-# Hallucination patterns — claiming actions without evidence
+# Test integrity patterns — agents cheating tests so they pass
+# Applied ONLY to test files (path contains test/spec/__tests__)
+# SOURCE: internal rule — "do not cheat tests or test libraries so tests pass"
+# WHY: an agent that skips failing tests, weakens assertions, or mocks the SUT
+#      produces a false green CI. The bug is hidden, not fixed.
+_TEST_CHEAT_PATTERNS = [
+    # Skipping tests instead of fixing them
+    (r"@pytest\.mark\.skip\b", "pytest.mark.skip — test bypassed instead of fixed"),
+    (r"@pytest\.mark\.skipif\b", "pytest.mark.skipif — conditional test bypass"),
+    (r"\bxit\s*\(", "xit() — Jasmine/Jest skipped test"),
+    (r"\bxtest\s*\(", "xtest() — skipped test"),
+    (r"\bxdescribe\s*\(", "xdescribe() — skipped test suite"),
+    (r"test\.skip\s*\(", "test.skip() — Jest/Vitest skipped test"),
+    (r"it\.skip\s*\(", "it.skip() — Jest skipped test"),
+    (r"describe\.skip\s*\(", "describe.skip() — Jest skipped suite"),
+    # Trivially-passing (useless) assertions
+    (r"\bassert\s+True\s*(?:#|$)", "assert True — trivially passes, tests nothing"),
+    (r"\bassert\s+1\s*(?:#|$)", "assert 1 — trivially passes, tests nothing"),
+    (
+        r"expect\([^)]+\)\.toBeTruthy\(\)\s*;?\s*$",
+        "toBeTruthy() — weak, tests nothing concrete",
+    ),
+    # Empty test bodies — test exists but does nothing
+    (
+        r"def test_\w+\s*\([^)]*\)\s*:\s*\n\s+(?:pass|\.\.\.)$",
+        "Empty test function — passes trivially",
+    ),
+    (r"it\s*\([^,]+,\s*\(\)\s*=>\s*\{\s*\}\s*\)", "Empty Jest/Vitest test body"),
+    # Swallowing failures in test code
+    (
+        r"except\s+(?:Exception|BaseException|AssertionError)\s*:\s*\n\s+pass\s*$",
+        "except Exception: pass in test — silences assertion failures",
+    ),
+    # Coverage configuration lowered to pass
+    (r"--cov-fail-under\s*=\s*0\b", "Coverage threshold set to 0 — defeats coverage"),
+    (r"fail_under\s*=\s*0\b", "fail_under=0 in coverage config — defeats coverage"),
+    (r"--cov-fail-under\s*=\s*[1-9]\b", "Coverage threshold ≤9% — effectively zero"),
+    # Conditional bypass injected into source code (not test file) to make test pass
+    (
+        r"if\s+os\.(?:getenv|environ).*[\"'](?:TEST_MODE|CI_SKIP|SKIP_TESTS|TESTING_BYPASS)[\"']",
+        "TEST_MODE bypass in production code — cheats test by changing real behavior",
+    ),
+]
+
+# Code slop patterns — lazy shortcuts that produce unmaintainable code
+# Applied to ALL code_write files, lower score than test cheating
+# SOURCE: internal clean-code rules (see skills/clean-code.md)
+_CODE_SLOP_PATTERNS = [
+    # TypeScript/JavaScript — type safety suppression
+    (r"//\s*@ts-ignore\b", "@ts-ignore — TypeScript error suppressed instead of fixed"),
+    (r"//\s*@ts-nocheck\b", "@ts-nocheck — TypeScript disabled for entire file"),
+    (r"/\*\s*eslint-disable\b", "eslint-disable block — lint rules suppressed"),
+    # Python — type/error suppression
+    (
+        r"#\s*type:\s*ignore\b",
+        "# type: ignore — mypy error suppressed instead of fixed",
+    ),
+    (
+        r"except\s+(?:Exception|BaseException)\s*:\s*\n\s+pass\s*$",
+        "except Exception: pass — silently swallows all errors",
+    ),
+    # CSS — specificity hacks and unnecessary vendor prefixes
+    (
+        r"!\s*important\b",
+        "!important — lazy specificity override, fix the selector cascade",
+    ),
+    (
+        r"-webkit-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
+        "-webkit- vendor prefix not needed since 2017 (caniuse: >98%)",
+    ),
+    (
+        r"-moz-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
+        "-moz- vendor prefix not needed since 2020",
+    ),
+]
 _HALLUCINATION_PATTERNS = [
     (
         r"j'ai\s+(?:deploye|déployé|lancé|exécuté|testé|vérifié|créé le fichier|commit)",
@@ -280,6 +356,38 @@ def check_l0(
                 issues.append(f"MOCK_IN_CODE: {desc} in {file_path}")
                 score += 3
                 break  # one mock per file is enough
+        # Check test cheating patterns — only in test files
+        is_test_file = any(
+            kw in file_path.lower()
+            for kw in [
+                "test_",
+                "_test.",
+                "/test/",
+                "/tests/",
+                ".spec.",
+                ".test.",
+                "__tests__",
+            ]
+        )
+        if is_test_file:
+            for pattern, desc in _TEST_CHEAT_PATTERNS:
+                if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"TEST_CHEAT: {desc} in {file_path}")
+                    score += 5  # hard reject — cheated test = hidden bug
+                    break  # one cheat per file flagged
+        # Check code slop patterns — all code files (lower score, warning)
+        is_code_file = file_path.lower().endswith(
+            (".py", ".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".less")
+        )
+        if is_code_file:
+            slop_hits = 0
+            for pattern, desc in _CODE_SLOP_PATTERNS:
+                if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"CODE_SLOP: {desc} in {file_path}")
+                    score += 2
+                    slop_hits += 1
+                    if slop_hits >= 3:
+                        break  # cap at 3 slop warnings per file
 
     # Quality checks — no tests in code_write, high complexity indicators
     if has_write_tool:
