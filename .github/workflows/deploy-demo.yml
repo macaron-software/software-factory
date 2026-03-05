@@ -282,12 +282,33 @@ jobs:
           [ -z "$AZURE_IP" ] && echo "AZURE_IP secret not set, skipping" && exit 0
           [ -z "$AZURE_USER" ] && AZURE_USER="macaron"
           # Rsync skills and platform code
-          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/skills/ || exit 0
-          rsync -az --checksum platform/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/platform/ || exit 0
-          # Copy skills into running container and clear cache
+          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/skills/ || true
+          rsync -az --checksum platform/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/platform/ || true
+          # Restart container (handles crash/OOM recovery) + copy skills into it
           ssh ${AZURE_USER}@${AZURE_IP} "
+            set -e
+            cd /opt/macaron
+
+            # Restart container to pick up new code (recreate if config changed)
+            docker compose restart platform 2>/dev/null || \
+              docker compose up -d --no-deps --force-recreate platform 2>/dev/null || \
+              docker restart deploy-platform-1 2>/dev/null || \
+              echo 'WARNING: could not restart platform container'
+
+            # Wait for health
+            echo 'Waiting for platform health...'
+            OK=0
+            for i in \$(seq 1 20); do
+              sleep 3
+              HTTP=\$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:8090/api/health 2>/dev/null || echo 000)
+              echo \"  [\${i}/20] health=\${HTTP}\"
+              if [ \"\$HTTP\" = '200' ] || [ \"\$HTTP\" = '302' ]; then OK=1; break; fi
+            done
+            [ \"\$OK\" = '1' ] && echo 'platform healthy ✓' || echo 'WARNING: health check timed out'
+
+            # Copy updated skills into running container
             docker cp /opt/macaron/skills/. deploy-platform-1:/app/skills/ 2>/dev/null && \
-            echo 'skills copied to container' || echo 'docker cp skipped'
+              echo 'skills copied ✓' || echo 'docker cp skipped (container name mismatch?)'
             echo 'Azure deploy complete'
-          "
+          " || echo "WARNING: Azure SSH step failed (non-fatal)"
           echo "=== Azure deploy done ==="
