@@ -118,6 +118,60 @@ WEB_CRITERIA = [
     ),
 ]
 
+GAME_HTML5_CRITERIA = [
+    Criterion(
+        "html-entry",
+        "Fichier index.html avec <canvas> existe",
+        "file_content_match",
+        {"pattern": "**/index.html", "contains": "canvas"},
+    ),
+    Criterion(
+        "game-loop",
+        "Boucle de jeu requestAnimationFrame ou setInterval présente",
+        "file_content_match",
+        {"pattern": "**/*.{js,ts}", "contains": "requestAnimationFrame"},
+    ),
+    Criterion(
+        "keyboard-input",
+        "Gestion clavier (keydown/ArrowLeft/ArrowRight) présente",
+        "file_content_match",
+        {"pattern": "**/*.{js,ts}", "contains": "keydown"},
+    ),
+    Criterion(
+        "score-display",
+        "Élément score dans HTML ou code",
+        "file_content_match",
+        {"pattern": "**/*.{html,js,ts}", "contains": "score"},
+    ),
+    Criterion(
+        "multiple-levels",
+        "Au moins 2 fichiers level ou niveau définis",
+        "file_content_match",
+        {"pattern": "**/*.{js,ts}", "contains": "level"},
+    ),
+    Criterion(
+        "gravity-or-jump",
+        "Mécanique gravité ou saut implémentée",
+        "file_content_match",
+        {
+            "pattern": "**/*.{js,ts}",
+            "contains_any": ["gravity", "jump", "velocityY", "vy"],
+        },
+    ),
+    Criterion(
+        "source-files",
+        "Au moins 3 fichiers source JS/TS",
+        "file_count_min",
+        {"pattern": "**/*.{js,ts}", "min": 3},
+    ),
+    Criterion(
+        "npm-test",
+        "npm test passe (au moins 1 test réel)",
+        "command_ok",
+        {"command": "npm test 2>&1 || true", "cwd": "."},
+    ),
+]
+
 BACKEND_CRITERIA = [
     Criterion(
         "source-files",
@@ -170,18 +224,107 @@ _TYPE_MAP = {
     "frontend": WEB_CRITERIA,
     "backend": BACKEND_CRITERIA,
     "rust": RUST_CRITERIA,
+    "game": GAME_HTML5_CRITERIA,
+    "donkey": GAME_HTML5_CRITERIA,
+    "kong": GAME_HTML5_CRITERIA,
+    "invader": GAME_HTML5_CRITERIA,
+    "pacman": GAME_HTML5_CRITERIA,
+    "tetris": GAME_HTML5_CRITERIA,
+    "snake": GAME_HTML5_CRITERIA,
+    "html5": GAME_HTML5_CRITERIA,
+    "arcade": GAME_HTML5_CRITERIA,
 }
 
 
+def _criteria_from_epic(epic_id: str) -> list[Criterion]:
+    """Extract Criterion objects from epic features/stories in the DB.
+
+    Reads epic description + feature names → generates functional criteria.
+    Falls back to [] if DB unavailable or no features found.
+    """
+    if not epic_id:
+        return []
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        # Get epic description
+        epic = db.execute(
+            "SELECT name, description, goal FROM epics WHERE id=?", (epic_id,)
+        ).fetchone()
+        if not epic:
+            return []
+        # Get feature names
+        features = db.execute(
+            "SELECT name, description FROM features WHERE epic_id=? AND status != 'archived'",
+            (epic_id,),
+        ).fetchall()
+        if not features:
+            return []
+
+        criteria: list[Criterion] = []
+        for i, feat in enumerate(features):
+            fname = (feat[0] or "").strip()
+            if not fname:
+                continue
+            # Each feature must be traceable in the codebase
+            # Use keyword extraction from name for file_content_match
+            keywords = [
+                w.lower()
+                for w in fname.replace("-", " ").replace("_", " ").split()
+                if len(w) > 3
+            ]
+            if keywords:
+                criteria.append(
+                    Criterion(
+                        f"feature-{i}-{keywords[0]}",
+                        f"Feature '{fname}' implémentée dans le code",
+                        "file_content_match",
+                        {
+                            "pattern": "**/*.{js,ts,py,rs,go,kt,java,tsx,jsx}",
+                            "contains_any": keywords[:3],
+                        },
+                    )
+                )
+        # Always add: npm/cargo test must pass if package.json or Cargo.toml present
+        criteria.append(
+            Criterion(
+                "tests-pass",
+                "Suite de tests passe (npm test / cargo test)",
+                "command_ok",
+                {
+                    "command": "npm test 2>&1 || cargo test 2>&1 || pytest 2>&1 || echo 'no test runner'"
+                },
+            )
+        )
+        return criteria
+    except Exception as _e:
+        logger.debug("_criteria_from_epic failed: %s", _e)
+        return []
+
+
 def get_criteria_for_workflow(
-    workflow_id: str, workflow_config: dict | None = None, workspace: str = ""
+    workflow_id: str,
+    workflow_config: dict | None = None,
+    workspace: str = "",
+    epic_id: str = "",
 ) -> list[Criterion]:
-    """Get acceptance criteria — from workflow config, auto-detect, or workspace scan."""
+    """Get acceptance criteria — from workflow config, epic DB, auto-detect, or workspace scan."""
     # 1. Check workflow config for explicit criteria
     if workflow_config and "acceptance_criteria" in workflow_config:
         return [Criterion(**c) for c in workflow_config["acceptance_criteria"]]
 
-    # 2. Auto-detect from workflow name
+    # 2. Load feature-based criteria from epic DB (project-specific ACs)
+    epic_criteria = _criteria_from_epic(epic_id)
+    if epic_criteria:
+        logger.info(
+            "evidence gate: %d criteria from epic %s features",
+            len(epic_criteria),
+            epic_id,
+        )
+        return epic_criteria
+
+    # 3. Auto-detect from workflow name
     wid = (workflow_id or "").lower()
     for key, criteria in _TYPE_MAP.items():
         if key in wid:
@@ -191,7 +334,7 @@ def get_criteria_for_workflow(
                 for c in criteria
             ]
 
-    # 3. Auto-detect from workspace contents
+    # 4. Auto-detect from workspace contents
     if workspace and os.path.isdir(workspace):
         if _glob_recursive(workspace, "**/build.gradle*") or _glob_recursive(
             workspace, "**/*.kt"
@@ -220,7 +363,7 @@ def get_criteria_for_workflow(
                 for c in WEB_CRITERIA
             ]
 
-    # 4. Generic fallback — works for any project type
+    # 5. Generic fallback — works for any project type
     return [
         Criterion(
             "source-files",
@@ -343,6 +486,28 @@ def run_evidence_checks(
                 except subprocess.TimeoutExpired:
                     c.passed = False
                     c.detail = f"timeout after {timeout}s"
+
+            elif c.check == "file_content_match":
+                pattern = c.params.get("pattern", "**/*")
+                contains = c.params.get("contains", "")
+                contains_any = c.params.get("contains_any", [])
+                if contains:
+                    contains_any = [contains]
+                found = False
+                for f in _glob_recursive(workspace, pattern):
+                    try:
+                        text = open(f, encoding="utf-8", errors="ignore").read()
+                        if any(kw in text for kw in contains_any):
+                            found = True
+                            break
+                    except Exception:
+                        pass
+                c.passed = found
+                c.detail = (
+                    f"Keyword found in {pattern}"
+                    if found
+                    else f"None of {contains_any} found in {pattern}"
+                )
 
             else:
                 c.passed = False

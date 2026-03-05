@@ -406,6 +406,80 @@ class EpicOrchestrator:
 
     # ── helpers re-used by the phase loop ──
 
+    async def _check_deploy_http(
+        self, workspace: str, session_id: str, mission_id: str, phase_id: str
+    ) -> bool:
+        """PR4 — Deploy gate: try to find the deployed port and HTTP-check it.
+
+        Reads docker-compose.project.yml or package.json scripts for port hints.
+        Retries 3× with 5s delay. Returns True if HTTP responds, False otherwise.
+        Non-blocking on errors (returns True to avoid blocking non-web projects).
+        """
+        import asyncio
+        import os
+        import re
+        import urllib.request
+
+        port: int | None = None
+        # Try to find port from docker-compose
+        dc_path = (
+            os.path.join(workspace, "docker-compose.project.yml") if workspace else ""
+        )
+        if workspace and os.path.isfile(dc_path):
+            try:
+                content = open(dc_path).read()
+                m = re.search(r'"(\d{4,5}):(?:\d{4,5})"', content) or re.search(
+                    r"'(\d{4,5}):\d+'", content
+                )
+                if m:
+                    port = int(m.group(1))
+            except Exception:
+                pass
+        # Try package.json scripts for port hint
+        if not port and workspace:
+            pkg = os.path.join(workspace, "package.json")
+            if os.path.isfile(pkg):
+                try:
+                    import json as _json
+
+                    data = _json.load(open(pkg))
+                    scripts = data.get("scripts", {})
+                    for v in scripts.values():
+                        m = re.search(
+                            r"-p\s+(\d{4,5})|--port\s+(\d{4,5})|:(\d{4,5})", str(v)
+                        )
+                        if m:
+                            port = int(next(g for g in m.groups() if g))
+                            break
+                except Exception:
+                    pass
+        if not port:
+            # No port found — skip gate for non-HTTP projects (static files, libs, etc.)
+            logger.info(
+                "Deploy gate: no port found in %s — skipping HTTP check", workspace
+            )
+            return True
+
+        url = f"http://localhost:{port}"
+        for attempt in range(3):
+            try:
+                req = urllib.request.urlopen(url, timeout=5)
+                if req.status < 500:
+                    await self._sse_orch_msg(
+                        f"✅ Deploy gate OK — {url} répond HTTP {req.status}", phase_id
+                    )
+                    return True
+            except Exception as _e:
+                logger.debug("Deploy gate attempt %d/%d: %s", attempt + 1, 3, _e)
+            if attempt < 2:
+                await asyncio.sleep(5)
+
+        await self._sse_orch_msg(
+            f"⚠️ Deploy gate: {url} ne répond pas après 3 tentatives — vérifier que le service est démarré",
+            phase_id,
+        )
+        return False
+
     async def _sse_orch_msg(self, content: str, phase_id: str = ""):
         await self._push_sse(
             self.session_id,
@@ -506,7 +580,7 @@ class EpicOrchestrator:
             wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
         )
         acceptance_criteria = get_criteria_for_workflow(
-            wf.id, wf_config, workspace=workspace
+            wf.id, wf_config, workspace=workspace, epic_id=mission.id
         )
         if acceptance_criteria:
             logger.warning(
@@ -1832,6 +1906,24 @@ class EpicOrchestrator:
                 "feature-deploy",
                 "tma-handoff",
             ):
+                # PR4 — Deploy gate: HTTP check to confirm service is actually up
+                if phase.phase_id in (
+                    "deploy-prod",
+                    "deploy",
+                    "deploy-feature",
+                    "feature-deploy",
+                ):
+                    _deploy_ok = await self._check_deploy_http(
+                        workspace, session_id, mission.id, phase.phase_id
+                    )
+                    if not _deploy_ok:
+                        phase_success = False
+                        phase_error = "Deploy gate FAILED: service did not respond on HTTP after deploy"
+                        await self._sse_orch_msg(
+                            "⛔ Deploy gate FAILED — le service ne répond pas sur HTTP. Phase marquée échouée.",
+                            phase.phase_id,
+                        )
+
                 try:
                     from ..epics.feedback import on_deploy_completed
 

@@ -13,6 +13,20 @@ from .registry import BaseTool
 
 logger = logging.getLogger(__name__)
 
+# Tools restricted to CTO/orchestrator agents — not available to project-scoped agents
+_PLATFORM_ONLY_TOOLS: set[str] = {
+    "create_project",
+    "platform_agents",
+    "platform_metrics",
+    "platform_sessions",
+    "platform_workflows",
+    "launch_ideation",
+    "launch_mkt_ideation",
+    "launch_group_ideation",
+    "create_domain",
+    "platform_guide",
+}
+
 
 class PlatformAgentsTool(BaseTool):
     name = "platform_agents"
@@ -717,6 +731,27 @@ class PlatformCreateProjectTool(BaseTool):
         from ..projects.manager import get_project_store, Project, scaffold_project
 
         name = params.get("name", "").strip()
+
+        # Only CTO/orchestrator agents can create projects
+        if agent and hasattr(agent, "role"):
+            role = (agent.role or "").lower()
+            _cto_roles = {
+                "cto",
+                "chief_technology_officer",
+                "orchestrator",
+                "organizer",
+                "platform",
+                "jarvis",
+                "strat-cto",
+            }
+            if not any(r in role for r in _cto_roles):
+                return json.dumps(
+                    {
+                        "error": "create_project is restricted to CTO/orchestrator agents. Use the existing project workspace.",
+                        "hint": "You are already in a project context. Work within the current workspace.",
+                    }
+                )
+
         if not name:
             return json.dumps({"error": "name is required"})
         import uuid
