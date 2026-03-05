@@ -3108,6 +3108,50 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "plan_get",
         "get_project_context",
     ],
+    # Diagnostic agent — root cause analysis, runtime investigation
+    # Activated by incident-diag module. Read-only: no code_write, no deploys.
+    "diagnostic": [
+        # Investigation tools (diag_tools.py — incident-diag module)
+        "diag_logs",
+        "diag_process_stats",
+        "diag_db_stats",
+        "diag_endpoint_latency",
+        "diag_queue_depth",
+        "diag_correlate",
+        # Existing infra/health tools
+        "infra_check",
+        "docker_status",
+        # Error monitoring (read — clustering, status, history)
+        "monitoring_scan_incidents",
+        "monitoring_cluster_incidents",
+        "monitoring_get_error_status",
+        "monitoring_should_alert",
+        # Perf audit tools (if perf-auditor module also enabled)
+        "perf_audit_lighthouse",
+        "perf_network_slow",
+        "perf_console_errors",
+        # Code read (to correlate with recent changes)
+        "code_read",
+        "code_search",
+        "list_files",
+        "git_log",
+        "git_diff",
+        "git_status",
+        "github_prs",
+        # Memory + context
+        "memory_search",
+        "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
+        "get_project_context",
+        "get_si_blueprint",
+        "get_project_health",
+        # Escalation (create TMA epic from confirmed root cause)
+        "monitoring_create_heal_epic",
+        "create_ticket",
+        "deep_search",
+    ],
 }
 
 # Quality tools — available to qa, devops, architecture, cdp roles

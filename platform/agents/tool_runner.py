@@ -257,6 +257,14 @@ def _get_tool_registry():
             register_perf_audit_tools(reg)
     except Exception:
         pass
+    # Incident diagnosis tools — guarded by incident-diag module
+    try:
+        if _is_module_enabled("incident-diag"):
+            from ..tools.diag_tools import register_diag_tools
+
+            register_diag_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

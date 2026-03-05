@@ -442,6 +442,43 @@ modules:
     # Tools: perf_audit_tools.py (BaseTool subclasses, not tool_runner functions)
     # Routing: mcp_cdp_<tool> → _tool_mcp_dynamic → mcp-chrome-devtools MCP server
 
+  - id: incident-diag
+    name: "Incident Diagnosis"
+    description: "Root cause analysis agent for production incidents. Structured RCA workflow: collect → correlate → hypothesise → confirm → recommend. Tools: diag_logs, diag_process_stats, diag_db_stats, diag_endpoint_latency, diag_queue_depth, diag_correlate. Read-only — investigation only, no auto-fix."
+    category: ops
+    icon: "stethoscope"
+    builtin: true
+    tools:
+      - diag_logs
+      - diag_process_stats
+      - diag_db_stats
+      - diag_endpoint_latency
+      - diag_queue_depth
+      - diag_correlate
+    skill: "skills/incident-diagnosis.md"
+    agent_role: "diagnostic"
+    # SOURCE: Original — inspired by structured incident management practices
+    # (Google SRE handbook, Netflix Chaos Engineering, PagerDuty runbooks)
+    #
+    # WHY: SF's auto-heal (ops/auto_heal.py) reacts to known patterns.
+    #      When it doesn't trigger — or when you need to understand WHY something
+    #      is slow/broken before applying a fix — there was no dedicated investigation
+    #      path. Existing agents (devops, qa) have shell tools but no structured RCA
+    #      workflow and no correlation step.
+    #
+    # DESIGN CHOICES:
+    # - Read-only tools only (no code_write, no deployments) — diagnostic agent
+    #   should never modify production state during investigation
+    # - diag_correlate returns a structured PROMPT (not computed answer) — RCA
+    #   is a reasoning task, not a computation. The LLM reasons over evidence.
+    # - All tools fail-open with graceful degradation (missing psutil, no PG, etc.)
+    # - diag_queue_depth checks platform-internal queues (missions/agents/incidents)
+    #   not external message brokers — SF uses SQLite queues, not Kafka/RabbitMQ
+    #
+    # INTEGRATION: diagnostic role in ROLE_TOOL_MAP (tool_schemas.py) includes
+    #   error-monitoring read tools + perf-audit tools (if that module is enabled)
+    #   → one agent can run a complete incident investigation without tool-hopping
+
   - id: wiki-guidelines
     name: "Architecture Guidelines (Wiki DSI)"
     description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
