@@ -81,9 +81,13 @@ def _init_pg():
 
     _log = _logging.getLogger(__name__)
     conn = get_connection()
-    # Acquire exclusive advisory lock — other nodes block here until migration done
+    # Acquire exclusive advisory lock — serialize migrations across nodes.
+    # Use a 30s lock_timeout so we never block forever if a prior process crashed
+    # mid-migration and left a zombie PG session holding the lock.
     try:
+        conn.execute("SET lock_timeout = '30s'")
         conn.execute("SELECT pg_advisory_lock(20260301)")
+        conn.execute("SET lock_timeout = '0'")  # reset
         _log.info("DB migration: advisory lock acquired")
     except Exception:
         pass  # non-fatal if advisory locks not supported
