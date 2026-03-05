@@ -1385,33 +1385,52 @@ class EpicOrchestrator:
 
             # Human-in-the-loop checkpoint
             if pattern_type == "human-in-the-loop":
-                phase.status = PhaseStatus.WAITING_VALIDATION
-                run_store.update(mission)
-                await self._push_sse(
-                    session_id,
-                    {
-                        "type": "checkpoint",
-                        "mission_id": mission.id,
-                        "phase_id": phase.phase_id,
-                        "question": f"Validation requise pour «{wf_phase.name}»",
-                        "options": ["GO", "NOGO", "PIVOT"],
-                    },
-                )
-                for _ in range(600):
-                    await asyncio.sleep(1)
-                    m = run_store.get(mission.id)
-                    if m:
-                        for p in m.phases:
-                            if (
-                                p.phase_id == phase.phase_id
-                                and p.status != PhaseStatus.WAITING_VALIDATION
-                            ):
-                                phase.status = p.status
-                                break
-                        if phase.status != PhaseStatus.WAITING_VALIDATION:
-                            break
-                if phase.status == PhaseStatus.WAITING_VALIDATION:
+                from ..config import get_config as _get_cfg
+
+                if _get_cfg().orchestrator.yolo_mode:
+                    # YOLO mode: auto-GO, no wait
                     phase.status = PhaseStatus.DONE
+                    run_store.update(mission)
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "checkpoint",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "question": f"Validation requise pour «{wf_phase.name}»",
+                            "options": ["GO", "NOGO", "PIVOT"],
+                            "auto_decision": "GO",
+                            "yolo": True,
+                        },
+                    )
+                else:
+                    phase.status = PhaseStatus.WAITING_VALIDATION
+                    run_store.update(mission)
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "checkpoint",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "question": f"Validation requise pour «{wf_phase.name}»",
+                            "options": ["GO", "NOGO", "PIVOT"],
+                        },
+                    )
+                    for _ in range(600):
+                        await asyncio.sleep(1)
+                        m = run_store.get(mission.id)
+                        if m:
+                            for p in m.phases:
+                                if (
+                                    p.phase_id == phase.phase_id
+                                    and p.status != PhaseStatus.WAITING_VALIDATION
+                                ):
+                                    phase.status = p.status
+                                    break
+                            if phase.status != PhaseStatus.WAITING_VALIDATION:
+                                break
+                    if phase.status == PhaseStatus.WAITING_VALIDATION:
+                        phase.status = PhaseStatus.DONE
                 if phase.status == PhaseStatus.FAILED:
                     run_store.update(mission)
                     await self._push_sse(
