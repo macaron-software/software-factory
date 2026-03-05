@@ -137,8 +137,10 @@ class PlatformMemoryTool(BaseTool):
         project_id = params.get("project_id")
         category = params.get("category")
         limit = int(params.get("limit", 20))
-        if query:
-            entries = mem.search(query, limit=limit)
+        if query and project_id:
+            entries = mem.project_search(project_id, query, limit=limit)
+        elif query:
+            entries = mem.global_search(query, limit=limit)
         elif project_id:
             entries = mem.project_get(project_id, category=category, limit=limit)
         else:
