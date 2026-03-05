@@ -480,6 +480,123 @@ async def cmd_db_status() -> SFCommandResponse:
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
 
 
+async def cmd_guide(args: list[str]) -> SFCommandResponse:
+    """Context-aware guidance on what to do next.
+    Inspired by BMAD /bmad-help — reads current state, recommends next steps.
+    Usage: guide [context hint, e.g. 'I just finished architecture, what next?']
+    """
+    from ...epics.store import get_epic_store
+    from ...projects.manager import get_project_store
+
+    context_hint = " ".join(args) if args else ""
+
+    try:
+        project_store = get_project_store()
+        epic_store = get_epic_store()
+
+        projects = project_store.list_all()
+        missions = epic_store.list_missions(limit=50)
+
+        running = [m for m in missions if m.status in ["running", "in_progress"]]
+        pending = [m for m in missions if m.status == "pending"]
+        done = [m for m in missions if m.status in ["completed", "done"]]
+
+        output = "SF Guide — What's next?\n"
+        output += "========================\n\n"
+
+        if context_hint:
+            output += f"Context: {context_hint}\n\n"
+
+        # Situation
+        output += "Current state:\n"
+        output += f"  • {len(projects)} project(s)\n"
+        output += f"  • {len(running)} mission(s) running  |  {len(pending)} pending  |  {len(done)} done\n"
+
+        if running:
+            for m in running[:3]:
+                name = getattr(m, "name", getattr(m, "title", "untitled"))
+                output += f"    → {name[:40]} [{m.status}]\n"
+        output += "\n"
+
+        # Recommendations based on state
+        output += "Recommended next steps:\n"
+        output += "-----------------------\n"
+
+        if not projects:
+            output += "1. Create a project: Projects → New Project\n"
+            output += "2. Pick a workflow: Workflows → Browse 46 workflows\n"
+            output += "3. Launch first mission\n"
+        elif not missions:
+            output += "1. Launch first mission via a workflow:\n"
+            output += "   → ideation-to-prod   full lifecycle (5 phases)\n"
+            output += "   → feature-sprint     implement a feature (TDD)\n"
+            output += "   → skill-eval         test skill quality\n"
+        elif running:
+            output += "1. Monitor missions: sf$ missions list --status=running\n"
+            output += "2. Review agent outputs in project chat\n"
+            output += "3. Respond to human-in-the-loop checkpoints if blocked\n"
+            output += "4. Use complexity=simple for quick tasks, complexity=enterprise for big ones\n"
+        else:
+            output += "1. Review completed missions for follow-up actions\n"
+            output += "2. Launch next workflow phase\n"
+            output += "3. Run skill-eval to verify skill quality\n"
+
+        # Context-specific advice
+        if context_hint:
+            kw = context_hint.lower()
+            output += "\n"
+            if any(w in kw for w in ["architect", "design", "system", "archi"]):
+                output += "For architecture:\n"
+                output += "  → Agent: architecte + skills/architecture-review.md\n"
+                output += "  → Workflow: feature-sprint (phase solutioning)\n"
+            elif any(w in kw for w in ["test", "qa", "quality", "eval"]):
+                output += "For QA / testing:\n"
+                output += "  → Workflow: test-campaign or skill-eval\n"
+                output += "  → Skills: tdd.md, qa-adversarial-llm.md\n"
+            elif any(w in kw for w in ["deploy", "prod", "release", "ship"]):
+                output += "For deployment:\n"
+                output += "  → Workflow: canary-deployment (1%→10%→50%→100% + HITL)\n"
+                output += "  → Agents: sre + devops\n"
+            elif any(w in kw for w in ["security", "audit", "pentest", "vuln"]):
+                output += "For security:\n"
+                output += (
+                    "  → Workflow: security-hacking (8 phases: recon→exploit→report)\n"
+                )
+                output += "  → Skills: security-audit.md, qa-adversarial-llm.md\n"
+            elif any(w in kw for w in ["skill", "agent", "prompt"]):
+                output += "For skill/agent improvement:\n"
+                output += (
+                    "  → Workflow: skill-eval (write eval_cases → grade → iterate)\n"
+                )
+                output += "  → Workflow: skill-evolution (audit all agents, extract best practices)\n"
+            elif any(w in kw for w in ["simple", "quick", "small", "bug", "fix"]):
+                output += "For quick tasks (simple complexity):\n"
+                output += "  → Launch workflow with complexity=simple\n"
+                output += "  → Heavy planning phases (min_complexity=enterprise) are auto-skipped\n"
+            elif any(w in kw for w in ["enterprise", "big", "large", "complex"]):
+                output += "For large projects (enterprise complexity):\n"
+                output += "  → Launch workflow with complexity=enterprise\n"
+                output += "  → All phases including heavyweight planning are included\n"
+
+        output += "\nTip: ask any agent in chat for deeper context-aware guidance.\n"
+        output += (
+            "     'sf$ missions list', 'sf$ agents list', 'sf$ skills search <topic>'\n"
+        )
+
+        return SFCommandResponse(
+            success=True,
+            output=output,
+            data={
+                "running": len(running),
+                "pending": len(pending),
+                "projects": len(projects),
+            },
+        )
+    except Exception as e:
+        logger.exception("Error in guide command")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
 async def cmd_help() -> SFCommandResponse:
     """Show SF CLI help."""
     output = """Software Factory CLI Help
@@ -511,6 +628,8 @@ DATABASE:
   
 SYSTEM:
   help                               Show this help message
+  guide                              What's next? Context-aware guidance (inspired by BMAD /bmad-help)
+  guide <context>                    Guidance with context (e.g. guide I just finished architecture)
   clear                              Clear terminal
 
 Examples:
@@ -552,6 +671,7 @@ SF_COMMANDS = {
     "db": {
         "status": cmd_db_status,
     },
+    "guide": cmd_guide,
     "help": cmd_help,
 }
 

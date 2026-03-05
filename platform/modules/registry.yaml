@@ -293,6 +293,25 @@ modules:
 
   # ── META / QUALITY ─────────────────────────────────────────────────────────
 
+  - id: bmad-method
+    name: "BMAD Method"
+    description: "Agile AI development framework (Build More Architect Dreams). Concepts ported to SF: (1) scale-domain-adaptive planning via min_complexity on workflow phases, (3) context-aware /sf-help guidance via 'sf guide' command + sf-guide.md skill. Not installed as IDE plugin — concepts adapted to SF autonomous agent platform."
+    category: meta
+    icon: "zap"
+    source_url: "https://github.com/bmad-code-org/BMAD-METHOD"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/sf-guide.md"
+    # SOURCE: BMAD Method v6 (bmad-code-org, MIT)
+    # WHY: 3 concepts worth porting to SF:
+    #   1. Scale-domain-adaptive — WorkflowPhase.min_complexity field, run_workflow(complexity=)
+    #      → lightweight workflows for simple tasks, full phases for enterprise
+    #   2. (skipped) Persona enrichment for 192 agents — too broad, out of scope
+    #   3. /bmad-help equivalent — 'sf guide [context]' command in sf_commands.py
+    #      + skills/sf-guide.md for agent-level context navigation
+    # NOT PORTED: .skill packaging, claude -p CLI, IDE-specific .claude/.augment configs
+
   - id: skill-creator
     name: "Anthropic Skill Creator"
     description: "Eval loop for SF skills: draft → eval_cases → execute → grade → iterate. skill-creator.md guides skill authoring, skill-grader.md grades outputs PASS/FAIL with evidence, skill-eval workflow runs the full loop. Prevents skill quality drift — 44+ skills with no regression coverage."

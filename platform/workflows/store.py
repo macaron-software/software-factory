@@ -35,6 +35,10 @@ class WorkflowPhase:
     retry_count: int = 1  # max retries on failure (0 = no retry)
     skip_on_failure: bool = False  # skip phase after all retries exhausted
     timeout: int = 0  # per-phase timeout override (0 = use global default)
+    # Scale-adaptive planning (BMAD-inspired): phase only runs at or above this complexity.
+    # Values: "simple" | "standard" | "enterprise" | "" (empty = always run).
+    # Example: set min_complexity="enterprise" on heavyweight planning phases.
+    min_complexity: str = ""
 
 
 @dataclass
@@ -500,11 +504,15 @@ async def run_workflow(
     initial_task: str,
     project_id: str = "",
     resume_from: int = 0,
+    complexity: str = "standard",
 ) -> WorkflowRun:
     """Execute a workflow — RTE facilitates each phase transition.
 
     Args:
         resume_from: phase index to resume from (skip completed phases).
+        complexity: scale-adaptive level — "simple" | "standard" | "enterprise".
+            Phases with min_complexity higher than this level are skipped.
+            Inspired by BMAD scale-domain-adaptive planning.
     """
     run = WorkflowRun(
         workflow=workflow,
@@ -552,6 +560,10 @@ async def run_workflow(
             project_id=project_id,
         )
 
+    # Complexity levels for scale-adaptive planning (BMAD-inspired)
+    _COMPLEXITY_ORDER = {"simple": 0, "standard": 1, "enterprise": 2}
+    _run_complexity_level = _COMPLEXITY_ORDER.get(complexity, 1)
+
     accumulated_context = []
     for i, phase in enumerate(workflow.phases):
         # Skip already-completed phases on resume
@@ -560,6 +572,21 @@ async def run_workflow(
                 {"phase": phase.name, "success": True, "skipped": True}
             )
             continue
+
+        # Scale-adaptive: skip phases requiring higher complexity than requested
+        if phase.min_complexity:
+            _phase_level = _COMPLEXITY_ORDER.get(phase.min_complexity, 1)
+            if _phase_level > _run_complexity_level:
+                run.phase_results.append(
+                    {
+                        "phase": phase.name,
+                        "success": True,
+                        "skipped": True,
+                        "reason": f"min_complexity={phase.min_complexity} > run complexity={complexity}",
+                    }
+                )
+                continue
+
         run.current_phase = i
 
         phase_agents = phase.config.get("agents", [])
