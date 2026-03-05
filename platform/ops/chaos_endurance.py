@@ -56,6 +56,13 @@ SCENARIOS_VM1 = [
     "wal_checkpoint_truncate",
     "memory_pressure_85pct",
     "disk_fill_500mb",
+    # Module resilience scenarios — test graceful degradation when optional
+    # modules are toggled OFF at runtime (source: SF chaos-endurance design doc).
+    # Rationale: optional modules MUST NOT crash the platform when disabled.
+    # Mirrors what users do via Settings → Modules toggle.
+    "module_disable_browser_cli",
+    "module_disable_rtk",
+    "module_disable_redis",
 ]
 
 SCENARIOS_VM2 = [
@@ -63,6 +70,13 @@ SCENARIOS_VM2 = [
     "network_partition_30s",
     "disk_fill_200mb",
 ]
+
+# Module IDs targeted by module chaos scenarios (mapped from scenario name)
+_MODULE_SCENARIO_MAP = {
+    "module_disable_browser_cli": "browser-cli",
+    "module_disable_rtk": "rtk",
+    "module_disable_redis": "redis",
+}
 
 
 def _ensure_table():
@@ -120,6 +134,108 @@ def get_chaos_history(limit: int = 50) -> list[dict]:
 
 
 # ── Scenario Executors ───────────────────────────────────────────────
+
+
+def _set_module_enabled(module_id: str, enabled: bool) -> list[str]:
+    """Toggle a module ON/OFF in DB settings. Returns previous enabled_modules list."""
+    import json as _json
+
+    db = get_connection()
+    row = db.execute(
+        "SELECT value FROM settings WHERE key='enabled_modules'"
+    ).fetchone()
+    prev: list[str] = _json.loads(row[0]) if row else []
+    updated = list(prev)
+    if enabled and module_id not in updated:
+        updated.append(module_id)
+    elif not enabled and module_id in updated:
+        updated.remove(module_id)
+    db.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES ('enabled_modules', ?)",
+        (_json.dumps(updated),),
+    )
+    db.commit()
+    db.close()
+    return prev
+
+
+async def _exec_module_scenario(scenario: str) -> "ChaosRunResult":
+    """Chaos scenario: disable an optional module, verify graceful degradation, restore.
+
+    Source: SF ADR-0008 (chaos-endurance), chaos-module-scenarios design.
+    Rationale: optional modules MUST NOT crash the platform when toggled OFF.
+    Test flow:
+      1. Disable the module in DB settings (simulates Settings → Modules toggle)
+      2. Poll health endpoint — platform must stay responsive (graceful degradation)
+      3. Re-enable the module and measure time to full recovery
+    """
+    run_id = str(uuid.uuid4())[:8]
+    ts = datetime.now(timezone.utc).isoformat()
+    module_id = _MODULE_SCENARIO_MAP.get(scenario, "")
+    logger.info(
+        "CHAOS [%s] module scenario: %s (module=%s)", run_id, scenario, module_id
+    )
+
+    if not module_id:
+        return ChaosRunResult(
+            id=run_id,
+            ts=ts,
+            scenario=scenario,
+            target="module",
+            mttr_ms=0,
+            phases_lost=0,
+            success=False,
+            detail=f"Unknown module scenario: {scenario}",
+        )
+
+    try:
+        # 1. Disable the module
+        _set_module_enabled(module_id, False)
+
+        # 2. Verify health still responds (graceful degradation — should not crash)
+        await asyncio.sleep(2)  # brief pause for in-flight requests to settle
+        healthy = await _check_health()
+
+        # 3. Restore immediately
+        t_restore_start = time.monotonic()
+        _set_module_enabled(module_id, True)
+        await asyncio.sleep(1)
+        health_after = await _check_health()
+        mttr = (time.monotonic() - t_restore_start) * 1000 if health_after else -1
+
+        # Graceful degradation: platform healthy BOTH during disable and after restore
+        success = healthy and health_after
+        detail = (
+            f"module={module_id} degradation=ok restore={'ok' if health_after else 'timeout'}"
+            if success
+            else f"module={module_id} unhealthy_during_disable={not healthy}"
+        )
+        return ChaosRunResult(
+            id=run_id,
+            ts=ts,
+            scenario=scenario,
+            target="module",
+            mttr_ms=int(mttr) if mttr >= 0 else -1,
+            phases_lost=0 if success else 1,
+            success=success,
+            detail=detail,
+        )
+    except Exception as e:
+        # Always restore on error
+        try:
+            _set_module_enabled(module_id, True)
+        except Exception:
+            pass
+        return ChaosRunResult(
+            id=run_id,
+            ts=ts,
+            scenario=scenario,
+            target="module",
+            mttr_ms=-1,
+            phases_lost=1,
+            success=False,
+            detail=str(e)[:200],
+        )
 
 
 async def _check_health(url: str = HEALTH_URL, timeout: float = 5.0) -> bool:
@@ -222,6 +338,9 @@ async def _exec_scenario(scenario: str) -> ChaosRunResult:
             mttr = 0 if healthy else await _wait_health()
 
         else:
+            # Delegate module chaos scenarios to dedicated handler
+            if scenario in _MODULE_SCENARIO_MAP:
+                return await _exec_module_scenario(scenario)
             return ChaosRunResult(
                 id=run_id,
                 ts=ts,

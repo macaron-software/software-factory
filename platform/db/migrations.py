@@ -965,6 +965,40 @@ def _ensure_darwin_tables(conn) -> None:
 
     conn.commit()
 
+    # GAEngine: evolution_proposals schema fix (added 2026-03)
+    # The original evolution_proposals table was created with column names that
+    # diverged from the GAEngine _save_proposal() code (genome_json vs mutated_config,
+    # fitness vs fitness_score). Added missing columns here so evolve_all() can persist
+    # proposals to DB. Source: platform/agents/evolution.py _save_proposal().
+    # Also dropped NOT NULL on legacy columns (workflow_id, mutated_config) to allow
+    # the new column-based INSERT without breaking existing schema.
+    conn.execute(
+        "ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS genome_json TEXT"
+    )
+    conn.execute(
+        "ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS fitness REAL DEFAULT 0.0"
+    )
+    conn.execute("ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS run_id TEXT")
+    conn.execute("ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS wf_id TEXT")
+    conn.execute(
+        "ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS generations INT DEFAULT 0"
+    )
+    conn.execute(
+        "ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS fitness_history_json TEXT"
+    )
+    # Drop legacy NOT NULL constraints — old code populated mutated_config/workflow_id,
+    # new code uses genome_json/wf_id. Both columns coexist; constraint removed so INSERT
+    # doesn't fail when only the new column is populated.
+    conn.execute("ALTER TABLE evolution_runs ALTER COLUMN workflow_id DROP NOT NULL")
+    conn.execute(
+        "ALTER TABLE evolution_proposals ALTER COLUMN mutated_config DROP NOT NULL"
+    )
+    # agents.project_id FK (added 2026-03) — links ft-* project agents back to their project
+    # Rationale: needed for project-scoped agent queries (ADR-0009 project isolation).
+    conn.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS project_id TEXT")
+
+    conn.commit()
+
 
 def get_db(db_path: Path = DB_PATH):
     """Get a database connection. Returns PostgreSQL adapter."""

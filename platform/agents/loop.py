@@ -200,6 +200,37 @@ class AgentLoop:
             if self._should_skip(msg):
                 continue
 
+            # Pre-LLM content veto gate (ADR-0015 — veto_triggers guardrail)
+            # Rationale: critical agents (CISO, Compliance, Architects) declare
+            # veto_keywords in permissions_json. If any keyword matches the incoming
+            # message, the agent emits an immediate VETO *before* the LLM is called.
+            # This is faster, deterministic, and tamper-resistant vs. asking the LLM.
+            # Source: ADR-0015, inspired by OWASP LLM01 (prompt injection guardrails).
+            _veto_kws: list = self.agent.permissions.get("veto_keywords", [])
+            if _veto_kws:
+                _content_lower = msg.content.lower()
+                _matched_kw = next(
+                    (kw for kw in _veto_kws if kw.lower() in _content_lower), None
+                )
+                if _matched_kw:
+                    logger.warning(
+                        "Agent %s: pre-LLM veto keyword=%r  session=%s",
+                        self.agent.id,
+                        _matched_kw,
+                        self.session_id,
+                    )
+                    await self.send_message(
+                        to=msg.from_agent,
+                        content=(
+                            f"[VETO:{_matched_kw}] "
+                            f"Requête bloquée par guardrail de sécurité "
+                            f"(mot-clé interdit pour {self.agent.role})."
+                        ),
+                        msg_type=MessageType.VETO,
+                        parent_id=msg.id or "",
+                    )
+                    continue
+
             # Round limit to prevent infinite loops
             self._rounds += 1
             if self._rounds > self.max_rounds:
