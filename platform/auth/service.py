@@ -177,6 +177,17 @@ def _ensure_personal_space(user: "User") -> None:
         logging.getLogger(__name__).warning("_ensure_personal_space failed: %s", e)
 
 
+def force_reset_password(email: str, new_password: str) -> None:
+    """Force-reset a user's password (used by demo_login when hash is stale)."""
+    pw_hash = _hash_password(new_password)
+    with get_db() as db:
+        db.execute(
+            "UPDATE users SET password_hash=? WHERE email=?",
+            (pw_hash, email.strip().lower()),
+        )
+        db.commit()
+
+
 def register(
     email: str,
     password: str,

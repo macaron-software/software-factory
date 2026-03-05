@@ -124,7 +124,15 @@ async def demo_login(request: Request):
             lambda: service.register(demo_email, demo_pass, demo_name, role="admin"),
         )
     except service.AuthError:
-        pass  # Already exists
+        # Already exists — force-reset password in case the stored hash is stale
+        # (e.g. created with a different password in a prior session / env change)
+        try:
+            await loop.run_in_executor(
+                None,
+                lambda: service.force_reset_password(demo_email, demo_pass),
+            )
+        except Exception as _pe:
+            _log.warning("demo_login: password reset failed: %s", _pe)
     except Exception as _e:
         _log.error("demo_login: register failed: %s", _e)
 
