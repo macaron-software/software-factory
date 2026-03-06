@@ -35,88 +35,40 @@ jobs:
           set -e
           echo "=== AC Cycle Status ==="
           
-          # Get API key — try DB first, then env, then process env
+          # Get API key — query PostgreSQL DB via process env DATABASE_URL
           API_KEY=""
           echo "Searching for API key..."
           
-          # Method 1: Query SQLite DB for platform_api_keys
-          DB_PATH=""
-          # First try to get DB path from running process env
           PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
-          if [ -n "$PLATFORM_PID" ]; then
-            DB_URL=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^DATABASE_URL=" | cut -d= -f2- | head -1)
-            echo "Process DB URL: $DB_URL"
-            if echo "$DB_URL" | grep -q "sqlite"; then
-              DB_PATH=$(echo "$DB_URL" | sed 's|sqlite:///||' | sed 's|sqlite+aiosqlite:///||')
-              echo "Resolved DB path: $DB_PATH"
-            fi
-          fi
-          # Fallback: scan env files
-          if [ -z "$DB_PATH" ]; then
-            for f in /tmp/sf-node.env /home/sfadmin/.env; do
-              if [ -f "$f" ]; then
-                DB_URL=$(grep "^DATABASE_URL=" "$f" 2>/dev/null | cut -d= -f2-)
-                if echo "$DB_URL" | grep -q "sqlite"; then
-                  DB_PATH=$(echo "$DB_URL" | sed 's|sqlite:///||' | sed 's|sqlite+aiosqlite:///||')
-                  echo "DB from $f: $DB_PATH"
-                  break
-                fi
-              fi
-            done
-          fi
-          # Fallback: common paths
-          if [ -z "$DB_PATH" ] || [ ! -f "$DB_PATH" ]; then
-            for dp in /home/sfadmin/data/platform.db /home/sfadmin/platform/data/platform.db /app/data/platform.db /tmp/platform.db; do
-              if [ -f "$dp" ] && [ "$(sqlite3 "$dp" '.tables' 2>/dev/null | wc -c)" -gt "5" ]; then
-                DB_PATH="$dp"
-                break
-              fi
-            done
-          fi
-          if [ -n "$DB_PATH" ]; then
-            echo "Found DB: $DB_PATH"
-            KEY=$(sqlite3 "$DB_PATH" "SELECT key FROM platform_api_keys WHERE active=1 LIMIT 1;" 2>/dev/null | head -1) || true
+          DB_URL=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^DATABASE_URL=" | cut -d= -f2- | head -1)
+          
+          if [ -n "$DB_URL" ]; then
+            # Try existing API key
+            KEY=$(psql "$DB_URL" -t -c "SELECT key FROM platform_api_keys WHERE active=true LIMIT 1;" 2>/dev/null | tr -d ' \n' || true)
             if [ -n "$KEY" ]; then
               API_KEY="$KEY"
-              echo "Got API key from platform_api_keys table"
-            fi
-          fi
-          
-          # Method 2: Check env files for any auth key
-          if [ -z "$API_KEY" ]; then
-            for f in /tmp/sf-node.env /home/sfadmin/.env; do
-              if [ -f "$f" ]; then
-                KEY=$(grep -E "^(MACARON|PLATFORM|SF|INTERNAL|API)_[A-Z_]*KEY=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | head -1) || true
-                if [ -n "$KEY" ]; then
-                  API_KEY="$KEY"
-                  echo "Found key in $f"
-                  break
-                fi
+              echo "Got existing API key from DB"
+            else
+              # Create temp key
+              TEMP_KEY="gh-dispatch-$(date +%s)"
+              psql "$DB_URL" -c "INSERT INTO platform_api_keys (key, name, active, created_at) VALUES ('$TEMP_KEY', 'gh-dispatch', true, NOW()) ON CONFLICT DO NOTHING;" 2>/dev/null || true
+              CHECK=$(psql "$DB_URL" -t -c "SELECT COUNT(*) FROM platform_api_keys WHERE key='$TEMP_KEY';" 2>/dev/null | tr -d ' \n' || echo "0")
+              if [ "$CHECK" = "1" ]; then
+                API_KEY="$TEMP_KEY"
+                echo "Created temp API key"
+              else
+                # Show tables for debugging
+                echo "DB tables: $(psql "$DB_URL" -t -c "\dt" 2>/dev/null | grep -E "api|key|user|auth" | head -5)"
+                # Get admin user email for JWT login
+                ADMIN_EMAIL=$(psql "$DB_URL" -t -c "SELECT email FROM users WHERE role='admin' LIMIT 1;" 2>/dev/null | tr -d ' \n' || true)
+                echo "Admin email found: $([ -n "$ADMIN_EMAIL" ] && echo $ADMIN_EMAIL || echo 'none')"
               fi
-            done
+            fi
+          else
+            echo "No DATABASE_URL in process env"
           fi
           
           echo "API key found: $([ -n "$API_KEY" ] && echo 'YES' || echo 'NO')"
-          
-          # If no API key found, create a temporary one in the DB
-          if [ -z "$API_KEY" ] && [ -n "$DB_PATH" ]; then
-            TEMP_KEY="gh-dispatch-$(date +%s)"
-            sqlite3 "$DB_PATH" "INSERT OR IGNORE INTO platform_api_keys (key, name, active, created_at) VALUES ('$TEMP_KEY', 'gh-dispatch', 1, datetime('now'));" 2>/dev/null || true
-            # Verify insertion
-            INSERTED=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM platform_api_keys WHERE key='$TEMP_KEY';" 2>/dev/null || echo "0")
-            if [ "$INSERTED" = "1" ]; then
-              API_KEY="$TEMP_KEY"
-              echo "Created temp DB key: $TEMP_KEY"
-            else
-              echo "Failed to create temp key (table may not exist or have different schema)"
-              # Check the schema
-              sqlite3 "$DB_PATH" ".schema platform_api_keys" 2>/dev/null || echo "No platform_api_keys table"
-              # List all tables
-              echo "All tables: $(sqlite3 "$DB_PATH" ".tables" 2>/dev/null)"
-              # Check users table
-              echo "Users: $(sqlite3 "$DB_PATH" "SELECT id,email,role FROM users LIMIT 5;" 2>/dev/null || echo 'no users table')"
-            fi
-          fi
           
           BASE_URL="http://localhost:8091"
           
