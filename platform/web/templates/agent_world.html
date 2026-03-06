@@ -201,9 +201,9 @@ const LIVE_DATA = {{ live_json|safe }};
 // ── Day/Night Mode — synced with site theme ──
 let isDayMode = (localStorage.getItem('macaron_theme') || 'dark') === 'light';
 const THEMES = {
-    night: { bg: 0x151020, fog: 0x151020, ambient: 0x6040a0, ambientI: 1.0, dirColor: 0xffeedd, dirI: 1.2,
-             fillColor: 0xaabbff, fillI: 0.5, hemiSky: 0x9080d0, hemiGnd: 0x302540, hemiI: 0.6,
-             floor: 0x1e1830, grid1: 0x302550, grid2: 0x251a40, exposure: 1.4 },
+    night: { bg: 0x151020, fog: 0x151020, ambient: 0x9080cc, ambientI: 2.2, dirColor: 0xffeedd, dirI: 2.0,
+             fillColor: 0xaabbff, fillI: 1.0, hemiSky: 0xb0a0e0, hemiGnd: 0x503070, hemiI: 1.0,
+             floor: 0x2e2845, grid1: 0x3a3060, grid2: 0x322854, exposure: 2.0 },
     day:   { bg: 0xb8d0e8, fog: 0xc8ddf0, ambient: 0xffffff, ambientI: 0.6, dirColor: 0xfffaf0, dirI: 1.8,
              fillColor: 0x8ebbff, fillI: 0.7, hemiSky: 0x87ceeb, hemiGnd: 0x8fbc8f, hemiI: 0.8,
              floor: 0xd5cfc2, grid1: 0xc0b8a8, grid2: 0xccc4b4, exposure: 1.0 },
@@ -231,20 +231,20 @@ function generateLayout() {
             const bw2 = (m2.phases?.length || 1) * PHASE_W + BLDG_PAD * 2;
             if (bw2 <= 18) {
                 const gap = 4;
-                mzones.push({ id:`mission-${m._i}`, name:m.name, mission:m, x:-(bw+gap)/2+bw/2, z:curZ, w:bw, h:BLDG_DEPTH, color:MISSION_COLORS[m._i%8], floorColor:0x152040, floorDay:0xd0d8e8, roles:[] });
-                mzones.push({ id:`mission-${m2._i}`, name:m2.name, mission:m2, x:(bw2+gap)/2-bw2/2+gap/2, z:curZ, w:bw2, h:BLDG_DEPTH, color:MISSION_COLORS[m2._i%8], floorColor:0x152040, floorDay:0xd0d8e8, roles:[] });
+                mzones.push({ id:`mission-${m._i}`, name:m.name, mission:m, x:-(bw+gap)/2+bw/2, z:curZ, w:bw, h:BLDG_DEPTH, color:MISSION_COLORS[m._i%8], floorColor:0x2a3a60, floorDay:0xd0d8e8, roles:[] });
+                mzones.push({ id:`mission-${m2._i}`, name:m2.name, mission:m2, x:(bw2+gap)/2-bw2/2+gap/2, z:curZ, w:bw2, h:BLDG_DEPTH, color:MISSION_COLORS[m2._i%8], floorColor:0x2a3a60, floorDay:0xd0d8e8, roles:[] });
                 idx += 2; curZ += BLDG_DEPTH + BLDG_GAP; continue;
             }
         }
-        mzones.push({ id:`mission-${m._i}`, name:m.name, mission:m, x:0, z:curZ, w:bw, h:BLDG_DEPTH, color:MISSION_COLORS[m._i%8], floorColor:0x152040, floorDay:0xd0d8e8, roles:[] });
+        mzones.push({ id:`mission-${m._i}`, name:m.name, mission:m, x:0, z:curZ, w:bw, h:BLDG_DEPTH, color:MISSION_COLORS[m._i%8], floorColor:0x2a3a60, floorDay:0xd0d8e8, roles:[] });
         idx++; curZ += BLDG_DEPTH + BLDG_GAP;
     }
     // Shared zones on the right side
     const sx = Math.max(22, ...mzones.map(z => z.x + z.w/2)) + 6;
     const shared = [
-        { id:'board', name:'Board Room', x:sx, z:-12, w:12, h:8, color:0xd4a017, floorColor:0x2a2010, floorDay:0xe8dcc0,
+        { id:'board', name:'Board Room', x:sx, z:-12, w:12, h:8, color:0xd4a017, floorColor:0x3a3018, floorDay:0xe8dcc0,
           roles:['dsi','cto','cpo','strat-cpo','strat-cto','lean_portfolio_manager','strat-portfolio','scrum_master','chef_projet','agile_coach','chef_de_programme','product_manager','epic_owner','solution_manager','enterprise_architect','solution_architect','cloud_architect','architecte','brain','product','tech_writer','pmo'] },
-        { id:'chill', name:'Chill Zone', x:sx, z:4, w:12, h:10, color:0x84cc16, floorColor:0x182510, floorDay:0xd0e8c0, roles:[] },
+        { id:'chill', name:'Chill Zone', x:sx, z:4, w:12, h:10, color:0x84cc16, floorColor:0x253818, floorDay:0xd0e8c0, roles:[] },
     ];
     return { missionZones: mzones, shared, all: [...mzones, ...shared] };
 }
@@ -516,7 +516,7 @@ function buildMissionBuildings() {
 
         // ── Roof beam ──
         const roof = new THREE.Mesh(new THREE.BoxGeometry(mz.w, 0.1, mz.h),
-            new THREE.MeshStandardMaterial({ color: isDayMode ? 0xd0c8b8 : 0x2a2040, transparent: true, opacity: 0.15 }));
+            new THREE.MeshStandardMaterial({ color: isDayMode ? 0xd0c8b8 : 0x3a3060, transparent: true, opacity: 0.15 }));
         roof.position.set(mz.x, wallH, mz.z); scene.add(roof);
 
         // ── Sign ──
@@ -904,7 +904,7 @@ function createAgentMesh(agent) {
     group.add(shadow);
 
     // Shoes
-    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.8 });
     for (const sx of [-0.12, 0.12]) {
         const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.2), shoeMat);
         shoe.position.set(sx, 0.08, 0.02);
@@ -912,7 +912,7 @@ function createAgentMesh(agent) {
     }
 
     // Legs
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x2a2a3a, roughness: 0.7 });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x3a3a50, roughness: 0.7 });
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.5, 0.14), legMat);
     leftLeg.position.set(-0.12, 0.38, 0);
     leftLeg.userData.isLeg = true;
@@ -1863,8 +1863,8 @@ function applyDayNight(day, animate) {
 
     // Trees — greener in day
     for (const tr of sceneRefs.trees) {
-        tr.trunk.material.color.setHex(day ? 0x8B5A2B : 0x4a3020);
-        const leafColor = day ? 0x4CAF50 : 0x1a5c30;
+        tr.trunk.material.color.setHex(day ? 0x8B5A2B : 0x6b4828);
+        const leafColor = day ? 0x4CAF50 : 0x2d7840;
         if (tr.crowns) {
             for (const c of tr.crowns) c.material.color.setHex(leafColor);
         } else if (tr.crown) {
@@ -1893,7 +1893,7 @@ function applyDayNight(day, animate) {
 // ═══════════════════════════════════════════════════════
 function buildPaths() {
     const pathMat = new THREE.MeshStandardMaterial({
-        color: isDayMode ? 0xc8bfb0 : 0x252035,
+        color: isDayMode ? 0xc8bfb0 : 0x3a3255,
         roughness: 0.85, metalness: 0.05,
     });
     // Connect zones with paths (flat boxes)
