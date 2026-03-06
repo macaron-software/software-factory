@@ -26,7 +26,6 @@ from starlette.responses import JSONResponse
 
 from ...auth import service
 from ...auth.middleware import require_auth, get_current_user
-from ...demo import is_demo_mode
 
 _log = logging.getLogger(__name__)
 
@@ -134,15 +133,7 @@ async def setup(request: Request):
 
 @router.post("/api/auth/demo")
 async def demo_login(request: Request):
-    """Skip login — create or reuse demo admin and auto-login.
-
-    WHY: Only enabled when PLATFORM_LLM_PROVIDER=demo. Leaving this endpoint
-    active on production would create a permanent admin backdoor with hardcoded
-    credentials. Ref: SecureByDesign v1.1.0 SBD-04.
-    """
-    # SBD-04: Restrict demo login to demo deployments only.
-    if not is_demo_mode():
-        return JSONResponse({"error": "Not found"}, status_code=404)
+    """Skip login — create or reuse demo admin and auto-login. Available on all environments."""
 
     ip = request.client.host if request.client else ""
     if _check_rate_limit(ip):
