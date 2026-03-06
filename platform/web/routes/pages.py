@@ -2364,6 +2364,166 @@ async def art_page(request: Request, tab: str = "agents"):
     )
 
 
+@router.get("/api/art/amelio/specbar/{subtab}")
+async def api_art_amelio_specbar(subtab: str):
+    """Return SAFe spec bar context for the given Amélioration Continue sub-tab.
+    Called live on each tab switch in art.html to populate Programme/Epic/Feature/etc.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _build():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            # All active AC projects
+            states = conn.execute(
+                "SELECT project_id, current_cycle, status, current_run_id, total_score_avg,"
+                " ci_status FROM ac_project_state ORDER BY updated_at DESC"
+            ).fetchall()
+            states = [dict(s) for s in states]
+            # Most recent cycle for the primary active project
+            active = next(
+                (s for s in states if s.get("status") not in ("idle", None)), None
+            ) or (states[0] if states else None)
+            latest_cycle = None
+            sprints = []
+            if active:
+                c = conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 1",
+                    (active["project_id"],),
+                ).fetchone()
+                if c:
+                    latest_cycle = dict(c)
+            # Tasks from current mission via epics/sprints
+            if active and active.get("current_run_id"):
+                try:
+                    from ...missions.store import get_mission_store
+
+                    st = get_mission_store()
+                    sp_list = st.list_sprints(active["current_run_id"])
+                    sprints = [
+                        {
+                            "title": f"{s.type} — {s.name or s.type}",
+                            "status": s.status,
+                        }
+                        for s in sp_list
+                    ]
+                except Exception:
+                    pass
+        except Exception:
+            states, active, latest_cycle, sprints = [], None, None, []
+        finally:
+            conn.close()
+        return states, active, latest_cycle, sprints
+
+    states, active, latest_cycle, sprints = await asyncio.to_thread(_build)
+
+    # Build context per sub-tab
+    n_active = sum(1 for s in states if s.get("status") not in ("idle", None))
+    n_total = len(states)
+    programme = "Software Factory"
+    programme_sub = f"{n_active}/{n_total} projets actifs" if n_total else ""
+
+    if subtab == "cycles" or subtab == "ac-panel-cycles":
+        if active:
+            epic_name = f"AC {active['project_id']} — Cycle {active['current_cycle']}"
+            feature = {
+                "name": latest_cycle.get("status", "pending")
+                if latest_cycle
+                else active.get("ci_status", "unknown"),
+                "status": active.get("status", ""),
+            }
+            stories = sprints or (
+                [
+                    {
+                        "title": f"Cycle {active['current_cycle']} en cours",
+                        "status": "active",
+                    }
+                ]
+                if active.get("current_cycle")
+                else []
+            )
+            persona = "Marc Lefèvre (Platform Lead)"
+            rbac = ["admin", "developer"]
+        else:
+            epic_name = "Aucun cycle actif"
+            feature = None
+            stories = []
+            persona = "—"
+            rbac = []
+    elif subtab == "skills" or subtab == "ac-panel-skills":
+        epic_name = "Skills Improvement"
+        feature = {"name": "Eval coverage", "status": "ongoing"}
+        stories = [
+            {"title": "Skills avec evals ≥ 80%", "status": "active"},
+            {"title": "Skills manquants à créer", "status": "pending"},
+        ]
+        persona = "Sophia Renard (Knowledge Lead)"
+        rbac = ["admin", "developer", "viewer"]
+    elif subtab == "thompson" or subtab == "ac-panel-thompson":
+        epic_name = "Thompson Sampling — Skill Variants"
+        feature = {"name": "Beta distribution selection", "status": "running"}
+        stories = [
+            {"title": "Variant A/B skill selection", "status": "active"},
+            {"title": "Bayesian reward update", "status": "active"},
+        ]
+        persona = "Karim Benchekroun (ML Lead)"
+        rbac = ["admin", "developer"]
+    elif subtab == "darwin" or subtab == "ac-panel-darwin":
+        epic_name = "Darwin Teams — GA Evolution"
+        feature = {"name": "Fitness GA", "status": "running"}
+        stories = [
+            {"title": "Team fitness scoring", "status": "active"},
+            {"title": "Natural selection + crossover", "status": "active"},
+        ]
+        persona = "Thomas Dubois (ART Lead)"
+        rbac = ["admin", "project_manager"]
+    elif subtab == "evolution" or subtab == "ac-panel-evolution":
+        epic_name = "Evolution nocturne — GA + RL"
+        feature = {"name": "Orchestration évolutive", "status": "scheduled"}
+        stories = [
+            {"title": "GA orchestration nocturne", "status": "active"},
+            {"title": "RL reward propagation", "status": "active"},
+        ]
+        persona = "Orchestrateur Évolution"
+        rbac = ["admin"]
+    elif subtab == "rl" or subtab == "ac-panel-rl":
+        epic_name = "RL Reward — Politique d'apprentissage"
+        feature = {
+            "name": f"Score moy. {active['total_score_avg']:.0f}/100"
+            if active
+            else "RL policy",
+            "status": "active",
+        }
+        stories = [
+            {
+                "title": "Reward R = f(qualité, adversarial, traceability)",
+                "status": "active",
+            },
+        ]
+        persona = "Arnaud Delacroix (Cost Lead)"
+        rbac = ["admin", "developer"]
+    else:
+        epic_name = f"Amélioration Continue — {subtab}"
+        feature = None
+        stories = []
+        persona = "—"
+        rbac = ["admin"]
+
+    return JSONResponse(
+        {
+            "programme": programme,
+            "programme_sub": programme_sub,
+            "epic": {"name": epic_name},
+            "feature": feature,
+            "user_stories": stories,
+            "persona": persona,
+            "rbac_roles": rbac,
+            "slug": f"/art#amelio/{subtab}",
+        }
+    )
+
+
 @router.get("/toolbox", response_class=HTMLResponse)
 async def toolbox_page(request: Request, tab: str = "skills"):
     """Toolbox — Skills + Memory + MCPs in tabs."""

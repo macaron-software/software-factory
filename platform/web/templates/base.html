@@ -1154,6 +1154,64 @@ body.sf-wireframe #sfWireframeBtn {
     if (notLinked) notLinked.style.display = 'inline';
   }
 
+  /* External API: update SpecBar with pre-fetched data object */
+  window.updateSpecBarWithData = function(d) {
+    if (!d) { showSpecNotLinked(); return; }
+    var progEl = document.getElementById('spec-programme');
+    var progSub = document.getElementById('spec-programme-sub');
+    var epicEl = document.getElementById('spec-epic');
+    var featEl = document.getElementById('spec-feature');
+    var featStatusEl = document.getElementById('spec-feature-status');
+    var storiesEl = document.getElementById('spec-stories');
+    var personaEl = document.getElementById('spec-persona-card');
+    var rbacEl = document.getElementById('spec-rbac');
+    var notLinked = document.getElementById('spec-not-linked');
+    var slugEl = document.getElementById('spec-page-slug');
+    if (progEl) progEl.textContent = d.programme || 'Software Factory';
+    if (progSub) progSub.textContent = d.programme_sub || '';
+    if (epicEl) epicEl.textContent = d.epic ? (d.epic.name || d.epic) : '—';
+    if (featEl) {
+      if (d.feature) {
+        featEl.textContent = d.feature.name || d.feature;
+        if (featStatusEl) featStatusEl.textContent = d.feature.status || '';
+      } else {
+        featEl.innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Non liée</span>';
+      }
+    }
+    if (storiesEl) {
+      if (d.user_stories && d.user_stories.length) {
+        storiesEl.innerHTML = d.user_stories.slice(0,3).map(function(s) {
+          var dot = (s.status === 'done' || s.status === 'completed') ? '✓' : '·';
+          var color = dot === '✓' ? 'var(--green,#1a7f37)' : 'var(--accent,#0969da)';
+          return '<div style="display:flex;gap:3px"><span style="color:' + color + '">' + dot + '</span>' + (s.title || s) + '</div>';
+        }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da);margin-top:2px">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
+      } else {
+        storiesEl.textContent = '—';
+      }
+    }
+    if (personaEl) personaEl.textContent = d.persona || '—';
+    if (rbacEl) {
+      if (d.rbac_roles && d.rbac_roles.length) {
+        var RC = {admin:'#cf222e',project_manager:'#8250df',developer:'#0969da',viewer:'#1a7f37'};
+        rbacEl.innerHTML = d.rbac_roles.map(function(r) {
+          var c = RC[r] || '#57606a';
+          return '<span style="display:inline-flex;align-items:center;padding:1px 6px;border-radius:10px;background:'+c+'20;color:'+c+';font-size:.6rem;font-weight:600;border:1px solid '+c+'40">' + r + '</span>';
+        }).join('');
+      } else { rbacEl.textContent = '—'; }
+    }
+    if (notLinked) notLinked.style.display = 'none';
+    if (slugEl) slugEl.textContent = d.slug || location.pathname;
+    specLoaded = true;
+  };
+
+  /* External API: fetch SpecBar data from a URL and apply it */
+  window.loadSpecBarFromUrl = function(url) {
+    fetch(url)
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) { window.updateSpecBarWithData(d); })
+      .catch(function() { showSpecNotLinked(); });
+  };
+
   /* Init on load */
   document.addEventListener('DOMContentLoaded', function() {
     if (specOpen) setSpecBarState(true);

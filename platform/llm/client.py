@@ -112,27 +112,24 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,
     },
-    # WHY: opencode is an OpenAI-compatible self-hosted inference server (Go).
-    # Used on OVH demo env as primary provider; supports multiple models via /v1/models.
-    # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
-    # Static list covers the standard opencode model profiles; ↻ in Settings fetches live list.
+    # WHY: OpenCode Go subscription — OpenAI-compatible API at opencode.ai/zen/go/v1.
+    # Source of truth: https://models.dev/api.json (opencode-go provider).
+    # Base URL confirmed via models.dev registry: https://opencode.ai/zen/go/v1
+    # API key env var: OPENCODE_API_KEY (sk-... format from opencode.ai/auth)
+    # Full model catalog: https://opencode.ai/docs/zen
     "opencode": {
         "name": "OpenCode (Go)",
-        "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
-        "key_env": "OPENCODE_API_KEY",
-        "models": sorted(
-            {
-                os.environ.get("OPENCODE_DEFAULT_MODEL", "coding"),
-                "coding",  # default code-optimized profile
-                "coding-fast",  # faster variant
-                "claude-sonnet-4-5",
-                "claude-haiku-4-5",
-                "gpt-4o",
-                "gpt-4o-mini",
-            }
-            - {""}  # remove empty string if OPENCODE_DEFAULT_MODEL unset
+        "base_url": os.environ.get(
+            "OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1"
         ),
-        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", "coding"),
+        "key_env": "OPENCODE_API_KEY",
+        "models": [
+            os.environ.get("OPENCODE_DEFAULT_MODEL", "kimi-k2.5"),
+            "kimi-k2.5",  # Kimi K2.5 — Moonshot AI via opencode-go subscription
+            "glm-5",  # GLM-5 — Zhipu AI via opencode-go subscription
+            "minimax-m2.5",  # MiniMax M2.5 via opencode-go subscription
+        ],
+        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", "kimi-k2.5"),
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },

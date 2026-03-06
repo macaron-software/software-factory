@@ -842,6 +842,10 @@ function artSwitchTab(btn, panelId) {
             renderAcGraph();
             document.getElementById('acGraphSvg').dataset.rendered = '1';
         }
+        // Update SAFe SpecBar with live AC data (current active sub-tab)
+        const activeStab = document.querySelector('.ac-stab.active');
+        const sub = activeStab ? activeStab.id.replace('ac-stab-', 'ac-panel-') : 'ac-panel-cycles';
+        if (window.loadSpecBarFromUrl) window.loadSpecBarFromUrl('/api/art/amelio/specbar/' + sub);
     }
 }
 
@@ -852,6 +856,8 @@ function acSwitchTab(btn, subId) {
         const el = document.getElementById(id);
         if (el) el.style.display = id === subId ? '' : 'none';
     });
+    // Update SAFe SpecBar live for this sub-tab
+    if (window.loadSpecBarFromUrl) window.loadSpecBarFromUrl('/api/art/amelio/specbar/' + subId);
     if (subId === 'ac-panel-thompson') loadThompsonTab();
     if (subId === 'ac-panel-skills') loadSkillsTab();
     if (subId === 'ac-panel-darwin') {
