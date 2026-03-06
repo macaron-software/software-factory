@@ -69,6 +69,22 @@ jobs:
           
           echo "API key found: $([ -n "$API_KEY" ] && echo 'YES' || echo 'NO')"
           
+          # If no API key found, create a temporary one in the DB
+          if [ -z "$API_KEY" ] && [ -n "$DB_PATH" ]; then
+            TEMP_KEY="gh-dispatch-$(date +%s)"
+            sqlite3 "$DB_PATH" "INSERT OR IGNORE INTO platform_api_keys (key, name, active, created_at) VALUES ('$TEMP_KEY', 'gh-dispatch', 1, datetime('now'));" 2>/dev/null || true
+            # Verify insertion
+            INSERTED=$(sqlite3 "$DB_PATH" "SELECT COUNT(*) FROM platform_api_keys WHERE key='$TEMP_KEY';" 2>/dev/null || echo "0")
+            if [ "$INSERTED" = "1" ]; then
+              API_KEY="$TEMP_KEY"
+              echo "Created temp DB key: $TEMP_KEY"
+            else
+              echo "Failed to create temp key (table may not exist or have different schema)"
+              # Check the schema
+              sqlite3 "$DB_PATH" ".schema platform_api_keys" 2>/dev/null || echo "No platform_api_keys table"
+            fi
+          fi
+          
           BASE_URL="http://localhost:8091"
           
           # Detect actual platform port
