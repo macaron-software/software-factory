@@ -1015,10 +1015,11 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
 
             store = get_mission_store()
             all_missions = store.list_missions(project_id=project_id, limit=200)
+            # recorded = run_ids of cycles that already have real scores (skip them)
             recorded = {
                 row[0]
                 for row in conn.execute(
-                    "SELECT platform_run_id FROM ac_cycles WHERE project_id=?",
+                    "SELECT platform_run_id FROM ac_cycles WHERE project_id=? AND total_score > 0",
                     (project_id,),
                 ).fetchall()
                 if row[0]
@@ -1053,6 +1054,7 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                 phase_scores_dict = {}
                 fix_summary = f"Cycle {cycle_num} — {status}"
                 total_score = 0
+                defect_count = 0
                 try:
                     sprints = store.list_sprints(run_id)
                     if sprints:
@@ -1061,26 +1063,54 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                         }
                         scored = [v for v in phase_scores_dict.values() if v]
                         total_score = sum(scored) // len(scored) if scored else 0
-                        retros = [
-                            f"{s.type}:{s.quality_score}"
-                            + (f"/{s.retro_notes[:60]}" if s.retro_notes else "")
-                            for s in sprints
-                            if s.quality_score or s.retro_notes
-                        ]
-                        if retros:
-                            fix_summary = (
-                                f"Cycle {cycle_num} — " + " · ".join(retros)[:200]
+                        # Build a readable fix_summary: prefer deploy/qa retro_notes
+                        _SUMMARY_PRIORITY = ["deploy", "qa-sprint", "adversarial", "tdd-sprint", "inception"]
+                        sprint_by_type = {s.type: s for s in sprints}
+                        summary_text = ""
+                        for ptype in _SUMMARY_PRIORITY:
+                            s = sprint_by_type.get(ptype)
+                            if s and s.retro_notes and len(s.retro_notes) > 10:
+                                summary_text = s.retro_notes[:300].strip()
+                                break
+                        if summary_text:
+                            scores_compact = " ".join(
+                                f"{t[:3]}:{v}" for t, v in phase_scores_dict.items() if v
                             )
+                            fix_summary = f"{summary_text} [{scores_compact}]"[:400]
+                        else:
+                            retros = [
+                                f"{s.type}:{s.quality_score}"
+                                for s in sprints
+                                if s.quality_score
+                            ]
+                            if retros:
+                                fix_summary = f"Cycle {cycle_num} — " + " · ".join(retros)
+                        # Estimate defect_count from adversarial retro_notes
+                        adv_sprint = sprint_by_type.get("adversarial")
+                        if adv_sprint and adv_sprint.retro_notes:
+                            import re as _re
+                            defect_count = len(_re.findall(
+                                r"\b(fail|bug|defect|error|issue|reject)\b",
+                                adv_sprint.retro_notes, _re.IGNORECASE
+                            ))
                 except Exception:
                     pass
                 import json as _json2
 
                 # Stub record — backfilled from mission/sprint data
+                # Use DO UPDATE to enrich stubs that were inserted with no scores
                 conn.execute(
                     "INSERT INTO ac_cycles (project_id, cycle_num, platform_run_id, status,"
                     " phase_scores, total_score, defect_count, fix_summary, started_at, completed_at)"
                     " VALUES (?,?,?,?,?,?,?,?,?,?)"
-                    " ON CONFLICT(project_id, cycle_num) DO NOTHING",
+                    " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
+                    " platform_run_id=COALESCE(NULLIF(excluded.platform_run_id,''), ac_cycles.platform_run_id),"
+                    " status=excluded.status,"
+                    " phase_scores=CASE WHEN ac_cycles.total_score <= 0 THEN excluded.phase_scores ELSE ac_cycles.phase_scores END,"
+                    " total_score=CASE WHEN ac_cycles.total_score <= 0 THEN excluded.total_score ELSE ac_cycles.total_score END,"
+                    " defect_count=CASE WHEN ac_cycles.defect_count = 0 THEN excluded.defect_count ELSE ac_cycles.defect_count END,"
+                    " fix_summary=CASE WHEN ac_cycles.total_score <= 0 OR ac_cycles.fix_summary LIKE 'Cycle % — %ompleted' OR ac_cycles.fix_summary LIKE 'Cycle % — unknown' THEN excluded.fix_summary ELSE ac_cycles.fix_summary END,"
+                    " completed_at=COALESCE(NULLIF(excluded.completed_at,''), ac_cycles.completed_at)",
                     (
                         project_id,
                         cycle_num,
@@ -1088,7 +1118,7 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                         status,
                         _json2.dumps(phase_scores_dict),
                         total_score,
-                        0,
+                        defect_count,
                         fix_summary,
                         started,
                         completed,
@@ -1988,20 +2018,34 @@ async def api_improvement_screenshot(project_id: str, cycle_num: int):
         candidates = [DATA_DIR / "workspaces" / sid for sid in session_ids]
         if run_id:
             candidates.append(DATA_DIR / "workspaces" / run_id)
+        # Also check project-level workspace dir
+        candidates.append(DATA_DIR / "workspaces" / project_id)
         # Try explicit path first
         if screenshot_path:
             for ws in candidates:
                 p = ws / screenshot_path
                 if p.exists():
                     return str(p)
-        # Auto-discover desktop screenshot
+            # Also try absolute path
+            from pathlib import Path as _Path
+            _abs = _Path(screenshot_path)
+            if _abs.is_absolute() and _abs.exists():
+                return str(_abs)
+        # Auto-discover screenshot
         for ws in candidates:
+            if not ws.exists():
+                continue
+            # Check screenshots/ subdir first
             ss_dir = ws / "screenshots"
             if ss_dir.exists():
-                for pat in ("desktop*.png", "*.png"):
+                for pat in ("desktop*.png", "screen*.png", "*.png"):
                     pngs = sorted(ss_dir.glob(pat))
                     if pngs:
                         return str(pngs[0])
+            # Also check workspace root for any PNG
+            root_pngs = sorted(ws.glob("*.png"))
+            if root_pngs:
+                return str(root_pngs[0])
         return None
 
     path = await asyncio.to_thread(_find_screenshot)
@@ -2010,7 +2054,34 @@ async def api_improvement_screenshot(project_id: str, cycle_num: int):
     return Response(status_code=404)
 
 
-@router.get("/api/improvement/project/{project_id}")
+@router.post("/api/improvement/backfill/{project_id}")
+async def api_improvement_backfill(project_id: str):
+    """Force re-backfill of cycle records from mission/sprint data. Updates stubs."""
+    from fastapi.responses import JSONResponse
+
+    def _force_backfill():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        updated = 0
+        try:
+            # Delete all stub rows (total_score=0 with no git_sha = backfill-only stubs)
+            conn.execute(
+                "DELETE FROM ac_cycles WHERE project_id=? AND total_score = 0 AND (git_sha IS NULL OR git_sha = '')",
+                (project_id,),
+            )
+            conn.commit()
+            updated = conn.total_changes
+        except Exception:
+            pass
+        finally:
+            conn.close()
+        return updated
+
+    deleted = await asyncio.to_thread(_force_backfill)
+    return JSONResponse({"ok": True, "project_id": project_id, "stubs_cleared": deleted,
+                         "message": "Stub cycles cleared. Reload the page to re-backfill from missions."})
+
+
 async def api_improvement_project_state(project_id: str):
     """
     Return current AC project state including RL hint, convergence, skill eval pending.

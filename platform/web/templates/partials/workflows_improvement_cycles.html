@@ -35,11 +35,23 @@
       <td class="{{ score_cls }}" style="font-weight:700">{{ score if score > 0 else '—' }}</td>
       <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.65rem">{{ "%.2f"|format(rl_r) if rl_r != 0 else '—' }}</td>
       <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
-      <td style="max-width:320px;font-size:.72rem;line-height:1.4;padding:.3rem .4rem">
+      <td style="max-width:340px;font-size:.72rem;line-height:1.4;padding:.3rem .4rem">
         {% if c.fix_summary %}
-          <span title="{{ c.fix_summary }}">{{ c.fix_summary[:200] }}{% if c.fix_summary|length > 200 %}…{% endif %}</span>
+          {# First line = main summary, rest in tooltip #}
+          {% set lines = c.fix_summary.split('\n') %}
+          {% set first_line = lines[0][:220] %}
+          <span title="{{ c.fix_summary }}" style="cursor:help">
+            {{ first_line }}{% if c.fix_summary|length > 220 %}&nbsp;<span style="color:var(--text-secondary)">[+{{ c.fix_summary|length - 220 }}c]</span>{% endif %}
+          </span>
         {% elif is_stub %}
-          <span style="color:var(--text-secondary);font-style:italic">Cycle {{ c.cycle_num }} — scores non enregistrés par l'agent CI/CD</span>
+          <span style="color:var(--text-secondary);font-style:italic">
+            Cycle {{ c.cycle_num }}
+            {% if c.phase_scores_dict %}
+              — {% for ph, s in c.phase_scores_dict.items() %}{{ ph[:3] }}:{{ s }}{% if not loop.last %} · {% endif %}{% endfor %}
+            {% else %}
+              — en attente de données agent CI/CD
+            {% endif %}
+          </span>
         {% else %}
           <span style="color:var(--text-secondary)">—</span>
         {% endif %}
@@ -60,3 +72,13 @@
 {% else %}
 <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
 {% endif %}
+<div style="margin-top:.75rem;display:flex;align-items:center;gap:.75rem">
+  <button class="btn btn-ghost" style="font-size:.7rem;padding:.25rem .6rem"
+          hx-post="/api/improvement/backfill/{{ project_id }}"
+          hx-swap="none"
+          hx-on::after-request="window.location.reload()"
+          title="Efface les stubs sans score et force un recalcul depuis les missions">
+    Recalculer historique
+  </button>
+  <span style="color:var(--text-secondary);font-size:.65rem">{{ cycles|length }} cycle(s) — recalcul recharge les données depuis les missions</span>
+</div>
