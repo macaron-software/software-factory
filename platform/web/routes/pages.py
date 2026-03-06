@@ -1248,19 +1248,19 @@ async def api_improvement_start(project_id: str):
 
     # Stop any existing active sessions for this project before starting a new one
     def _stop_existing_sessions():
-        from ...sessions.store import get_session_store
+        from ...db.migrations import get_db
 
-        ss = get_session_store()
-        existing = ss.list()
-        stopped = 0
-        for s in existing:
-            if getattr(s, "project_id", None) == project_id and s.status in (
-                "active",
-                "running",
-            ):
-                ss.update_status(s.id, "interrupted")
-                stopped += 1
-        return stopped
+        db = get_db()
+        try:
+            db.execute(
+                "UPDATE sessions SET status='interrupted' WHERE project_id=? AND status IN ('active','running')",
+                (project_id,),
+            )
+            db.commit()
+        except Exception:
+            pass
+        finally:
+            db.close()
 
     await asyncio.to_thread(_stop_existing_sessions)
 
