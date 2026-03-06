@@ -176,12 +176,12 @@ def _select_model_for_agent(
             # Code generation, tests, QA → Qwen (local-mlx)
             return _local_primary, _local_model
         elif role_l in _REASONING_ROLES or tags_l & _REASONING_TAGS:
-            # Architecture, planning, pilotage → azure-openai fallback
-            _az_provider = (
-                "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
-            )
+            # Architecture, planning, pilotage → azure-openai only if the deployment
+            # explicitly targets it (not when PLATFORM_LLM_PROVIDER=minimax, e.g. OVH).
+            if _local_primary == "minimax" or not os.environ.get("AZURE_OPENAI_API_KEY"):
+                return _local_primary, _local_model
             _az_model = os.environ.get("DEFAULT_MODEL", "gpt-5-mini")
-            return _az_provider, _az_model
+            return "azure-openai", _az_model
         else:
             # Small talk, generic → minimax (cheap)
             return CHEAP_PROVIDER, CHEAP_MODEL
