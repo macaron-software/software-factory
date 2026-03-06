@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 # Provider for tool-calling agents (OpenAI models handle tools reliably)
 TOOL_PROVIDER = "azure-openai"
 TOOL_MODEL = "gpt-5-mini"
-# Providers that support native function calling
-TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama"}
+# Providers that support native function calling (minimax M2.5 supports tools)
+TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama", "minimax"}
 
 # Backward-compat aliases (executor.py used underscore-prefixed names)
 _TOOL_PROVIDER = TOOL_PROVIDER
@@ -285,13 +285,16 @@ def _route_provider(
     )
 
     if tools and best_provider not in _TOOL_CAPABLE_PROVIDERS:
+        # On non-Azure, don't escalate to azure-openai — stay on configured provider
+        if not os.environ.get("AZURE_DEPLOY", ""):
+            return best_provider, best_model
         return _TOOL_PROVIDER, _TOOL_MODEL
 
     if best_provider not in _TOOL_CAPABLE_PROVIDERS:
         try:
             from .selection import rejection_rate
 
-            if rejection_rate(agent.id) > 0.40:
+            if rejection_rate(agent.id) > 0.40 and os.environ.get("AZURE_DEPLOY", ""):
                 logger.debug(
                     "Escalating %s to azure-openai (high rejection rate)", agent.id
                 )
