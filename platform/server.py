@@ -742,6 +742,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
+    # Platform quality watchdog: detect false-positive completions → trigger quality-improvement
+    try:
+        from .ops.platform_watchdog import ENABLED as _pw_enabled
+        from .ops.platform_watchdog import platform_watchdog_loop
+
+        if _pw_enabled:
+            asyncio.create_task(platform_watchdog_loop())
+            logger.warning("Platform quality watchdog enabled")
+    except Exception as e:
+        logger.warning("Platform watchdog failed to start: %s", e)
+
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
         from .epics.store import get_epic_run_store
