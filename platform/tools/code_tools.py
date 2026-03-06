@@ -24,6 +24,9 @@ _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
     _BASE_DIR / "workspaces",  # project workspaces (supabase-lite etc.)
     _CWD_DATA / "workspaces",
     _BASE_DIR / "tests",  # test files
+    _BASE_DIR
+    / "platform",  # SF self-improvement: quality-improvement workflow can edit platform source
+    _CWD_DATA / "platform",  # systemd deployments
     Path("/tmp"),  # scratch
 )
 
@@ -149,7 +152,9 @@ class CodeEditTool(BaseTool):
                 # Fuzzy fallback: normalize whitespace (trailing spaces, CRLF, indent drift)
                 import re as _re
 
-                _norm = lambda s: _re.sub(r"[ \t]+\n", "\n", s.replace("\r\n", "\n"))
+                def _norm(s: str) -> str:
+                    return _re.sub(r"[ \t]+\n", "\n", s.replace("\r\n", "\n"))
+
                 old_n, content_n = _norm(old), _norm(content)
                 if old_n in content_n:
                     # Apply on normalized content
