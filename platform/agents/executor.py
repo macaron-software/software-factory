@@ -1329,10 +1329,16 @@ class AgentExecutor:
                         if tools is not None
                         else None
                     )
+                    _read_tools = {
+                        "code_read",
+                        "list_files",
+                        "code_search",
+                        "file_search",
+                    }
                     if (
                         _allowed_tc_names is not None
                         and tc.function_name not in _allowed_tc_names
-                        and tc.function_name in ("code_read", "list_files")
+                        and tc.function_name in _read_tools
                     ):
                         result = (
                             f"⚠️ '{tc.function_name}' n'est pas disponible à ce stade. "
