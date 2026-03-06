@@ -1060,6 +1060,379 @@ async def live_page(request: Request):
 
 
 # ============================================================================
+# AMÉLIORATION CONTINUE — Projects, Cycles, Thompson/RL/GA, Git Watcher
+# ============================================================================
+
+# 5 pilot projects — increasing complexity and different tech stacks
+AC_PROJECTS = [
+    {
+        "id": "ac-hello-html",
+        "name": "Hello World HTML",
+        "tier": "simple",
+        "tier_label": "Simple",
+        "tech": ["HTML", "CSS"],
+        "compile": False,
+        "workflow": "feature-sprint",
+        "max_cycles": 20,
+        "description": "Page HTML/CSS statique — pas de compilation",
+        "color": "green",
+    },
+    {
+        "id": "ac-hello-vue",
+        "name": "Hello World Vue.js",
+        "tier": "simple-compile",
+        "tier_label": "Simple + Build",
+        "tech": ["Vue.js", "Vite", "npm"],
+        "compile": True,
+        "workflow": "feature-sprint",
+        "max_cycles": 20,
+        "description": "Composant Vue.js — requiert npm build",
+        "color": "blue",
+    },
+    {
+        "id": "ac-fullstack-rust",
+        "name": "Full-Stack Rust + SvelteKit",
+        "tier": "medium",
+        "tier_label": "Medium",
+        "tech": ["PostgreSQL", "Rust", "Axum", "SvelteKit"],
+        "compile": True,
+        "workflow": "ideation-to-prod",
+        "max_cycles": 20,
+        "description": "API Rust/Axum + frontend SvelteKit + PostgreSQL — 2 features",
+        "color": "orange",
+    },
+    {
+        "id": "ac-docsign-clone",
+        "name": "DocuSign Clone",
+        "tier": "complex",
+        "tier_label": "Complexe",
+        "tech": ["FastAPI", "React", "PostgreSQL", "PDF", "JWT"],
+        "compile": True,
+        "workflow": "ideation-to-prod",
+        "max_cycles": 20,
+        "description": "Signature électronique — upload PDF, signatures, workflow validation",
+        "color": "purple",
+    },
+    {
+        "id": "ac-ecommerce-solaris",
+        "name": "E-commerce + Solaris DS",
+        "tier": "enterprise",
+        "tier_label": "Enterprise",
+        "tech": ["Next.js", "Node.js", "PostgreSQL", "Solaris DS", "Stripe"],
+        "compile": True,
+        "workflow": "product-lifecycle",
+        "max_cycles": 20,
+        "description": "E-commerce complet avec Design System Solaris + paiement Stripe",
+        "color": "red",
+    },
+]
+
+AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
+
+_AC_AGENTS_GRAPH = {
+    "nodes": [
+        {
+            "id": "plat-endurance-manager",
+            "label": "Endurance Manager",
+            "group": 1,
+            "r": 22,
+        },
+        {"id": "plat-cto", "label": "CTO Orchestrateur", "group": 1, "r": 20},
+        {"id": "plat-quality-analyst", "label": "Quality Analyst", "group": 2, "r": 16},
+        {"id": "plat-platform-dev", "label": "Platform Dev", "group": 2, "r": 16},
+        {"id": "plat-deploy-engineer", "label": "Deploy Engineer", "group": 3, "r": 16},
+        {"id": "plat-qa-validator", "label": "QA Validator", "group": 2, "r": 16},
+    ],
+    "links": [
+        {"source": "plat-endurance-manager", "target": "plat-cto", "strength": 2},
+        {"source": "plat-cto", "target": "plat-quality-analyst", "strength": 1},
+        {"source": "plat-cto", "target": "plat-platform-dev", "strength": 1},
+        {"source": "plat-cto", "target": "plat-deploy-engineer", "strength": 1},
+        {"source": "plat-cto", "target": "plat-qa-validator", "strength": 1},
+        {
+            "source": "plat-quality-analyst",
+            "target": "plat-platform-dev",
+            "strength": 0.5,
+        },
+        {"source": "plat-platform-dev", "target": "plat-qa-validator", "strength": 0.5},
+        {
+            "source": "plat-qa-validator",
+            "target": "plat-deploy-engineer",
+            "strength": 0.5,
+        },
+    ],
+}
+
+
+def _ac_ensure_tables(conn: sqlite3.Connection):
+    """Create improvement-cycle tables if they don't exist."""
+    conn.executescript("""
+        CREATE TABLE IF NOT EXISTS ac_cycles (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  TEXT NOT NULL,
+            cycle_num   INTEGER NOT NULL,
+            git_sha     TEXT,
+            platform_run_id TEXT,
+            status      TEXT DEFAULT 'pending',
+            phase_scores TEXT DEFAULT '{}',
+            total_score INTEGER DEFAULT 0,
+            defect_count INTEGER DEFAULT 0,
+            fix_commit  TEXT,
+            fix_summary TEXT,
+            ga_fitness  REAL DEFAULT 0,
+            rl_reward   REAL DEFAULT 0,
+            started_at  TEXT,
+            completed_at TEXT,
+            UNIQUE(project_id, cycle_num)
+        );
+        CREATE TABLE IF NOT EXISTS ac_thompson (
+            agent_id    TEXT NOT NULL,
+            phase_type  TEXT NOT NULL,
+            successes   INTEGER DEFAULT 0,
+            failures    INTEGER DEFAULT 0,
+            PRIMARY KEY (agent_id, phase_type)
+        );
+        CREATE TABLE IF NOT EXISTS ac_project_state (
+            project_id  TEXT PRIMARY KEY,
+            current_cycle INTEGER DEFAULT 0,
+            status      TEXT DEFAULT 'idle',
+            current_run_id TEXT,
+            total_score_avg REAL DEFAULT 0,
+            last_git_sha TEXT,
+            ci_status   TEXT DEFAULT 'unknown',
+            started_at  TEXT,
+            updated_at  TEXT
+        );
+    """)
+    conn.commit()
+
+
+def _ac_get_project_states() -> Dict:
+    """Load all project states from DB."""
+    conn = get_db()
+    _ac_ensure_tables(conn)
+    states = {}
+    for p in AC_PROJECTS:
+        row = conn.execute(
+            "SELECT * FROM ac_project_state WHERE project_id=?", (p["id"],)
+        ).fetchone()
+        if row:
+            states[p["id"]] = dict(row)
+        else:
+            states[p["id"]] = {
+                "project_id": p["id"],
+                "current_cycle": 0,
+                "status": "idle",
+                "current_run_id": None,
+                "total_score_avg": 0,
+                "last_git_sha": None,
+                "ci_status": "unknown",
+            }
+    conn.close()
+    return states
+
+
+def _ac_get_cycles(project_id: str) -> List[Dict]:
+    """Load cycle history for a project."""
+    conn = get_db()
+    _ac_ensure_tables(conn)
+    rows = conn.execute(
+        "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def _ac_get_thompson_probs() -> List[Dict]:
+    """Compute Thompson sampling probabilities from Beta distributions."""
+    conn = get_db()
+    _ac_ensure_tables(conn)
+    rows = conn.execute(
+        "SELECT agent_id, phase_type, successes, failures FROM ac_thompson ORDER BY agent_id"
+    ).fetchall()
+    conn.close()
+    results = {}
+    for r in rows:
+        key = r["agent_id"]
+        if key not in results:
+            results[key] = {"agent_id": key, "phases": {}, "overall_prob": 0.5}
+        alpha = r["successes"] + 1
+        beta_v = r["failures"] + 1
+        # Expected value of Beta(α, β) = α / (α + β)
+        prob = alpha / (alpha + beta_v)
+        results[key]["phases"][r["phase_type"]] = round(prob, 3)
+
+    # Compute overall probability as mean across phases
+    for v in results.values():
+        if v["phases"]:
+            v["overall_prob"] = round(sum(v["phases"].values()) / len(v["phases"]), 3)
+
+    # Add default entries for our agents if not yet tracked
+    default_agents = [
+        ("plat-cto", 0.90),
+        ("plat-quality-analyst", 0.82),
+        ("plat-platform-dev", 0.85),
+        ("plat-deploy-engineer", 0.78),
+        ("plat-qa-validator", 0.80),
+    ]
+    for agent_id, default_prob in default_agents:
+        if agent_id not in results:
+            results[agent_id] = {
+                "agent_id": agent_id,
+                "phases": {},
+                "overall_prob": default_prob,
+            }
+
+    return sorted(results.values(), key=lambda x: -x["overall_prob"])
+
+
+def _ac_get_rl_history(project_id: str) -> List[float]:
+    """Return RL reward per cycle for the project."""
+    conn = get_db()
+    _ac_ensure_tables(conn)
+    rows = conn.execute(
+        "SELECT rl_reward FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [r["rl_reward"] for r in rows]
+
+
+def _ac_get_ci_status(git_sha: str) -> str:
+    """Check GitHub Actions CI status for a given SHA (best-effort)."""
+    try:
+        import subprocess as sp
+
+        result = sp.run(
+            [
+                "gh",
+                "run",
+                "list",
+                "--commit",
+                git_sha,
+                "--json",
+                "status,conclusion",
+                "--limit",
+                "1",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=str(BASE_DIR.parent),
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            if data:
+                s = data[0]
+                if s.get("status") == "completed":
+                    return "success" if s.get("conclusion") == "success" else "failure"
+                return "running"
+    except Exception:
+        pass
+    return "unknown"
+
+
+@app.get("/api/improvement/projects")
+async def api_improvement_projects():
+    """List pilot projects with their current state."""
+    states = await asyncio.to_thread(_ac_get_project_states)
+    result = []
+    for p in AC_PROJECTS:
+        state = states.get(p["id"], {})
+        result.append({**p, **state})
+    return result
+
+
+@app.get("/api/improvement/cycles/{project_id}")
+async def api_improvement_cycles(project_id: str):
+    """Get cycle history for a project."""
+    cycles = await asyncio.to_thread(_ac_get_cycles, project_id)
+    return cycles
+
+
+@app.get("/api/improvement/agents/graph")
+async def api_improvement_agents_graph():
+    """Agent team force graph data."""
+    thompson = await asyncio.to_thread(_ac_get_thompson_probs)
+    prob_map = {t["agent_id"]: t["overall_prob"] for t in thompson}
+    nodes = [
+        {**n, "prob": prob_map.get(n["id"], 0.5)} for n in _AC_AGENTS_GRAPH["nodes"]
+    ]
+    return {"nodes": nodes, "links": _AC_AGENTS_GRAPH["links"]}
+
+
+@app.get("/api/improvement/thompson")
+async def api_improvement_thompson():
+    """Thompson sampling probabilities per agent."""
+    return await asyncio.to_thread(_ac_get_thompson_probs)
+
+
+@app.get("/api/improvement/stream")
+async def improvement_stream():
+    """SSE stream for live improvement board updates."""
+
+    async def generate():
+        while True:
+            try:
+                states = await asyncio.to_thread(_ac_get_project_states)
+                payload = []
+                for p in AC_PROJECTS:
+                    s = states.get(p["id"], {})
+                    payload.append(
+                        {
+                            "id": p["id"],
+                            "status": s.get("status", "idle"),
+                            "current_cycle": s.get("current_cycle", 0),
+                            "total_score_avg": s.get("total_score_avg", 0),
+                            "ci_status": s.get("ci_status", "unknown"),
+                        }
+                    )
+                yield f"event: update\ndata: {json.dumps(payload)}\n\n"
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            await asyncio.sleep(5)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/improvement", response_class=HTMLResponse)
+async def improvement_page(request: Request):
+    """Amélioration Continue live board."""
+    projects = []
+    states = await asyncio.to_thread(_ac_get_project_states)
+    for p in AC_PROJECTS:
+        state = states.get(p["id"], {})
+        cycles = await asyncio.to_thread(_ac_get_cycles, p["id"])
+        projects.append({**p, **state, "cycles": cycles})
+
+    agents_graph = await api_improvement_agents_graph()
+    thompson = await asyncio.to_thread(_ac_get_thompson_probs)
+    agents_graph_json = json.dumps(agents_graph)
+    projects_json = json.dumps(
+        [{k: v for k, v in proj.items() if k != "cycles"} for proj in projects]
+    )
+
+    return templates.TemplateResponse(
+        "improvement.html",
+        {
+            "request": request,
+            "projects": projects,
+            "agents_graph_json": agents_graph_json,
+            "projects_json": projects_json,
+            "thompson": thompson,
+            "phases": AC_PHASES,
+        },
+    )
+
+
+# ============================================================================
 # MAIN
 # ============================================================================
 
