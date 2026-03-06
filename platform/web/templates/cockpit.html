@@ -83,6 +83,41 @@
 .section-title{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary)}
 </style>
 
+<!-- SVG diagram light-mode tokenization ──────────────────────────────────
+     CSS can override SVG presentation attributes (fill/stroke) via properties.
+     Light-mode rules remap hardcoded dark palette → design tokens.
+-->
+<style>
+/* ── Background panels (near-black in dark, needs inversion for light) ── */
+[data-theme="light"] svg[id^="sf-"] [fill="#0f172a"],
+[data-theme="light"] svg[id^="sf-"] [fill="#0F172A"] { fill: var(--bg-primary); }
+[data-theme="light"] svg[id^="sf-"] [fill="#1e293b"],
+[data-theme="light"] svg[id^="sf-"] [fill="#1E293B"] { fill: var(--bg-secondary); }
+[data-theme="light"] svg[id^="sf-"] [fill="#0f1629"] { fill: var(--bg-primary); }
+
+/* ── Muted text labels ── */
+[data-theme="light"] svg[id^="sf-"] [fill="#6b7280"],
+[data-theme="light"] svg[id^="sf-"] [fill="#64748b"],
+[data-theme="light"] svg[id^="sf-"] [fill="#94a3b8"] { fill: var(--text-secondary); }
+
+/* ── Title / heading text ── */
+[data-theme="light"] svg[id^="sf-"] [fill="#e2e8f0"],
+[data-theme="light"] svg[id^="sf-"] [fill="#f1f5f9"],
+[data-theme="light"] svg[id^="sf-"] [fill="#cbd5e1"] { fill: var(--text-primary); }
+
+/* ── Dark borders / dividers ── */
+[data-theme="light"] svg[id^="sf-"] [stroke="#334155"],
+[data-theme="light"] svg[id^="sf-"] [stroke="#1e293b"],
+[data-theme="light"] svg[id^="sf-"] [stroke="#0f172a"] { stroke: var(--border); }
+
+/* ── Arrow/connector paths ── */
+[data-theme="light"] svg[id^="sf-"] [fill="#6b7280"] path,
+[data-theme="light"] svg[id^="sf-"] path[fill="#6b7280"] { fill: var(--text-secondary); }
+
+/* ── Semantic accent colors: pass-through (work in both themes) ── */
+/* red, blue, green, yellow, purple fills/strokes are kept as-is */
+</style>
+
 <div class="cockpit" id="cockpit">
 
   <!-- Header row -->

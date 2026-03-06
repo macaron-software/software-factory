@@ -971,16 +971,17 @@ def create_app() -> FastAPI:
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{code} — Software Factory</title>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
   <link rel="stylesheet" href="/static/css/main.css">
   <style>
     .err-wrap{{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1.2rem;text-align:center;padding:2rem}}
-    .err-code{{font-size:5rem;font-weight:800;color:var(--purple,#7c3aed);line-height:1}}
-    .err-title{{font-size:1.5rem;font-weight:600;color:var(--text,#f0f0f0)}}
-    .err-msg{{color:var(--text-muted,#888);max-width:36rem;line-height:1.6}}
+    .err-code{{font-size:5rem;font-weight:800;color:var(--purple);line-height:1}}
+    .err-title{{font-size:1.5rem;font-weight:600;color:var(--text-primary)}}
+    .err-msg{{color:var(--text-secondary);max-width:36rem;line-height:1.6}}
     .err-actions{{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:0.5rem}}
     .err-btn{{padding:0.5rem 1.2rem;border-radius:6px;font-size:0.9rem;cursor:pointer;border:none}}
-    .err-btn-primary{{background:var(--purple,#7c3aed);color:#fff}}
-    .err-btn-secondary{{background:var(--bg-card,#1e1e2e);color:var(--text,#f0f0f0);border:1px solid var(--border,#333)}}
+    .err-btn-primary{{background:var(--purple);color:var(--text-on-accent)}}
+    .err-btn-secondary{{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border)}}
   </style>
 </head>
 <body>
