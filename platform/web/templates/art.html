@@ -304,100 +304,106 @@
 
     <!-- Skills Health sub-panel -->
     <div id="ac-panel-skills" style="display:none">
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+        <!-- KPIs + progress -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem">
             <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
             <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
             <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
             <div class="art-kpi"><div class="num" id="sk-run">–</div><div class="lbl">Ever run</div></div>
         </div>
-        <div style="background:var(--bg-secondary);border-radius:4px;height:8px;margin-bottom:1.5rem;overflow:hidden">
+        <div style="background:var(--bg-secondary);border-radius:4px;height:6px;margin-bottom:1.25rem;overflow:hidden">
             <div id="sk-progress" style="background:#6366f1;height:100%;width:0%;transition:width 0.4s"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
-            <div class="card" style="padding:1rem">
-                <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">Skills with evals</div>
-                <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
-                    <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
-                        <th style="text-align:left;padding:2px 4px">Skill</th>
-                        <th style="text-align:center;padding:2px 4px">Cases</th>
-                        <th style="text-align:center;padding:2px 4px">Pass rate</th>
-                        <th style="text-align:center;padding:2px 4px">Run</th>
-                    </tr></thead>
-                    <tbody id="sk-eval-tbody"><tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr></tbody>
-                </table>
-            </div>
-            <div class="card" style="padding:1rem">
-                <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
-                    Skills missing evals <span id="sk-missing-count" style="color:#f59e0b"></span>
-                </div>
-                <div id="sk-missing-list" style="font-size:0.82rem;line-height:1.8;color:var(--text-secondary)">Loading…</div>
-            </div>
+
+        <!-- Toolbar -->
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem">
+            <button id="sk-run-all-btn" onclick="skRunAll()" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.8rem;font-weight:600;cursor:pointer">
+                ▶ Run all evals
+            </button>
+            <span id="sk-run-all-status" style="font-size:0.78rem;color:var(--text-tertiary)"></span>
+            <label style="margin-left:auto;font-size:0.78rem;color:var(--text-secondary)">
+                Filter:
+                <select id="sk-filter" onchange="skFilterTable()" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.78rem;color:var(--text-primary);margin-left:4px">
+                    <option value="all">All skills</option>
+                    <option value="evals">With evals</option>
+                    <option value="missing">Missing evals</option>
+                    <option value="fail">Failing</option>
+                </select>
+            </label>
         </div>
-        <div style="font-size:0.75rem;color:var(--text-tertiary)">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-            Graduation rule: once pass rate hits 100%, cases become regression tests. If skill passes without being loaded → retire it.
+
+        <!-- Main skill grid -->
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.25rem">
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse" id="sk-main-table">
+                <thead>
+                    <tr style="background:var(--bg-secondary);font-size:0.7rem;color:var(--text-tertiary)">
+                        <th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)">Skill</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Cases</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Determ.</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Judge</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Pass rate</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Last run</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="sk-main-tbody">
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr>
+                </tbody>
+            </table>
         </div>
-        <!-- Testing pipeline diagram — philschmid.de/testing-skills -->
-        <div class="card" style="padding:1.25rem;margin-top:1.5rem">
-            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:1rem">Testing pipeline</div>
-            <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;font-family:inherit">
-                <defs>
-                    <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                        <path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/>
-                    </marker>
-                </defs>
-                <!-- boxes -->
-                <!-- Test Case -->
-                <rect x="10" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
-                <text x="55" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Test Case</text>
-                <text x="55" y="89" text-anchor="middle" font-size="9" fill="#6b7280">prompt</text>
-                <text x="55" y="100" text-anchor="middle" font-size="9" fill="#6b7280">checks · expect</text>
-                <!-- Skill Selector -->
-                <rect x="130" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
-                <text x="175" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Skill Selector</text>
-                <text x="175" y="90" text-anchor="middle" font-size="9" fill="#6b7280">trigger match?</text>
-                <text x="175" y="101" text-anchor="middle" font-size="9" fill="#6b7280">load / skip</text>
-                <!-- LLM -->
-                <rect x="250" y="55" width="80" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
-                <text x="290" y="78" text-anchor="middle" font-size="10" fill="#9ca3af">LLM</text>
-                <text x="290" y="93" text-anchor="middle" font-size="9" fill="#6b7280">± skill loaded</text>
-                <!-- Output -->
-                <rect x="360" y="55" width="70" height="50" rx="6" fill="none" stroke="#4b5563" stroke-width="1.5"/>
-                <text x="395" y="83" text-anchor="middle" font-size="10" fill="#d1d5db">Output</text>
-                <!-- Deterministic -->
-                <rect x="460" y="10" width="105" height="55" rx="6" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
-                <text x="512" y="27" text-anchor="middle" font-size="9" fill="#93c5fd">Deterministic</text>
-                <text x="512" y="40" text-anchor="middle" font-size="8" fill="#6b7280">regex · length</text>
-                <text x="512" y="52" text-anchor="middle" font-size="8" fill="#6b7280">no_placeholder</text>
-                <text x="512" y="62" text-anchor="middle" font-size="8" fill="#4ade80">fast · free</text>
-                <!-- LLM Judge -->
-                <rect x="460" y="95" width="105" height="55" rx="6" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
-                <text x="512" y="112" text-anchor="middle" font-size="9" fill="#c4b5fd">LLM Judge</text>
-                <text x="512" y="125" text-anchor="middle" font-size="8" fill="#6b7280">expectations</text>
-                <text x="512" y="137" text-anchor="middle" font-size="8" fill="#6b7280">outcome · style</text>
-                <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
-                <!-- Verdict -->
-                <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
-                <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
-                <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80">✓ pass</text>
-                <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
-                <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171">✗ fail</text>
-                <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
-                <!-- arrows -->
-                <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
-                <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
-                <line x1="330" y1="80" x2="358" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
-                <!-- output → deterministic (up) -->
-                <line x1="430" y1="70" x2="458" y2="37" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
-                <!-- output → llm judge (down) -->
-                <line x1="430" y1="90" x2="458" y2="120" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
-                <!-- deterministic → verdict -->
-                <line x1="565" y1="37" x2="598" y2="68" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
-                <!-- llm judge → verdict -->
-                <line x1="565" y1="120" x2="598" y2="100" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
-                <!-- ref label -->
-                <text x="380" y="155" text-anchor="middle" font-size="8" fill="#4b5563">ref: philschmid.de/testing-skills</text>
-            </svg>
+
+        <!-- Case detail panel (shown on row expand) -->
+        <div id="sk-case-detail" style="display:none;margin-bottom:1.25rem"></div>
+
+        <!-- Pipeline diagram (collapsible) -->
+        <details style="margin-bottom:0.5rem">
+            <summary style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);cursor:pointer;padding:0.5rem 0;user-select:none">
+                Testing pipeline — philschmid.de/testing-skills
+            </summary>
+            <div class="card" style="padding:1.25rem;margin-top:0.5rem">
+                <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;font-family:inherit">
+                    <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/></marker></defs>
+                    <rect x="10" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="55" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Test Case</text>
+                    <text x="55" y="89" text-anchor="middle" font-size="9" fill="#6b7280">prompt</text>
+                    <text x="55" y="100" text-anchor="middle" font-size="9" fill="#6b7280">checks · expect</text>
+                    <rect x="130" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="175" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Skill Selector</text>
+                    <text x="175" y="90" text-anchor="middle" font-size="9" fill="#6b7280">trigger match?</text>
+                    <text x="175" y="101" text-anchor="middle" font-size="9" fill="#6b7280">load / skip</text>
+                    <rect x="250" y="55" width="80" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="290" y="78" text-anchor="middle" font-size="10" fill="#9ca3af">LLM</text>
+                    <text x="290" y="93" text-anchor="middle" font-size="9" fill="#6b7280">± skill loaded</text>
+                    <rect x="360" y="55" width="70" height="50" rx="6" fill="none" stroke="#4b5563" stroke-width="1.5"/>
+                    <text x="395" y="83" text-anchor="middle" font-size="10" fill="#d1d5db">Output</text>
+                    <rect x="460" y="10" width="105" height="55" rx="6" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+                    <text x="512" y="27" text-anchor="middle" font-size="9" fill="#93c5fd">Deterministic</text>
+                    <text x="512" y="40" text-anchor="middle" font-size="8" fill="#6b7280">regex · length</text>
+                    <text x="512" y="52" text-anchor="middle" font-size="8" fill="#6b7280">no_placeholder</text>
+                    <text x="512" y="62" text-anchor="middle" font-size="8" fill="#4ade80">fast · free</text>
+                    <rect x="460" y="95" width="105" height="55" rx="6" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="512" y="112" text-anchor="middle" font-size="9" fill="#c4b5fd">LLM Judge</text>
+                    <text x="512" y="125" text-anchor="middle" font-size="8" fill="#6b7280">expectations</text>
+                    <text x="512" y="137" text-anchor="middle" font-size="8" fill="#6b7280">outcome · style</text>
+                    <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
+                    <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
+                    <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80">✓ pass</text>
+                    <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
+                    <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171">✗ fail</text>
+                    <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
+                    <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="330" y1="80" x2="358" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="430" y1="70" x2="458" y2="37" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="430" y1="90" x2="458" y2="120" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="565" y1="37" x2="598" y2="68" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="565" y1="120" x2="598" y2="100" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                </svg>
+            </div>
+        </details>
+        <div style="font-size:0.72rem;color:var(--text-tertiary);margin-top:0.5rem">
+            Graduation: pass rate 100% → regression tests. Skill passes without loading → retire.
         </div>
     </div>
 
@@ -976,83 +982,278 @@ function skSwitchTab(tab) {
     if (!isEtat) loadSkillsAmelio();
 }
 
-// Skills Health tab loader
-// WHY: Surfaces skill eval coverage + pass rates from /api/skills/eval
-// so engineers can see which skills need evals at a glance — same dashboard
-// as Darwin team fitness and Thompson Sampling scores.
+
+// ── Skills Health — full eval grid + run controls ─────────────────────────
 // Ref: https://www.philschmid.de/testing-skills
+let _skAllSkills = [];
+let _skJobs = {}; // skill_name → {job_id, status}
+
 async function loadSkillsTab() {
-    const tbody = document.getElementById('sk-eval-tbody');
-    if (tbody && tbody.dataset.loaded) return;
+    const tbody = document.getElementById('sk-main-tbody');
+    if (!tbody) return;
     try {
-        const [coverageResp, listResp] = await Promise.all([
+        const [covResp, listResp] = await Promise.all([
             fetch('/api/skills/eval'),
             fetch('/api/skills/list'),
         ]);
-        if (!coverageResp.ok || !listResp.ok) {
-            const msg = `API error: ${coverageResp.status} / ${listResp.status}`;
-            if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">${msg}</td></tr>`;
-            return;
-        }
-        const coverage = await coverageResp.json();
-        const listRaw = await listResp.json();
-        const skillList = Array.isArray(listRaw) ? listRaw : [];
+        const coverage = covResp.ok ? await covResp.json() : {};
+        const listRaw = listResp.ok ? await listResp.json() : [];
+        _skAllSkills = Array.isArray(listRaw) ? listRaw : [];
 
         // KPIs
-        document.getElementById('sk-total').textContent = coverage.total ?? '–';
-        document.getElementById('sk-coverage').textContent = (coverage.coverage_pct ?? '–') + '%';
-        document.getElementById('sk-passing').textContent = coverage.passing ?? '–';
-        document.getElementById('sk-run').textContent = coverage.run ?? '–';
+        document.getElementById('sk-total').textContent = coverage.total ?? _skAllSkills.length;
+        document.getElementById('sk-coverage').textContent = (coverage.coverage_pct ?? 0) + '%';
+        document.getElementById('sk-passing').textContent = coverage.passing ?? 0;
+        document.getElementById('sk-run').textContent = coverage.run ?? 0;
         document.getElementById('sk-progress').style.width = (coverage.coverage_pct || 0) + '%';
 
-        // Skills with evals table
-        const withEvals = skillList.filter(s => s.has_evals);
-        if (tbody) {
-            if (!withEvals.length) {
-                tbody.innerHTML = '<tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">No skills with eval_cases yet</td></tr>';
-            } else {
-                tbody.innerHTML = withEvals.map(s => {
-                    const pr = s.pass_rate;
-                    const prPct = pr !== null && pr !== undefined ? Math.round(pr * 100) : null;
-                    const color = pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
-                    let badge;
-                    if (pr == null) {
-                        badge = '<span style="color:#6b7280;font-size:0.75rem">not run</span>';
-                    } else if (s.verdict === 'regression') {
-                        badge = '<span style="color:#6366f1;font-size:0.75rem;font-weight:600" title="100% pass — cases are now regression tests">regression</span>';
-                    } else if (s.verdict === 'retire') {
-                        badge = '<span style="color:#94a3b8;font-size:0.75rem;font-style:italic" title="Model absorbed this skill">retired</span>';
-                    } else {
-                        badge = `<span style="font-weight:600;color:${color}">${prPct}%</span>`;
-                    }
-                    const ran = s.ran_at ? s.ran_at.substring(0,10) : '—';
-                    return `<tr>
-                        <td style="padding:5px 4px">${s.name}</td>
-                        <td style="text-align:center;padding:5px 4px;color:var(--text-secondary)">${s.eval_cases}</td>
-                        <td style="text-align:center;padding:5px 4px">${badge}
-                            ${pr != null && s.verdict !== 'regression' && s.verdict !== 'retire' ? `<div style="background:var(--border);border-radius:2px;height:4px;margin-top:3px"><div style="background:${color};border-radius:2px;height:4px;width:${prPct}%"></div></div>` : ''}
-                        </td>
-                        <td style="text-align:center;padding:5px 4px;font-size:0.75rem;color:var(--text-tertiary)">${ran}</td>
-                    </tr>`;
-                }).join('');
-            }
-            tbody.dataset.loaded = '1';
-        }
-
-        // Missing evals list
-        const missing = coverage.without_evals || [];
-        const missingEl = document.getElementById('sk-missing-list');
-        const countEl = document.getElementById('sk-missing-count');
-        if (countEl) countEl.textContent = `(${missing.length})`;
-        if (missingEl) {
-            missingEl.innerHTML = missing.slice(0, 30).map(n =>
-                `<span style="display:inline-block;margin-right:0.5rem;margin-bottom:0.25rem;background:var(--bg-secondary);border-radius:3px;padding:1px 7px;font-size:0.78rem">${n}</span>`
-            ).join('') + (missing.length > 30 ? `<span style="color:var(--text-tertiary)"> +${missing.length-30} more</span>` : '');
-        }
+        skRenderTable(_skAllSkills);
     } catch(e) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">Error: ${e.message}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#ef4444">Error: ${e.message}</td></tr>`;
     }
 }
+
+function skRenderTable(skills) {
+    const tbody = document.getElementById('sk-main-tbody');
+    if (!tbody) return;
+    const filter = document.getElementById('sk-filter')?.value || 'all';
+    let rows = skills;
+    if (filter === 'evals') rows = skills.filter(s => s.has_evals);
+    else if (filter === 'missing') rows = skills.filter(s => !s.has_evals);
+    else if (filter === 'fail') rows = skills.filter(s => s.has_evals && s.pass_rate != null && s.pass_rate < 0.8);
+
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">No skills matching filter</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = rows.map(s => skRowHtml(s)).join('');
+}
+
+function skFilterTable() { skRenderTable(_skAllSkills); }
+
+function skRowHtml(s) {
+    const pr = s.pass_rate;
+    const prPct = pr != null ? Math.round(pr * 100) : null;
+    const color = pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+
+    // Pass rate badge
+    let badge;
+    if (!s.has_evals) {
+        badge = '<span style="font-size:0.72rem;color:#6b7280;border:1px solid #374151;border-radius:3px;padding:0 5px">no evals</span>';
+    } else if (s.verdict === 'regression') {
+        badge = '<span style="color:#6366f1;font-size:0.75rem;font-weight:600">regression</span>';
+    } else if (s.verdict === 'retire') {
+        badge = '<span style="color:#94a3b8;font-size:0.75rem;font-style:italic">retired</span>';
+    } else if (pr == null) {
+        badge = '<span style="color:#6b7280;font-size:0.75rem">not run</span>';
+    } else {
+        badge = `<span style="font-weight:600;color:${color}">${prPct}%</span>
+            <div style="background:var(--border);border-radius:2px;height:3px;margin-top:3px;width:60px">
+                <div style="background:${color};border-radius:2px;height:3px;width:${prPct}%"></div>
+            </div>`;
+    }
+
+    // Determ / Judge scores
+    const det = s.checks_pass_rate != null ? `<span style="color:${s.checks_pass_rate>=0.8?'#3b82f6':'#f59e0b'}">${Math.round(s.checks_pass_rate*100)}%</span>` : '–';
+    const judge = s.llm_judge_score != null && s.llm_judge_score >= 0 ? `<span style="color:${s.llm_judge_score>=0.8?'#8b5cf6':'#f59e0b'}">${Math.round(s.llm_judge_score*100)}%</span>` : '–';
+    const ran = s.ran_at ? s.ran_at.substring(0,10) : '—';
+
+    // Job state
+    const job = _skJobs[s.name];
+    let actionBtn;
+    if (job && job.status === 'running') {
+        actionBtn = `<button disabled style="background:#1e293b;color:#6b7280;border:1px solid #374151;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:default">
+            <span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> running…
+        </button>`;
+    } else if (!s.has_evals) {
+        actionBtn = '<span style="font-size:0.72rem;color:#374151">—</span>';
+    } else {
+        actionBtn = `<button onclick="skRunOne('${s.name}')" style="background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:pointer">▶ Run</button>`;
+    }
+
+    const caseCount = s.eval_cases ?? 0;
+    const rowBg = s.has_evals && pr != null && pr < 0.6 ? 'background:rgba(239,68,68,0.04)' : '';
+    return `<tr style="border-bottom:1px solid var(--border,#2d3748);${rowBg}" data-skill="${s.name}">
+        <td style="padding:7px 12px;font-weight:${s.has_evals?'500':'normal'}">${s.name}</td>
+        <td style="text-align:center;padding:7px 8px;color:var(--text-secondary)">${caseCount || '—'}</td>
+        <td style="text-align:center;padding:7px 8px">${det}</td>
+        <td style="text-align:center;padding:7px 8px">${judge}</td>
+        <td style="text-align:center;padding:7px 8px">${badge}</td>
+        <td style="text-align:center;padding:7px 8px;font-size:0.72rem;color:var(--text-tertiary)">${ran}</td>
+        <td style="text-align:center;padding:7px 8px">${actionBtn}
+            ${s.has_evals && s.pass_rate != null ? `<button onclick="skShowDetail('${s.name}')" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:0.72rem;margin-left:4px">detail</button>` : ''}
+        </td>
+    </tr>`;
+}
+
+async function skRunOne(skillName) {
+    _skJobs[skillName] = {status: 'running'};
+    // Re-render just this row
+    const skill = _skAllSkills.find(s => s.name === skillName);
+    if (skill) {
+        const row = document.querySelector(`tr[data-skill="${skillName}"]`);
+        if (row) row.outerHTML = skRowHtml(skill);
+    }
+    document.getElementById('sk-run-all-status').textContent = `Running ${skillName}…`;
+    try {
+        const resp = await fetch(`/api/skills/eval/${skillName}/run`, {method:'POST'});
+        if (!resp.ok) {
+            _skJobs[skillName] = {status:'error'};
+            document.getElementById('sk-run-all-status').textContent = `Error running ${skillName}`;
+            return;
+        }
+        const {job_id} = await resp.json();
+        _skJobs[skillName] = {status:'running', job_id};
+        skPollJob(skillName, job_id);
+    } catch(e) {
+        _skJobs[skillName] = {status:'error'};
+        document.getElementById('sk-run-all-status').textContent = `Error: ${e.message}`;
+    }
+}
+
+async function skPollJob(skillName, jobId) {
+    for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+            const resp = await fetch(`/api/skills/eval/job/${jobId}`);
+            if (!resp.ok) break;
+            const job = await resp.json();
+            if (job.status === 'done' || job.status === 'error') {
+                _skJobs[skillName] = job;
+                // Reload skill data
+                const listResp = await fetch('/api/skills/list');
+                if (listResp.ok) {
+                    _skAllSkills = await listResp.json();
+                    skRenderTable(_skAllSkills);
+                    // Reload KPIs
+                    const covResp = await fetch('/api/skills/eval');
+                    if (covResp.ok) {
+                        const coverage = await covResp.json();
+                        document.getElementById('sk-passing').textContent = coverage.passing ?? 0;
+                        document.getElementById('sk-run').textContent = coverage.run ?? 0;
+                        document.getElementById('sk-progress').style.width = (coverage.coverage_pct||0) + '%';
+                    }
+                }
+                const pr = job.pass_rate != null ? Math.round(job.pass_rate * 100) + '%' : '';
+                document.getElementById('sk-run-all-status').textContent =
+                    job.status === 'done' ? `✓ ${skillName}: ${pr} in ${job.duration_s?.toFixed(1)}s` : `✗ ${skillName}: error`;
+                return;
+            }
+        } catch(_) { break; }
+    }
+    _skJobs[skillName] = {status: 'timeout'};
+}
+
+let _skRunAllQueue = [];
+let _skRunAllIdx = 0;
+
+async function skRunAll() {
+    const withEvals = _skAllSkills.filter(s => s.has_evals);
+    if (!withEvals.length) {
+        document.getElementById('sk-run-all-status').textContent = 'No skills with eval_cases';
+        return;
+    }
+    _skRunAllQueue = withEvals.map(s => s.name);
+    _skRunAllIdx = 0;
+    const btn = document.getElementById('sk-run-all-btn');
+    btn.disabled = true; btn.textContent = '⟳ Running…';
+    await skRunAllNext();
+}
+
+async function skRunAllNext() {
+    if (_skRunAllIdx >= _skRunAllQueue.length) {
+        const btn = document.getElementById('sk-run-all-btn');
+        btn.disabled = false; btn.textContent = '▶ Run all evals';
+        document.getElementById('sk-run-all-status').textContent = `✓ All ${_skRunAllQueue.length} skills evaluated`;
+        return;
+    }
+    const name = _skRunAllQueue[_skRunAllIdx];
+    document.getElementById('sk-run-all-status').textContent = `[${_skRunAllIdx+1}/${_skRunAllQueue.length}] Running ${name}…`;
+    _skJobs[name] = {status: 'running'};
+    skRenderTable(_skAllSkills);
+    try {
+        const resp = await fetch(`/api/skills/eval/${name}/run`, {method:'POST'});
+        if (!resp.ok) { _skRunAllIdx++; await skRunAllNext(); return; }
+        const {job_id} = await resp.json();
+        // Poll until done
+        for (let i = 0; i < 60; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            const pr = await fetch(`/api/skills/eval/job/${job_id}`).then(r=>r.json()).catch(()=>({status:'error'}));
+            if (pr.status === 'done' || pr.status === 'error') {
+                _skJobs[name] = pr;
+                break;
+            }
+        }
+        // Refresh skill data
+        const listResp = await fetch('/api/skills/list');
+        if (listResp.ok) _skAllSkills = await listResp.json();
+        skRenderTable(_skAllSkills);
+    } catch(_) {}
+    _skRunAllIdx++;
+    await skRunAllNext();
+}
+
+async function skShowDetail(skillName) {
+    const panel = document.getElementById('sk-case-detail');
+    if (!panel) return;
+    if (panel.dataset.skill === skillName && panel.style.display !== 'none') {
+        panel.style.display = 'none'; return;
+    }
+    panel.style.display = '';
+    panel.dataset.skill = skillName;
+    panel.innerHTML = '<div style="padding:1rem;color:var(--text-secondary)">Loading detail…</div>';
+    try {
+        const resp = await fetch(`/api/skills/eval/${skillName}`);
+        if (!resp.ok) { panel.innerHTML = `<div style="padding:1rem;color:#ef4444">Error ${resp.status}</div>`; return; }
+        const d = await resp.json();
+        if (d.status === 'never_run') {
+            panel.innerHTML = `<div class="card" style="padding:1rem;border-left:3px solid #374151">
+                <b>${skillName}</b> — never evaluated. ${d.eval_cases_total} case(s) defined.
+                <button onclick="skRunOne('${skillName}')" style="margin-left:1rem;background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.78rem;cursor:pointer">▶ Run now</button>
+            </div>`;
+            return;
+        }
+        const cases = d.case_results || [];
+        const overallColor = (d.pass_rate||0) >= 0.8 ? '#10b981' : (d.pass_rate||0) >= 0.6 ? '#f59e0b' : '#ef4444';
+        panel.innerHTML = `<div class="card" style="padding:1.25rem;border-left:3px solid ${overallColor}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+                <div style="font-weight:700">${skillName} — detail</div>
+                <div style="display:flex;gap:1rem;font-size:0.8rem">
+                    <span>Pass rate: <b style="color:${overallColor}">${Math.round((d.pass_rate||0)*100)}%</b></span>
+                    <span style="color:var(--text-tertiary)">${d.eval_cases_total} cases · ${d.trials_per_case||3} trials · ${d.duration_s?.toFixed(1)||'?'}s</span>
+                </div>
+                <button onclick="skRunOne('${skillName}')" style="background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:pointer">▶ Re-run</button>
+                <button onclick="document.getElementById('sk-case-detail').style.display='none'" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1rem">✕</button>
+            </div>
+            ${cases.map(c => {
+                const cColor = c.overall_pass_rate >= 0.8 ? '#10b981' : c.overall_pass_rate >= 0.6 ? '#f59e0b' : '#ef4444';
+                const detPct = Math.round(c.checks_pass_rate * 100);
+                const judPct = c.llm_judge_score >= 0 ? Math.round(c.llm_judge_score * 100) : null;
+                return `<div style="background:var(--bg-secondary);border-radius:6px;padding:0.75rem;margin-bottom:0.5rem;border-left:3px solid ${cColor}">
+                    <div style="display:flex;align-items:flex-start;gap:0.75rem">
+                        <span style="font-size:0.85rem;font-weight:600;color:${cColor};min-width:40px">${Math.round(c.overall_pass_rate*100)}%</span>
+                        <div style="flex:1">
+                            <div style="font-size:0.82rem;color:var(--text-primary);margin-bottom:0.35rem;font-style:italic">"${c.prompt?.substring(0,120)||''}"</div>
+                            <div style="display:flex;gap:1rem;font-size:0.75rem">
+                                <span style="color:#3b82f6">🔧 Determ: ${detPct}%</span>
+                                ${judPct !== null ? `<span style="color:#8b5cf6">⚖ Judge: ${judPct}%</span>` : ''}
+                                <span style="color:var(--text-tertiary)">${c.trials} trials</span>
+                                ${!c.should_trigger ? '<span style="color:#f59e0b">negative test</span>' : ''}
+                            </div>
+                            ${(c.check_details||c.checks_details) ? `<div style="margin-top:0.35rem;display:flex;flex-wrap:wrap;gap:0.3rem">
+                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}">${ch.passed?'✓':'✗'} ${ch.check_spec?.substring(0,30)||ch.spec?.substring(0,30)||''}</span>`).join('')}
+                            </div>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
+        </div>`;
+    } catch(e) {
+        panel.innerHTML = `<div style="padding:1rem;color:#ef4444">Error: ${e.message}</div>`;
+    }
+}
+
+
 
 // Skills Amélioration tab — priority backlog + run history
 async function loadSkillsAmelio() {

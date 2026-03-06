@@ -42,9 +42,9 @@ Eval case format (YAML frontmatter in skills/*.md):
     has_section:TITLE  — markdown heading present
     no_placeholder     — no TODO/FIXME/placeholder/... patterns
 """
+
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -64,9 +64,9 @@ logger = logging.getLogger(__name__)
 EVAL_RESULTS_DIR = DATA_DIR / "skill_evals"
 EVAL_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
-DEFAULT_TRIALS = 3          # trials per case (article: 3-5)
-PASS_RATE_GREEN = 0.80      # ≥80% → green / ready
-PASS_RATE_YELLOW = 0.60     # ≥60% → yellow / needs work
+DEFAULT_TRIALS = 3  # trials per case (article: 3-5)
+PASS_RATE_GREEN = 0.80  # ≥80% → green / ready
+PASS_RATE_YELLOW = 0.60  # ≥60% → yellow / needs work
 
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 
@@ -78,9 +78,11 @@ _PLACEHOLDER_RE = re.compile(
 
 # ── Data classes ─────────────────────────────────────────────────────────────
 
+
 @dataclass
 class CheckResult:
     """Result of a single deterministic check."""
+
     check_id: str
     check_spec: str
     passed: bool
@@ -90,16 +92,21 @@ class CheckResult:
 @dataclass
 class CaseResult:
     """Result of one eval_case across N trials."""
+
     case_id: str
     prompt: str
     should_trigger: bool
     trials: int
-    checks_pass_rate: float     # fraction of deterministic checks passing (avg over trials)
-    llm_judge_score: float      # 0.0–1.0 from LLM-as-judge (avg over trials), -1 if no expectations
-    overall_pass_rate: float    # combined (checks * weight + judge * weight)
-    dimension_outcome: float    # did it produce a working artifact?
-    dimension_style: float      # does it follow skill conventions?
-    dimension_efficiency: float # avg tokens used (normalised)
+    checks_pass_rate: (
+        float  # fraction of deterministic checks passing (avg over trials)
+    )
+    llm_judge_score: (
+        float  # 0.0–1.0 from LLM-as-judge (avg over trials), -1 if no expectations
+    )
+    overall_pass_rate: float  # combined (checks * weight + judge * weight)
+    dimension_outcome: float  # did it produce a working artifact?
+    dimension_style: float  # does it follow skill conventions?
+    dimension_efficiency: float  # avg tokens used (normalised)
     check_details: list[CheckResult] = field(default_factory=list)
     judge_notes: str = ""
     avg_tokens: int = 0
@@ -110,20 +117,22 @@ class CaseResult:
 @dataclass
 class SkillEvalResult:
     """Full eval result for one skill."""
+
     skill_name: str
     skill_version: str
     eval_cases_total: int
-    pass_rate: float            # 0.0–1.0 — key metric (article: aim for ≥0.80)
+    pass_rate: float  # 0.0–1.0 — key metric (article: aim for ≥0.80)
     case_results: list[CaseResult] = field(default_factory=list)
-    coverage_gap: list[str] = field(default_factory=list)   # missing test types
+    coverage_gap: list[str] = field(default_factory=list)  # missing test types
     retirement_signal: bool = False  # True if skill passes WITHOUT being loaded
     ran_at: str = ""
     duration_s: float = 0.0
-    status: str = "ok"          # ok | error | no_cases
+    status: str = "ok"  # ok | error | no_cases
     error: str = ""
 
 
 # ── Frontmatter loader ───────────────────────────────────────────────────────
+
 
 def _load_skill_frontmatter(skill_name: str) -> tuple[dict, str]:
     """Load a skill's YAML frontmatter and full body.
@@ -157,16 +166,40 @@ def list_skills_with_evals() -> list[dict]:
             continue
         cases = fm.get("eval_cases", [])
         last_result = _load_last_result(name)
-        skills.append({
-            "name": name,
-            "description": fm.get("description", "")[:120],
-            "category": fm.get("metadata", {}).get("category", ""),
-            "eval_cases": len(cases),
-            "has_evals": len(cases) > 0,
-            "pass_rate": last_result.get("pass_rate") if last_result else None,
-            "ran_at": last_result.get("ran_at") if last_result else None,
-            "status": last_result.get("status", "never_run") if last_result else "never_run",
-        })
+        # Compute avg checks_pass_rate / llm_judge_score from case_results
+        cr = last_result.get("case_results", []) if last_result else []
+        avg_checks = (
+            round(sum(c.get("checks_pass_rate", 0) for c in cr) / len(cr), 3)
+            if cr
+            else None
+        )
+        avg_judge_vals = [
+            c.get("llm_judge_score", -1)
+            for c in cr
+            if c.get("llm_judge_score", -1) >= 0
+        ]
+        avg_judge = (
+            round(sum(avg_judge_vals) / len(avg_judge_vals), 3)
+            if avg_judge_vals
+            else None
+        )
+        skills.append(
+            {
+                "name": name,
+                "description": fm.get("description", "")[:120],
+                "category": fm.get("metadata", {}).get("category", ""),
+                "eval_cases": len(cases),
+                "has_evals": len(cases) > 0,
+                "pass_rate": last_result.get("pass_rate") if last_result else None,
+                "verdict": last_result.get("verdict") if last_result else None,
+                "checks_pass_rate": avg_checks,
+                "llm_judge_score": avg_judge,
+                "ran_at": last_result.get("ran_at") if last_result else None,
+                "status": last_result.get("status", "never_run")
+                if last_result
+                else "never_run",
+            }
+        )
     return skills
 
 
@@ -183,12 +216,17 @@ def coverage_summary() -> dict:
         "coverage_pct": round(100 * with_evals / total) if total else 0,
         "run": run,
         "passing": passing,
-        "needing_work": [s for s in skills if s["has_evals"] and (s["pass_rate"] or 0) < PASS_RATE_GREEN],
+        "needing_work": [
+            s
+            for s in skills
+            if s["has_evals"] and (s["pass_rate"] or 0) < PASS_RATE_GREEN
+        ],
         "without_evals": [s["name"] for s in skills if not s["has_evals"]],
     }
 
 
 # ── Deterministic checks ─────────────────────────────────────────────────────
+
 
 def _run_check(spec: str, output: str) -> CheckResult:
     """Run a single deterministic check against an output string.
@@ -230,7 +268,11 @@ def _run_check(spec: str, output: str) -> CheckResult:
             return CheckResult(spec, spec, ok, notes)
 
         if kind == "has_section":
-            ok = bool(re.search(rf"^#+\s+{re.escape(arg)}", output, re.MULTILINE | re.IGNORECASE))
+            ok = bool(
+                re.search(
+                    rf"^#+\s+{re.escape(arg)}", output, re.MULTILINE | re.IGNORECASE
+                )
+            )
             notes = f"Section '{arg}' {'found' if ok else 'NOT found'}"
             return CheckResult(spec, spec, ok, notes)
 
@@ -246,6 +288,7 @@ def _run_check(spec: str, output: str) -> CheckResult:
 
 
 # ── LLM-as-judge ─────────────────────────────────────────────────────────────
+
 
 async def _llm_judge(
     skill_content: str,
@@ -268,7 +311,7 @@ async def _llm_judge(
     from ..llm.client import LLMClient, LLMMessage
 
     # Build grading prompt — structured output via JSON schema
-    exp_list = "\n".join(f"{i+1}. {e}" for i, e in enumerate(expectations))
+    exp_list = "\n".join(f"{i + 1}. {e}" for i, e in enumerate(expectations))
     judge_prompt = f"""You are an evaluator grading an AI agent's output against a skill's expectations.
 
 SKILL (excerpt, first 600 chars):
@@ -320,7 +363,9 @@ Rules:
         # Add evidence summary
         failed = [g for g in grades if not g.get("passed", False)]
         if failed:
-            notes += " | FAILED: " + "; ".join(g.get("evidence", "?") for g in failed[:2])
+            notes += " | FAILED: " + "; ".join(
+                g.get("evidence", "?") for g in failed[:2]
+            )
         return score, notes
     except Exception as exc:
         logger.warning("LLM judge failed: %s", exc)
@@ -328,6 +373,7 @@ Rules:
 
 
 # ── Eval runner ───────────────────────────────────────────────────────────────
+
 
 async def run_skill_eval(
     skill_name: str,
@@ -376,7 +422,9 @@ async def run_skill_eval(
     from ..llm.client import LLMClient, LLMMessage
 
     for case in eval_cases:
-        case_id = str(case.get("id") or case.get("prompt", "")[:30] or f"case-{len(case_results)}")
+        case_id = str(
+            case.get("id") or case.get("prompt", "")[:30] or f"case-{len(case_results)}"
+        )
         prompt = str(case.get("prompt") or case.get("input", ""))
         should_trigger = bool(case.get("should_trigger", True))
         checks_spec: list[str] = case.get("checks", [])
@@ -411,7 +459,9 @@ async def run_skill_eval(
                 output = resp.content
                 tokens = (resp.tokens_in or 0) + (resp.tokens_out or 0)
             except Exception as exc:
-                logger.warning("Skill eval run failed for %s/%s: %s", skill_name, case_id, exc)
+                logger.warning(
+                    "Skill eval run failed for %s/%s: %s", skill_name, case_id, exc
+                )
                 output = ""
                 latency_ms = 0.0
                 tokens = 0
@@ -425,15 +475,21 @@ async def run_skill_eval(
                 # Skill should NOT have been applied → output should be generic, not skill-specific
                 # We check that NO skill-specific markers appear
                 triggered_markers = _detect_skill_trigger(skill_body, output)
-                check_details.append(CheckResult(
-                    "trigger-check", "skill should NOT trigger",
-                    not triggered_markers,
-                    "Skill markers absent" if not triggered_markers else f"Skill triggered unexpectedly: {triggered_markers[:80]}",
-                ))
+                check_details.append(
+                    CheckResult(
+                        "trigger-check",
+                        "skill should NOT trigger",
+                        not triggered_markers,
+                        "Skill markers absent"
+                        if not triggered_markers
+                        else f"Skill triggered unexpectedly: {triggered_markers[:80]}",
+                    )
+                )
 
             check_pass_rate = (
                 sum(1 for c in check_details if c.passed) / len(check_details)
-                if check_details else 1.0
+                if check_details
+                else 1.0
             )
             last_check_details = check_details
             trial_check_rates.append(check_pass_rate)
@@ -452,7 +508,11 @@ async def run_skill_eval(
             trial_judge_scores = [-1.0] * trials
             last_judge_notes = "no expectations defined"
 
-        avg_checks = sum(trial_check_rates) / len(trial_check_rates) if trial_check_rates else 0.0
+        avg_checks = (
+            sum(trial_check_rates) / len(trial_check_rates)
+            if trial_check_rates
+            else 0.0
+        )
         valid_judge = [s for s in trial_judge_scores if s >= 0]
         avg_judge = sum(valid_judge) / len(valid_judge) if valid_judge else -1.0
 
@@ -467,30 +527,40 @@ async def run_skill_eval(
         dim_style = avg_judge if avg_judge >= 0 else avg_checks  # style = LLM judge
         max_tokens_expected = 1000
         avg_tok = sum(trial_tokens) / len(trial_tokens) if trial_tokens else 0
-        dim_efficiency = max(0.0, 1.0 - (avg_tok / max_tokens_expected)) if avg_tok else 1.0
+        dim_efficiency = (
+            max(0.0, 1.0 - (avg_tok / max_tokens_expected)) if avg_tok else 1.0
+        )
 
-        case_results.append(CaseResult(
-            case_id=case_id,
-            prompt=prompt,
-            should_trigger=should_trigger,
-            trials=trials,
-            checks_pass_rate=round(avg_checks, 3),
-            llm_judge_score=round(avg_judge, 3),
-            overall_pass_rate=round(overall, 3),
-            dimension_outcome=round(dim_outcome, 3),
-            dimension_style=round(dim_style, 3),
-            dimension_efficiency=round(dim_efficiency, 3),
-            check_details=last_check_details,
-            judge_notes=last_judge_notes,
-            avg_tokens=int(avg_tok),
-            avg_latency_ms=round(sum(trial_latency) / len(trial_latency), 1) if trial_latency else 0.0,
-            tags=tags,
-        ))
+        case_results.append(
+            CaseResult(
+                case_id=case_id,
+                prompt=prompt,
+                should_trigger=should_trigger,
+                trials=trials,
+                checks_pass_rate=round(avg_checks, 3),
+                llm_judge_score=round(avg_judge, 3),
+                overall_pass_rate=round(overall, 3),
+                dimension_outcome=round(dim_outcome, 3),
+                dimension_style=round(dim_style, 3),
+                dimension_efficiency=round(dim_efficiency, 3),
+                check_details=last_check_details,
+                judge_notes=last_judge_notes,
+                avg_tokens=int(avg_tok),
+                avg_latency_ms=round(sum(trial_latency) / len(trial_latency), 1)
+                if trial_latency
+                else 0.0,
+                tags=tags,
+            )
+        )
 
     # Aggregate: pass_rate = fraction of cases with overall_pass_rate >= 0.8
     # Article: "pass_rate >= 0.8 — skill is ready to ship"
-    passing_cases = sum(1 for c in case_results if c.overall_pass_rate >= PASS_RATE_GREEN)
-    result.pass_rate = round(passing_cases / len(case_results), 3) if case_results else 0.0
+    passing_cases = sum(
+        1 for c in case_results if c.overall_pass_rate >= PASS_RATE_GREEN
+    )
+    result.pass_rate = (
+        round(passing_cases / len(case_results), 3) if case_results else 0.0
+    )
     result.case_results = case_results
     result.duration_s = round(time.time() - t0, 2)
 
@@ -522,8 +592,10 @@ def _detect_skill_trigger(skill_body: str, output: str) -> str:
 
 # ── Persistence ──────────────────────────────────────────────────────────────
 
+
 def _now_iso() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
@@ -569,7 +641,9 @@ def _save_result(skill_name: str, result: SkillEvalResult) -> None:
                 for c in result.case_results
             ],
         }
-        _result_path(skill_name).write_text(json.dumps(data, indent=2, ensure_ascii=False))
+        _result_path(skill_name).write_text(
+            json.dumps(data, indent=2, ensure_ascii=False)
+        )
     except Exception as exc:
         logger.warning("Could not save eval result for %s: %s", skill_name, exc)
 
