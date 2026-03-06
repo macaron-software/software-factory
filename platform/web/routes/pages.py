@@ -940,6 +940,7 @@ async def api_improvement_start(project_id: str):
                         time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     ),
                 )
+                conn.commit()
             except Exception:
                 pass
             conn.close()
@@ -951,6 +952,59 @@ async def api_improvement_start(project_id: str):
 
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.post("/api/improvement/stop/{project_id}")
+async def api_improvement_stop(project_id: str):
+    """Stop/abort a running AC cycle for a project."""
+    import time
+    from fastapi.responses import JSONResponse
+
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    cancelled_run_id = None
+
+    def _stop():
+        nonlocal cancelled_run_id
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            row = conn.execute(
+                "SELECT current_run_id, status FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if row:
+                cancelled_run_id = row["current_run_id"]
+                conn.execute(
+                    "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=? WHERE project_id=?",
+                    (time.strftime("%Y-%m-%dT%H:%M:%SZ"), project_id),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        conn.close()
+
+    await asyncio.to_thread(_stop)
+
+    # Try to cancel the mission run if it exists
+    if cancelled_run_id:
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            await asyncio.to_thread(
+                store.update_mission_status, cancelled_run_id, "cancelled"
+            )
+        except Exception:
+            pass
+
+    return JSONResponse(
+        {"ok": True, "project_id": project_id, "cancelled_run": cancelled_run_id}
+    )
 
 
 @router.post("/api/improvement/inject-cycle")
@@ -1038,6 +1092,7 @@ async def api_improvement_inject_cycle(request: Request):
         except Exception as e:
             conn.close()
             raise e
+        conn.commit()
         conn.close()
 
     try:
@@ -1354,6 +1409,176 @@ async def api_improvement_scores(project_id: str):
             "convergence": conv,
             "avg_reward": round(sum(rewards) / len(rewards), 3) if rewards else 0.0,
             "skill_stats": skill_stats,
+        }
+    )
+
+
+@router.get("/api/improvement/live/{project_id}")
+async def api_improvement_live(project_id: str):
+    """Comprehensive live snapshot for the project detail modal.
+    Returns state, all cycles (phase breakdown, adversarial, fix_summary, tools, errors),
+    adversarial findings, and mission run status.
+    """
+    import json as _json
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state_row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
+            ).fetchone()
+            cycles = conn.execute(
+                "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 20",
+                (project_id,),
+            ).fetchall()
+            adv_rows = conn.execute(
+                "SELECT cycle_num, dimension, score, verdict, findings, checked_at "
+                "FROM ac_adversarial WHERE project_id=? ORDER BY cycle_num DESC, score ASC LIMIT 50",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            state_row = None
+            cycles = []
+            adv_rows = []
+        finally:
+            conn.close()
+        return state_row, [dict(c) for c in cycles], [dict(r) for r in adv_rows]
+
+    state_row, cycles_raw, adv_rows = await asyncio.to_thread(_load)
+
+    # Parse cycles
+    cycles = []
+    all_scores = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        try:
+            row["adv_dict"] = _json.loads(row.get("adversarial_scores") or "{}")
+        except Exception:
+            row["adv_dict"] = {}
+        all_scores.append(row.get("total_score", 0))
+        cycles.append(row)
+    all_scores.reverse()  # chronological
+
+    # Parse adversarial findings
+    adv_by_cycle: dict = {}
+    for r in adv_rows:
+        cn = r["cycle_num"]
+        if cn not in adv_by_cycle:
+            adv_by_cycle[cn] = []
+        try:
+            r["findings_list"] = _json.loads(r.get("findings") or "[]")
+        except Exception:
+            r["findings_list"] = []
+        adv_by_cycle[cn].append(r)
+
+    # State
+    state = dict(state_row) if state_row else {}
+    for field in ("next_cycle_hint", "skill_eval_pending"):
+        raw = state.get(field)
+        if raw and isinstance(raw, str):
+            try:
+                state[field] = _json.loads(raw)
+            except Exception:
+                pass
+
+    # Convergence
+    from ...ac.convergence import ac_convergence_check
+
+    conv = (
+        ac_convergence_check(all_scores)
+        if len(all_scores) >= 3
+        else {"status": "cold_start"}
+    )
+
+    # Mission run status (live phase tracking)
+    run_status = {}
+    current_run_id = state.get("current_run_id")
+    if current_run_id:
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            run = await asyncio.to_thread(store.get_mission, current_run_id)
+            if run:
+                run_status = {
+                    "id": str(run.id),
+                    "name": run.name,
+                    "status": run.status,
+                    "current_phase": getattr(run, "current_phase", None),
+                    "started_at": str(getattr(run, "started_at", "") or ""),
+                    "updated_at": str(getattr(run, "updated_at", "") or ""),
+                }
+        except Exception:
+            pass
+
+    # Latest cycle full detail
+    latest = cycles[0] if cycles else {}
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "state": {
+                "current_cycle": state.get("current_cycle", 0),
+                "status": state.get("status", "idle"),
+                "ci_status": state.get("ci_status", "unknown"),
+                "last_git_sha": state.get("last_git_sha", ""),
+                "total_score_avg": round(state.get("total_score_avg") or 0, 1),
+                "next_cycle_hint": state.get("next_cycle_hint"),
+                "skill_eval_pending": state.get("skill_eval_pending"),
+                "updated_at": state.get("updated_at", ""),
+            },
+            "convergence": conv,
+            "run": run_status,
+            "latest_cycle": {
+                "cycle_num": latest.get("cycle_num", 0),
+                "status": latest.get("status", ""),
+                "total_score": latest.get("total_score", 0),
+                "defect_count": latest.get("defect_count", 0),
+                "veto_count": latest.get("veto_count", 0),
+                "traceability_score": latest.get("traceability_score", 0),
+                "ga_fitness": latest.get("ga_fitness", 0),
+                "rl_reward": latest.get("rl_reward", 0),
+                "fix_summary": latest.get("fix_summary", ""),
+                "git_sha": latest.get("git_sha", ""),
+                "phase_scores": latest.get("phase_scores_dict", {}),
+                "adversarial_scores": latest.get("adv_dict", {}),
+                "started_at": latest.get("started_at", ""),
+                "completed_at": latest.get("completed_at", ""),
+            },
+            "cycles": [
+                {
+                    "cycle_num": c.get("cycle_num"),
+                    "total_score": c.get("total_score", 0),
+                    "defect_count": c.get("defect_count", 0),
+                    "veto_count": c.get("veto_count", 0),
+                    "rl_reward": c.get("rl_reward", 0),
+                    "traceability_score": c.get("traceability_score", 0),
+                    "phase_scores": c.get("phase_scores_dict", {}),
+                    "fix_summary": c.get("fix_summary", ""),
+                    "status": c.get("status", ""),
+                    "started_at": c.get("started_at", ""),
+                    "completed_at": c.get("completed_at", ""),
+                }
+                for c in reversed(cycles)
+            ],
+            "adversarial": [
+                {
+                    "cycle_num": r["cycle_num"],
+                    "dimension": r["dimension"],
+                    "score": r["score"],
+                    "verdict": r["verdict"],
+                    "findings": r["findings_list"],
+                }
+                for r in adv_rows
+            ],
+            "phases": _AC_PHASES,
+            "all_scores": all_scores,
         }
     )
 

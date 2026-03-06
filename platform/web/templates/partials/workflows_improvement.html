@@ -107,10 +107,6 @@
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
     <span style="font-size:.7rem;color:var(--purple)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
-    <button id="ac-start-btn" onclick="acStartCycle()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--purple);color:var(--text-on-accent);border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
-      {{ fi('play', 12) }} Démarrer
-    </button>
   </div>
 </div>
 <div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
@@ -166,10 +162,15 @@
   {% set score = p.total_score_avg|int %}
   {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
   <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
+       id="ac-card-{{ p.id }}"
        onclick="acSelectProject('{{ p.id }}', this)"
-       ondblclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
-       title="Clic: sélectionner · Double-clic: détail">
-    <div class="tier-label">{{ p.tier_label }}</div>
+       title="Clic: sélectionner · Voir détail avec bouton ⤢">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="tier-label">{{ p.tier_label }}</div>
+      <button onclick="event.stopPropagation();acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+        style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.65rem;padding:0;line-height:1"
+        title="Voir détail / suivi live">⤢</button>
+    </div>
     <div class="proj-name">{{ p.name }}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
       <div>
@@ -182,9 +183,29 @@
     <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
       Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
       &nbsp;·&nbsp;
-      <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}">{{ p.status }}</span>
+      <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}" id="ac-status-{{ p.id }}">{{ p.status }}</span>
     </div>
     <div class="ac-bar"><div class="ac-bar-fill tier-{{ p.tier }}" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%"></div></div>
+    {# Per-card controls #}
+    <div style="display:flex;gap:.4rem;margin-top:.5rem" onclick="event.stopPropagation()">
+      {% if p.status == 'running' %}
+      <button onclick="acStopProject('{{ p.id }}')"
+        style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.2rem .5rem;background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem">
+        {{ fi('x-circle', 11) }} Stop
+      </button>
+      {% else %}
+      <button onclick="acStartProject('{{ p.id }}')"
+        {% if p.current_cycle >= p.max_cycles %}disabled{% endif %}
+        style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.2rem .5rem;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem{% if p.current_cycle >= p.max_cycles %};opacity:.4;cursor:default{% endif %}">
+        {{ fi('play', 11) }} {% if p.current_cycle == 0 %}Démarrer{% else %}Cycle {{ p.current_cycle + 1 }}{% endif %}
+      </button>
+      {% endif %}
+      <button onclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+        style="display:flex;align-items:center;justify-content:center;padding:.2rem .4rem;background:none;color:var(--text-secondary);border:1px solid var(--border);border-radius:.25rem;cursor:pointer;font-size:.65rem"
+        title="Suivi détaillé">
+        {{ fi('activity', 11) }}
+      </button>
+    </div>
   </div>
   {% else %}
   <div style="color:var(--text-secondary);font-size:.8rem;padding:2rem 0">
@@ -278,62 +299,225 @@ function acSelectProject(projectId, card) {
   acRefreshIntel();
 }
 
+var _acModalPollId = null;
+
+async function acStartProject(projectId) {
+  const card = document.getElementById('ac-card-' + projectId);
+  const statusEl = document.getElementById('ac-status-' + projectId);
+  if (card) card.style.opacity = '.6';
+  try {
+    const res = await fetch('/api/improvement/start/' + projectId, { method: 'POST' });
+    const data = await res.json();
+    if (data.run_id) {
+      if (statusEl) statusEl.textContent = 'running';
+      // Full partial reload to update card controls
+      setTimeout(() => {
+        const t = document.querySelector('[id$="amelio-container"]') || document.getElementById('ac-container');
+        if (t) htmx.ajax('GET', '/workflows/improvement', {target: t, swap: 'innerHTML'});
+      }, 1500);
+    } else {
+      alert('Erreur : ' + (data.detail || data.error || 'unknown'));
+    }
+  } catch(e) {
+    alert('Erreur réseau : ' + e.message);
+  }
+  if (card) card.style.opacity = '1';
+}
+
+async function acStopProject(projectId) {
+  if (!confirm('Arrêter le cycle en cours pour ce projet ?')) return;
+  const card = document.getElementById('ac-card-' + projectId);
+  if (card) card.style.opacity = '.6';
+  try {
+    await fetch('/api/improvement/stop/' + projectId, { method: 'POST' });
+    setTimeout(() => {
+      const t = document.querySelector('[id$="amelio-container"]') || document.getElementById('ac-container');
+      if (t) htmx.ajax('GET', '/workflows/improvement', {target: t, swap: 'innerHTML'});
+    }, 800);
+  } catch(e) { console.error(e); }
+  if (card) card.style.opacity = '1';
+}
+
 async function acOpenModal(projectId, projectName) {
-  // Create or reuse overlay
-  let overlay = document.getElementById('ac-detail-overlay');
+  if (_acModalPollId) { clearInterval(_acModalPollId); _acModalPollId = null; }
+
+  var overlay = document.getElementById('ac-detail-overlay');
   if (!overlay) {
     overlay = document.createElement('div');
     overlay.id = 'ac-detail-overlay';
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
-    overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center';
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        if (_acModalPollId) { clearInterval(_acModalPollId); _acModalPollId = null; }
+        overlay.remove();
+      }
+    });
     document.body.appendChild(overlay);
   }
-  overlay.innerHTML = `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:.75rem;padding:1.5rem;min-width:360px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
-    <button onclick="document.getElementById('ac-detail-overlay').remove()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.1rem">✕</button>
-    <div style="font-weight:700;font-size:1rem;margin-bottom:1rem">${projectName || projectId}</div>
-    <div id="ac-modal-body" style="color:var(--text-secondary);font-size:.8rem">Chargement…</div>
-  </div>`;
+
+  overlay.innerHTML = '<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:.75rem;width:min(820px,95vw);max-height:88vh;overflow-y:auto;position:relative;display:flex;flex-direction:column">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-secondary);z-index:1">'
+    + '<div><span style="font-weight:700;font-size:.95rem" id="ac-modal-title">' + (projectName||projectId) + '</span>'
+    + '<span style="margin-left:.75rem;font-size:.7rem;padding:.15rem .4rem;border-radius:.25rem;background:var(--bg-tertiary)" id="ac-modal-status-badge">…</span>'
+    + '<span style="margin-left:.5rem;font-size:.65rem;color:var(--text-secondary)" id="ac-modal-live-dot"></span></div>'
+    + '<button onclick="if(window._acModalPollId){clearInterval(window._acModalPollId);window._acModalPollId=null;}document.getElementById(\'ac-detail-overlay\').remove()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.1rem;padding:.25rem">✕</button>'
+    + '</div>'
+    + '<div id="ac-modal-body" style="padding:1.25rem;flex:1">Chargement…</div>'
+    + '</div>';
   overlay.style.display = 'flex';
 
-  try {
-    const [stateRes, scoresRes] = await Promise.all([
-      fetch('/api/improvement/project/' + projectId),
-      fetch('/api/improvement/scores/' + projectId)
-    ]);
-    const state = await stateRes.json();
-    const scores = await scoresRes.json();
-    const conv = state.convergence || {};
-    const hint = state.next_cycle_hint || {};
-    const recent = state.recent_scores || [];
-    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem">';
-    const kpi = (label, val, col) => `<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.5rem;text-align:center"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</div><div style="font-size:1.1rem;font-weight:700;color:${col||'var(--text-primary)'}">${val}</div></div>`;
-    html += kpi('Convergence', conv.status || 'cold_start', '#7c3aed');
-    html += kpi('Cycles', state.cycle_count || 0, 'var(--blue-bright)');
-    html += kpi('Score moy.', state.total_score_avg ? Math.round(state.total_score_avg) : '—', 'var(--green)');
-    html += kpi('RL Reward', scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—', '#f59e0b');
-    html += kpi('Statut', state.status || 'idle', 'var(--text-secondary)');
-    html += kpi('Hint RL', hint.action ? hint.action.substring(0,12) : '—', '#06b6d4');
-    html += '</div>';
-    if (recent.length) {
-      html += '<div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle (récents)</div>';
-      html += '<div style="display:flex;align-items:flex-end;gap:3px;height:36px;margin-bottom:1rem">';
-      const mx = Math.max(...recent, 1);
-      recent.forEach(s => {
-        const h = Math.round((s/mx)*32);
-        const c = s>=80?'var(--green)':s>=60?'var(--yellow-deep)':'var(--red)';
-        html += `<div style="flex:1;height:${h}px;background:${c};border-radius:1px" title="${s}/100"></div>`;
+  async function acFetchAndRender() {
+    try {
+      var res = await fetch('/api/improvement/live/' + projectId);
+      var d = await res.json();
+
+      var statusEl = document.getElementById('ac-modal-status-badge');
+      var liveEl = document.getElementById('ac-modal-live-dot');
+      var st = d.state || {};
+      var status = st.status || 'idle';
+      var isRunning = status === 'running';
+
+      if (statusEl) {
+        statusEl.textContent = status;
+        statusEl.style.color = isRunning ? 'var(--green)' : status === 'completed' ? 'var(--blue-bright)' : 'var(--text-secondary)';
+      }
+      if (liveEl) {
+        liveEl.textContent = isRunning ? '● LIVE' : '';
+        liveEl.style.color = 'var(--green)';
+      }
+
+      // --- Phase timeline ---
+      var phases = d.phases || [];
+      var latestPhaseScores = (d.latest_cycle && d.latest_cycle.phase_scores) || {};
+      var phaseHtml = '<div style="margin-bottom:1rem">';
+      phaseHtml += '<div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.5rem">Phases — dernier cycle</div>';
+      phaseHtml += '<div style="display:flex;gap:.3rem;flex-wrap:wrap">';
+      phases.forEach(function(ph) {
+        var s = latestPhaseScores[ph];
+        var col = s === undefined ? 'var(--text-secondary)' : s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+        var bg = s === undefined ? 'var(--bg-tertiary)' : s >= 80 ? 'rgba(63,185,80,.12)' : s >= 60 ? 'rgba(210,153,34,.12)' : 'rgba(248,81,73,.12)';
+        phaseHtml += '<div style="background:' + bg + ';border-radius:.3rem;padding:.3rem .6rem;text-align:center;min-width:80px">'
+          + '<div style="font-size:.6rem;color:var(--text-secondary);text-transform:uppercase">' + ph + '</div>'
+          + '<div style="font-size:.9rem;font-weight:700;color:' + col + '">' + (s !== undefined ? s : '·') + '</div>'
+          + '</div>';
       });
-      html += '</div>';
+      phaseHtml += '</div></div>';
+
+      // --- KPI grid ---
+      var lc = d.latest_cycle || {};
+      var conv = d.convergence || {};
+      function kpi(label, val, col) {
+        return '<div style="background:var(--bg-tertiary);border-radius:.35rem;padding:.5rem .75rem">'
+          + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.2rem">' + label + '</div>'
+          + '<div style="font-size:1.05rem;font-weight:700;color:' + (col||'var(--text-primary)') + '">' + val + '</div>'
+          + '</div>';
+      }
+      var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:1rem">';
+      kpiHtml += kpi('Score moy.', st.total_score_avg ? Math.round(st.total_score_avg) + '/100' : '—', st.total_score_avg >= 80 ? 'var(--green)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('Cycle', st.current_cycle + '/20', 'var(--blue-bright)');
+      kpiHtml += kpi('Convergence', conv.status || 'cold_start', conv.status === 'improving' ? 'var(--green)' : conv.status === 'regression' ? 'var(--red)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('CI/CD', st.ci_status || '—', st.ci_status === 'green' ? 'var(--green)' : st.ci_status === 'red' ? 'var(--red)' : 'var(--text-secondary)');
+      kpiHtml += kpi('RL Reward', lc.rl_reward ? lc.rl_reward.toFixed(3) : '—', lc.rl_reward > 0.2 ? 'var(--green)' : lc.rl_reward < -0.2 ? 'var(--red)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('Défauts', lc.defect_count !== undefined ? lc.defect_count : '—', lc.defect_count > 5 ? 'var(--red)' : 'var(--green)');
+      kpiHtml += kpi('Veto', lc.veto_count !== undefined ? lc.veto_count : '—', lc.veto_count > 0 ? 'var(--red)' : 'var(--green)');
+      kpiHtml += kpi('Traçabilité', lc.traceability_score ? lc.traceability_score + '%' : '—', lc.traceability_score >= 90 ? 'var(--green)' : 'var(--yellow-deep)');
+      kpiHtml += '</div>';
+
+      // --- Score sparkline ---
+      var sparkHtml = '';
+      var allScores = d.all_scores || [];
+      if (allScores.length) {
+        var mx = Math.max.apply(null, allScores.concat([1]));
+        sparkHtml = '<div style="margin-bottom:1rem"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle</div>'
+          + '<div style="display:flex;align-items:flex-end;gap:3px;height:40px">';
+        allScores.forEach(function(s, i) {
+          var h = Math.max(3, Math.round((s/mx)*36));
+          var c = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+          sparkHtml += '<div style="flex:1;height:' + h + 'px;background:' + c + ';border-radius:2px 2px 0 0;min-width:4px" title="Cycle ' + (i+1) + ': ' + s + '/100"></div>';
+        });
+        sparkHtml += '</div></div>';
+      }
+
+      // --- Mission run section ---
+      var runHtml = '';
+      var run = d.run || {};
+      if (run.id) {
+        var runColor = run.status === 'running' ? 'var(--green)' : run.status === 'completed' ? 'var(--blue-bright)' : run.status === 'failed' ? 'var(--red)' : 'var(--text-secondary)';
+        runHtml = '<div style="margin-bottom:1rem;padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:.4rem;font-size:.72rem">'
+          + '<div style="display:flex;justify-content:space-between;margin-bottom:.25rem">'
+          + '<strong>Mission en cours</strong><span style="color:' + runColor + '">' + run.status + '</span></div>'
+          + '<div style="color:var(--text-secondary)">' + run.name + '</div>'
+          + (run.current_phase ? '<div style="margin-top:.25rem">Phase : <strong>' + run.current_phase + '</strong></div>' : '')
+          + '<div style="margin-top:.2rem;color:var(--text-secondary);font-size:.65rem">démarré ' + (run.started_at || '—') + '</div>'
+          + '</div>';
+      }
+
+      // --- Fix summary ---
+      var fixHtml = '';
+      if (lc.fix_summary) {
+        fixHtml = '<div style="margin-bottom:1rem;padding:.6rem .75rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.72rem">'
+          + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.3rem">Fix Summary — cycle ' + lc.cycle_num + '</div>'
+          + '<div style="color:var(--text-primary)">' + lc.fix_summary + '</div>'
+          + (lc.git_sha ? '<div style="margin-top:.25rem;font-family:monospace;font-size:.65rem;color:var(--text-secondary)">git: ' + lc.git_sha.slice(0,12) + '</div>' : '')
+          + '</div>';
+      }
+
+      // --- Adversarial findings ---
+      var advHtml = '';
+      var advData = d.adversarial || [];
+      if (advData.length) {
+        advHtml = '<div style="margin-bottom:1rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Adversarial — derniers cycles</div>';
+        advHtml += '<table style="width:100%;font-size:.7rem;border-collapse:collapse">';
+        advHtml += '<thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Cycle</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Dimension</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Score</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Verdict</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Findings</th></tr></thead><tbody>';
+        advData.slice(0, 15).forEach(function(r) {
+          var vc = r.verdict === 'pass' ? 'var(--green)' : r.verdict === 'warn' ? 'var(--yellow-deep)' : 'var(--red)';
+          var sc = r.score >= 80 ? 'var(--green)' : r.score >= 50 ? 'var(--yellow-deep)' : 'var(--red)';
+          var findings = Array.isArray(r.findings) ? r.findings.join('; ') : (r.findings || '');
+          advHtml += '<tr><td style="padding:.2rem .4rem;color:var(--text-secondary)">' + r.cycle_num + '</td>'
+            + '<td style="padding:.2rem .4rem;font-family:monospace">' + r.dimension + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + sc + ';font-weight:700">' + r.score + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + vc + '">' + r.verdict + '</td>'
+            + '<td style="padding:.2rem .4rem;color:var(--text-secondary);font-size:.65rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + findings + '">' + (findings || '—') + '</td></tr>';
+        });
+        advHtml += '</tbody></table></div>';
+      }
+
+      // --- Cycle history mini-table ---
+      var cyclesHtml = '';
+      var cyclesData = d.cycles || [];
+      if (cyclesData.length) {
+        cyclesHtml = '<div><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Historique cycles</div>';
+        cyclesHtml += '<table style="width:100%;font-size:.7rem;border-collapse:collapse">';
+        cyclesHtml += '<thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">#</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Score</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">RL R</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Défauts</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Veto</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Status</th></tr></thead><tbody>';
+        cyclesData.slice(-10).reverse().forEach(function(c) {
+          var sc = c.total_score >= 80 ? 'var(--green)' : c.total_score >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+          var rl = typeof c.rl_reward === 'number' ? c.rl_reward.toFixed(3) : '—';
+          cyclesHtml += '<tr><td style="padding:.2rem .4rem;font-family:monospace;font-weight:700">' + c.cycle_num + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + sc + ';font-weight:700">' + (c.total_score || '—') + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;font-family:monospace;font-size:.65rem">' + rl + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + (c.defect_count > 5 ? 'var(--red)' : 'var(--text-secondary)') + '">' + (c.defect_count !== undefined ? c.defect_count : '—') + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + (c.veto_count > 0 ? 'var(--red)' : 'var(--text-secondary)') + '">' + (c.veto_count !== undefined ? c.veto_count : '—') + '</td>'
+            + '<td style="padding:.2rem .4rem;color:' + (c.status === 'completed' ? 'var(--green)' : 'var(--text-secondary)') + '">' + (c.status||'—') + '</td></tr>';
+        });
+        cyclesHtml += '</tbody></table></div>';
+      }
+
+      var body = document.getElementById('ac-modal-body');
+      if (body) {
+        body.innerHTML = phaseHtml + kpiHtml + sparkHtml + runHtml + fixHtml + advHtml + cyclesHtml;
+      }
+
+      // Schedule next poll if running
+      if (isRunning && document.getElementById('ac-detail-overlay')) {
+        _acModalPollId = setTimeout(acFetchAndRender, 4000);
+      }
+    } catch(e) {
+      var body = document.getElementById('ac-modal-body');
+      if (body) body.textContent = 'Erreur chargement : ' + e.message;
     }
-    // Adversarial
-    const adv = state.last_adversarial || {};
-    if (adv.score !== undefined) {
-      html += `<div style="font-size:.7rem;color:var(--text-secondary)">Dernier adversarial : <strong style="color:${adv.score>=7?'var(--red)':'var(--green)'}">${adv.score}/14</strong> — ${adv.verdict||'—'}</div>`;
-    }
-    document.getElementById('ac-modal-body').innerHTML = html;
-  } catch(e) {
-    document.getElementById('ac-modal-body').textContent = 'Aucune donnée disponible pour ce projet.';
   }
+
+  acFetchAndRender();
 }
 
 async function acRefreshIntel() {
@@ -400,28 +584,9 @@ async function acRefreshIntel() {
 }
 
 async function acStartCycle() {
-  if (!_acSelectedProject) return;
-  const btn = document.getElementById('ac-start-btn');
-  const bar = document.getElementById('ac-status-bar');
-  btn.disabled = true;
-  bar.style.display = 'block';
-  bar.textContent = 'Démarrage du cycle AC pour ' + _acSelectedProject + '…';
-  try {
-    const res = await fetch('/api/improvement/start/' + _acSelectedProject, { method: 'POST' });
-    const data = await res.json();
-    if (data.run_id) {
-      bar.style.color = 'var(--green)';
-      bar.textContent = 'Cycle ' + (data.cycle_num||'?') + ' démarré — run ' + data.run_id.slice(0,8) + '. Suivi : Missions';
-    } else {
-      bar.style.color = 'var(--red)';
-      bar.textContent = 'Erreur : ' + (data.detail || data.error || 'unknown');
-      btn.disabled = false;
-    }
-  } catch(e) {
-    bar.style.color = 'var(--red)';
-    bar.textContent = 'Erreur réseau : ' + e.message;
-    btn.disabled = false;
-  }
+  // Legacy — now handled per-card via acStartProject
+  var pid = _acSelectedProject;
+  if (pid) acStartProject(pid);
 }
 
 // Auto-refresh intel on load
