@@ -1,3 +1,67 @@
+---
+name: ac-security
+description: >
+  AC Security phase — applies SecureByDesign v1.1.0's 25 controls (OWASP Web 2021,
+  OWASP LLM 2025, NIST CSF 2.0, ISO 27001:2022) to sprint output before CI/CD validation.
+  Produces a per-control pass/fail report and remediation plan.
+metadata:
+  category: security
+  triggers:
+    - "when applying security hardening on sprint output"
+    - "when running SecureByDesign controls"
+    - "when checking for SBD compliance before CI validation"
+# EVAL CASES
+# WHY: The AC security phase must detect real SBD failures (injection, missing
+# rate-limiting) and produce structured pass/fail reports — not generic advice.
+# Ref: philschmid.de/testing-skills; SecureByDesign v1.1.0 SKILL.md
+eval_cases:
+  - id: sbd01-injection-fail
+    prompt: |
+      Audit this code under SecureByDesign SBD-01:
+      def update_user(user_id, **kwargs):
+          sets = ", ".join(f"{k}=?" for k in kwargs)
+          db.execute(f"UPDATE users SET {sets} WHERE id=?", list(kwargs.values()) + [user_id])
+    should_trigger: true
+    checks:
+      - "regex:SBD-01|injection|f-string|dynamic.*column|whitelist|allowlist"
+      - "no_placeholder"
+      - "length_min:80"
+    expectations:
+      - "evaluates specifically against SBD-01 (injection control)"
+      - "flags dynamic column names in f-string even if values are parameterized"
+      - "recommends a column allowlist"
+    tags: [sbd-01, sql-injection]
+  - id: sbd04-rate-limit-fail
+    prompt: |
+      Audit this FastAPI route under SecureByDesign SBD-04:
+      @router.post("/api/auth/login")
+      async def login(request: Request):
+          body = await request.json()
+          return service.login(body["email"], body["password"])
+    should_trigger: true
+    checks:
+      - "regex:SBD-04|rate.*limit|brute.*force|429|Retry-After|throttl"
+      - "no_placeholder"
+    expectations:
+      - "flags missing rate limiting as SBD-04 FAIL"
+      - "recommends per-IP rate limiting with 429 response"
+    tags: [sbd-04, rate-limiting]
+  - id: sbd-report-format
+    prompt: |
+      Run a SecureByDesign audit on this module and produce a structured report.
+      The module has: JWT auth with HS256, bcrypt password hashing, no hardcoded
+      secrets, parameterized queries, but no security headers middleware.
+    should_trigger: true
+    checks:
+      - "regex:PASS|FAIL|SBD-|control|score|tier"
+      - "no_placeholder"
+      - "length_min:150"
+    expectations:
+      - "produces a structured per-control report (PASS/FAIL per SBD-XX)"
+      - "correctly marks JWT/bcrypt/parameterized queries as PASS"
+      - "marks missing security headers as FAIL (SBD-03)"
+    tags: [report-format, sbd-03]
+---
 # Skill: AC Security — SecureByDesign Hardening Phase
 
 ## Persona

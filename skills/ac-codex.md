@@ -1,3 +1,63 @@
+---
+name: ac-codex
+description: >
+  AC Codex — TDD coder phase using GPT-5.2 Codex. Implements sprint features with
+  strict Red→Green→Refactor cycle: test first, minimal implementation, no stubs.
+  Applies corrections from ADVERSARIAL_N.md and CICD_FAILURE_N.md from prior cycles.
+metadata:
+  category: development
+  triggers:
+    - "when implementing a feature with strict TDD"
+    - "when writing a failing test before implementation"
+    - "when applying Red-Green-Refactor cycle"
+# EVAL CASES
+# WHY: TDD coder must write tests BEFORE implementation, never produce stubs, and
+# apply the minimal fix that makes the failing test pass.
+# Ref: philschmid.de/testing-skills; ADR-0017 (TDD-first mandate)
+eval_cases:
+  - id: test-before-code
+    prompt: |
+      Implement a function validate_email(email: str) -> bool that returns True
+      for valid emails and False otherwise. Use TDD.
+    should_trigger: true
+    checks:
+      - "regex:def test_|class Test"
+      - "regex:assert|pytest|assertEqual"
+      - "regex:def validate_email|validate_email"
+      - "no_placeholder"
+      - "length_min:150"
+    expectations:
+      - "writes the failing test FIRST, before validate_email implementation"
+      - "test covers valid email, invalid email, and edge cases (empty string, no @)"
+      - "implementation is minimal — just enough to pass the tests"
+    tags: [tdd, test-first]
+  - id: no-stub-no-fake
+    prompt: |
+      Implement a JWT token decoder that extracts the user_id payload. Use TDD.
+    should_trigger: true
+    checks:
+      - "no_placeholder"
+      - "not_regex:return 'user_123'|return fake_user|# TODO implement|raise NotImplementedError"
+      - "regex:decode|jwt|base64|header|payload|pyjwt"
+    expectations:
+      - "implements actual JWT decode logic — not a stub returning hardcoded user_id"
+      - "test uses a real encoded token, not a mock return value"
+    tags: [anti-stub, jwt]
+  - id: red-green-cycle
+    prompt: |
+      The following test is failing: assert calculate_discount(100, 0.2) == 80.0
+      Fix it with strict TDD.
+    should_trigger: true
+    checks:
+      - "regex:RED|GREEN|REFACTOR|failing.*test|test.*fail|make.*pass"
+      - "regex:def calculate_discount|calculate_discount"
+      - "no_placeholder"
+    expectations:
+      - "explicitly identifies the RED phase (failing test)"
+      - "implements minimal code to reach GREEN"
+      - "does not add extra features beyond what the test requires"
+    tags: [red-green-refactor, minimal]
+---
 # Skill: AC Codex — TDD Coder (GPT-5.2 Codex)
 
 ## Persona

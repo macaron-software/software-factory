@@ -14,6 +14,60 @@ metadata:
     - "when implementing health checks"
     - "when user asks about deployment or rollback strategies"
     - "when configuring monitoring or logging"
+# EVAL CASES
+# WHY: DevOps skill must catch production anti-patterns (latest tag, no health checks,
+# no rollback) while not over-flagging minimal but valid configs.
+# Ref: philschmid.de/testing-skills
+eval_cases:
+  - id: dockerfile-antipatterns
+    prompt: |
+      Review this Dockerfile:
+      FROM python:latest
+      COPY . /app
+      RUN pip install -r requirements.txt
+      CMD ["python", "app.py"]
+    should_trigger: true
+    checks:
+      - "regex:latest|pinned|specific.*version|SHA|reproducib"
+      - "regex:root|non-root|USER|privilege"
+      - "no_placeholder"
+      - "length_min:100"
+    expectations:
+      - "flags 'python:latest' — recommends pinned version (e.g. python:3.12-slim)"
+      - "flags running as root — recommends adding USER directive"
+      - "may suggest multi-stage build or .dockerignore"
+    tags: [docker, security, reproducibility]
+  - id: missing-health-check
+    prompt: |
+      Review this docker-compose service:
+      services:
+        api:
+          image: myapp:1.2.3
+          ports: ["8080:8080"]
+          environment:
+            DATABASE_URL: postgresql://db:5432/app
+      secrets are in env vars directly.
+    should_trigger: true
+    checks:
+      - "regex:healthcheck|health_check|depends_on|liveness|readiness"
+      - "regex:secret|env.*secret|vault|file.*secret|docker secret"
+    expectations:
+      - "flags missing healthcheck — service has no liveness check"
+      - "flags secrets passed as plain environment variables"
+    tags: [health-check, secrets]
+  - id: solid-pipeline
+    prompt: |
+      Review this CI pipeline step:
+      - name: Run tests
+        run: pytest tests/ --tb=short
+        if: github.event_name == 'push'
+    should_trigger: true
+    checks:
+      - "length_min:40"
+    expectations:
+      - "does not fabricate issues with a basic but valid test step"
+      - "may note branch filtering could be more explicit"
+    tags: [negative]
 ---
 
 # DevOps Pipeline

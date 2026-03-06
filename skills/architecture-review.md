@@ -13,6 +13,60 @@ metadata:
     - "when user mentions SOLID, DDD, or clean architecture"
     - "when evaluating scalability of a system"
     - "when creating Architecture Decision Records"
+# EVAL CASES
+# WHY: Architecture skill must surface real design issues (god objects, tight coupling,
+# missing interfaces) and know when to recommend ADRs vs. direct fixes.
+# Ref: philschmid.de/testing-skills
+eval_cases:
+  - id: tight-coupling
+    prompt: |
+      Review this Python service architecture:
+      class OrderService:
+          def __init__(self):
+              self.db = MySQLConnector(host="localhost", user="root", password="admin")
+              self.mailer = SendgridMailer(api_key="SG.xxx")
+              self.stripe = StripeClient(secret="sk_live_xxx")
+          def place_order(self, order): ...
+    should_trigger: true
+    checks:
+      - "regex:tight.*coupl|depend.*inject|DI|interface|abstract|hard.*cod|invers"
+      - "no_placeholder"
+      - "length_min:100"
+    expectations:
+      - "identifies tight coupling between OrderService and concrete implementations"
+      - "recommends dependency injection / interface abstractions"
+      - "may reference SOLID Dependency Inversion Principle"
+    tags: [solid, coupling, dip]
+  - id: missing-adr
+    prompt: |
+      We're choosing between PostgreSQL and MongoDB for our main data store
+      in a multi-tenant SaaS platform handling structured financial data.
+      What architectural considerations apply?
+    should_trigger: true
+    checks:
+      - "regex:ADR|Architecture Decision|trade-off|ACID|schema|relational|document"
+      - "no_placeholder"
+      - "length_min:150"
+    expectations:
+      - "recommends creating an ADR to document the decision"
+      - "explains trade-offs: PostgreSQL ACID/relational vs MongoDB schema-flex"
+      - "considers multi-tenancy and structured data requirements"
+    tags: [adr, database-choice]
+  - id: well-designed-module
+    prompt: |
+      Review this module structure:
+      # auth/
+      #   __init__.py
+      #   service.py    — AuthService with login/register/token operations
+      #   middleware.py — require_auth() FastAPI dependency
+      #   models.py     — User dataclass
+    should_trigger: true
+    checks:
+      - "length_min:40"
+    expectations:
+      - "recognizes clean separation of concerns"
+      - "does NOT invent architectural problems that don't exist"
+    tags: [negative]
 ---
 
 # Architecture Review

@@ -27,6 +27,71 @@ metadata:
     LLM-specific adversarial testing (SBD-17, prompt injection test suites) is in
     skills/qa-adversarial-llm.md. Conflict resolution SBD-09/SBD-10 is in
     platform/tools/monitoring_tools.py.
+# EVAL CASES
+# WHY: Security skill must surface real vulnerabilities (not style), never
+# produce false negatives on obvious injection patterns, and cover OWASP LLM risks.
+# Ref: philschmid.de/testing-skills — skill eval harness convention.
+eval_cases:
+  - id: sql-injection-detection
+    prompt: |
+      Review this Python code for security issues:
+      def get_user(email):
+          query = f"SELECT * FROM users WHERE email='{email}'"
+          return db.execute(query)
+    should_trigger: true
+    checks:
+      - "regex:SQL inject|f-string|parameteriz|prepared statement|placeholder"
+      - "regex:OWASP|A03|injection"
+      - "no_placeholder"
+      - "length_min:100"
+    expectations:
+      - "identifies the SQL injection vulnerability in the f-string query"
+      - "recommends parameterized queries or ORM"
+      - "references OWASP A03:2021 or equivalent"
+    tags: [sql-injection, owasp-a03]
+  - id: hardcoded-secret
+    prompt: |
+      Review this config for security issues:
+      SECRET_KEY = "abc123supersecret"
+      DATABASE_URL = "postgresql://admin:password@prod-db:5432/app"
+    should_trigger: true
+    checks:
+      - "regex:hardcoded|secret|credential|env.*var|vault|rotate"
+      - "no_placeholder"
+    expectations:
+      - "flags hardcoded credentials as high severity"
+      - "recommends environment variables or secrets manager (Vault, Infisical)"
+    tags: [hardcoded-secrets, owasp-a07]
+  - id: prompt-injection-llm
+    prompt: |
+      This LLM endpoint passes user input directly to the system prompt:
+      system_prompt = f"You are a helpful assistant. User context: {user_input}"
+      response = llm.chat(system_prompt)
+    should_trigger: true
+    checks:
+      - "regex:prompt inject|LLM|OWASP LLM01|system prompt|sanitiz|escap"
+      - "no_placeholder"
+    expectations:
+      - "identifies prompt injection risk (OWASP LLM01:2025)"
+      - "recommends separating system prompt from user content"
+    tags: [prompt-injection, llm-security, owasp-llm01]
+  - id: clean-code-no-vuln
+    prompt: |
+      Review this code for security issues:
+      from fastapi import APIRouter, Depends
+      router = APIRouter()
+
+      @router.get("/api/users/{user_id}")
+      async def get_user(user_id: str, current_user=Depends(require_auth)):
+          return await user_service.get_by_id(user_id, requester=current_user)
+    should_trigger: true
+    checks:
+      - "length_min:50"
+    expectations:
+      - "does NOT fabricate vulnerabilities that don't exist"
+      - "may note that IDOR check depends on get_by_id implementation"
+      - "does not raise false positives on well-structured code"
+    tags: [negative, false-positive-guard]
 ---
 
 # Security Audit
