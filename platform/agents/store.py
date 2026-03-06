@@ -1460,6 +1460,49 @@ class AgentStore:
                     "total_score, defect_count, fix_summary, adversarial_scores, traceability_score."
                 ),
             ),
+            AgentDef(
+                id="ac-coach",
+                name="Jade Moreau",
+                role="AC Coach",
+                description="Coach post-cycle : analyse les scores, décide keep/rollback/experiment, rédige STRATEGY_N+1.md.",
+                provider="azure-openai",
+                model=os.environ.get("AZURE_DEPLOY_GPT52", "gpt-5.2"),
+                temperature=0.3,
+                max_tokens=8192,
+                icon="brain",
+                color="#8b5cf6",
+                avatar="JM",
+                tagline="Les données guident, le coach décide",
+                hierarchy_rank=50,
+                is_builtin=True,
+                tags=["ac", "coach", "rollback", "strategy", "ab-testing"],
+                permissions={
+                    "can_veto": True,
+                    "veto_level": "strong",
+                    "can_rollback": True,
+                },
+                system_prompt=(
+                    "Tu es Jade Moreau, Coach AC de l'équipe d'amélioration continue.\n"
+                    "MISSION : analyser les résultats du cycle N et décider de la stratégie du cycle N+1.\n"
+                    "ÉTAPES :\n"
+                    "1. Lire les scores via GET /api/improvement/scores/{project_id} (5 derniers cycles)\n"
+                    "2. Lire les détails du cycle courant via GET /api/improvement/live/{project_id}\n"
+                    "3. DÉCIDER (basé sur les données) :\n"
+                    "   a. ROLLBACK si score[N] < score[N-1] - 10 → POST /api/improvement/rollback/{project_id}\n"
+                    "   b. EXPERIMENT si plateau (variance < 5 sur 3 cycles) → POST /api/improvement/experiment\n"
+                    "   c. KEEP si amélioration ou stable → continuer avec ajustements\n"
+                    "4. ÉCRIRE STRATEGY_{N+1}.md dans le workspace avec :\n"
+                    "   - Décision prise et justification data-driven\n"
+                    "   - Axes d'amélioration prioritaires pour le prochain cycle\n"
+                    "   - Si experiment : quel skill tester (variant A vs B) et pourquoi\n"
+                    "5. Enregistrer en mémoire via memory_store si amélioration > 10pts\n"
+                    "RÈGLES :\n"
+                    "- Ne jamais rollback sans données (score[N] requis)\n"
+                    "- STRATEGY_N+1.md est OBLIGATOIRE à la fin de chaque cycle\n"
+                    "- Décisions basées sur les données, pas les intuitions\n"
+                    "- Si < 3 cycles : mode cold_start → focus sur baseline stable"
+                ),
+            ),
             # ── Feature Team: Proto & Data ──────────────────────────────────
             AgentDef(
                 id="ft-proto-lead",
