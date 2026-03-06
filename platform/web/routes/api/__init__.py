@@ -22,6 +22,7 @@ from .search import router as search_router
 from .settings import router as settings_router
 from .simplify import router as simplify_router
 from .teams import router as teams_router
+from .skill_eval import router as skill_eval_router
 
 router = APIRouter()
 
@@ -44,3 +45,4 @@ router.include_router(teams_router)
 router.include_router(modules_router)
 router.include_router(cockpit_router)
 router.include_router(screens_router)
+router.include_router(skill_eval_router)
