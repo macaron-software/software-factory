@@ -163,28 +163,32 @@ def _select_model_for_agent(
     """
     import os
 
+    # Default provider/model from env (works for local-mlx, minimax, OVH, etc.)
+    _default_provider = os.environ.get("PLATFORM_LLM_PROVIDER", "local-mlx")
+    _default_model = os.environ.get(
+        "PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
+    )
+
     if not os.environ.get("AZURE_DEPLOY", ""):
-        # Local multi-LLM routing: code/QA → local-mlx (Qwen), pilotage/reasoning → azure-openai,
-        # small talk / cheap ops → minimax
-        _local_primary = os.environ.get("PLATFORM_LLM_PROVIDER", "local-mlx")
-        _local_model = os.environ.get(
-            "PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
-        )
+        # Non-Azure deployment (local dev, OVH demo…).
+        # Always check Settings → LLM DB config first so operators can override
+        # the model for each category without touching code.
         role_l = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
         tags_l = {t.lower() for t in (agent.tags or [])}
-        if role_l in _CODE_ROLES or tags_l & _CODE_TAGS:
-            # Code generation, tests, QA → Qwen (local-mlx)
-            return _local_primary, _local_model
-        elif role_l in _REASONING_ROLES or tags_l & _REASONING_TAGS:
-            # Architecture, planning, pilotage → azure-openai only if the deployment
-            # explicitly targets it (not when PLATFORM_LLM_PROVIDER=minimax, e.g. OVH).
-            if _local_primary == "minimax" or not os.environ.get("AZURE_OPENAI_API_KEY"):
-                return _local_primary, _local_model
-            _az_model = os.environ.get("DEFAULT_MODEL", "gpt-5-mini")
-            return "azure-openai", _az_model
+
+        if role_l in _REASONING_ROLES or tags_l & _REASONING_TAGS:
+            _cat = "reasoning_heavy"
+        elif role_l in _CODE_ROLES or tags_l & _CODE_TAGS:
+            _cat = "production_heavy"
         else:
-            # Small talk, generic → minimax (cheap)
-            return CHEAP_PROVIDER, CHEAP_MODEL
+            _cat = "tasks_heavy"
+
+        _db_cfg = _load_routing_config().get(_cat, {})
+        if _db_cfg.get("provider"):
+            return _db_cfg["provider"], _db_cfg.get("model", _default_model)
+
+        # No DB override — use env defaults (all agents on the same provider)
+        return _default_provider, _default_model
 
     azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
     role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
