@@ -25,7 +25,7 @@ description: >
   Activate when: reviewing a deployed feature, validating perf budgets,
   debugging a slow page, or running perf acceptance criteria.
 
-version: "1.2.0"
+version: "1.3.0"
 
 eval_cases:
   - id: interpret-lighthouse-results
@@ -58,6 +58,9 @@ eval_cases:
 
   - id: interpret-mobile-cwv
     prompt: |
+      The perf_emulate_mobile and perf_audit_lighthouse tools have already been executed.
+      Below are the collected results — do NOT run any tools, just interpret and recommend:
+
       Mobile audit complete (Moto G4 / fast-3g). Core Web Vitals from perf_audit_lighthouse:
       LCP: 5.2s (threshold: < 2.5s)
       CLS: 0.08 (threshold: < 0.1)
