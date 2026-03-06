@@ -21,6 +21,7 @@ import sqlite3  # kept only for RTK history DB (external tool)
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -60,6 +61,20 @@ if _env_file.exists():
 # FastAPI app
 app = FastAPI(title="Software Factory Dashboard", version="1.0.0")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+@app.on_event("startup")
+async def _start_background_tasks():
+    """Start background watchers at server startup."""
+    try:
+        from .git_action_watcher import run_git_action_watcher
+
+        asyncio.create_task(run_git_action_watcher(), name="ac-git-watcher")
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).warning("AC watcher not started: %s", e)
+
 
 # ============================================================================
 # SIMPLE TTL CACHE (no external deps)
@@ -1164,11 +1179,11 @@ _AC_AGENTS_GRAPH = {
 }
 
 
-def _ac_ensure_tables(conn: sqlite3.Connection):
-    """Create improvement-cycle tables if they don't exist."""
-    conn.executescript("""
-        CREATE TABLE IF NOT EXISTS ac_cycles (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+def _ac_ensure_tables(conn) -> None:
+    """Create improvement-cycle tables in PostgreSQL if they don't exist."""
+    stmts = [
+        """CREATE TABLE IF NOT EXISTS ac_cycles (
+            id          SERIAL PRIMARY KEY,
             project_id  TEXT NOT NULL,
             cycle_num   INTEGER NOT NULL,
             git_sha     TEXT,
@@ -1184,15 +1199,15 @@ def _ac_ensure_tables(conn: sqlite3.Connection):
             started_at  TEXT,
             completed_at TEXT,
             UNIQUE(project_id, cycle_num)
-        );
-        CREATE TABLE IF NOT EXISTS ac_thompson (
+        )""",
+        """CREATE TABLE IF NOT EXISTS ac_thompson (
             agent_id    TEXT NOT NULL,
             phase_type  TEXT NOT NULL,
             successes   INTEGER DEFAULT 0,
             failures    INTEGER DEFAULT 0,
             PRIMARY KEY (agent_id, phase_type)
-        );
-        CREATE TABLE IF NOT EXISTS ac_project_state (
+        )""",
+        """CREATE TABLE IF NOT EXISTS ac_project_state (
             project_id  TEXT PRIMARY KEY,
             current_cycle INTEGER DEFAULT 0,
             status      TEXT DEFAULT 'idle',
@@ -1202,24 +1217,38 @@ def _ac_ensure_tables(conn: sqlite3.Connection):
             ci_status   TEXT DEFAULT 'unknown',
             started_at  TEXT,
             updated_at  TEXT
-        );
-    """)
-    conn.commit()
+        )""",
+    ]
+    with conn.cursor() as cur:
+        for stmt in stmts:
+            cur.execute(stmt)
 
 
 def _ac_get_project_states() -> Dict:
     """Load all project states from DB."""
     conn = get_db()
-    _ac_ensure_tables(conn)
-    states = {}
-    for p in AC_PROJECTS:
-        row = conn.execute(
-            "SELECT * FROM ac_project_state WHERE project_id=?", (p["id"],)
-        ).fetchone()
-        if row:
-            states[p["id"]] = dict(row)
-        else:
-            states[p["id"]] = {
+    try:
+        _ac_ensure_tables(conn)
+        states = {}
+        for p in AC_PROJECTS:
+            row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=%s", (p["id"],)
+            ).fetchone()
+            if row:
+                states[p["id"]] = dict(row)
+            else:
+                states[p["id"]] = {
+                    "project_id": p["id"],
+                    "current_cycle": 0,
+                    "status": "idle",
+                    "current_run_id": None,
+                    "total_score_avg": 0,
+                    "last_git_sha": None,
+                    "ci_status": "unknown",
+                }
+    except Exception:
+        states = {
+            p["id"]: {
                 "project_id": p["id"],
                 "current_cycle": 0,
                 "status": "idle",
@@ -1228,30 +1257,41 @@ def _ac_get_project_states() -> Dict:
                 "last_git_sha": None,
                 "ci_status": "unknown",
             }
-    conn.close()
+            for p in AC_PROJECTS
+        }
+    finally:
+        conn.close()
     return states
 
 
 def _ac_get_cycles(project_id: str) -> List[Dict]:
     """Load cycle history for a project."""
     conn = get_db()
-    _ac_ensure_tables(conn)
-    rows = conn.execute(
-        "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
-        (project_id,),
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT * FROM ac_cycles WHERE project_id=%s ORDER BY cycle_num",
+            (project_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 def _ac_get_thompson_probs() -> List[Dict]:
     """Compute Thompson sampling probabilities from Beta distributions."""
     conn = get_db()
-    _ac_ensure_tables(conn)
-    rows = conn.execute(
-        "SELECT agent_id, phase_type, successes, failures FROM ac_thompson ORDER BY agent_id"
-    ).fetchall()
-    conn.close()
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT agent_id, phase_type, successes, failures FROM ac_thompson ORDER BY agent_id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        conn.close()
     results = {}
     for r in rows:
         key = r["agent_id"]
@@ -1290,13 +1330,17 @@ def _ac_get_thompson_probs() -> List[Dict]:
 def _ac_get_rl_history(project_id: str) -> List[float]:
     """Return RL reward per cycle for the project."""
     conn = get_db()
-    _ac_ensure_tables(conn)
-    rows = conn.execute(
-        "SELECT rl_reward FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
-        (project_id,),
-    ).fetchall()
-    conn.close()
-    return [r["rl_reward"] for r in rows]
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT rl_reward FROM ac_cycles WHERE project_id=%s ORDER BY cycle_num",
+            (project_id,),
+        ).fetchall()
+        return [r["rl_reward"] for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
 
 
 def _ac_get_ci_status(git_sha: str) -> str:
@@ -1430,6 +1474,121 @@ async def improvement_page(request: Request):
             "phases": AC_PHASES,
         },
     )
+
+
+@app.post("/api/improvement/start/{project_id}")
+async def api_improvement_start(project_id: str):
+    """Bootstrap a pilot project: create in SF platform + launch cycle 1."""
+    try:
+        from .git_action_watcher import bootstrap_project
+
+        ok = await asyncio.to_thread(bootstrap_project, project_id)
+        return {"ok": ok, "project_id": project_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/improvement/start-all")
+async def api_improvement_start_all():
+    """Bootstrap all 5 pilot projects."""
+    results = {}
+    try:
+        from .git_action_watcher import bootstrap_project
+
+        for p in AC_PROJECTS:
+            pid = p["id"]
+            try:
+                ok = await asyncio.to_thread(bootstrap_project, pid)
+                results[pid] = "started" if ok else "failed"
+            except Exception as e:
+                results[pid] = f"error: {e}"
+    except Exception as e:
+        return {"ok": False, "error": str(e), "results": results}
+    return {"ok": True, "results": results}
+
+
+@app.post("/api/improvement/inject-cycle")
+async def api_improvement_inject_cycle(request: Request):
+    """Manually inject a cycle result (for testing / SF webhook)."""
+    body = await request.json()
+    project_id = body.get("project_id")
+    cycle_num = body.get("cycle_num", 1)
+    phase_scores = body.get("phase_scores", {})
+    total_score = body.get("total_score", 0)
+    defect_count = body.get("defect_count", 0)
+    git_sha = body.get("git_sha", "")
+    run_id = body.get("run_id", "")
+    fix_summary = body.get("fix_summary", "")
+
+    if not project_id:
+        return {"ok": False, "error": "project_id required"}
+
+    def _do_inject():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        now = datetime.utcnow().isoformat()
+        # Upsert cycle record
+        conn.execute(
+            """
+            INSERT INTO ac_cycles
+            (project_id, cycle_num, git_sha, platform_run_id, status,
+             phase_scores, total_score, defect_count, fix_summary,
+             completed_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (project_id, cycle_num) DO UPDATE SET
+                git_sha=EXCLUDED.git_sha, platform_run_id=EXCLUDED.platform_run_id,
+                status=EXCLUDED.status, phase_scores=EXCLUDED.phase_scores,
+                total_score=EXCLUDED.total_score, defect_count=EXCLUDED.defect_count,
+                fix_summary=EXCLUDED.fix_summary,
+                completed_at=EXCLUDED.completed_at
+        """,
+            (
+                project_id,
+                cycle_num,
+                git_sha,
+                run_id,
+                "completed",
+                json.dumps(phase_scores),
+                total_score,
+                defect_count,
+                fix_summary,
+                now,
+            ),
+        )
+        # Compute new average
+        all_scores_row = conn.execute(
+            "SELECT AVG(total_score) AS avg_score FROM ac_cycles WHERE project_id=%s AND status='completed'",
+            (project_id,),
+        ).fetchone()
+        avg_score = round(
+            (all_scores_row["avg_score"] or 0) if all_scores_row else 0, 1
+        )
+        existing = conn.execute(
+            "SELECT project_id FROM ac_project_state WHERE project_id=%s", (project_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE ac_project_state
+                SET current_cycle=%s, total_score_avg=%s, last_git_sha=%s, updated_at=%s
+                WHERE project_id=%s
+            """,
+                (cycle_num, avg_score, git_sha, now, project_id),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO ac_project_state
+                (project_id, current_cycle, status, total_score_avg, last_git_sha, updated_at)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """,
+                (project_id, cycle_num, "idle", avg_score, git_sha, now),
+            )
+        conn.close()
+        return avg_score
+
+    avg = await asyncio.to_thread(_do_inject)
+    return {"ok": True, "avg_score": avg}
 
 
 # ============================================================================
