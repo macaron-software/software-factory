@@ -130,6 +130,26 @@ jobs:
             psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status, LEFT(config_json,80) FROM sessions WHERE status='interrupted' AND created_at >= NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
             echo "Active/running sessions:"
             psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status FROM sessions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "AC cycles scores:"
+            psql "$DB_URL" -t -c "SELECT project_id, cycle_num, score_moyen, status, LEFT(phases_json::text,200) FROM ac_cycles ORDER BY created_at DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no ac_cycles table or empty)"
+            echo "Message count per AC session:"
+            psql "$DB_URL" -t -c "SELECT s.id, LEFT(s.name,30), s.status, COUNT(m.id) as msgs FROM sessions s LEFT JOIN messages m ON m.session_id=s.id WHERE s.config_json LIKE '%ac-improvement-cycle%' AND s.created_at >= NOW() - INTERVAL '3 hours' GROUP BY s.id, s.name, s.status ORDER BY s.created_at DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || true
+            echo "Latest messages hello-html cycle 10:"
+            psql "$DB_URL" -t -c "SELECT from_agent, LEFT(content,150), message_type FROM messages WHERE session_id='7c3947e9' ORDER BY timestamp DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || true
+            echo "Workspace paths:"
+            psql "$DB_URL" -t -c "SELECT id, workspace_path FROM projects WHERE id IN ('ac-hello-html','ac-fullstack-rs');" 2>/dev/null | grep -v "^$" || true
           fi
+          
+          echo "=== Docker Containers ==="
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | grep -E "ac-|proj-" || echo "(no AC containers)"
+          
+          echo "=== Workspace Files ==="
+          for WS in /opt/software-factory/workspaces/ac-hello-html /opt/macaron/workspaces/ac-hello-html /home/sfadmin/workspaces/ac-hello-html; do
+            if [ -d "$WS" ]; then
+              echo "Found: $WS"
+              find "$WS" -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.rs" -o -name "*.svelte" -o -name "Dockerfile" \) 2>/dev/null | head -15
+              break
+            fi
+          done
           
           REMOTE
