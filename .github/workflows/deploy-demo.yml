@@ -27,6 +27,14 @@ jobs:
       - name: Detect changed layers
         id: changes
         run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          # Skip deploy if commit message contains [skip deploy] or [skip ci]
+          if echo "$COMMIT_MSG" | grep -qE '\[skip deploy\]|\[skip ci\]|\[no deploy\]'; then
+            echo "ui_only=skip" >> "$GITHUB_OUTPUT"
+            echo "Deploy skipped: [skip deploy] in commit message"
+            exit 0
+          fi
+
           CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "platform/")
           echo "Changed files:"
           echo "$CHANGED"
@@ -43,6 +51,7 @@ jobs:
           echo "Deploy mode: ui_only=$UI_ONLY"
 
       - name: Set up SSH
+        if: steps.changes.outputs.ui_only != 'skip'
         run: |
           mkdir -p ~/.ssh
           # Secret stored as: cat ~/.ssh/id_rsa | base64 -w 0
@@ -58,6 +67,7 @@ jobs:
           EOF
 
       - name: Rsync to OVH
+        if: steps.changes.outputs.ui_only != 'skip'
         run: |
           # Write VERSION file so the container knows git tag + commit (no .git inside Docker)
           TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
@@ -79,6 +89,7 @@ jobs:
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
 
       - name: Disk cleanup (Docker cache + old images)
+        if: steps.changes.outputs.ui_only != 'skip'
         run: |
           ssh debian@${{ secrets.OVH_IP }} '
             docker builder prune --all --force 2>/dev/null || true
@@ -121,6 +132,7 @@ jobs:
           ENDSSH
 
       - name: Blue-Green Deploy (UI / web process)
+        if: steps.changes.outputs.ui_only != 'skip'
         run: |
           ssh debian@${{ secrets.OVH_IP }} << 'ENDSSH'
           set -e
@@ -212,7 +224,17 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
+      - name: Check skip
+        id: skip
+        run: |
+          if git log -1 --pretty=%B | grep -qE '\[skip deploy\]|\[skip ci\]|\[no deploy\]'; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Set up SSH (Innovation)
+        if: steps.skip.outputs.skipped != 'true'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
@@ -225,6 +247,7 @@ jobs:
           EOF
 
       - name: Rsync platform to Innovation Node 1
+        if: steps.skip.outputs.skipped != 'true'
         run: |
           TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           SHA=$(git rev-parse --short HEAD)
@@ -237,6 +260,7 @@ jobs:
             sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/ 2>/dev/null || true
 
       - name: Blue-Green swap Innovation Node 1
+        if: steps.skip.outputs.skipped != 'true'
         run: |
           ssh sfadmin@${{ secrets.SF_NODE1_IP }} '
             set -e
@@ -245,6 +269,7 @@ jobs:
           ' || echo "WARNING: Innovation Node 1 deploy failed — continuing"
 
       - name: Rsync platform to Innovation Node 2
+        if: steps.skip.outputs.skipped != 'true'
         run: |
           ssh-keyscan -H "${{ secrets.SF_NODE2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
           rsync -az --checksum --delete \
@@ -255,6 +280,7 @@ jobs:
             sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/ 2>/dev/null || true
 
       - name: Blue-Green swap Innovation Node 2
+        if: steps.skip.outputs.skipped != 'true'
         run: |
           ssh sfadmin@${{ secrets.SF_NODE2_IP }} '
             set -e
