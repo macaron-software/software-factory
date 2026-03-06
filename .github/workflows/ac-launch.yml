@@ -119,8 +119,13 @@ jobs:
             psql "$DB_URL" -t -c "SELECT id, LEFT(name,40), status, created_at FROM sessions ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
             echo "Epic runs (last 5):"
             psql "$DB_URL" -t -c "SELECT id, session_id, status, started_at FROM epic_runs ORDER BY started_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
-            echo "LLM cooldowns:"
-            psql "$DB_URL" -t -c "SELECT provider, status, until_ts FROM llm_cooldown ORDER BY until_ts DESC LIMIT 3;" 2>/dev/null | grep -v "^$" || echo "  (table may not exist)"
+            echo "Latest hello-html session messages:"
+            SID=$(psql "$DB_URL" -t -c "SELECT id FROM sessions WHERE name LIKE '%Hello HTML%' ORDER BY created_at DESC LIMIT 1;" 2>/dev/null | tr -d ' \n' || true)
+            if [ -n "$SID" ]; then
+              psql "$DB_URL" -t -c "SELECT from_agent, LEFT(content,200), message_type FROM messages WHERE session_id='$SID' ORDER BY timestamp LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            fi
+            echo "LLM errors (last 10 min):"
+            psql "$DB_URL" -t -c "SELECT provider, error_type, created_at FROM llm_errors ORDER BY created_at DESC LIMIT 3;" 2>/dev/null | grep -v "^$" || echo "  (no llm_errors table)"
           fi
           
           REMOTE
