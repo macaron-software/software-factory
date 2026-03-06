@@ -117,17 +117,18 @@ def _launch_quality_improvement(db, run_id: str, issues: list[str]) -> Optional[
         db.execute(
             """INSERT INTO epic_runs
                (id, workflow_id, workflow_name, project_id, status, current_phase,
-                phases_json, brief, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'paused', 'quality-scan', ?, ?, ?, ?)""",
+                phases_json, brief, created_at, updated_at, cdp_agent_id)
+               VALUES (?, ?, ?, ?, 'paused', 'quality-scan', ?, ?, ?, ?, ?)""",
             (
                 new_id,
                 QI_WORKFLOW_ID,
-                "Quality Improvement Cycle",
+                "Platform Quality Loop — Recursive Self-Improvement",
                 SF_PROJECT_ID,
                 wf_row[0],
                 brief,
                 now,
                 now,
+                "plat-cto",  # GPT-5.2-Codex CTO as lead orchestrator
             ),
         )
         db.commit()
