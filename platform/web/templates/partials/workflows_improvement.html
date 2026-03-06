@@ -25,45 +25,72 @@
 
 <style>
 .ac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; }
-.ac-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
-.ac-card:hover { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
-.ac-card.selected { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
-.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); }
+.ac-card { background:var(--bg-secondary); border:1px solid var(--border); border-left:3px solid var(--border); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
+.ac-card:hover { box-shadow:0 0 0 2px var(--purple); }
+.ac-card.selected { box-shadow:0 0 0 2px var(--purple); }
+.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); }
 .ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; }
 .ac-card .score-big { font-size:1.8rem; font-weight:700; line-height:1; }
-.ac-bar { height:4px; border-radius:2px; background:var(--border,#2a2d3e); margin-top:.5rem; }
-.ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; }
-.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); margin-bottom:.5rem; }
+/* Tier accent colors */
+.ac-card.tier-simple          { border-left-color: var(--green); }
+.ac-card.tier-simple-compile  { border-left-color: var(--blue-bright); }
+.ac-card.tier-medium          { border-left-color: var(--yellow-deep); }
+.ac-card.tier-complex         { border-left-color: var(--purple); }
+.ac-card.tier-enterprise      { border-left-color: var(--red); }
+.ac-bar { height:4px; border-radius:2px; background:var(--border); margin-top:.5rem; }
+.ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; background:var(--purple); }
+.ac-bar-fill.tier-simple          { background: var(--green); }
+.ac-bar-fill.tier-simple-compile  { background: var(--blue-bright); }
+.ac-bar-fill.tier-medium          { background: var(--yellow-deep); }
+.ac-bar-fill.tier-complex         { background: var(--purple); }
+.ac-bar-fill.tier-enterprise      { background: var(--red); }
+.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin-bottom:.5rem; }
 .ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
-.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-muted,#888); font-weight:500; border-bottom:1px solid var(--border,#2a2d3e); }
-.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border,#1a1c2a); }
-.score-green { color:#22c55e; font-weight:700; }
-.score-yellow { color:#f59e0b; font-weight:700; }
-.score-red { color:#ef4444; font-weight:700; }
-.verdict-pass { background:#14532d; color:#4ade80; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
-.verdict-warn { background:#78350f; color:#fcd34d; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
-.verdict-fail { background:#7f1d1d; color:#fca5a5; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-secondary); font-weight:500; border-bottom:1px solid var(--border); }
+.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border); }
+.score-green { color:var(--green); font-weight:700; }
+.score-yellow { color:var(--yellow-deep); font-weight:700; }
+.score-red { color:var(--red); font-weight:700; }
+.verdict-pass { background:rgba(63,185,80,.15); color:var(--green); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-warn { background:rgba(210,153,34,.15); color:var(--yellow-deep); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-fail { background:rgba(248,81,73,.15); color:var(--red); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
 .adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
-.adv-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem; }
+.adv-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem; }
 /* Intelligence panel */
 .intel-panel { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-top:.5rem; }
-.intel-metric { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem .75rem; }
-.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted,#888); margin-bottom:.2rem; }
+.intel-metric { background:var(--bg-secondary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem .75rem; }
+.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); margin-bottom:.2rem; }
 .intel-metric .value { font-size:1.1rem; font-weight:700; }
-.conv-improving { color:#22c55e; }
-.conv-plateau    { color:#f59e0b; }
-.conv-regression { color:#ef4444; }
-.conv-spike_failure { color:#ef4444; }
-.conv-cold_start { color:#888; }
-.conv-converging { color:#3b82f6; }
+.conv-improving { color:var(--green); }
+.conv-plateau    { color:var(--yellow-deep); }
+.conv-regression { color:var(--red); }
+.conv-spike_failure { color:var(--red); }
+.conv-cold_start { color:var(--gray); }
+.conv-converging { color:var(--blue-bright); }
+/* Project status */
+.status-running   { color:var(--green); }
+.status-completed { color:var(--blue-bright); }
+.status-default   { color:var(--gray); }
+/* Phase score cells */
+.phase-ok   { text-align:center; color:var(--green); }
+.phase-warn { text-align:center; color:var(--yellow-deep); }
+.phase-fail { text-align:center; color:var(--red); }
+.phase-none { text-align:center; color:var(--text-secondary); }
+/* Cycle table cells */
+.defect-high { color:var(--red); }
+.defect-ok   { color:var(--gray); }
+.fix-label   { font-size:.7rem; color:var(--yellow-deep); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 /* mini sparkline */
 .sparkline { display:flex; align-items:flex-end; gap:2px; height:32px; margin-top:.3rem; }
-.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--accent,#6c63ff); opacity:.7; transition:opacity .15s; }
+.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--purple); opacity:.7; transition:opacity .15s; }
 .spark-bar:hover { opacity:1; }
+.spark-ok   { background:var(--green); }
+.spark-warn { background:var(--yellow-deep); }
+.spark-bad  { background:var(--red); }
 /* Thompson stats */
 .thompson-row td { font-size:.7rem; padding:.3rem .4rem; }
-.thompson-win { color:#22c55e; }
-.thompson-lose { color:#ef4444; }
+.thompson-win { color:var(--green); }
+.thompson-lose { color:var(--red); }
 </style>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
@@ -136,29 +163,27 @@
   {% for p in projects %}
   {% set score = p.total_score_avg|int %}
   {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
-  {% set border_color = {'simple':'#22c55e','simple-compile':'#3b82f6','medium':'#f59e0b','complex':'#a855f7','enterprise':'#ef4444'}.get(p.tier, '#6b7280') %}
-  <div class="ac-card {% if loop.first %}selected{% endif %}"
-       style="border-left:3px solid {{ border_color }}"
+  <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
        onclick="acSelectProject('{{ p.id }}', this)">
     <div class="tier-label">{{ p.tier_label }}</div>
     <div class="proj-name">{{ p.name }}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
       <div>
         {% for tech in p.tech[:3] %}
-        <span style="font-size:.65rem;background:var(--border,#2a2d3e);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+        <span style="font-size:.65rem;background:var(--bg-tertiary);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
         {% endfor %}
       </div>
       <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
     </div>
-    <div style="font-size:.7rem;color:var(--text-muted,#888);margin-bottom:.25rem">
+    <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
       Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
       &nbsp;·&nbsp;
-      <span style="color:{% if p.status == 'running' %}#22c55e{% elif p.status == 'completed' %}#3b82f6{% else %}#888{% endif %}">{{ p.status }}</span>
+      <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}">{{ p.status }}</span>
     </div>
-    <div class="ac-bar"><div class="ac-bar-fill" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%;background:{{ border_color }}"></div></div>
+    <div class="ac-bar"><div class="ac-bar-fill tier-{{ p.tier }}" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%"></div></div>
   </div>
   {% else %}
-  <div style="color:var(--text-muted,#888);font-size:.8rem;padding:2rem 0">
+  <div style="color:var(--text-secondary);font-size:.8rem;padding:2rem 0">
     Aucun projet actif — cliquer "Démarrer" pour lancer le premier cycle.
   </div>
   {% endfor %}
@@ -192,21 +217,21 @@
         {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
         <tr>
           <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
-          <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+          <td><code style="font-size:.7rem;background:var(--bg-tertiary);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
           {% for ph in phases %}
           {% set s = c.phase_scores_dict.get(ph) if c.phase_scores_dict is defined else none %}
-          <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
+          <td class="{% if s is not none %}{% if s >= 80 %}phase-ok{% elif s >= 60 %}phase-warn{% else %}phase-fail{% endif %}{% else %}phase-none{% endif %}">{{ s if s is not none else '·' }}</td>
           {% endfor %}
           <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
           <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
-          <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
-          <td style="font-size:.7rem;color:#f59e0b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+          <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
+          <td class="fix-label" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     {% else %}
-    <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+    <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
     {% endif %}
   </div>
 </div>
@@ -223,8 +248,8 @@
         <span style="font-size:.75rem;font-weight:600">{{ d.dimension }}</span>
         <span class="{{ verdict_cls }}">{{ d.verdict }}</span>
       </div>
-      <div style="background:var(--border,#2a2d3e);border-radius:2px;height:3px">
-        <div style="height:100%;border-radius:2px;width:{{ d.score }}%;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+      <div style="background:var(--border);border-radius:2px;height:3px">
+        <div style="height:100%;border-radius:2px;width:{{ d.score }}%" class="{% if d.score >= 80 %}spark-ok{% elif d.score >= 50 %}spark-warn{% else %}spark-bad{% endif %}"></div>
       </div>
       <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.25rem">{{ d.score }}/100</div>
     </div>
@@ -299,11 +324,11 @@ async function acRefreshIntel() {
       const maxS = Math.max(...recent, 1);
       sparkEl.innerHTML = recent.map(s => {
         const h = Math.round((s / maxS) * 32);
-        const col = s >= 80 ? '#22c55e' : s >= 60 ? '#f59e0b' : '#ef4444';
-        return `<div class="spark-bar" style="height:${h}px;background:${col}" title="${s}/100"></div>`;
+        const cls = s >= 80 ? 'spark-ok' : s >= 60 ? 'spark-warn' : 'spark-bad';
+        return `<div class="spark-bar ${cls}" style="height:${h}px" title="${s}/100"></div>`;
       }).join('');
     } else {
-      sparkEl.innerHTML = '<span style="color:#444;font-size:.7rem">pas de données</span>';
+      sparkEl.innerHTML = '<span style="color:var(--text-secondary);font-size:.7rem">pas de données</span>';
     }
 
     // Thompson stats
@@ -343,15 +368,15 @@ async function acStartCycle() {
     const res = await fetch('/api/improvement/start/' + _acSelectedProject, { method: 'POST' });
     const data = await res.json();
     if (data.run_id) {
-      bar.style.color = '#22c55e';
+      bar.style.color = 'var(--green)';
       bar.textContent = 'Cycle ' + (data.cycle_num||'?') + ' démarré — run ' + data.run_id.slice(0,8) + '. Suivi : Missions';
     } else {
-      bar.style.color = '#ef4444';
+      bar.style.color = 'var(--red)';
       bar.textContent = 'Erreur : ' + (data.detail || data.error || 'unknown');
       btn.disabled = false;
     }
   } catch(e) {
-    bar.style.color = '#ef4444';
+    bar.style.color = 'var(--red)';
     bar.textContent = 'Erreur réseau : ' + e.message;
     btn.disabled = false;
   }

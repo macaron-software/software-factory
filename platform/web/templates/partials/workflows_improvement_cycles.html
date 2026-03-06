@@ -20,19 +20,19 @@
     {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
     <tr>
       <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
-      <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+      <td><code style="font-size:.7rem;background:var(--bg-tertiary);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
       {% for ph in phases %}
       {% set s = c.phase_scores_dict.get(ph) %}
-      <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
+      <td class="{% if s is not none %}{% if s >= 80 %}phase-ok{% elif s >= 60 %}phase-warn{% else %}phase-fail{% endif %}{% else %}phase-none{% endif %}">{{ s if s is not none else '·' }}</td>
       {% endfor %}
       <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
       <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
-      <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
-      <td style="font-size:.7rem;color:#f59e0b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+      <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
+      <td class="fix-label" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 {% else %}
-<div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
 {% endif %}

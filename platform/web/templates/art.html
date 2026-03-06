@@ -335,7 +335,7 @@
 
     <!-- Progress bar -->
     <div style="background:var(--bg-secondary);border-radius:4px;height:8px;margin-bottom:1.5rem;overflow:hidden">
-        <div id="sk-progress" style="background:#6366f1;height:100%;width:0%;transition:width 0.4s"></div>
+        <div id="sk-progress" style="background:var(--purple);height:100%;width:0%;transition:width 0.4s"></div>
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
@@ -361,7 +361,7 @@
         <!-- Skills without evals -->
         <div class="card" style="padding:1rem">
             <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
-                Skills missing evals <span id="sk-missing-count" style="color:#f59e0b"></span>
+                Skills missing evals <span id="sk-missing-count" style="color:var(--yellow-deep)"></span>
             </div>
             <div id="sk-missing-list" style="font-size:0.82rem;line-height:1.8;color:var(--text-secondary)">
                 Loading…
@@ -375,6 +375,170 @@
         Graduation rule: once pass rate hits 100%, cases become regression tests.
         If skill passes without being loaded → retire it (model absorbed the skill).
         <a href="/workflows" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
+    </div>
+
+    <!-- Skill Eval Engine — diagram inspired by philschmid.de/testing-skills -->
+    <div style="margin-top:1.5rem">
+        <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);margin-bottom:0.75rem">
+            Skill Eval Engine
+        </div>
+        <svg id="sf-skill-eval-diag" viewBox="0 0 880 390" width="100%" style="max-height:390px;display:block">
+        <defs>
+            <marker id="sk-arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#6b7280"/></marker>
+            <marker id="sk-arr-g" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#22c55e"/></marker>
+            <marker id="sk-arr-p" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#a78bfa"/></marker>
+        </defs>
+        <style>
+            #sf-skill-eval-diag { font-family: var(--font-sans, system-ui, sans-serif); }
+            #sf-skill-eval-diag .sk-bg   { fill: var(--bg-secondary); stroke: var(--border); stroke-width:1; }
+            #sf-skill-eval-diag .sk-bg3  { fill: var(--bg-tertiary);  stroke: var(--border); stroke-width:1; }
+            #sf-skill-eval-diag .sk-txt  { fill: var(--text-primary);   font-size:8.5px; }
+            #sf-skill-eval-diag .sk-sub  { fill: var(--text-secondary); font-size:7.5px; }
+            #sf-skill-eval-diag .sk-sec  { fill: var(--text-secondary); font-size:7px; font-weight:700; letter-spacing:.08em; }
+            #sf-skill-eval-diag .sk-ttl  { fill: var(--text-primary);   font-size:9px; font-weight:700; }
+            #sf-skill-eval-diag .sk-arr  { stroke: var(--border); stroke-width:1.5; fill:none; marker-end:url(#sk-arr); }
+            #sf-skill-eval-diag .sk-arr-g{ stroke: #22c55e; stroke-width:1.5; fill:none; marker-end:url(#sk-arr-g); stroke-dasharray:4 3; }
+            #sf-skill-eval-diag .sk-arr-p{ stroke: #a78bfa; stroke-width:1.5; fill:none; marker-end:url(#sk-arr-p); }
+            #sf-skill-eval-diag .badge   { rx:3; ry:3; }
+        </style>
+
+        <!-- ── ROW 1: SKILL.md ANATOMY ───────────────────────────── -->
+        <text x="14" y="14" class="sk-sec">SKILL.md ANATOMY</text>
+        <!-- Box: Frontmatter -->
+        <rect x="10"  y="20" width="190" height="90" rx="6" class="sk-bg3" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="20"  y="36" class="sk-ttl">Frontmatter</text>
+        <text x="20"  y="50" class="sk-sub">name · description</text>
+        <text x="20"  y="63" class="sk-sub">→ trigger mechanism</text>
+        <rect x="16"  y="70" width="54" height="13" rx="3" fill="#a78bfa" opacity=".15"/>
+        <text x="43"  y="80" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-size="7px">YAML</text>
+        <rect x="76"  y="70" width="120" height="13" rx="3" fill="#a78bfa" opacity=".1"/>
+        <text x="136" y="80" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-size="7px">vague → won't trigger</text>
+        <text x="20"  y="101" class="sk-sub" font-style="italic">Most important piece</text>
+        <!-- Arrow → Body -->
+        <line x1="200" y1="65" x2="220" y2="65" class="sk-arr"/>
+        <!-- Box: Body -->
+        <rect x="220" y="20" width="190" height="90" rx="6" class="sk-bg3" stroke="#3b82f6" stroke-width="1.5"/>
+        <text x="230" y="36" class="sk-ttl">Body</text>
+        <text x="230" y="50" class="sk-sub">Instructions &amp; directives</text>
+        <text x="230" y="63" class="sk-sub">APIs · patterns · anti-patterns</text>
+        <rect x="226" y="70" width="90" height="13" rx="3" fill="#3b82f6" opacity=".15"/>
+        <text x="271" y="80" text-anchor="middle" class="sk-sub" fill="#3b82f6" font-size="7px">Capability skill</text>
+        <rect x="322" y="70" width="82" height="13" rx="3" fill="#3b82f6" opacity=".15"/>
+        <text x="363" y="80" text-anchor="middle" class="sk-sub" fill="#3b82f6" font-size="7px">Preference skill</text>
+        <text x="230" y="101" class="sk-sub" font-style="italic">Directives &gt; information</text>
+        <!-- Arrow → Resources -->
+        <line x1="410" y1="65" x2="430" y2="65" class="sk-arr"/>
+        <!-- Box: Resources -->
+        <rect x="430" y="20" width="160" height="90" rx="6" class="sk-bg3"/>
+        <text x="440" y="36" class="sk-ttl">Resources</text>
+        <text x="440" y="50" class="sk-sub">scripts/ · examples/</text>
+        <text x="440" y="63" class="sk-sub">references/ (optional)</text>
+        <text x="440" y="80" class="sk-sub">consulted during exec</text>
+        <text x="440" y="101" class="sk-sub" font-style="italic">Progressive disclosure</text>
+
+        <!-- Big arrow: Anatomy → Pipeline -->
+        <line x1="440" y1="110" x2="440" y2="128" class="sk-arr"/>
+
+        <!-- ── ROW 2: EVAL PIPELINE ─────────────────────────────── -->
+        <text x="14" y="142" class="sk-sec">EVAL PIPELINE</text>
+        <!-- Step 1: Define Success -->
+        <rect x="10"  y="148" width="185" height="100" rx="6" class="sk-bg"/>
+        <rect x="10"  y="148" width="185" height="18"  rx="6" fill="#a78bfa" opacity=".2"/>
+        <rect x="10"  y="157" width="185" height="9"   fill="#a78bfa" opacity=".2"/>
+        <text x="22"  y="162" class="sk-ttl">① Define Success Criteria</text>
+        <text x="20"  y="179" class="sk-sub">• Outcome — compiles / runs</text>
+        <text x="20"  y="191" class="sk-sub">• Style — conventions &amp; SDK</text>
+        <text x="20"  y="203" class="sk-sub">• Efficiency — tokens · latency</text>
+        <text x="20"  y="218" class="sk-sub" font-style="italic">Grade outcomes, not paths</text>
+        <text x="20"  y="238" class="sk-sub">Manual runs first ↓ surface</text>
+        <text x="20"  y="248" class="sk-sub">hidden assumptions</text>
+        <!-- Arrow 1→2 -->
+        <line x1="195" y1="198" x2="217" y2="198" class="sk-arr"/>
+        <!-- Step 2: Prompt Set -->
+        <rect x="217" y="148" width="185" height="100" rx="6" class="sk-bg"/>
+        <rect x="217" y="148" width="185" height="18"  rx="6" fill="#3b82f6" opacity=".2"/>
+        <rect x="217" y="157" width="185" height="9"   fill="#3b82f6" opacity=".2"/>
+        <text x="229" y="162" class="sk-ttl">② Prompt Set</text>
+        <text x="227" y="179" class="sk-sub">10–20 prompts minimum</text>
+        <text x="227" y="191" class="sk-sub">• should_trigger: true/false</text>
+        <text x="227" y="203" class="sk-sub">• expected_checks: [...]</text>
+        <text x="227" y="218" class="sk-sub" font-style="italic">Include negative tests!</text>
+        <text x="227" y="238" class="sk-sub">Each failure → new test case</text>
+        <text x="227" y="248" class="sk-sub">3–5 trials per prompt</text>
+        <!-- Arrow 2→3 -->
+        <line x1="402" y1="198" x2="424" y2="198" class="sk-arr"/>
+        <!-- Step 3: Run Agent -->
+        <rect x="424" y="148" width="185" height="100" rx="6" class="sk-bg"/>
+        <rect x="424" y="148" width="185" height="18"  rx="6" fill="#f59e0b" opacity=".2"/>
+        <rect x="424" y="157" width="185" height="9"   fill="#f59e0b" opacity=".2"/>
+        <text x="436" y="162" class="sk-ttl">③ Run Agent + Capture</text>
+        <text x="434" y="179" class="sk-sub">CLI / harness (isolated env)</text>
+        <text x="434" y="191" class="sk-sub">capture stdout + stats</text>
+        <text x="434" y="203" class="sk-sub">extract_code_blocks(output)</text>
+        <text x="434" y="218" class="sk-sub" font-style="italic">Isolate each run — no</text>
+        <text x="434" y="228" class="sk-sub" font-style="italic">context bleed</text>
+        <text x="434" y="248" class="sk-sub">Test across harnesses</text>
+        <!-- Arrow 3→4 -->
+        <line x1="609" y1="198" x2="631" y2="198" class="sk-arr"/>
+        <!-- Step 4: Score -->
+        <rect x="631" y="148" width="240" height="100" rx="6" class="sk-bg"/>
+        <rect x="631" y="148" width="240" height="18"  rx="6" fill="#22c55e" opacity=".2"/>
+        <rect x="631" y="157" width="240" height="9"   fill="#22c55e" opacity=".2"/>
+        <text x="643" y="162" class="sk-ttl">④ Score</text>
+        <!-- Deterministic column -->
+        <rect x="637" y="170" width="108" height="70" rx="4" fill="#22c55e" opacity=".07" stroke="#22c55e" stroke-width=".8"/>
+        <text x="691" y="182" text-anchor="middle" class="sk-sub" fill="#22c55e" font-weight="700">Deterministic</text>
+        <text x="641" y="194" class="sk-sub">regex → bool</text>
+        <text x="641" y="205" class="sk-sub">CHECK_REGISTRY</text>
+        <text x="641" y="216" class="sk-sub">fast · cheap</text>
+        <text x="641" y="230" class="sk-sub" font-style="italic">prefer first</text>
+        <!-- LLM-as-judge column -->
+        <rect x="751" y="170" width="112" height="70" rx="4" fill="#a78bfa" opacity=".07" stroke="#a78bfa" stroke-width=".8"/>
+        <text x="807" y="182" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-weight="700">LLM-as-Judge</text>
+        <text x="755" y="194" class="sk-sub">structured output</text>
+        <text x="755" y="205" class="sk-sub">qualitative checks</text>
+        <text x="755" y="216" class="sk-sub">score 0–100</text>
+        <text x="755" y="230" class="sk-sub" font-style="italic">cost ↑ · selective</text>
+
+        <!-- Big arrow: Pipeline → Lifecycle -->
+        <line x1="440" y1="248" x2="440" y2="265" class="sk-arr"/>
+
+        <!-- ── ROW 3: EVAL LIFECYCLE ────────────────────────────── -->
+        <text x="14" y="280" class="sk-sec">EVAL LIFECYCLE</text>
+        <!-- Phase 1: Capability -->
+        <rect x="10"  y="286" width="250" height="90" rx="6" class="sk-bg" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="20"  y="302" class="sk-ttl" fill="#f59e0b">Capability Eval</text>
+        <text x="20"  y="318" class="sk-sub">Start at low pass rate</text>
+        <text x="20"  y="330" class="sk-sub">e.g. 66.7% → iterate → 100%</text>
+        <text x="20"  y="342" class="sk-sub">Fix description → directives</text>
+        <text x="20"  y="354" class="sk-sub">Each fix = new test case</text>
+        <text x="20"  y="366" class="sk-sub" font-style="italic">Hill-climbing toward 100%</text>
+        <!-- Arrow 1→2 -->
+        <line x1="260" y1="331" x2="282" y2="331" class="sk-arr"/>
+        <!-- Phase 2: Regression -->
+        <rect x="282" y="286" width="250" height="90" rx="6" class="sk-bg" stroke="#22c55e" stroke-width="1.5"/>
+        <text x="292" y="302" class="sk-ttl" fill="#22c55e">Regression Eval</text>
+        <text x="292" y="318" class="sk-sub">≥ 100% pass rate reached</text>
+        <text x="292" y="330" class="sk-sub">Cases protect backsliding</text>
+        <text x="292" y="342" class="sk-sub">Run on every skill change</text>
+        <text x="292" y="354" class="sk-sub">Track distribution over trials</text>
+        <text x="292" y="366" class="sk-sub" font-style="italic">Guard against regressions</text>
+        <!-- Arrow 2→3 -->
+        <line x1="532" y1="331" x2="554" y2="331" class="sk-arr"/>
+        <!-- Phase 3: Retirement -->
+        <rect x="554" y="286" width="280" height="90" rx="6" class="sk-bg" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="564" y="302" class="sk-ttl" fill="#a78bfa">Retirement Detection</text>
+        <text x="564" y="318" class="sk-sub">Run evals with skill unloaded</text>
+        <text x="564" y="330" class="sk-sub">Still passing? → model absorbed it</text>
+        <text x="564" y="342" class="sk-sub">skill.status = "retired"</text>
+        <text x="564" y="354" class="sk-sub">Free up context · reduce noise</text>
+        <text x="564" y="366" class="sk-sub" font-style="italic">Capability skills retire; preference skills endure</text>
+
+        <!-- Feedback arrow: Regression failure → back to Step 2 -->
+        <path d="M 407,331 Q 407,390 310,390 Q 213,390 213,280" stroke="#a78bfa" stroke-width="1.2" fill="none" marker-end="url(#sk-arr-p)" stroke-dasharray="5 3"/>
+        <text x="360" y="388" class="sk-sub" fill="#a78bfa" font-size="7px">new failure → new test case</text>
+
+        </svg>
     </div>
 </div>
 
