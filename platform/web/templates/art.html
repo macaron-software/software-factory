@@ -113,6 +113,26 @@
 .ac-stab{padding:0.35rem 0.9rem;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.82rem;background:transparent;color:var(--text-secondary);transition:background 0.15s}
 .ac-stab:hover{background:var(--bg-tertiary)}
 .ac-stab.active{background:var(--bg-secondary);border-color:var(--border,#333);color:var(--text-primary);font-weight:600}
+/* AC team graph — mirrors ideation.css ig-* classes */
+.idea-graph{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.idea-graph-header{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.6rem;cursor:pointer;user-select:none}
+.idea-graph-header:hover{background:var(--bg-tertiary)}
+.idea-graph-title{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:.4rem}
+.idea-graph-toggle{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s}
+.idea-graph-toggle.open{transform:rotate(180deg)}
+.idea-graph-canvas{height:280px;position:relative;overflow:hidden;cursor:grab;background:var(--bg-primary);border-top:1px solid var(--border)}
+.idea-graph-canvas svg{width:100%;height:100%}
+.idea-graph-legend{display:flex;gap:.75rem;padding:.35rem .6rem;border-top:1px solid var(--border);flex-wrap:wrap}
+.idea-graph-legend-item{display:flex;align-items:center;gap:.3rem;font-size:.65rem;color:var(--text-secondary)}
+.ig-node{cursor:pointer}
+.ig-node:hover .ig-node-bg{filter:brightness(1.15)}
+.ig-node-bg{fill:var(--bg-secondary);stroke:var(--border);stroke-width:1;rx:8;ry:8}
+.ig-node-name{font-size:11px;fill:var(--text-primary);font-weight:600}
+.ig-node-role{font-size:9px;fill:var(--text-secondary)}
+.ig-edge{fill:none;stroke-width:1.8;opacity:.6}
+.ig-edge.active{opacity:1;stroke-width:2.5;filter:drop-shadow(0 0 4px currentColor)}
+.ig-edge-label{font-size:8px;fill:var(--text-secondary);text-anchor:middle}
+.ig-node.active .ig-node-bg{filter:brightness(1.3);stroke:var(--purple);stroke-width:2}
 </style>
 
 <div class="tabs" style="margin-bottom:1rem">
