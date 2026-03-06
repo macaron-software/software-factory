@@ -132,11 +132,19 @@ _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
 _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
+
+
 # Local inference servers require explicit opt-in
-_local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
-_ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
+def _env_flag(name: str) -> bool:
+    """Return True only for non-empty values that are not '0', 'false', 'no'."""
+    v = os.environ.get(name, "").strip().lower()
+    return v not in ("", "0", "false", "no")
+
+
+_local_mlx_enabled = _env_flag("LOCAL_MLX_ENABLED")
+_ollama_enabled = _env_flag("OLLAMA_ENABLED")
 _opencode_enabled = bool(
-    os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
+    os.environ.get("OPENCODE_API_KEY", "") or _env_flag("OPENCODE_ENABLED")
 )
 # ── LLM timeout settings (override via env vars) ──────────────────────────────
 # LLM_TIMEOUT_HTTP     : httpx total timeout per request (seconds). Default: 600.
@@ -185,22 +193,22 @@ def _ensure_mlx_server() -> None:
     mlx_url = os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1")
     mlx_model = os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
 
-    # Quick health check — if responding, nothing to do
-    try:
-        import urllib.request
+    # Health check with generous timeout — avoids false negatives on loaded servers
+    def _is_up(t: float = 5.0) -> bool:
+        try:
+            import urllib.request
 
-        urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+            urllib.request.urlopen(f"{mlx_url}/models", timeout=t)
+            return True
+        except Exception:
+            return False
+
+    if _is_up():
         return  # already running
-    except Exception:
-        pass
 
     with _mlx_lock:
-        # Double-check inside lock
-        try:
-            urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+        if _is_up():
             return
-        except Exception:
-            pass
 
         # Already launched by us and still running?
         if _mlx_proc is not None and _mlx_proc.poll() is None:
@@ -233,12 +241,9 @@ def _ensure_mlx_server() -> None:
 
         for _ in range(_LLM_TIMEOUT_MLX_WAIT):
             _time.sleep(1)
-            try:
-                urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+            if _is_up():
                 logger.warning("local-mlx: server ready on %s", mlx_url)
                 return
-            except Exception:
-                pass
         logger.warning(
             "local-mlx: server did not become ready after %ds", _LLM_TIMEOUT_MLX_WAIT
         )
