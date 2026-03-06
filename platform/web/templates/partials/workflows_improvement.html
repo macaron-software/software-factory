@@ -239,6 +239,7 @@
           <th>RL R</th>
           <th>Défauts</th>
           <th>Fix</th>
+          <th>📸</th>
         </tr>
       </thead>
       <tbody>
@@ -259,6 +260,14 @@
           <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
           <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
           <td class="fix-label" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+          <td style="width:48px;padding:.15rem .3rem">
+            <a href="/api/improvement/screenshot/{{ projects[0].id if projects else '' }}/{{ c.cycle_num }}" target="_blank"
+               title="Prod screenshot — cycle {{ c.cycle_num }}">
+              <img src="/api/improvement/screenshot/{{ projects[0].id if projects else '' }}/{{ c.cycle_num }}"
+                   style="width:44px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--border);background:var(--bg-tertiary)"
+                   loading="lazy" onerror="this.parentElement.style.display='none'">
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

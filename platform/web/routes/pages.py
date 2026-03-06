@@ -743,6 +743,7 @@ def _ac_ensure_tables(conn) -> None:
             "ALTER TABLE ac_project_state ADD COLUMN current_run_id TEXT",
             "ALTER TABLE ac_cycles ADD COLUMN rolled_back INTEGER DEFAULT 0",
             "ALTER TABLE ac_cycles ADD COLUMN experiment_id TEXT",
+            "ALTER TABLE ac_cycles ADD COLUMN screenshot_path TEXT",
         ]:
             try:
                 conn.execute(alter)
@@ -864,7 +865,12 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
 
     return _templates(request).TemplateResponse(
         "partials/workflows_improvement_cycles.html",
-        {"request": request, "cycles": cycles, "phases": _AC_PHASES},
+        {
+            "request": request,
+            "cycles": cycles,
+            "phases": _AC_PHASES,
+            "project_id": project_id,
+        },
     )
 
 
@@ -1036,6 +1042,8 @@ async def api_improvement_inject_cycle(request: Request):
     fix_summary = body.get("fix_summary", "")
     adversarial_scores = body.get("adversarial_scores", {})
     traceability_score = int(body.get("traceability_score", 0))
+    screenshot_path = body.get("screenshot_path", "")  # relative path in workspace
+    platform_run_id = body.get("platform_run_id", f"ac-{project_id}-{cycle_num}")
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def _write():
@@ -1055,13 +1063,15 @@ async def api_improvement_inject_cycle(request: Request):
             conn.execute(
                 "INSERT INTO ac_cycles (project_id, cycle_num, git_sha, status, phase_scores,"
                 " total_score, defect_count, fix_summary, adversarial_scores, traceability_score,"
-                " started_at, completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+                " screenshot_path, started_at, completed_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
                 " git_sha=excluded.git_sha, status=excluded.status, phase_scores=excluded.phase_scores,"
                 " total_score=excluded.total_score, defect_count=excluded.defect_count,"
                 " fix_summary=excluded.fix_summary, adversarial_scores=excluded.adversarial_scores,"
-                " traceability_score=excluded.traceability_score, completed_at=excluded.completed_at",
+                " traceability_score=excluded.traceability_score,"
+                " screenshot_path=COALESCE(NULLIF(excluded.screenshot_path,''), ac_cycles.screenshot_path),"
+                " completed_at=excluded.completed_at",
                 (
                     project_id,
                     cycle_num,
@@ -1073,6 +1083,7 @@ async def api_improvement_inject_cycle(request: Request):
                     fix_summary,
                     adv_scores_json,
                     traceability_score,
+                    screenshot_path,
                     now,
                     now,
                 ),
@@ -1174,9 +1185,7 @@ async def api_improvement_inject_cycle(request: Request):
 
                     rl = get_rl_policy()
                     rl.record_experience(
-                        mission_id=body.get(
-                            "platform_run_id", f"ac-{project_id}-{cycle_num}"
-                        ),
+                        mission_id=platform_run_id,
                         state_dict=state,
                         action="keep",
                         reward=reward,
@@ -1312,6 +1321,70 @@ async def api_improvement_inject_cycle(request: Request):
         )
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.get("/api/improvement/screenshot/{project_id}/{cycle_num}")
+async def api_improvement_screenshot(project_id: str, cycle_num: int):
+    """Serve the screenshot captured during a cycle's QA phase."""
+    from fastapi.responses import FileResponse, Response
+
+    def _find_screenshot():
+        from ...config import DATA_DIR
+
+        conn = _ac_get_db()
+        try:
+            row = conn.execute(
+                "SELECT screenshot_path, platform_run_id FROM ac_cycles"
+                " WHERE project_id=? AND cycle_num=?",
+                (project_id, cycle_num),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        screenshot_path = (row.get("screenshot_path") or "").strip()
+        run_id = (row.get("platform_run_id") or "").strip()
+        # Find session_ids linked to this run
+        session_ids = []
+        if run_id:
+            try:
+                from ...agents.store import get_session_store
+
+                for s in get_session_store().list():
+                    cfg = s.config if isinstance(s.config, dict) else {}
+                    if cfg.get("mission_id") == run_id or s.id == run_id:
+                        session_ids.append(s.id)
+            except Exception:
+                pass
+        candidates = [DATA_DIR / "workspaces" / sid for sid in session_ids]
+        if run_id:
+            candidates.append(DATA_DIR / "workspaces" / run_id)
+        # Try explicit path first
+        if screenshot_path:
+            for ws in candidates:
+                p = ws / screenshot_path
+                if p.exists():
+                    return str(p)
+        # Auto-discover desktop screenshot
+        for ws in candidates:
+            ss_dir = ws / "screenshots"
+            if ss_dir.exists():
+                for pat in ("desktop*.png", "*.png"):
+                    pngs = sorted(ss_dir.glob(pat))
+                    if pngs:
+                        return str(pngs[0])
+        return None
+
+    path = await asyncio.to_thread(_find_screenshot)
+    if path:
+        return FileResponse(path, media_type="image/png")
+    # 1×1 transparent PNG placeholder
+    _px = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
+        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+    return Response(content=_px, media_type="image/png")
 
 
 @router.get("/api/improvement/project/{project_id}")

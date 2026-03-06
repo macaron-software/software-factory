@@ -46,6 +46,13 @@ git push origin main
 #   - VETO → retour tdd-sprint avec le fichier de contexte
 ```
 
+### Étape 3b : Récupérer le screenshot QA
+```
+# Lire QA_REPORT_{N}.md pour trouver la ligne "[SCREENSHOT:screenshots/xxx.png]"
+# OU lister screenshots/ dans le workspace
+# → screenshot_path = "screenshots/desktop-home.png" (relatif au workspace)
+```
+
 ### Étape 4 : Enregistrement cycle en DB
 ```
 # Appeler POST /api/improvement/inject-cycle avec :
@@ -73,7 +80,8 @@ git push origin main
     "traceability": X, "fallback": X, "over_engineering": X,
     "observability": X, "resilience": X, "honesty": X
   },
-  "traceability_score": X
+  "traceability_score": X,
+  "screenshot_path": "screenshots/desktop-home.png"  # Chemin relatif dans le workspace (depuis QA_REPORT_N.md ou listing screenshots/)
 }
 # → La plateforme calcule automatiquement :
 #   rl_reward (R∈[-1,+1]) → enregistre RL record_experience()
@@ -102,5 +110,6 @@ git push origin main
 - git_commit, git_push
 - http_get (GitHub Actions API pour poll CI)
 - http_post (pour enregistrement cycle)
+- file_read, list_files (lire QA_REPORT_N.md + lister screenshots/)
 - file_write (CICD_FAILURE_N.md si fail)
 - memory_store (persist le SHA + résultat CI)
