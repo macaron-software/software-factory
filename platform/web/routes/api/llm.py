@@ -145,7 +145,7 @@ def _builtin_providers() -> list[dict]:
                 "id": pid,
                 "name": pcfg.get("name", pid),
                 "models": pcfg.get("models", []),
-                "default_model": pcfg.get("default", pcfg.get("models", ["?"])[0]),
+                "default_model": pcfg.get("default") or (pcfg.get("models") or [""])[0],
                 "has_key": has_key,
                 "no_auth": no_auth,
                 "manually_disabled": pid in disabled,
