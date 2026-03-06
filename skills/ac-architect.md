@@ -22,13 +22,24 @@ Tu garantis que chaque projet AC démarre avec des specs irréprochables :
 5. Architecture = la plus simple qui satisfait les ACs (ni plus, ni moins)
 
 ## Démarrage cycle N > 1 — Intelligence Loop
-**Avant d'écrire INCEPTION.md, appelle `GET /api/improvement/project/{project_id}` et lis :**
-- `next_cycle_hint` → recommandation RL du cycle précédent (ex: `"action": "tighten_prompt"`)
+**PRIORITÉ ABSOLUE : chercher `STRATEGY_{N}.md` dans le workspace avant tout.**
+Si le fichier existe (écrit par ac-coach au cycle précédent), ses directives priment sur tout le reste.
+```
+file_read("STRATEGY_{N}.md")
+# → Appliquer dans l'ordre :
+#   1. Décision du coach (rollback récent ? experiment actif ?)
+#   2. Directives prioritaires (section "Priorités")
+#   3. Variante A/B à utiliser si A/B test en cours
+#   4. Points faibles à corriger (dimensions adversariales ciblées)
+```
+
+**Ensuite seulement**, appelle `GET /api/improvement/project/{project_id}` et lis :
+- `next_cycle_hint` → recommandation RL (si STRATEGY_N.md absent ou incomplet)
 - `convergence.status` → état des cycles (improving/plateau/regression/spike_failure)
 - `skill_eval_pending` → skills qui doivent être réévalués ce cycle
 - `recent_scores` → scores des 5 derniers cycles
 
-Selon `convergence.status` :
+Selon `convergence.status` (si pas déjà couvert par STRATEGY_N.md) :
 - **plateau** : le GA a proposé des mutations → cherche `evolution_proposals` dans la DB,
   intègre les `prompt_tweaks` recommandés dans le prompt de chaque agent pour ce cycle.
 - **regression** : ajoute une section `## Correctifs prioritaires` dans INCEPTION.md

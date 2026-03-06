@@ -1018,6 +1018,198 @@ async def api_improvement_stop(project_id: str):
     )
 
 
+@router.post("/api/improvement/rollback/{project_id}")
+async def api_improvement_rollback(project_id: str, request: Request):
+    """
+    AC Coach rollback: git revert last commit in workspace + delete current cycle from DB.
+    Called by ac-coach when score drops > 10pts.
+    """
+    import time
+    import subprocess
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    reason = body.get("reason", "score regression")
+    cycle_num = int(body.get("cycle_num", 0))
+
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    def _rollback():
+        from ...config import DATA_DIR
+
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state = conn.execute(
+                "SELECT last_git_sha, current_cycle, current_run_id FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if not state:
+                return {"error": "no state found"}
+
+            last_sha = state.get("last_git_sha", "")
+            _ = last_sha  # kept for potential future use (git reset --hard)
+            current_cycle = state.get("current_cycle", 0)
+            run_id = state.get("current_run_id", "")
+            rollback_cycle = cycle_num or current_cycle
+
+            # Find workspace for git revert
+            workspace_path = None
+            if run_id:
+                try:
+                    from ...agents.store import get_session_store
+
+                    for s in get_session_store().list():
+                        cfg = s.config if isinstance(s.config, dict) else {}
+                        if cfg.get("mission_id") == run_id or s.id == run_id:
+                            ws = DATA_DIR / "workspaces" / s.id
+                            if ws.exists():
+                                workspace_path = str(ws)
+                                break
+                except Exception:
+                    pass
+                if not workspace_path:
+                    ws = DATA_DIR / "workspaces" / run_id
+                    if ws.exists():
+                        workspace_path = str(ws)
+
+            git_reverted = False
+            git_output = ""
+            if workspace_path:
+                try:
+                    r = subprocess.run(
+                        ["git", "revert", "--no-commit", "HEAD"],
+                        cwd=workspace_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if r.returncode == 0:
+                        subprocess.run(
+                            [
+                                "git",
+                                "commit",
+                                "-m",
+                                f"revert(ac-coach): rollback cycle {rollback_cycle} — {reason[:120]}",
+                            ],
+                            cwd=workspace_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        git_reverted = True
+                        git_output = "git revert HEAD applied"
+                    else:
+                        git_output = r.stderr[:200]
+                except Exception as e:
+                    git_output = str(e)
+
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            # Mark cycle as rolled back (don't delete, keep for history)
+            conn.execute(
+                "UPDATE ac_cycles SET rolled_back=1 WHERE project_id=? AND cycle_num=?",
+                (project_id, rollback_cycle),
+            )
+            # Reset project state to previous cycle
+            prev_cycle = max(0, rollback_cycle - 1)
+            conn.execute(
+                "UPDATE ac_project_state SET status='idle', current_cycle=?, current_run_id=NULL, updated_at=? WHERE project_id=?",
+                (prev_cycle, now, project_id),
+            )
+            conn.commit()
+
+            # Close any active experiment as rolled_back
+            try:
+                from ...ac.experiments import get_active_experiment, close_experiment
+
+                exp = get_active_experiment(project_id)
+                if exp:
+                    close_experiment(
+                        exp["id"],
+                        None,
+                        None,
+                        "none",
+                        strategy_notes=reason,
+                        rolled_back=True,
+                    )
+            except Exception:
+                pass
+
+            return {
+                "ok": True,
+                "project_id": project_id,
+                "cycle_rolled_back": rollback_cycle,
+                "reset_to_cycle": prev_cycle,
+                "git_reverted": git_reverted,
+                "git_output": git_output,
+                "reason": reason,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+        finally:
+            conn.close()
+
+    result = await asyncio.to_thread(_rollback)
+    if "error" in result:
+        return JSONResponse(result, status_code=500)
+    return JSONResponse(result)
+
+
+@router.post("/api/improvement/experiment")
+async def api_improvement_experiment(request: Request):
+    """
+    Register an A/B experiment for the current cycle.
+    Called by ac-coach when it decides to test a new variant.
+    """
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    project_id = body.get("project_id")
+    cycle_num = int(body.get("cycle_num", 0))
+    experiment_key = body.get("experiment_key", "")
+    variant_a = body.get("variant_a", "v1")
+    variant_b = body.get("variant_b", "v2")
+    score_before = int(body.get("score_before", 0))
+    strategy_notes = body.get("strategy_notes", "")
+
+    if not project_id or not experiment_key:
+        return JSONResponse(
+            {"error": "project_id and experiment_key required"}, status_code=400
+        )
+
+    def _record():
+        from ...ac.experiments import record_experiment
+
+        exp_id = record_experiment(
+            project_id=project_id,
+            cycle_num=cycle_num,
+            experiment_key=experiment_key,
+            variant_a=variant_a,
+            variant_b=variant_b,
+            score_before=score_before,
+            strategy_notes=strategy_notes,
+        )
+        return exp_id
+
+    exp_id = await asyncio.to_thread(_record)
+    return JSONResponse(
+        {
+            "ok": True,
+            "experiment_id": exp_id,
+            "project_id": project_id,
+            "experiment_key": experiment_key,
+            "variant_a": variant_a,
+            "variant_b": variant_b,
+        }
+    )
+
+
 @router.post("/api/improvement/inject-cycle")
 async def api_improvement_inject_cycle(request: Request):
     """Record a completed AC cycle — called by ac-cicd-agent after CI/CD."""
