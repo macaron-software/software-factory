@@ -17,6 +17,7 @@ from __future__ import annotations
 import random
 import math
 import logging
+from ..db.migrations import get_db
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -93,7 +94,6 @@ class MissionSimulator:
         """
         global PATTERN_MODS, _CALIBRATED
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
             rows = db.execute(
@@ -119,9 +119,8 @@ class MissionSimulator:
             # Compute global baseline from all data
             db2 = db  # already closed, re-fetch
             try:
-                from ..db.migrations import get_db as _gdb
 
-                db2 = _gdb()
+                db2 = get_db()
                 baseline_row = db2.execute(
                     "SELECT AVG(success), AVG(quality_score) FROM phase_outcomes"
                 ).fetchone()
@@ -319,7 +318,6 @@ class MissionSimulator:
     def _write_phase_result(self, phase_result: dict, epic_id: str) -> int:
         """Write simulated agent outcomes to agent_scores table."""
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
             count = 0

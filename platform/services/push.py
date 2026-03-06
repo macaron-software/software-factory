@@ -16,6 +16,7 @@ import base64
 import json
 import logging
 import os
+from ..db.migrations import get_db
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -40,7 +41,6 @@ def _get_or_create_vapid_keys() -> tuple[str, str, str]:
 
     # Try loading from DB
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         try:
@@ -100,7 +100,6 @@ def _get_or_create_vapid_keys() -> tuple[str, str, str]:
 
     # Persist to DB
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         try:
@@ -264,7 +263,6 @@ async def broadcast_push(title: str, body: str, url: str = "") -> int:
 
 def _load_subscriptions(project_id: Optional[str] = None) -> list[dict]:
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         try:
@@ -292,7 +290,6 @@ def _remove_subscriptions(endpoints: list[str]) -> None:
     if not endpoints:
         return
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         try:

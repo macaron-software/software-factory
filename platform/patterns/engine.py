@@ -279,11 +279,6 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     """Auto-create TMA tickets from E2E/build results that contain failures."""
     import uuid
 
-    try:
-        from ..db.migrations import get_db
-    except Exception:
-        return
-
     # Detect failures in results
     fail_lines = []
     # Patterns that indicate env/infra issues, not real QA failures
@@ -354,11 +349,6 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     """
     import re
     import uuid
-
-    try:
-        from ..db.migrations import get_db
-    except Exception:
-        return
 
     # Extract epics — two formats:
     # Format 1: | **E1** | Title | Priority |
@@ -453,11 +443,6 @@ def _auto_extract_requirements(description: str, mission_id: str):
     Output: REQ-xxxx-01 (parent) + REQ-xxxx-01.1, 01.2, 01.3 (sub-reqs)
     """
     import re
-
-    try:
-        from ..db.migrations import get_db
-    except Exception:
-        return
 
     # Match numbered items: "1. **Title**: desc" OR "1. Title: desc"
     req_pattern = re.compile(
@@ -1231,7 +1216,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 content = rejection + content
                 # Track rejection in agent scores + update quality_score
                 try:
-                    from ..db.migrations import get_db
 
                     db = get_db()
                     try:
@@ -1261,9 +1245,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # Auto-close if agent already has >=3 open quality_rejection incidents
                 try:
                     from ..epics.feedback import create_platform_incident
-                    from ..db.migrations import get_db as _get_db
 
-                    _db = _get_db()
+                    _db = get_db()
                     try:
                         open_count = _db.execute(
                             """SELECT COUNT(*) FROM platform_incidents
@@ -1514,9 +1497,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
             # Record as tool_call for monitoring (auto-store counts as memory_store)
             try:
-                from ..db.migrations import get_db as _get_db2
 
-                _db2 = _get_db2()
+                _db2 = get_db()
                 _db2.execute(
                     "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
                     "VALUES (?, ?, 'memory_store', ?, ?, 1, datetime('now'))",
@@ -1541,7 +1523,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
 
     # Track agent performance score with real quality_score
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         # Compute quality signals: output length, tools used
@@ -1782,6 +1763,7 @@ from .impls.backprop_merge import run_backprop_merge as _impl_backprop_merge
 from .impls.fractal_stories import run_fractal_stories as _impl_fractal_stories
 from .impls.fractal_tests import run_fractal_tests as _impl_fractal_tests
 from .impls.fractal_qa import run_fractal_qa as _impl_fractal_qa
+from ..db.migrations import get_db
 
 
 class _EngineProxy:

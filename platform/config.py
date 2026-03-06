@@ -285,6 +285,8 @@ def load_config() -> PlatformConfig:
         cfg.server.port = int(p)
     if h := os.environ.get("PLATFORM_HOST"):
         cfg.server.host = h
+    if y := os.environ.get("PLATFORM_YOLO_MODE"):
+        cfg.orchestrator.yolo_mode = y.lower() in ("1", "true", "yes", "on")
 
     return cfg
 

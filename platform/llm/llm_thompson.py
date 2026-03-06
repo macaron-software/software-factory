@@ -18,6 +18,7 @@ import logging
 import math
 import random
 import time
+from ..db.migrations import get_db
 
 log = logging.getLogger(__name__)
 
@@ -31,7 +32,6 @@ def _ensure_table() -> None:
     if _DB_READY:
         return
     try:
-        from ..db.migrations import get_db
         db = get_db()
         db.execute("""
             CREATE TABLE IF NOT EXISTS llm_provider_scores (
@@ -54,7 +54,6 @@ def _get_scores(providers: list[str]) -> dict[str, dict]:
     """Load Beta distribution params for given providers."""
     _ensure_table()
     try:
-        from ..db.migrations import get_db
         db = get_db()
         rows = db.execute(
             "SELECT * FROM llm_provider_scores WHERE provider IN (%s)"
@@ -122,7 +121,6 @@ def llm_thompson_record(provider: str, success: bool, quality: float = 0.0) -> N
     accepted = 1 if (success and quality >= QUALITY_THRESHOLD) else 0
     rejected = 0 if accepted else 1
     try:
-        from ..db.migrations import get_db
         db = get_db()
         row = db.execute(
             "SELECT accepted, rejected, total_calls, avg_quality FROM llm_provider_scores WHERE provider=?",
@@ -153,7 +151,6 @@ def llm_thompson_stats() -> list[dict]:
     """Return stats for all known providers."""
     _ensure_table()
     try:
-        from ..db.migrations import get_db
         db = get_db()
         rows = db.execute(
             "SELECT * FROM llm_provider_scores ORDER BY avg_quality DESC"

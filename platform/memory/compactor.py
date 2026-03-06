@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from ..db.migrations import get_db
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -49,7 +50,6 @@ class CompactionStats:
 
 def run_compaction() -> CompactionStats:
     """Run all compaction rules synchronously. Safe to call from any context."""
-    from ..db.migrations import get_db
 
     stats = CompactionStats(ran_at=datetime.now(timezone.utc).isoformat())
     conn = get_db()
@@ -220,7 +220,6 @@ def run_compaction() -> CompactionStats:
 
 def get_memory_health() -> dict:
     """Return a health snapshot of all memory layers."""
-    from ..db.migrations import get_db
     from ..db.adapter import is_postgresql
 
     _pg = is_postgresql()

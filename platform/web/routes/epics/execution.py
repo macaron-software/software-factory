@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from ....i18n import t
 from ...schemas import ErrorResponse, OkResponse
 from ..helpers import _active_mission_tasks, get_mission_semaphore, _parse_body
+from ..sse_utils import sse
 from .execution_helpers import build_epic_context, get_role_instruction
 
 router = APIRouter()
@@ -495,9 +496,6 @@ async def mission_chat_stream(request: Request, epic_id: str):
 
     async def event_generator():
         import markdown as md_lib
-
-        def sse(event: str, data: dict) -> str:
-            return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
         yield sse("status", {"label": "Analyse en cours..."})
 

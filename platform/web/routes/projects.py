@@ -17,6 +17,7 @@ from fastapi.responses import (
 )
 
 from .helpers import _templates
+from .sse_utils import sse
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -751,8 +752,6 @@ async def project_hub_chat_stream(request: Request, project_id: str):
     except Exception:
         pass
 
-    def sse(event: str, payload: dict) -> str:
-        return f"event: {event}\ndata: {_json.dumps(payload, ensure_ascii=False)}\n\n"
 
     async def event_generator():
         yield sse("status", {"label": "Analyse en cours…"})

@@ -19,6 +19,7 @@ import copy
 import json
 import random
 import logging
+from ..db.migrations import get_db
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -359,7 +360,6 @@ class GAEngine:
         Applies: redundancy penalty, diversity bonus, phase budget penalty.
         """
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
 
@@ -637,7 +637,6 @@ class GAEngine:
 
         run_id = str(uuid.uuid4())[:8]
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
             db.execute(
@@ -662,7 +661,6 @@ class GAEngine:
 
         proposal_id = str(uuid.uuid4())[:8]
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
 

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import math
 import logging
+from ..db.migrations import get_db
 from typing import Any
 
 log = logging.getLogger(__name__)
@@ -177,7 +178,6 @@ class RLPolicy:
         if next_state_dict is None:
             next_state_dict = {}
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
             wf_id = state_dict.get("workflow_id", "")
@@ -221,7 +221,6 @@ class RLPolicy:
         Returns training stats.
         """
         try:
-            from ..db.migrations import get_db
 
             db = get_db()
             rows = db.execute(

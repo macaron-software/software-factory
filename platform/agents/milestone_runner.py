@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from ..db.migrations import get_db
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -561,7 +562,6 @@ def _load_compliance_history(project_id: str, agent_id: str) -> str:
     if not project_id:
         return ""
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         rows = db.execute(
@@ -621,7 +621,6 @@ def _persist_compliance_verdict(
 ) -> None:
     """Persist compliance verdict to DB for dashboard queries."""
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         # Ensure table exists

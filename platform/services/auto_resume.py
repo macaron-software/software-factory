@@ -20,6 +20,8 @@ from typing import AsyncGenerator
 
 logger = logging.getLogger(__name__)
 
+from ..db.migrations import get_db  # noqa: E402 — placed after logger for readability
+
 
 def _run_lock_key(run_id: str) -> int:
     """Convert run_id to a stable positive int64 for PG advisory lock."""
@@ -238,7 +240,6 @@ async def _resume_batch(stagger: float = 3.0) -> int:
 
     if _os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
         return 0
-    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -522,9 +523,8 @@ async def _launch_run(run_id: str) -> None:
 
     # Ensure a session row exists for this epic_run (needed for messages FK)
     if mission.session_id:
-        from ..db.migrations import get_db as _get_db
 
-        _db = _get_db()
+        _db = get_db()
         try:
             exists = _db.execute(
                 "SELECT id FROM sessions WHERE id=?", (mission.session_id,)
@@ -561,10 +561,9 @@ async def _launch_run(run_id: str) -> None:
         try:
             import json as _json
 
-            from ..db.migrations import get_db as _get_db2
             from ..models import PhaseStatus as _PhaseStatus
 
-            _db2 = _get_db2()
+            _db2 = get_db()
             try:
                 _scfg_row = _db2.execute(
                     "SELECT config_json FROM sessions WHERE id=?", (mission.session_id,)
@@ -679,7 +678,6 @@ async def handle_failed_runs() -> int:
     Called once at startup (before the watchdog loop starts retrying paused runs).
     Returns number of runs repaired.
     """
-    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -812,7 +810,6 @@ async def _create_tma_incident(
 ) -> None:
     """Create a TMA incident epic_run for a failed execution phase."""
     import uuid
-    from ..db.migrations import get_db
 
     incident_id = str(uuid.uuid4())[:8] + "-tma-incident"
     brief = (
@@ -861,7 +858,6 @@ async def auto_launch_continuous_missions() -> int:
     and launch them. Called by the watchdog loop after handling paused/failed.
     Returns count of missions launched.
     """
-    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -1006,7 +1002,6 @@ async def check_ga_health() -> None:
     """P1 watchdog: if all GA proposals are pending for > 1h with none approved,
     auto-approve the best per workflow (bootstrap) and log a P1 warning.
     Runs every watchdog cycle (~5 min) but only acts once per stall episode."""
-    from ..db.migrations import get_db
 
     db = get_db()
     try:
@@ -1062,7 +1057,6 @@ async def check_ga_health() -> None:
 
 async def _cleanup_disk() -> None:
     """Hourly cleanup: orphaned workspaces + old LLM traces + stale cancelled runs."""
-    from ..db.migrations import get_db
 
     db = None
     try:
@@ -1249,9 +1243,8 @@ async def _enforce_container_ttl_and_slots() -> None:
             # Pause any still-running SF run whose mission maps to this container
             try:
                 prefix = name.removeprefix("macaron-app-").removeprefix("proj-")
-                from ..db.migrations import get_db as _get_db2
 
-                _db2 = _get_db2()
+                _db2 = get_db()
                 try:
                     _db2.execute(
                         """UPDATE epic_runs SET status='paused', updated_at=datetime('now')

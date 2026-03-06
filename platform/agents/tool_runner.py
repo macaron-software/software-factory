@@ -1137,7 +1137,7 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
     """Create a support ticket in the platform DB."""
     import uuid
 
-    from ..db import get_db
+    from ..db.migrations import get_db
 
     title = args.get("title", "")
     desc = args.get("description", "")

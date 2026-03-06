@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from ..db.migrations import get_db
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -246,7 +247,6 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
     Maps: TaskDef → Sous-Tâche, UserStoryDef → User Story, FeatureDef → Feature.
     Skips items that already have a jira_key stored.
     """
-    from ..db.migrations import get_db
 
     try:
         db = get_db()
@@ -405,7 +405,6 @@ async def jira_kanban_sync(direction: str = "both") -> str:
     direction: 'to_jira' | 'from_jira' | 'both'
     Matches missions to Jira issues via the jira_key field on missions.
     """
-    from ..db.migrations import get_db
     from ..services.notifications import emit_notification
 
     results = []

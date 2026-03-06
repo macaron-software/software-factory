@@ -13,7 +13,9 @@ async def run_human_in_the_loop(engine, run, task: str):
     from ...sessions.store import get_session_store, MessageDef
     from ...config import get_config
 
-    _yolo = get_config().orchestrator.yolo_mode
+    # Read yolo_mode dynamically at each checkpoint (not once at start)
+    def _is_yolo() -> bool:
+        return get_config().orchestrator.yolo_mode
 
     nodes = engine._ordered_nodes(run.pattern)
     if not nodes:

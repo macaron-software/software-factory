@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from ..db.migrations import get_db
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,6 @@ async def run_knowledge_maintenance(project_id: str | None = None) -> str | None
 
         # If no project given, pick the most active project
         if not project_id:
-            from ..db.migrations import get_db
 
             conn = get_db()
             row = conn.execute(
@@ -86,7 +86,6 @@ async def knowledge_scheduler_loop() -> None:
             await asyncio.sleep(wait_secs)
 
             # Run maintenance on all active projects
-            from ..db.migrations import get_db
 
             conn = get_db()
             active_projects = [

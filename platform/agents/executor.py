@@ -29,6 +29,7 @@ from .tool_runner import (
     _record_artifact,
 )
 from .tool_schemas import _filter_schemas, _get_tool_schemas
+from ..db.migrations import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -143,7 +144,6 @@ def _get_rate_limit_setting(key: str, default: str) -> str:
     now = time.monotonic()
     if now - _settings_cache_ts > _SETTINGS_TTL:
         try:
-            from ..db.migrations import get_db
 
             with get_db() as db:
                 rows = db.execute(
@@ -166,7 +166,6 @@ def _check_session_budget(session_id: str) -> None:
         cap = float(cap_str)
         if cap <= 0:
             return
-        from ..db.migrations import get_db
 
         with get_db() as db:
             row = db.execute(
@@ -201,7 +200,6 @@ def _write_llm_usage(
 ) -> None:
     """Insert one row into llm_usage. Never raises."""
     try:
-        from ..db.migrations import get_db
         from ..llm.observability import _estimate_cost
 
         cost = _estimate_cost(model, tokens_in, tokens_out)
@@ -231,7 +229,6 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
         return
     try:
         import uuid as _uuid_w
-        from ..db.migrations import get_db
 
         with get_db() as db:
             row = db.execute(
@@ -267,7 +264,6 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
 def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
     """Update epic_runs.llm_cost_usd from llm_traces. Never raises."""
     try:
-        from ..db.migrations import get_db
 
         with get_db() as db:
             mid = epic_run_id
@@ -489,7 +485,6 @@ class AgentExecutor:
                 while True:
                     await asyncio.sleep(30)
                     try:
-                        from ..db.migrations import get_db
 
                         with get_db() as db:
                             db.execute(
@@ -532,7 +527,6 @@ class AgentExecutor:
         """
         try:
             import json as _json
-            from ..db.migrations import get_db
 
             with get_db() as db:
                 db.execute(
@@ -1274,7 +1268,6 @@ class AgentExecutor:
                     )
                     # Persist tool call to DB for monitoring
                     try:
-                        from ..db.migrations import get_db
 
                         with get_db() as db:
                             db.execute(

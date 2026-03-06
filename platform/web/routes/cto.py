@@ -16,6 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from starlette.requests import Request
 
 from .helpers import _parse_body, _templates, _avatar_url
+from .sse_utils import sse
 
 logger = logging.getLogger(__name__)
 
@@ -765,8 +766,6 @@ async def cto_message(request: Request):
         f"</div>"
     )
 
-    def sse(event: str, data: dict) -> str:
-        return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
     async def event_generator():
         yield sse("user_html", {"html": user_html, "session_id": session.id})

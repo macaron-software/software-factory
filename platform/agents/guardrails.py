@@ -21,6 +21,7 @@ import json
 import logging
 import re
 import time
+from ..db.migrations import get_db
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,6 @@ def _load_config() -> dict:
 
     cfg = dict(_DEFAULT_CONFIG)
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         rows = db.execute(
@@ -174,7 +174,6 @@ def _audit_log(
 ) -> None:
     """Write an entry to admin_audit_log. Never raises."""
     try:
-        from ..db.migrations import get_db
 
         db = get_db()
         args_preview = json.dumps(

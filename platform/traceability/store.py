@@ -5,41 +5,27 @@ we log WHY it was created: the full lineage chain from vision down to the task.
 
 Answers: "Why does this code/test exist?"
 
-Design: SQLite table why_log (lightweight, no external deps, same DB as platform).
-Inspired by our own practice of documenting sources in code comments
-(ADR-0015, TinyAGI/fractals, OWASP LLM01 etc.) — now applied systematically.
+Rationale: using get_db() ensures why_log goes into the same backend (SQLite dev /
+PostgreSQL prod) as all other platform tables, instead of a hard-coded SQLite path.
+The why_log schema is created by _ensure_table() on first use so no migration needed.
+Source: TinyAGI/fractals traceability concept + ADR-0015.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import sqlite3
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+
+from ..db.migrations import get_db
 
 logger = logging.getLogger(__name__)
 
-# Platform's main SQLite DB
-_DB_PATH = Path(__file__).parent.parent.parent / "data" / "platform.db"
-
-
-@contextmanager
-def _db():
-    _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(_DB_PATH), check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
-
 
 def _ensure_table() -> None:
-    with _db() as conn:
+    conn = get_db()
+    try:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS why_log (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -53,6 +39,9 @@ def _ensure_table() -> None:
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_why_log_session  ON why_log(session_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_why_log_artifact ON why_log(artifact_ref)")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 @dataclass
@@ -79,7 +68,8 @@ def log_artifact(
 ) -> int:
     """Log WHY an artifact was created. Returns the why_log row id."""
     _ensure_table()
-    with _db() as conn:
+    conn = get_db()
+    try:
         cur = conn.execute(
             "INSERT INTO why_log "
             "(session_id, artifact_type, artifact_ref, lineage_json, rationale, created_at) "
@@ -93,32 +83,41 @@ def log_artifact(
                 datetime.now(timezone.utc).isoformat(),
             ),
         )
+        conn.commit()
         return cur.lastrowid
+    finally:
+        conn.close()
 
 
 def get_why(artifact_ref: str) -> list[WhyEntry]:
     """Get all why_log entries matching an artifact ref (filename, story id, etc.)."""
     _ensure_table()
-    with _db() as conn:
+    conn = get_db()
+    try:
         rows = conn.execute(
             "SELECT * FROM why_log WHERE artifact_ref LIKE ? ORDER BY created_at DESC",
             (f"%{artifact_ref}%",),
         ).fetchall()
+    finally:
+        conn.close()
     return [_row_to_entry(r) for r in rows]
 
 
 def get_session_why(session_id: str) -> list[WhyEntry]:
     """Get full why-chain for all artifacts produced in a session."""
     _ensure_table()
-    with _db() as conn:
+    conn = get_db()
+    try:
         rows = conn.execute(
             "SELECT * FROM why_log WHERE session_id = ? ORDER BY created_at ASC",
             (session_id,),
         ).fetchall()
+    finally:
+        conn.close()
     return [_row_to_entry(r) for r in rows]
 
 
-def _row_to_entry(row: sqlite3.Row) -> WhyEntry:
+def _row_to_entry(row) -> WhyEntry:
     return WhyEntry(
         id=row["id"],
         session_id=row["session_id"],

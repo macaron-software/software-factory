@@ -18,10 +18,7 @@ INTERVAL_SECONDS = 600  # 10 minutes
 
 def run_zombie_cleanup() -> dict:
     """Mark stale running/paused missions as failed/abandoned. Returns counts."""
-    try:
-        from ..db.migrations import get_db
-    except ImportError:
-        from platform.db.migrations import get_db  # type: ignore
+    from ..db.migrations import get_db
 
     failed = 0
     abandoned = 0
