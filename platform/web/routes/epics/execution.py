@@ -152,7 +152,7 @@ async def launch_mission_workflow(request: Request, epic_id: str):
     # Register project in project store with workspace path so tools_enabled works
     _proj_id = mission.project_id or epic_id
     try:
-        from ...projects.manager import Project, get_project_store
+        from ....projects.manager import Project, get_project_store
 
         _p_store = get_project_store()
         _existing = _p_store.get(_proj_id)
