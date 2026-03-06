@@ -1196,6 +1196,13 @@ body.sf-wireframe #sfWireframeBtn {
   document.addEventListener('htmx:responseError', function(evt) {
     var status = evt.detail && evt.detail.xhr && evt.detail.xhr.status;
     if (!status) return;
+    // On 401: stop any polling on this element and redirect to login
+    if (status === 401) {
+      var elt = evt.detail.elt;
+      if (elt) { elt.removeAttribute('hx-trigger'); htmx.remove(elt); }
+      window.location.href = '/login';
+      return;
+    }
     if (status === 404) {
       showErrToast('Page not found (404)', 'This section is not available yet. Try refreshing or come back later.');
     } else if (status >= 500) {

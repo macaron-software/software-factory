@@ -429,7 +429,7 @@
                         <div class="integ-field">
                             <label>{{ key|replace('_',' ')|title }}</label>
                             {% if 'token' in key or 'secret' in key or 'password' in key or 'api_key' in key or 'key_id' in key or 'client_secret' in key %}
-                            <input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            <form onsubmit="return false"><input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}"></form>
                             {% elif 'url' in key or key == 'instance' or key == 'domain' %}
                             <input type="url" placeholder="https://..." value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif val is sameas true or val is sameas false %}
@@ -665,9 +665,9 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Best quality for general assets, backgrounds, concept art. ~$0.05/image.</p>
-                    <input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
+                    <form onsubmit="return false"><input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
-                        oninput="markImageProviderDirty('falai')">
+                        oninput="markImageProviderDirty('falai')"></form>
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('falai')" style="font-size:0.72rem">
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
                     </button>
@@ -685,9 +685,9 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Purpose-built for pixel art game assets. Sprite sheets, rotations, animation frames.</p>
-                    <input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
+                    <form onsubmit="return false"><input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
-                        oninput="markImageProviderDirty('pixellab')">
+                        oninput="markImageProviderDirty('pixellab')"></form>
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('pixellab')" style="font-size:0.72rem">
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
                     </button>
@@ -705,9 +705,9 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">UI mockups, screens & flows. Generate full interface designs from a prompt, then feed image to Claude to implement. Uses your existing GEMINI_API_KEY.</p>
-                    <input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
+                    <form onsubmit="return false"><input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
-                        oninput="markImageProviderDirty('gemini-image')">
+                        oninput="markImageProviderDirty('gemini-image')"></form>
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('gemini-image')" style="font-size:0.72rem">
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
                     </button>
@@ -725,9 +725,9 @@
                         </label>
                     </div>
                     <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Access to all open models (Flux, SDXL + LoRAs). Good for experimentation and style-consistent asset libraries.</p>
-                    <input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
+                    <form onsubmit="return false"><input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
                         style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
-                        oninput="markImageProviderDirty('replicate')">
+                        oninput="markImageProviderDirty('replicate')"></form>
                     <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('replicate')" style="font-size:0.72rem">
                         <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
                     </button>
