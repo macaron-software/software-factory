@@ -3,10 +3,6 @@ name: Deploy GitHub Pages
 on:
   push:
     branches: [main, master]
-    paths:
-      - 'index.html'
-      - 'docs/**'
-      - '.nojekyll'
   workflow_dispatch:
 
 permissions:
