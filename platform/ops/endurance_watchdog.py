@@ -17,10 +17,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import sqlite3
 import time
 from datetime import datetime, timezone
 from typing import Optional
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,6 @@ PHASE_STALL_THRESHOLD = int(os.environ.get("WATCHDOG_STALL_THRESHOLD", "900"))  
 DISK_ALERT_PCT = int(os.environ.get("WATCHDOG_DISK_ALERT", "90"))
 ENABLED = os.environ.get("WATCHDOG_ENABLED", "1") == "1"
 HEALTH_URL = os.environ.get("WATCHDOG_HEALTH_URL", "http://localhost:8099/api/health")
-DB_PATH = os.environ.get("WATCHDOG_DB_PATH", "")
-
-
-def _db_path() -> str:
-    if DB_PATH:
-        return DB_PATH
-    base = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    return os.path.join(base, "data", "platform.db")
 
 
 def _get_db():
@@ -47,10 +40,8 @@ def _get_db():
 
         return get_db()
     except Exception:
-        # Fallback to direct SQLite (standalone mode)
-        conn = sqlite3.connect(_db_path())
-        conn.row_factory = sqlite3.Row
-        return conn
+        # Fallback to direct connection (standalone mode)
+        return get_connection()
 
 
 def _ensure_table():
@@ -134,7 +125,7 @@ async def _check_stalled_missions() -> list[dict]:
         db = _get_db()
         rows = db.execute("""
             SELECT mr.id, mr.workflow_name as name, mr.status, mr.current_phase, mr.updated_at
-            FROM mission_runs mr
+            FROM epic_runs mr
             WHERE mr.status = 'running'
         """).fetchall()
         db.close()
@@ -295,7 +286,7 @@ async def _auto_resume_paused() -> int:
         db = _get_db()
         try:
             running = db.execute(
-                "SELECT COUNT(*) as c FROM mission_runs WHERE status='running'"
+                "SELECT COUNT(*) as c FROM epic_runs WHERE status='running'"
             ).fetchone()["c"]
 
             if running >= MAX_CONCURRENT_RUNS:
@@ -312,7 +303,7 @@ async def _auto_resume_paused() -> int:
                 SELECT mr.session_id, mr.id, s.config_json, mr.workflow_id,
                        COALESCE(mr.resume_attempts, 0) as attempts,
                        mr.last_resume_at, mr.project_id, mr.brief
-                FROM mission_runs mr
+                FROM epic_runs mr
                 JOIN sessions s ON mr.session_id = s.id
                 WHERE mr.status = 'paused'
                 AND s.status IN ('interrupted', 'paused')
@@ -371,7 +362,7 @@ async def _auto_resume_paused() -> int:
                 if not wf_id:
                     no_wf_ids.append(row["id"])
                     db.execute(
-                        "UPDATE mission_runs SET human_input_required=1 WHERE id=?",
+                        "UPDATE epic_runs SET human_input_required=1 WHERE id=?",
                         (row["id"],),
                     )
                     continue
@@ -382,14 +373,14 @@ async def _auto_resume_paused() -> int:
                     (row["session_id"],),
                 )
                 db.execute(
-                    "UPDATE mission_runs SET status='running', resume_attempts=?, last_resume_at=? WHERE id=?",
+                    "UPDATE epic_runs SET status='running', resume_attempts=?, last_resume_at=? WHERE id=?",
                     (new_attempts, now_iso, row["id"]),
                 )
             db.commit()
 
             # Auto-abandon exhausted missions
             abandoned = db.execute(
-                """UPDATE mission_runs SET status='abandoned', updated_at=datetime('now')
+                """UPDATE epic_runs SET status='abandoned', updated_at=datetime('now')
                    WHERE status='paused'
                    AND COALESCE(resume_attempts, 0) >= ?
                    AND COALESCE(human_input_required, 0) = 0""",
@@ -434,7 +425,7 @@ async def _auto_resume_paused() -> int:
             db2 = _get_db()
             try:
                 db2.execute(
-                    "UPDATE mission_runs SET status='paused' WHERE id=?", (row["id"],)
+                    "UPDATE epic_runs SET status='paused' WHERE id=?", (row["id"],)
                 )
                 db2.commit()
             finally:
@@ -491,7 +482,7 @@ async def _recover_stale_sessions() -> int:
                         (row["id"],),
                     )
                     db.execute(
-                        "UPDATE mission_runs SET status='paused' WHERE session_id=? AND status='running'",
+                        "UPDATE epic_runs SET status='paused' WHERE session_id=? AND status='running'",
                         (row["id"],),
                     )
                     recovered += 1
@@ -528,7 +519,7 @@ async def _cleanup_failed_sessions() -> int:
         cleaned = db.execute("""
             UPDATE sessions SET status='failed'
             WHERE id IN (
-                SELECT session_id FROM mission_runs
+                SELECT session_id FROM epic_runs
                 WHERE status='failed'
             ) AND status IN ('active', 'interrupted')
         """).rowcount
@@ -552,7 +543,7 @@ async def _cleanup_phantom_runs() -> int:
         db = _get_db()
         # Step 1: running but stale 1h+ → reset to paused so watchdog retries
         result = db.execute("""
-            UPDATE mission_runs SET status='paused', updated_at=datetime('now')
+            UPDATE epic_runs SET status='paused', updated_at=datetime('now')
             WHERE status = 'running'
             AND (
                 updated_at IS NULL
@@ -570,7 +561,7 @@ async def _cleanup_phantom_runs() -> int:
 
         # Step 2: running/paused > 48h → abandon definitively
         result = db.execute("""
-            UPDATE mission_runs SET status='abandoned'
+            UPDATE epic_runs SET status='abandoned'
             WHERE status IN ('running', 'paused')
             AND (
                 updated_at IS NULL
@@ -644,7 +635,8 @@ def _table_exists(db, name: str) -> bool:
     except Exception:
         pass
     r = db.execute(
-        "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?", (name,)
+        "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+        (name,),
     ).fetchone()
     return bool(r and r[0] > 0)
 

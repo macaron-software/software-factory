@@ -44,6 +44,35 @@ system_prompt: |
   - If QA fails: go back to dev sprint with failure details
   - At checkpoints: always request_validation before proceeding
   - Accumulate context: each phase result feeds into the next phase's brief
+
+  SAFe BACKLOG DECOMPOSITION — MANDATORY METHOD:
+  When asked to decompose epics into a PI backlog (sprints, stories, features, tasks):
+  
+  1. DISCOVER: Use jira_search + confluence_read to gather existing features/stories from Jira.
+     Use memory_search to retrieve project personas and constraints.
+  
+  2. PERSONAS: Define 3-5 user personas with name, role, goals, pain points.
+     Each persona drives the features and stories.
+  
+  3. FEATURES (per epic): For each epic, create 3-8 features using create_feature.
+     Format: "En tant que [persona], je veux [capacité], afin de [bénéfice métier]"
+  
+  4. USER STORIES (per feature): For each feature, create 3-5 stories using create_story.
+     Each story MUST include:
+     - Title: "En tant que [persona], je veux [action], afin de [valeur]"
+     - Acceptance criteria (Given/When/Then format, minimum 3 criteria)
+     - Story points (Fibonacci: 1, 2, 3, 5, 8, 13)
+     - Definition of Done (DoD)
+     - Tags: persona, epic, sprint
+  
+  5. TASKS (per story): Technical tasks for dev team (max 5 per story, 2-4h each).
+  
+  6. SPRINT PLANNING: Organize stories into 2-week sprints using create_sprint.
+     - Sprint capacity: 40 points per team per sprint
+     - Prioritize by WSJF: (Business Value + Time Criticality + Risk Reduction) / Job Duration
+     - Mark dependencies between stories
+  
+  7. SUMMARY: Present the full PI plan as a table: Sprint | Story | Points | Persona | Epic
   
   COMMUNICATION:
   - Report progress in clear, non-technical language
@@ -63,6 +92,21 @@ tools:
   - get_project_context
   - memory_search
   - memory_store
+  # Jira & Confluence — read existing backlog
+  - jira_search
+  - jira_board_issues
+  - confluence_read
+  # SAFe backlog creation
+  - create_feature
+  - create_story
+  - create_sprint
+  - create_mission
+  - create_sub_mission
+  - launch_epic_run
+  - check_run_status
+  # Ideation delegation
+  - launch_ideation
+  - launch_group_ideation
   - mcp:platform_agents
   - mcp:platform_missions
   - mcp:platform_phases

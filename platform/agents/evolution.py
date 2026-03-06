@@ -642,10 +642,10 @@ class GAEngine:
             db = get_db()
             db.execute(
                 """
-                INSERT INTO evolution_runs (id, wf_id, generations, best_fitness, fitness_history_json)
+                INSERT INTO evolution_runs (id, workflow_id, generation, best_fitness, population_size)
                 VALUES (?, ?, ?, ?, ?)
             """,
-                (run_id, wf_id, generations, best_fitness, json.dumps(history)),
+                (run_id, wf_id, generations, best_fitness, 0),
             )
             db.commit()
             db.close()
@@ -694,8 +694,8 @@ class GAEngine:
             db.execute(
                 """
                 INSERT INTO evolution_proposals
-                    (id, base_wf_id, genome_json, fitness, generation, run_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                    (id, base_wf_id, mutated_config, fitness_score, generation, status)
+                VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (
                     proposal_id,
@@ -703,7 +703,6 @@ class GAEngine:
                     json.dumps(genome.to_dict()),
                     genome.fitness,
                     generation,
-                    run_id,
                     status,
                 ),
             )
@@ -729,7 +728,7 @@ class GAEngine:
         """
         try:
             row = db.execute(
-                "SELECT MAX(fitness) FROM evolution_proposals WHERE base_wf_id=? AND status='approved'",
+                "SELECT MAX(fitness_score) FROM evolution_proposals WHERE base_wf_id=? AND status='approved'",
                 (wf_id,),
             ).fetchone()
             if row and row[0] is not None:

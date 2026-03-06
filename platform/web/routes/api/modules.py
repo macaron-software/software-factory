@@ -6,8 +6,11 @@ POST /api/modules/{id}/toggle → enable/disable a module
 POST /api/modules/{id}/install → run install command
 GET  /api/modules/categories → list categories
 """
+
 from __future__ import annotations
 
+import importlib.util
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -17,18 +20,18 @@ import yaml
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from platform.web.routes.helpers import _parse_body
 
 try:
     from platform.agents.store import get_db
+
     _has_db = True
 except Exception:
     _has_db = False
 
 router = APIRouter()
 
-REGISTRY_PATH = Path(__file__).parent.parent.parent / "modules" / "registry.yaml"
-DATA_DIR = Path(__file__).parent.parent.parent.parent / "data"
+REGISTRY_PATH = Path(__file__).parent.parent.parent.parent / "modules" / "registry.yaml"
+DATA_DIR = Path(__file__).parent.parent.parent.parent.parent / "data"
 
 
 def _load_registry() -> list[Dict]:
@@ -40,9 +43,14 @@ def _load_registry() -> list[Dict]:
 
 
 def _get_enabled_ids() -> set[str]:
-    """Read enabled module IDs from DB settings table."""
+    """Read enabled module IDs from DB settings table.
+    Default: all builtin modules are enabled.
+    NOTE: toggling from UI persists preference in DB but does NOT yet enforce
+    at agent runtime — tool registration happens at startup unconditionally.
+    """
+    builtin_defaults = {m["id"] for m in _load_registry() if m.get("builtin")}
     if not _has_db:
-        return {"component-gallery"}  # default
+        return builtin_defaults
     try:
         db = get_db()
         rows = db.execute(
@@ -50,10 +58,11 @@ def _get_enabled_ids() -> set[str]:
         ).fetchone()
         if rows:
             import json
+
             return set(json.loads(rows[0]))
     except Exception:
         pass
-    return {"component-gallery"}
+    return builtin_defaults
 
 
 def _set_enabled_ids(ids: set[str]) -> None:
@@ -61,10 +70,11 @@ def _set_enabled_ids(ids: set[str]) -> None:
         return
     try:
         import json
+
         db = get_db()
         db.execute(
             "INSERT OR REPLACE INTO settings(key, value) VALUES('enabled_modules', ?)",
-            (json.dumps(sorted(ids)),)
+            (json.dumps(sorted(ids)),),
         )
         db.commit()
     except Exception:
@@ -72,7 +82,33 @@ def _set_enabled_ids(ids: set[str]) -> None:
 
 
 def _is_installed(module: Dict) -> bool:
-    """Check whether the module's data file exists (or no data file required)."""
+    """Check whether a module is installed — synchronous, instant (no subprocess).
+
+    Logic:
+    - builtin: True  → always installed (bundled with SF)
+    - check_cmd starts with "python3 -c import X" → importlib.util.find_spec(X)
+    - check_cmd is a binary → shutil.which(binary)
+    - data_file  → check file exists
+    - otherwise  → True (live API, no install needed)
+    """
+    if module.get("builtin"):
+        return True
+
+    check_cmd = module.get("check_cmd", "")
+    if check_cmd:
+        # python3 -c "import pkg" or "from pkg import ..."
+        if check_cmd.startswith("python"):
+            import re
+
+            m = re.search(r"import\s+([\w.]+)", check_cmd)
+            if m:
+                pkg = m.group(1).split(".")[0]
+                return importlib.util.find_spec(pkg) is not None
+            return True  # can't parse → assume ok
+        # binary check
+        binary = check_cmd.split()[0]
+        return shutil.which(binary) is not None
+
     data_file = module.get("data_file")
     if not data_file:
         return True
@@ -89,6 +125,7 @@ def _enrich(module: Dict, enabled_ids: set[str]) -> Dict:
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/api/modules")
 async def list_modules():
@@ -125,6 +162,22 @@ async def toggle_module(module_id: str):
         now_enabled = True
 
     _set_enabled_ids(enabled)
+
+    # If disabling a module that has a running MCP, stop it immediately
+    if not now_enabled:
+        _MCP_FOR_MODULE = {"playwright-mcp": "mcp-playwright"}
+        mcp_id = _MCP_FOR_MODULE.get(module_id)
+        if mcp_id:
+            try:
+                from platform.mcps.manager import get_mcp_manager
+
+                mgr = get_mcp_manager()
+                import asyncio
+
+                asyncio.create_task(mgr.stop(mcp_id))
+            except Exception:
+                pass
+
     return JSONResponse({"ok": True, "id": module_id, "enabled": now_enabled})
 
 
@@ -137,20 +190,39 @@ async def install_module(module_id: str):
 
     install_cmd = module.get("install", "")
     if not install_cmd or install_cmd.startswith("#"):
-        return JSONResponse({"ok": True, "message": "No install required", "already_installed": True})
+        return JSONResponse(
+            {"ok": True, "message": "No install required", "already_installed": True}
+        )
+
+    # Determine how to run the install command
+    first_token = install_cmd.split()[0]
+    if (
+        first_token == "python"
+        or first_token == "python3"
+        or first_token == sys.executable
+    ):
+        cmd = [sys.executable] + install_cmd.split()[1:]
+    elif first_token in ("pip", "pip3"):
+        cmd = [sys.executable, "-m", "pip"] + install_cmd.split()[1:]
+    elif first_token == "npm":
+        cmd = install_cmd.split()
+    elif first_token == "brew":
+        cmd = install_cmd.split()
+    else:
+        cmd = install_cmd.split()
 
     try:
         result = subprocess.run(
-            [sys.executable] + install_cmd.split()[1:],  # strip "python -m ..."
-            capture_output=True, text=True, timeout=300,
-            cwd=str(DATA_DIR.parent)
+            cmd, capture_output=True, text=True, timeout=300, cwd=str(DATA_DIR.parent)
         )
-        return JSONResponse({
-            "ok": result.returncode == 0,
-            "stdout": result.stdout[-3000:] if result.stdout else "",
-            "stderr": result.stderr[-2000:] if result.stderr else "",
-            "returncode": result.returncode,
-        })
+        return JSONResponse(
+            {
+                "ok": result.returncode == 0,
+                "stdout": result.stdout[-3000:] if result.stdout else "",
+                "stderr": result.stderr[-2000:] if result.stderr else "",
+                "returncode": result.returncode,
+            }
+        )
     except subprocess.TimeoutExpired:
         return JSONResponse({"ok": False, "error": "Install timed out (300s)"})
     except Exception as e:

@@ -114,7 +114,7 @@
             <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch_phase', n=done_count + 1) }}
         </button>
         {% endif %}
-        <a href="/epics/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Mission Control">
+        <a href="/epics/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Epic Control">
             <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
         </a>
         <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="{{ _('delete') }}">
@@ -185,7 +185,7 @@ async function runPhase(runId) {
     try {
         const r = await fetch(`/api/epics/${runId}/run`, {method:'POST'});
         const j = await r.json();
-        if (j.status === 'started' || j.redirect) location.href = `/missions/${runId}/control`;
+        if (j.status === 'started' || j.redirect) location.href = `/epics/${runId}/control`;
         else alert(j.error || j.message || _('error_generic'));
     } catch(err) { alert(err); }
 }

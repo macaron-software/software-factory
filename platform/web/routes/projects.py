@@ -88,17 +88,51 @@ def _auto_git_init(project):
 
 @router.get("/projects", response_class=HTMLResponse)
 async def projects_page(request: Request):
-    """Projects list (legacy)."""
+    """Projects list."""
     from ...projects.manager import get_project_store
 
     store = get_project_store()
-    projects = store.list_all()
+    q = request.query_params.get("q", "").strip()
+    factory_type = request.query_params.get("type", "").strip()
+    has_workspace = request.query_params.get("ws", "").strip()
+    all_projects = store.list_all()
+    # Server-side filter
+    projects_raw = [
+        p for p in all_projects
+        if (not q or q.lower() in p.name.lower() or q.lower() in p.id.lower())
+        and (not factory_type or p.factory_type == factory_type)
+    ]
+    projects = [
+        {"info": p, "git": None, "tasks": None, "has_workspace": p.exists}
+        for p in projects_raw
+    ]
+    # Build domain groups (preserving insertion order: domains with projects come first)
+    _domain_order: list[str] = []
+    _domain_map: dict[str, list] = {}
+    for proj in projects:
+        dom = proj["info"].client_domain or ""
+        if dom:
+            if dom not in _domain_map:
+                _domain_order.append(dom)
+                _domain_map[dom] = []
+            _domain_map[dom].append(proj)
+    domain_groups = [{"domain": d, "projects": _domain_map[d]} for d in _domain_order]
+    ungrouped = [p for p in projects if not p["info"].client_domain]
+
     return _templates(request).TemplateResponse(
         "projects.html",
         {
             "request": request,
             "page_title": "Projects",
-            "projects": [{"info": p, "git": None, "tasks": None} for p in projects],
+            "projects": projects,
+            "domain_groups": domain_groups,
+            "ungrouped": ungrouped,
+            "total_pages": 1,
+            "page": 1,
+            "q": q,
+            "factory_type": factory_type,
+            "has_workspace": has_workspace,
+            "total": len(projects),
         },
     )
 
@@ -157,7 +191,7 @@ async def project_git_status(project_id: str):
 async def project_overview(request: Request, project_id: str):
     """Project overview page — created from ideation, shows epic/features/team."""
     from ...projects.manager import get_project_store
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...missions.product import get_product_backlog
     from ...agents.store import get_agent_store
 
@@ -166,8 +200,8 @@ async def project_overview(request: Request, project_id: str):
     if not project:
         return HTMLResponse("<h2>Project not found</h2>", status_code=404)
 
-    mission_store = get_mission_store()
-    epics = mission_store.list_missions(project_id=project_id)
+    epic_store = get_epic_store()
+    epics = epic_store.list_missions(project_id=project_id)
 
     backlog = get_product_backlog()
     agent_store = get_agent_store()
@@ -241,6 +275,212 @@ async def project_overview(request: Request, project_id: str):
             "project": project,
             "epics": epics_enriched,
             "team_agents": team_agents,
+        },
+    )
+
+
+@router.get("/projects/{project_id}/hub", response_class=HTMLResponse)
+async def project_hub(request: Request, project_id: str):
+    """Project Hub — SAFe hierarchy + board + activity + docs."""
+    from ...projects.manager import get_project_store
+    from ...epics.store import get_epic_run_store, get_epic_store
+    from ...missions.product import get_product_backlog
+    from ...sessions.store import get_session_store
+    from ...agents.store import get_agent_store
+
+    ps = get_project_store()
+    project = ps.get(project_id)
+    if not project:
+        return HTMLResponse("<h2>Project not found</h2>", status_code=404)
+
+    epic_store = get_epic_store()
+    proj_epics = epic_store.list_missions(project_id=project_id)
+
+    system_epics = sorted(
+        [e for e in proj_epics if e.category == "system"],
+        key=lambda e: e.wsjf_score, reverse=True,
+    )
+    functional_epics = sorted(
+        [e for e in proj_epics if e.category != "system"],
+        key=lambda e: e.wsjf_score, reverse=True,
+    )
+
+    backlog = get_product_backlog()
+    epics_tree = []
+    for ep in proj_epics:
+        features = backlog.list_features(ep.id)
+        features_data = []
+        for f in features:
+            stories = backlog.list_stories(f.id)
+            features_data.append({
+                "id": f.id, "name": f.name, "status": f.status,
+                "story_points": f.story_points,
+                "stories": [{"id": s.id, "title": s.title, "status": s.status, "story_points": s.story_points} for s in stories],
+            })
+        epics_tree.append({"id": ep.id, "name": ep.name, "status": ep.status,
+            "category": ep.category, "type": ep.type, "wsjf_score": ep.wsjf_score, "features": features_data})
+
+    for ep_data in epics_tree:
+        done = sum(1 for f in ep_data["features"] for s in f["stories"] if s["status"] in ("done","completed"))
+        total_s = sum(len(f["stories"]) for f in ep_data["features"])
+        ep_data["stories_done"] = done
+        ep_data["stories_total"] = total_s
+        ep_data["progress_pct"] = int(done / total_s * 100) if total_s else 0
+        ep_data["kanban_status"] = next((e.kanban_status for e in proj_epics if e.id == ep_data["id"]), "funnel")
+
+    all_stories_backlog = [
+        {**s, "feature": f["name"], "epic": ep_d["name"]}
+        for ep_d in epics_tree for f in ep_d["features"]
+        for s in f["stories"] if s["status"] not in ("done","completed")
+    ]
+
+    _kanban_cols = ["funnel","analyzing","backlog","implementing","done"]
+    epics_kanban = {col: [] for col in _kanban_cols}
+    for ep_data in epics_tree:
+        col = ep_data.get("kanban_status", "funnel")
+        epics_kanban.get(col, epics_kanban["funnel"]).append(ep_data)
+
+    run_store = get_epic_run_store()
+    all_runs_raw = run_store.list_runs(project_id=project_id, limit=50)
+    epic_runs_active, epic_runs_history = [], []
+    for run in all_runs_raw:
+        phases_data = [ph.model_dump() if hasattr(ph,"model_dump") else dict(ph) for ph in run.phases]
+        run_dict = {
+            "id": run.id, "workflow_id": run.workflow_id, "workflow_name": run.workflow_name,
+            "project_id": run.project_id,
+            "status": run.status.value if hasattr(run.status,"value") else str(run.status),
+            "current_phase": run.current_phase, "phases": phases_data,
+            "created_at": run.created_at.isoformat() if run.created_at else "",
+            "completed_at": run.completed_at.isoformat() if run.completed_at else "",
+            "brief": (run.brief or "")[:120],
+        }
+        (epic_runs_active if run_dict["status"] in ("running","pending") else epic_runs_history).append(run_dict)
+
+    current_sprint = None
+    sprint_stories_by_status = {"backlog":[],"in_progress":[],"review":[],"done":[],"blocked":[]}
+    try:
+        for ep in proj_epics:
+            sprints = epic_store.list_sprints(ep.id)
+            active_sp = next((s for s in sprints if s.status == "active"), None)
+            if active_sp:
+                current_sprint = {"id": active_sp.id, "name": active_sp.name, "epic": ep.name}
+                for ep_d in epics_tree:
+                    for f in ep_d["features"]:
+                        for s in f["stories"]:
+                            bucket = s["status"] if s["status"] in sprint_stories_by_status else "backlog"
+                            sprint_stories_by_status[bucket].append({**s, "feature": f["name"], "epic": ep_d["name"]})
+                break
+    except Exception:
+        pass
+
+    memory_docs: dict = {}
+    quality_scores = []
+    try:
+        from ...db import get_db as _get_db
+        _db = _get_db()
+        try:
+            rows = _db.execute(
+                "SELECT id, category, key, value, substr(value,1,300) as excerpt, agent_role, created_at "
+                "FROM memory_project WHERE project_id=? ORDER BY category, created_at DESC", (project_id,),
+            ).fetchall()
+            for r in rows:
+                cat = r["category"] or "general"
+                memory_docs.setdefault(cat, []).append({
+                    "id": r["id"], "category": cat, "key": r["key"],
+                    "excerpt": r["excerpt"], "value": r["value"] or "",
+                    "agent_role": r["agent_role"] or "", "created_at": r["created_at"] or "",
+                })
+            for qr in _db.execute(
+                "SELECT dimension, AVG(score) as avg_score, COUNT(*) as cnt FROM quality_reports "
+                "WHERE project_id=? GROUP BY dimension ORDER BY avg_score DESC", (project_id,)
+            ).fetchall():
+                quality_scores.append({"dimension": qr["dimension"], "avg_score": round(float(qr["avg_score"] or 0),1), "count": qr["cnt"]})
+        finally:
+            _db.close()
+    except Exception as _e:
+        logger.debug("[hub] memory/quality: %s", _e)
+
+    sess_store = get_session_store()
+    sessions = sorted([s for s in sess_store.list_all() if s.project_id == project_id],
+        key=lambda s: s.created_at or "", reverse=True)
+    active_session = None
+    req_sess = request.query_params.get("session")
+    if req_sess:
+        active_session = sess_store.get(req_sess)
+    if not active_session:
+        active_sessions = [s for s in sessions if s.status == "active"]
+        if active_sessions:
+            active_session = active_sessions[0]
+    messages = []
+    if active_session:
+        messages = [m for m in sess_store.get_messages(active_session.id) if m.from_agent != "system"]
+
+    agent_store = get_agent_store()
+    lead = agent_store.get(project.lead_agent_id) if project.lead_agent_id else None
+    lead_avatar_url = ""
+    if lead:
+        _av_dir = Path(__file__).parent.parent / "static" / "avatars"
+        for ext in ("jpg","svg"):
+            if (_av_dir / f"{lead.id}.{ext}").exists():
+                lead_avatar_url = f"/static/avatars/{lead.id}.{ext}"
+                break
+
+    phases = project.phases if hasattr(project, "phases") and project.phases else []
+    active_count = sum(1 for e in proj_epics if e.status == "active")
+    completed_count = sum(1 for e in proj_epics if e.status == "completed")
+    blocked_count = sum(1 for e in proj_epics if e.status == "blocked")
+    total = len(proj_epics) or 1
+    health = max(0, min(100, int((active_count/total)*40 + (completed_count/total)*50 - (blocked_count/total)*30
+        + (20 if project.exists else 0) + (10 if project.has_git else 0))))
+
+    _av_dir2 = Path(__file__).parent.parent / "static" / "avatars"
+    lead_agents_for_personas = []
+    for agent_id in (project.agents or []):
+        a = agent_store.get(agent_id)
+        if not a:
+            continue
+        av_url = ""
+        for ext in ("jpg","svg"):
+            if (_av_dir2 / f"{a.id}.{ext}").exists():
+                av_url = f"/static/avatars/{a.id}.{ext}"
+                break
+        lead_agents_for_personas.append({"name": a.name, "role": getattr(a,"role",""),
+            "color": getattr(a,"color","#333"), "avatar_url": av_url})
+
+    return _templates(request).TemplateResponse(
+        "project_hub.html",
+        {
+            "request": request,
+            "page_title": f"{project.name} — Hub",
+            "project": project,
+            "phases": phases,
+            "system_missions": system_epics,
+            "functional_missions": functional_epics,
+            "epics_tree": epics_tree,
+            "epics_kanban": epics_kanban,
+            "epic_runs_active": epic_runs_active,
+            "epic_runs_history": epic_runs_history,
+            "current_sprint": current_sprint,
+            "sprint_stories_by_status": sprint_stories_by_status,
+            "memory_docs": memory_docs,
+            "quality_scores": quality_scores,
+            "backlog_stories": all_stories_backlog,
+            "health": health,
+            "sessions": sessions[:10],
+            "active_session": active_session,
+            "messages": messages,
+            "lead_agent": lead,
+            "lead_avatar_url": lead_avatar_url,
+            "lead_agents_for_personas": lead_agents_for_personas,
+            "stats": {
+                "total": len(proj_epics),
+                "active": active_count,
+                "completed": completed_count,
+                "blocked": blocked_count,
+                "features": sum(len(e["features"]) for e in epics_tree),
+                "stories": len(all_stories_backlog),
+                "story_points": sum(s.get("story_points") or 0 for ep_d in epics_tree for f in ep_d["features"] for s in f["stories"]),
+            },
         },
     )
 
@@ -326,9 +566,9 @@ async def project_detail(request: Request, project_id: str):
     # Load missions for this project
     project_missions = []
     try:
-        from ...missions.store import get_mission_store
+        from ...epics.store import get_epic_store
 
-        m_store = get_mission_store()
+        m_store = get_epic_store()
         project_missions = m_store.list_missions(project_id=project_id)
     except Exception:
         pass
@@ -352,7 +592,7 @@ async def project_detail(request: Request, project_id: str):
             "messages": messages,
             "memory_files": memory_files,
             "workflows": workflows,
-            "missions": project_missions,
+            "epics": project_missions,
         },
     )
 
@@ -365,7 +605,7 @@ async def project_board_page(request: Request, project_id: str):
     """Kanban board view for a project."""
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store, get_mission_run_store
+    from ...epics.store import get_epic_store, get_epic_run_store
     from ...missions.product import get_product_backlog
 
     proj_store = get_project_store()
@@ -388,17 +628,17 @@ async def project_board_page(request: Request, project_id: str):
             return f"/static/avatars/{agent_id}.svg"
         return ""
 
-    # Build task list from missions + mission_run phases (live)
+    # Build task list from missions + epic_run phases (live)
     tasks = []
     try:
-        m_store = get_mission_store()
-        run_store = get_mission_run_store()
+        m_store = get_epic_store()
+        run_store = get_epic_run_store()
         missions = m_store.list_missions(project_id=project_id)
         all_runs = run_store.list_runs(limit=100)
         runs_by_mission = {}
         for r in all_runs:
-            if r.parent_mission_id:
-                runs_by_mission[r.parent_mission_id] = r
+            if r.parent_epic_id:
+                runs_by_mission[r.parent_epic_id] = r
             runs_by_mission[r.id] = r
 
         status_col = {
@@ -427,7 +667,7 @@ async def project_board_page(request: Request, project_id: str):
                     "agent_name": agent.name if agent else "",
                 }
             )
-            # Also add phases from mission_run as sub-tasks
+            # Also add phases from epic_run as sub-tasks
             run = runs_by_mission.get(m.id)
             if run and run.phases:
                 phase_col_map = {
@@ -1750,7 +1990,7 @@ async def ws_metrics(project_id: str, request: Request):
     try:
         active_agents = (
             db.execute(
-                "SELECT COUNT(DISTINCT agent_id) FROM mission_runs WHERE project_id=? AND status='running'",
+                "SELECT COUNT(DISTINCT agent_id) FROM epic_runs WHERE project_id=? AND status='running'",
                 (project_id,),
             ).fetchone()[0]
             or 0
@@ -1783,7 +2023,7 @@ async def ws_metrics(project_id: str, request: Request):
     try:
         active_missions = (
             db.execute(
-                "SELECT COUNT(*) FROM mission_runs WHERE project_id=? AND status='running'",
+                "SELECT COUNT(*) FROM epic_runs WHERE project_id=? AND status='running'",
                 (project_id,),
             ).fetchone()[0]
             or 0
@@ -1810,7 +2050,7 @@ async def ws_metrics(project_id: str, request: Request):
             "active_agents": active_agents,
             "tool_calls_last_hour": calls_h,
             "files_written": files_w,
-            "mission_runs_active": active_missions,
+            "epic_runs_active": active_missions,
             "last_commit_hash": last_hash,
             "last_commit_msg": last_msg,
         }
@@ -1930,7 +2170,7 @@ async def ws_agents(project_id: str, request: Request):
     try:
         rows = db.execute(
             "SELECT mr.agent_id, mr.status, mr.phase, mr.progress, m.title, s.id "
-            "FROM mission_runs mr LEFT JOIN missions m ON mr.mission_id=m.id "
+            "FROM epic_runs mr LEFT JOIN epics m ON mr.mission_id=m.id "
             "LEFT JOIN sessions s ON s.project_id=mr.project_id "
             "WHERE mr.project_id=? AND mr.status IN ('running','active') "
             "ORDER BY mr.started_at DESC LIMIT 20",
@@ -1968,7 +2208,7 @@ async def ws_backlog(project_id: str, request: Request):
     missions = []
     try:
         rows = db.execute(
-            "SELECT id, title, status, type, goal FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 30",
+            "SELECT id, title, status, type, goal FROM epics WHERE project_id=? ORDER BY created_at DESC LIMIT 30",
             (project_id,),
         ).fetchall()
         for row in rows:
@@ -2001,7 +2241,7 @@ async def ws_backlog(project_id: str, request: Request):
     except Exception:
         pass
     db.close()
-    return JSONResponse({"missions": missions})
+    return JSONResponse({"epics": missions})
 
 
 # ── Docker ────────────────────────────────────────────────────────────────────
@@ -2092,91 +2332,6 @@ async def ws_docker_action(project_id: str, action: str, request: Request):
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     return JSONResponse({"ok": True})
-
-
-# ── Database browser ──────────────────────────────────────────────────────────
-
-
-@router.get("/api/projects/{project_id}/workspace/db")
-async def ws_db_list(project_id: str, request: Request):
-    import sqlite3 as _sq
-
-    proj = _get_proj(project_id)
-    if not proj or not proj.path:
-        return JSONResponse({"databases": []})
-    p = Path(proj.path)
-    dbs = []
-    for db_file in sorted(p.rglob("*.db")):
-        if any(
-            skip in str(db_file) for skip in ("node_modules", ".git", "__pycache__")
-        ):
-            continue
-        tables = []
-        try:
-            conn = _sq.connect(str(db_file), timeout=5)
-            table_names = [
-                r[0]
-                for r in conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                ).fetchall()
-            ]
-            for tname in table_names:
-                try:
-                    count = conn.execute(f"SELECT COUNT(*) FROM '{tname}'").fetchone()[
-                        0
-                    ]
-                    cols = [
-                        {
-                            "name": r[1],
-                            "type": r[2],
-                            "notnull": bool(r[3]),
-                            "pk": bool(r[5]),
-                        }
-                        for r in conn.execute(
-                            f"PRAGMA table_info('{tname}')"
-                        ).fetchall()
-                    ]
-                    tables.append({"name": tname, "rows": count, "columns": cols})
-                except Exception:
-                    pass
-            conn.close()
-        except Exception:
-            pass
-        dbs.append({"file": str(db_file.relative_to(p)), "tables": tables})
-    return JSONResponse({"databases": dbs})
-
-
-@router.post("/api/projects/{project_id}/workspace/db/query")
-async def ws_db_query(project_id: str, request: Request):
-    import sqlite3 as _sq
-
-    proj = _get_proj(project_id)
-    if not proj or not proj.path:
-        return JSONResponse({"error": "Not found"}, status_code=404)
-    body = await request.json()
-    db_file = body.get("file", "")
-    sql = body.get("sql", "").strip()
-    if not sql:
-        return JSONResponse({"error": "SQL required"}, status_code=400)
-    target = (Path(proj.path) / db_file).resolve()
-    try:
-        target.relative_to(Path(proj.path))
-    except ValueError:
-        return JSONResponse({"error": "Access denied"}, status_code=403)
-    try:
-        conn = _sq.connect(str(target), timeout=10)
-        conn.row_factory = _sq.Row
-        cur = conn.execute(sql)
-        if cur.description:
-            cols = [d[0] for d in cur.description]
-            rows = [list(r) for r in cur.fetchmany(200)]
-            conn.close()
-            return JSONResponse({"columns": cols, "rows": rows})
-        conn.commit()
-        conn.close()
-        return JSONResponse({"ok": True, "rowcount": cur.rowcount})
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=400)
 
 
 # ── Secrets / .env ────────────────────────────────────────────────────────────
@@ -2275,7 +2430,7 @@ async def ws_timeline(project_id: str, request: Request, filter: str = "all"):
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT title, status, created_at FROM missions WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
+                "SELECT title, status, created_at FROM epics WHERE project_id=? ORDER BY created_at DESC LIMIT 10",
                 (project_id,),
             ).fetchall()
             for r in rows:

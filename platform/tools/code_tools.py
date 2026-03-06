@@ -15,11 +15,16 @@ from .registry import BaseTool
 # Allowed base directories for code_write / code_edit operations.
 # Paths MUST resolve to one of these prefixes or they are rejected.
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent  # repo root
+# _CWD_DATA: for systemd deployments where WorkingDirectory != code dir
+# (e.g. Innovation: code in /home/sfadmin/slots/green/, data in /home/sfadmin/data/)
+_CWD_DATA = Path(os.getcwd()).resolve()
 _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
-    _BASE_DIR / "data" / "workspaces",   # agent mission workspaces
-    _BASE_DIR / "workspaces",             # project workspaces (supabase-lite etc.)
-    _BASE_DIR / "tests",                  # test files
-    Path("/tmp"),                          # scratch
+    _BASE_DIR / "data" / "workspaces",  # agent mission workspaces
+    _CWD_DATA / "data" / "workspaces",  # systemd deployments (cwd != code dir)
+    _BASE_DIR / "workspaces",  # project workspaces (supabase-lite etc.)
+    _CWD_DATA / "workspaces",
+    _BASE_DIR / "tests",  # test files
+    Path("/tmp"),  # scratch
 )
 
 
@@ -76,8 +81,15 @@ class CodeWriteTool(BaseTool):
             return "Error: path required"
         # Reject placeholder/slop content
         stripped = content.strip()
-        if stripped in ("// your code here\n...", "// your code here", "// TODO", "..."):
-            return "Error: placeholder content rejected — write real implementation code"
+        if stripped in (
+            "// your code here\n...",
+            "// your code here",
+            "// TODO",
+            "...",
+        ):
+            return (
+                "Error: placeholder content rejected — write real implementation code"
+            )
         if len(stripped) < 10 and not path.endswith((".env", ".gitignore", ".gitkeep")):
             return f"Error: content too short ({len(stripped)} chars) — write real code"
         # Resolve symlinks to prevent path traversal
@@ -85,8 +97,10 @@ class CodeWriteTool(BaseTool):
         # Workspace restriction: reject writes outside allowed directories
         if not _is_path_allowed(path):
             import logging as _log_cw
+
             _log_cw.getLogger(__name__).warning(
-                "code_write BLOCKED: agent=%s path=%s", getattr(agent, 'id', '?'), path)
+                "code_write BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
+            )
             return f"Error: path '{path}' is outside allowed workspace directories"
         try:
             p = Path(path)
@@ -115,15 +129,18 @@ class CodeEditTool(BaseTool):
         # Workspace restriction
         if not _is_path_allowed(path):
             import logging as _log_ce
+
             _log_ce.getLogger(__name__).warning(
-                "code_edit BLOCKED: agent=%s path=%s", getattr(agent, 'id', '?'), path)
+                "code_edit BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
+            )
             return f"Error: path '{path}' is outside allowed workspace directories"
         try:
             content = Path(path).read_text()
             if old not in content:
                 # Fuzzy fallback: normalize whitespace (trailing spaces, CRLF, indent drift)
                 import re as _re
-                _norm = lambda s: _re.sub(r'[ \t]+\n', '\n', s.replace('\r\n', '\n'))
+
+                _norm = lambda s: _re.sub(r"[ \t]+\n", "\n", s.replace("\r\n", "\n"))
                 old_n, content_n = _norm(old), _norm(content)
                 if old_n in content_n:
                     # Apply on normalized content

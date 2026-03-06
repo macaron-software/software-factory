@@ -198,11 +198,11 @@ class MissionSimulator:
         Returns a dict mapping phase_id → new status.
         """
         try:
-            from ..missions.store import PhaseStatus, get_mission_store
+            from ..epics.store import PhaseStatus, get_epic_store
         except ImportError as exc:
             raise RuntimeError("Mission store not available") from exc
 
-        ms = get_mission_store()
+        ms = get_epic_store()
         mission = ms.get(mission_id)
         if not mission:
             raise ValueError(f"Mission {mission_id!r} not found")

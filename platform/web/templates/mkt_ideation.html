@@ -167,6 +167,7 @@
 </div>
 
 <script>
+(function(){
 /* ── Agent data from server ── */
 var MKT_AGENTS = {{ agents | tojson }};
 var MKT_COLORS = {};
@@ -1093,5 +1094,17 @@ async function mktLoadSession(sessionId) {
 
 /* ── Init graph after htmx swap ── */
 setTimeout(mktBuildGraph, 200);
+/* ── Expose onclick functions to global scope ── */
+window.mktToggleSection = mktToggleSection;
+window.mktToggleSidebar = mktToggleSidebar;
+window.mktSetPrompt = mktSetPrompt;
+window.mktClosePopover = mktClosePopover;
+window.mktSend = mktSend;
+window.mktGeneratePlan = mktGeneratePlan;
+window.mktClosePlan = mktClosePlan;
+window.mktExportMarkdown = mktExportMarkdown;
+window.mktCreateMission = mktCreateMission;
+window.mktLoadSession = mktLoadSession;
+})();
 </script>
 

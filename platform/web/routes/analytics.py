@@ -194,9 +194,9 @@ async def get_skills_cache_stats() -> dict[str, Any]:
 async def get_missions_status() -> MissionsStatusResponse:
     """Get missions distribution by status."""
     try:
-        from ...missions.store import get_mission_store
+        from ...epics.store import get_epic_store
 
-        store = get_mission_store()
+        store = get_epic_store()
         missions = store.list_missions(limit=1000)
 
         # Count by status
@@ -231,9 +231,9 @@ async def get_missions_status() -> MissionsStatusResponse:
 async def get_missions_performance() -> dict[str, Any]:
     """Get missions performance metrics."""
     try:
-        from ...missions.store import get_mission_store
+        from ...epics.store import get_epic_store
 
-        store = get_mission_store()
+        store = get_epic_store()
         missions = store.list_missions(limit=1000)
 
         # Calculate metrics
@@ -425,7 +425,7 @@ async def get_system_health() -> SystemHealthResponse:
 
         db = get_db()
 
-        # Database size (only meaningful for SQLite)
+        # Database size
         db_path = "platform.db"
         db_size_mb = (
             os.path.getsize(db_path) / (1024 * 1024) if os.path.exists(db_path) else 0
@@ -438,7 +438,7 @@ async def get_system_health() -> SystemHealthResponse:
             ).fetchall()
         else:
             tables_raw = db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE 'pg_%'"
             ).fetchall()
 
         table_stats = []
@@ -500,7 +500,7 @@ async def get_analytics_overview() -> dict[str, Any]:
                     "top": top_skills.data[:5] if top_skills.success else [],
                     "cache": cache_stats.get("data", {}),
                 },
-                "missions": {
+                "epics": {
                     "status": missions_status.data if missions_status.success else {},
                     "performance": (
                         missions_perf.get("data", {}) if missions_perf else {}
@@ -675,11 +675,10 @@ async def get_failure_analysis() -> dict[str, Any]:
         from ...db.migrations import get_db
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         # 1. Error category classification (Python-based for accuracy)
         all_failed = db.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE status = 'failed'"
+            "SELECT id, phases_json FROM epic_runs WHERE status = 'failed'"
         ).fetchall()
 
         cat_counts: dict[str, int] = {}
@@ -717,7 +716,7 @@ async def get_failure_analysis() -> dict[str, Any]:
         # 2. Phase failure heatmap — which phases fail most
         phase_failures = []
         rows = db.execute("""
-            SELECT id, phases_json FROM mission_runs
+            SELECT id, phases_json FROM epic_runs
             WHERE status IN ('failed', 'paused') AND phases_json != '[]'
         """).fetchall()
 
@@ -762,7 +761,7 @@ async def get_failure_analysis() -> dict[str, Any]:
 
         # 3. Resumable runs — paused runs that can be auto-resumed
         resumable = db.execute("""
-            SELECT COUNT(*) as cnt FROM mission_runs mr
+            SELECT COUNT(*) as cnt FROM epic_runs mr
             JOIN sessions s ON mr.session_id = s.id
             WHERE mr.status = 'paused'
             AND s.status IN ('interrupted', 'paused', 'active')
@@ -770,14 +769,14 @@ async def get_failure_analysis() -> dict[str, Any]:
 
         # 4. Run status summary
         run_stats = db.execute("""
-            SELECT status, COUNT(*) as cnt FROM mission_runs GROUP BY status
+            SELECT status, COUNT(*) as cnt FROM epic_runs GROUP BY status
         """).fetchall()
 
         # 5. Recent failures (last 20)
         recent = db.execute("""
             SELECT mr.id, mr.workflow_name, mr.current_phase, mr.status,
                    mr.created_at, mr.updated_at
-            FROM mission_runs mr
+            FROM epic_runs mr
             WHERE mr.status = 'failed'
             ORDER BY mr.updated_at DESC LIMIT 20
         """).fetchall()
@@ -821,11 +820,10 @@ async def resume_all_paused() -> dict[str, Any]:
         from ...workflows.store import get_workflow_store, run_workflow
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         paused = db.execute("""
             SELECT mr.session_id, mr.id, s.config_json
-            FROM mission_runs mr
+            FROM epic_runs mr
             JOIN sessions s ON mr.session_id = s.id
             WHERE mr.status = 'paused'
             AND s.status IN ('interrupted', 'paused')
@@ -855,7 +853,7 @@ async def resume_all_paused() -> dict[str, Any]:
 
                 db.execute("UPDATE sessions SET status='active' WHERE id=?", (sid,))
                 db.execute(
-                    "UPDATE mission_runs SET status='running' WHERE session_id=?",
+                    "UPDATE epic_runs SET status='running' WHERE session_id=?",
                     (sid,),
                 )
                 db.commit()
@@ -936,7 +934,6 @@ async def get_agent_scores() -> dict[str, Any]:
         from ...db.migrations import get_db
 
         db = get_db()
-        db.row_factory = __import__("sqlite3").Row
 
         # Ensure agent_scores table exists
         db.execute("""
@@ -1061,7 +1058,7 @@ async def get_cost_analytics(period: str = "7d") -> dict[str, Any]:
                 ROUND(SUM(t.cost_usd), 4) as cost_usd,
                 COUNT(DISTINCT mr.id) as missions
             FROM llm_traces t
-            LEFT JOIN mission_runs mr ON mr.session_id = t.session_id
+            LEFT JOIN epic_runs mr ON mr.session_id = t.session_id
             WHERE t.created_at >= {since}
             GROUP BY COALESCE(mr.project_id, 'unknown')
             ORDER BY cost_usd DESC
@@ -1129,7 +1126,7 @@ async def get_cost_analytics(period: str = "7d") -> dict[str, Any]:
                     "tokens": int(
                         r["tokens_total"] if hasattr(r, "keys") else r[2] or 0
                     ),
-                    "missions": int(r["missions"] if hasattr(r, "keys") else r[4] or 0),
+                    "epics": int(r["epics"] if hasattr(r, "keys") else r[4] or 0),
                 }
                 for r in project_rows
             ],

@@ -15,9 +15,10 @@ import hashlib
 import json
 import logging
 import os
-import sqlite3
 import time
 from pathlib import Path
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -35,14 +36,19 @@ def _cache_key(
 ) -> str:
     """Deterministic hash of the request parameters."""
     payload = json.dumps(
-        {"model": model, "messages": messages, "temperature": temperature, "tools": tools or []},
+        {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "tools": tools or [],
+        },
         sort_keys=True,
         ensure_ascii=False,
     )
     return hashlib.sha256(payload.encode()).hexdigest()
 
 
-def _ensure_table(db: sqlite3.Connection) -> None:
+def _ensure_table(db) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS llm_cache (
             cache_key   TEXT PRIMARY KEY,
@@ -55,20 +61,20 @@ def _ensure_table(db: sqlite3.Connection) -> None:
             hit_count   INTEGER DEFAULT 0
         )
     """)
-    db.execute("CREATE INDEX IF NOT EXISTS idx_llm_cache_created ON llm_cache(created_at)")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_llm_cache_created ON llm_cache(created_at)"
+    )
 
 
 class LLMCache:
-    """SQLite-backed LLM response cache."""
+    """PostgreSQL-backed LLM response cache."""
 
     def __init__(self, db_path: Path | str | None = None):
-        self._db_path = Path(db_path) if db_path else _DB_PATH
         self._stats = {"hits": 0, "misses": 0, "evictions": 0, "tokens_saved": 0}
         self._initialized = False
 
-    def _db(self) -> sqlite3.Connection:
-        db = sqlite3.connect(str(self._db_path))
-        db.row_factory = sqlite3.Row
+    def _db(self):
+        db = get_connection()
         if not self._initialized:
             _ensure_table(db)
             self._initialized = True
@@ -88,7 +94,9 @@ class LLMCache:
         key = _cache_key(model, messages, temperature, tools)
         db = self._db()
         try:
-            row = db.execute("SELECT * FROM llm_cache WHERE cache_key = ?", (key,)).fetchone()
+            row = db.execute(
+                "SELECT * FROM llm_cache WHERE cache_key = ?", (key,)
+            ).fetchone()
             if row is None:
                 self._stats["misses"] += 1
                 return None
@@ -102,7 +110,8 @@ class LLMCache:
 
             # Cache hit
             db.execute(
-                "UPDATE llm_cache SET hit_count = hit_count + 1 WHERE cache_key = ?", (key,)
+                "UPDATE llm_cache SET hit_count = hit_count + 1 WHERE cache_key = ?",
+                (key,),
             )
             db.commit()
             self._stats["hits"] += 1

@@ -126,7 +126,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 2: SAFe Backlog & Planning ────────────────────────────────────────
     {
         "id": "epic-backlog",
@@ -204,7 +203,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 3: Agent Management ────────────────────────────────────────────────
     {
         "id": "epic-agents",
@@ -280,7 +278,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 4: Knowledge & Memory ─────────────────────────────────────────────
     {
         "id": "epic-knowledge",
@@ -343,7 +340,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 5: Automation & Workflows ─────────────────────────────────────────
     {
         "id": "epic-automation",
@@ -356,7 +352,12 @@ SAFE_MAP = [
                 "description": "Création et gestion de workflows d'automatisation multi-agents.",
                 "persona": "Tech Lead",
                 "rbac": ROLES["dev_up"],
-                "pages": ["/workflows", "/workflows/new", "/workflows/list", "/workflows/evolution"],
+                "pages": [
+                    "/workflows",
+                    "/workflows/new",
+                    "/workflows/list",
+                    "/workflows/evolution",
+                ],
                 "stories": [
                     "Créer un nouveau workflow d'automatisation",
                     "Visualiser la liste des workflows actifs",
@@ -407,7 +408,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 6: Observability & Ops ────────────────────────────────────────────
     {
         "id": "epic-observability",
@@ -483,7 +483,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 7: Configuration & Administration ─────────────────────────────────
     {
         "id": "epic-admin",
@@ -496,7 +495,7 @@ SAFE_MAP = [
                 "description": "Configuration globale : LLM, intégrations, notifications, clés API.",
                 "persona": "Admin Plateforme",
                 "rbac": ROLES["admin_only"],
-                "pages": ["/settings"],
+                "pages": ["/settings", "/setup", "/login"],
                 "stories": [
                     "Configurer le fournisseur LLM par défaut",
                     "Gérer les clés API des intégrations tierces",
@@ -548,7 +547,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 8: Idéation & Innovation ──────────────────────────────────────────
     {
         "id": "epic-ideation",
@@ -623,7 +621,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 9: Intégrations Externes ──────────────────────────────────────────
     {
         "id": "epic-integrations",
@@ -696,7 +693,6 @@ SAFE_MAP = [
             },
         ],
     },
-
     # ── EPIC 10: Annotation & Traceability ─────────────────────────────────────
     {
         "id": "epic-annotation",
@@ -741,16 +737,22 @@ def run():
         except Exception:
             pass
         try:
-            db.execute("ALTER TABLE project_screens ADD COLUMN rbac_roles TEXT DEFAULT '[]'")
+            db.execute(
+                "ALTER TABLE project_screens ADD COLUMN rbac_roles TEXT DEFAULT '[]'"
+            )
         except Exception:
             pass
 
     # ── Programme ───────────────────────────────────────────────────────────────
     db.execute(
         "INSERT OR REPLACE INTO org_portfolios (id, name, description) VALUES (?,?,?)",
-        (PROGRAMME_ID, PROGRAMME_NAME, "Plateforme d'orchestration d'agents IA — Software Factory"),
+        (
+            PROGRAMME_ID,
+            PROGRAMME_NAME,
+            "Plateforme d'orchestration d'agents IA — Software Factory",
+        ),
     )
-    print(f"✓ Programme: {PROGRAMME_NAME}")
+    print(f"[ok] Programme: {PROGRAMME_NAME}")
 
     total_features = total_stories = total_screens = 0
 
@@ -758,7 +760,13 @@ def run():
         # ── Epic ────────────────────────────────────────────────────────────────
         db.execute(
             "INSERT OR REPLACE INTO epics (id, programme_id, name, description, status) VALUES (?,?,?,?,?)",
-            (epic_def["id"], PROGRAMME_ID, epic_def["name"], epic_def["description"], "in_progress"),
+            (
+                epic_def["id"],
+                PROGRAMME_ID,
+                epic_def["name"],
+                epic_def["description"],
+                "in_progress",
+            ),
         )
         print(f"\n  Epic: {epic_def['name']}")
 
@@ -784,10 +792,16 @@ def run():
 
             # ── User Stories ─────────────────────────────────────────────────────
             for i, story in enumerate(feat_def.get("stories", [])):
-                story_id = f"{feat_def['id']}-s{i+1:02d}"
+                story_id = f"{feat_def['id']}-s{i + 1:02d}"
                 db.execute(
                     "INSERT OR REPLACE INTO user_stories (id, feature_id, title, status, priority) VALUES (?,?,?,?,?)",
-                    (story_id, feat_def["id"], story, "backlog", len(feat_def["stories"]) - i),
+                    (
+                        story_id,
+                        feat_def["id"],
+                        story,
+                        "backlog",
+                        len(feat_def["stories"]) - i,
+                    ),
                 )
                 total_stories += 1
 
@@ -797,23 +811,37 @@ def run():
                 if "{" in page_url:
                     continue
                 screen_id = slug(page_url)
-                screen_name = page_url.strip("/").replace("-", " ").replace("/", " — ").title() or "Home"
+                screen_name = (
+                    page_url.strip("/").replace("-", " ").replace("/", " — ").title()
+                    or "Home"
+                )
                 db.execute(
                     "INSERT OR REPLACE INTO project_screens "
                     "(id, project_id, name, page_url, feature_id, rbac_roles) "
                     "VALUES (?,?,?,?,?,?)",
-                    (screen_id, "_sf", screen_name, page_url, feat_def["id"], rbac_json),
+                    (
+                        screen_id,
+                        "_sf",
+                        screen_name,
+                        page_url,
+                        feat_def["id"],
+                        rbac_json,
+                    ),
                 )
                 total_screens += 1
 
-            print(f"    Feature: {feat_def['name']} | persona={feat_def.get('persona','')} | {len(feat_def.get('pages',[]))} pages | {len(feat_def.get('stories',[]))} stories | rbac={feat_def.get('rbac',[])}")
+            print(
+                f"    Feature: {feat_def['name']} | persona={feat_def.get('persona', '')} | {len(feat_def.get('pages', []))} pages | {len(feat_def.get('stories', []))} stories | rbac={feat_def.get('rbac', [])}"
+            )
 
     try:
         db.commit()
     except Exception:
         pass
 
-    print(f"\n✅ Done: {len(SAFE_MAP)} epics | {total_features} features | {total_stories} stories | {total_screens} screens")
+    print(
+        f"\nDone: {len(SAFE_MAP)} epics | {total_features} features | {total_stories} stories | {total_screens} screens"
+    )
 
 
 if __name__ == "__main__":

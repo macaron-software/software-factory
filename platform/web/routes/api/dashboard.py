@@ -17,15 +17,15 @@ logger = logging.getLogger(__name__)
 async def dashboard_kpis(request: Request, perspective: str = "admin"):
     """KPI cards adapted to perspective."""
     from ....agents.store import get_agent_store
-    from ....missions.store import get_mission_run_store, get_mission_store
+    from ....epics.store import get_epic_run_store, get_epic_store
     from ....sessions.store import get_session_store
 
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
     agent_store = get_agent_store()
     session_store = get_session_store()
 
-    missions = mission_store.list_missions(limit=500)
+    missions = epic_store.list_missions(limit=500)
     runs = run_store.list_runs(limit=500)
     agents = agent_store.list_all()
     sessions = session_store.list_all(limit=100)
@@ -108,13 +108,13 @@ async def dashboard_kpis(request: Request, perspective: str = "admin"):
 @router.get("/api/dashboard/missions")
 async def dashboard_missions(request: Request):
     """Active missions with progress bars."""
-    from ....missions.store import get_mission_run_store, get_mission_store
+    from ....epics.store import get_epic_run_store, get_epic_store
 
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
-    missions = mission_store.list_missions(limit=50)
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
+    missions = epic_store.list_missions(limit=50)
     runs = run_store.list_runs(limit=50)
-    runs_map = {r.parent_mission_id: r for r in runs if r.parent_mission_id}
+    runs_map = {r.parent_epic_id: r for r in runs if r.parent_epic_id}
 
     html = ""
     active = [m for m in missions if m.status in ("active", "running")][:8]
@@ -141,12 +141,49 @@ async def dashboard_missions(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/dashboard/features")
+async def dashboard_features(request: Request):
+    """Active features with progress bars."""
+    from ....db.migrations import get_db
+
+    db = get_db()
+    try:
+        rows = db.execute(
+            "SELECT id, title, status, story_points FROM features"
+            " WHERE status IN ('in_progress','active','running')"
+            " ORDER BY updated_at DESC LIMIT 8"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        db.close()
+
+    if not rows:
+        return HTMLResponse('<p class="text-muted">No active features</p>')
+
+    html = ""
+    for r in rows:
+        name = html_mod.escape((r["title"] or r["id"])[:40])
+        sp = r["story_points"] or ""
+        badge = (
+            f'<span style="font-size:0.65rem;color:var(--text-secondary);margin-left:4px">{sp}sp</span>'
+            if sp
+            else ""
+        )
+        html += f"""<div class="dash-mission">
+            <div class="dash-mission-name">{name}{badge}</div>
+            <div class="dash-mission-bar"><div class="dash-mission-fill" style="width:50%;background:var(--purple)"></div></div>
+            <div class="dash-mission-pct" style="color:var(--purple)">active</div>
+        </div>"""
+    return HTMLResponse(html)
+
+
 @router.get("/api/dashboard/sprints")
 async def dashboard_sprints(request: Request):
     """Active sprints summary."""
-    from ....missions.store import get_mission_store
+    from ....epics.store import get_epic_store
 
-    store = get_mission_store()
+    store = get_epic_store()
     try:
         sprints = store.list_sprints(limit=10)
     except Exception:
@@ -174,9 +211,9 @@ async def dashboard_sprints(request: Request):
 @router.get("/api/dashboard/backlog")
 async def dashboard_backlog(request: Request):
     """Backlog stats for PO."""
-    from ....missions.store import get_mission_store
+    from ....epics.store import get_epic_store
 
-    store = get_mission_store()
+    store = get_epic_store()
     try:
         features = store.list_features(limit=100)
     except Exception:
@@ -244,6 +281,12 @@ async def dashboard_quality(request: Request):
     return HTMLResponse(html)
 
 
+@router.get("/api/dashboard/overview-quality", response_class=HTMLResponse)
+async def dashboard_overview_quality(request: Request):
+    """Alias for dashboard_quality — used by dsi.html panel."""
+    return await dashboard_quality(request)
+
+
 @router.get("/api/quality/{project_id}")
 async def api_quality_project(request: Request, project_id: str):
     """Get quality scorecard for a project."""
@@ -283,23 +326,36 @@ async def dashboard_quality_badge(request: Request, project_id: str = ""):
         try:
             from ....projects.manager import get_project_store
             from pathlib import Path as _P
+
             proj = get_project_store().get(project_id)
             if not proj:
                 return HTMLResponse("")
             badges = []
-            _st = 'display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-secondary)'
+            _st = "display:inline-flex;align-items:center;gap:3px;font-size:0.72rem;padding:1px 6px;border-radius:4px;border:1px solid var(--border);color:var(--text-secondary);background:var(--bg-secondary)"
             # Workspace
             if proj.exists:
-                badges.append(f'<span style="{_st}" title="{proj.path}">workspace</span>')
+                badges.append(
+                    f'<span style="{_st}" title="{proj.path}">workspace</span>'
+                )
             # Git
             if proj.has_git:
-                badges.append(f'<span style="{_st};color:#f59e0b;border-color:#f59e0b22">git</span>')
+                badges.append(
+                    f'<span style="{_st};color:#f59e0b;border-color:#f59e0b22">git</span>'
+                )
             # Docker
             p = _P(proj.path)
-            if (p / "Dockerfile").exists() or (p / "docker-compose.yml").exists() or (p / "docker-compose.yaml").exists():
-                badges.append(f'<span style="{_st};color:#3b82f6;border-color:#3b82f622">docker</span>')
+            if (
+                (p / "Dockerfile").exists()
+                or (p / "docker-compose.yml").exists()
+                or (p / "docker-compose.yaml").exists()
+            ):
+                badges.append(
+                    f'<span style="{_st};color:#3b82f6;border-color:#3b82f622">docker</span>'
+                )
             if badges:
-                return HTMLResponse(f'<span style="display:inline-flex;gap:4px;flex-wrap:wrap">{"".join(badges)}</span>')
+                return HTMLResponse(
+                    f'<span style="display:inline-flex;gap:4px;flex-wrap:wrap">{"".join(badges)}</span>'
+                )
         except Exception:
             pass
         return HTMLResponse("")

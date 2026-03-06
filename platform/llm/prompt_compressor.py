@@ -201,10 +201,13 @@ def compress_messages(
     )
 
 
-def record_compression_stats(provider: str, original_tokens: int, compressed_tokens: int, savings_pct: float) -> None:
+def record_compression_stats(
+    provider: str, original_tokens: int, compressed_tokens: int, savings_pct: float
+) -> None:
     """Persist compression stats to DB (fire-and-forget, no exception propagation)."""
     try:
         from ..db.migrations import get_db
+
         db = get_db()
         try:
             db.execute(

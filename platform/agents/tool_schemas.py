@@ -107,6 +107,56 @@ def _core_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "git_create_branch",
+                "description": "Create and checkout a named git branch. Use before starting feature work to ensure delivery lands on a clean named branch (e.g. 'feature/sav-parcours').",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "branch": {
+                            "type": "string",
+                            "description": "Branch name to create (required), e.g. 'feature/sav-parcours'",
+                        },
+                        "cwd": {
+                            "type": "string",
+                            "description": "Workspace path (default: project root)",
+                        },
+                        "from_branch": {
+                            "type": "string",
+                            "description": "Base branch to branch from (default: current HEAD)",
+                        },
+                    },
+                    "required": ["branch"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "git_clone",
+                "description": "Clone a remote git repository into a local workspace. Use to onboard existing projects.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "HTTPS or SSH git remote URL (required)",
+                        },
+                        "dest": {
+                            "type": "string",
+                            "description": "Local destination path (default: auto-derived from repo name in workspace/)",
+                        },
+                        "branch": {
+                            "type": "string",
+                            "description": "Branch or tag to checkout (default: default branch)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "git_status",
                 "description": "Show git status of the project.",
                 "parameters": {
@@ -193,6 +243,59 @@ def _core_schemas() -> list[dict]:
                     },
                     "required": ["key", "value"],
                 },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_create",
+                "description": "Create an execution plan before tackling a complex task. Use this to break down multi-step work into trackable steps.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "description": "Short plan title"},
+                        "steps": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Ordered list of steps to execute",
+                        },
+                    },
+                    "required": ["title", "steps"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_update",
+                "description": "Update a step status in the current plan.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "step": {
+                            "type": "integer",
+                            "description": "Step number (1-based)",
+                        },
+                        "status": {
+                            "type": "string",
+                            "enum": ["in_progress", "done", "blocked", "skipped"],
+                            "description": "New status for the step",
+                        },
+                        "result": {
+                            "type": "string",
+                            "description": "Optional short result/note",
+                        },
+                    },
+                    "required": ["step", "status"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "plan_get",
+                "description": "Get the current plan and progress.",
+                "parameters": {"type": "object", "properties": {}},
             },
         },
         {
@@ -1414,6 +1517,149 @@ def _build_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Pentest / Offensive security tools ──
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_portscan",
+                "description": "nmap port scan — detect open ports and service versions on a target host.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "description": "Hostname or IP to scan",
+                        },
+                        "ports": {
+                            "type": "string",
+                            "description": "Port range, e.g. '1-1000' or '80,443,8080'",
+                        },
+                    },
+                    "required": ["target"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_subdomain",
+                "description": "Enumerate subdomains of a domain using subfinder (passive recon).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "domain": {
+                            "type": "string",
+                            "description": "Target domain, e.g. example.com",
+                        },
+                    },
+                    "required": ["domain"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "recon_fingerprint",
+                "description": "Identify tech stack, framework, CMS, server software on a URL using whatweb.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_fuzz_api",
+                "description": "Fuzz API endpoints using schemathesis — finds 5xx errors, injection vectors in OpenAPI/GraphQL APIs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "API base URL"},
+                        "schema": {
+                            "type": "string",
+                            "description": "Path to OpenAPI schema file or URL (default: /openapi.json)",
+                        },
+                        "max_examples": {
+                            "type": "integer",
+                            "description": "Max test cases per endpoint (default: 10)",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_inject",
+                "description": "Test a URL parameter for SQL/command injection. Sends payloads and analyzes error responses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                        "param": {
+                            "type": "string",
+                            "description": "Parameter name to test",
+                        },
+                        "method": {
+                            "type": "string",
+                            "enum": ["GET", "POST"],
+                            "description": "HTTP method",
+                        },
+                        "type": {
+                            "type": "string",
+                            "enum": ["sqli", "cmd", "ldap"],
+                            "description": "Injection type",
+                        },
+                    },
+                    "required": ["url", "param"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_auth",
+                "description": "Test authentication bypass: default credentials, forced browsing, missing security headers.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target base URL"},
+                        "auth_url": {
+                            "type": "string",
+                            "description": "Login endpoint URL",
+                        },
+                        "protected_url": {
+                            "type": "string",
+                            "description": "URL that should require authentication",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "pentest_ssrf",
+                "description": "Test a URL parameter for Server-Side Request Forgery (SSRF). Probes internal addresses.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "Target URL"},
+                        "param": {
+                            "type": "string",
+                            "description": "Parameter that accepts a URL (default: 'url')",
+                        },
+                    },
+                    "required": ["url"],
+                },
+            },
+        },
         # ── Ticket/Incident management tools ──
         {
             "type": "function",
@@ -1804,7 +2050,7 @@ def _platform_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "create_project",
-                "description": "Create a new project on the platform. Returns the project id and name.",
+                "description": "Create a new project on the platform. If git_url is provided, clones the existing repo as workspace. Otherwise scaffolds from scratch. Returns the project id and workspace path.",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -1812,9 +2058,17 @@ def _platform_schemas() -> list[dict]:
                             "type": "string",
                             "description": "Project name (required)",
                         },
+                        "git_url": {
+                            "type": "string",
+                            "description": "HTTPS or SSH URL of existing repo to clone as workspace (optional — leave empty to scaffold new project)",
+                        },
                         "description": {
                             "type": "string",
                             "description": "Project description",
+                        },
+                        "vision": {
+                            "type": "string",
+                            "description": "Project vision / long-term goal",
                         },
                         "factory_type": {
                             "type": "string",
@@ -1853,6 +2107,10 @@ def _platform_schemas() -> list[dict]:
                         "workflow_id": {
                             "type": "string",
                             "description": "Workflow template ID (optional)",
+                        },
+                        "target_branch": {
+                            "type": "string",
+                            "description": "Git branch where agents will deliver code (e.g. 'feature/sav-parcours'). Auto-created in the project workspace.",
                         },
                     },
                     "required": ["name"],
@@ -2038,7 +2296,7 @@ def _platform_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {
+                        "parent_epic_id": {
                             "type": "string",
                             "description": "Parent mission/epic ID",
                         },
@@ -2073,7 +2331,7 @@ def _platform_schemas() -> list[dict]:
                             "description": "Extra config: team_ids, stack, ao_refs",
                         },
                     },
-                    "required": ["parent_mission_id", "name"],
+                    "required": ["parent_epic_id", "name"],
                 },
             },
         },
@@ -2085,12 +2343,12 @@ def _platform_schemas() -> list[dict]:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "parent_mission_id": {
+                        "parent_epic_id": {
                             "type": "string",
                             "description": "Parent mission ID",
                         },
                     },
-                    "required": ["parent_mission_id"],
+                    "required": ["parent_epic_id"],
                 },
             },
         },
@@ -2435,7 +2693,13 @@ def _platform_schemas() -> list[dict]:
                     "properties": {
                         "group_id": {
                             "type": "string",
-                            "enum": ["knowledge", "archi", "security", "data-ai", "pi-planning"],
+                            "enum": [
+                                "knowledge",
+                                "archi",
+                                "security",
+                                "data-ai",
+                                "pi-planning",
+                            ],
                             "description": "The expert community to engage",
                         },
                         "prompt": {
@@ -2444,6 +2708,35 @@ def _platform_schemas() -> list[dict]:
                         },
                     },
                     "required": ["group_id", "prompt"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "confluence_write_page",
+                "description": "Create or update a Confluence wiki page with markdown content. Use to publish documentation, architecture notes, project wiki, onboarding guides.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Page title (required)",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Page content in Markdown (required)",
+                        },
+                        "space": {
+                            "type": "string",
+                            "description": "Confluence space key (default: VELIGO)",
+                        },
+                        "parent_title": {
+                            "type": "string",
+                            "description": "Title of parent page for hierarchy (optional)",
+                        },
+                    },
+                    "required": ["title", "content"],
                 },
             },
         },
@@ -2479,6 +2772,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         # Memory
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         # Project context (read-only, no filesystem browsing)
         "get_project_context",
         # Git read (on explicit user request with workspace context)
@@ -2486,6 +2782,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_log",
         "git_diff",
         # Git write ops (explicit user requests only)
+        "git_clone",
+        "git_create_branch",
         "git_init",
         "git_commit",
         "git_push",
@@ -2506,14 +2804,21 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "launch_ideation",
         "launch_mkt_ideation",
         "launch_group_ideation",
-        # Jira / Confluence (project tracking & knowledge)
-        "jira_search",
-        "jira_board_issues",
-        "jira_add_comment",
-        "confluence_read",
         # Web / fetch
         "mcp_fetch_fetch",
         "deep_search",
+        # Confluence write
+        "confluence_write_page",
+        # Jira / Confluence (project-level queries)
+        "jira_search",
+        "jira_create",
+        "jira_update",
+        "jira_board_issues",
+        "confluence_read",
+        # Code / project exploration (for project-level work)
+        "code_read",
+        "code_search",
+        "list_files",
     ],
     "product": [
         "code_read",
@@ -2522,6 +2827,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "create_feature",
         "create_story",
@@ -2536,6 +2844,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_add_comment",
         "jira_sync_from_platform",
         "confluence_read",
+        "confluence_write_page",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
@@ -2554,6 +2863,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_log",
         "git_diff",
@@ -2569,6 +2881,7 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_sub_mission",
         "list_sub_missions",
         "set_constraints",
+        "confluence_write_page",
         "mcp_fetch_fetch",
         "mcp_memory_create_entities",
         "mcp_memory_search_nodes",
@@ -2586,6 +2899,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "screenshot",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "create_feature",
         "figma_get_node",
@@ -2605,11 +2921,16 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "git_status",
         "git_log",
         "git_diff",
+        "git_clone",
+        "git_create_branch",
         "git_commit",
         "git_create_pr",
         "list_files",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "build",
         "test",
@@ -2658,6 +2979,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "run_e2e_tests",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_diff",
         "git_log",
@@ -2703,6 +3027,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "browser_screenshot",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "lrm_build",
         "github_actions",
@@ -2721,6 +3048,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "deep_search",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "git_log",
         "git_diff",
@@ -2729,6 +3059,13 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "sast_scan",
         "dependency_audit",
         "secrets_scan",
+        "recon_portscan",
+        "recon_subdomain",
+        "recon_fingerprint",
+        "pentest_fuzz_api",
+        "pentest_inject",
+        "pentest_auth",
+        "pentest_ssrf",
         "get_si_blueprint",
         "lrm_guidelines_summary",
         "lrm_guidelines_search",
@@ -2737,6 +3074,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
     "cdp": [
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
         "list_files",
         "deep_search",
@@ -2758,6 +3098,16 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "jira_transition",
         "jira_board_issues",
         "jira_sync_from_platform",
+        "confluence_read",
+        "confluence_write_page",
+        "create_feature",
+        "create_story",
+        "create_sprint",
+        "create_mission",
+        "launch_epic_run",
+        "check_run_status",
+        "launch_ideation",
+        "launch_group_ideation",
     ],
     "reviewer": [
         "code_read",
@@ -2773,6 +3123,9 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "github_issues",
         "memory_search",
         "memory_store",
+        "plan_create",
+        "plan_update",
+        "plan_get",
         "get_project_context",
     ],
 }
@@ -2796,6 +3149,7 @@ _PLATFORM_TOOLS = [
     "platform_metrics",
     "platform_sessions",
     "platform_workflows",
+    "platform_guide",  # BMAD /bmad-help inspired — context-aware next-step guidance
 ]
 for _role_key in ROLE_TOOL_MAP:
     ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)

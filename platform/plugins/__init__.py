@@ -28,13 +28,12 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-import os
-import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import yaml
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +115,9 @@ def load_plugin_tools(manifest: PluginManifest) -> list:
         return []
 
     try:
-        spec = importlib.util.spec_from_file_location(f"plugin_{manifest.id}_tools", tools_path)
+        spec = importlib.util.spec_from_file_location(
+            f"plugin_{manifest.id}_tools", tools_path
+        )
         if spec is None or spec.loader is None:
             return []
         module = importlib.util.module_from_spec(spec)
@@ -135,7 +136,7 @@ def load_plugin_tools(manifest: PluginManifest) -> list:
         return []
 
 
-def _ensure_table(db: sqlite3.Connection) -> None:
+def _ensure_table(db) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS plugins (
             id          TEXT PRIMARY KEY,
@@ -153,9 +154,9 @@ def _ensure_table(db: sqlite3.Connection) -> None:
     """)
 
 
-def register_plugin(manifest: PluginManifest, db_path: Path | str | None = None) -> bool:
+def register_plugin(manifest: PluginManifest) -> bool:
     """Register a plugin in the database."""
-    db = sqlite3.connect(str(db_path or _DB_PATH))
+    db = get_connection()
     try:
         _ensure_table(db)
         db.execute(
@@ -184,10 +185,9 @@ def register_plugin(manifest: PluginManifest, db_path: Path | str | None = None)
         db.close()
 
 
-def list_plugins(db_path: Path | str | None = None) -> list[dict]:
+def list_plugins() -> list[dict]:
     """List all registered plugins."""
-    db = sqlite3.connect(str(db_path or _DB_PATH))
-    db.row_factory = sqlite3.Row
+    db = get_connection()
     try:
         _ensure_table(db)
         rows = db.execute("SELECT * FROM plugins ORDER BY id").fetchall()
@@ -211,7 +211,7 @@ def discover_plugins(plugins_dir: Path | None = None) -> list[PluginManifest]:
     return manifests
 
 
-def load_all_plugins(plugins_dir: Path | None = None, db_path: Path | str | None = None) -> dict:
+def load_all_plugins(plugins_dir: Path | None = None) -> dict:
     """Discover, load, and register all plugins. Returns summary."""
     manifests = discover_plugins(plugins_dir)
     summary = {"loaded": 0, "agents": 0, "tools": 0, "mcps": 0, "errors": []}
@@ -222,7 +222,7 @@ def load_all_plugins(plugins_dir: Path | None = None, db_path: Path | str | None
 
         agents = load_plugin_agents(manifest)
         tools = load_plugin_tools(manifest)
-        register_plugin(manifest, db_path)
+        register_plugin(manifest)
 
         summary["loaded"] += 1
         summary["agents"] += len(agents)

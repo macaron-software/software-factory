@@ -59,12 +59,12 @@ def enrich_agent_with_skills(
         base_prompt = f"You are a {agent_role}."
 
         # Use mission description as context
-        mission_context = mission_description or f"Working as {agent_role}"
+        epic_context = mission_description or f"Working as {agent_role}"
 
         # Inject skills
         result = enhancer.enhance_agent_prompt(
             base_system_prompt=base_prompt,
-            mission_description=mission_context,
+            mission_description=epic_context,
             agent_role=agent_role,
             mission_id=project_id,
         )

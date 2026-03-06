@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
-from .input_models import GlobalMemoryCreate
+from .input_models import GlobalMemoryCreate, ProjectMemoryCreate
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -48,6 +48,22 @@ async def project_memory(
             project_id, category=category or None, agent_role=role
         )
     return JSONResponse(entries)
+
+
+@router.post("/api/memory/project/{project_id}")
+async def project_memory_store(project_id: str, body: ProjectMemoryCreate):
+    """Store a project memory entry."""
+    from ....memory.manager import get_memory_manager
+
+    get_memory_manager().project_store(
+        project_id,
+        body.key,
+        body.value,
+        category=body.category,
+        source=body.source,
+        confidence=body.confidence,
+    )
+    return JSONResponse({"ok": True})
 
 
 @router.delete("/api/memory/project/{project_id}")

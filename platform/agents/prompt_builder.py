@@ -79,16 +79,9 @@ def _load_guidelines_for_prompt(ctx: "ExecutionContext") -> str:
                 return summary
 
     try:
-        from pathlib import Path
+        from ..db.adapter import get_connection
 
-        db_path = Path(__file__).parent.parent.parent / "data" / "guidelines.db"
-        if not db_path.exists():
-            return ""
-
-        import sqlite3
-
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
+        conn = get_connection()
 
         from mcp_lrm.guidelines_scraper import build_guidelines_summary
 
@@ -138,6 +131,16 @@ CRITICAL: When the user asks you to DO something (lancer, fixer, chercher), USE 
 3. What to store: decisions, technical choices, API contracts, blockers found, verdicts (GO/NOGO), risks identified.
 4. What NOT to store: greetings, process descriptions, "I will now examine...".""")
 
+        # RLM instruction — mandatory for agents with deep_search access
+        if ctx.allowed_tools is None or "deep_search" in (ctx.allowed_tools or []):
+            parts.append("""
+## Deep Search / RLM (MANDATORY after memory)
+After calling memory_search, if the question involves codebase exploration, technical analysis, specs understanding, or architectural decisions:
+3. ALWAYS call deep_search(query="<your question>") BEFORE synthesizing your answer.
+   deep_search triggers the RLM (Recursive Language Model) engine: it runs iterative parallel sub-agent exploration (grep, file read, structure analysis) and is 10× more thorough than memory_search alone.
+   Use it for: "how does X work?", "where is Y implemented?", "what are the specs for Z?", "analyse l'architecture de...", "que faut-il pour coder..."
+   Skip it only for: simple factual lookups, greetings, or when you already called it this turn.""")
+
         # Role-specific tool instructions
         role_cat = _classify_agent_role(agent)
         if role_cat == "cto":
@@ -153,8 +156,15 @@ RÈGLES FONDAMENTALES :
    → Si le bloc indique des missions SF actives, tu peux appeler platform_missions(project_id="...")
 2. Pour lister les projets SF : appelle platform_agents() ou demande à l'utilisateur d'utiliser @NomProjet
 3. Pour les métriques globales : platform_metrics(), platform_sessions()
-4. INTERDIT : list_files, code_search (ces outils cherchent dans le filesystem local, pas dans la SF)
+4. INTERDIT dans le contexte SF-Platform uniquement : list_files, code_search (cherchent dans le filesystem local, pas dans la SF)
 5. INTERDIT : créer des fichiers locaux, demander des credentials, générer du SQL
+
+POUR LES PROJETS CLIENTS (Veligo, LDP, PSY, Finary, etc.) :
+- Utilise memory_search pour lire la mémoire du projet (specs, architecture, décisions)
+- Utilise jira_search(project="VELIGO") pour consulter les tickets Jira
+- Utilise confluence_read(page_id="...") pour lire la documentation Confluence
+- Utilise code_read / list_files si le projet a un workspace local
+- Utilise deep_search pour une exploration récursive du codebase
 
 ACTIONS QUE TU PEUX EFFECTUER :
 - Créer un projet complet : create_project(name, description, vision, factory_type)
@@ -229,6 +239,20 @@ RULES:
         parts.append(
             "\nYou do NOT have tools. Do NOT write [TOOL_CALL] or attempt to use tools. Focus on analysis, synthesis, and delegation to your team."
         )
+
+    # Traceability requirement for all dev roles
+    _dev_roles = {"backend", "frontend", "fullstack", "dev", "mobile", "architect"}
+    if role_cat in _dev_roles:
+        parts.append("""
+## Traceability (MANDATORY)
+Every source file you create with code_write MUST include a traceability header:
+  # Ref: {feature_id} — {feature_name}
+  # Story: {story_id} — {story_title}
+Example: # Ref: feat-a1b2 — User authentication endpoint
+
+This enables full audit trail: feature → code → test.
+If you don't have a feature ID, use the task name (e.g., # Ref: task-auth — Login flow).
+""")
 
     if ctx.skills_prompt:
         parts.append(f"\n## Skills\n{ctx.skills_prompt}")

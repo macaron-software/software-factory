@@ -30,12 +30,16 @@ STATIC_DIR = WEB_DIR / "static"
 
 # ── OpenTelemetry setup (module-level, before create_app) ──────────────────
 _otel_provider = None
+_otel_meter_provider = None
 if os.environ.get("OTEL_ENABLED"):
     try:
+        import atexit
+
+        from opentelemetry import metrics as otel_metrics
         from opentelemetry import trace
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
         _otel_resource = Resource.create(
             {
@@ -44,35 +48,168 @@ if os.environ.get("OTEL_ENABLED"):
                 "deployment.environment": os.environ.get("PLATFORM_ENV", "production"),
             }
         )
-        _otel_provider = TracerProvider(resource=_otel_resource)
 
+        # ── Traces ─────────────────────────────────────────────────────────
+        _otel_provider = TracerProvider(resource=_otel_resource)
         _otlp_endpoint = os.environ.get(
             "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317"
         )
+        _http_ep = _otlp_endpoint.replace(":4317", ":4318")
+
         try:
             from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
                 OTLPSpanExporter,
             )
 
-            _http_ep = _otlp_endpoint.replace(":4317", ":4318")
             _traces_ep = _http_ep + "/v1/traces"
             _otel_provider.add_span_processor(
-                SimpleSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
+                BatchSpanProcessor(OTLPSpanExporter(endpoint=_traces_ep))
             )
             logger.warning("OTEL: exporting traces to %s", _traces_ep)
         except ImportError:
-            from opentelemetry.sdk.trace.export import ConsoleSpanExporter
-
-            _otel_provider.add_span_processor(
-                SimpleSpanProcessor(ConsoleSpanExporter())
+            from opentelemetry.sdk.trace.export import (
+                BatchSpanProcessor,
+                ConsoleSpanExporter,
             )
+
+            _otel_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
             logger.warning("OTEL: OTLP exporter not available, using console")
 
         trace.set_tracer_provider(_otel_provider)
-
-        import atexit
-
         atexit.register(_otel_provider.shutdown)
+
+        # ── Metrics ────────────────────────────────────────────────────────
+        try:
+            from opentelemetry.sdk.metrics import MeterProvider
+            from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+            from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+                OTLPMetricExporter,
+            )
+
+            _metric_reader = PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=_http_ep + "/v1/metrics"),
+                export_interval_millis=15_000,
+            )
+            _otel_meter_provider = MeterProvider(
+                resource=_otel_resource, metric_readers=[_metric_reader]
+            )
+            otel_metrics.set_meter_provider(_otel_meter_provider)
+            atexit.register(_otel_meter_provider.shutdown)
+
+            # Register observable gauges bridging MetricsCollector → OTEL
+            _meter = otel_metrics.get_meter("macaron-platform")
+
+            def _obs_http_requests(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["total_requests"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_http_errors(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["total_errors"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_http_avg_ms(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["http"]["avg_ms"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_mcp_calls(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["mcp"]["total_calls"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_llm_cost(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["llm_costs"]["total_usd"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_db_queries(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["db_queries"]["total"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            def _obs_uptime(options):
+                try:
+                    from .metrics.collector import get_collector
+
+                    yield otel_metrics.Observation(
+                        get_collector().snapshot()["uptime_seconds"]
+                    )
+                except Exception:
+                    yield otel_metrics.Observation(0)
+
+            _meter.create_observable_gauge(
+                "macaron_http_requests_total",
+                callbacks=[_obs_http_requests],
+                description="Total HTTP requests",
+            )
+            _meter.create_observable_gauge(
+                "macaron_http_errors_total",
+                callbacks=[_obs_http_errors],
+                description="Total HTTP errors (4xx+5xx)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_http_latency_avg_ms",
+                callbacks=[_obs_http_avg_ms],
+                description="Avg HTTP latency (ms)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_mcp_calls_total",
+                callbacks=[_obs_mcp_calls],
+                description="Total MCP tool calls",
+            )
+            _meter.create_observable_gauge(
+                "macaron_llm_cost_usd_total",
+                callbacks=[_obs_llm_cost],
+                description="Cumulative LLM cost (USD)",
+            )
+            _meter.create_observable_gauge(
+                "macaron_db_queries_total",
+                callbacks=[_obs_db_queries],
+                description="Total DB queries",
+            )
+            _meter.create_observable_gauge(
+                "macaron_uptime_seconds",
+                callbacks=[_obs_uptime],
+                description="Process uptime (seconds)",
+            )
+
+            logger.warning(
+                "OTEL: MeterProvider ready, OTLP push + /metrics scrape endpoint"
+            )
+        except ImportError as e:
+            logger.warning("OTEL: metrics exporter not available (%s)", e)
 
         logger.warning(
             "OpenTelemetry tracing enabled (service: %s)",
@@ -83,25 +220,8 @@ if os.environ.get("OTEL_ENABLED"):
 
 
 def _recover_db_lock():
-    """Checkpoint any stale WAL file left by a previously crashed process.
-
-    A container killed during a write leaves platform.db-wal / platform.db-shm
-    which cause 'database is locked' on the next startup. This runs *before*
-    init_db() so the migration never hits a lock.
-    """
-    import sqlite3 as _sqlite3
-    from .config import DB_PATH
-
-    if not DB_PATH.exists():
-        return
-    try:
-        conn = _sqlite3.connect(str(DB_PATH), timeout=5)
-        conn.execute("PRAGMA busy_timeout=5000")
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-        logger.info("DB WAL checkpoint OK")
-    except Exception as exc:
-        logger.warning("DB WAL checkpoint failed (non-fatal): %s", exc)
+    """No-op: WAL checkpoint is SQLite-specific, not needed with current DB adapter."""
+    logger.debug("_recover_db_lock: skipped (managed by db adapter)")
 
 
 @asynccontextmanager
@@ -111,9 +231,9 @@ async def lifespan(app: FastAPI):
 
     setup_logging(level=os.environ.get("LOG_LEVEL", "WARNING"))
 
-    # PLATFORM_MODE: full (default) | factory (headless) | ui (web-only)
+    # PLATFORM_MODE: full (default) | factory (headless) | ui (web-only) | slave (API-only, no IHM)
     _mode = os.environ.get("PLATFORM_MODE", "full").lower()
-    if _mode not in ("full", "factory", "ui"):
+    if _mode not in ("full", "factory", "ui", "slave"):
         logger.warning("Unknown PLATFORM_MODE=%r — falling back to 'full'", _mode)
         _mode = "full"
     if _mode != "full":
@@ -126,6 +246,50 @@ async def lifespan(app: FastAPI):
     _recover_db_lock()
 
     init_db()
+
+    # SAFe rename migration: missions → epics, mission_runs → epic_runs
+    try:
+        from .db.migration_epic_rename import run_migration as _epic_migration
+
+        _epic_migration()
+    except Exception as _me:
+        logger.warning("Epic rename migration failed (non-fatal): %s", _me)
+
+    # Agent plan tables (TodoList middleware)
+    try:
+        from .db.migrations import get_db as _gdb_plans
+
+        with _gdb_plans() as _pdb:
+            _pdb.execute("""
+                CREATE TABLE IF NOT EXISTS agent_plans (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT NOT NULL,
+                    project_id TEXT,
+                    agent_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            _pdb.execute("""
+                CREATE TABLE IF NOT EXISTS agent_plan_steps (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL REFERENCES agent_plans(id) ON DELETE CASCADE,
+                    step_num INTEGER NOT NULL,
+                    description TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    result TEXT,
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+            _pdb.execute(
+                "CREATE INDEX IF NOT EXISTS idx_agent_plans_session ON agent_plans(session_id)"
+            )
+            _pdb.execute(
+                "CREATE INDEX IF NOT EXISTS idx_plan_steps_plan ON agent_plan_steps(plan_id)"
+            )
+    except Exception as _pe:
+        logger.warning("Agent plan tables migration failed (non-fatal): %s", _pe)
 
     # Seed built-in agents
     from .agents.store import get_agent_store
@@ -150,38 +314,45 @@ async def lifespan(app: FastAPI):
         logger.info("Seeded %d skills into DB", n)
 
     # Ensure every project has TMA + Security + Debt (+ MVP if applicable) missions
+    # Moved to background task to reduce startup/MTTR time
     from .projects.manager import get_project_store
+    import asyncio as _asyncio
 
     ps = get_project_store()
     ps.seed_from_registry()
 
-    _prov_count = 0
-    for proj in ps.list_all():
+    async def _bg_heal_and_seed():
+        import asyncio as _a
+
+        _loop = _a.get_event_loop()
+        _prov_count = 0
+        for proj in ps.list_all():
+            try:
+                created = await _loop.run_in_executor(None, ps.heal_epics, proj)
+                _prov_count += len(created)
+            except Exception as e:
+                logger.warning("heal_epics failed for %s: %s", proj.id, e)
+        if _prov_count:
+            logger.warning(
+                "heal_epics: created %d missions across all projects", _prov_count
+            )
+
+        # Scaffold all projects: ensure workspace + git + docker + docs + code exist
+        from .projects.manager import heal_all_projects as _heal
+
+        await _loop.run_in_executor(None, _heal)
+
+        # Seed memory (global knowledge + project files)
+        from .memory.seeder import seed_all as seed_memories
+
         try:
-            created = ps.heal_missions(proj)
-            _prov_count += len(created)
-        except Exception as e:
-            logger.warning("heal_missions failed for %s: %s", proj.id, e)
-    if _prov_count:
-        logger.warning(
-            "heal_missions: created %d missions across all projects", _prov_count
-        )
+            n_mem = await _loop.run_in_executor(None, seed_memories)
+            if n_mem:
+                logger.info("Seeded %d memories", n_mem)
+        except Exception as _e:
+            logger.warning("Memory seeding skipped: %s", _e)
 
-    # Scaffold all projects: ensure workspace + git + docker + docs + code exist
-    from .projects.manager import heal_all_projects as _heal
-    import asyncio as _asyncio
-
-    _asyncio.get_event_loop().run_in_executor(None, _heal)
-
-    # Seed memory (global knowledge + project files)
-    from .memory.seeder import seed_all as seed_memories
-
-    try:
-        n_mem = seed_memories()
-        if n_mem:
-            logger.info("Seeded %d memories", n_mem)
-    except Exception as _e:
-        logger.warning("Memory seeding skipped: %s", _e)
+    _asyncio.create_task(_bg_heal_and_seed())
 
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
@@ -195,7 +366,10 @@ async def lifespan(app: FastAPI):
     seed_demo_data()
 
     # Sync agent models+provider: ensure DB agents match the current DEFAULT_MODEL/PROVIDER
-    from .agents.store import DEFAULT_MODEL as _current_model, DEFAULT_PROVIDER as _current_provider
+    from .agents.store import (
+        DEFAULT_MODEL as _current_model,
+        DEFAULT_PROVIDER as _current_provider,
+    )
 
     try:
         from .db.migrations import get_db as _gdb_sync
@@ -230,29 +404,29 @@ async def lifespan(app: FastAPI):
     if _orphaned:
         logger.info("Marked %d orphaned active sessions as interrupted", _orphaned)
 
-    # Reset stale "running" mission_runs (orphaned after container restart)
-    from .missions.store import get_mission_run_store
+    # Reset stale "running" epic_runs (orphaned after container restart)
+    from .epics.store import get_epic_run_store
 
-    _mrs = get_mission_run_store()
+    _mrs = get_epic_run_store()
     try:
         from .db.migrations import get_db as _gdb
 
         _rdb = _gdb()
         _stale = _rdb.execute(
-            "UPDATE mission_runs SET status='paused' WHERE status='running'"
+            "UPDATE epic_runs SET status='paused' WHERE status='running'"
         ).rowcount
         # Reset resume_attempts too — restart ≠ failure, don't burn backoff budget.
         # Wrapped separately so older DBs without the column don't break the status reset.
         try:
             _rdb.execute(
-                "UPDATE mission_runs SET resume_attempts=0 WHERE status='paused' AND (resume_attempts IS NULL OR resume_attempts > 0)"
+                "UPDATE epic_runs SET resume_attempts=0 WHERE status='paused' AND (resume_attempts IS NULL OR resume_attempts > 0)"
             )
         except Exception:
             pass
         # Also fix phases stuck at "running" inside phases_json
         _stuck_phases = 0
         _rows = _rdb.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE phases_json LIKE ?",
+            "SELECT id, phases_json FROM epic_runs WHERE phases_json LIKE ?",
             ('%"running"%',),
         ).fetchall()
         for _row in _rows:
@@ -270,14 +444,14 @@ async def lifespan(app: FastAPI):
                     _stuck_phases += 1
             if _fixed:
                 _rdb.execute(
-                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    "UPDATE epic_runs SET phases_json=? WHERE id=?",
                     (_json.dumps(_phases, default=str), _row[0]),
                 )
         _rdb.commit()
         _rdb.close()
         if _stale or _stuck_phases:
             logger.warning(
-                "Reset %d stale mission_runs to paused, fixed %d stuck running phases",
+                "Reset %d stale epic_runs to paused, fixed %d stuck running phases",
                 _stale,
                 _stuck_phases,
             )
@@ -286,10 +460,10 @@ async def lifespan(app: FastAPI):
 
     # Auto-resume watchdog: handles paused/failed runs + launches unstarted continuous missions
     import asyncio as _asyncio
-    from .services.auto_resume import auto_resume_missions as _auto_resume_missions
+    from .services.auto_resume import auto_resume_epics as _auto_resume_epics
 
     if _mode != "ui":
-        _asyncio.create_task(_auto_resume_missions())
+        _asyncio.create_task(_auto_resume_epics())
         logger.warning("Auto-resume watchdog scheduled")
 
     # Start endurance watchdog (continuous auto-resume, session recovery, health)
@@ -327,6 +501,15 @@ async def lifespan(app: FastAPI):
             # UI process subscribes to factory events via Redis
             _asyncio2.create_task(_bus.start_redis_listener(_redis_url))
             logger.info("Redis SSE listener scheduled")
+
+    # PG NOTIFY/LISTEN: cross-node SSE fan-out (no Redis needed)
+    import asyncio as _asyncio3
+    from .a2a.bus import get_bus as _get_bus2
+
+    _bus2 = _get_bus2()
+    _asyncio3.create_task(_bus2.connect_pg_notify())
+    _asyncio3.create_task(_bus2.start_pg_listen())
+    logger.warning("PG NOTIFY/LISTEN cross-node bus scheduled")
 
     # Seed simulator if agent_scores is empty (cold start)
     async def _seed_simulator_if_empty():
@@ -487,18 +670,58 @@ async def lifespan(app: FastAPI):
         return proc
 
     try:
-        _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
+        # Acquire exclusive non-blocking lock so only ONE slot (blue/green)
+        # manages the MCP.  Prevents the two uvicorn processes on the same node
+        # from killing each other's MCP subprocess.
+        import fcntl as _fcntl
+
+        _mcp_lock_path = Path("/tmp/mcp_sf_manager.lock")
+        _mcp_lock_fd = None
+        try:
+            _mcp_lock_fd = open(_mcp_lock_path, "w")
+            _fcntl.flock(_mcp_lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+            _mcp_lock_fd.write(str(os.getpid()))
+            _mcp_lock_fd.flush()
+            _is_mcp_manager = True
+        except (BlockingIOError, OSError):
+            _is_mcp_manager = False
+            if _mcp_lock_fd:
+                _mcp_lock_fd.close()
+                _mcp_lock_fd = None
+
+        if _is_mcp_manager:
+            logger.info(
+                "MCP manager lock acquired (PID %d), starting MCP SF", os.getpid()
+            )
+            _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
+        else:
+            logger.info("MCP manager lock held by another slot, skipping MCP startup")
     except Exception as exc:
         logger.warning("MCP SF Server failed to start: %s", exc)
+        _is_mcp_manager = False
+        _mcp_lock_fd = None
 
     async def _mcp_watchdog():
-        """Auto-restart MCP server if it crashes."""
+        """Auto-restart MCP server if it crashes (manager slot only).
+        Re-checks the lock each iteration — if another slot took it over (restart race),
+        this watchdog exits gracefully to avoid double-manager conflicts.
+        """
+        if not _is_mcp_manager:
+            return
         while True:
-            await asyncio.sleep(30)
+            await asyncio.sleep(15)
+            # Verify we still hold the exclusive lock
+            if _mcp_lock_fd is not None:
+                try:
+                    _fcntl.flock(_mcp_lock_fd, _fcntl.LOCK_EX | _fcntl.LOCK_NB)
+                except (BlockingIOError, OSError):
+                    logger.warning(
+                        "MCP manager lock lost, stopping watchdog (another slot took over)"
+                    )
+                    return
             proc = _mcp_procs.get("sf")
             if proc and proc.poll() is not None:
                 logger.warning("MCP SF died (exit=%s), restarting...", proc.returncode)
-                await asyncio.sleep(3)  # wait for port to be released
                 try:
                     _mcp_procs["sf"] = _start_mcp("sf", _mcp_sf_mod, 9501)
                 except Exception as e:
@@ -507,26 +730,6 @@ async def lifespan(app: FastAPI):
     import asyncio
 
     asyncio.create_task(_mcp_watchdog())
-
-    # Periodic WAL checkpoint to prevent data loss on crash
-    async def _wal_checkpoint_loop():
-        import asyncio
-        import sqlite3
-
-        db_path = str(Path(__file__).parent.parent / "data" / "platform.db")
-        while True:
-            await asyncio.sleep(30)
-            try:
-                conn = sqlite3.connect(db_path, timeout=30)
-                conn.execute("PRAGMA busy_timeout=30000")
-                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
-                conn.close()
-            except Exception:
-                pass
-
-    import asyncio
-
-    asyncio.create_task(_wal_checkpoint_loop())
 
     # Auto-heal loop: scan incidents → create epics → launch TMA workflows
     try:
@@ -539,11 +742,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
+    # Platform quality watchdog: detect false-positive completions → trigger quality-improvement
+    try:
+        from .ops.platform_watchdog import ENABLED as _pw_enabled
+        from .ops.platform_watchdog import platform_watchdog_loop
+
+        if _pw_enabled:
+            asyncio.create_task(platform_watchdog_loop())
+            logger.warning("Platform quality watchdog enabled")
+    except Exception as e:
+        logger.warning("Platform watchdog failed to start: %s", e)
+
     # Log paused missions (no auto-resume — paused missions stay paused until manually restarted)
     try:
-        from .missions.store import get_mission_run_store
+        from .epics.store import get_epic_run_store
 
-        _mrs = get_mission_run_store()
+        _mrs = get_epic_run_store()
         _all_runs = _mrs.list_runs(limit=50)
         _paused = [m for m in _all_runs if m.status.value == "paused"]
         if _paused:
@@ -567,47 +781,90 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         logger.warning("Failed to load push subscriptions: %s", exc)
 
-    # Node heartbeat: register this node + send heartbeat every 30s
+    # Node heartbeat: register this node in platform_nodes every 30s
+    # Only "full" (master) nodes self-register — slave/ui/factory containers
+    # are deployed apps and must not pollute the cluster node list.
     import os as _os_hb
     import socket as _socket_hb
 
-    _hb_node_id = _os_hb.environ.get("SF_NODE_ID") or _os_hb.environ.get("HOSTNAME") or _socket_hb.gethostname()
-    _hb_role = "master" if _mode == "full" else "slave"
-    _hb_url = _os_hb.environ.get("SF_NODE_URL", "")
-    try:
-        import subprocess as _sp
-        _hb_version = _sp.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=__file__, stderr=_sp.DEVNULL).decode().strip()
-    except Exception:
-        _hb_version = ""
+    _hb_mode = os.environ.get("PLATFORM_MODE", "full").lower()
+    _hb_role = "master" if _hb_mode == "full" else "slave"
 
-    async def _node_heartbeat_loop():
-        import asyncio as _aio
-        import psutil as _psu
-        from .db.migrations import get_db as _get_db
+    if _hb_mode != "full":
+        logger.debug("Node heartbeat disabled (PLATFORM_MODE=%s)", _hb_mode)
+    else:
+        _hb_node_id = (
+            _os_hb.environ.get("SF_NODE_ID")
+            or _os_hb.environ.get("HOSTNAME")
+            or _socket_hb.gethostname()
+        )
+        _hb_url = _os_hb.environ.get("SF_NODE_URL", "")
+        try:
+            import subprocess as _sp
 
-        while True:
-            try:
-                _cpu = _psu.cpu_percent(interval=None)
-                _mem = _psu.virtual_memory().percent
-                _db = _get_db()
+            _hb_version = (
+                _sp.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"], stderr=_sp.DEVNULL
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            _hb_version = ""
+
+        async def _node_heartbeat_loop():
+            import asyncio as _aio
+            import psutil as _psu
+            from .db.migrations import get_db as _get_db
+
+            while True:
                 try:
-                    _db.execute("""
-                        INSERT INTO platform_nodes (node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version)
-                        VALUES (?, ?, ?, ?, NOW(), 'online', ?, ?, ?)
-                        ON CONFLICT(node_id) DO UPDATE SET
-                            role=EXCLUDED.role, mode=EXCLUDED.mode, url=EXCLUDED.url,
-                            last_seen=NOW(), status='online',
-                            cpu_pct=EXCLUDED.cpu_pct, mem_pct=EXCLUDED.mem_pct, version=EXCLUDED.version
-                    """, (_hb_node_id, _hb_role, _mode, _hb_url, _cpu, _mem, _hb_version))
-                    _db.commit()
-                finally:
-                    _db.close()
-            except Exception as _e:
-                logger.debug("Node heartbeat failed: %s", _e)
-            await _aio.sleep(30)
+                    _cpu = _psu.cpu_percent(interval=None)
+                    _mem = _psu.virtual_memory().percent
+                    _db = _get_db()
+                    try:
+                        _db.execute(
+                            """
+                            INSERT INTO platform_nodes (node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version)
+                            VALUES (?, ?, ?, ?, NOW(), 'online', ?, ?, ?)
+                            ON CONFLICT(node_id) DO UPDATE SET
+                                role=EXCLUDED.role, mode=EXCLUDED.mode, url=EXCLUDED.url,
+                                last_seen=NOW(), status='online',
+                                cpu_pct=EXCLUDED.cpu_pct, mem_pct=EXCLUDED.mem_pct, version=EXCLUDED.version
+                        """,
+                            (
+                                _hb_node_id,
+                                _hb_role,
+                                _hb_mode,
+                                _hb_url,
+                                _cpu,
+                                _mem,
+                                _hb_version,
+                            ),
+                        )
+                        _db.commit()
+                        # Purge stale nodes (not seen in 5 min) every heartbeat cycle
+                        try:
+                            _db2 = _get_db()
+                            _db2.execute(
+                                "DELETE FROM platform_nodes WHERE last_seen < NOW() - INTERVAL '5 minutes'"
+                            )
+                            _db2.commit()
+                            _db2.close()
+                        except Exception:
+                            pass
+                    finally:
+                        _db.close()
+                except Exception as _e:
+                    logger.debug("Node heartbeat failed: %s", _e)
+                await _aio.sleep(
+                    int(_os_hb.environ.get("SF_HEARTBEAT_INTERVAL_S", "10"))
+                )
 
-    asyncio.create_task(_node_heartbeat_loop())
-    logger.info("Node heartbeat started: %s (%s/%s)", _hb_node_id, _hb_role, _mode)
+        asyncio.create_task(_node_heartbeat_loop())
+        logger.info(
+            "Node heartbeat started: %s (%s/%s)", _hb_node_id, _hb_role, _hb_mode
+        )
 
     yield
 
@@ -635,17 +892,16 @@ async def lifespan(app: FastAPI):
 
 def _record_incident(path: str, status_code: int, detail: str = ""):
     """Record a platform incident with deduplication: one open incident per (error_type, error_detail)."""
-    import sqlite3
     import uuid
 
-    from .config import DB_PATH
+    from .db.adapter import get_connection
 
     error_type = str(status_code)
     error_detail = detail or f"HTTP {status_code} on {path}"
     title = f"[Auto] {error_type} — {path}"
 
     try:
-        conn = sqlite3.connect(str(DB_PATH), timeout=30)
+        conn = get_connection()
         # Deduplicate: increment existing open incident instead of creating a new one
         existing = conn.execute(
             "SELECT id FROM platform_incidents WHERE error_type=? AND error_detail=? AND status='open' LIMIT 1",
@@ -703,6 +959,78 @@ def create_app() -> FastAPI:
         allow_credentials=True,
     )
 
+    # ── Custom error pages ──────────────────────────────────────────────────
+    from fastapi import Request as _Request
+    from fastapi.responses import HTMLResponse as _HTMLResponse
+    from starlette.exceptions import HTTPException as _StarletteHTTPException
+
+    def _error_html(code: int, title: str, message: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{code} — Software Factory</title>
+  <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <style>
+    .err-wrap{{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1.2rem;text-align:center;padding:2rem}}
+    .err-code{{font-size:5rem;font-weight:800;color:var(--purple);line-height:1}}
+    .err-title{{font-size:1.5rem;font-weight:600;color:var(--text-primary)}}
+    .err-msg{{color:var(--text-secondary);max-width:36rem;line-height:1.6}}
+    .err-actions{{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:0.5rem}}
+    .err-btn{{padding:0.5rem 1.2rem;border-radius:6px;font-size:0.9rem;cursor:pointer;border:none}}
+    .err-btn-primary{{background:var(--purple);color:var(--text-on-accent)}}
+    .err-btn-secondary{{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border)}}
+  </style>
+</head>
+<body>
+  <div class="err-wrap">
+    <div class="err-code">{code}</div>
+    <div class="err-title">{title}</div>
+    <div class="err-msg">{message}</div>
+    <div class="err-actions">
+      <button class="err-btn err-btn-primary" onclick="history.back()">← Go back</button>
+      <button class="err-btn err-btn-secondary" onclick="location.href='/'">Home</button>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    @app.exception_handler(_StarletteHTTPException)
+    async def http_exception_handler(request: _Request, exc: _StarletteHTTPException):
+        # JSON API routes: return JSON
+        if request.url.path.startswith(
+            "/api/"
+        ) or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        if exc.status_code == 404:
+            html = _error_html(
+                404,
+                "Page not found",
+                "The page you're looking for doesn't exist or has been moved.",
+            )
+        else:
+            html = _error_html(
+                exc.status_code,
+                "Unexpected error",
+                "A temporary error occurred. We've been notified and are working on it — please try again in a few minutes.",
+            )
+        return _HTMLResponse(html, status_code=exc.status_code)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: _Request, exc: Exception):
+        if request.url.path.startswith(
+            "/api/"
+        ) or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"detail": "Internal server error"}, status_code=500)
+        html = _error_html(
+            500,
+            "Temporary error",
+            "Something went wrong on our end. We've been notified and are working on it — please try again in a few minutes.",
+        )
+        return _HTMLResponse(html, status_code=500)
+
     # ── Security: Response headers ──────────────────────────────────────────
     @app.middleware("http")
     async def security_headers(request, call_next):
@@ -716,7 +1044,7 @@ def create_app() -> FastAPI:
         if path.startswith("/projects/") and path.endswith("/workspace"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline'; "
                 "font-src 'self' data:; "
                 "img-src 'self' data: blob: https:; "
@@ -728,10 +1056,10 @@ def create_app() -> FastAPI:
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
+                "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://analytics.macaron-software.com; "
                 "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com; "
-                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com https://i.pravatar.cc; "
+                "img-src 'self' data: https://api.dicebear.com https://avatars.githubusercontent.com https://i.pravatar.cc https://cdn.simpleicons.org; "
                 "connect-src 'self' https://analytics.macaron-software.com; "
                 "frame-ancestors 'none'"
             )
@@ -833,6 +1161,9 @@ def create_app() -> FastAPI:
         if path.startswith("/api/analytics") or path.startswith("/api/health"):
             return await call_next(request)
 
+        # A2A endpoints — require auth (cookie) but not onboarding
+        # The /.well-known path is fully public (no auth required)
+
         # Skip auth in test mode
         if os.environ.get("PLATFORM_ENV") == "test":
             return await call_next(request)
@@ -862,6 +1193,8 @@ def create_app() -> FastAPI:
             path.startswith("/static")
             or path.startswith("/api/")
             or path.startswith("/auth/")
+            or path.startswith("/.well-known")
+            or path.startswith("/a2a/")
             or path.startswith("/projects/")
             and "/preview/" in path
             or path
@@ -1221,6 +1554,45 @@ def create_app() -> FastAPI:
         except ImportError:
             pass
 
+    # Mount Prometheus /metrics endpoint if meter provider initialized
+    if _otel_meter_provider is not None:
+        try:
+            from .metrics.collector import get_collector as _get_collector
+            from fastapi import Response as _Response
+
+            @app.get("/api/metrics/prometheus", include_in_schema=False)
+            async def prometheus_metrics():
+                """Live Prometheus scrape endpoint — reads MetricsCollector snapshot."""
+                snap = _get_collector().snapshot()
+                lines = [
+                    "# HELP macaron_http_requests_total Total HTTP requests",
+                    "# TYPE macaron_http_requests_total gauge",
+                    f"macaron_http_requests_total {snap['http']['total_requests']}",
+                    "# HELP macaron_http_errors_total Total HTTP errors (4xx+5xx)",
+                    "# TYPE macaron_http_errors_total gauge",
+                    f"macaron_http_errors_total {snap['http']['total_errors']}",
+                    "# HELP macaron_http_latency_avg_ms Average HTTP latency ms",
+                    "# TYPE macaron_http_latency_avg_ms gauge",
+                    f"macaron_http_latency_avg_ms {snap['http']['avg_ms']}",
+                    "# HELP macaron_mcp_calls_total Total MCP tool calls",
+                    "# TYPE macaron_mcp_calls_total gauge",
+                    f"macaron_mcp_calls_total {snap['mcp']['total_calls']}",
+                    "# HELP macaron_llm_cost_usd_total Cumulative LLM cost USD",
+                    "# TYPE macaron_llm_cost_usd_total gauge",
+                    f"macaron_llm_cost_usd_total {snap['llm_costs']['total_usd']}",
+                    "# HELP macaron_db_queries_total Total DB queries",
+                    "# TYPE macaron_db_queries_total gauge",
+                    f"macaron_db_queries_total {snap['db_queries']['total']}",
+                    "# HELP macaron_uptime_seconds Process uptime seconds",
+                    "# TYPE macaron_uptime_seconds gauge",
+                    f"macaron_uptime_seconds {snap['uptime_seconds']}",
+                ]
+                return _Response(
+                    "\n".join(lines) + "\n", media_type="text/plain; version=0.0.4"
+                )
+        except Exception:
+            pass
+
     app.state.templates = templates if _mode != "factory" else None
 
     # Routes — core (skipped in factory mode)
@@ -1231,11 +1603,19 @@ def create_app() -> FastAPI:
     from .web.routes.api.health import router as health_router
 
     app.include_router(health_router)
-    if _mode != "factory":
+
+    # A2A (Agent-to-Agent) Protocol Server
+    from .web.routes.a2a_server import router as a2a_router
+
+    app.include_router(a2a_router)
+
+    # slave mode: API-only, no IHM (web UI), no SSE write endpoints
+    if _mode not in ("factory", "slave"):
         from .web.routes import router as web_router
 
         app.include_router(web_router)
-    app.include_router(sse_router, prefix="/sse")
+    if _mode != "slave":
+        app.include_router(sse_router, prefix="/sse")
 
     # Routes — optional (safe mode: import failures are logged, not fatal)
     _loaded_modules: list[str] = []
@@ -1250,6 +1630,8 @@ def create_app() -> FastAPI:
         ("push", ".web.routes.api.push", {}),
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
+        ("traceability", ".web.routes.api.traceability", {}),
+        ("skill-eval", ".web.routes.api.skill_eval", {}),
         ("mkt_ideation", ".web.routes.mkt_ideation", {}),
         ("group_ideation", ".web.routes.group_ideation", {}),
     ]

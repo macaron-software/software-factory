@@ -200,6 +200,10 @@ class AgentLoop:
             if self._should_skip(msg):
                 continue
 
+            # Veto keyword pre-filter: auto-veto WITHOUT LLM call if content matches
+            if await self._keyword_veto_check(msg):
+                continue
+
             # Round limit to prevent infinite loops
             self._rounds += 1
             if self._rounds > self.max_rounds:
@@ -291,12 +295,11 @@ class AgentLoop:
                     )
                 except asyncio.TimeoutError:
                     logger.warning(
-                        "Executor timeout agent=%s session=%s timeout=%.0fs — retrying",
+                        "Executor timeout  agent=%s session=%s timeout=%.0fs — retrying",
                         self.agent.id,
                         self.session_id,
                         self.think_timeout,
                     )
-                    # Never stop — retry the same message
                     await asyncio.sleep(5)
                     continue
 
@@ -412,6 +415,40 @@ class AgentLoop:
                     self.agent.id,
                     partner,
                     self._pair_counts[partner],
+                )
+                return True
+        return False
+
+    async def _keyword_veto_check(self, msg: A2AMessage) -> bool:
+        """Pre-LLM veto gate: if message content matches a veto_keyword, emit VETO directly.
+
+        Critical agents (CISO, compliance, architects, security) declare forbidden topics in
+        ``permissions_json.veto_keywords``. This avoids wasting an LLM call when the answer
+        is deterministically "no" (e.g. "deploy without tests", "disable RGPD checks").
+
+        Source pattern: airweave-ai/error-monitoring-agent keyword-trigger approach, adapted
+        for the SF A2A bus (emits MessageType.VETO instead of raising an exception).
+        """
+        keywords: list[str] = self.agent.permissions.get("veto_keywords", [])
+        if not keywords or not msg.content:
+            return False
+        content_lower = msg.content.lower()
+        for kw in keywords:
+            if kw.lower() in content_lower:
+                reason = f"Mot-clé interdit détecté: '{kw}'"
+                await self.send_message(
+                    to=msg.from_agent,
+                    content=reason,
+                    msg_type=MessageType.VETO,
+                    parent_id=msg.id,
+                    metadata={"action_type": "veto", "trigger": "keyword", "keyword": kw},
+                )
+                logger.info(
+                    "Keyword-veto  agent=%s keyword=%s sender=%s session=%s",
+                    self.agent.id,
+                    kw,
+                    msg.from_agent,
+                    self.session_id,
                 )
                 return True
         return False
@@ -540,16 +577,16 @@ class AgentLoop:
         # BUT enable for agents with explicit tools (like CDP with phase tools)
         agent_tools_enabled = self.agent.hierarchy_rank >= 30 or bool(self.agent.tools)
 
-        # Resolve mission_run_id for CDP agent
-        mission_run_id = None
+        # Resolve epic_run_id for CDP agent
+        epic_run_id = None
         if self.agent.id == "chef_de_programme":
             try:
-                from ..missions.store import get_mission_run_store
+                from ..epics.store import get_epic_run_store
 
-                runs = get_mission_run_store().list_runs(limit=10)
+                runs = get_epic_run_store().list_runs(limit=10)
                 for mr in runs:
                     if mr.session_id == self.session_id:
-                        mission_run_id = mr.id
+                        epic_run_id = mr.id
                         break
             except Exception:
                 pass
@@ -565,7 +602,7 @@ class AgentLoop:
             skills_prompt=skills_prompt,
             vision=vision,
             tools_enabled=agent_tools_enabled,
-            mission_run_id=mission_run_id,
+            epic_run_id=epic_run_id,
             capability_grade=grade,
         )
 

@@ -1,14 +1,5 @@
 """
-Dual-backend database adapter: SQLite (local) / PostgreSQL (production).
-
-Provides a unified interface so all 22+ modules keep using:
-    db = get_db()
-    rows = db.execute("SELECT * FROM agents WHERE id=?", (aid,)).fetchall()
-    db.commit()
-
-Backend selected via DATABASE_URL env var:
-    - Not set / "sqlite:///..." → SQLite (default, local dev)
-    - "postgresql://..." → PostgreSQL (production)
+PostgreSQL adapter.
 
 Handles:
     - ? → %s placeholder translation
@@ -19,7 +10,6 @@ Handles:
 
 import os
 import re
-import sqlite3
 from typing import Any, Sequence
 
 try:
@@ -29,7 +19,7 @@ except ImportError:
     psycopg = None  # type: ignore
 
 _PG_URL = os.environ.get("DATABASE_URL", "")
-_USE_PG = _PG_URL.startswith("postgresql://") or _PG_URL.startswith("postgres://")
+_USE_PG = True
 
 # Connection pool for PostgreSQL (lazy initialized)
 _pg_pool = None
@@ -399,8 +389,17 @@ class PgConnectionWrapper:
         last_cur = None
         for stmt in cleaned.split(";"):
             stmt = stmt.strip()
-            if not stmt or stmt.startswith("--"):
+            if not stmt:
                 continue
+            # Strip leading comment lines to check if there's actual SQL
+            import re as _re
+
+            sql_body = _re.sub(
+                r"^\s*--[^\n]*\n?", "", stmt, flags=_re.MULTILINE
+            ).strip()
+            if not sql_body:
+                continue
+            stmt = sql_body  # execute only the SQL, not the comments
             cur = self._conn.cursor()
             try:
                 cur.execute("SAVEPOINT _exec_sp")
@@ -408,7 +407,25 @@ class PgConnectionWrapper:
                 cur.execute("RELEASE SAVEPOINT _exec_sp")
                 last_cur = cur
             except psycopg.errors.Error as exc:
-                _logger.debug("executescript: skipping statement error: %s", exc)
+                # "Already exists" errors are expected during idempotent schema init — ignore silently.
+                # Any other error is unexpected and should be visible in logs.
+                is_harmless = isinstance(
+                    exc,
+                    (
+                        psycopg.errors.DuplicateTable,
+                        psycopg.errors.DuplicateColumn,
+                        psycopg.errors.DuplicateObject,
+                        psycopg.errors.UniqueViolation,
+                    ),
+                )
+                if is_harmless:
+                    _logger.debug("executescript: skipping statement error: %s", exc)
+                else:
+                    _logger.warning(
+                        "executescript: unexpected error on stmt [%.80s]: %s",
+                        stmt,
+                        exc,
+                    )
                 try:
                     cur.execute("ROLLBACK TO SAVEPOINT _exec_sp")
                     cur.execute("RELEASE SAVEPOINT _exec_sp")
@@ -489,31 +506,14 @@ class _NullCursor:
 
 def is_postgresql() -> bool:
     """Check if using PostgreSQL backend."""
-    return _USE_PG
+    return True
 
 
-def get_connection(db_path=None) -> Any:
-    """Get a database connection (SQLite or PostgreSQL).
-
-    For SQLite: returns sqlite3.Connection (with row_factory set)
-    For PostgreSQL: returns PgConnectionWrapper
-    """
-    if _USE_PG:
-        conn = _get_pg_connection()
-        conn.autocommit = False
-        return PgConnectionWrapper(conn)
-    else:
-        # SQLite path — same as original get_db()
-        from ..config import DB_PATH
-
-        path = db_path or DB_PATH
-        conn = sqlite3.connect(str(path), timeout=30)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=30000")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA foreign_keys=ON")
-        return conn
+def get_connection() -> Any:
+    """Get a PostgreSQL database connection."""
+    conn = _get_pg_connection()
+    conn.autocommit = False
+    return PgConnectionWrapper(conn)
 
 
 def return_connection(conn):

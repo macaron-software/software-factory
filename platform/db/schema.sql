@@ -182,23 +182,6 @@ CREATE TABLE IF NOT EXISTS features (
 
 CREATE INDEX IF NOT EXISTS idx_features_epic ON features(epic_id);
 
-CREATE TABLE IF NOT EXISTS user_stories (
-    id TEXT PRIMARY KEY,
-    feature_id TEXT REFERENCES features(id) ON DELETE CASCADE,
-    title TEXT NOT NULL,
-    description TEXT DEFAULT '',
-    acceptance_criteria TEXT DEFAULT '',
-    story_points INTEGER DEFAULT 1,
-    priority INTEGER DEFAULT 5,
-    status TEXT DEFAULT 'backlog',
-    assigned_to TEXT DEFAULT '',
-    jira_key TEXT DEFAULT '',
-    sprint_id TEXT DEFAULT '',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_user_stories_feature ON user_stories(feature_id);
-
 -- ============================================================================
 -- SESSIONS (legacy — kept for backward compatibility)
 -- ============================================================================
@@ -300,10 +283,6 @@ CREATE TABLE IF NOT EXISTS memory_project (
     value TEXT NOT NULL,
     confidence REAL DEFAULT 0.5,
     source TEXT DEFAULT '',
-    agent_role TEXT DEFAULT '',
-    relevance_score REAL,
-    access_count INTEGER DEFAULT 0,
-    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -332,9 +311,6 @@ CREATE TABLE IF NOT EXISTS memory_global (
     confidence REAL DEFAULT 0.5,
     occurrences INTEGER DEFAULT 1,
     projects_json TEXT DEFAULT '[]',
-    relevance_score REAL,
-    access_count INTEGER DEFAULT 0,
-    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -538,3 +514,17 @@ CREATE INDEX IF NOT EXISTS idx_events_entity ON events(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_events_mission ON events(mission_id);
 CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp);
+
+-- Deploy Targets Registry (cloud/infra platform selector)
+CREATE TABLE IF NOT EXISTS deploy_targets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    driver TEXT NOT NULL DEFAULT 'docker_local',
+    config_json TEXT DEFAULT '{}',
+    status TEXT DEFAULT 'unknown',
+    last_check TEXT,
+    is_default INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_deploy_targets_driver ON deploy_targets(driver);

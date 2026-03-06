@@ -1,0 +1,937 @@
+{# Amélioration Continue Tab — AC projects overview + cycle history #}
+
+{% macro fi(name, size=14) %}
+<svg xmlns="http://www.w3.org/2000/svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+  style="display:inline-block;vertical-align:middle;flex-shrink:0">
+  {% if name == 'refresh-cw' %}<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  {% elif name == 'play' %}<polygon points="5 3 19 12 5 21 5 3"></polygon>
+  {% elif name == 'check-circle' %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+  {% elif name == 'x-circle' %}<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
+  {% elif name == 'clock' %}<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+  {% elif name == 'shield-off' %}<path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"></path><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"></path><line x1="1" y1="1" x2="23" y2="23"></line>
+  {% elif name == 'trending-up' %}<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>
+  {% elif name == 'alert-triangle' %}<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+  {% elif name == 'layers' %}<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>
+  {% elif name == 'link' %}<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+  {% elif name == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  {% elif name == 'bar-chart-2' %}<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+  {% elif name == 'activity' %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+  {% elif name == 'cpu' %}<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>
+  {% elif name == 'git-branch' %}<line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+<style>
+.ac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; }
+.ac-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
+.ac-card:hover { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
+.ac-card.selected { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
+.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); }
+.ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; }
+.ac-card .score-big { font-size:1.8rem; font-weight:700; line-height:1; }
+.ac-bar { height:4px; border-radius:2px; background:var(--border,#2a2d3e); margin-top:.5rem; }
+.ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; }
+.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); margin-bottom:.5rem; }
+.ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
+.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-muted,#888); font-weight:500; border-bottom:1px solid var(--border,#2a2d3e); }
+.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border,#1a1c2a); }
+.score-green { color:#22c55e; font-weight:700; }
+.score-yellow { color:#f59e0b; font-weight:700; }
+.score-red { color:#ef4444; font-weight:700; }
+.verdict-pass { background:#14532d; color:#4ade80; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-warn { background:#78350f; color:#fcd34d; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-fail { background:#7f1d1d; color:#fca5a5; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
+.adv-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem; }
+/* Intelligence panel */
+.intel-panel { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-top:.5rem; }
+.intel-metric { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem .75rem; }
+.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted,#888); margin-bottom:.2rem; }
+.intel-metric .value { font-size:1.1rem; font-weight:700; }
+.conv-improving { color:#22c55e; }
+.conv-plateau    { color:#f59e0b; }
+.conv-regression { color:#ef4444; }
+.conv-spike_failure { color:#ef4444; }
+.conv-cold_start { color:#888; }
+.conv-converging { color:#3b82f6; }
+/* mini sparkline */
+.sparkline { display:flex; align-items:flex-end; gap:2px; height:32px; margin-top:.3rem; }
+.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--accent,#6c63ff); opacity:.7; transition:opacity .15s; }
+.spark-bar:hover { opacity:1; }
+/* Thompson stats */
+.thompson-row td { font-size:.7rem; padding:.3rem .4rem; }
+.thompson-win { color:#22c55e; }
+.thompson-lose { color:#ef4444; }
+/* Project detail modal */
+.ac-modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center }
+.ac-modal { background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);border-radius:.75rem;width:min(780px,96vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column }
+.ac-modal-header { display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-bottom:1px solid var(--border,#2a2d3e);flex-shrink:0 }
+.ac-modal-body { overflow-y:auto;padding:1rem;flex:1 }
+.ac-modal-grid { display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem }
+.ac-modal-tile { background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;padding:.5rem .75rem }
+.ac-modal-tile .tl { font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.15rem }
+.ac-modal-tile .tv { font-size:1rem;font-weight:700 }
+/* Team diagram */
+.ac-team-diagram { background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:.75rem;margin-top:1rem }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+  <div style="display:flex;align-items:center;gap:.5rem">
+    {{ fi('refresh-cw', 18) }}
+    <strong>Amélioration Continue</strong>
+    <span style="font-size:.7rem;color:var(--text-muted,#888)">{{ projects|length }} projets · {{ projects|map(attribute='max_cycles')|max if projects else 20 }} cycles max · Thompson + RL + GA · Lighthouse · axe · lint · adversarial 14D · traceabilité · métriques</span>
+  </div>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <span style="font-size:.7rem;color:var(--accent,#6c63ff)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+    <button id="ac-intel-toggle" onclick="acToggleIntel()"
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      {{ fi('cpu', 12) }} Intelligence
+    </button>
+    <button id="ac-start-btn" onclick="acStartCycle()"
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      {{ fi('play', 12) }} Démarrer
+    </button>
+  </div>
+</div>
+<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;font-size:.75rem;color:var(--text-muted,#888)"></div>
+
+{# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
+<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);display:flex;align-items:center;gap:.4rem">
+      {{ fi('cpu', 12) }} Métriques Intelligence —
+      <select id="ac-intel-proj-select" onchange="acIntelSwitchProject(this.value)"
+        style="background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);color:var(--accent,#6c63ff);font-size:.7rem;padding:.1rem .3rem;border-radius:.25rem;cursor:pointer">
+        {% for p in projects %}
+        <option value="{{ p.id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
+      {{ fi('refresh-cw', 11) }} Actualiser
+    </button>
+  </div>
+
+  <div class="intel-panel" id="ac-intel-metrics">
+    <div class="intel-metric"><div class="label">Convergence</div><div class="value conv-cold_start" id="im-conv">—</div></div>
+    <div class="intel-metric"><div class="label">RL Reward moy.</div><div class="value" id="im-reward">—</div></div>
+    <div class="intel-metric"><div class="label">Cycles total</div><div class="value" id="im-cycles">—</div></div>
+    <div class="intel-metric"><div class="label">Score moy.</div><div class="value" id="im-avg">—</div></div>
+    <div class="intel-metric"><div class="label">Hint RL</div><div class="value" style="font-size:.75rem" id="im-hint">—</div></div>
+    <div class="intel-metric"><div class="label">Skill Eval</div><div class="value" style="font-size:.7rem;color:#f59e0b" id="im-eval">—</div></div>
+    <div class="intel-metric"><div class="label">Lighthouse perf.</div><div class="value" id="im-lighthouse">—</div></div>
+    <div class="intel-metric"><div class="label">axe a11y</div><div class="value" id="im-axe">—</div></div>
+    <div class="intel-metric"><div class="label">Lint erreurs</div><div class="value" id="im-lint">—</div></div>
+    <div class="intel-metric"><div class="label">Tests passés</div><div class="value" id="im-tests">—</div></div>
+    <div class="intel-metric"><div class="label">Traçabilité</div><div class="value" id="im-trace">—</div></div>
+    <div class="intel-metric"><div class="label">Adversarial 14D</div><div class="value" id="im-adv">—</div></div>
+  </div>
+
+  {# Sparkline #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;color:var(--text-muted,#888);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
+    <div class="sparkline" id="ac-sparkline"></div>
+  </div>
+
+  {# Thompson stats table #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.4rem">
+      {{ fi('activity', 11) }} Thompson Sampling — skills
+    </div>
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>Skill</th><th>Variant</th><th>Wins</th><th>Losses</th><th>Avg score</th><th>Thompson prob.</th>
+        </tr>
+      </thead>
+      <tbody id="ac-thompson-tbody">
+        <tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Project cards ─────────────────────────────────────────────────────────── #}
+<div class="ac-section-title">Projets pilotes</div>
+<div class="ac-grid" id="ac-proj-grid">
+  {% for p in projects %}
+  {% set score = p.total_score_avg|int %}
+  {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+  {% set border_color = {'simple':'#22c55e','simple-compile':'#3b82f6','medium':'#f59e0b','complex':'#a855f7','enterprise':'#ef4444','game-simple':'#06b6d4','game-complex':'#f97316','migration':'#84cc16'}.get(p.tier, '#6b7280') %}
+  <div class="ac-card {% if loop.first %}selected{% endif %}"
+       style="border-left:3px solid {{ border_color }}"
+       onclick="acSelectProject('{{ p.id }}', this)"
+       ondblclick="acOpenModal('{{ p.id }}')">
+    <div class="tier-label">{{ p.tier_label }}</div>
+    <div class="proj-name">{{ p.name }}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
+      <div>
+        {% for tech in p.tech[:3] %}
+        <span style="font-size:.65rem;background:var(--border,#2a2d3e);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+        {% endfor %}
+      </div>
+      <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
+    </div>
+    <div style="font-size:.7rem;color:var(--text-muted,#888);margin-bottom:.25rem">
+      Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
+      &nbsp;·&nbsp;
+      <span style="color:{% if p.status == 'running' %}#22c55e{% elif p.status == 'completed' %}#3b82f6{% else %}#888{% endif %}">{{ p.status }}</span>
+    </div>
+    <div class="ac-bar"><div class="ac-bar-fill" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%;background:{{ border_color }}"></div></div>
+    <div style="font-size:.62rem;color:#555;margin-top:.4rem;text-align:right">double-clic → détail</div>
+  </div>
+  {% else %}
+  <div style="color:var(--text-muted,#888);font-size:.8rem;padding:2rem 0">
+    Aucun projet actif — cliquer "Démarrer" pour lancer le premier cycle.
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Cycle history for selected project ────────────────────────────────────── #}
+<div style="margin-top:1.5rem">
+
+{# ── Team diagram ─────────────────────────────────────────────────────────── #}
+<details id="ac-team-details" style="margin-bottom:1.5rem">
+  <summary style="font-size:.7rem;font-weight:600;color:var(--text-secondary,#aaa);cursor:pointer;display:flex;align-items:center;gap:.4rem;padding:.35rem 0;list-style:none;outline:none">
+    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="17" cy="21" r="1"/><circle cx="6" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+    Équipe AC — Diagramme agents &amp; pattern
+    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" id="ac-team-chevron"><polyline points="6 9 12 15 18 9"></polyline></svg>
+  </summary>
+  <div class="ac-team-diagram" id="ac-team-graph-container">
+    <div id="ac-team-graph-svg" style="overflow-x:auto"></div>
+    <div style="margin-top:.6rem;display:flex;flex-wrap:wrap;gap:.5rem;font-size:.65rem;color:#888">
+      <span>Phases AC :</span>
+      <span style="color:#a855f7">● Inception</span>
+      <span style="color:#3b82f6">● Dev TDD Sprint</span>
+      <span style="color:#f97316">● Adversarial</span>
+      <span style="color:#06b6d4">● Scan Tools</span>
+      <span style="color:#22c55e">● Record</span>
+      <span style="color:#f59e0b">● Learn</span>
+    </div>
+  </div>
+</details>
+  <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.5rem">
+    <div class="ac-section-title" id="ac-history-title" style="margin:0">
+      Historique — {{ projects[0].name if projects else '—' }}
+    </div>
+    <div style="display:flex;gap:.4rem">
+      <button onclick="acHistoryView('table')" id="ac-hview-table"
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:var(--accent,#6c63ff);color:#fff;border:none;cursor:pointer">
+        {{ fi('list', 11) }} Table
+      </button>
+      <button onclick="acHistoryView('topo')" id="ac-hview-topo"
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);cursor:pointer">
+        {{ fi('git-branch', 11) }} 360 Topo
+      </button>
+      <button onclick="acHistoryView('screens')" id="ac-hview-screens"
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);cursor:pointer">
+        {{ fi('layers', 11) }} Captures
+      </button>
+    </div>
+  </div>
+  <div id="ac-history-content">
+    {% if cycles %}
+    {# ── Table view ── #}
+    <div id="ac-hview-panel-table">
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Git SHA</th>
+          {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
+          <th>Score</th>
+          <th>RL R</th>
+          <th>Lighthouse</th>
+          <th>axe</th>
+          <th>Lint</th>
+          <th>Défauts</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cycles[-10:]|reverse %}
+        {% set ps = c.phase_scores|tojson if c.phase_scores is string else '{}' %}
+        {% set score = c.total_score|int %}
+        {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+        {% set rl_r = c.rl_reward|float %}
+        {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
+        {% set adv = c.adversarial_scores if c.adversarial_scores is mapping else {} %}
+        {% set lh = adv.get('lighthouse', adv.get('perf', '—')) %}
+        {% set axe_v = adv.get('axe', adv.get('a11y', '—')) %}
+        {% set lint_v = adv.get('lint', '—') %}
+        <tr>
+          <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
+          <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+          {% for ph in phases %}
+          {% set s = c.phase_scores_dict.get(ph) if c.phase_scores_dict is defined else none %}
+          <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
+          {% endfor %}
+          <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
+          <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
+          <td style="font-size:.7rem;color:{% if lh != '—' and lh|int >= 90 %}#22c55e{% elif lh != '—' %}#f59e0b{% else %}#444{% endif %}">{{ lh }}</td>
+          <td style="font-size:.7rem;color:{% if axe_v != '—' and axe_v|int == 0 %}#22c55e{% elif axe_v != '—' %}#ef4444{% else %}#444{% endif %}">{{ axe_v }}</td>
+          <td style="font-size:.7rem;color:{% if lint_v != '—' and lint_v|int == 0 %}#22c55e{% elif lint_v != '—' %}#f59e0b{% else %}#444{% endif %}">{{ lint_v }}</td>
+          <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
+          <td style="font-size:.7rem;color:#f59e0b;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {# ── 360 Topo view ── #}
+    <div id="ac-hview-panel-topo" style="display:none">
+      {% set p = projects[0] if projects else none %}
+      {% if p %}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.5rem">
+        {# Architecture topology card #}
+        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Stack Architecture</div>
+          <div id="ac-topo-svg" style="min-height:120px;display:flex;flex-direction:column;gap:.5rem">
+            {% for tech in p.tech %}
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <div style="width:8px;height:8px;border-radius:50%;background:#6c63ff;flex-shrink:0"></div>
+              <div style="font-family:monospace;font-size:.75rem;color:var(--text-primary)">{{ tech }}</div>
+              {% if not loop.last %}
+              <div style="flex:1;height:1px;background:var(--border,#2a2d3e);margin-left:.25rem"></div>
+              <div style="font-size:.6rem;color:var(--text-muted,#888)">→</div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {# Cycle progression card #}
+        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Progression Scores</div>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:60px">
+            {% for c in cycles[-15:] %}
+            {% set h = ((c.total_score / 100) * 60)|int %}
+            {% set col = '#22c55e' if c.total_score >= 80 else ('#f59e0b' if c.total_score >= 60 else '#ef4444') %}
+            <div title="Cycle {{ c.cycle_num }}: {{ c.total_score }}"
+              style="flex:1;height:{{ h if h > 2 else 2 }}px;background:{{ col }};border-radius:2px 2px 0 0;min-width:4px;opacity:.8"></div>
+            {% else %}
+            <div style="color:var(--text-muted,#888);font-size:.75rem;align-self:center">Aucun cycle</div>
+            {% endfor %}
+          </div>
+          <div style="font-size:.6rem;color:var(--text-muted,#888);margin-top:.25rem">{{ cycles|length }} cycles · score max {{ cycles|map(attribute='total_score')|max if cycles else 0 }}/100</div>
+        </div>
+        {# Adversarial radar #}
+        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Dernières dimensions adversariales</div>
+          {% if adversarial %}
+          <div style="display:flex;flex-wrap:wrap;gap:.3rem">
+            {% for d in adversarial[:8] %}
+            <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-secondary);border-radius:.25rem;padding:.2rem .4rem">
+              <div style="width:24px;height:4px;border-radius:2px;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+              <span style="font-size:.65rem;color:var(--text-muted,#888)">{{ d.dimension[:10] }}</span>
+              <span style="font-size:.65rem;font-weight:700">{{ d.score }}</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div style="color:var(--text-muted,#888);font-size:.75rem">Aucune donnée adversariale</div>
+          {% endif %}
+        </div>
+        {# Tools health #}
+        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Outils déterministes</div>
+          {% set last = cycles[-1] if cycles else none %}
+          {% set adv_last = last.adversarial_scores if last and last.adversarial_scores is mapping else {} %}
+          <div style="display:flex;flex-direction:column;gap:.4rem">
+            {% for tool, key in [('Lighthouse', 'lighthouse'), ('axe a11y', 'axe'), ('Lint', 'lint'), ('Tests', 'tests'), ('Build CI', 'ci')] %}
+            {% set v = adv_last.get(key, '—') %}
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.75rem">{{ tool }}</span>
+              <span style="font-size:.75rem;font-weight:600;color:{% if v == '—' %}#444{% elif v|string == '0' or (v|string).startswith('9') or (v|string).startswith('10') %}#22c55e{% else %}#f59e0b{% endif %}">{{ v }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {# ── Screenshots view ── #}
+    <div id="ac-hview-panel-screens" style="display:none">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:.5rem">
+        {% for c in cycles[-6:]|reverse %}
+        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;overflow:hidden">
+          {# Screenshot area — real screenshot if available, placeholder otherwise #}
+          {% set screen_url = '/api/improvement/screenshot/' ~ (projects[0].id if projects else '') ~ '/' ~ c.cycle_num %}
+          <div style="width:100%;height:120px;background:var(--bg-secondary,#1a1128);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden"
+               id="ac-screen-{{ c.cycle_num }}">
+            <img src="{{ screen_url }}" alt="Cycle {{ c.cycle_num }}"
+              onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+              style="width:100%;height:100%;object-fit:cover">
+            <div style="display:none;flex-direction:column;align-items:center;gap:.3rem;color:var(--text-muted,#888)">
+              {{ fi('layers', 24) }}
+              <span style="font-size:.65rem">Capture indisponible</span>
+            </div>
+          </div>
+          <div style="padding:.5rem .75rem">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.75rem;font-weight:600">Cycle {{ c.cycle_num }}</span>
+              {% set score = c.total_score|int %}
+              <span style="font-size:.7rem;font-weight:700;color:{% if score >= 80 %}#22c55e{% elif score >= 60 %}#f59e0b{% else %}#ef4444{% endif %}">{{ score if score > 0 else '—' }}/100</span>
+            </div>
+            <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.2rem">
+              {{ c.git_sha[:7] if c.git_sha else '—' }}
+              · {{ c.status }}
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Adversarial scores ─────────────────────────────────────────────────────── #}
+{% if adversarial %}
+<div style="margin-top:1.5rem">
+  <div class="ac-section-title">Dimensions Adversariales — dernier cycle</div>
+  <div class="adv-grid">
+    {% for d in adversarial %}
+    {% set verdict_cls = 'verdict-pass' if d.verdict == 'pass' else ('verdict-warn' if d.verdict == 'warn' else 'verdict-fail') %}
+    <div class="adv-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+        <span style="font-size:.75rem;font-weight:600">{{ d.dimension }}</span>
+        <span class="{{ verdict_cls }}">{{ d.verdict }}</span>
+      </div>
+      <div style="background:var(--border,#2a2d3e);border-radius:2px;height:3px">
+        <div style="height:100%;border-radius:2px;width:{{ d.score }}%;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.25rem">{{ d.score }}/100</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
+let _acIntelOpen = false;
+let _acHistoryView = 'table';
+
+{# Serialize project data for JS modal #}
+const _AC_PROJECTS_DATA = {
+  {% for p in projects %}
+  '{{ p.id }}': {
+    id: '{{ p.id }}',
+    name: '{{ p.name }}',
+    tier: '{{ p.tier }}',
+    tier_label: '{{ p.tier_label }}',
+    tech: {{ p.tech | tojson }},
+    max_cycles: {{ p.max_cycles }},
+    current_cycle: {{ p.current_cycle }},
+    status: '{{ p.status }}',
+    score_avg: {{ p.total_score_avg|float|round(1) }},
+    run_id: '{{ p.current_run_id or "" }}',
+    convergence: '{{ p.convergence_status or "cold_start" }}',
+    ci_status: '{{ p.ci_status or "unknown" }}',
+    updated_at: '{{ p.updated_at or "" }}'
+  }{% if not loop.last %},{% endif %}
+  {% endfor %}
+};
+
+// ── Project Detail Modal ─────────────────────────────────────────────────────
+async function acOpenModal(projectId) {
+  const proj = _AC_PROJECTS_DATA[projectId];
+  if (!proj) return;
+  // Remove old modal if any
+  document.getElementById('ac-detail-modal')?.remove();
+
+  const tierColors = {simple:'#22c55e','simple-compile':'#3b82f6',medium:'#f59e0b',complex:'#a855f7',enterprise:'#ef4444','game-simple':'#06b6d4','game-complex':'#f97316',migration:'#84cc16'};
+  const bc = tierColors[proj.tier] || '#6b7280';
+  const statusColor = proj.status==='running'?'#22c55e':proj.status==='completed'?'#3b82f6':'#888';
+
+  const overlay = document.createElement('div');
+  overlay.id = 'ac-detail-modal';
+  overlay.className = 'ac-modal-overlay';
+  overlay.onclick = e => { if (e.target===overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+  <div class="ac-modal">
+    <div class="ac-modal-header" style="border-left:4px solid ${bc}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <strong style="font-size:.9rem">${proj.name}</strong>
+      <span style="font-size:.7rem;background:var(--bg-tertiary,#251a35);padding:.15rem .5rem;border-radius:.25rem;color:${bc}">${proj.tier_label}</span>
+      <span style="font-size:.7rem;color:${statusColor};margin-left:auto">${proj.status}</span>
+      <button onclick="document.getElementById('ac-detail-modal').remove()"
+        style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:1.2rem;padding:0 .25rem;margin-left:.5rem">✕</button>
+    </div>
+    <div class="ac-modal-body">
+      <div class="ac-modal-grid">
+        <div class="ac-modal-tile"><div class="tl">Stack</div><div class="tv" style="font-size:.8rem;font-family:monospace">${proj.tech.join(' · ')}</div></div>
+        <div class="ac-modal-tile"><div class="tl">Progression</div><div class="tv">${proj.current_cycle}<span style="font-size:.7rem;color:#888">/${proj.max_cycles} cycles</span></div></div>
+        <div class="ac-modal-tile"><div class="tl">Score moyen</div><div class="tv" style="color:${proj.score_avg>=80?'#22c55e':proj.score_avg>=60?'#f59e0b':'#ef4444'}">${proj.score_avg>0?Math.round(proj.score_avg)+'<span style=\"font-size:.7rem\">/100</span>':'—'}</div></div>
+        <div class="ac-modal-tile"><div class="tl">Convergence</div><div class="tv" style="font-size:.85rem">${proj.convergence}</div></div>
+        <div class="ac-modal-tile"><div class="tl">CI Status</div><div class="tv" style="font-size:.85rem;color:${proj.ci_status==='green'?'#22c55e':proj.ci_status==='red'?'#ef4444':'#888'}">${proj.ci_status}</div></div>
+        <div class="ac-modal-tile"><div class="tl">Run actif</div><div class="tv" style="font-size:.72rem;font-family:monospace">${proj.run_id?'<a href="/missions/'+proj.run_id+'" target="_blank" style="color:var(--accent,#6c63ff)">'+proj.run_id.slice(0,8)+'↗</a>':'—'}</div></div>
+      </div>
+
+      <!-- Progress bar -->
+      <div style="margin-bottom:.75rem">
+        <div style="font-size:.65rem;color:#888;margin-bottom:.25rem">Progression cycles</div>
+        <div style="background:var(--border,#2a2d3e);border-radius:3px;height:6px">
+          <div style="width:${Math.round((proj.current_cycle/proj.max_cycles)*100)}%;background:${bc};height:100%;border-radius:3px;transition:width .5s"></div>
+        </div>
+      </div>
+
+      <!-- Live metrics -->
+      <div id="ac-modal-metrics-${projectId}" style="min-height:60px">
+        <div style="font-size:.65rem;color:#888;margin-bottom:.5rem">Chargement métriques…</div>
+      </div>
+
+      <!-- Cycle history mini-table -->
+      <div id="ac-modal-history-${projectId}" style="margin-top:.75rem;min-height:40px">
+        <div style="font-size:.65rem;color:#888">Chargement historique…</div>
+      </div>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+
+  // Load data
+  try {
+    const [stateRes, scoresRes, cyclesRes] = await Promise.all([
+      fetch('/api/improvement/project/' + projectId),
+      fetch('/api/improvement/scores/' + projectId),
+      fetch('/api/ac/projects/' + projectId + '/cycles?limit=8')
+    ]);
+    const state = await stateRes.json();
+    const scores = await scoresRes.json();
+    const cyclesData = cyclesRes.ok ? await cyclesRes.json() : {cycles:[]};
+
+    // Metrics tiles
+    const lc = state.last_cycle || {};
+    const adv = lc.adversarial_scores || {};
+    const advArr = Object.values(adv).filter(v=>typeof v==='number');
+    const advAvg = advArr.length ? Math.round(advArr.reduce((a,b)=>a+b,0)/advArr.length) : null;
+    const metricsEl = document.getElementById('ac-modal-metrics-'+projectId);
+    if (metricsEl) {
+      const m = [
+        ['RL Reward', scores.avg_reward!==undefined?scores.avg_reward.toFixed(3):'—', null],
+        ['Lighthouse', adv.lighthouse??lc.lighthouse_perf??'—', v=>parseInt(v)>=90],
+        ['axe violations', adv.axe??lc.axe_critical??'—', v=>parseInt(v)===0],
+        ['Lint errors', adv.lint??lc.lint_errors??'—', v=>parseInt(v)===0],
+        ['Tests pass', adv.tests??lc.test_coverage??'—', v=>parseFloat(v)>=90],
+        ['Traçabilité', state.traceability_score??lc.traceability_score??'—', v=>parseInt(v)>=80],
+        ['Adversarial', advAvg!==null?advAvg+'%':'—', v=>parseInt(v)>=80],
+        ['Défauts', lc.defect_count??'—', v=>parseInt(v)===0],
+      ];
+      metricsEl.innerHTML = '<div style="font-size:.65rem;color:#888;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Métriques dernier cycle</div>'
+        + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.4rem">'
+        + m.map(([label,val,fn])=>{
+          const col = fn&&val!=='—'?(fn(val)?'#22c55e':'#f59e0b'):'var(--text-primary)';
+          return `<div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.35rem;padding:.4rem .5rem">
+            <div style="font-size:.6rem;color:#888;margin-bottom:.1rem">${label}</div>
+            <div style="font-size:.9rem;font-weight:700;color:${col}">${val}</div>
+          </div>`;
+        }).join('')+'</div>';
+
+      // Adversarial breakdown if available
+      if (Object.keys(adv).length > 0) {
+        metricsEl.innerHTML += '<div style="font-size:.65rem;color:#888;margin:.75rem 0 .4rem;text-transform:uppercase;letter-spacing:.05em">Adversarial par dimension</div>'
+          + '<div style="display:flex;flex-direction:column;gap:.25rem">'
+          + Object.entries(adv).map(([dim,score])=>{
+            const pct = typeof score==='number'?score:0;
+            const col = pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
+            return `<div style="display:flex;align-items:center;gap:.5rem;font-size:.7rem">
+              <div style="width:100px;color:#888;flex-shrink:0">${dim.replace(/_/g,' ')}</div>
+              <div style="flex:1;background:var(--border,#2a2d3e);border-radius:2px;height:5px">
+                <div style="width:${pct}%;background:${col};height:100%;border-radius:2px"></div>
+              </div>
+              <div style="width:28px;text-align:right;color:${col};font-weight:700">${pct}</div>
+            </div>`;
+          }).join('')+'</div>';
+      }
+    }
+
+    // Cycle history
+    const histEl = document.getElementById('ac-modal-history-'+projectId);
+    const cycles = (cyclesData.cycles||[]).reverse();
+    if (histEl && cycles.length) {
+      histEl.innerHTML = '<div style="font-size:.65rem;color:#888;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Historique cycles</div>'
+        + '<table style="width:100%;font-size:.7rem;border-collapse:collapse">'
+        + '<thead><tr style="color:#888;border-bottom:1px solid var(--border,#2a2d3e)">'
+        + '<th style="text-align:left;padding:.25rem .4rem">#</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">Score</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">RL</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">Défauts</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">Traç.</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">Statut</th>'
+        + '<th style="text-align:left;padding:.25rem .4rem">Fix</th>'
+        + '</tr></thead><tbody>'
+        + cycles.map(c=>{
+          const sc = c.total_score||0;
+          const col = sc>=80?'#22c55e':sc>=60?'#f59e0b':'#ef4444';
+          return `<tr style="border-bottom:1px solid var(--border,#1a1c2a)">
+            <td style="padding:.25rem .4rem;color:#888">${c.cycle_num}</td>
+            <td style="padding:.25rem .4rem;font-weight:700;color:${col}">${sc}/100</td>
+            <td style="padding:.25rem .4rem;font-family:monospace">${(c.rl_reward||0).toFixed(3)}</td>
+            <td style="padding:.25rem .4rem;color:${(c.defect_count||0)===0?'#22c55e':'#ef4444'}">${c.defect_count||0}</td>
+            <td style="padding:.25rem .4rem">${c.traceability_score||0}%</td>
+            <td style="padding:.25rem .4rem;color:${c.status==='completed'?'#22c55e':c.status==='failed'?'#ef4444':'#888'}">${c.status||'—'}</td>
+            <td style="padding:.25rem .4rem;color:#888;font-size:.65rem">${(c.fix_summary||'—').slice(0,40)}</td>
+          </tr>`;
+        }).join('')+'</tbody></table>';
+    } else if (histEl) {
+      histEl.innerHTML = '<div style="font-size:.75rem;color:#555;padding:.5rem 0">Aucun cycle enregistré — lancer: Démarrer</div>';
+    }
+  } catch(e) {
+    console.error('AC modal fetch error', e);
+  }
+}
+
+function acSelectProject(projectId, card) {
+  _acSelectedProject = projectId;
+  document.querySelectorAll('.ac-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  // Sync Intelligence selector
+  const sel = document.getElementById('ac-intel-proj-select');
+  if (sel) sel.value = projectId;
+  htmx.ajax('GET', '/workflows/improvement/cycles/' + projectId, {
+    target: '#ac-history-content',
+    swap: 'innerHTML'
+  });
+  document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
+  if (_acIntelOpen) acRefreshIntel();
+}
+
+function acIntelSwitchProject(projectId) {
+  _acSelectedProject = projectId;
+  // Sync card selection
+  document.querySelectorAll('.ac-card').forEach(c => {
+    const onclick = c.getAttribute('onclick') || '';
+    if (onclick.includes("'" + projectId + "'")) c.classList.add('selected');
+    else c.classList.remove('selected');
+  });
+  acRefreshIntel();
+}
+
+function acToggleIntel() {
+  const panel = document.getElementById('ac-intel-panel');
+  _acIntelOpen = !_acIntelOpen;
+  panel.style.display = _acIntelOpen ? 'block' : 'none';
+  if (_acIntelOpen) acRefreshIntel();
+}
+
+function acHistoryView(view) {
+  _acHistoryView = view;
+  ['table','topo','screens'].forEach(v => {
+    const panel = document.getElementById('ac-hview-panel-' + v);
+    const btn = document.getElementById('ac-hview-' + v);
+    if (panel) panel.style.display = v === view ? '' : 'none';
+    if (btn) {
+      btn.style.background = v === view ? 'var(--accent,#6c63ff)' : 'transparent';
+      btn.style.color = v === view ? '#fff' : 'var(--text-muted,#888)';
+      btn.style.border = v === view ? 'none' : '1px solid var(--border,#2a2d3e)';
+    }
+  });
+}
+
+async function acRefreshIntel() {
+  if (!_acSelectedProject) return;
+  try {
+    const [stateRes, scoresRes] = await Promise.all([
+      fetch('/api/improvement/project/' + _acSelectedProject),
+      fetch('/api/improvement/scores/' + _acSelectedProject)
+    ]);
+    const state = await stateRes.json();
+    const scores = await scoresRes.json();
+
+    // Convergence
+    const conv = state.convergence || {};
+    const convEl = document.getElementById('im-conv');
+    convEl.textContent = conv.status || '—';
+    convEl.className = 'value conv-' + (conv.status || 'cold_start');
+
+    // RL reward
+    document.getElementById('im-reward').textContent =
+      scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—';
+
+    // Cycles + avg score
+    document.getElementById('im-cycles').textContent = state.cycle_count || 0;
+    document.getElementById('im-avg').textContent =
+      state.total_score_avg ? Math.round(state.total_score_avg) : '—';
+
+    // RL hint
+    const hint = state.next_cycle_hint;
+    document.getElementById('im-hint').textContent =
+      hint ? (hint.action || '—') + (hint.confidence ? ' (' + hint.confidence.toFixed(2) + ')' : '') : '—';
+
+    // Skill eval
+    const evalPending = state.skill_eval_pending;
+    document.getElementById('im-eval').textContent =
+      evalPending && evalPending.length ? evalPending.join(', ') : 'aucun';
+
+    // Deterministic tool metrics from last cycle
+    const lc = state.last_cycle || {};
+    const advScores = lc.adversarial_scores || {};
+    const setMetric = (id, val, greenIf) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = val !== undefined && val !== null ? val : '—';
+      if (val !== undefined && val !== null && greenIf) {
+        el.style.color = greenIf(val) ? '#22c55e' : '#f59e0b';
+      }
+    };
+    setMetric('im-lighthouse', advScores.lighthouse ?? lc.lighthouse, v => parseInt(v) >= 90);
+    setMetric('im-axe', advScores.axe ?? lc.axe_violations, v => parseInt(v) === 0);
+    setMetric('im-lint', advScores.lint ?? lc.lint_errors, v => parseInt(v) === 0);
+    setMetric('im-tests', advScores.tests ?? lc.test_pass_rate, v => parseFloat(v) >= 90);
+    setMetric('im-trace', state.traceability_score, v => parseInt(v) >= 80);
+    // Adversarial global avg
+    const advArr = Object.values(advScores).filter(v => typeof v === 'number');
+    const advAvg = advArr.length ? Math.round(advArr.reduce((a, b) => a + b, 0) / advArr.length) : null;
+    setMetric('im-adv', advAvg !== null ? advAvg + '%' : '—', v => parseInt(v) >= 80);
+
+    // Sparkline
+    const sparkEl = document.getElementById('ac-sparkline');
+    const recent = state.recent_scores || [];
+    if (recent.length) {
+      const maxS = Math.max(...recent, 1);
+      sparkEl.innerHTML = recent.map(s => {
+        const h = Math.round((s / maxS) * 32);
+        const col = s >= 80 ? '#22c55e' : s >= 60 ? '#f59e0b' : '#ef4444';
+        return `<div class="spark-bar" style="height:${h}px;background:${col}" title="${s}/100"></div>`;
+      }).join('');
+    } else {
+      sparkEl.innerHTML = '<span style="color:#444;font-size:.7rem">pas de données</span>';
+    }
+
+    // Thompson stats
+    const tbody = document.getElementById('ac-thompson-tbody');
+    const skillStats = scores.skill_stats || {};
+    const rows = [];
+    for (const [skill, variants] of Object.entries(skillStats)) {
+      for (const [variant, stats] of Object.entries(variants)) {
+        const prob = stats.wins / Math.max(1, stats.wins + stats.losses);
+        rows.push(`<tr class="thompson-row">
+          <td style="font-family:monospace">${skill}</td>
+          <td style="font-family:monospace;font-size:.65rem">${variant}</td>
+          <td class="thompson-win">${stats.wins}</td>
+          <td class="thompson-lose">${stats.losses}</td>
+          <td>${stats.avg_score ? Math.round(stats.avg_score) : '—'}</td>
+          <td style="font-family:monospace">${(prob * 100).toFixed(1)}%</td>
+        </tr>`);
+      }
+    }
+    tbody.innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+
+  } catch(e) {
+    console.error('AC intel fetch error', e);
+  }
+}
+
+async function acStartCycle() {
+  if (!_acSelectedProject) return;
+  const btn = document.getElementById('ac-start-btn');
+  const bar = document.getElementById('ac-status-bar');
+  btn.disabled = true;
+  bar.style.display = 'block';
+  bar.textContent = 'Démarrage du cycle AC pour ' + _acSelectedProject + '…';
+  try {
+    const res = await fetch('/api/improvement/start/' + _acSelectedProject, { method: 'POST' });
+    const data = await res.json();
+    if (data.run_id) {
+      bar.style.color = '#22c55e';
+      bar.textContent = 'Cycle ' + (data.cycle_num||'?') + ' démarré — run ' + data.run_id.slice(0,8) + '. Suivi : Missions';
+      if (window._acStartPoll) window._acStartPoll();
+    } else {
+      bar.style.color = '#ef4444';
+      bar.textContent = 'Erreur : ' + (data.detail || data.error || 'unknown');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    bar.style.color = '#ef4444';
+    bar.textContent = 'Erreur réseau : ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+// ── Auto-refresh: reload panel every 8s while any project is running ──────────
+(function() {
+  var _acPollTimer = null;
+  function _acHasRunning() {
+    return !!document.querySelector('.ac-card [style*="22c55e"]');
+  }
+  function _acPoll() {
+    var target = document.getElementById('art-amelio-content');
+    if (!target) { clearInterval(_acPollTimer); _acPollTimer = null; return; }
+    // Only reload if Cycles AC panel is visible
+    var panel = document.getElementById('ac-panel-cycles');
+    if (panel && panel.style.display === 'none') return;
+    htmx.ajax('GET', '/workflows/improvement', {target: '#art-amelio-content', swap: 'innerHTML'});
+  }
+  function _acStartPoll() {
+    if (_acPollTimer) return;
+    _acPollTimer = setInterval(_acPoll, 8000);
+  }
+  // Start polling on load
+  document.addEventListener('htmx:afterSettle', function(e) {
+    if (e.target && e.target.id === 'art-amelio-content') {
+      if (_acHasRunning()) _acStartPoll();
+    }
+  });
+  // Also start immediately if already running
+  setTimeout(function() { if (_acHasRunning()) _acStartPoll(); }, 500);
+  // Expose for external use
+  window._acStartPoll = _acStartPoll;
+})();
+
+// ── Team diagram: AC improvement workflow agents + phases ─────────────────────
+function _acRenderTeamDiagram() {
+  const container = document.getElementById('ac-team-graph-svg');
+  if (!container || container.dataset.rendered) return;
+  container.dataset.rendered = '1';
+
+  // Phase colors
+  const phaseColors = {
+    inception: '#a855f7', dev: '#3b82f6', adversarial: '#f97316',
+    tools: '#06b6d4', record: '#22c55e', learn: '#f59e0b'
+  };
+
+  // Agent nodes: {id, label, role, phase, x, y}
+  const NW=140, NH=46, GAP_X=165, GAP_Y=62, PH_W=NW+14, PH_H=NH+24;
+  const agents = [
+    // Phase 1: Inception (col 0, rows 0-1)
+    {id:'lead-dev-ac',  label:'Lead Dev',    role:'inception lead',  phase:'inception', x:10, y:10},
+    {id:'arch-ac',      label:'Architecte',  role:'inception',       phase:'inception', x:10, y:10+GAP_Y},
+    // Phase 2: Dev Sprint (col 1, rows 0-3)
+    {id:'dev-tdd-l',    label:'Lead Dev',    role:'tdd sprint',      phase:'dev',  x:10+GAP_X,   y:10},
+    {id:'dev-tdd-1',    label:'Dev-1',       role:'implementation',  phase:'dev',  x:10+GAP_X,   y:10+GAP_Y},
+    {id:'dev-tdd-2',    label:'Dev-2',       role:'implementation',  phase:'dev',  x:10+GAP_X,   y:10+GAP_Y*2},
+    {id:'qa-tdd',       label:'QA',          role:'tests TDD',       phase:'dev',  x:10+GAP_X,   y:10+GAP_Y*3},
+    // Phase 3: Adversarial (col 2, rows 0-2)
+    {id:'arch-adv',     label:'Architecte',  role:'L1 critic',       phase:'adversarial', x:10+GAP_X*2, y:10},
+    {id:'lead-adv',     label:'Lead Dev',    role:'code critic',     phase:'adversarial', x:10+GAP_X*2, y:10+GAP_Y},
+    {id:'qa-adv',       label:'QA',          role:'L0 checks',       phase:'adversarial', x:10+GAP_X*2, y:10+GAP_Y*2},
+    // Phase 4: Tools Scan (col 3, rows 0-1)
+    {id:'qa-tools',     label:'QA',          role:'Lighthouse/axe',  phase:'tools', x:10+GAP_X*3, y:10},
+    {id:'devops-tools', label:'DevOps',      role:'lint/CI check',   phase:'tools', x:10+GAP_X*3, y:10+GAP_Y},
+    // Phase 5: Record (col 4, row 0)
+    {id:'lead-record',  label:'Lead Dev',    role:'inject-cycle API',phase:'record', x:10+GAP_X*4, y:10+GAP_Y},
+    // Phase 6: Learn (col 5, rows 0-1)
+    {id:'lead-learn',   label:'Lead Dev',    role:'RL + Thompson',   phase:'learn', x:10+GAP_X*5, y:10},
+    {id:'po-learn',     label:'PO',          role:'plan cycle N+1',  phase:'learn', x:10+GAP_X*5, y:10+GAP_Y},
+  ];
+
+  // Phase group boxes
+  const phaseGroups = {
+    inception:    {label:'Inception',   col:0, rows:2, col2:0},
+    dev:          {label:'Dev TDD',     col:1, rows:4, col2:1},
+    adversarial:  {label:'Adversarial', col:2, rows:3, col2:2},
+    tools:        {label:'Scan Tools',  col:3, rows:2, col2:3},
+    record:       {label:'Record',      col:4, rows:1, col2:4},
+    learn:        {label:'Learn RL',    col:5, rows:2, col2:5},
+  };
+
+  // Edges: from phase output to next phase input (horizontal flow)
+  const edges = [
+    {from:'lead-dev-ac', to:'dev-tdd-l',    color:phaseColors.inception},
+    {from:'arch-ac',     to:'dev-tdd-l',    color:phaseColors.inception},
+    {from:'dev-tdd-2',   to:'arch-adv',     color:phaseColors.dev},
+    {from:'qa-tdd',      to:'qa-adv',       color:phaseColors.dev},
+    {from:'qa-adv',      to:'qa-tools',     color:phaseColors.adversarial},
+    {from:'arch-adv',    to:'devops-tools', color:phaseColors.adversarial},
+    {from:'qa-tools',    to:'lead-record',  color:phaseColors.tools},
+    {from:'devops-tools',to:'lead-record',  color:phaseColors.tools},
+    {from:'lead-record', to:'lead-learn',   color:phaseColors.record},
+    {from:'lead-learn',  to:'lead-dev-ac',  color:phaseColors.learn, label:'→ N+1'},
+  ];
+
+  const maxCol = 5;
+  const W = 10 + GAP_X * (maxCol + 1) + NW + 10;
+  const H = 10 + GAP_Y * 4 + NH + 30;
+
+  // Build SVG
+  const nodeById = {};
+  agents.forEach(n => { nodeById[n.id] = n; });
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="width:100%;max-height:${H}px">`;
+
+  // Defs for markers
+  Object.entries(phaseColors).forEach(([ph, col]) => {
+    const id = col.replace('#','');
+    svg += `<defs><marker id="acm-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="${col}"/></marker></defs>`;
+  });
+
+  // Phase group backgrounds
+  Object.entries(phaseGroups).forEach(([ph, g]) => {
+    const col = phaseColors[ph] || '#6b7280';
+    const gx = 10 + g.col * GAP_X - 7;
+    const gy = 10 - 18;
+    const gw = NW + 14;
+    const gh = g.rows * GAP_Y + NH + 8;
+    svg += `<rect x="${gx}" y="${gy}" width="${gw}" height="${gh}" rx="5" fill="${col}" fill-opacity=".06" stroke="${col}" stroke-opacity=".3" stroke-width="1" stroke-dasharray="3,3"/>`;
+    svg += `<text x="${gx+gw/2}" y="${gy+12}" text-anchor="middle" style="font-size:9px;fill:${col};font-weight:700">${g.label}</text>`;
+  });
+
+  // Edges
+  edges.forEach(e => {
+    const fn = nodeById[e.from], tn = nodeById[e.to];
+    if (!fn || !tn) return;
+    const col = e.color || '#8b5cf6';
+    const colId = col.replace('#','');
+    // From right side of source node to left side of target node
+    const x1 = fn.x + NW, y1 = fn.y + NH/2;
+    const x2 = tn.x, y2 = tn.y + NH/2;
+    const dx = Math.abs(x2-x1);
+    let d;
+    if (e.from === 'lead-learn' && e.to === 'lead-dev-ac') {
+      // Feedback loop - curve below
+      const midY = H - 12;
+      d = `M${x1},${y1} C${x1+30},${midY} ${x2-30},${midY} ${x2},${y2}`;
+    } else if (y1 === y2) {
+      d = `M${x1},${y1} L${x2},${y2}`;
+    } else {
+      const cp = dx * 0.4;
+      d = `M${x1},${y1} C${x1+cp},${y1} ${x2-cp},${y2} ${x2},${y2}`;
+    }
+    svg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.5" opacity=".7" marker-end="url(#acm-${colId})"/>`;
+    if (e.label) {
+      const mx=(x1+x2)/2, my=(y1+y2)/2-6;
+      svg += `<text x="${mx}" y="${my}" text-anchor="middle" style="font-size:8px;fill:${col};font-weight:600">${e.label}</text>`;
+    }
+  });
+
+  // Agent nodes
+  agents.forEach(n => {
+    const col = phaseColors[n.phase] || '#8b5cf6';
+    svg += `<g transform="translate(${n.x},${n.y})">`;
+    svg += `<rect width="${NW}" height="${NH}" rx="4" fill="var(--bg-tertiary,#251a35)" stroke="var(--border,#2a2d3e)" stroke-width="1"/>`;
+    svg += `<line x1="0" y1="0" x2="${NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
+    // Avatar circle
+    svg += `<circle cx="18" cy="${NH/2}" r="12" fill="${col}" opacity=".15"/>`;
+    svg += `<text x="18" y="${NH/2+4}" text-anchor="middle" style="font-size:9px;fill:${col};font-weight:700">${n.label.substring(0,2).toUpperCase()}</text>`;
+    // Name + role
+    const nameShort = n.label.length>16?n.label.substring(0,15)+'…':n.label;
+    const roleShort = n.role.length>20?n.role.substring(0,19)+'…':n.role;
+    svg += `<text x="36" y="${NH/2-5}" style="font-size:9px;fill:var(--text-primary,#e0e0e0);font-weight:600">${nameShort}</text>`;
+    svg += `<text x="36" y="${NH/2+7}" style="font-size:7.5px;fill:var(--text-secondary,#888)">${roleShort}</text>`;
+    svg += `</g>`;
+  });
+
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+// Render diagram when details is opened
+document.getElementById('ac-team-details')?.addEventListener('toggle', function(e) {
+  if (this.open) {
+    _acRenderTeamDiagram();
+    document.getElementById('ac-team-chevron').style.transform = 'rotate(180deg)';
+  } else {
+    document.getElementById('ac-team-chevron').style.transform = '';
+  }
+});
+

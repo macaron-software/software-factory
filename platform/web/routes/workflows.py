@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
-from .helpers import _templates, _avatar_url, _parse_body
+from .helpers import _templates, _avatar_url
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -377,14 +377,14 @@ async def _run_workflow_background(
     from ...sessions.store import get_session_store, MessageDef
     from .helpers import _active_mission_tasks
 
-    # Mark mission_run as running at task start — overrides any 'paused' set by
+    # Mark epic_run as running at task start — overrides any 'paused' set by
     # startup cleanup that raced with asyncio task scheduling.
     try:
         from ...db.migrations import get_db as _gdb_start
 
         _db_start = _gdb_start()
         _db_start.execute(
-            "UPDATE mission_runs SET status='running' WHERE session_id=?",
+            "UPDATE epic_runs SET status='running' WHERE session_id=?",
             (session_id,),
         )
         _db_start.commit()
@@ -402,12 +402,17 @@ async def _run_workflow_background(
         # Update linked mission status if autoheal
         sess_store = get_session_store()
         sess = sess_store.get(session_id)
-        if sess and sess.config and sess.config.get("autoheal") and result.status != "paused":
+        if (
+            sess
+            and sess.config
+            and sess.config.get("autoheal")
+            and result.status != "paused"
+        ):
             mission_id = sess.config.get("mission_id")
             if mission_id:
-                from ...missions.store import get_mission_store
+                from ...epics.store import get_epic_store
 
-                ms = get_mission_store()
+                ms = get_epic_store()
                 final = "completed" if result.status == "completed" else "failed"
                 ms.update_mission_status(mission_id, final)
                 logger.info("Auto-heal mission %s → %s", mission_id, final)
@@ -474,7 +479,7 @@ async def _run_workflow_background(
         except Exception:
             pass
     finally:
-        # Update linked mission_run status so it doesn't stay 'running' on restart
+        # Update linked epic_run status so it doesn't stay 'running' on restart
         # Use the actual final status: "paused" when awaiting human, "completed" otherwise
         try:
             from ...db.migrations import get_db as _gdb
@@ -482,7 +487,7 @@ async def _run_workflow_background(
             _db = _gdb()
             mr_status = "paused" if _final_run_status == "paused" else "completed"
             _db.execute(
-                "UPDATE mission_runs SET status=? WHERE session_id=? AND status='running'",
+                "UPDATE epic_runs SET status=? WHERE session_id=? AND status='running'",
                 (mr_status, session_id),
             )
             _db.commit()
@@ -542,24 +547,28 @@ async def workflow_nogo(session_id: str):
 
     # Record NO GO message in thread
     from ...sessions.store import MessageDef
-    store.add_message(MessageDef(
-        session_id=session_id,
-        from_agent="system",
-        to_agent="user",
-        message_type="system",
-        content="**❌ NO GO — Workflow arrêté**\n\nLe checkpoint humain a été rejeté. Le workflow a été interrompu.",
-    ))
+
+    store.add_message(
+        MessageDef(
+            session_id=session_id,
+            from_agent="system",
+            to_agent="user",
+            message_type="system",
+            content="**❌ NO GO — Workflow arrêté**\n\nLe checkpoint humain a été rejeté. Le workflow a été interrompu.",
+        )
+    )
 
     # Update mission run to failed if linked
     config = sess.config or {}
-    mission_run_id = config.get("mission_run_id")
-    if mission_run_id:
+    epic_run_id = config.get("epic_run_id")
+    if epic_run_id:
         try:
             from datetime import datetime, timezone
+
             db = get_db()
             db.execute(
-                "UPDATE mission_runs SET status='failed', completed_at=? WHERE id=?",
-                (datetime.now(timezone.utc).isoformat(), mission_run_id),
+                "UPDATE epic_runs SET status='failed', completed_at=? WHERE id=?",
+                (datetime.now(timezone.utc).isoformat(), epic_run_id),
             )
             db.commit()
             db.close()
@@ -569,37 +578,34 @@ async def workflow_nogo(session_id: str):
     return {"status": "nogo", "session_id": session_id}
 
 
-
-
-
 @router.get("/dsi", response_class=HTMLResponse)
 async def dsi_board_page(request: Request):
     """DSI strategic dashboard — kanban pipeline + KPIs."""
     from ...projects.manager import get_project_store
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
 
     project_store = get_project_store()
     agent_store = get_agent_store()
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
 
     all_projects = project_store.list_all()
     all_agents = agent_store.list_all()
-    all_missions = mission_store.list_missions()
+    all_missions = epic_store.list_missions()
 
     # Load mission runs for live phase progress
-    from ...missions.store import get_mission_run_store
+    from ...epics.store import get_epic_run_store
 
-    run_store = get_mission_run_store()
+    run_store = get_epic_run_store()
     all_runs = run_store.list_runs(limit=100)
     runs_by_mission: dict = {}
     for r in all_runs:
-        if r.parent_mission_id:
-            runs_by_mission[r.parent_mission_id] = r
+        if r.parent_epic_id:
+            runs_by_mission[r.parent_epic_id] = r
         runs_by_mission[r.id] = r
 
     def _phase_stats(mission_id):
-        """Get progress from mission_run phases (live) or fallback to tasks."""
+        """Get progress from epic_run phases (live) or fallback to tasks."""
         run = runs_by_mission.get(mission_id)
         if run and run.phases:
             total = len(run.phases)
@@ -618,7 +624,7 @@ async def dsi_board_page(request: Request):
                 "current_phase": current_name,
                 "run_status": run.status.value,
             }
-        stats = mission_store.mission_stats(mission_id)
+        stats = epic_store.mission_stats(mission_id)
         return {
             "total": stats.get("total", 0),
             "done": stats.get("done", 0),
@@ -652,7 +658,7 @@ async def dsi_board_page(request: Request):
         if status_key == "backlog":
             for m in all_missions:
                 if m.status == "planning":
-                    sprints = mission_store.list_sprints(m.id)
+                    sprints = epic_store.list_sprints(m.id)
                     if not sprints:
                         ps = _phase_stats(m.id)
                         col_missions.append(
@@ -671,7 +677,7 @@ async def dsi_board_page(request: Request):
         elif status_key == "planning":
             for m in all_missions:
                 if m.status == "planning":
-                    sprints = mission_store.list_sprints(m.id)
+                    sprints = epic_store.list_sprints(m.id)
                     if sprints:
                         ps = _phase_stats(m.id)
                         col_missions.append(
@@ -689,7 +695,7 @@ async def dsi_board_page(request: Request):
                         )
         elif status_key == "review":
             for m in all_missions:
-                sprints = mission_store.list_sprints(m.id)
+                sprints = epic_store.list_sprints(m.id)
                 if any(s.status == "review" for s in sprints) and m.status == "active":
                     ps = _phase_stats(m.id)
                     col_missions.append(
@@ -709,7 +715,7 @@ async def dsi_board_page(request: Request):
             for m in all_missions:
                 if m.status == match_status:
                     if status_key == "active":
-                        sprints = mission_store.list_sprints(m.id)
+                        sprints = epic_store.list_sprints(m.id)
                         if any(s.status == "review" for s in sprints):
                             continue
                     ps = _phase_stats(m.id)
@@ -726,9 +732,7 @@ async def dsi_board_page(request: Request):
                             "current_phase": ps["current_phase"],
                         }
                     )
-        pipeline.append(
-            {"status": status_key, "label": label, "missions": col_missions}
-        )
+        pipeline.append({"status": status_key, "label": label, "epics": col_missions})
 
     # Resource allocation per project (phase-based progress)
     resources = []
@@ -1230,15 +1234,7 @@ async def dsi_workflow_start(request: Request, workflow_id: str):
         return HTMLResponse("Pas de phases", 400)
 
     phase1 = phases[0]
-    # Allow project_id override from request query param or body
-    _req_project_id = str(request.query_params.get("project_id", "")).strip()
-    if not _req_project_id and request.method == "POST":
-        try:
-            _body = await _parse_body(request)
-            _req_project_id = str(_body.get("project_id", "")).strip()
-        except Exception:
-            pass
-    project_id = _req_project_id or cfg.get("project_id", "")
+    project_id = cfg.get("project_id", "")
 
     # Create session
     session_store = get_session_store()

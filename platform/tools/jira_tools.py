@@ -45,7 +45,9 @@ async def _jira_get(path: str, params: dict | None = None) -> dict:
     url, token = _get_jira_config()
     async with (
         aiohttp.ClientSession(headers=_headers(token)) as s,
-        s.get(f"{url}{path}", params=params, timeout=aiohttp.ClientTimeout(total=30)) as r,
+        s.get(
+            f"{url}{path}", params=params, timeout=aiohttp.ClientTimeout(total=30)
+        ) as r,
     ):
         r.raise_for_status()
         return await r.json()
@@ -57,7 +59,9 @@ async def _jira_post(path: str, payload: dict) -> dict:
     url, token = _get_jira_config()
     async with (
         aiohttp.ClientSession(headers=_headers(token)) as s,
-        s.post(f"{url}{path}", json=payload, timeout=aiohttp.ClientTimeout(total=30)) as r,
+        s.post(
+            f"{url}{path}", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+        ) as r,
     ):
         r.raise_for_status()
         if r.status == 204 or r.content_length == 0:
@@ -74,7 +78,9 @@ async def _jira_put(path: str, payload: dict) -> int:
     url, token = _get_jira_config()
     async with (
         aiohttp.ClientSession(headers=_headers(token)) as s,
-        s.put(f"{url}{path}", json=payload, timeout=aiohttp.ClientTimeout(total=30)) as r,
+        s.put(
+            f"{url}{path}", json=payload, timeout=aiohttp.ClientTimeout(total=30)
+        ) as r,
     ):
         r.raise_for_status()
         return r.status
@@ -103,7 +109,9 @@ async def jira_search(jql: str, max_results: int = 20) -> str:
             assignee = (f.get("assignee") or {}).get("displayName", "unassigned")
             status = f.get("status", {}).get("name", "?")
             itype = f.get("issuetype", {}).get("name", "?")
-            lines.append(f"[{i['key']}] {f.get('summary', '')} | {itype} | {status} | {assignee}")
+            lines.append(
+                f"[{i['key']}] {f.get('summary', '')} | {itype} | {status} | {assignee}"
+            )
         return f"Found {data.get('total', len(issues))} issues:\n" + "\n".join(lines)
     except Exception as e:
         return f"Jira search error: {e}"
@@ -155,7 +163,9 @@ async def jira_update(issue_key: str, fields: dict) -> str:
             update_fields["labels"] = fields["labels"]
         if "assignee" in fields:
             update_fields["assignee"] = {"name": fields["assignee"]}
-        status = await _jira_put(f"/rest/api/2/issue/{issue_key}", {"fields": update_fields})
+        status = await _jira_put(
+            f"/rest/api/2/issue/{issue_key}", {"fields": update_fields}
+        )
         return f"Updated {issue_key} (HTTP {status})"
     except Exception as e:
         return f"Jira update error: {e}"
@@ -181,7 +191,8 @@ async def jira_transition(issue_key: str, transition_name: str) -> str:
             avail = ", ".join(f"{t['name']} (id={t['id']})" for t in transitions)
             return f"Transition '{transition_name}' not found. Available: {avail}"
         await _jira_post(
-            f"/rest/api/2/issue/{issue_key}/transitions", {"transition": {"id": match["id"]}}
+            f"/rest/api/2/issue/{issue_key}/transitions",
+            {"transition": {"id": match["id"]}},
         )
         return f"Transitioned {issue_key} → {match['name']}"
     except Exception as e:
@@ -193,7 +204,10 @@ async def jira_board_issues(board_id: int = 8680, max_results: int = 50) -> str:
     try:
         data = await _jira_get(
             f"/rest/agile/1.0/board/{board_id}/issue",
-            {"maxResults": max_results, "fields": "summary,status,issuetype,assignee,priority"},
+            {
+                "maxResults": max_results,
+                "fields": "summary,status,issuetype,assignee,priority",
+            },
         )
         issues = data.get("issues", [])
         if not issues:
@@ -204,7 +218,10 @@ async def jira_board_issues(board_id: int = 8680, max_results: int = 50) -> str:
             status = f.get("status", {}).get("name", "?")
             assignee = (f.get("assignee") or {}).get("displayName", "unassigned")
             lines.append(f"[{i['key']}] {f.get('summary', '')} | {status} | {assignee}")
-        return f"Board {board_id} — {data.get('total', len(issues))} issues:\n" + "\n".join(lines)
+        return (
+            f"Board {board_id} — {data.get('total', len(issues))} issues:\n"
+            + "\n".join(lines)
+        )
     except Exception as e:
         return f"Jira board error: {e}"
 
@@ -212,7 +229,9 @@ async def jira_board_issues(board_id: int = 8680, max_results: int = 50) -> str:
 async def jira_add_comment(issue_key: str, comment: str) -> str:
     """Add a comment to an issue."""
     try:
-        data = await _jira_post(f"/rest/api/2/issue/{issue_key}/comment", {"body": comment})
+        data = await _jira_post(
+            f"/rest/api/2/issue/{issue_key}/comment", {"body": comment}
+        )
         return f"Comment added to {issue_key} (id={data.get('id', '?')})"
     except Exception as e:
         return f"Jira comment error: {e}"
@@ -234,7 +253,7 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
         url, _ = _get_jira_config()
 
         # Get mission info
-        mission = db.execute("SELECT * FROM missions WHERE id=?", (mission_id,)).fetchone()
+        mission = db.execute("SELECT * FROM epics WHERE id=?", (mission_id,)).fetchone()
         if not mission:
             return f"Mission {mission_id} not found."
 
@@ -242,7 +261,9 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
         created = []
 
         # Sync features
-        features = db.execute("SELECT * FROM features WHERE mission_id=?", (mission_id,)).fetchall()
+        features = db.execute(
+            "SELECT * FROM features WHERE mission_id=?", (mission_id,)
+        ).fetchall()
         for feat in features:
             if feat["jira_key"] if "jira_key" in feat.keys() else None:
                 continue
@@ -256,7 +277,10 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
             if "Created" in result:
                 jira_key = result.split(" ")[1]
                 try:
-                    db.execute("UPDATE features SET jira_key=? WHERE id=?", (jira_key, feat["id"]))
+                    db.execute(
+                        "UPDATE features SET jira_key=? WHERE id=?",
+                        (jira_key, feat["id"]),
+                    )
                     db.commit()
                 except Exception:
                     pass
@@ -281,7 +305,8 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
                 jira_key = result.split(" ")[1]
                 try:
                     db.execute(
-                        "UPDATE user_stories SET jira_key=? WHERE id=?", (jira_key, story["id"])
+                        "UPDATE user_stories SET jira_key=? WHERE id=?",
+                        (jira_key, story["id"]),
                     )
                     db.commit()
                 except Exception:
@@ -289,7 +314,9 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
                 created.append(f"Story {story['title']} → {jira_key}")
 
         # Sync tasks
-        tasks = db.execute("SELECT * FROM tasks WHERE mission_id=?", (mission_id,)).fetchall()
+        tasks = db.execute(
+            "SELECT * FROM tasks WHERE mission_id=?", (mission_id,)
+        ).fetchall()
         for task in tasks:
             if task["jira_key"] if "jira_key" in task.keys() else None:
                 continue
@@ -303,7 +330,9 @@ async def jira_sync_from_platform(mission_id: str, board_id: int = 8680) -> str:
             if "Created" in result:
                 jira_key = result.split(" ")[1]
                 try:
-                    db.execute("UPDATE tasks SET jira_key=? WHERE id=?", (jira_key, task["id"]))
+                    db.execute(
+                        "UPDATE tasks SET jira_key=? WHERE id=?", (jira_key, task["id"])
+                    )
                     db.commit()
                 except Exception:
                     pass
@@ -324,7 +353,10 @@ async def jira_sync_to_platform(board_id: int = 8680) -> str:
     try:
         data = await _jira_get(
             f"/rest/agile/1.0/board/{board_id}/issue",
-            {"maxResults": 50, "fields": "summary,status,issuetype,assignee,priority,updated"},
+            {
+                "maxResults": 50,
+                "fields": "summary,status,issuetype,assignee,priority,updated",
+            },
         )
         issues = data.get("issues", [])
         if not issues:
@@ -385,7 +417,7 @@ async def jira_kanban_sync(direction: str = "both") -> str:
 
         # Get all missions with jira_key
         missions = db.execute(
-            "SELECT id, name, kanban_status, status, jira_key FROM missions WHERE jira_key IS NOT NULL AND jira_key != ''"
+            "SELECT id, name, kanban_status, status, jira_key FROM epics WHERE jira_key IS NOT NULL AND jira_key != ''"
         ).fetchall()
 
         # Get Jira board issues
@@ -427,13 +459,13 @@ async def jira_kanban_sync(direction: str = "both") -> str:
 
                 # Find matching mission
                 linked = db.execute(
-                    "SELECT id, name, kanban_status FROM missions WHERE jira_key=?", (key,)
+                    "SELECT id, name, kanban_status FROM epics WHERE jira_key=?", (key,)
                 ).fetchone()
                 if linked:
                     old_kanban = linked["kanban_status"] or "funnel"
                     if old_kanban != new_kanban:
                         db.execute(
-                            "UPDATE missions SET kanban_status=? WHERE id=?",
+                            "UPDATE epics SET kanban_status=? WHERE id=?",
                             (new_kanban, linked["id"]),
                         )
                         db.commit()
@@ -450,7 +482,7 @@ async def jira_kanban_sync(direction: str = "both") -> str:
         # ── Auto-link: create Jira issues for unlinked missions ──
         if direction in ("to_jira", "both"):
             unlinked = db.execute(
-                "SELECT id, name, kanban_status, status FROM missions WHERE (jira_key IS NULL OR jira_key = '') AND status != 'archived' AND name NOT LIKE '[TMA]%' LIMIT 10"
+                "SELECT id, name, kanban_status, status FROM epics WHERE (jira_key IS NULL OR jira_key = '') AND status != 'archived' AND name NOT LIKE '[TMA]%' LIMIT 10"
             ).fetchall()
             for m in unlinked:
                 result = await jira_create(
@@ -461,7 +493,9 @@ async def jira_kanban_sync(direction: str = "both") -> str:
                 )
                 if "Created" in result:
                     jira_key = result.split(" ")[1]
-                    db.execute("UPDATE missions SET jira_key=? WHERE id=?", (jira_key, m["id"]))
+                    db.execute(
+                        "UPDATE epics SET jira_key=? WHERE id=?", (jira_key, m["id"])
+                    )
                     db.commit()
                     # Set the right Jira status
                     target = _PLATFORM_TO_JIRA.get(m["kanban_status"] or "funnel")
@@ -512,11 +546,15 @@ async def run_jira_tool(name: str, args: dict) -> str:
     if name == "jira_transition":
         return await jira_transition(args["issue_key"], args["transition"])
     if name == "jira_board_issues":
-        return await jira_board_issues(args.get("board_id", 8680), args.get("max_results", 50))
+        return await jira_board_issues(
+            args.get("board_id", 8680), args.get("max_results", 50)
+        )
     if name == "jira_add_comment":
         return await jira_add_comment(args["issue_key"], args["comment"])
     if name == "jira_sync_from_platform":
-        return await jira_sync_from_platform(args["mission_id"], args.get("board_id", 8680))
+        return await jira_sync_from_platform(
+            args["mission_id"], args.get("board_id", 8680)
+        )
     if name == "jira_sync_to_platform":
         return await jira_sync_to_platform(args.get("board_id", 8680))
     if name == "jira_kanban_sync":

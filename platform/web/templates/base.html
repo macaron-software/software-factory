@@ -137,9 +137,6 @@
                         <svg class="icon"><use href="#icon-users"/></svg>
                     </a></li>
                     {% endif %}
-                    <li><a href="/marketplace" data-tooltip="Marketplace" class="{% if page_title == 'Marketplace' %}active{% endif %}">
-                        <svg class="icon"><use href="#icon-grid"/></svg>
-                    </a></li>
                     <li><a href="/world" data-tooltip="World 3D" class="{% if page_title in ('Agent World', 'World') %}active{% endif %}">
                         <svg class="icon"><use href="#icon-globe"/></svg>
                     </a></li>
@@ -425,6 +422,14 @@
     .notif-footer a{color:var(--purple-light);font-size:11px;text-decoration:none}
     .notif-footer a:hover{text-decoration:underline}
     .notif-empty{padding:24px;text-align:center;color:var(--text-secondary);font-size:12px}
+    /* Checkpoint notification action buttons */
+    .notif-checkpoint{cursor:default;align-items:flex-start}
+    .notif-checkpoint:hover{background:rgba(245,158,11,.06)}
+    .notif-btn{font-size:11px;font-weight:600;padding:3px 10px;border-radius:5px;border:1px solid;cursor:pointer;transition:opacity .1s}
+    .notif-btn:hover{opacity:.8}
+    .notif-btn-go{background:rgba(34,197,94,.15);border-color:#22c55e;color:#22c55e}
+    .notif-btn-nogo{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+    .notif-btn-pivot{background:rgba(245,158,11,.15);border-color:#f59e0b;color:#f59e0b}
     /* TMA heartbeat — animated ECG icon in topbar */
     .tma-heartbeat-wrapper{position:relative;display:flex;align-items:center}
     .tma-hb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-full);cursor:help;transition:background .15s}
@@ -435,11 +440,23 @@
     .tma-hb.starting svg{opacity:.6;animation:hb-fade 2s ease-in-out infinite}
     .cluster-nodes-wrapper{display:flex;align-items:center}
     .cluster-nodes-inner{display:flex;align-items:center;gap:6px}
-    .cluster-node-badge{display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);cursor:default;font-size:0.65rem;color:var(--text-secondary);white-space:nowrap}
+    .cluster-node-wrapper{position:relative}
+    .cluster-node-badge{display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);cursor:pointer;font-size:0.65rem;color:var(--text-secondary);white-space:nowrap;user-select:none}
     .cluster-node-badge:hover{border-color:var(--purple);color:var(--text-primary)}
     .cluster-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:cluster-pulse 2s ease-in-out infinite}
     .cluster-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.02em}
     @keyframes cluster-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    .cluster-node-pop{position:absolute;top:calc(100% + 8px);right:0;min-width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:999;padding:0;overflow:hidden}
+    .cnp-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg-tertiary)}
+    .cnp-header strong{flex:1;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-primary)}
+    .cnp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .cnp-status{font-size:0.65rem;padding:1px 6px;border-radius:3px;font-weight:600}
+    .cnp-status-ok{background:rgba(34,197,94,.15);color:#22c55e}
+    .cnp-status-err{background:rgba(239,68,68,.15);color:#ef4444}
+    .cnp-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;font-size:0.72rem;border-bottom:1px solid rgba(255,255,255,.04)}
+    .cnp-row:last-child{border-bottom:none}
+    .cnp-row>span:first-child{color:var(--text-secondary);min-width:72px}
+    .cnp-row>span:last-child{color:var(--text-primary);font-family:var(--font-mono);font-size:0.68rem}
     .tma-hb.stale svg{opacity:.4;animation:none}
     @keyframes hb-fade{0%,100%{opacity:.3}50%{opacity:.8}}
     @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
@@ -605,6 +622,26 @@ async function setPerspective(p) {
     await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
     location.reload();
 }
+function sfToggleNodePop(id) {
+    const pop = document.getElementById(id);
+    if (!pop) return;
+    const isOpen = pop.style.display !== 'none';
+    // close all other popovers first
+    document.querySelectorAll('.cluster-node-pop').forEach(p => p.style.display = 'none');
+    if (!isOpen) {
+        pop.style.display = 'block';
+        // close on outside click
+        setTimeout(() => {
+            const handler = (e) => {
+                if (!pop.contains(e.target) && !e.target.closest('.cluster-node-badge')) {
+                    pop.style.display = 'none';
+                    document.removeEventListener('click', handler);
+                }
+            };
+            document.addEventListener('click', handler);
+        }, 0);
+    }
+}
 
 // ── Browser Web Push Registration ──────────────────────────────────
 (async function initPush() {
@@ -757,8 +794,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var path = (e.detail.requestConfig || {}).path || '';
     var method = ((e.detail.requestConfig || {}).verb || '').toUpperCase();
     if (method !== 'POST') return;
-    if (/\/missions\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
-    else if (/\/missions\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
+    if (/\/epics\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
+    else if (/\/epics\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
     else if (/\/sessions\/[^/]+\/run-pattern/.test(path)) sfTrack('run_pattern', {});
     else if (/\/sessions\/[^/]+\/run-workflow/.test(path)) sfTrack('run_workflow', {});
     else if (/\/api\/ideation/.test(path) || /\/mkt-ideation/.test(path)) sfTrack('ideation_submit', {});
@@ -1120,6 +1157,64 @@ body.sf-wireframe #sfWireframeBtn {
   /* Init on load */
   document.addEventListener('DOMContentLoaded', function() {
     if (specOpen) setSpecBarState(true);
+  });
+})();
+</script>
+<!-- HTMX / fetch error toast ─────────────────────────────────────────── -->
+<style>#sf-err-toast{display:none}#sf-err-toast.visible{display:flex}</style>
+<div id="sf-err-toast" style="
+  position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);
+  background:var(--bg-secondary);border:1px solid var(--red-light);border-radius:8px;
+  padding:0.75rem 1.2rem 0.75rem 1rem;
+  color:var(--text-primary);font-size:0.88rem;line-height:1.4;
+  box-shadow:0 4px 24px rgba(0,0,0,.35);z-index:99999;
+  align-items:flex-start;gap:0.75rem;max-width:420px" aria-live="assertive" role="alert">
+  <svg style="flex-shrink:0;margin-top:2px;color:var(--red-light)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <div style="flex:1">
+    <div id="sf-err-toast-title" style="font-weight:600;margin-bottom:0.2rem">Temporary error</div>
+    <div id="sf-err-toast-msg">We've been notified and are working on it — please try again in a few minutes.</div>
+  </div>
+  <button onclick="document.getElementById('sf-err-toast').classList.remove('visible')" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0;line-height:1;flex-shrink:0" aria-label="Dismiss">✕</button>
+</div>
+<script>
+(function(){
+  var toast = document.getElementById('sf-err-toast');
+  var toastTitle = document.getElementById('sf-err-toast-title');
+  var toastMsg = document.getElementById('sf-err-toast-msg');
+  var _hideTimer = null;
+
+  function showErrToast(title, msg) {
+    if (!toast) return;
+    toastTitle.textContent = title || 'Temporary error';
+    toastMsg.textContent = msg || 'We\'ve been notified and are working on it — please try again in a few minutes.';
+    toast.classList.add('visible');
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(function(){ toast.classList.remove('visible'); }, 8000);
+  }
+
+  // HTMX partial errors (4xx / 5xx on hx-get/hx-post)
+  document.addEventListener('htmx:responseError', function(evt) {
+    var status = evt.detail && evt.detail.xhr && evt.detail.xhr.status;
+    if (!status) return;
+    // On 401: stop any polling on this element and redirect to login
+    if (status === 401) {
+      var elt = evt.detail.elt;
+      if (elt) { elt.removeAttribute('hx-trigger'); htmx.remove(elt); }
+      window.location.href = '/login';
+      return;
+    }
+    if (status === 404) {
+      showErrToast('Page not found (404)', 'This section is not available yet. Try refreshing or come back later.');
+    } else if (status >= 500) {
+      showErrToast('Temporary error (' + status + ')', 'Something went wrong on our end — we\'ve been notified. Please try again in a few minutes.');
+    } else if (status >= 400) {
+      showErrToast('Request error (' + status + ')', 'The request could not be completed. Please try again.');
+    }
+  });
+
+  // Also catch htmx:sendError (network failure)
+  document.addEventListener('htmx:sendError', function() {
+    showErrToast('Network error', 'Could not reach the server. Check your connection and try again.');
   });
 })();
 </script>

@@ -24,7 +24,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 
@@ -51,8 +50,12 @@ KEYS_DIR = Path.home() / ".config" / "factory"
 PG_URL = os.environ.get("DATABASE_URL", "")
 
 
-def _run(cmd: str, check: bool = True, capture: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, shell=True, check=check, capture_output=capture, text=True)
+def _run(
+    cmd: str, check: bool = True, capture: bool = True
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        cmd, shell=True, check=check, capture_output=capture, text=True
+    )
 
 
 def _az_list_blobs(container: str, prefix: str = "") -> list[dict]:
@@ -61,7 +64,7 @@ def _az_list_blobs(container: str, prefix: str = "") -> list[dict]:
         f"az storage blob list --account-name {STORAGE_ACCOUNT} "
         f"--container-name {container} "
         f"{'--prefix ' + prefix if prefix else ''} "
-        f"--query \"[].{{name:name,size:properties.contentLength,modified:properties.lastModified}}\" "
+        f'--query "[].{{name:name,size:properties.contentLength,modified:properties.lastModified}}" '
         f"-o json --only-show-errors"
     )
     result = _run(cmd, check=False)
@@ -97,14 +100,16 @@ def list_backups():
             for tier, items in sorted(tiers.items()):
                 latest = sorted(items, key=lambda x: x["name"], reverse=True)[0]
                 size_mb = (latest.get("size") or 0) / (1024 * 1024)
-                print(f"    {tier}: {len(items)} backups, latest={latest['name']} ({size_mb:.1f}MB)")
+                print(
+                    f"    {tier}: {len(items)} backups, latest={latest['name']} ({size_mb:.1f}MB)"
+                )
         else:
             print(f"  {container}/ (empty)")
 
     # Snapshots
     result = _run(
         "az snapshot list -g RG-MACARON --query \"[?starts_with(name,'vm-macaron-snap-')]"
-        ".{name:name,time:timeCreated,size:diskSizeGb}\" -o json",
+        '.{name:name,time:timeCreated,size:diskSizeGb}" -o json',
         check=False,
     )
     if result.returncode == 0:
@@ -124,49 +129,6 @@ def _find_latest_blobs(container: str, date_filter: str = "") -> list[dict]:
     if not blobs:
         blobs = _az_list_blobs(container, prefix=f"monthly/{date_filter}")
     return sorted(blobs, key=lambda x: x["name"], reverse=True)
-
-
-def restore_sqlite(date_filter: str = "", dry_run: bool = False) -> int:
-    """Restore SQLite databases from backup."""
-    print("📦 Restoring SQLite databases...")
-    blobs = _find_latest_blobs("db-backups", date_filter)
-    if not blobs:
-        print("  ❌ No SQLite backups found")
-        return 0
-
-    # Group by date (take latest set)
-    latest_prefix = "/".join(blobs[0]["name"].split("/")[:2])
-    latest_blobs = [b for b in blobs if b["name"].startswith(latest_prefix)]
-    print(f"  Found {len(latest_blobs)} files from {latest_prefix}")
-
-    count = 0
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for blob in latest_blobs:
-            db_name = blob["name"].split("/")[-1].replace(".gz", "")
-            dest_gz = Path(tmpdir) / f"{db_name}.gz"
-            dest_db = DATA_DIR / db_name
-
-            if dry_run:
-                print(f"  [DRY-RUN] Would restore {blob['name']} → {dest_db}")
-                count += 1
-                continue
-
-            if _az_download("db-backups", blob["name"], str(dest_gz)):
-                # Decompress
-                dest_tmp = Path(tmpdir) / db_name
-                with gzip.open(dest_gz, "rb") as f_in, open(dest_tmp, "wb") as f_out:
-                    shutil.copyfileobj(f_in, f_out)
-
-                # Backup current before overwrite
-                if dest_db.exists():
-                    bak = dest_db.with_suffix(".db.pre-restore")
-                    shutil.copy2(dest_db, bak)
-
-                shutil.move(str(dest_tmp), str(dest_db))
-                print(f"  ✅ {db_name} restored")
-                count += 1
-
-    return count
 
 
 def restore_postgresql(date_filter: str = "", dry_run: bool = False) -> bool:
@@ -212,7 +174,11 @@ def restore_postgresql(date_filter: str = "", dry_run: bool = False) -> bool:
             conn = psycopg.connect(pg_url, autocommit=True)
 
             sql_text = dest_sql.read_text()
-            stmts = [s.strip() for s in sql_text.split("\n") if s.strip() and not s.strip().startswith("--")]
+            stmts = [
+                s.strip()
+                for s in sql_text.split("\n")
+                if s.strip() and not s.strip().startswith("--")
+            ]
             total = len(stmts)
             ok, err = 0, 0
 
@@ -291,16 +257,18 @@ def restore_vm_from_snapshot(snapshot_name: str, dry_run: bool = False) -> bool:
         return False
 
     print(f"  ✅ Disk created: {disk_name}")
-    print(f"  ⚠ To swap: az vm update -n vm-macaron -g RG-MACARON --os-disk {disk_name}")
-    print(f"  ⚠ Then: az vm start -n vm-macaron -g RG-MACARON")
+    print(
+        f"  ⚠ To swap: az vm update -n vm-macaron -g RG-MACARON --os-disk {disk_name}"
+    )
+    print("  ⚠ Then: az vm start -n vm-macaron -g RG-MACARON")
     return True
 
 
 def run_full_restore(date_filter: str = "", dry_run: bool = False):
     """Full restore pipeline."""
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"🔄 MACARON FULL RESTORE {'[DRY-RUN]' if dry_run else ''}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
     if not dry_run:
         print("⚠️  WARNING: This will OVERWRITE existing data!")
@@ -311,16 +279,14 @@ def run_full_restore(date_filter: str = "", dry_run: bool = False):
             return
 
     results = {}
-    results["sqlite"] = restore_sqlite(date_filter, dry_run)
     results["pg"] = restore_postgresql(date_filter, dry_run)
     results["secrets"] = restore_secrets(date_filter, dry_run)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"📊 RESTORE SUMMARY {'[DRY-RUN]' if dry_run else ''}")
-    print(f"  SQLite DBs: {results['sqlite']} files")
     print(f"  PostgreSQL: {'✅' if results['pg'] else '⏭'}")
     print(f"  Secrets: {'✅' if results['secrets'] else '⏭'}")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 def main():
@@ -328,8 +294,9 @@ def main():
     parser.add_argument("--list", action="store_true", help="List available backups")
     parser.add_argument("--latest", action="store_true", help="Restore latest backup")
     parser.add_argument("--date", help="Restore from specific date (YYYYMMDD)")
-    parser.add_argument("--dry-run", action="store_true", help="Preview without restoring")
-    parser.add_argument("--sqlite-only", action="store_true")
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Preview without restoring"
+    )
     parser.add_argument("--pg-only", action="store_true")
     parser.add_argument("--secrets-only", action="store_true")
     parser.add_argument("--from-snapshot", help="Restore VM from snapshot name")
@@ -349,9 +316,7 @@ def main():
         parser.print_help()
         return
 
-    if args.sqlite_only:
-        restore_sqlite(date_filter, args.dry_run)
-    elif args.pg_only:
+    if args.pg_only:
         restore_postgresql(date_filter, args.dry_run)
     elif args.secrets_only:
         restore_secrets(date_filter, args.dry_run)

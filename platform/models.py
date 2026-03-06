@@ -344,7 +344,7 @@ class PhaseRun(BaseModel):
     output_parse_errors: int = 0  # retry count
 
 
-class MissionStatus(str, Enum):
+class EpicStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -354,11 +354,11 @@ class MissionStatus(str, Enum):
     ABANDONED = "abandoned"
 
 
-class MissionRun(BaseModel):
+class EpicRun(BaseModel):
     """Tracks execution of a full mega-workflow (multi-phase mission)."""
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
-    workflow_id: str
+    workflow_id: str = ""
     workflow_name: str = ""
     session_id: str = ""
     cdp_agent_id: str = "chef_de_programme"
@@ -366,12 +366,14 @@ class MissionRun(BaseModel):
     workspace_path: str = (
         ""  # filesystem path for agent tools (code_write, git, docker)
     )
-    parent_mission_id: str = ""  # SAFe: Epic→Feature hierarchy
-    status: MissionStatus = MissionStatus.PENDING
+    parent_epic_id: str = ""  # SAFe: Epic→Feature hierarchy
+    status: EpicStatus = EpicStatus.PENDING
     current_phase: str = ""
     phases: list[PhaseRun] = Field(default_factory=list)
     brief: str = ""
     llm_cost_usd: float = 0.0  # accumulated LLM cost for this mission
+    cancel_reason: Optional[str] = None  # error/reason when failed or cancelled
+    started_at: Optional[datetime] = None  # when run first transitioned to running
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None

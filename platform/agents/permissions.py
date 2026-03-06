@@ -12,14 +12,16 @@ Usage in executor._execute_tool():
     if denied:
         return denied  # "Permission denied: ..."
 """
+
 from __future__ import annotations
 
 import fnmatch
 import logging
 import os
-import sqlite3
 import time
 from collections import defaultdict
+
+from ..db.adapter import get_connection
 from dataclasses import dataclass
 from typing import Optional
 
@@ -28,9 +30,19 @@ logger = logging.getLogger(__name__)
 # ── Tools that access the filesystem ──
 _FILE_READ_TOOLS = {"code_read", "code_search", "list_files"}
 _FILE_WRITE_TOOLS = {"code_write", "code_edit"}
-_EXEC_TOOLS = {"build", "test", "lint", "docker_build", "deploy_azure",
-               "playwright_test", "chaos_test", "tmc_load_test",
-               "sast_scan", "dependency_audit", "secrets_scan"}
+_EXEC_TOOLS = {
+    "build",
+    "test",
+    "lint",
+    "docker_build",
+    "deploy_azure",
+    "playwright_test",
+    "chaos_test",
+    "tmc_load_test",
+    "sast_scan",
+    "dependency_audit",
+    "secrets_scan",
+}
 _GIT_WRITE_TOOLS = {"git_commit"}
 _GIT_READ_TOOLS = {"git_status", "git_log", "git_diff"}
 _ALL_WRITE_TOOLS = _FILE_WRITE_TOOLS | _GIT_WRITE_TOOLS
@@ -80,11 +92,7 @@ class PermissionDenial:
 class PermissionGuard:
     """Enforces tool ACL, path sandboxing, rate limits, and git path guard."""
 
-    def __init__(self, db_path: str = ""):
-        if not db_path:
-            from ..config import DB_PATH
-            db_path = str(DB_PATH).replace("platform.db", "permissions_audit.db")
-        self._db_path = db_path
+    def __init__(self):
         # Rate limit counters: key = "{agent_id}:{session_id}"
         self._call_counts: dict[str, int] = defaultdict(int)
         self._write_counts: dict[str, int] = defaultdict(int)
@@ -92,7 +100,7 @@ class PermissionGuard:
 
     def _init_db(self):
         try:
-            conn = sqlite3.connect(self._db_path)
+            conn = get_connection()
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS permission_denials (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -114,28 +122,45 @@ class PermissionGuard:
         except Exception as e:
             logger.warning("Permission audit DB init failed: %s", e)
 
-    def _log_denial(self, denial: PermissionDenial, session_id: str = "",
-                    args_preview: str = ""):
+    def _log_denial(
+        self, denial: PermissionDenial, session_id: str = "", args_preview: str = ""
+    ):
         """Record denial to audit log."""
-        logger.warning("PERMISSION DENIED: agent=%s tool=%s reason=%s path=%s",
-                       denial.agent_id, denial.tool_name, denial.reason, denial.path)
+        logger.warning(
+            "PERMISSION DENIED: agent=%s tool=%s reason=%s path=%s",
+            denial.agent_id,
+            denial.tool_name,
+            denial.reason,
+            denial.path,
+        )
         try:
-            conn = sqlite3.connect(self._db_path)
+            conn = get_connection()
             conn.execute(
                 """INSERT INTO permission_denials
                    (agent_id, session_id, tool_name, reason, path, args_preview, created_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (denial.agent_id, session_id, denial.tool_name,
-                 denial.reason, denial.path, args_preview[:500], time.time())
+                (
+                    denial.agent_id,
+                    session_id,
+                    denial.tool_name,
+                    denial.reason,
+                    denial.path,
+                    args_preview[:500],
+                    time.time(),
+                ),
             )
             conn.commit()
             conn.close()
         except Exception:
             pass
 
-    def check_tool_acl(self, agent_id: str, tool_name: str,
-                       allowed_tools: Optional[list[str]],
-                       session_id: str = "") -> Optional[str]:
+    def check_tool_acl(
+        self,
+        agent_id: str,
+        tool_name: str,
+        allowed_tools: Optional[list[str]],
+        session_id: str = "",
+    ) -> Optional[str]:
         """Check if agent is allowed to use this tool. Returns error string or None."""
         if allowed_tools is None:
             return None  # no restrictions
@@ -151,10 +176,15 @@ class PermissionGuard:
         self._log_denial(denial, session_id=session_id)
         return f"Permission denied: tool '{tool_name}' is not available to this agent."
 
-    def check_path_access(self, agent_id: str, tool_name: str,
-                          path: str, project_path: str,
-                          permissions: Optional[dict] = None,
-                          session_id: str = "") -> Optional[str]:
+    def check_path_access(
+        self,
+        agent_id: str,
+        tool_name: str,
+        path: str,
+        project_path: str,
+        permissions: Optional[dict] = None,
+        session_id: str = "",
+    ) -> Optional[str]:
         """Check if agent can access this path. Returns error string or None."""
         if not path:
             return None
@@ -178,8 +208,10 @@ class PermissionGuard:
 
         # 2. Check custom denied_paths from agent permissions
         if permissions:
-            for pattern in (permissions.get("denied_paths") or []):
-                if fnmatch.fnmatch(abs_path, pattern) or fnmatch.fnmatch(os.path.basename(abs_path), pattern):
+            for pattern in permissions.get("denied_paths") or []:
+                if fnmatch.fnmatch(abs_path, pattern) or fnmatch.fnmatch(
+                    os.path.basename(abs_path), pattern
+                ):
                     denial = PermissionDenial(
                         agent_id=agent_id,
                         tool_name=tool_name,
@@ -188,14 +220,14 @@ class PermissionGuard:
                         timestamp=time.time(),
                     )
                     self._log_denial(denial, session_id=session_id)
-                    return f"Permission denied: access to this path is restricted for this agent."
+                    return "Permission denied: access to this path is restricted for this agent."
 
         # 3. Check path is within project workspace
         if abs_project:
             allowed_roots = [abs_project]
             # Add custom allowed_paths
             if permissions:
-                for ap in (permissions.get("allowed_paths") or []):
+                for ap in permissions.get("allowed_paths") or []:
                     allowed_roots.append(os.path.abspath(ap))
 
             in_allowed = any(
@@ -206,18 +238,22 @@ class PermissionGuard:
                 denial = PermissionDenial(
                     agent_id=agent_id,
                     tool_name=tool_name,
-                    reason=f"Path outside workspace boundary",
+                    reason="Path outside workspace boundary",
                     path=abs_path,
                     timestamp=time.time(),
                 )
                 self._log_denial(denial, session_id=session_id)
-                return f"Permission denied: path is outside the project workspace."
+                return "Permission denied: path is outside the project workspace."
 
         return None
 
-    def check_write_permission(self, agent_id: str, tool_name: str,
-                               permissions: Optional[dict] = None,
-                               session_id: str = "") -> Optional[str]:
+    def check_write_permission(
+        self,
+        agent_id: str,
+        tool_name: str,
+        permissions: Optional[dict] = None,
+        session_id: str = "",
+    ) -> Optional[str]:
         """Check if agent has write permission for write tools."""
         if permissions and permissions.get("can_write") is False:
             if tool_name in _FILE_WRITE_TOOLS | _GIT_WRITE_TOOLS:
@@ -231,9 +267,13 @@ class PermissionGuard:
                 return "Permission denied: this agent has read-only access."
         return None
 
-    def check_exec_permission(self, agent_id: str, tool_name: str,
-                              permissions: Optional[dict] = None,
-                              session_id: str = "") -> Optional[str]:
+    def check_exec_permission(
+        self,
+        agent_id: str,
+        tool_name: str,
+        permissions: Optional[dict] = None,
+        session_id: str = "",
+    ) -> Optional[str]:
         """Check if agent can execute commands."""
         if permissions and permissions.get("can_execute") is False:
             if tool_name in _EXEC_TOOLS:
@@ -247,8 +287,9 @@ class PermissionGuard:
                 return "Permission denied: this agent cannot execute commands."
         return None
 
-    def check_rate_limit(self, agent_id: str, tool_name: str,
-                         session_id: str = "") -> Optional[str]:
+    def check_rate_limit(
+        self, agent_id: str, tool_name: str, session_id: str = ""
+    ) -> Optional[str]:
         """Check if agent has exceeded rate limits for this session."""
         key = f"{agent_id}:{session_id}" if session_id else agent_id
 
@@ -267,7 +308,10 @@ class PermissionGuard:
             self._log_denial(denial, session_id=session_id)
             return f"Rate limit exceeded: max {MAX_TOOL_CALLS_PER_SESSION} tool calls per session."
 
-        if tool_name in _ALL_WRITE_TOOLS and self._write_counts[key] > MAX_WRITES_PER_SESSION:
+        if (
+            tool_name in _ALL_WRITE_TOOLS
+            and self._write_counts[key] > MAX_WRITES_PER_SESSION
+        ):
             denial = PermissionDenial(
                 agent_id=agent_id,
                 tool_name=tool_name,
@@ -279,9 +323,14 @@ class PermissionGuard:
 
         return None
 
-    def check_git_path_guard(self, agent_id: str, tool_name: str,
-                             args: dict, project_path: str,
-                             session_id: str = "") -> Optional[str]:
+    def check_git_path_guard(
+        self,
+        agent_id: str,
+        tool_name: str,
+        args: dict,
+        project_path: str,
+        session_id: str = "",
+    ) -> Optional[str]:
         """Restrict git tools to operate only within project_path."""
         if tool_name not in (_GIT_READ_TOOLS | _GIT_WRITE_TOOLS):
             return None
@@ -303,7 +352,7 @@ class PermissionGuard:
                 timestamp=time.time(),
             )
             self._log_denial(denial, session_id=session_id)
-            return f"Permission denied: git operations must be within the project workspace."
+            return "Permission denied: git operations must be within the project workspace."
 
         # Also check path argument for git_diff
         if tool_name == "git_diff":
@@ -318,7 +367,7 @@ class PermissionGuard:
                         timestamp=time.time(),
                     )
                     self._log_denial(denial, session_id=session_id)
-                    return f"Permission denied: git diff path is outside the project workspace."
+                    return "Permission denied: git diff path is outside the project workspace."
 
         return None
 
@@ -332,11 +381,16 @@ class PermissionGuard:
             "max_writes": MAX_WRITES_PER_SESSION,
         }
 
-    def check(self, agent_id: str, tool_name: str, args: dict,
-              allowed_tools: Optional[list[str]] = None,
-              project_path: str = "",
-              permissions: Optional[dict] = None,
-              session_id: str = "") -> Optional[str]:
+    def check(
+        self,
+        agent_id: str,
+        tool_name: str,
+        args: dict,
+        allowed_tools: Optional[list[str]] = None,
+        project_path: str = "",
+        permissions: Optional[dict] = None,
+        session_id: str = "",
+    ) -> Optional[str]:
         """Run all permission checks. Returns error string or None if allowed."""
         # 1. Tool ACL
         denied = self.check_tool_acl(agent_id, tool_name, allowed_tools, session_id)
@@ -344,12 +398,16 @@ class PermissionGuard:
             return denied
 
         # 2. Write permission
-        denied = self.check_write_permission(agent_id, tool_name, permissions, session_id)
+        denied = self.check_write_permission(
+            agent_id, tool_name, permissions, session_id
+        )
         if denied:
             return denied
 
         # 3. Execute permission
-        denied = self.check_exec_permission(agent_id, tool_name, permissions, session_id)
+        denied = self.check_exec_permission(
+            agent_id, tool_name, permissions, session_id
+        )
         if denied:
             return denied
 
@@ -368,7 +426,9 @@ class PermissionGuard:
                 return denied
 
         # 6. Git path guard
-        denied = self.check_git_path_guard(agent_id, tool_name, args, project_path, session_id)
+        denied = self.check_git_path_guard(
+            agent_id, tool_name, args, project_path, session_id
+        )
         if denied:
             return denied
 
@@ -379,17 +439,16 @@ class PermissionGuard:
     def recent_denials(self, limit: int = 50, agent_id: str = "") -> list[dict]:
         """Get recent permission denials."""
         try:
-            conn = sqlite3.connect(self._db_path)
-            conn.row_factory = sqlite3.Row
+            conn = get_connection()
             if agent_id:
                 rows = conn.execute(
                     "SELECT * FROM permission_denials WHERE agent_id=? ORDER BY created_at DESC LIMIT ?",
-                    (agent_id, limit)
+                    (agent_id, limit),
                 ).fetchall()
             else:
                 rows = conn.execute(
                     "SELECT * FROM permission_denials ORDER BY created_at DESC LIMIT ?",
-                    (limit,)
+                    (limit,),
                 ).fetchall()
             conn.close()
             return [dict(r) for r in rows]
@@ -399,8 +458,10 @@ class PermissionGuard:
     def denial_stats(self) -> dict:
         """Get denial statistics."""
         try:
-            conn = sqlite3.connect(self._db_path)
-            total = conn.execute("SELECT COUNT(*) FROM permission_denials").fetchone()[0]
+            conn = get_connection()
+            total = conn.execute("SELECT COUNT(*) FROM permission_denials").fetchone()[
+                0
+            ]
             by_tool = conn.execute(
                 "SELECT tool_name, COUNT(*) as cnt FROM permission_denials GROUP BY tool_name ORDER BY cnt DESC LIMIT 10"
             ).fetchall()
@@ -423,6 +484,7 @@ class PermissionGuard:
 
 # Singleton
 _guard: Optional[PermissionGuard] = None
+
 
 def get_permission_guard() -> PermissionGuard:
     global _guard

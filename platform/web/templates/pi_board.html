@@ -577,7 +577,7 @@ async function runPhase(runId) {
 async function deleteRun(runId, runName) {
     openDeleteModal({
         title: 'Supprimer cet epic',
-        subtitle: 'Supprime l'epic et toutes les données associées',
+        subtitle: 'Supprime l\'epic et toutes les données associées',
         warning: 'Sprints, tâches, sessions, messages, traces LLM et artefacts seront définitivement supprimés.',
         expectedName: runName || runId.slice(0,8),
         onConfirm: async () => {
@@ -592,7 +592,7 @@ async function deleteMission(missionId, missionName) {
     openDeleteModal({
         title: 'Supprimer cette epic',
         subtitle: 'Supprime l\'epic et toutes ses missions, features et données',
-        warning: 'Toutes les missions (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
+        warning: 'Toutes les epics (runs), features, user stories, sprints, tâches et sessions associées seront définitivement supprimées.',
         expectedName: missionName || missionId.slice(0,8),
         onConfirm: async () => {
             const r = await fetch(`/api/epics/${missionId}`, {method:'DELETE'});

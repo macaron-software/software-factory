@@ -553,6 +553,7 @@
 </div>
 
 <script>
+(function() {
 let charts = {};
 
 async function loadAnalytics() {
@@ -572,18 +573,12 @@ async function loadAnalytics() {
 }
 
 function updateStats(data) {
-    document.getElementById('stat-missions').textContent = 
-        data.missions?.status?.total || 0;
-    
+    function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+    set('stat-missions', data.missions?.status?.total || 0);
     const successRate = data.missions?.performance?.success_rate || 0;
-    document.getElementById('stat-success').textContent = 
-        successRate.toFixed(1) + '%';
-    
-    document.getElementById('stat-agents').textContent = 
-        data.agents?.utilization?.total || 0;
-    
-    document.getElementById('stat-skills').textContent = 
-        data.skills?.top?.length || 0;
+    set('stat-success', successRate.toFixed(1) + '%');
+    set('stat-agents', data.agents?.utilization?.total || 0);
+    set('stat-skills', data.skills?.top?.length || 0);
 }
 
 function renderCharts(data) {
@@ -870,7 +865,7 @@ async function loadThompsonScores() {
 
         const tbody = document.getElementById('ts-tbody');
         if (!d.agents.length) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donnée — les scores s\'accumulent en cours de mission</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donn\u00e9e \u2014 les scores s\'accumulent en cours d\'epic</td></tr>';
             return;
         }
         tbody.innerHTML = d.agents.map(a => {
@@ -1058,6 +1053,25 @@ async function updateCosts() {
 }
 updateCosts();
 
+async function updateRtk() {
+    try {
+        const d = await fetch('/api/analytics/rtk').then(r => r.json());
+        const fmt = b => b >= 1048576 ? (b/1048576).toFixed(1)+'MB' : b >= 1024 ? (b/1024).toFixed(1)+'KB' : b+'B';
+        document.getElementById('rtk-calls').textContent = (d.calls||0).toLocaleString();
+        document.getElementById('rtk-saved').textContent = fmt(d.bytes_saved||0);
+        document.getElementById('rtk-ratio').textContent = (d.ratio_pct||0) + '%';
+        document.getElementById('rtk-tokens').textContent = (d.tokens_saved_est||0).toLocaleString();
+    } catch(e) {}
+}
+updateRtk();
+window.refreshData = refreshData;
+window.loadFailures = loadFailures;
+window.resumeAll = resumeAll;
+window.triggerGARun = triggerGARun;
+window.approveProposal = approveProposal;
+window.rejectProposal = rejectProposal;
+})();
+
 </script>
 
 <div style="margin-top:2rem">
@@ -1068,4 +1082,17 @@ updateCosts();
     <div class="stat-card"><h3>MiniMax</h3><p class="stat-value" id="cost-minimax">—</p><p class="stat-label">USD</p></div>
   </div>
   <div id="cost-by-agent" style="font-size:0.82rem"></div>
+</div>
+
+<div style="margin-top:2rem">
+  <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:0.75rem">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    RTK — Compression de contexte
+  </div>
+  <div class="stats-grid" style="margin-bottom:0.5rem">
+    <div class="stat-card"><h3>Appels compressés</h3><p class="stat-value" id="rtk-calls" style="color:#10b981">—</p><p class="stat-label">depuis démarrage</p></div>
+    <div class="stat-card"><h3>Bytes économisés</h3><p class="stat-value" id="rtk-saved" style="color:#10b981">—</p><p class="stat-label">raw − compressed</p></div>
+    <div class="stat-card"><h3>Taux compression</h3><p class="stat-value" id="rtk-ratio" style="color:#10b981">—</p><p class="stat-label">% réduit</p></div>
+    <div class="stat-card"><h3>Tokens estimés économisés</h3><p class="stat-value" id="rtk-tokens" style="color:#10b981">—</p><p class="stat-label">~4 chars/token</p></div>
+  </div>
 </div>

@@ -15,12 +15,14 @@ Opens at http://localhost:8080
 
 import asyncio
 import json
+import logging
 import os
 import platform
-import sqlite3
+import sqlite3  # kept only for RTK history DB (external tool)
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -60,6 +62,20 @@ if _env_file.exists():
 # FastAPI app
 app = FastAPI(title="Software Factory Dashboard", version="1.0.0")
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+
+
+@app.on_event("startup")
+async def _start_background_tasks():
+    """Start background watchers at server startup."""
+    try:
+        from .git_action_watcher import run_git_action_watcher
+
+        asyncio.create_task(run_git_action_watcher(), name="ac-git-watcher")
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).warning("AC watcher not started: %s", e)
+
 
 # ============================================================================
 # SIMPLE TTL CACHE (no external deps)
@@ -102,12 +118,68 @@ def cached(ttl: float):
 # DATABASE HELPERS
 # ============================================================================
 
+_PG_URL: str | None = None
 
-def get_db(db_name: str = "factory.db") -> sqlite3.Connection:
-    """Get database connection."""
-    conn = sqlite3.connect(DATA_DIR / db_name)
-    conn.row_factory = sqlite3.Row
+
+def _get_pg_url() -> str:
+    global _PG_URL
+    if _PG_URL:
+        return _PG_URL
+    url = os.environ.get("DATABASE_URL", "")
+    if not url:
+        for candidate in [BASE_DIR / ".env", Path.home() / ".sf" / ".env"]:
+            if candidate.exists():
+                for line in candidate.read_text().splitlines():
+                    if line.startswith("DATABASE_URL="):
+                        url = line.split("=", 1)[1].strip()
+                        break
+            if url:
+                break
+    if not url:
+        raise RuntimeError("DATABASE_URL not set — cannot connect to PostgreSQL")
+    _PG_URL = url
+    return url
+
+
+def get_db():
+    """Get PostgreSQL connection (replaces old SQLite get_db)."""
+    import psycopg
+    from psycopg.rows import dict_row
+
+    conn = psycopg.connect(_get_pg_url(), row_factory=dict_row)
+    conn.autocommit = True
     return conn
+
+
+def _ensure_dashboard_tables(conn) -> None:
+    """Create legacy dashboard tables in PostgreSQL if they don't exist."""
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                project_id TEXT,
+                title TEXT,
+                status TEXT DEFAULT 'pending',
+                domain TEXT,
+                wsjf_score REAL DEFAULT 0,
+                created_at TIMESTAMPTZ DEFAULT NOW(),
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS critic_metrics (
+                id SERIAL PRIMARY KEY,
+                project_id TEXT,
+                layer TEXT,
+                result TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS idx_critic_project_layer ON critic_metrics(project_id, layer)"
+        )
 
 
 # ============================================================================
@@ -222,7 +294,7 @@ def get_project_stats(project_id: str) -> Dict[str, int]:
             """
             SELECT status, COUNT(*) as cnt
             FROM tasks
-            WHERE project_id = ?
+            WHERE project_id = %s
             GROUP BY status
         """,
             (project_id,),
@@ -458,61 +530,56 @@ def get_worker_count(project_id: str) -> int:
 @cached(ttl=30)
 def get_metrics(project_id: str) -> Dict:
     """Get Team of Rivals metrics for a project."""
-    metrics_db = DATA_DIR / "metrics.db"
-    if not metrics_db.exists():
-        return {"l0": {}, "l1_code": {}, "l1_security": {}, "l2_arch": {}, "final": {}}
-
-    # Map project_id to potential names
     project_names = [project_id]
     config = load_project_config(project_id)
     if config and config.get("project", {}).get("name"):
         project_names.append(config["project"]["name"])
 
-    with sqlite3.connect(metrics_db) as conn:
-        conn.row_factory = sqlite3.Row
+    try:
+        with get_db() as conn:
+            metrics = {}
+            for layer in ["l0", "l1_code", "l1_security", "l2_arch"]:
+                placeholders = ",".join(["%s"] * len(project_names))
+                row = conn.execute(
+                    f"""
+                    SELECT
+                        COUNT(*) as total,
+                        SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) as rejected,
+                        SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved
+                    FROM critic_metrics
+                    WHERE project_id IN ({placeholders}) AND layer = %s
+                """,
+                    (*project_names, layer),
+                ).fetchone()
 
-        metrics = {}
-        for layer in ["l0", "l1_code", "l1_security", "l2_arch"]:
-            placeholders = ",".join("?" * len(project_names))
-            row = conn.execute(
+                total = (row["total"] or 0) if row else 0
+                rejected = (row["rejected"] or 0) if row else 0
+                metrics[layer] = {
+                    "total": total,
+                    "rejected": rejected,
+                    "approved": (row["approved"] or 0) if row else 0,
+                    "catch_rate": round(rejected / total * 100, 1) if total > 0 else 0,
+                }
+
+            placeholders = ",".join(["%s"] * len(project_names))
+            final = conn.execute(
                 f"""
-                SELECT
-                    COUNT(*) as total,
-                    SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) as rejected,
-                    SUM(CASE WHEN result = 'approved' THEN 1 ELSE 0 END) as approved
-                FROM critic_metrics
-                WHERE project_id IN ({placeholders}) AND layer = ?
+                SELECT COUNT(*) as cnt FROM critic_metrics
+                WHERE project_id IN ({placeholders}) AND layer = 'final' AND result = 'approved'
             """,
-                (*project_names, layer),
+                tuple(project_names),
             ).fetchone()
 
-            total = row["total"] or 0
-            rejected = row["rejected"] or 0
-            metrics[layer] = {
-                "total": total,
-                "rejected": rejected,
-                "approved": row["approved"] or 0,
-                "catch_rate": round(rejected / total * 100, 1) if total > 0 else 0,
+            total_started = metrics["l0"]["total"]
+            final_approved = (final["cnt"] or 0) if final else 0
+            metrics["final"] = {
+                "approved": final_approved,
+                "success_rate": round(final_approved / total_started * 100, 1)
+                if total_started > 0
+                else 0,
             }
-
-        # Final approved
-        placeholders = ",".join("?" * len(project_names))
-        final = conn.execute(
-            f"""
-            SELECT COUNT(*) as cnt FROM critic_metrics
-            WHERE project_id IN ({placeholders}) AND layer = 'final' AND result = 'approved'
-        """,
-            project_names,
-        ).fetchone()
-
-        total_started = metrics["l0"]["total"]
-        final_approved = final["cnt"] or 0
-        metrics["final"] = {
-            "approved": final_approved,
-            "success_rate": round(final_approved / total_started * 100, 1)
-            if total_started > 0
-            else 0,
-        }
+    except Exception:
+        return {"l0": {}, "l1_code": {}, "l1_security": {}, "l2_arch": {}, "final": {}}
 
     return metrics
 
@@ -535,18 +602,18 @@ def get_tasks(
         params = []
 
         if project_id:
-            query += " AND project_id = ?"
+            query += " AND project_id = %s"
             params.append(project_id)
 
         if status:
-            query += " AND status = ?"
+            query += " AND status = %s"
             params.append(status)
 
         if domain:
-            query += " AND domain = ?"
+            query += " AND domain = %s"
             params.append(domain)
 
-        query += " ORDER BY wsjf_score DESC, created_at DESC LIMIT ? OFFSET ?"
+        query += " ORDER BY wsjf_score DESC, created_at DESC LIMIT %s OFFSET %s"
         params.extend([limit, offset])
 
         rows = conn.execute(query, params).fetchall()
@@ -662,6 +729,63 @@ async def api_daemon_stop(project_id: str, daemon: str):
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+@app.get("/api/agent-plans")
+async def api_agent_plans(
+    session_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+    limit: int = Query(20, le=100),
+):
+    """Get recent agent plans (TodoList middleware)."""
+    try:
+        import sys
+
+        sys.path.insert(0, str(Path(__file__).parent.parent))
+        from platform.db.migrations import get_db
+
+        with get_db() as db:
+            query = "SELECT p.*, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id AND s.status='done') as done_count, (SELECT COUNT(*) FROM agent_plan_steps s WHERE s.plan_id=p.id) as total_count FROM agent_plans p WHERE 1=1"
+            params: list = []
+            if session_id:
+                query += " AND p.session_id=%s"
+                params.append(session_id)
+            if project_id:
+                query += " AND p.project_id=%s"
+                params.append(project_id)
+            query += " ORDER BY p.updated_at DESC LIMIT %s"
+            params.append(limit)
+            plans = db.execute(query, params).fetchall()
+            result = []
+            for plan in plans:
+                steps = db.execute(
+                    "SELECT * FROM agent_plan_steps WHERE plan_id=%s ORDER BY step_num",
+                    (plan["id"],),
+                ).fetchall()
+                result.append(
+                    {
+                        "id": plan["id"],
+                        "session_id": plan["session_id"],
+                        "project_id": plan["project_id"],
+                        "agent_id": plan["agent_id"],
+                        "title": plan["title"],
+                        "done": plan["done_count"],
+                        "total": plan["total_count"],
+                        "updated_at": str(plan["updated_at"]),
+                        "steps": [
+                            {
+                                "num": s["step_num"],
+                                "desc": s["description"],
+                                "status": s["status"],
+                                "result": s.get("result"),
+                            }
+                            for s in steps
+                        ],
+                    }
+                )
+            return {"plans": result}
+    except Exception as e:
+        return {"plans": [], "error": str(e)}
 
 
 @app.get("/api/tasks")
@@ -824,61 +948,61 @@ async def tasks_page(
 
 
 def _get_live_activity(since_ts: str | None = None) -> dict:
-    """Fetch recent platform activity from platform.db."""
-    db_path = DATA_DIR / "platform.db"
-    if not db_path.exists():
-        return {"tool_calls": [], "messages": [], "llm_cost": 0.0, "active_agents": []}
+    """Fetch recent platform activity from PostgreSQL."""
     try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
+        import datetime
+
+        conn = get_db()
         # Default: last 30 seconds
         if not since_ts:
             since_ts = (
-                __import__("datetime").datetime.utcnow()
-                - __import__("datetime").timedelta(seconds=30)
+                datetime.datetime.utcnow() - datetime.timedelta(seconds=30)
             ).strftime("%Y-%m-%d %H:%M:%S")
 
         tool_calls = conn.execute(
             "SELECT agent_id, tool_name, success, timestamp FROM tool_calls "
-            "WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 50",
+            "WHERE timestamp >= %s ORDER BY timestamp DESC LIMIT 50",
             (since_ts,),
         ).fetchall()
 
         messages = conn.execute(
             "SELECT from_agent, to_agent, substr(content,1,120) as preview, timestamp "
-            "FROM messages WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 30",
+            "FROM messages WHERE timestamp >= %s ORDER BY timestamp DESC LIMIT 30",
             (since_ts,),
         ).fetchall()
 
         # Active agents (sessions active last 5 min)
         active = conn.execute(
             "SELECT DISTINCT from_agent as agent_id FROM messages "
-            "WHERE timestamp >= datetime('now','-5 minutes') LIMIT 20",
+            "WHERE timestamp >= NOW() - INTERVAL '5 minutes' LIMIT 20",
         ).fetchall()
 
         # LLM cost (last hour)
         cost_row = conn.execute(
-            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= datetime('now','-1 hour')",
+            "SELECT SUM(cost_usd) FROM llm_traces WHERE created_at >= NOW() - INTERVAL '1 hour'",
         ).fetchone()
-        cost = float(cost_row[0] or 0.0)
+        cost = float((cost_row.get("sum") or 0.0) if cost_row else 0.0)
 
         # Commits (today)
         commits = conn.execute(
             "SELECT agent_id, tool_name, timestamp FROM tool_calls "
-            "WHERE tool_name='git_commit' AND timestamp >= date('now') ORDER BY timestamp DESC LIMIT 10",
+            "WHERE tool_name='git_commit' AND timestamp >= CURRENT_DATE ORDER BY timestamp DESC LIMIT 10",
         ).fetchall()
 
-        # RTK proxy stats — sandbox cmd counts from platform.db
-        rtk_row = conn.execute(
-            "SELECT cmds_total, cmds_proxied FROM rtk_stats WHERE id=1",
-        ).fetchone()
-        rtk = dict(rtk_row) if rtk_row else {"cmds_total": 0, "cmds_proxied": 0}
+        # RTK proxy stats
+        try:
+            rtk_row = conn.execute(
+                "SELECT cmds_total, cmds_proxied FROM rtk_stats WHERE id=1"
+            ).fetchone()
+            rtk = dict(rtk_row) if rtk_row else {"cmds_total": 0, "cmds_proxied": 0}
+        except Exception:
+            rtk = {"cmds_total": 0, "cmds_proxied": 0}
         rtk["proxied_pct"] = (
             round(100 * rtk["cmds_proxied"] / rtk["cmds_total"], 1)
             if rtk["cmds_total"]
             else 0
         )
-        # Real token savings from RTK's own history DB
+        # Real token savings from RTK's own history DB (still SQLite — external tool)
         rtk["tokens_saved"] = 0
         rtk["tokens_input"] = 0
         if _RTK_HISTORY_DB:
@@ -949,6 +1073,859 @@ async def live_stream(since: str | None = None):
 async def live_page(request: Request):
     """Live activity feed page."""
     return templates.TemplateResponse("live.html", {"request": request})
+
+
+# ============================================================================
+# AMÉLIORATION CONTINUE — Projects, Cycles, Thompson/RL/GA, Git Watcher
+# ============================================================================
+
+# 5 pilot projects — increasing complexity and different tech stacks
+AC_PROJECTS = [
+    {
+        "id": "ac-hello-html",
+        "name": "Hello World HTML",
+        "tier": "simple",
+        "tier_label": "Simple",
+        "tech": ["HTML", "CSS"],
+        "compile": False,
+        "workflow": "feature-sprint",
+        "max_cycles": 20,
+        "description": "Page HTML/CSS statique — pas de compilation",
+        "color": "green",
+    },
+    {
+        "id": "ac-hello-vue",
+        "name": "Hello World Vue.js",
+        "tier": "simple-compile",
+        "tier_label": "Simple + Build",
+        "tech": ["Vue.js", "Vite", "npm"],
+        "compile": True,
+        "workflow": "feature-sprint",
+        "max_cycles": 20,
+        "description": "Composant Vue.js — requiert npm build",
+        "color": "blue",
+    },
+    {
+        "id": "ac-fullstack-rust",
+        "name": "Full-Stack Rust + SvelteKit",
+        "tier": "medium",
+        "tier_label": "Medium",
+        "tech": ["PostgreSQL", "Rust", "Axum", "SvelteKit"],
+        "compile": True,
+        "workflow": "ideation-to-prod",
+        "max_cycles": 20,
+        "description": "API Rust/Axum + frontend SvelteKit + PostgreSQL — 2 features",
+        "color": "orange",
+    },
+    {
+        "id": "ac-docsign-clone",
+        "name": "DocuSign Clone",
+        "tier": "complex",
+        "tier_label": "Complexe",
+        "tech": ["FastAPI", "React", "PostgreSQL", "PDF", "JWT"],
+        "compile": True,
+        "workflow": "ideation-to-prod",
+        "max_cycles": 20,
+        "description": "Signature électronique — upload PDF, signatures, workflow validation",
+        "color": "purple",
+    },
+    {
+        "id": "ac-ecommerce-solaris",
+        "name": "E-commerce + Solaris DS",
+        "tier": "enterprise",
+        "tier_label": "Enterprise",
+        "tech": ["Next.js", "Node.js", "PostgreSQL", "Solaris DS", "Stripe"],
+        "compile": True,
+        "workflow": "product-lifecycle",
+        "max_cycles": 20,
+        "description": "E-commerce complet avec Design System Solaris + paiement Stripe",
+        "color": "red",
+    },
+]
+
+AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
+# Hardening phase is auto-injected after deploy when total_score < AC_HARDENING_THRESHOLD
+AC_PHASES_WITH_HARDENING = AC_PHASES + ["hardening"]
+
+# Adversarial quality dimensions — measured by LLM agents reading code/tests/config
+AC_ADVERSARIAL = [
+    # ── Security ──────────────────────────────────────────────────────────────
+    (
+        "security",
+        "lock",
+        "SAST + secrets scan + CVE deps",
+        "0 critical vulns, 0 secrets in code, all deps pinned",
+    ),
+    (
+        "architecture",
+        "layers",
+        "Coupling, complexity, SOLID violations",
+        "cyclomatic < 10, no God classes, clear layer separation",
+    ),
+    # ── Slop / Honesty ────────────────────────────────────────────────────────
+    (
+        "no_slop",
+        "scissors",
+        "No copy-paste, no dead code, no placeholders",
+        "0 TODO/FIXME in prod, 0 lorem ipsum, 0 unreachable code",
+    ),
+    (
+        "fallback",
+        "shield",
+        "Error handling completeness, no silent failures",
+        "no bare except, no swallowed exceptions, all errors logged",
+    ),
+    (
+        "honesty",
+        "alert-circle",
+        "No lies: comments match code, types match runtime",
+        "no misleading docstrings, no wrong return types, no phantom features",
+    ),
+    (
+        "mock_data",
+        "eye-off",
+        "No hardcoded/fake data in production code",
+        "no fixtures in prod path, no static demo users, no seeded magic ids",
+    ),
+    (
+        "hardcoded",
+        "settings",
+        "No magic numbers, hardcoded URLs, credentials",
+        "all config via env vars, no string literals for secrets or ports",
+    ),
+    (
+        "test_quality",
+        "activity",
+        "No false tests, no shortcuts, real assertions",
+        "coverage >= 80%, every test has >=1 assert, no mock-everything tests",
+    ),
+    # ── Depth ─────────────────────────────────────────────────────────────────
+    (
+        "over_engineering",
+        "rotate-cw",
+        "YAGNI: no premature abstraction or generalization",
+        "no unused interfaces, no DI for trivial cases, < 3 levels abstraction",
+    ),
+    (
+        "observability",
+        "radio",
+        "Logging, metrics, health checks present",
+        "structured logs, /health endpoint, errors include context",
+    ),
+    (
+        "resilience",
+        "zap",
+        "Retry, timeout, graceful degradation",
+        "network calls have timeout, DB calls have retry, failures degrade gracefully",
+    ),
+    (
+        "traceability",
+        "link-2",
+        "Feature->Story->Code->Test refs 100% covered",
+        "every file has story ref, every test has AC ref, DELIVERY_REPORT complete",
+    ),
+]
+
+# Just the dimension keys for phase_scores JSON
+AC_ADVERSARIAL_KEYS = [d[0] for d in AC_ADVERSARIAL]
+
+_AC_AGENTS_GRAPH = {
+    "nodes": [
+        {
+            "id": "plat-endurance-manager",
+            "label": "Endurance Manager",
+            "group": 1,
+            "r": 22,
+        },
+        {"id": "plat-cto", "label": "CTO Orchestrateur", "group": 1, "r": 20},
+        {"id": "plat-quality-analyst", "label": "Quality Analyst", "group": 2, "r": 16},
+        {"id": "plat-platform-dev", "label": "Platform Dev", "group": 2, "r": 16},
+        {"id": "plat-deploy-engineer", "label": "Deploy Engineer", "group": 3, "r": 16},
+        {"id": "plat-qa-validator", "label": "QA Validator", "group": 2, "r": 16},
+    ],
+    "links": [
+        {"source": "plat-endurance-manager", "target": "plat-cto", "strength": 2},
+        {"source": "plat-cto", "target": "plat-quality-analyst", "strength": 1},
+        {"source": "plat-cto", "target": "plat-platform-dev", "strength": 1},
+        {"source": "plat-cto", "target": "plat-deploy-engineer", "strength": 1},
+        {"source": "plat-cto", "target": "plat-qa-validator", "strength": 1},
+        {
+            "source": "plat-quality-analyst",
+            "target": "plat-platform-dev",
+            "strength": 0.5,
+        },
+        {"source": "plat-platform-dev", "target": "plat-qa-validator", "strength": 0.5},
+        {
+            "source": "plat-qa-validator",
+            "target": "plat-deploy-engineer",
+            "strength": 0.5,
+        },
+    ],
+}
+
+
+def _ac_ensure_tables(conn) -> None:
+    """Create improvement-cycle tables in PostgreSQL if they don't exist."""
+    stmts = [
+        """CREATE TABLE IF NOT EXISTS ac_cycles (
+            id          SERIAL PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            cycle_num   INTEGER NOT NULL,
+            git_sha     TEXT,
+            platform_run_id TEXT,
+            status      TEXT DEFAULT 'pending',
+            phase_scores TEXT DEFAULT '{}',
+            total_score INTEGER DEFAULT 0,
+            defect_count INTEGER DEFAULT 0,
+            fix_commit  TEXT,
+            fix_summary TEXT,
+            ga_fitness  REAL DEFAULT 0,
+            rl_reward   REAL DEFAULT 0,
+            started_at  TEXT,
+            completed_at TEXT,
+            UNIQUE(project_id, cycle_num)
+        )""",
+        """CREATE TABLE IF NOT EXISTS ac_thompson (
+            agent_id    TEXT NOT NULL,
+            phase_type  TEXT NOT NULL,
+            successes   INTEGER DEFAULT 0,
+            failures    INTEGER DEFAULT 0,
+            PRIMARY KEY (agent_id, phase_type)
+        )""",
+        """CREATE TABLE IF NOT EXISTS ac_project_state (
+            project_id  TEXT PRIMARY KEY,
+            current_cycle INTEGER DEFAULT 0,
+            status      TEXT DEFAULT 'idle',
+            current_run_id TEXT,
+            total_score_avg REAL DEFAULT 0,
+            last_git_sha TEXT,
+            ci_status   TEXT DEFAULT 'unknown',
+            started_at  TEXT,
+            updated_at  TEXT
+        )""",
+        # Adversarial scores per cycle (one row per dimension per cycle)
+        """CREATE TABLE IF NOT EXISTS ac_adversarial (
+            id          SERIAL PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            cycle_num   INTEGER NOT NULL,
+            dimension   TEXT NOT NULL,
+            score       INTEGER DEFAULT 0,
+            verdict     TEXT DEFAULT 'pending',
+            findings    TEXT DEFAULT '[]',
+            checked_at  TEXT,
+            UNIQUE(project_id, cycle_num, dimension)
+        )""",
+        # Traceability links: artifact chain feature→story→code→test
+        """CREATE TABLE IF NOT EXISTS ac_traceability (
+            id           SERIAL PRIMARY KEY,
+            project_id   TEXT NOT NULL,
+            cycle_num    INTEGER NOT NULL,
+            artifact_type TEXT NOT NULL,
+            artifact_id  TEXT NOT NULL,
+            artifact_ref TEXT,
+            reason       TEXT,
+            linked_to    TEXT,
+            linked_type  TEXT,
+            status       TEXT DEFAULT 'present',
+            created_at   TEXT
+        )""",
+        # Add traceability_score to ac_cycles if not present (idempotent)
+        """ALTER TABLE ac_cycles ADD COLUMN IF NOT EXISTS adversarial_scores TEXT DEFAULT '{}'""",
+        """ALTER TABLE ac_cycles ADD COLUMN IF NOT EXISTS traceability_score INTEGER DEFAULT 0""",
+    ]
+    with conn.cursor() as cur:
+        for stmt in stmts:
+            cur.execute(stmt)
+
+
+def _ac_get_project_states() -> Dict:
+    """Load all project states from DB."""
+    conn = get_db()
+    try:
+        _ac_ensure_tables(conn)
+        states = {}
+        for p in AC_PROJECTS:
+            row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=%s", (p["id"],)
+            ).fetchone()
+            if row:
+                states[p["id"]] = dict(row)
+            else:
+                states[p["id"]] = {
+                    "project_id": p["id"],
+                    "current_cycle": 0,
+                    "status": "idle",
+                    "current_run_id": None,
+                    "total_score_avg": 0,
+                    "last_git_sha": None,
+                    "ci_status": "unknown",
+                }
+    except Exception:
+        states = {
+            p["id"]: {
+                "project_id": p["id"],
+                "current_cycle": 0,
+                "status": "idle",
+                "current_run_id": None,
+                "total_score_avg": 0,
+                "last_git_sha": None,
+                "ci_status": "unknown",
+            }
+            for p in AC_PROJECTS
+        }
+    finally:
+        conn.close()
+    return states
+
+
+def _ac_get_cycles(project_id: str) -> List[Dict]:
+    """Load cycle history for a project."""
+    conn = get_db()
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT * FROM ac_cycles WHERE project_id=%s ORDER BY cycle_num",
+            (project_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def _ac_get_thompson_probs() -> List[Dict]:
+    """Compute Thompson sampling probabilities from Beta distributions."""
+    conn = get_db()
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT agent_id, phase_type, successes, failures FROM ac_thompson ORDER BY agent_id"
+        ).fetchall()
+    except Exception:
+        rows = []
+    finally:
+        conn.close()
+    results = {}
+    for r in rows:
+        key = r["agent_id"]
+        if key not in results:
+            results[key] = {"agent_id": key, "phases": {}, "overall_prob": 0.5}
+        alpha = r["successes"] + 1
+        beta_v = r["failures"] + 1
+        # Expected value of Beta(α, β) = α / (α + β)
+        prob = alpha / (alpha + beta_v)
+        results[key]["phases"][r["phase_type"]] = round(prob, 3)
+
+    # Compute overall probability as mean across phases
+    for v in results.values():
+        if v["phases"]:
+            v["overall_prob"] = round(sum(v["phases"].values()) / len(v["phases"]), 3)
+
+    # Add default entries for our agents if not yet tracked
+    default_agents = [
+        ("plat-cto", 0.90),
+        ("plat-quality-analyst", 0.82),
+        ("plat-platform-dev", 0.85),
+        ("plat-deploy-engineer", 0.78),
+        ("plat-qa-validator", 0.80),
+    ]
+    for agent_id, default_prob in default_agents:
+        if agent_id not in results:
+            results[agent_id] = {
+                "agent_id": agent_id,
+                "phases": {},
+                "overall_prob": default_prob,
+            }
+
+    return sorted(results.values(), key=lambda x: -x["overall_prob"])
+
+
+def _ac_get_rl_history(project_id: str) -> List[float]:
+    """Return RL reward per cycle for the project."""
+    conn = get_db()
+    try:
+        _ac_ensure_tables(conn)
+        rows = conn.execute(
+            "SELECT rl_reward FROM ac_cycles WHERE project_id=%s ORDER BY cycle_num",
+            (project_id,),
+        ).fetchall()
+        return [r["rl_reward"] for r in rows]
+    except Exception:
+        return []
+    finally:
+        conn.close()
+
+
+def _ac_get_ci_status(git_sha: str) -> str:
+    """Check GitHub Actions CI status for a given SHA (best-effort)."""
+    try:
+        import subprocess as sp
+
+        result = sp.run(
+            [
+                "gh",
+                "run",
+                "list",
+                "--commit",
+                git_sha,
+                "--json",
+                "status,conclusion",
+                "--limit",
+                "1",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            cwd=str(BASE_DIR.parent),
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            if data:
+                s = data[0]
+                if s.get("status") == "completed":
+                    return "success" if s.get("conclusion") == "success" else "failure"
+                return "running"
+    except Exception:
+        pass
+    return "unknown"
+
+
+@app.get("/api/improvement/projects")
+async def api_improvement_projects():
+    """List pilot projects with their current state."""
+    states = await asyncio.to_thread(_ac_get_project_states)
+    result = []
+    for p in AC_PROJECTS:
+        state = states.get(p["id"], {})
+        result.append({**p, **state})
+    return result
+
+
+@app.get("/api/improvement/cycles/{project_id}")
+async def api_improvement_cycles(project_id: str):
+    """Get cycle history for a project."""
+    cycles = await asyncio.to_thread(_ac_get_cycles, project_id)
+    return cycles
+
+
+@app.get("/api/improvement/agents/graph")
+async def api_improvement_agents_graph():
+    """Agent team force graph data."""
+    thompson = await asyncio.to_thread(_ac_get_thompson_probs)
+    prob_map = {t["agent_id"]: t["overall_prob"] for t in thompson}
+    nodes = [
+        {**n, "prob": prob_map.get(n["id"], 0.5)} for n in _AC_AGENTS_GRAPH["nodes"]
+    ]
+    return {"nodes": nodes, "links": _AC_AGENTS_GRAPH["links"]}
+
+
+@app.get("/api/improvement/thompson")
+async def api_improvement_thompson():
+    """Thompson sampling probabilities per agent."""
+    return await asyncio.to_thread(_ac_get_thompson_probs)
+
+
+@app.get("/api/improvement/stream")
+async def improvement_stream():
+    """SSE stream for live improvement board updates."""
+
+    async def generate():
+        while True:
+            try:
+                states = await asyncio.to_thread(_ac_get_project_states)
+                payload = []
+                for p in AC_PROJECTS:
+                    s = states.get(p["id"], {})
+                    payload.append(
+                        {
+                            "id": p["id"],
+                            "status": s.get("status", "idle"),
+                            "current_cycle": s.get("current_cycle", 0),
+                            "total_score_avg": s.get("total_score_avg", 0),
+                            "ci_status": s.get("ci_status", "unknown"),
+                        }
+                    )
+                yield f"event: update\ndata: {json.dumps(payload)}\n\n"
+            except asyncio.CancelledError:
+                return
+            except Exception as e:
+                yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+            await asyncio.sleep(5)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+@app.get("/improvement", response_class=HTMLResponse)
+async def improvement_page(request: Request):
+    """Amélioration Continue live board."""
+    projects = []
+    states = await asyncio.to_thread(_ac_get_project_states)
+    for p in AC_PROJECTS:
+        state = states.get(p["id"], {})
+        cycles = await asyncio.to_thread(_ac_get_cycles, p["id"])
+        projects.append({**p, **state, "cycles": cycles})
+
+    agents_graph = await api_improvement_agents_graph()
+    thompson = await asyncio.to_thread(_ac_get_thompson_probs)
+    agents_graph_json = json.dumps(agents_graph)
+    projects_json = json.dumps(
+        [{k: v for k, v in proj.items() if k != "cycles"} for proj in projects]
+    )
+
+    return templates.TemplateResponse(
+        "improvement.html",
+        {
+            "request": request,
+            "projects": projects,
+            "agents_graph_json": agents_graph_json,
+            "projects_json": projects_json,
+            "thompson": thompson,
+            "phases": AC_PHASES,
+            "adversarial": AC_ADVERSARIAL,
+            "adversarial_keys": AC_ADVERSARIAL_KEYS,
+        },
+    )
+
+
+@app.post("/api/improvement/start/{project_id}")
+async def api_improvement_start(project_id: str):
+    """Bootstrap a pilot project: create in SF platform + launch cycle 1."""
+    try:
+        from .git_action_watcher import bootstrap_project
+
+        ok = await asyncio.to_thread(bootstrap_project, project_id)
+        return {"ok": ok, "project_id": project_id}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+@app.post("/api/improvement/start-all")
+async def api_improvement_start_all():
+    """Bootstrap all 5 pilot projects."""
+    results = {}
+    try:
+        from .git_action_watcher import bootstrap_project
+
+        for p in AC_PROJECTS:
+            pid = p["id"]
+            try:
+                ok = await asyncio.to_thread(bootstrap_project, pid)
+                results[pid] = "started" if ok else "failed"
+            except Exception as e:
+                results[pid] = f"error: {e}"
+    except Exception as e:
+        return {"ok": False, "error": str(e), "results": results}
+    return {"ok": True, "results": results}
+
+
+HARDENING_SCORE_THRESHOLD = int(os.environ.get("AC_HARDENING_THRESHOLD", "85"))
+_HARDENING_WORKFLOW = "hardening-sprint"
+
+
+def _get_ac_quality_settings() -> dict:
+    """Read AC quality thresholds live from platform_settings DB."""
+    defaults = {
+        "ac_hardening_threshold": "85",
+        "ac_adversarial_warn": "60",
+        "ac_adversarial_fail": "40",
+        "ac_max_hardening_per_cycle": "1",
+        "ac_auto_hardening_enabled": "true",
+    }
+    try:
+        db = get_db()
+        rows = db.execute(
+            "SELECT key, value FROM platform_settings WHERE key LIKE 'ac_%'"
+        ).fetchall()
+        db.close()
+        for r in rows:
+            defaults[r["key"]] = r["value"]
+    except Exception:
+        pass
+    return defaults
+
+
+async def _trigger_hardening_sprint(
+    project_id: str, cycle_num: int, total_score: int, adversarial_scores: dict
+) -> Optional[str]:
+    """Launch a hardening-sprint run on the SF platform when total_score < threshold."""
+    try:
+        from .git_action_watcher import SF_PLATFORM_URL, _sf_headers
+
+        # Identify the 3 worst adversarial dimensions to focus on
+        low_dims = sorted(adversarial_scores.items(), key=lambda x: x[1])[:3]
+        low_dims_text = ", ".join(f"{d}={s}" for d, s in low_dims)
+
+        brief = (
+            f"Hardening Sprint auto — cycle {cycle_num} score={total_score}/100 (<seuil configuré).\n"
+            f"Dimensions basses : {low_dims_text}.\n"
+            f"Objectif : passer le score >= seuil configuré en ciblant no_slop, "
+            f"architecture et over_engineering.\n"
+            f"RÈGLE : ne pas modifier les APIs publiques ni les tests existants."
+        )
+        import httpx
+
+        resp = httpx.post(
+            f"{SF_PLATFORM_URL}/api/projects/{project_id}/run",
+            headers=_sf_headers(),
+            json={
+                "workflow_id": _HARDENING_WORKFLOW,
+                "brief": brief,
+                "cdp_agent_id": "plat-endurance-manager",
+                "config": {
+                    "source_cycle": cycle_num,
+                    "source_score": total_score,
+                    "target_score": HARDENING_SCORE_THRESHOLD,
+                    "triggered_by": "hardening_auto",
+                    "improvement_mode": True,
+                },
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            run_id = data.get("run_id") or data.get("id")
+            logging.getLogger(__name__).info(
+                "hardening-sprint triggered: project=%s cycle=%d score=%d run_id=%s",
+                project_id,
+                cycle_num,
+                total_score,
+                run_id,
+            )
+            return run_id
+        logging.getLogger(__name__).warning(
+            "hardening-sprint launch failed: project=%s status=%d",
+            project_id,
+            resp.status_code,
+        )
+    except Exception as e:
+        logging.getLogger(__name__).warning("hardening-sprint trigger error: %s", e)
+    return None
+
+
+@app.post("/api/improvement/inject-cycle")
+async def api_improvement_inject_cycle(request: Request):
+    """Inject a cycle result — accepts adversarial scores + traceability links."""
+    body = await request.json()
+    project_id = body.get("project_id")
+    cycle_num = body.get("cycle_num", 1)
+    phase_scores = body.get("phase_scores", {})
+    adversarial_scores = body.get("adversarial_scores", {})  # {dimension: score}
+    traceability_items = body.get(
+        "traceability", []
+    )  # [{type, id, ref, reason, linked_to, linked_type}]
+    total_score = body.get("total_score", 0)
+    defect_count = body.get("defect_count", 0)
+    git_sha = body.get("git_sha", "")
+    run_id = body.get("run_id", "")
+    fix_summary = body.get("fix_summary", "")
+    traceability_score = body.get("traceability_score", 0)
+    # Don't auto-trigger hardening on hardening cycles themselves
+    _is_hardening = body.get("triggered_by") == "hardening_auto"
+
+    if not project_id:
+        return {"ok": False, "error": "project_id required"}
+
+    def _do_inject():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        now = datetime.utcnow().isoformat()
+
+        # ── 1. Upsert main cycle record ──────────────────────────────────────
+        conn.execute(
+            """
+            INSERT INTO ac_cycles
+            (project_id, cycle_num, git_sha, platform_run_id, status,
+             phase_scores, total_score, defect_count, fix_summary,
+             adversarial_scores, traceability_score, completed_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (project_id, cycle_num) DO UPDATE SET
+                git_sha=EXCLUDED.git_sha, platform_run_id=EXCLUDED.platform_run_id,
+                status=EXCLUDED.status, phase_scores=EXCLUDED.phase_scores,
+                total_score=EXCLUDED.total_score, defect_count=EXCLUDED.defect_count,
+                fix_summary=EXCLUDED.fix_summary,
+                adversarial_scores=EXCLUDED.adversarial_scores,
+                traceability_score=EXCLUDED.traceability_score,
+                completed_at=EXCLUDED.completed_at
+            """,
+            (
+                project_id,
+                cycle_num,
+                git_sha,
+                run_id,
+                "completed",
+                json.dumps(phase_scores),
+                total_score,
+                defect_count,
+                fix_summary,
+                json.dumps(adversarial_scores),
+                traceability_score,
+                now,
+            ),
+        )
+
+        # ── 2. Upsert adversarial dimension rows ─────────────────────────────
+        for dimension, score in adversarial_scores.items():
+            findings = body.get("findings", {}).get(dimension, [])
+            verdict = "pass" if score >= 70 else "warn" if score >= 40 else "fail"
+            conn.execute(
+                """
+                INSERT INTO ac_adversarial
+                (project_id, cycle_num, dimension, score, verdict, findings, checked_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (project_id, cycle_num, dimension) DO UPDATE SET
+                    score=EXCLUDED.score, verdict=EXCLUDED.verdict,
+                    findings=EXCLUDED.findings, checked_at=EXCLUDED.checked_at
+                """,
+                (
+                    project_id,
+                    cycle_num,
+                    dimension,
+                    score,
+                    verdict,
+                    json.dumps(findings),
+                    now,
+                ),
+            )
+
+        # ── 3. Insert traceability links ──────────────────────────────────────
+        for item in traceability_items:
+            conn.execute(
+                """
+                INSERT INTO ac_traceability
+                (project_id, cycle_num, artifact_type, artifact_id,
+                 artifact_ref, reason, linked_to, linked_type, status, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    project_id,
+                    cycle_num,
+                    item.get("type", "code"),
+                    item.get("id", ""),
+                    item.get("ref", ""),
+                    item.get("reason", ""),
+                    item.get("linked_to", ""),
+                    item.get("linked_type", ""),
+                    item.get("status", "present"),
+                    now,
+                ),
+            )
+
+        # ── 4. Update project state avg ───────────────────────────────────────
+        all_scores_row = conn.execute(
+            "SELECT AVG(total_score) AS avg_score FROM ac_cycles WHERE project_id=%s AND status='completed'",
+            (project_id,),
+        ).fetchone()
+        avg_score = round(
+            (all_scores_row["avg_score"] or 0) if all_scores_row else 0, 1
+        )
+        existing = conn.execute(
+            "SELECT project_id FROM ac_project_state WHERE project_id=%s", (project_id,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """UPDATE ac_project_state
+                   SET current_cycle=%s, total_score_avg=%s, last_git_sha=%s, updated_at=%s
+                   WHERE project_id=%s""",
+                (cycle_num, avg_score, git_sha, now, project_id),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO ac_project_state
+                   (project_id, current_cycle, status, total_score_avg, last_git_sha, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s)""",
+                (project_id, cycle_num, "idle", avg_score, git_sha, now),
+            )
+        conn.close()
+        return avg_score
+
+    avg = await asyncio.to_thread(_do_inject)
+
+    # ── Auto-trigger hardening sprint if score below threshold ────────────────
+    hardening_run_id = None
+    _quality = _get_ac_quality_settings()
+    _hardening_threshold = int(_quality.get("ac_hardening_threshold", "85"))
+    _auto_enabled = _quality.get("ac_auto_hardening_enabled", "true") == "true"
+    if project_id and not _is_hardening and _auto_enabled and total_score < _hardening_threshold:
+        hardening_run_id = await _trigger_hardening_sprint(
+            project_id, cycle_num, total_score, adversarial_scores
+        )
+
+    return {
+        "ok": True,
+        "avg_score": avg,
+        "hardening_triggered": hardening_run_id is not None,
+        "hardening_run_id": hardening_run_id,
+    }
+
+
+@app.get("/api/improvement/adversarial/{project_id}")
+async def api_improvement_adversarial(project_id: str):
+    """Get latest adversarial dimension scores for a project."""
+
+    def _load():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        try:
+            rows = conn.execute(
+                """SELECT dimension, score, verdict, findings, checked_at
+                   FROM ac_adversarial
+                   WHERE project_id=%s
+                   ORDER BY cycle_num DESC, dimension""",
+                (project_id,),
+            ).fetchall()
+            # Keep only latest per dimension
+            seen, result = set(), []
+            for r in rows:
+                if r["dimension"] not in seen:
+                    seen.add(r["dimension"])
+                    result.append(dict(r))
+            return result
+        finally:
+            conn.close()
+
+    data = await asyncio.to_thread(_load)
+    return data
+
+
+@app.get("/api/improvement/traceability/{project_id}")
+async def api_improvement_traceability(project_id: str, cycle: int = 0):
+    """Get traceability matrix for a project (latest cycle or specific)."""
+
+    def _load():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        try:
+            if cycle:
+                rows = conn.execute(
+                    """SELECT * FROM ac_traceability
+                       WHERE project_id=%s AND cycle_num=%s
+                       ORDER BY artifact_type, artifact_id""",
+                    (project_id, cycle),
+                ).fetchall()
+            else:
+                max_cycle_row = conn.execute(
+                    "SELECT MAX(cycle_num) AS mc FROM ac_traceability WHERE project_id=%s",
+                    (project_id,),
+                ).fetchone()
+                mc = (max_cycle_row["mc"] or 1) if max_cycle_row else 1
+                rows = conn.execute(
+                    """SELECT * FROM ac_traceability
+                       WHERE project_id=%s AND cycle_num=%s
+                       ORDER BY artifact_type, artifact_id""",
+                    (project_id, mc),
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    data = await asyncio.to_thread(_load)
+    return data
 
 
 # ============================================================================

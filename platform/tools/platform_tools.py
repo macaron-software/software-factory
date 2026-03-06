@@ -57,16 +57,16 @@ class PlatformAgentsTool(BaseTool):
 class PlatformMissionsTool(BaseTool):
     name = "platform_missions"
     description = (
-        "List all missions/epics or get details of one, including phase statuses."
+        "List SAFe epics (missions) or get details of one, including phase statuses."
     )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.store import get_mission_run_store, get_mission_store
+        from ..epics.store import get_epic_run_store, get_epic_store
 
         mission_id = params.get("mission_id")
         if mission_id:
-            store = get_mission_run_store()
+            store = get_epic_run_store()
             m = store.get(mission_id)
             if not m:
                 return json.dumps({"error": f"Mission {mission_id} not found"})
@@ -96,10 +96,10 @@ class PlatformMissionsTool(BaseTool):
                 }
             )
         # List missions (not runs) with optional status/project filter
-        mstore = get_mission_store()
+        epic_store = get_epic_store()
         status_filter = params.get("status")
         project_filter = params.get("project_id")
-        missions = mstore.list_missions(limit=int(params.get("limit", 100)))
+        missions = epic_store.list_missions(limit=int(params.get("limit", 100)))
         items = []
         for m in missions:
             s = (
@@ -121,7 +121,7 @@ class PlatformMissionsTool(BaseTool):
                     "project_id": getattr(m, "project_id", ""),
                 }
             )
-        return json.dumps({"total": len(items), "missions": items})
+        return json.dumps({"total": len(items), "epics": items})
 
 
 class PlatformMemoryTool(BaseTool):
@@ -149,8 +149,8 @@ class PlatformMemoryTool(BaseTool):
 class PlatformMetricsTool(BaseTool):
     name = "platform_metrics"
     description = (
-        "Get platform statistics. Pass project_id to filter by project: "
-        "mission_runs count, sessions, messages, agents involved."
+        "Get platform SAFe portfolio statistics. Pass project_id to filter by project. "
+        "Returns epics, features, tasks, agents, sessions, messages counts."
     )
     category = "platform"
 
@@ -162,18 +162,34 @@ class PlatformMetricsTool(BaseTool):
         counts = {}
 
         if project_id:
-            # Project-specific metrics
-            for table, col in (
-                ("mission_runs", "project_id"),
-                ("sessions", "project_id"),
+            for table, col, key in (
+                ("epics", "project_id", "epics"),
+                ("features", "epic_id", None),  # features join via epics
+                ("epic_runs", "project_id", "epic_runs"),
+                ("sessions", "project_id", "sessions"),
             ):
                 try:
-                    counts[table] = db.execute(
-                        f"SELECT COUNT(*) FROM {table} WHERE {col}=?", (project_id,)
-                    ).fetchone()[0]
+                    if table == "features":
+                        counts["features"] = db.execute(
+                            "SELECT COUNT(*) FROM features WHERE epic_id IN "
+                            "(SELECT id FROM epics WHERE project_id=?)",
+                            (project_id,),
+                        ).fetchone()[0]
+                    else:
+                        counts[key] = db.execute(
+                            f"SELECT COUNT(*) FROM {table} WHERE {col}=?", (project_id,)
+                        ).fetchone()[0]
                 except Exception:
-                    counts[table] = 0
-            # Messages via sessions of the project
+                    counts[key or table] = 0
+            try:
+                counts["tasks"] = db.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE feature_id IN ("
+                    "SELECT id FROM features WHERE epic_id IN ("
+                    "SELECT id FROM epics WHERE project_id=?))",
+                    (project_id,),
+                ).fetchone()[0]
+            except Exception:
+                counts["tasks"] = 0
             try:
                 counts["messages"] = db.execute(
                     "SELECT COUNT(*) FROM messages WHERE session_id IN "
@@ -182,23 +198,30 @@ class PlatformMetricsTool(BaseTool):
                 ).fetchone()[0]
             except Exception:
                 counts["messages"] = 0
-            # Agents involved via mission_runs
             try:
                 counts["agents_involved"] = db.execute(
-                    "SELECT COUNT(DISTINCT cdp_agent_id) FROM mission_runs WHERE project_id=?",
+                    "SELECT COUNT(DISTINCT cdp_agent_id) FROM epic_runs WHERE project_id=?",
                     (project_id,),
                 ).fetchone()[0]
             except Exception:
                 counts["agents_involved"] = 0
             counts["project_id"] = project_id
         else:
-            for table in ("agents", "missions", "mission_runs", "sessions", "messages"):
+            # Global portfolio stats — SAFe labels
+            def _count(table):
                 try:
-                    counts[table] = db.execute(
-                        f"SELECT COUNT(*) FROM {table}"
-                    ).fetchone()[0]
+                    return db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                 except Exception:
-                    counts[table] = 0
+                    return 0
+
+            counts["projects"] = _count("projects")
+            counts["epics"] = _count("epics")
+            counts["features"] = _count("features")
+            counts["tasks"] = _count("tasks")
+            counts["agents"] = _count("agents")
+            counts["epic_runs"] = _count("epic_runs")
+            counts["sessions"] = _count("sessions")
+            counts["messages"] = _count("messages")
         return json.dumps(counts)
 
 
@@ -260,6 +283,111 @@ class PlatformWorkflowsTool(BaseTool):
         )
 
 
+class PlatformGuideTool(BaseTool):
+    """Context-aware guidance on what to do next.
+
+    Inspired by BMAD /bmad-help (MIT) — adapted for SF autonomous agent platform.
+    Source: https://github.com/bmad-code-org/BMAD-METHOD
+    Reads current state (missions, projects) and recommends next steps.
+    Available to Jarvis (strat-cto) and all orchestrator agents.
+    """
+
+    name = "platform_guide"
+    description = (
+        "Context-aware guidance: reads current platform state (running missions, projects) "
+        "and recommends what to do next. Accepts optional context hint. "
+        "Inspired by BMAD /bmad-help pattern."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from ..epics.store import get_epic_store
+        from ..projects.manager import get_project_store
+
+        context = params.get("context", "")
+        try:
+            projects = get_project_store().list_all()
+            missions = get_epic_store().list_missions(limit=50)
+
+            running = [m for m in missions if m.status in ["running", "in_progress"]]
+            pending = [m for m in missions if m.status == "pending"]
+            done = [m for m in missions if m.status in ["completed", "done"]]
+
+            guide: dict = {
+                "state": {
+                    "projects": len(projects),
+                    "missions_running": len(running),
+                    "missions_pending": len(pending),
+                    "missions_done": len(done),
+                },
+                "running_missions": [
+                    {
+                        "id": m.id,
+                        "name": getattr(m, "name", getattr(m, "title", "untitled")),
+                        "status": m.status,
+                    }
+                    for m in running[:5]
+                ],
+                "recommendations": [],
+            }
+
+            recs = guide["recommendations"]
+            if not projects:
+                recs.append("Create a project: Projects → New Project")
+                recs.append("Pick a workflow: browse 46 workflows")
+            elif not missions:
+                recs.append(
+                    "Launch first mission via ideation-to-prod or feature-sprint workflow"
+                )
+                recs.append(
+                    "Use complexity=simple for quick tasks, complexity=enterprise for large projects"
+                )
+            elif running:
+                recs.append("Monitor running missions: platform_missions tool")
+                recs.append(
+                    "Check human-in-the-loop checkpoints if any mission is blocked"
+                )
+            else:
+                recs.append("Review completed missions for follow-up actions")
+                recs.append("Run skill-eval workflow to verify skill quality")
+                recs.append(
+                    "Consider skill-evolution workflow to improve underperforming agents"
+                )
+
+            if context:
+                guide["context"] = context
+                kw = context.lower()
+                if any(w in kw for w in ["architect", "design", "system"]):
+                    recs.append(
+                        "Architecture → feature-sprint workflow (phase: solutioning) + architecte agent"
+                    )
+                elif any(w in kw for w in ["test", "qa", "quality", "eval"]):
+                    recs.append(
+                        "QA → test-campaign or skill-eval workflow + qa agent + tdd.md skill"
+                    )
+                elif any(w in kw for w in ["deploy", "prod", "release", "ship"]):
+                    recs.append(
+                        "Deploy → canary-deployment workflow (1%→10%→50%→100% + HITL)"
+                    )
+                elif any(w in kw for w in ["security", "audit", "pentest"]):
+                    recs.append(
+                        "Security → security-hacking workflow (8 phases) + security-audit.md skill"
+                    )
+                elif any(w in kw for w in ["simple", "quick", "small", "bug", "fix"]):
+                    recs.append(
+                        "Simple task → launch workflow with complexity=simple (enterprise phases auto-skipped)"
+                    )
+                elif any(w in kw for w in ["enterprise", "large", "big", "complex"]):
+                    recs.append(
+                        "Large project → launch workflow with complexity=enterprise (all phases included)"
+                    )
+
+            return json.dumps(guide, ensure_ascii=False)
+        except Exception as e:
+            logger.exception("Error in platform_guide tool")
+            return json.dumps({"error": str(e)})
+
+
 class PlatformCreateFeatureTool(BaseTool):
     name = "create_feature"
     description = (
@@ -269,7 +397,7 @@ class PlatformCreateFeatureTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.product import FeatureDef, ProductBacklog
+        from ..epics.product import FeatureDef, ProductBacklog
 
         epic_id = params.get("epic_id", "")
         name = params.get("name", "")
@@ -299,7 +427,7 @@ class PlatformCreateStoryTool(BaseTool):
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.product import ProductBacklog, UserStoryDef
+        from ..epics.product import ProductBacklog, UserStoryDef
 
         feature_id = params.get("feature_id", "")
         title = params.get("title", "")
@@ -321,18 +449,269 @@ class PlatformCreateStoryTool(BaseTool):
         return json.dumps({"ok": True, "story_id": story.id, "title": story.title})
 
 
+class PlatformCreateSprintTool(BaseTool):
+    name = "create_sprint"
+    description = (
+        "Create a sprint record for an epic (mission). "
+        "Params: epic_id (required), name, goal, type (inception|infra|tdd|adversarial|qa|deploy), "
+        "number (sprint number), planned_sp (story points planned), team_agents (list of agent ids). "
+        "Returns sprint_id and number."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+        from ..epics.store import get_epic_run_store, SprintDef
+
+        epic_id = params.get("epic_id", "")
+        if not epic_id:
+            return _json.dumps({"error": "epic_id is required"})
+        store = get_epic_run_store()
+        # Auto-compute sprint number
+        existing = store.list_sprints(epic_id)
+        number = params.get("number", len(existing) + 1)
+        team = params.get("team_agents", [])
+        sprint = SprintDef(
+            mission_id=epic_id,
+            number=number,
+            name=params.get("name", f"Sprint {number}"),
+            goal=params.get("goal", ""),
+            type=params.get("type", "tdd"),
+            planned_sp=params.get("planned_sp", 0),
+            team_agents=_json.dumps(team) if isinstance(team, list) else team,
+            status="active",
+        )
+        sprint = store.create_sprint(sprint)
+        return _json.dumps(
+            {"ok": True, "sprint_id": sprint.id, "number": sprint.number}
+        )
+
+
+class PlatformLaunchEpicRunTool(BaseTool):
+    name = "launch_epic_run"
+    description = (
+        "Launch a workflow execution for an epic. Creates a session and starts the workflow. "
+        "Params: epic_id (required), workflow_id (optional, uses epic's default if omitted). "
+        "Returns session_id, workflow_id, run status. "
+        "Use this to start or restart an epic run autonomously."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        epic_id = params.get("epic_id", "")
+        if not epic_id:
+            return _json.dumps({"error": "epic_id is required"})
+        workflow_id = params.get("workflow_id", "")
+
+        try:
+            from ..epics.store import get_epic_store, get_epic_run_store
+            from ..workflows.store import get_workflow_store
+            from ..models import EpicRun, PhaseRun, PhaseStatus
+            from ..sessions.store import SessionDef, MessageDef, get_session_store
+            import uuid
+
+            epic_store = get_epic_store()
+            mission = epic_store.get_mission(epic_id)
+            if not mission:
+                return _json.dumps({"error": f"Epic '{epic_id}' not found"})
+
+            wf_id = workflow_id or mission.workflow_id
+            if not wf_id:
+                return _json.dumps({"error": "No workflow_id for this epic"})
+
+            wf = get_workflow_store().get(wf_id)
+            if not wf:
+                return _json.dumps({"error": f"Workflow '{wf_id}' not found"})
+
+            # Build phase runs
+            phases = wf.phases_json if isinstance(wf.phases_json, list) else []
+            phase_runs = [
+                PhaseRun(
+                    phase_id=p["id"],
+                    phase_name=p.get("name", p["id"]),
+                    pattern_id=p.get("pattern_id", "sequential"),
+                    status=PhaseStatus.PENDING,
+                )
+                for p in phases
+            ]
+
+            run_id = str(uuid.uuid4())[:8]
+            session_id = run_id
+            run = EpicRun(
+                id=run_id,
+                session_id=session_id,
+                workflow_id=wf_id,
+                workflow_name=wf.name,
+                project_id=mission.project_id,
+                parent_epic_id=epic_id,
+                status="paused",
+                phases_json=phase_runs,
+            )
+            run_store = get_epic_run_store()
+            run_store.create_run(run)
+
+            # Create session
+            ss = get_session_store()
+            s = SessionDef(
+                id=session_id,
+                project_id=mission.project_id,
+                title=f"{mission.name} — {wf.name}",
+                messages=[
+                    MessageDef(
+                        role="user",
+                        content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
+                    )
+                ],
+            )
+            ss.create_session(s)
+
+            # Resume immediately
+            from ..workflows.store import run_workflow
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                asyncio.to_thread(
+                    run_workflow, wf, session_id, mission.name, mission.project_id
+                )
+            )
+
+            return _json.dumps(
+                {
+                    "ok": True,
+                    "run_id": run_id,
+                    "session_id": session_id,
+                    "workflow_id": wf_id,
+                    "epic_id": epic_id,
+                    "phases": [p["id"] for p in phases],
+                }
+            )
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
+class PlatformResumeRunTool(BaseTool):
+    name = "resume_run"
+    description = (
+        "Resume a paused or stuck epic run. "
+        "Params: run_id or session_id (required). "
+        "Returns status. Use to unblock stuck workflows."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        run_id = params.get("run_id") or params.get("session_id", "")
+        if not run_id:
+            return _json.dumps({"error": "run_id or session_id required"})
+
+        try:
+            from ..epics.store import get_epic_run_store
+
+            run_store = get_epic_run_store()
+            run = run_store.get(run_id)
+            if not run:
+                return _json.dumps({"error": f"Run '{run_id}' not found"})
+            if run.status == "cancelled":
+                return _json.dumps({"error": "Run is cancelled, cannot resume"})
+
+            from ..workflows.store import get_workflow_store, run_workflow
+            import asyncio
+
+            wf = get_workflow_store().get(run.workflow_id)
+            if not wf:
+                return _json.dumps({"error": f"Workflow '{run.workflow_id}' not found"})
+
+            run_store.update_run_status(run_id, "running")
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                asyncio.to_thread(
+                    run_workflow, wf, run_id, run.workflow_name or "", run.project_id
+                )
+            )
+            return _json.dumps({"ok": True, "run_id": run_id, "status": "resuming"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
+class PlatformCheckRunTool(BaseTool):
+    name = "check_run_status"
+    description = (
+        "Check status of an epic run (workflow execution). "
+        "Params: run_id or session_id. Or project_id to list all runs for a project. "
+        "Returns status, current_phase, phases progress, sprint count."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import json as _json
+
+        run_id = params.get("run_id") or params.get("session_id", "")
+        project_id = params.get("project_id", "")
+
+        try:
+            from ..epics.store import get_epic_run_store
+
+            store = get_epic_run_store()
+            if run_id:
+                run = store.get(run_id)
+                if not run:
+                    return _json.dumps({"error": f"Run '{run_id}' not found"})
+                phases = run.phases_json if isinstance(run.phases_json, list) else []
+                sprints = store.list_sprints(run.parent_epic_id or run_id)
+                return _json.dumps(
+                    {
+                        "run_id": run.id,
+                        "status": run.status,
+                        "current_phase": run.current_phase,
+                        "workflow_id": run.workflow_id,
+                        "project_id": run.project_id,
+                        "phases": [
+                            {"id": p.phase_id, "status": p.status} for p in phases
+                        ]
+                        if phases
+                        else [],
+                        "sprint_count": len(sprints),
+                        "resume_attempts": getattr(run, "resume_attempts", 0),
+                    }
+                )
+            elif project_id:
+                runs = store.list_runs(project_id=project_id, limit=10)
+                return _json.dumps(
+                    [
+                        {
+                            "run_id": r.id,
+                            "status": r.status,
+                            "current_phase": r.current_phase,
+                            "workflow_id": r.workflow_id,
+                        }
+                        for r in runs
+                    ]
+                )
+            else:
+                return _json.dumps({"error": "run_id or project_id required"})
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 class PlatformCreateProjectTool(BaseTool):
     name = "create_project"
     description = (
-        "Create a new project on the platform with full setup: workspace dir, git init, Dockerfile, docker-compose, "
-        "README, docs/spec.md, docs/security.md, and standard missions (TMA/MCO, Security, Tech Debt + Legal). "
-        "Params: name (required), description, vision, stack (tech stack string), "
-        "factory_type ('software'|'data'|'security'|'standalone'). "
+        "Create a new project on the platform. "
+        "If git_url is provided, clones the existing repository as the workspace. "
+        "Otherwise scaffolds a new project (git init, Dockerfile, README, docs/spec.md). "
+        "Standard missions (TMA/MCO, Security, Tech Debt + Legal) are always provisioned. "
+        "Params: name (required), git_url (existing repo URL to clone), description, vision, "
+        "stack (tech stack string), factory_type ('software'|'data'|'security'|'standalone'). "
         "Returns the created project id, name, workspace path, scaffold actions, and mission ids."
     )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        import subprocess as _sp
         from ..projects.manager import get_project_store, Project, scaffold_project
 
         name = params.get("name", "").strip()
@@ -340,6 +719,8 @@ class PlatformCreateProjectTool(BaseTool):
             return json.dumps({"error": "name is required"})
         import uuid
         import datetime
+
+        git_url = (params.get("git_url") or "").strip()
 
         store = get_project_store()
         proj = Project(
@@ -349,23 +730,54 @@ class PlatformCreateProjectTool(BaseTool):
             description=params.get("description", ""),
             vision=params.get("vision", params.get("description", "")),
             factory_type=params.get("factory_type", "software"),
+            git_url=git_url,
             created_at=datetime.datetime.utcnow().isoformat(),
         )
         proj = store.create(proj)
 
-        # Scaffold workspace: git init + Dockerfile + docker-compose + README + docs/spec.md + src/
         scaffold_result = {}
-        try:
-            scaffold_result = scaffold_project(proj)
-        except Exception as _e:
-            scaffold_result = {"error": str(_e)}
+        if git_url:
+            # Clone existing repo into workspace
+            import os as _os
 
-        # List missions provisioned by store.create() → heal_missions()
+            workspace_root = (
+                _os.path.dirname(proj.path)
+                if proj.path
+                else _os.path.join(_os.getcwd(), "workspace")
+            )
+            dest = proj.path or _os.path.join(workspace_root, proj.id)
+            try:
+                r = _sp.run(
+                    ["git", "clone", git_url, dest],
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+                if r.returncode == 0:
+                    # Update project path to the cloned directory
+                    proj.path = dest
+                    store.update(proj)
+                    scaffold_result = {"actions": [f"cloned {git_url} → {dest}"]}
+                else:
+                    scaffold_result = {
+                        "error": r.stderr.strip() or "clone failed",
+                        "actions": [],
+                    }
+            except Exception as _e:
+                scaffold_result = {"error": str(_e), "actions": []}
+        else:
+            # Scaffold workspace: git init + Dockerfile + docker-compose + README + docs/spec.md + src/
+            try:
+                scaffold_result = scaffold_project(proj)
+            except Exception as _e:
+                scaffold_result = {"error": str(_e)}
+
+        # List missions provisioned by store.create() → heal_epics()
         missions_created = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             missions_created = [
                 {
                     "mission_id": m.id,
@@ -385,7 +797,7 @@ class PlatformCreateProjectTool(BaseTool):
                 "name": proj.name,
                 "workspace": proj.path,
                 "scaffold": scaffold_result.get("actions", []),
-                "missions": missions_created,
+                "epics": missions_created,
             }
         )
 
@@ -395,12 +807,12 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
 
     Idempotent: skips any mission whose workflow_id already exists for this project.
     """
-    from ..missions.store import get_mission_store, MissionDef, get_mission_run_store
-    from ..models import MissionRun, MissionStatus
+    from ..epics.store import get_epic_store, MissionDef, get_epic_run_store
+    from ..models import EpicRun, EpicStatus
     import uuid
 
-    m_store = get_mission_store()
-    run_store = get_mission_run_store()
+    m_store = get_epic_store()
+    run_store = get_epic_run_store()
     created = []
 
     # Idempotency: collect already-existing workflow_ids for this project
@@ -443,10 +855,10 @@ async def _bootstrap_standard_missions(project_id: str, project_name: str) -> li
                 status="active",
             )
             mission = m_store.create_mission(mission)
-            run = MissionRun(
+            run = EpicRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PENDING,
+                status=EpicStatus.PENDING,
                 project_id=project_id,
             )
             run = run_store.create(run)
@@ -510,7 +922,7 @@ async def _ensure_project_for_mission(
     proj = store.create(proj)
 
     # Full scaffold: workspace, git init, README, docs/spec.md, Dockerfile, docker-compose
-    # NOTE: store.create() already calls heal_missions() which provisions standard missions.
+    # NOTE: store.create() already calls heal_epics() which provisions standard missions.
     try:
         scaffold_project(proj)
     except Exception as _e:
@@ -532,19 +944,22 @@ class PlatformCreateMissionTool(BaseTool):
         "If project_id is omitted, a project is auto-created with full scaffold "
         "(workspace, git, README, docs/spec.md, Dockerfile, docker-compose) "
         "and standard missions (TMA/MCO, Security, Tech Debt). "
-        "Params: name (required), goal/description, project_id, workflow_id (optional). "
+        "Params: name (required), goal/description, project_id, workflow_id (optional), "
+        "target_branch (optional — git branch where agents will deliver code, e.g. 'feature/sav-parcours'; "
+        "auto-created in the project workspace if it doesn't exist). "
         "Returns the mission id and auto-created project_id if applicable."
     )
     category = "platform"
 
     async def execute(self, params: dict, agent: AgentInstance = None) -> str:
-        from ..missions.store import get_mission_store, MissionDef
+        from ..epics.store import get_epic_store, MissionDef
 
         name = params.get("name", "").strip()
         if not name:
             return json.dumps({"error": "name is required"})
 
         project_id = params.get("project_id", "").strip()
+        target_branch = (params.get("target_branch") or "").strip()
         auto_project: dict = {}
 
         # Rule: mission without project → auto-create project + scaffold
@@ -556,7 +971,18 @@ class PlatformCreateMissionTool(BaseTool):
                 "auto_created_project_name": proj_name,
             }
 
-        store = get_mission_store()
+        # Resolve workspace_path from project
+        workspace_path = ""
+        try:
+            from ..projects.manager import get_project_store
+
+            proj = get_project_store().get(project_id)
+            if proj and proj.path:
+                workspace_path = proj.path
+        except Exception:
+            pass
+
+        store = get_epic_store()
         mission = MissionDef(
             name=name,
             description=params.get("description", params.get("goal", "")),
@@ -567,30 +993,69 @@ class PlatformCreateMissionTool(BaseTool):
         )
         mission = store.create_mission(mission)
 
-        # Auto-launch orchestrator (create mission_run + start execution)
+        # Create target branch in workspace if requested
+        branch_info = {}
+        if target_branch and workspace_path:
+            import subprocess as _sp
+            import os as _os
+
+            if _os.path.isdir(_os.path.join(workspace_path, ".git")):
+                try:
+                    existing = _sp.run(
+                        ["git", "rev-parse", "--verify", target_branch],
+                        cwd=workspace_path,
+                        capture_output=True,
+                        timeout=10,
+                    )
+                    if existing.returncode == 0:
+                        branch_info = {
+                            "target_branch": target_branch,
+                            "branch_action": "exists",
+                        }
+                    else:
+                        r = _sp.run(
+                            ["git", "checkout", "-b", target_branch],
+                            cwd=workspace_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=15,
+                        )
+                        if r.returncode == 0:
+                            branch_info = {
+                                "target_branch": target_branch,
+                                "branch_action": "created",
+                            }
+                        else:
+                            branch_info = {"target_branch_error": r.stderr.strip()}
+                except Exception as _e:
+                    branch_info = {"target_branch_error": str(_e)}
+
+        # Auto-launch orchestrator (create epic_run + start execution)
         run_info = {}
         try:
-            from ..missions.store import get_mission_run_store
-            from ..models import MissionRun, MissionStatus
+            from ..epics.store import get_epic_run_store
+            from ..models import EpicRun, EpicStatus
             import uuid
             import asyncio
 
-            run_store = get_mission_run_store()
-            run = MissionRun(
+            run_store = get_epic_run_store()
+            run = EpicRun(
                 id=str(uuid.uuid4())[:8],
                 mission_id=mission.id,
-                status=MissionStatus.PENDING,
+                status=EpicStatus.PENDING,
                 project_id=mission.project_id or "",
+                workspace_path=workspace_path,
+                context={"target_branch": target_branch} if target_branch else {},
             )
             run = run_store.create(run)
-            run_info = {"mission_run_id": run.id}
+            run_info = {"epic_run_id": run.id}
 
             # Schedule launch in background (don't block tool response)
             async def _launch():
                 try:
-                    from ..services.mission_orchestrator import MissionOrchestrator
+                    from ..services.epic_orchestrator import EpicOrchestrator
 
-                    orch = MissionOrchestrator()
+                    orch = EpicOrchestrator()
                     await orch.run(run.id)
                 except Exception:
                     pass
@@ -604,8 +1069,10 @@ class PlatformCreateMissionTool(BaseTool):
                 "ok": True,
                 "mission_id": mission.id,
                 "name": mission.name,
+                "workspace_path": workspace_path or None,
                 **auto_project,
                 **run_info,
+                **branch_info,
             }
         )
 
@@ -869,9 +1336,9 @@ class PlatformCreateDomainTool(BaseTool):
 
         missions_created = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             missions_created = [
                 {
                     "mission_id": m.id,
@@ -912,7 +1379,7 @@ class PlatformCreateDomainTool(BaseTool):
                 "name": domain.name,
                 "workspace": domain.path,
                 "scaffold": scaffold_result.get("actions", []),
-                "missions": missions_created,
+                "epics": missions_created,
                 "sub_projects": sub_projects_created,
             }
         )
@@ -949,7 +1416,7 @@ class PlatformTmaTool(BaseTool):
             inc_args.append(severity)
         if project_id:
             inc_where.append(
-                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+                "mission_id IN (SELECT id FROM epics WHERE project_id = ?)"
             )
             inc_args.append(project_id)
 
@@ -974,7 +1441,7 @@ class PlatformTmaTool(BaseTool):
             tkt_args.append(severity)
         if project_id:
             tkt_where.append(
-                "mission_id IN (SELECT id FROM missions WHERE project_id = ?)"
+                "mission_id IN (SELECT id FROM epics WHERE project_id = ?)"
             )
             tkt_args.append(project_id)
 
@@ -991,9 +1458,9 @@ class PlatformTmaTool(BaseTool):
         # TMA missions summary
         tma_missions = []
         try:
-            from ..missions.store import get_mission_store
+            from ..epics.store import get_epic_store
 
-            m_store = get_mission_store()
+            m_store = get_epic_store()
             all_missions = m_store.list_missions(limit=200)
             for m in all_missions:
                 wf = getattr(m, "workflow_id", "") or ""
@@ -1035,6 +1502,119 @@ class PlatformTmaTool(BaseTool):
         )
 
 
+class PlatformClusterTool(BaseTool):
+    name = "platform_cluster"
+    description = (
+        "List all cluster nodes with their status (online/stale), role (master/slave), "
+        "mode, URL, CPU%, MEM%, last_seen age, and version. "
+        "Use this to check cluster health, see which nodes are active, and report on load distribution."
+    )
+    category = "platform"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        from datetime import datetime
+
+        from ..db.migrations import get_db
+
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version "
+                "FROM platform_nodes ORDER BY role DESC, node_id"
+            ).fetchall()
+        except Exception as e:
+            return json.dumps({"error": str(e), "nodes": []})
+        finally:
+            db.close()
+
+        now = datetime.utcnow()
+        nodes = []
+        for r in rows:
+            try:
+                last_seen_dt = datetime.fromisoformat(
+                    str(r["last_seen"]).replace("Z", "").split(".")[0]
+                )
+                age_s = int((now - last_seen_dt).total_seconds())
+            except Exception:
+                age_s = 9999
+            nodes.append(
+                {
+                    "node_id": r["node_id"],
+                    "role": r["role"],
+                    "mode": r["mode"],
+                    "url": r["url"] or "",
+                    "status": "online" if age_s < 60 else "stale",
+                    "age_seconds": age_s,
+                    "cpu_pct": round(r["cpu_pct"] or 0, 1),
+                    "mem_pct": round(r["mem_pct"] or 0, 1),
+                    "version": r["version"] or "unknown",
+                }
+            )
+
+        online = sum(1 for n in nodes if n["status"] == "online")
+        return json.dumps(
+            {
+                "nodes": nodes,
+                "summary": {
+                    "total": len(nodes),
+                    "online": online,
+                    "stale": len(nodes) - online,
+                },
+            }
+        )
+
+
+class ConfluenceWritePageTool(BaseTool):
+    name = "confluence_write_page"
+    description = (
+        "Create or update a Confluence page with markdown content. "
+        "Params: title (required), content (markdown, required), "
+        "space (Confluence space key, default from CONFLUENCE_SPACE env), "
+        "parent_title (optional parent page title for hierarchy). "
+        "Returns the page URL and ID."
+    )
+    category = "platform"
+    allowed_roles = []
+
+    async def execute(self, params: dict, agent=None) -> str:
+        import json as _json
+
+        title = (params.get("title") or "").strip()
+        content = (params.get("content") or "").strip()
+        if not title or not content:
+            return _json.dumps({"error": "title and content are required"})
+
+        space = (params.get("space") or "").strip() or None
+        parent_title = (params.get("parent_title") or "").strip() or None
+
+        try:
+            from ..confluence.client import get_confluence_client
+            from ..confluence.converter import md_to_confluence
+
+            client = get_confluence_client()
+            if space:
+                client.space_key = space
+
+            parent_id = None
+            if parent_title:
+                parent_page = client.find_page(parent_title, space_key=space)
+                if parent_page:
+                    parent_id = parent_page["id"]
+
+            body_xhtml = md_to_confluence(content)
+            page = client.create_or_update(
+                title=title,
+                body_xhtml=body_xhtml,
+                parent_id=parent_id,
+            )
+            url = f"{client.base_url}/pages/{page.get('id', '')}"
+            return _json.dumps(
+                {"ok": True, "page_id": page.get("id"), "title": title, "url": url}
+            )
+        except Exception as e:
+            return _json.dumps({"error": str(e)})
+
+
 def register_platform_tools(registry):
     """Register all platform introspection tools."""
     registry.register(PlatformAgentsTool())
@@ -1045,6 +1625,10 @@ def register_platform_tools(registry):
     registry.register(PlatformWorkflowsTool())
     registry.register(PlatformCreateFeatureTool())
     registry.register(PlatformCreateStoryTool())
+    registry.register(PlatformCreateSprintTool())
+    registry.register(PlatformLaunchEpicRunTool())
+    registry.register(PlatformResumeRunTool())
+    registry.register(PlatformCheckRunTool())
     registry.register(PlatformCreateProjectTool())
     registry.register(PlatformCreateDomainTool())
     registry.register(PlatformCreateMissionTool())
@@ -1052,3 +1636,5 @@ def register_platform_tools(registry):
     registry.register(LaunchIdeationTool())
     registry.register(LaunchMktIdeationTool())
     registry.register(LaunchGroupIdeationTool())
+    registry.register(PlatformClusterTool())
+    registry.register(ConfluenceWritePageTool())

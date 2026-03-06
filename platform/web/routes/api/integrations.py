@@ -346,43 +346,63 @@ async def jira_kanban_sync_api(direction: str = "both"):
 @router.get("/api/integrations/{integ_id}/stats")
 async def get_integration_stats(integ_id: str):
     """Return usage stats for an integration. RTK: compression stats. Others: generic."""
-    import json as _json
     from ....db.migrations import get_db
+
     db = get_db()
     try:
         if integ_id == "rtk-compression":
             try:
-                total = db.execute("SELECT COUNT(*) as n, SUM(original_tokens) as orig, SUM(compressed_tokens) as comp, AVG(savings_pct) as avg_pct FROM rtk_compression_stats").fetchone()
-                by_provider = db.execute("SELECT provider, COUNT(*) as calls, SUM(original_tokens) as orig_tokens, SUM(compressed_tokens) as comp_tokens, AVG(savings_pct) as avg_pct FROM rtk_compression_stats GROUP BY provider ORDER BY calls DESC").fetchall()
-                last_24h = db.execute("SELECT COUNT(*) as calls, AVG(savings_pct) as avg_pct, SUM(original_tokens - compressed_tokens) as tokens_saved FROM rtk_compression_stats WHERE ts > datetime('now', '-24 hours')").fetchone()
-                recent = db.execute("SELECT provider, original_tokens, compressed_tokens, savings_pct, ts FROM rtk_compression_stats ORDER BY ts DESC LIMIT 20").fetchall()
-                return JSONResponse({
-                    "ok": True,
-                    "total_calls": total["n"] or 0,
-                    "total_tokens_original": total["orig"] or 0,
-                    "total_tokens_compressed": total["comp"] or 0,
-                    "total_tokens_saved": (total["orig"] or 0) - (total["comp"] or 0),
-                    "avg_savings_pct": round(total["avg_pct"] or 0, 1),
-                    "last_24h": {
-                        "calls": last_24h["calls"] or 0,
-                        "avg_pct": round(last_24h["avg_pct"] or 0, 1),
-                        "tokens_saved": last_24h["tokens_saved"] or 0,
-                    },
-                    "by_provider": [dict(r) for r in by_provider],
-                    "recent": [dict(r) for r in recent],
-                })
+                total = db.execute(
+                    "SELECT COUNT(*) as n, SUM(original_tokens) as orig, SUM(compressed_tokens) as comp, AVG(savings_pct) as avg_pct FROM rtk_compression_stats"
+                ).fetchone()
+                by_provider = db.execute(
+                    "SELECT provider, COUNT(*) as calls, SUM(original_tokens) as orig_tokens, SUM(compressed_tokens) as comp_tokens, AVG(savings_pct) as avg_pct FROM rtk_compression_stats GROUP BY provider ORDER BY calls DESC"
+                ).fetchall()
+                last_24h = db.execute(
+                    "SELECT COUNT(*) as calls, AVG(savings_pct) as avg_pct, SUM(original_tokens - compressed_tokens) as tokens_saved FROM rtk_compression_stats WHERE ts > datetime('now', '-24 hours')"
+                ).fetchone()
+                recent = db.execute(
+                    "SELECT provider, original_tokens, compressed_tokens, savings_pct, ts FROM rtk_compression_stats ORDER BY ts DESC LIMIT 20"
+                ).fetchall()
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "total_calls": total["n"] or 0,
+                        "total_tokens_original": total["orig"] or 0,
+                        "total_tokens_compressed": total["comp"] or 0,
+                        "total_tokens_saved": (total["orig"] or 0)
+                        - (total["comp"] or 0),
+                        "avg_savings_pct": round(total["avg_pct"] or 0, 1),
+                        "last_24h": {
+                            "calls": last_24h["calls"] or 0,
+                            "avg_pct": round(last_24h["avg_pct"] or 0, 1),
+                            "tokens_saved": last_24h["tokens_saved"] or 0,
+                        },
+                        "by_provider": [dict(r) for r in by_provider],
+                        "recent": [dict(r) for r in recent],
+                    }
+                )
             except Exception as e:
-                return JSONResponse({"ok": True, "total_calls": 0, "note": f"No stats yet: {e}"})
+                return JSONResponse(
+                    {"ok": True, "total_calls": 0, "note": f"No stats yet: {e}"}
+                )
         else:
-            row = db.execute("SELECT status, last_sync, updated_at FROM integrations WHERE id=?", (integ_id,)).fetchone()
+            row = db.execute(
+                "SELECT status, last_sync, updated_at FROM integrations WHERE id=?",
+                (integ_id,),
+            ).fetchone()
             if not row:
-                return JSONResponse({"ok": False, "error": "not found"}, status_code=404)
-            return JSONResponse({
-                "ok": True,
-                "status": row["status"],
-                "last_sync": row["last_sync"],
-                "updated_at": row["updated_at"],
-                "note": "Detailed stats not available for this integration",
-            })
+                return JSONResponse(
+                    {"ok": False, "error": "not found"}, status_code=404
+                )
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "status": row["status"],
+                    "last_sync": row["last_sync"],
+                    "updated_at": row["updated_at"],
+                    "note": "Detailed stats not available for this integration",
+                }
+            )
     finally:
         db.close()

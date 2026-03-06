@@ -92,7 +92,7 @@ class WorkflowPaused(Exception):
     def __init__(self, phase_index: int = 0, checkpoint_msg: str = ""):
         self.phase_index = phase_index
         self.checkpoint_msg = checkpoint_msg
-        super().__init__(f"Workflow paused at checkpoint")
+        super().__init__("Workflow paused at checkpoint")
 
 
 async def _sse(run: PatternRun, event: dict):
@@ -285,18 +285,32 @@ def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
 
     # Detect failures in results
     fail_lines = []
+    # Patterns that indicate env/infra issues, not real QA failures
+    _env_noise = (
+        "executable doesn't exist",
+        "no such file or directory",
+        "not installed",
+        "command not found",
+        "permission denied",
+        "cannot find module",
+        "no test specified",
+        "no tests found",
+    )
     for line in results.split("\n"):
         line_lower = line.lower()
         if any(
             kw in line_lower for kw in ("fail", "error:", "timeout", "not responding")
         ):
             if "npm install: OK" not in line and "0 failures" not in line_lower:
+                # Skip environment/infra noise that would create false-positive tickets
+                if any(noise in line_lower for noise in _env_noise):
+                    continue
                 fail_lines.append(line.strip())
 
     if not fail_lines:
         return
 
-    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    mission_id = getattr(ctx, "epic_run_id", "") or ""
     agent_id = ctx.agent.id if ctx.agent else source
     db = get_db()
     try:
@@ -786,6 +800,10 @@ async def _execute_node(
             or "fullstack" in role_lower
             or "backend" in role_lower
             or "frontend" in role_lower
+            or "worker" in role_lower
+            or "tdd" in role_lower
+            or "coder" in role_lower
+            or "implementer" in role_lower
         ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
@@ -985,8 +1003,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
         "Épic" in content or "Epic" in content or "US-" in content or "Story" in content
     ):
         mission_id = run.session_id  # fallback
-        if hasattr(ctx, "mission_run_id") and ctx.mission_run_id:
-            mission_id = ctx.mission_run_id
+        if hasattr(ctx, "epic_run_id") and ctx.epic_run_id:
+            mission_id = ctx.epic_run_id
         else:
             # Try to get mission_id from session config
             try:
@@ -1063,6 +1081,18 @@ This is BLOCKING: developers cannot start without your design tokens."""
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)
                 break  # on error, don't block
+
+            # Record guard event for metrics (best-effort, non-blocking)
+            try:
+                from ..agents.adversarial import record_guard_event
+                record_guard_event(
+                    run_id=getattr(run, "run_id", "") or "",
+                    agent_name=agent.name,
+                    agent_role=agent.role or "",
+                    guard_result=guard_result,
+                )
+            except Exception:
+                pass
 
             if guard_result.passed:
                 if guard_result.issues:
@@ -1225,7 +1255,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # Create platform_incident for adversarial rejections (DORA tracking)
                 # Auto-close if agent already has >=3 open quality_rejection incidents
                 try:
-                    from ..missions.feedback import create_platform_incident
+                    from ..epics.feedback import create_platform_incident
                     from ..db.migrations import get_db as _get_db
 
                     _db = _get_db()

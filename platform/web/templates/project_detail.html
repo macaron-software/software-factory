@@ -631,7 +631,7 @@ function deleteProject(projectId, projectName) {
     openDeleteModal({
         title: 'Supprimer ce projet',
         subtitle: 'Supprime le projet et TOUTES les données associées',
-        warning: 'Toutes les missions, epics, features, user stories, sprints, tâches, sessions, messages, mémoire projet et agents associés seront définitivement supprimés.',
+        warning: 'Toutes les epics, epics, features, user stories, sprints, tâches, sessions, messages, mémoire projet et agents associés seront définitivement supprimés.',
         expectedName: projectName,
         onConfirm: async () => {
             const r = await fetch(`/api/projects/${projectId}`, {method:'DELETE'});

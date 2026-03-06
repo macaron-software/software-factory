@@ -61,7 +61,7 @@ Legacy: `_SOFTWARE_FACTORY-old/` (core/, factory CLI, brain, TDD workers — arc
 │ Environment    │ URL / Access            │ Details                          │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
 │ Azure Prod     │ http://<AZURE_VM_IP>    │ D4as_v5 4CPU/16GB, francecentral │
-│                │ SSH: macaron@<VM>       │ LLM: azure-openai / gpt-5-mini  │
+│                │ SSH: macaron@<VM>       │ LLM: azure-openai (opanai-flamme)│
 │                │ nginx basic auth        │ Container: deploy-platform-1     │
 │                │                         │ Compose: deploy/docker-compose-  │
 │                │                         │   vm.yml (context: /opt/macaron) │
@@ -111,14 +111,25 @@ cd platform/tests/e2e && npx playwright test   # 82 tests (9 specs)
 
 ## LLM
 
+**0 FALLBACK — chaque env a UN seul provider, aucune chaîne.**
+
 ```
-Default: PLATFORM_LLM_PROVIDER=minimax  PLATFORM_LLM_MODEL=MiniMax-M2.5
-Azure:   PLATFORM_LLM_PROVIDER=azure-openai  PLATFORM_LLM_MODEL=gpt-5-mini
+Azure Prod (node-1 + node-2) : PLATFORM_LLM_PROVIDER=azure-openai  AZURE_DEPLOY=1
+  Resource : opanai-flamme (swedencentral) — https://opanai-flamme.openai.azure.com
+  gpt-5-mini    → AZURE_DEPLOY_GPT5_MINI=gpt-5-mini    (default / small talk)
+  gpt-5.2       → AZURE_DEPLOY_GPT52=gpt-5.2            (reasoning / strategy)
+  gpt-5.2-codex → AZURE_DEPLOY_CODEX2=gpt-5.2-codex    (code)
+  Routing : routing.py _select_model_for_agent() — reasoning→gpt-5.2, code→gpt-5.2-codex, default→gpt-5-mini
+  Node-1 env : /home/sfadmin/.env  (macaron-platform-blue, port 8090, master)
+  Node-2 env : /etc/sf-platform/secrets  (sf-platform, port 8090, slave)
+
+OVH Demo        : PLATFORM_LLM_PROVIDER=minimax  PLATFORM_LLM_MODEL=MiniMax-M2.5
+Local Dev       : PLATFORM_LLM_PROVIDER=ollama   PLATFORM_LLM_MODEL=qwen3:14b
 ```
 
-Fallback: minimax → azure-openai → azure-ai. Cooldown 90s on 429.
+GPT-5.x : NO `max_tokens` → use `max_completion_tokens`. NO `temperature`. Min 8K tokens.
+MiniMax : strip `<think>` blocks, json fences. Min 16K tokens.
 Keys: `~/.config/factory/*.key` — NEVER `*_API_KEY=dummy`
-MiniMax: <think> consume tokens (min 16K). GPT-5-mini: NO temperature, max_completion_tokens≥8K.
 
 ## AZURE
 
@@ -130,7 +141,7 @@ VM:  <AZURE_VM_IP> (D4as_v5 4CPU/16GB, francecentral) — SSH macaron@<VM>, ngin
      ⚠️ Module name = macaron_platform (NOT platform). Package maps platform/ → macaron_platform/.
 PG:  macaron-platform-pg.postgres.database.azure.com — B1ms PG17 32GB, pgvector, pg_trgm
      DB: macaron_platform, user: macaron, SSL required, dual adapter (adapter.py)
-LLM: ascii-ui-openai (francecentral) — gpt-5-mini, 100req/min, 100K tok/min
+LLM: opanai-flamme (swedencentral) — gpt-5-mini/gpt-5.2/gpt-5.2-codex, 100req/min
 DR:  L3 full 14/14 — blob GRS (macaronbackups), snapshots, PG PITR 7d
      RPO: PG 24h+PITR 7d, SQLite 24h, VM 7d, secrets 24h, code 0 (git)
      RTO: PG 15min, SQLite 5min, VM 30min
@@ -367,3 +378,136 @@ Accessibilité:    rse-a11y agent + rse-compliance a11y-audit phase ✓
 RSE/Green IT:     rse-compliance (eco + social + ethical AI audit) ✓
 SAFe:             pi-planning + epic-decompose (ART, portfolio, WSJF) ✓
 ```
+
+## MARATHON & PILOTAGE AUTONOME
+
+### Architecture de pilotage (Jarvis chain)
+
+```
+[Nous] → brief à Jarvis (strat-cto Karim Benali)
+  → Jarvis crée projet + epic en DB (create_project, create_epic)
+  → délègue [product PO Laura Vidal] : create_feature/story + AC GIVEN/WHEN/THEN + WSJF
+  → délègue [rte Marc Delacroix] : launch_epic_run → poll check_run_status → resume_run si paused
+  → [rte] escalade Jarvis si stuck >3 attempts ou quality_score < 50
+  → [scrum_master Inès] : create_sprint, velocity, retros
+```
+
+**On ne crée RIEN directement par script — tout passe par la chaîne agents.**
+
+### Fixes critiques Innovation Azure (52.143.158.19)
+
+```
+ROLE_TOOL_MAP [tool_schemas.py ~L2882]:
+  architecture role += create_feature, create_story, create_sprint (54 tools total)
+  ⚠️ Vérifier avec .venv/bin/python3 (pas python3 système)
+
+YOLO mode [config.py L237] : yolo_mode = True
+  → epic_orchestrator.py: human-in-the-loop auto-approuve (YOLO check ajouté)
+  → ancienne implémentation (workflows/store.py) aussi patchée
+  ⚠️ Ne PAS désactiver : comite-strat + deploy-prod bloquent sans YOLO
+
+DB auth : cookie JWT (pas Bearer token)
+  curl -c /tmp/sf_cookies.txt POST /api/auth/login email=admin@demo.local pw=demo-admin-2026
+  Endpoints features : POST /api/epics/{epic_id}/features
+                       POST /api/features/{feature_id}/stories
+
+review-cycle epics : toujours désactiver après restart
+  UPDATE epics SET status='planning' WHERE workflow_id='review-cycle' AND status='active';
+```
+
+### Marathon v10 — 18 projets / 7 vagues
+
+```
+Vague 1 (ideation-to-prod ×2 + game-sprint ×1) — EN COURS
+  P01 api-url-shortener  run=9cbe9c1e epic=c4dc5da2
+  P02 saas-task-manager  run=97ef1b3e epic=6b01994d
+  P07 game-space-invaders run=747a8100 epic=a954e968
+
+Vague 2 (feature-sprint ×3 + TMA + debt) — P03..P05, P11..P12
+Vague 3 (game-sprint ×2 : tetris + mobile-game) — P08..P10
+Vague 4 (docs + design-system + arch + product-lifecycle) — P15..P18
+
+Concurrence : 3-4 runs max
+Azure-OpenAI : opanai-flamme (swedencentral), 0 fallback, AZURE_DEPLOY=1
+```
+
+### Critères de validation par run
+
+```
+□ ≥3 features + ≥5 stories avec AC GIVEN/WHEN/THEN en DB
+□ Sprints avec type/team_agents/quality_score
+□ Code dans workspace (≥1 fichier métier + ≥1 test)
+□ Tests TU passent (Jest/pytest)
+□ Adversarial review VETO ou APPROVE avec score
+□ Dockerfile + docker build OK (feature-sprint+)
+□ DELIVERY_REPORT.md dans workspace
+□ Aucun run stuck >3 resumes (RTE escalade Jarvis)
+```
+
+### Patterns workflow Epic
+
+```
+ideation-to-prod (10 phases) : ideation→po-structure→comite-strat(HITL)→project-setup
+  →architecture→dev-sprint→cicd-pipeline→qa-validation→deploy-prod(HITL)→tma-handoff
+game-sprint v2 (6 phases) : game-inception→env-setup→tdd-sprint(loop)
+  →adversarial-review→feature-e2e→feature-deploy
+feature-sprint (6 phases) : feature-design→env-setup→tdd-sprint→adversarial→e2e→deploy
+```
+
+### Boucle Sprint — Enchainement Jarvis → Epic → Sprint → Feature
+
+```mermaid
+flowchart TD
+    J["🤖 Jarvis CTO\n(strat-cto)"]
+    PM["📋 Product Manager PO\n(po Laura Vidal)"]
+    RTE["🚂 RTE\n(rte Marc Delacroix)"]
+    WF["📄 Workflow YAML\nPhases séquentielles"]
+
+    J -->|"create_project\ncreate_epic + WSJF"| PM
+    PM -->|"create_feature/story\nAC GIVEN/WHEN/THEN"| RTE
+    RTE -->|"launch_epic_run"| WF
+
+    WF --> PN["Phase non-dev\n(triage, archi, deploy, QA…)\n→ 1 seul pass, pas de retry"]
+    WF --> PD["Phase dev/sprint/test\n→ boucle for sprint_num in range(1, max+1)"]
+
+    PD --> S1["Sprint 1\n• Mise en place\n• Feature MVP du backlog WSJF\n• features → in_progress"]
+    S1 --> RETRO1["Rétrospective LLM\n(auto-générée)"]
+    RETRO1 --> SN["Sprint 2..N-1\n• Features suivantes WSJF\n• Code existant injecté\n• Mémoire projet (archi/produit)"]
+    SN --> RETRO2["Rétrospective LLM\n→ injectée sprint suivant"]
+    RETRO2 --> SF["Sprint final\n• Finalisation\n• Nettoyage\n• Handoff CI/CD"]
+
+    SF -->|"✅ succès"| BREAK["break — phase complète\n(pas de sprint N+1)"]
+    SF -->|"❌ échec"| RETRY["Retry avec feedback\ncorrectif injecté"]
+    RETRY --> SN
+    SF -->|"⚠️ max épuisé\n(défaut: 20 sprints)"| CONT["continue quand même\nnon-bloquant"]
+
+    BREAK --> NEXT["Phase suivante\ndu workflow"]
+    CONT --> NEXT
+
+    style J fill:#7c3aed,color:#fff
+    style PM fill:#7c3aed,color:#fff
+    style RTE fill:#7c3aed,color:#fff
+    style WF fill:#1e1b4b,color:#c4b5fd
+    style PN fill:#1e1b4b,color:#fbbf24
+    style PD fill:#1e1b4b,color:#34d399
+    style S1 fill:#064e3b,color:#fff
+    style SN fill:#064e3b,color:#fff
+    style SF fill:#064e3b,color:#fff
+    style BREAK fill:#065f46,color:#fff
+    style CONT fill:#78350f,color:#fff
+    style RETRY fill:#7f1d1d,color:#fff
+    style NEXT fill:#1e1b4b,color:#c4b5fd
+    style RETRO1 fill:#1e3a5f,color:#bfdbfe
+    style RETRO2 fill:#1e3a5f,color:#bfdbfe
+```
+
+**Injection features par sprint :**
+- Début de chaque sprint → `product_backlog.list_features(epic_id)` trié WSJF → injecté dans le prompt système
+- Sprint 1 → features passent `pending → in_progress`
+- Mémoire projet (`category=product/architecture`) injectée depuis les phases précédentes
+- Rétrospective auto-générée après chaque sprint → injectée en contexte du sprint suivant
+
+**Limites par défaut :**
+- Phase evidence-gated (TDD sprint) : `MAX_SPRINTS_GATED=20`
+- Autres phases dev : `MAX_SPRINTS_DEV=20`
+- Override YAML : `config.max_iterations: N` (prioritaire)

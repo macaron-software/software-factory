@@ -66,6 +66,10 @@ const TAB_URLS = {
   'data-ai': '/group/data-ai', 'pi-planning': '/group/pi-planning'
 };
 
+// In-flight requests tracker — not used for actual abort (htmx doesn't expose XHR),
+// but used as a guard to avoid stacking duplicate loads.
+const _tabLoading = {};
+
 function switchTab(tab, pushState = true) {
   // Update button states
   document.querySelectorAll('.home-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
@@ -78,15 +82,30 @@ function switchTab(tab, pushState = true) {
   // Show or create this tab's panel
   let panel = document.getElementById('panel-' + tab);
   if (!panel) {
+    if (_tabLoading[tab]) return; // already loading, don't stack
+    _tabLoading[tab] = true;
+
     panel = document.createElement('div');
     panel.id = 'panel-' + tab;
     panel.className = 'home-panel';
     panel.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;height:100%;';
     panel.innerHTML = '<div class="home-loading"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Chargement…</div>';
     document.getElementById('home-tab-panels').appendChild(panel);
-    htmx.ajax('GET', TAB_URLS[tab], { target: panel, swap: 'innerHTML' });
+    htmx.ajax('GET', TAB_URLS[tab], { target: panel, swap: 'innerHTML' }).then(() => {
+      delete _tabLoading[tab];
+    }).catch(() => {
+      delete _tabLoading[tab];
+      panel.remove(); // allow retry on next click
+    });
   } else {
     panel.style.display = 'flex';
+    // Re-size any Chart.js canvases that rendered while panel was hidden
+    if (window.Chart) {
+      panel.querySelectorAll('canvas').forEach(c => {
+        const ch = Chart.getChart(c);
+        if (ch) { try { ch.resize(); } catch(e){} }
+      });
+    }
   }
 }
 

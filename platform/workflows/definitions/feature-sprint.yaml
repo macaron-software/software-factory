@@ -8,12 +8,44 @@ phases:
 - id: feature-design
   pattern_id: aggregator
   name: Feature Design
-  description: Lead + Archi définissent l'architecture de la feature. Stories, acceptance criteria, interfaces.
+  description: >
+    Lead + Archi analysent le brief et DÉCIDENT du workflow adapté.
+    RÈGLE CRITIQUE — avant tout design, évaluer la complexité :
+    • Si le brief décrit UNE fonction / UN endpoint / UN module simple (< 5 fichiers estimés)
+      → continuer en feature-sprint normalement.
+    • Si le brief décrit UN système complet (auth, API multi-routes, CRUD, microservice, etc.)
+      → émettre exactement [ESCALATE: epic-decompose] dans la réponse pour basculer
+        automatiquement vers la décomposition en Epic avec Feature Teams parallèles.
+    En cas d'escalade, ne pas écrire de code — juste [ESCALATE: epic-decompose] + 1 phrase
+    expliquant pourquoi.
+    Sinon : définir OBLIGATOIREMENT pour chaque feature :
+    1. PERSONA : qui utilise ce feature (nom, rôle, besoin concret) — pas "casual user"
+    2. USER STORIES : "En tant que [persona], je veux [action] afin de [bénéfice]"
+    3. ACCEPTANCE CRITERIA testables : conditions précises vérifiables par un test E2E
+    4. DEFINITION OF DONE : build Docker OK + tests E2E passent + screenshots capturés
+    Sans ces 4 éléments, la phase n'est pas terminée.
   gate: always
   config:
     agents:
     - system-architect-art
     dynamic_lead: true
+- id: env-setup
+  pattern_id: sequential
+  name: Environment Setup
+  description: >
+    DevOps lit le brief et détecte la stack technique (Rust/Node/Python/Go/etc.).
+    Écrit Dockerfile adapté à la stack (multi-stage si nécessaire). Attention aux versions :
+    Rust WASM nécessite rust:latest (pas 1.77), Node WASM nécessite node:20+.
+    OBLIGATOIRE — appeler docker_deploy(cwd=workspace, mission_id=...) pour vérifier que
+    le build Docker réussit réellement. Un Dockerfile "bien écrit" ne suffit PAS — il faut
+    que docker build + docker run + health check passent tous. Si docker_deploy retourne FAIL,
+    corriger les erreurs de compilation/configuration avant de passer à la suite.
+    BLOQUANT : la phase tdd-sprint ne démarre pas tant que docker_deploy ne retourne pas OK.
+    Ne jamais utiliser uniquement build() (cargo/npm natif) — toujours docker_deploy().
+  gate: always
+  config:
+    agents:
+    - ft-infra-lead
 - id: tdd-sprint
   pattern_id: loop
   name: TDD Sprint
@@ -35,7 +67,16 @@ phases:
 - id: feature-e2e
   pattern_id: parallel
   name: Tests E2E
-  description: Tests E2E API + IHM en parallèle. Smoke + journeys.
+  description: >
+    Tests E2E API + IHM en parallèle. Smoke + journeys complets.
+    OBLIGATOIRE — AVANT tout test Playwright, appeler docker_deploy(cwd=workspace, mission_id=...)
+    pour démarrer le container projet et obtenir l'URL (ex: http://127.0.0.1:9100).
+    Utiliser CETTE URL dans tous les tests (pas localhost:8080 en dur).
+    Vérifier que docker_deploy retourne OK et une URL valide avant de lancer playwright_test.
+    Si docker_deploy échoue, signaler VETO avec les logs d'erreur — ne pas lancer les tests.
+    Après les tests, prendre des screenshots avec screenshot(url=...) pour documenter les journeys.
+    Un résultat {"status":"failed","failedTests":[]} signifie que le serveur n'était PAS démarré
+    — c'est un ÉCHEC, pas un succès. Toujours vérifier status="passed" ET failedTests=[].
   gate: all_approved
   config:
     agents:
@@ -54,6 +95,12 @@ phases:
 config:
   graph:
     nodes:
+    - id: n0
+      agent_id: ft-infra-lead
+      x: 400
+      y: -80
+      label: Env Setup
+      phase: env-setup
     - id: n1
       agent_id: system-architect-art
       x: 400
@@ -103,6 +150,10 @@ config:
       label: Deploy
       phase: feature-deploy
     edges:
+    - from: n0
+      to: n1
+      label: env ready
+      color: '#a855f7'
     - from: n1
       to: n2
       label: stories

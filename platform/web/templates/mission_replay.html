@@ -30,7 +30,7 @@
 
 {% block topbar_actions %}
 <div style="display:flex;gap:0.5rem;align-items:center">
-    <a href="/epics/{{ mission_id }}" class="btn btn-sm btn-ghost">← Mission</a>
+    <a href="/epics/{{ mission_id }}" class="btn btn-sm btn-ghost">← Épic</a>
     <button class="btn btn-sm btn-primary" onclick="replayMission()">
         <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Re-lancer
     </button>
@@ -191,7 +191,7 @@ async function replayMission() {
         if (resp.ok) {
             const data = await resp.json();
             const newId = data.run_id || data.id;
-            if (newId) { window.location.href = `/missions/${newId}/replay`; return; }
+            if (newId) { window.location.href = `/epics/${newId}/replay`; return; }
         }
         alert('Erreur lors du re-lancement');
     } catch(e) { alert('Erreur: ' + e.message); }

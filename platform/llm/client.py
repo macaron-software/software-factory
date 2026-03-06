@@ -15,13 +15,14 @@ import asyncio
 import json
 import logging
 import os
-import sqlite3
 import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+
+from ..db.adapter import get_connection
 
 import httpx
 
@@ -111,6 +112,18 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,
     },
+    # WHY: opencode is an OpenAI-compatible self-hosted inference server (Go).
+    # Used on OVH demo env as primary provider; supports multiple models via /v1/models.
+    # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
+    "opencode": {
+        "name": "OpenCode (Go)",
+        "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
+        "key_env": "OPENCODE_API_KEY",
+        "models": [],  # fetched live from /v1/models; populated on first Settings load
+        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", ""),
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+    },
 }
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
@@ -119,15 +132,23 @@ _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
 _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
-# On local dev, include local-mlx or ollama in Thompson candidates if available
+# Local inference servers require explicit opt-in
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
 _ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
+_opencode_enabled = bool(
+    os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
+)
 _FALLBACK_CHAIN = [_primary] + [
     p
     for p in (
         (["local-mlx"] if _local_mlx_enabled else [])
         + (["ollama"] if _ollama_enabled else [])
-        + ["minimax", "azure-openai", "azure-ai", "openai"]
+        + (["opencode"] if _opencode_enabled else [])
+        + (
+            ["minimax", "azure-openai", "azure-ai"]
+            if not _is_azure
+            else ["azure-openai", "azure-ai"]
+        )
     )
     if p != _primary
 ]
@@ -217,6 +238,8 @@ class LLMStreamChunk:
     done: bool = False
     model: str = ""
     finish_reason: str = ""
+    tokens_in: int = 0
+    tokens_out: int = 0
 
 
 # Cost estimation: $/1M tokens (input, output) per model
@@ -228,8 +251,6 @@ _MODEL_PRICING: dict[str, tuple[float, float]] = {
     "m2.5": (0.50, 2.00),
 }
 _DEFAULT_PRICING = (1.00, 4.00)  # fallback for unknown models
-
-_USAGE_DB_PATH = Path(__file__).parent.parent.parent / "data" / "platform.db"
 
 
 class LLMClient:
@@ -815,20 +836,28 @@ class LLMClient:
                     if _rtk_now - _rtk_cache.get("ts", 0) > 60.0:
                         try:
                             from ..db.migrations import get_db as _get_db
+
                             _db = _get_db()
                             _row = _db.execute(
                                 "SELECT enabled FROM integrations WHERE id='rtk-compression'"
                             ).fetchone()
                             _db.close()
-                            _rtk_cache["enabled"] = bool(_row["enabled"]) if _row else True
+                            _rtk_cache["enabled"] = (
+                                bool(_row["enabled"]) if _row else True
+                            )
                         except Exception:
-                            _rtk_cache["enabled"] = not bool(os.environ.get("LLM_COMPRESS_DISABLED", ""))
+                            _rtk_cache["enabled"] = not bool(
+                                os.environ.get("LLM_COMPRESS_DISABLED", "")
+                            )
                         _rtk_cache["ts"] = _rtk_now
                     if _rtk_cache.get("enabled", True):
                         try:
-                            from .prompt_compressor import compress_messages as _rtk_compress
-                            _stream_messages, _stream_system, _rtk_stats = _rtk_compress(
-                                messages, system_prompt, provider=prov
+                            from .prompt_compressor import (
+                                compress_messages as _rtk_compress,
+                            )
+
+                            _stream_messages, _stream_system, _rtk_stats = (
+                                _rtk_compress(messages, system_prompt, provider=prov)
                             )
                             if _rtk_stats["savings_pct"] > 0:
                                 logger.warning(
@@ -839,7 +868,13 @@ class LLMClient:
                                     _rtk_stats["savings_pct"],
                                 )
                         except Exception as _ce:
-                            logger.debug("RTK stream compressor error (skipped): %s", _ce)
+                            logger.debug(
+                                "RTK stream compressor error (skipped): %s", _ce
+                            )
+                    _stream_tokens_in = 0
+                    _stream_tokens_out = 0
+                    _stream_accumulated = ""
+                    _stream_t0 = time.monotonic()
                     async for chunk in self._do_stream(
                         pcfg,
                         prov,
@@ -849,8 +884,37 @@ class LLMClient:
                         max_tokens,
                         _stream_system,
                     ):
+                        if chunk.delta:
+                            _stream_accumulated += chunk.delta
+                        if chunk.tokens_in:
+                            _stream_tokens_in = chunk.tokens_in
+                        if chunk.tokens_out:
+                            _stream_tokens_out = chunk.tokens_out
                         yield chunk
+                    # Estimate tokens if API didn't report them
+                    if not _stream_tokens_in:
+                        _stream_tokens_in = (
+                            sum(len(m.content or "") for m in _stream_messages) // 4
+                        )
+                    if not _stream_tokens_out:
+                        _stream_tokens_out = len(_stream_accumulated) // 4
                     self._cb_record_success(prov)
+                    self._stats["calls"] += 1
+                    self._stats["tokens_in"] += _stream_tokens_in
+                    self._stats["tokens_out"] += _stream_tokens_out
+                    # Trace streaming call for observability
+                    _stream_result = LLMResponse(
+                        content=_stream_accumulated,
+                        model=use_model,
+                        provider=prov,
+                        tokens_in=_stream_tokens_in,
+                        tokens_out=_stream_tokens_out,
+                        duration_ms=int((time.monotonic() - _stream_t0) * 1000),
+                    )
+                    self._trace(_stream_result, _stream_messages)
+                    await self._persist_usage(
+                        prov, use_model, _stream_tokens_in, _stream_tokens_out
+                    )
                     return
                 except Exception as exc:
                     err_str = repr(exc)
@@ -944,7 +1008,9 @@ class LLMClient:
         if provider == "local-mlx":
             embedded_sys = [m for m in msgs if m["role"] == "system"]
             msgs = [m for m in msgs if m["role"] != "system"]
-            all_sys = ([sys_content] if sys_content else []) + [m["content"] for m in embedded_sys]
+            all_sys = ([sys_content] if sys_content else []) + [
+                m["content"] for m in embedded_sys
+            ]
             if all_sys:
                 msgs.insert(0, {"role": "system", "content": "\n\n".join(all_sys)})
         elif sys_content:
@@ -996,15 +1062,24 @@ class LLMClient:
                     text = await resp.aread()
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
                 logger.warning("LLM stream %s/%s connected", provider, model)
+                _stream_usage: dict = {}
                 async for line in resp.aiter_lines():
                     if not line.startswith("data: "):
                         continue
                     payload = line[6:]
                     if payload.strip() == "[DONE]":
-                        yield LLMStreamChunk(delta="", done=True, model=model)
+                        yield LLMStreamChunk(
+                            delta="",
+                            done=True,
+                            model=model,
+                            tokens_in=_stream_usage.get("prompt_tokens", 0),
+                            tokens_out=_stream_usage.get("completion_tokens", 0),
+                        )
                         return
                     try:
                         data = json.loads(payload)
+                        if data.get("usage"):
+                            _stream_usage = data["usage"]
                         choices = data.get("choices") or [{}]
                         if not choices:
                             continue
@@ -1015,7 +1090,12 @@ class LLMClient:
                             yield LLMStreamChunk(delta=content, model=model)
                         if finish:
                             yield LLMStreamChunk(
-                                delta="", done=True, model=model, finish_reason=finish
+                                delta="",
+                                done=True,
+                                model=model,
+                                finish_reason=finish,
+                                tokens_in=_stream_usage.get("prompt_tokens", 0),
+                                tokens_out=_stream_usage.get("completion_tokens", 0),
                             )
                             return  # MiniMax doesn't send [DONE], exit on finish_reason
                     except json.JSONDecodeError:
@@ -1063,15 +1143,25 @@ class LLMClient:
             logger.debug("Trace recording failed: %s", exc)
 
     def available_providers(self) -> list[dict]:
-        """List providers with availability status."""
+        """List providers with availability status.
+
+        WHY: local-mlx and ollama have no_auth=True which previously caused them
+        to always appear as has_key=True in the cockpit — showing '✓ OK' even when
+        the local servers weren't running. They now require their explicit enable flag
+        (LOCAL_MLX_ENABLED / OLLAMA_ENABLED) to be considered available.
+        """
         result = []
         for pid, pcfg in _PROVIDERS.items():
-            key = self._get_api_key(pcfg)
-            has_key = (
-                bool(key and key != "no-key")
-                or not pcfg.get("key_env")
-                or pcfg.get("no_auth")
-            )
+            # Local servers: only available if explicitly enabled
+            if pid == "local-mlx":
+                has_key = bool(os.environ.get("LOCAL_MLX_ENABLED"))
+            elif pid == "ollama":
+                has_key = bool(os.environ.get("OLLAMA_ENABLED"))
+            elif pcfg.get("no_auth"):
+                has_key = True  # other no-auth providers (none currently)
+            else:
+                key = self._get_api_key(pcfg)
+                has_key = bool(key and key != "no-key")
             result.append(
                 {
                     "id": pid,
@@ -1090,8 +1180,7 @@ class LLMClient:
         """Create llm_usage table if it doesn't exist (called once lazily)."""
         if self._usage_table_ready:
             return
-        _USAGE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(str(_USAGE_DB_PATH))
+        conn = get_connection()
         try:
             conn.execute("""CREATE TABLE IF NOT EXISTS llm_usage (
                 id TEXT PRIMARY KEY,
@@ -1143,7 +1232,7 @@ class LLMClient:
 
             def _insert():
                 self._ensure_usage_table()
-                conn = sqlite3.connect(str(_USAGE_DB_PATH))
+                conn = get_connection()
                 try:
                     conn.execute(
                         "INSERT INTO llm_usage (id,ts,provider,model,tokens_in,tokens_out,"
@@ -1163,7 +1252,7 @@ class LLMClient:
 
         def _query():
             self._ensure_usage_table()
-            conn = sqlite3.connect(str(_USAGE_DB_PATH))
+            conn = get_connection()
             try:
                 cutoff = f"datetime('now', '-{days} days')"
                 by_day = conn.execute(

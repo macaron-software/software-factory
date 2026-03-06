@@ -84,6 +84,7 @@
 <div class="modal-overlay" id="userModal">
     <div class="modal-box">
         <h3 id="modalTitle">New user</h3>
+        <form onsubmit="return false">
         <input type="hidden" id="modalUserId">
         <div class="modal-field">
             <label for="modalName">Display name</label>
@@ -110,6 +111,7 @@
             <button class="btn-cancel" onclick="closeModal()">Cancel</button>
             <button class="btn-save" onclick="saveUser()">Save</button>
         </div>
+        </form>
     </div>
 </div>
 

@@ -266,3 +266,22 @@ When creating a design, provide:
 - **NEVER** ignore `prefers-reduced-motion` — respect user preferences
 - **NEVER** sacrifice readability for aesthetics — text must be readable
 - **NEVER** use tiny text (below 14px for body) or low contrast for style
+
+- **NEVER** hardcode colors as hex values — use CSS custom properties (`var(--color-primary)`)
+- **NEVER** hardcode spacing values inline — use the spacing scale tokens
+- **NEVER** use vendor prefixes without checking caniuse.com first (most are dead weight in 2026)
+- **NEVER** write fallback CSS for features with >95% browser support (grid, flex, gap, custom properties)
+- **NEVER** use inline `style=""` attributes in production HTML/JSX — all styles go in CSS/SCSS classes
+- **NEVER** add `z-index: 9999` — define a named z-index scale in your token system
+
+## CSS Clean Code Rules (enforced by adversarial.py)
+
+See `skills/clean-code.md` for the full set. CSS-specific rules:
+
+| Rule | WRONG | RIGHT |
+|------|-------|-------|
+| No `!important` | `.btn { color: red !important }` | `.page .btn { color: red }` |
+| No vendor prefix slop | `-webkit-border-radius: 4px` | `border-radius: 4px` |
+| No hardcoded hex | `color: #3b82f6` | `color: var(--color-primary)` |
+| No inline styles | `<div style="margin:24px">` | `<div class="my-6">` |
+| No fallback bloat | `display: block; display: flex` | `display: flex` |

@@ -405,10 +405,10 @@ class GitCreatePRTool(BaseTool):
                 # Auto-launch code review mission
                 try:
                     import asyncio
-                    from ..missions.store import MissionDef, get_mission_store
+                    from ..epics.store import MissionDef, get_epic_store
 
                     pr_number = pr_url.rstrip("/").split("/")[-1]
-                    ms = get_mission_store()
+                    ms = get_epic_store()
                     review_mission = MissionDef(
                         name=f"PR Review: {title[:80]}",
                         description=f"Automated code review for PR #{pr_number}",

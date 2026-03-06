@@ -351,7 +351,7 @@ html,body{height:100%;overflow:hidden}
             <button class="ws-preview-btn ws-preview-btn-icon" onclick="wsPreviewToggleMobile()" id="wsPreviewMobileBtn" title="Mobile">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
             </button>
-            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir">
+            <button class="ws-preview-btn ws-preview-btn-icon" onclick="window.open(document.getElementById('wsPreviewUrl').value,'_blank')" title="Ouvrir dans un onglet">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </button>
           </div>
@@ -1086,7 +1086,7 @@ function wsLoadToolcalls() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var items = data.items || [];
-      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez une mission pour voir les tool calls</span></div>'; return; }
+      if (!items.length) { body.innerHTML = '<div class="ws-empty-state"><span>Aucun tool call</span><span class="ws-empty-hint">Lancez un epic pour voir les tool calls</span></div>'; return; }
       var html = '<table class="ws-table"><thead><tr><th>Outil</th><th>Paramètres</th><th>Statut</th><th>Durée</th></tr></thead><tbody>';
       items.forEach(function(tc) {
         var params = ''; try { var p=JSON.parse(tc.parameters_json||'{}'); params=JSON.stringify(p).substring(0,80); } catch(e){}
@@ -1263,7 +1263,9 @@ function wsLoadPreview() { var url=document.getElementById('wsPreviewUrl').value
 function wsPreviewLoad(url) {
   if(!url) url=document.getElementById('wsPreviewUrl').value.trim(); if(!url) return;
   document.getElementById('wsPreviewEmpty').style.display='none';
-  var f=document.getElementById('wsPreviewFrame'); f.style.display=''; f.src=url;
+  var f=document.getElementById('wsPreviewFrame'); f.style.display='';
+  // Route through server-side proxy so internal ports are reachable from any browser
+  f.src='/projects/'+encodeURIComponent(_wsProjectId)+'/preview/';
 }
 function wsPreviewToggleMobile() {
   _wsPreviewMobile=!_wsPreviewMobile;
@@ -1279,7 +1281,7 @@ function wsLoadBacklog() {
     .then(function(r){ return r.json(); })
     .then(function(data) {
       var missions = data.missions || [];
-      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucune mission pour ce projet</span><span class="ws-empty-hint">Créez une mission depuis la page projet</span></div>'; return; }
+      if (!missions.length) { body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 0 2-2h2a2 2 0 0 0 2 2"/></svg><span>Aucun epic pour ce projet</span><span class="ws-empty-hint">Créez un epic depuis la page projet</span></div>'; return; }
       var html = '';
       missions.forEach(function(m) {
         var sc = m.status==='active'?'ws-badge-ok':m.status==='planning'?'ws-badge-idle':'ws-badge-err';
@@ -1320,7 +1322,7 @@ function wsLoadCompliance() {
         summary.innerHTML = '<span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> <strong>'+totalPass+'</strong> PASS</span><span style="margin-left:.5rem"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> <strong>'+totalFail+'</strong> FAIL</span><span style="margin-left:.5rem;opacity:.6">'+by.length+' agents</span>';
       }
       if (!recent.length) {
-        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'une mission avec des agents de conformité</span></div>';
+        body.innerHTML = '<div class="ws-empty-state"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span>Aucun rapport de conformité</span><span class="ws-empty-hint">Les rapports apparaîtront après l\'exécution d\'un epic avec des agents de conformité</span></div>';
         return;
       }
       var html = '<table class="ws-table"><thead><tr><th>Milestone</th><th>Agent</th><th>Verdict</th><th>Résultat</th><th>Date</th></tr></thead><tbody>';
@@ -1798,7 +1800,7 @@ function wsLoadProgress() {
     .then(function(r){ return r.json(); })
     .then(function(d) {
       if (!d.exists || !d.content) {
-        el.innerHTML = '<div class="ws-empty-state"><span>Pas de PROGRESS.md</span><span class="ws-empty-hint">Sera créé par les agents lors d\'une mission</span></div>';
+        el.innerHTML = '<div class="ws-empty-state"><span>Pas de PROGRESS.md</span><span class="ws-empty-hint">Sera créé par les agents lors d\'un epic</span></div>';
         return;
       }
       // Simple markdown → HTML (headings, bold, code blocks, lists)

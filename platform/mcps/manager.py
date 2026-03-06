@@ -18,6 +18,40 @@ from .store import MCPServer, get_mcp_store
 
 logger = logging.getLogger(__name__)
 
+# Map MCP store IDs → optional module registry IDs.
+# None = always allowed (core platform MCP, not gated by module toggle).
+_MCP_MODULE_MAP: dict[str, str | None] = {
+    "mcp-playwright": "playwright-mcp",
+    "mcp-fetch":      None,
+    "mcp-memory":     None,
+    "mcp-github":     None,
+    "mcp-solaris":    None,
+    "mcp-jira":       None,
+    "mcp-confluence": None,
+}
+
+
+def _mcp_module_enabled(mcp_id: str) -> bool:
+    """Return False if this MCP's module is explicitly disabled in settings."""
+    module_id = _MCP_MODULE_MAP.get(mcp_id)
+    if module_id is None:
+        return True  # not gated
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM settings WHERE key='enabled_modules'"
+        ).fetchone()
+        if row:
+            import json as _json
+
+            return module_id in _json.loads(row[0])
+    except Exception:
+        pass
+    # Default: playwright-mcp is builtin → enabled
+    return True
+
 # JSON-RPC message IDs
 _msg_counter = 0
 
@@ -220,6 +254,9 @@ class MCPManager:
 
     async def start(self, mcp_id: str) -> tuple[bool, str]:
         """Start an MCP server by ID."""
+        if not _mcp_module_enabled(mcp_id):
+            return False, f"MCP '{mcp_id}' is disabled — enable the module in Settings → Modules"
+
         store = get_mcp_store()
         mcp = store.get(mcp_id)
         if not mcp:

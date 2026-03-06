@@ -45,6 +45,7 @@ def get_builtin_workflows() -> list[WorkflowDef]:
                     retry_count=p.get("retry_count", 1),
                     skip_on_failure=p.get("skip_on_failure", False),
                     timeout=p.get("timeout", 0),
+                    min_complexity=p.get("min_complexity", ""),
                 ))
 
             wf = WorkflowDef(

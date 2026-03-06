@@ -470,7 +470,7 @@ CREATE TABLE agents (
 
 ### missions
 ```sql
-CREATE TABLE missions (
+CREATE TABLE epics (
     id TEXT PRIMARY KEY, project_id TEXT,
     title TEXT, prompt TEXT NOT NULL,
     status TEXT DEFAULT 'planning',
@@ -501,7 +501,7 @@ CREATE TABLE users (
 
 ## Full Table List (~30 tables)
 
-`agents`, `missions`, `mission_runs`, `run_phases`, `projects`, `sessions`,
+`agents`, `missions`, `epic_runs`, `run_phases`, `projects`, `sessions`,
 `session_messages`, `memory_entries`, `features`, `feature_deps`,
 `program_increments`, `users`, `user_sessions`, `user_project_roles`,
 `agent_scores`, `retrospectives`, `quality_reports`, `quality_snapshots`,
@@ -717,7 +717,7 @@ sf projects create "My Project" --description "..."
 """,
     },
     {
-        "slug": "missions",
+        "slug": "epics",
         "title": "Missions & SAFe",
         "category": "Projects",
         "icon": "",
@@ -2078,7 +2078,7 @@ Mission created
         -> SSE events streamed to UI
         -> Session completed/failed
     -> Workflow phase transitions
--> Mission completed
+-> Epic completed
 ```
 
 ## Session Components
@@ -2213,7 +2213,7 @@ Individual dimension reports are stored per mission run:
 ```sql
 SELECT dimension, score, notes, agent_id
 FROM quality_reports
-WHERE mission_run_id = ?;
+WHERE epic_run_id = ?;
 ```
 
 ## Quality Gate Workflow

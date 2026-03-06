@@ -3,6 +3,7 @@ Confluence sync engine — syncs mission control tabs to Confluence pages.
 Idempotent: creates or updates pages by title match.
 Tracks page IDs in `confluence_pages` DB table.
 """
+
 from __future__ import annotations
 
 import json
@@ -11,8 +12,7 @@ from datetime import datetime
 from typing import Optional
 
 from ..db.migrations import get_db
-from ..missions.store import get_mission_run_store
-from ..sessions.store import get_session_store
+from ..epics.store import get_epic_run_store
 from .client import ConfluenceClient, get_confluence_client, HOMEPAGE_ID
 from . import converter
 
@@ -32,9 +32,13 @@ class ConfluenceSyncEngine:
 
     def _ensure_hierarchy(self, mission) -> dict[str, str]:
         """Ensure page hierarchy exists, return tab → page_id mapping."""
-        project_name = getattr(mission, 'project_id', '') or "Software Factory"
-        # MissionRun uses brief, MissionDef uses name
-        epic_name = getattr(mission, 'brief', '')[:80] or getattr(mission, 'name', '') or mission.id
+        project_name = getattr(mission, "project_id", "") or "Software Factory"
+        # EpicRun uses brief, MissionDef uses name
+        epic_name = (
+            getattr(mission, "brief", "")[:80]
+            or getattr(mission, "name", "")
+            or mission.id
+        )
 
         # Create hierarchy: PROJETS / project / epic
         projets_id = self._get_or_create("PROJETS", HOMEPAGE_ID)
@@ -54,29 +58,36 @@ class ConfluenceSyncEngine:
     # ── Tab content builders ───────────────────────────────────
 
     def _m_name(self, mission) -> str:
-        return getattr(mission, 'name', '') or getattr(mission, 'brief', '')[:80]
+        return getattr(mission, "name", "") or getattr(mission, "brief", "")[:80]
 
     def _m_project(self, mission) -> str:
-        return getattr(mission, 'project_id', '') or ''
+        return getattr(mission, "project_id", "") or ""
 
     def _build_po_content(self, mission) -> str:
         """Build PO tab content (features kanban)."""
         db = get_db()
         features = db.execute(
-            "SELECT * FROM features WHERE epic_id = ? ORDER BY priority",
-            (mission.id,)
+            "SELECT * FROM features WHERE epic_id = ? ORDER BY priority", (mission.id,)
         ).fetchall()
         db.close()
 
         features_list = [dict(f) for f in features]
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-        body = converter.page_header("Product Owner — Features", self._m_name(mission),
-                                      self._m_project(mission), now)
+        body = converter.page_header(
+            "Product Owner — Features",
+            self._m_name(mission),
+            self._m_project(mission),
+            now,
+        )
 
         # Group by status
-        for status, label in [("backlog", "Backlog"), ("sprint", "Sprint"),
-                               ("in_progress", "En cours"), ("done", "Terminé")]:
+        for status, label in [
+            ("backlog", "Backlog"),
+            ("sprint", "Sprint"),
+            ("in_progress", "En cours"),
+            ("done", "Terminé"),
+        ]:
             filtered = [f for f in features_list if f.get("status") == status]
             body += f"<h2>{label} ({len(filtered)})</h2>"
             body += converter.features_to_confluence(filtered)
@@ -86,8 +97,9 @@ class ConfluenceSyncEngine:
     def _build_qa_content(self, mission, session_id: str = None) -> str:
         """Build QA tab content (test results + screenshots)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("QA — Tests & Qualité", self._m_name(mission),
-                                      self._m_project(mission), now)
+        body = converter.page_header(
+            "QA — Tests & Qualité", self._m_name(mission), self._m_project(mission), now
+        )
 
         # Get QA messages from mission sessions
         messages = self._get_phase_messages(mission.id, "qa")
@@ -103,8 +115,9 @@ class ConfluenceSyncEngine:
     def _build_archi_content(self, mission) -> str:
         """Build Architecture tab content."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("Architecture", self._m_name(mission),
-                                      self._m_project(mission), now)
+        body = converter.page_header(
+            "Architecture", self._m_name(mission), self._m_project(mission), now
+        )
 
         # Workflow graph in architecture too
         body += self._build_workflow_graph_section(mission)
@@ -115,14 +128,17 @@ class ConfluenceSyncEngine:
             body += converter.messages_to_confluence(messages, "Architecture")
 
         # Get architecture artifacts from workspace
-        body += self._get_workspace_file_content(mission, "Architecture.md", "Architecture détaillée")
+        body += self._get_workspace_file_content(
+            mission, "Architecture.md", "Architecture détaillée"
+        )
         return body
 
     def _build_wiki_content(self, mission) -> str:
         """Build Wiki/documentation tab content."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        body = converter.page_header("Wiki — Documentation", self._m_name(mission),
-                                      self._m_project(mission), now)
+        body = converter.page_header(
+            "Wiki — Documentation", self._m_name(mission), self._m_project(mission), now
+        )
 
         messages = self._get_phase_messages(mission.id, "wiki")
         if messages:
@@ -137,30 +153,35 @@ class ConfluenceSyncEngine:
     def _build_projet_content(self, mission) -> str:
         """Build Project tab content (overview, stats, workflow graph)."""
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-        m_name = getattr(mission, 'name', '') or getattr(mission, 'brief', '')[:80]
-        m_project = getattr(mission, 'project_id', '') or ''
+        m_name = getattr(mission, "name", "") or getattr(mission, "brief", "")[:80]
+        m_project = getattr(mission, "project_id", "") or ""
         body = converter.page_header("Projet — Vue d'ensemble", m_name, m_project, now)
 
-        # Mission metadata — adapt to MissionRun or MissionDef
-        m_status = getattr(mission, 'status', '')
-        if hasattr(m_status, 'value'):
+        # Mission metadata — adapt to EpicRun or MissionDef
+        m_status = getattr(mission, "status", "")
+        if hasattr(m_status, "value"):
             m_status = m_status.value
-        m_type = getattr(mission, 'type', getattr(mission, 'workflow_name', ''))
-        m_wsjf = getattr(mission, 'wsjf_score', '')
-        body += converter.info_macro("Métadonnées", (
-            f"<p>ID: <code>{mission.id}</code></p>"
-            f"<p>Status: <strong>{m_status}</strong></p>"
-            f"<p>Type: {m_type}</p>"
-            f"<p>WSJF: {m_wsjf}</p>"
-            f"<p>Créé: {mission.created_at}</p>"
-        ))
+        m_type = getattr(mission, "type", getattr(mission, "workflow_name", ""))
+        m_wsjf = getattr(mission, "wsjf_score", "")
+        body += converter.info_macro(
+            "Métadonnées",
+            (
+                f"<p>ID: <code>{mission.id}</code></p>"
+                f"<p>Status: <strong>{m_status}</strong></p>"
+                f"<p>Type: {m_type}</p>"
+                f"<p>WSJF: {m_wsjf}</p>"
+                f"<p>Créé: {mission.created_at}</p>"
+            ),
+        )
 
-        # Description & Goal (MissionDef) or Brief (MissionRun)
-        description = getattr(mission, 'description', '') or getattr(mission, 'brief', '')
+        # Description & Goal (MissionDef) or Brief (EpicRun)
+        description = getattr(mission, "description", "") or getattr(
+            mission, "brief", ""
+        )
         if description:
             body += "<h2>Description</h2>"
             body += converter.md_to_confluence(description)
-        goal = getattr(mission, 'goal', '')
+        goal = getattr(mission, "goal", "")
         if goal:
             body += "<h2>Objectif</h2>"
             body += converter.md_to_confluence(goal)
@@ -177,32 +198,40 @@ class ConfluenceSyncEngine:
 
     def _build_workflow_graph_section(self, mission) -> str:
         """Build workflow graph as a Confluence table (SVG in CDATA causes 400 errors)."""
-        wf_id = getattr(mission, 'workflow_id', '')
+        wf_id = getattr(mission, "workflow_id", "")
         if not wf_id:
             return ""
         try:
             from ..workflows.store import get_workflow_store
+
             ws = get_workflow_store()
             wf = ws.get(wf_id)
             if not wf:
                 return ""
             import json as _json
-            cfg = _json.loads(wf.config) if isinstance(wf.config, str) else (wf.config or {})
+
+            cfg = (
+                _json.loads(wf.config)
+                if isinstance(wf.config, str)
+                else (wf.config or {})
+            )
             graph = cfg.get("graph", {})
             nodes = graph.get("nodes", [])
             if not nodes:
                 return ""
 
             # Build simple table instead of SVG (Confluence-compatible)
-            rows = ['<tr><th>Agent</th><th>Role</th></tr>']
+            rows = ["<tr><th>Agent</th><th>Role</th></tr>"]
             for n in nodes:
                 label = n.get("label", n.get("id", "?"))
                 role = n.get("role", "")
-                rows.append(f'<tr><td><strong>{converter._inline(label)}</strong></td><td>{converter._inline(role)}</td></tr>')
+                rows.append(
+                    f"<tr><td><strong>{converter._inline(label)}</strong></td><td>{converter._inline(role)}</td></tr>"
+                )
 
             return (
-                f'<h2>Workflow — {converter._inline(wf.name)}</h2>'
-                f'<table><tbody>{"".join(rows)}</tbody></table>'
+                f"<h2>Workflow — {converter._inline(wf.name)}</h2>"
+                f"<table><tbody>{''.join(rows)}</tbody></table>"
             )
         except Exception as e:
             log.warning("Graph generation failed: %s", e)
@@ -211,13 +240,12 @@ class ConfluenceSyncEngine:
     def _build_screenshots_section(self, mission) -> str:
         """Find screenshots in workspace and reference them."""
         from pathlib import Path
-        from ..config import FACTORY_ROOT
 
         db = get_db()
         try:
             runs = db.execute(
-                "SELECT workspace_path FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                (mission.id,)
+                "SELECT workspace_path FROM epic_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission.id,),
             ).fetchall()
             if not runs or not runs[0]["workspace_path"]:
                 return ""
@@ -229,16 +257,16 @@ class ConfluenceSyncEngine:
         if not screenshots_dir.exists():
             return ""
 
-        images = list(screenshots_dir.glob("*.png")) + list(screenshots_dir.glob("*.jpg"))
+        images = list(screenshots_dir.glob("*.png")) + list(
+            screenshots_dir.glob("*.jpg")
+        )
         if not images:
             return ""
 
         body = "<h2>Captures d'écran</h2>"
         for img in sorted(images)[:10]:
             body += f"<p><strong>{img.name}</strong></p>"
-            body += converter.svg_to_confluence_attachment(
-                "", filename=img.name
-            )
+            body += converter.svg_to_confluence_attachment("", filename=img.name)
         return body
 
     def _upload_screenshots(self, mission, page_id: str):
@@ -248,8 +276,8 @@ class ConfluenceSyncEngine:
         db = get_db()
         try:
             runs = db.execute(
-                "SELECT workspace_path FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                (mission.id,)
+                "SELECT workspace_path FROM epic_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission.id,),
             ).fetchall()
             if not runs or not runs[0]["workspace_path"]:
                 return
@@ -274,8 +302,8 @@ class ConfluenceSyncEngine:
         try:
             # Get mission run sessions
             runs = db.execute(
-                "SELECT session_id FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                (mission_id,)
+                "SELECT session_id FROM epic_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission_id,),
             ).fetchall()
 
             if not runs or not runs[0]["session_id"]:
@@ -284,7 +312,7 @@ class ConfluenceSyncEngine:
             session_id = runs[0]["session_id"]
             messages = db.execute(
                 "SELECT * FROM messages WHERE session_id = ? ORDER BY timestamp",
-                (session_id,)
+                (session_id,),
             ).fetchall()
 
             result = []
@@ -293,21 +321,28 @@ class ConfluenceSyncEngine:
                 content = m.get("content", "")
                 sender = (m.get("from_agent", "") or "").lower()
                 # Filter by tab relevance
-                if tab_keyword == "qa" and any(k in sender for k in ["qa", "test", "quality"]):
+                if tab_keyword == "qa" and any(
+                    k in sender for k in ["qa", "test", "quality"]
+                ):
                     result.append(m)
-                elif tab_keyword == "archi" and any(k in sender for k in ["archi", "lead", "sre"]):
+                elif tab_keyword == "archi" and any(
+                    k in sender for k in ["archi", "lead", "sre"]
+                ):
                     result.append(m)
-                elif tab_keyword == "wiki" and any(k in sender for k in ["tech_writer", "doc", "wiki"]):
+                elif tab_keyword == "wiki" and any(
+                    k in sender for k in ["tech_writer", "doc", "wiki"]
+                ):
                     result.append(m)
-                elif tab_keyword == "po" and any(k in sender for k in ["product", "po", "owner"]):
+                elif tab_keyword == "po" and any(
+                    k in sender for k in ["product", "po", "owner"]
+                ):
                     result.append(m)
 
             return result[-20:]  # Last 20 messages max
         finally:
             db.close()
 
-    def _get_workspace_file_content(self, mission, filename: str,
-                                     heading: str) -> str:
+    def _get_workspace_file_content(self, mission, filename: str, heading: str) -> str:
         """Read a file from workspace and convert to Confluence format."""
         from pathlib import Path
         from ..config import FACTORY_ROOT
@@ -316,8 +351,8 @@ class ConfluenceSyncEngine:
         db = get_db()
         try:
             runs = db.execute(
-                "SELECT workspace_path FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                (mission.id,)
+                "SELECT workspace_path FROM epic_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission.id,),
             ).fetchall()
             if runs and runs[0]["workspace_path"]:
                 ws_path = Path(runs[0]["workspace_path"])
@@ -337,8 +372,8 @@ class ConfluenceSyncEngine:
         db = get_db()
         try:
             runs = db.execute(
-                "SELECT phases_json, status FROM mission_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
-                (mission_id,)
+                "SELECT phases_json, status FROM epic_runs WHERE id = ? ORDER BY created_at DESC LIMIT 1",
+                (mission_id,),
             ).fetchall()
             if not runs:
                 return "<p><em>No execution.</em></p>"
@@ -353,23 +388,27 @@ class ConfluenceSyncEngine:
             if not phases:
                 return "<p><em>No phase executed.</em></p>"
 
-            rows = ['<tr><th>Phase</th><th>Status</th><th>Résumé</th></tr>']
+            rows = ["<tr><th>Phase</th><th>Status</th><th>Résumé</th></tr>"]
             for p in phases:
                 name = p.get("name", p.get("phase_id", "?"))
                 status = p.get("status", "pending")
                 summary = p.get("summary", "")[:200]
-                color = {"completed": "Green", "running": "Blue",
-                         "failed": "Red", "skipped": "Grey"}.get(status, "Grey")
+                color = {
+                    "completed": "Green",
+                    "running": "Blue",
+                    "failed": "Red",
+                    "skipped": "Grey",
+                }.get(status, "Grey")
                 rows.append(
-                    f'<tr><td>{name}</td>'
+                    f"<tr><td>{name}</td>"
                     f'<td><ac:structured-macro ac:name="status">'
                     f'<ac:parameter ac:name="colour">{color}</ac:parameter>'
                     f'<ac:parameter ac:name="title">{status}</ac:parameter>'
-                    f'</ac:structured-macro></td>'
-                    f'<td>{converter._inline(summary)}</td></tr>'
+                    f"</ac:structured-macro></td>"
+                    f"<td>{converter._inline(summary)}</td></tr>"
                 )
 
-            return f'<h2>Phases</h2><table><tbody>{"".join(rows)}</tbody></table>'
+            return f"<h2>Phases</h2><table><tbody>{''.join(rows)}</tbody></table>"
         finally:
             db.close()
 
@@ -385,7 +424,7 @@ class ConfluenceSyncEngine:
                    ON CONFLICT(mission_id, tab) DO UPDATE SET
                    confluence_page_id = excluded.confluence_page_id,
                    last_synced = CURRENT_TIMESTAMP""",
-                (mission_id, tab, page_id)
+                (mission_id, tab, page_id),
             )
             db.commit()
         finally:
@@ -397,7 +436,7 @@ class ConfluenceSyncEngine:
         try:
             row = db.execute(
                 "SELECT confluence_page_id FROM confluence_pages WHERE mission_id = ? AND tab = ?",
-                (mission_id, tab)
+                (mission_id, tab),
             ).fetchone()
             return row["confluence_page_id"] if row else None
         finally:
@@ -407,16 +446,17 @@ class ConfluenceSyncEngine:
 
     def sync_tab(self, mission_id: str, tab: str) -> dict:
         """Sync a single tab to Confluence. Returns {page_id, url, status}."""
-        # Try mission_runs first (active executions), fallback to missions (SAFe backlog)
-        run_store = get_mission_run_store()
+        # Try epic_runs first (active executions), fallback to missions (SAFe backlog)
+        run_store = get_epic_run_store()
         mission = run_store.get(mission_id)
         mission_name = ""
         if mission:
             mission_name = (mission.brief or "")[:80]
         else:
             try:
-                from ..missions.store import get_mission_store
-                ms = get_mission_store()
+                from ..epics.store import get_epic_store
+
+                ms = get_epic_store()
                 m = ms.get_mission(mission_id)
                 if m:
                     mission = m
@@ -445,8 +485,13 @@ class ConfluenceSyncEngine:
         body = builder(mission)
 
         # Title format: "Epic Name — Tab"
-        tab_labels = {"po": "PO — Features", "qa": "QA — Tests",
-                       "archi": "Architecture", "wiki": "Wiki", "projet": "Projet"}
+        tab_labels = {
+            "po": "PO — Features",
+            "qa": "QA — Tests",
+            "archi": "Architecture",
+            "wiki": "Wiki",
+            "projet": "Projet",
+        }
         title = f"{mission_name or mission_id} — {tab_labels.get(tab, tab)}"
 
         # Create or update
@@ -481,16 +526,22 @@ class ConfluenceSyncEngine:
         try:
             rows = db.execute(
                 "SELECT tab, confluence_page_id, last_synced FROM confluence_pages WHERE mission_id = ?",
-                (mission_id,)
+                (mission_id,),
             ).fetchall()
-            return {r["tab"]: {"page_id": r["confluence_page_id"],
-                               "last_synced": r["last_synced"]} for r in rows}
+            return {
+                r["tab"]: {
+                    "page_id": r["confluence_page_id"],
+                    "last_synced": r["last_synced"],
+                }
+                for r in rows
+            }
         finally:
             db.close()
 
 
 # Singleton
 _engine: Optional[ConfluenceSyncEngine] = None
+
 
 def get_sync_engine() -> ConfluenceSyncEngine:
     global _engine

@@ -1,5 +1,5 @@
 """
-MCP Store — CRUD for external MCP server registry.
+MCP Store — PostgreSQL CRUD for external MCP server registry.
 ====================================================
 Persists in `mcps` table. Each MCP has:
 - command (python3 -m mcp_server_fetch, npx @playwright/mcp, etc.)
@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Optional
 
-from ..config import DB_PATH
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,7 @@ class MCPServer:
     updated_at: str = ""
 
 
-def _row_to_mcp(row: sqlite3.Row) -> MCPServer:
+def _row_to_mcp(row) -> MCPServer:
     return MCPServer(
         id=row["id"],
         name=row["name"],
@@ -56,13 +54,11 @@ def _row_to_mcp(row: sqlite3.Row) -> MCPServer:
 class MCPStore:
     """SQLite CRUD for MCP server registry."""
 
-    def __init__(self, db_path: Path = DB_PATH):
-        self._db_path = db_path
+    def __init__(self):
+        pass
 
-    def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _conn(self):
+        return get_connection()
 
     def _ensure_table(self, conn) -> None:
         conn.execute("""
@@ -249,6 +245,76 @@ BUILTIN_MCPS = [
         is_builtin=True,
     ),
     MCPServer(
+        id="mcp-chrome-devtools",
+        name="Chrome DevTools",
+        description=(
+            "Performance auditing via Chrome DevTools Protocol: Lighthouse scores, "
+            "Core Web Vitals (LCP/CLS/INP), CDP performance traces, network analysis, "
+            "console error inspection. Use for perf audits and debugging — "
+            "playwright-mcp handles automation, this handles diagnostics."
+        ),
+        # SOURCE: Chrome DevTools team (Google) — https://github.com/ChromeDevTools/chrome-devtools-mcp
+        # WHY: playwright-mcp is automation-oriented. chrome-devtools-mcp adds perf/debug:
+        #   lighthouse_audit, performance_start/stop_trace, performance_analyze_insight,
+        #   list_network_requests, list_console_messages. Enables a perf-auditor agent
+        #   with the same tooling a developer has in Chrome DevTools.
+        command="npx",
+        args=[
+            "chrome-devtools-mcp@latest",
+            "--headless",
+        ],
+        env={},
+        tools=[
+            {
+                "name": "lighthouse_audit",
+                "description": "Run Lighthouse audit — perf/a11y/best-practices/SEO scores + suggestions",
+                "params": {"url": "string", "categories": "array of strings"},
+            },
+            {
+                "name": "performance_start_trace",
+                "description": "Start CDP performance trace (CPU, rendering, CWV)",
+                "params": {},
+            },
+            {
+                "name": "performance_stop_trace",
+                "description": "Stop trace and return LCP/CLS/INP Core Web Vitals",
+                "params": {},
+            },
+            {
+                "name": "performance_analyze_insight",
+                "description": "Drill into a specific perf insight from trace results",
+                "params": {"insight": "string"},
+            },
+            {
+                "name": "list_network_requests",
+                "description": "List all network requests with timing and status",
+                "params": {},
+            },
+            {
+                "name": "list_console_messages",
+                "description": "List console errors/warnings/logs from current page",
+                "params": {"level": "string: error|warning|all"},
+            },
+            {
+                "name": "navigate_page",
+                "description": "Navigate to a URL",
+                "params": {"url": "string"},
+            },
+            {
+                "name": "emulate",
+                "description": "Emulate mobile device with network throttling",
+                "params": {"device": "string", "network": "string"},
+            },
+            {
+                "name": "take_screenshot",
+                "description": "Take a screenshot of the current page",
+                "params": {},
+            },
+        ],
+        status="stopped",
+        is_builtin=True,
+    ),
+    MCPServer(
         id="mcp-github",
         name="GitHub",
         description="GitHub issues, PRs, code search, actions via gh CLI.",
@@ -344,6 +410,89 @@ BUILTIN_MCPS = [
                 "name": "solaris_stats",
                 "description": "Get overall Solaris statistics",
                 "params": {},
+            },
+        ],
+        status="available",
+        is_builtin=True,
+    ),
+    MCPServer(
+        id="mcp-jira",
+        name="Jira (La Poste)",
+        description="Accès anonymisé au Jira La Poste (RGPD Art. 25). Recherche JQL, backlog, sprints, épics.",
+        command="python3",
+        args=["-m", "mcp_jira.server"],
+        env={
+            "JIRA_URL": "https://jira.net.extra.laposte.fr/jira",
+            "JIRA_PROJECT": "VELIGO",
+        },
+        tools=[
+            {
+                "name": "jira_search",
+                "description": "Recherche JQL (résultats anonymisés)",
+                "params": {
+                    "jql": "string (required)",
+                    "project": "string",
+                    "max_results": "int",
+                },
+            },
+            {
+                "name": "jira_get_issue",
+                "description": "Détails d'une issue par clé (anonymisé)",
+                "params": {"issue_key": "string (required)"},
+            },
+            {
+                "name": "jira_get_backlog",
+                "description": "Backlog du projet (anonymisé)",
+                "params": {"project": "string", "max_results": "int"},
+            },
+            {
+                "name": "jira_get_sprints",
+                "description": "Sprints actifs/futurs du board",
+                "params": {"board_id": "string"},
+            },
+            {
+                "name": "jira_get_epics",
+                "description": "Épics du projet (anonymisé)",
+                "params": {"project": "string"},
+            },
+        ],
+        status="available",
+        is_builtin=True,
+    ),
+    MCPServer(
+        id="mcp-confluence",
+        name="Confluence (La Poste)",
+        description="Accès anonymisé au Confluence La Poste (RGPD Art. 25). Pages, espaces, recherche full-text.",
+        command="python3",
+        args=["-m", "mcp_confluence.server"],
+        env={
+            "CONFLUENCE_URL": "https://wiki.net.extra.laposte.fr/confluence",
+            "CONFLUENCE_SPACE": "VELIGO",
+        },
+        tools=[
+            {
+                "name": "confluence_get_page",
+                "description": "Contenu d'une page par ID ou titre (anonymisé)",
+                "params": {"page_id": "string", "title": "string", "space": "string"},
+            },
+            {
+                "name": "confluence_search",
+                "description": "Recherche full-text CQL (anonymisé)",
+                "params": {
+                    "query": "string (required)",
+                    "space": "string",
+                    "max_results": "int",
+                },
+            },
+            {
+                "name": "confluence_get_space",
+                "description": "Pages d'un espace (anonymisé)",
+                "params": {"space": "string", "max_results": "int"},
+            },
+            {
+                "name": "confluence_get_children",
+                "description": "Sous-pages d'une page",
+                "params": {"page_id": "string (required)"},
             },
         ],
         status="available",

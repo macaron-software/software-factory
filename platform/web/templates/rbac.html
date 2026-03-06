@@ -99,7 +99,7 @@
 <div id="panel-members" class="rbac-panel active">
 
     <!-- Invite bar -->
-    <div class="invite-bar">
+    <form onsubmit="return false" class="invite-bar">
         <svg style="width:14px;height:14px;stroke:var(--text-secondary);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0"><use href="#icon-mail"/></svg>
         <input type="email" id="inv-email" placeholder="Email address to invite…">
         <input type="text" id="inv-name" placeholder="Display name" style="max-width:160px">
@@ -114,7 +114,7 @@
             <svg style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><use href="#icon-plus"/></svg>
             Invite
         </button>
-    </div>
+    </form>
     <div id="invite-err"></div>
     <div id="inv-success"></div>
 

@@ -79,7 +79,8 @@ async def list_api_keys():
 def _table_exists(conn, table: str) -> bool:
     return (
         conn.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+            "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=%s",
+            (table,),
         ).fetchone()
         is not None
     )

@@ -41,6 +41,35 @@ SANDBOX_TIMEOUT = int(os.environ.get("SANDBOX_TIMEOUT", "300"))
 SANDBOX_MEMORY = os.environ.get("SANDBOX_MEMORY", "512m")
 SANDBOX_WORKSPACE_VOLUME = os.environ.get("SANDBOX_WORKSPACE_VOLUME", "")
 
+# Landlock filesystem sandbox — auto-detect binary path
+# Binary lives at platform/tools/sandbox/landlock-runner (built from Rust source)
+_LANDLOCK_DEFAULT = os.path.join(
+    os.path.dirname(__file__), "sandbox", "landlock-runner"
+)
+_LANDLOCK_PATH = os.environ.get("LANDLOCK_RUNNER_PATH", "") or (
+    _LANDLOCK_DEFAULT if os.path.isfile(_LANDLOCK_DEFAULT) else ""
+)
+
+
+def _landlock_enabled() -> bool:
+    """Runtime check — respects config override (can be toggled in /settings)."""
+    env_val = os.environ.get("LANDLOCK_ENABLED", "auto").lower()
+    if env_val in ("false", "0", "no"):
+        return False
+    if not _LANDLOCK_PATH:
+        return False
+    # Check platform config for runtime toggle
+    try:
+        from ..config import get_config
+
+        cfg = get_config()
+        return cfg.security.landlock_enabled
+    except Exception:
+        return True  # default on if binary exists
+
+
+LANDLOCK_ENABLED = _landlock_enabled()
+
 # RTK proxy — auto-detect unless explicitly set
 _RTK_ENABLED_ENV = os.environ.get("RTK_ENABLED", "auto").lower()
 _RTK_PATH = os.environ.get("RTK_PATH", "") or shutil.which("rtk") or ""
@@ -307,15 +336,30 @@ class SandboxExecutor:
         timeout: int,
         env: Optional[dict],
     ) -> SandboxResult:
-        """Run command directly on host (no sandbox), with RTK proxy for token compression."""
+        """Run command, optionally wrapped in Landlock filesystem sandbox + RTK proxy."""
+        import shlex
+
         run_env = None
         if env:
             run_env = {**os.environ, **env}
 
         # Apply RTK proxy — rewrites known commands (git, grep, pytest, etc.)
-        # to compress stdout before it reaches the LLM agent context
         proxied = _rtk_wrap(command)
         was_proxied = proxied != command
+
+        # Apply Landlock sandbox when available and workspace is set
+        # Wraps: landlock-runner <workspace> -- sh -c '<command>'
+        # Result: filesystem access restricted to workspace + system RO paths
+        effective_workspace = cwd or self.workspace
+        landlock_applied = False
+        if _landlock_enabled() and effective_workspace and effective_workspace != ".":
+            ws_abs = os.path.abspath(effective_workspace)
+            if os.path.isdir(ws_abs):
+                proxied = f"{_LANDLOCK_PATH} {shlex.quote(ws_abs)} -- sh -c {shlex.quote(proxied)}"
+                landlock_applied = True
+                logger.debug(
+                    "Landlock sandbox: workspace=%s cmd=%s", ws_abs, command[:80]
+                )
 
         try:
             r = subprocess.run(
@@ -323,7 +367,7 @@ class SandboxExecutor:
                 shell=True,
                 capture_output=True,
                 text=True,
-                cwd=cwd or self.workspace,
+                cwd=effective_workspace,
                 timeout=timeout,
                 env=run_env,
                 preexec_fn=lambda: os.nice(10),  # low CPU priority
@@ -333,7 +377,7 @@ class SandboxExecutor:
                 stdout=r.stdout[-5000:],
                 stderr=r.stderr[-3000:],
                 returncode=r.returncode,
-                sandboxed=False,
+                sandboxed=landlock_applied,
                 rtk_proxied=was_proxied,
             )
         except subprocess.TimeoutExpired:

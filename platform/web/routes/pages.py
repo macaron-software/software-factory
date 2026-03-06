@@ -18,6 +18,8 @@ from .helpers import (
     _templates,
 )
 
+log = logging.getLogger(__name__)
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -92,23 +94,23 @@ async def dashboard_page(request: Request):
 async def portfolio_page(request: Request):
     """Portfolio dashboard — tour de contrôle DSI (legacy view)."""
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...epics.store import get_epic_run_store, get_epic_store
     from ...projects.manager import get_project_store
 
     project_store = get_project_store()
     agent_store = get_agent_store()
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
 
     all_projects = project_store.list_all()
     all_agents = agent_store.list_all()
-    all_missions = mission_store.list_missions(limit=500)
+    all_missions = epic_store.list_missions(limit=500)
     all_runs = run_store.list_runs(limit=500)
-    # Index runs by parent_mission_id for quick lookup
+    # Index runs by parent_epic_id for quick lookup
     runs_by_mission: dict = {}
     for r in all_runs:
-        if r.parent_mission_id:
-            runs_by_mission[r.parent_mission_id] = r
+        if r.parent_epic_id:
+            runs_by_mission[r.parent_epic_id] = r
         runs_by_mission[r.id] = r  # Also index by run id (same as mission id)
 
     strategic_raw = [
@@ -169,7 +171,7 @@ async def portfolio_page(request: Request):
         p_active = 0
         mission_cards = []
         for m in p_missions:
-            # Compute progress from mission_run phases (live data)
+            # Compute progress from epic_run phases (live data)
             run = runs_by_mission.get(m.id)
             if run and run.phases:
                 t_total = len(run.phases)
@@ -185,7 +187,7 @@ async def portfolio_page(request: Request):
                 )
             else:
                 # Fallback to task-based stats
-                stats = mission_store.mission_stats(m.id)
+                stats = epic_store.mission_stats(m.id)
                 t_total = stats.get("total", 0)
                 t_done = stats.get("done", 0)
                 current_name = ""
@@ -246,7 +248,7 @@ async def portfolio_page(request: Request):
                 "name": p.name,
                 "factory_type": p.factory_type,
                 "description": p.description or (p.vision or "")[:100],
-                "missions": mission_cards,
+                "epics": mission_cards,
                 "mission_count": len(p_missions),
                 "active_mission_count": p_active,
                 "team_avatars": team_avatars,
@@ -287,7 +289,7 @@ async def portfolio_page(request: Request):
             )
             run_status = run.status.value
         else:
-            stats = mission_store.mission_stats(m.id)
+            stats = epic_store.mission_stats(m.id)
             t_total = stats.get("total", 0)
             t_done = stats.get("done", 0)
             current_name = ""
@@ -397,11 +399,11 @@ async def backlog_page(request: Request, tab: str = "backlog"):
 async def pi_board_page(request: Request):
     """PI Board — epics + missions list with creation."""
     from ...db.migrations import get_db
-    from ...missions.store import get_mission_run_store
+    from ...epics.store import get_epic_run_store
     from ...projects.manager import get_project_store
     from ...workflows.store import get_workflow_store
 
-    runs = get_mission_run_store().list_runs(limit=500)
+    runs = get_epic_run_store().list_runs(limit=500)
     projects = get_project_store().list_all()
     workflows = get_workflow_store().list_all()
     active_ids = {mid for mid, t in _active_mission_tasks.items() if not t.done()}
@@ -412,7 +414,7 @@ async def pi_board_page(request: Request):
         rows = db.execute("""
             SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
                    p.name as project_name
-            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            FROM epics m LEFT JOIN projects p ON m.project_id = p.id
             WHERE m.type = 'epic'
             ORDER BY m.created_at DESC
         """).fetchall()
@@ -467,7 +469,7 @@ async def pi_board_page(request: Request):
         tma_rows = db.execute("""
             SELECT m.id, m.project_id, m.name, m.description, m.goal, m.status, m.type, m.created_at,
                    p.name as project_name
-            FROM missions m LEFT JOIN projects p ON m.project_id = p.id
+            FROM epics m LEFT JOIN projects p ON m.project_id = p.id
             WHERE m.type IN ('bug', 'debt', 'security')
             ORDER BY
                 CASE m.type WHEN 'security' THEN 0 WHEN 'bug' THEN 1 WHEN 'debt' THEN 2 ELSE 3 END,
@@ -547,7 +549,7 @@ async def workflows_evolution(request: Request):
     runs = [
         dict(r)
         for r in db.execute(
-            "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
+            "SELECT * FROM evolution_runs ORDER BY completed_at DESC LIMIT 20"
         ).fetchall()
     ]
     db.close()
@@ -590,7 +592,1064 @@ async def workflows_evolution(request: Request):
     )
 
 
-@router.get("/ceremonies", response_class=HTMLResponse)
+# ── AC_PHASES matching dashboard definition ──────────────────────────────────
+_AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
+
+_AC_PROJECTS = [
+    {
+        "id": "ac-hello-html",
+        "name": "Hello HTML",
+        "tier": "simple",
+        "tier_label": "Simple",
+        "tech": ["html", "css", "nginx"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-hello-vue",
+        "name": "Hello Vue.js",
+        "tier": "simple-compile",
+        "tier_label": "Simple + Compile",
+        "tech": ["vue", "vite", "node"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-fullstack-rs",
+        "name": "Fullstack Rust+Svelte",
+        "tier": "medium",
+        "tier_label": "Medium Fullstack",
+        "tech": ["rust", "sveltekit", "postgres"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-docusign",
+        "name": "DocuSign Clone",
+        "tier": "complex",
+        "tier_label": "Complex",
+        "tech": ["react", "fastapi", "postgres"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-ecommerce",
+        "name": "E-Commerce + Solaris",
+        "tier": "enterprise",
+        "tier_label": "Enterprise",
+        "tech": ["nextjs", "solaris", "stripe", "pg"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-game-threejs",
+        "name": "Jeu Three.js",
+        "tier": "game-simple",
+        "tier_label": "Jeu Simple",
+        "tech": ["threejs", "js", "webgl", "vite"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-game-native",
+        "name": "Jeu Natif Compilé",
+        "tier": "game-complex",
+        "tier_label": "Jeu Compilé",
+        "tech": ["rust", "sdl2", "opengl", "cargo"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-migration-php",
+        "name": "Migration PHP → FastAPI",
+        "tier": "migration",
+        "tier_label": "Migration",
+        "tech": ["php", "fastapi", "postgres", "alembic"],
+        "max_cycles": 20,
+    },
+]
+
+
+def _ac_get_db():
+    """Get DB connection — uses platform DB adapter (SQLite or PG via DATABASE_URL)."""
+    from ...db.migrations import get_db
+
+    return get_db()
+
+
+def _ac_ensure_tables(conn) -> None:
+    """Create AC tables if they don't exist (idempotent)."""
+    is_pg = False
+    try:
+        from ...db.adapter import is_postgresql
+
+        is_pg = is_postgresql()
+    except Exception:
+        pass
+
+    if is_pg:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS ac_cycles (
+                id SERIAL PRIMARY KEY, project_id TEXT NOT NULL, cycle_num INTEGER NOT NULL,
+                git_sha TEXT, platform_run_id TEXT, status TEXT DEFAULT 'pending',
+                phase_scores TEXT DEFAULT '{}', total_score INTEGER DEFAULT 0,
+                defect_count INTEGER DEFAULT 0, fix_commit TEXT, fix_summary TEXT,
+                adversarial_scores TEXT DEFAULT '{}', traceability_score INTEGER DEFAULT 0,
+                ga_fitness REAL DEFAULT 0, rl_reward REAL DEFAULT 0,
+                started_at TEXT, completed_at TEXT, UNIQUE(project_id, cycle_num))""",
+            """CREATE TABLE IF NOT EXISTS ac_project_state (
+                project_id TEXT PRIMARY KEY, current_cycle INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle', current_run_id TEXT,
+                total_score_avg REAL DEFAULT 0, last_git_sha TEXT,
+                ci_status TEXT DEFAULT 'unknown', started_at TEXT, updated_at TEXT)""",
+            """CREATE TABLE IF NOT EXISTS ac_adversarial (
+                id SERIAL PRIMARY KEY, project_id TEXT NOT NULL, cycle_num INTEGER NOT NULL,
+                dimension TEXT NOT NULL, score INTEGER DEFAULT 0, verdict TEXT DEFAULT 'pending',
+                findings TEXT DEFAULT '[]', checked_at TEXT,
+                UNIQUE(project_id, cycle_num, dimension))""",
+        ]
+    else:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS ac_cycles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
+                cycle_num INTEGER NOT NULL, git_sha TEXT, platform_run_id TEXT,
+                status TEXT DEFAULT 'pending', phase_scores TEXT DEFAULT '{}',
+                total_score INTEGER DEFAULT 0, defect_count INTEGER DEFAULT 0,
+                fix_commit TEXT, fix_summary TEXT,
+                adversarial_scores TEXT DEFAULT '{}', traceability_score INTEGER DEFAULT 0,
+                ga_fitness REAL DEFAULT 0, rl_reward REAL DEFAULT 0,
+                started_at TEXT, completed_at TEXT, UNIQUE(project_id, cycle_num))""",
+            """CREATE TABLE IF NOT EXISTS ac_project_state (
+                project_id TEXT PRIMARY KEY, current_cycle INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle', current_run_id TEXT,
+                total_score_avg REAL DEFAULT 0, last_git_sha TEXT,
+                ci_status TEXT DEFAULT 'unknown', started_at TEXT, updated_at TEXT)""",
+            """CREATE TABLE IF NOT EXISTS ac_adversarial (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
+                cycle_num INTEGER NOT NULL, dimension TEXT NOT NULL,
+                score INTEGER DEFAULT 0, verdict TEXT DEFAULT 'pending',
+                findings TEXT DEFAULT '[]', checked_at TEXT,
+                UNIQUE(project_id, cycle_num, dimension))""",
+        ]
+    try:
+        for stmt in stmts:
+            conn.execute(stmt)
+        conn.commit()
+        # Idempotent column additions
+        for alter in [
+            "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'",
+            "ALTER TABLE ac_cycles ADD COLUMN traceability_score INTEGER DEFAULT 0",
+            "ALTER TABLE ac_cycles ADD COLUMN rl_reward REAL DEFAULT 0",
+            "ALTER TABLE ac_cycles ADD COLUMN veto_count INTEGER DEFAULT 0",
+            "ALTER TABLE ac_project_state ADD COLUMN next_cycle_hint TEXT",
+            "ALTER TABLE ac_project_state ADD COLUMN skill_eval_pending TEXT",
+            "ALTER TABLE ac_project_state ADD COLUMN convergence_status TEXT DEFAULT 'cold_start'",
+        ]:
+            try:
+                conn.execute(alter)
+                conn.commit()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
+@router.get("/workflows/improvement", response_class=HTMLResponse)
+async def workflows_improvement(request: Request):
+    """Partial: Amélioration Continue — project cards + cycle history."""
+    import json as _json
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            states = {
+                r["project_id"]: dict(r)
+                for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
+            }
+        except Exception:
+            states = {}
+        try:
+            adv = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT dimension, score, verdict, findings FROM ac_adversarial "
+                    "WHERE project_id = (SELECT project_id FROM ac_project_state ORDER BY updated_at DESC LIMIT 1) "
+                    "ORDER BY score ASC LIMIT 24"
+                ).fetchall()
+            ]
+        except Exception:
+            adv = []
+        try:
+            first_id = _AC_PROJECTS[0]["id"] if _AC_PROJECTS else None
+            cycles_raw = (
+                conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                    (first_id,),
+                ).fetchall()
+                if first_id
+                else []
+            )
+        except Exception:
+            cycles_raw = []
+        conn.close()
+        return states, adv, cycles_raw
+
+    states, adv, cycles_raw = await asyncio.to_thread(_load)
+
+    projects = []
+    for p in _AC_PROJECTS:
+        s = states.get(p["id"], {})
+        projects.append(
+            {
+                **p,
+                "current_cycle": s.get("current_cycle", 0),
+                "status": s.get("status", "idle"),
+                "total_score_avg": s.get("total_score_avg", 0),
+            }
+        )
+
+    cycles = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        try:
+            adv_raw = row.get("adversarial_scores") or "{}"
+            row["adversarial_scores"] = _json.loads(adv_raw) if isinstance(adv_raw, str) else adv_raw
+        except Exception:
+            row["adversarial_scores"] = {}
+        cycles.append(row)
+
+    avg_cycle = (
+        sum(p["current_cycle"] for p in projects) / len(projects) if projects else 0
+    )
+
+    return _templates(request).TemplateResponse(
+        "partials/workflows_improvement.html",
+        {
+            "request": request,
+            "projects": projects,
+            "cycles": cycles,
+            "adversarial": adv,
+            "phases": _AC_PHASES,
+            "avg_cycle": avg_cycle,
+        },
+    )
+
+
+@router.get("/workflows/improvement/cycles/{project_id}", response_class=HTMLResponse)
+async def workflows_improvement_cycles(request: Request, project_id: str):
+    """HTMX fragment: cycle table for a given project."""
+    import json as _json
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            rows = conn.execute(
+                "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            rows = []
+        conn.close()
+        return rows
+
+    cycles_raw = await asyncio.to_thread(_load)
+    cycles = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        try:
+            adv_raw = row.get("adversarial_scores") or "{}"
+            row["adversarial_scores"] = _json.loads(adv_raw) if isinstance(adv_raw, str) else adv_raw
+        except Exception:
+            row["adversarial_scores"] = {}
+        cycles.append(row)
+
+    return _templates(request).TemplateResponse(
+        "partials/workflows_improvement_cycles.html",
+        {"request": request, "cycles": cycles, "phases": _AC_PHASES},
+    )
+
+
+@router.post("/api/improvement/start/{project_id}")
+async def api_improvement_start(project_id: str):
+    """Launch an AC improvement cycle for a project via the platform workflow engine."""
+    import time as _time
+    import uuid
+    import subprocess
+    from fastapi.responses import JSONResponse
+
+    # Validate project_id
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    # Determine next cycle number
+    def _get_next_cycle():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            row = conn.execute(
+                "SELECT current_cycle FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            cycle_num = (row["current_cycle"] if row else 0) + 1
+        except Exception:
+            cycle_num = 1
+        conn.close()
+        return cycle_num
+
+    cycle_num = await asyncio.to_thread(_get_next_cycle)
+
+    # Build mission brief for the workflow
+    proj = next(p for p in _AC_PROJECTS if p["id"] == project_id)
+    brief = (
+        f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
+        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n\n"
+        f"Cycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
+        f"Objectif : score > 80/100, 0 défauts critiques, traçabilité 100%.\n"
+        f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections.\n"
+        f"Workflow : ac-improvement-cycle"
+    )
+
+    try:
+        from ...workflows.store import get_workflow_store
+        from ...models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+        from ...epics.store import MissionDef, get_epic_store as _get_epic_store, get_epic_run_store
+        from ...sessions.store import MessageDef, SessionDef, get_session_store
+        from ...agents.loop import get_loop_manager
+        from ...config import DATA_DIR
+
+        wf = get_workflow_store().get("ac-improvement-cycle")
+        if not wf:
+            return JSONResponse(
+                {"error": "Workflow ac-improvement-cycle not found — server restart needed?"},
+                status_code=500,
+            )
+
+        # Build phase runs from workflow definition
+        phases = [
+            PhaseRun(
+                phase_id=wp.id,
+                phase_name=wp.name,
+                pattern_id=wp.pattern_id,
+                status=PhaseStatus.PENDING,
+            )
+            for wp in wf.phases
+        ]
+
+        mission_id = uuid.uuid4().hex[:8]
+
+        # Create workspace with git repo
+        workspace_root = DATA_DIR / "workspaces" / mission_id
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
+        subprocess.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=str(workspace_root), capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
+        (workspace_root / "README.md").write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
+        (workspace_root / ".gitignore").write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n")
+        subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit — AC workspace"], cwd=str(workspace_root), capture_output=True)
+
+        orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
+        mission = EpicRun(
+            id=mission_id,
+            workflow_id="ac-improvement-cycle",
+            workflow_name=wf.name,
+            brief=brief,
+            status=EpicStatus.RUNNING,
+            phases=phases,
+            project_id=project_id,
+            workspace_path=str(workspace_root),
+            cdp_agent_id=orchestrator_id,
+        )
+        run_store = get_epic_run_store()
+        run_store.create(mission)
+
+        # Also create Epic record in missions table for backlog tracking
+        try:
+            epic = MissionDef(
+                id=mission_id,
+                project_id=project_id,
+                name=f"AC {proj['name']} — Cycle {cycle_num}",
+                description=brief,
+                goal=f"Score > 80/100, 0 défauts critiques — cycle {cycle_num}/20",
+                status="active",
+                type="improvement",
+                workflow_id="ac-improvement-cycle",
+                config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
+            )
+            await asyncio.to_thread(_get_epic_store().create_mission, epic)
+        except Exception as _e:
+            logger.warning("AC: could not create epic record: %s", _e)
+
+        # Create session and start orchestrator
+        session_store = get_session_store()
+        session_id = uuid.uuid4().hex[:8]
+        session_store.create(SessionDef(id=session_id, name=f"AC: {wf.name}", project_id=project_id, status="active"))
+        mission.session_id = session_id
+        run_store.update(mission)
+        session_store.add_message(MessageDef(
+            session_id=session_id, from_agent="user", to_agent=orchestrator_id,
+            message_type="instruction", content=brief,
+        ))
+
+        mgr = get_loop_manager()
+        try:
+            await mgr.start_agent(orchestrator_id, session_id, project_id, str(workspace_root))
+        except Exception as _ae:
+            logger.error("AC: Failed to start agent: %s", _ae)
+
+        # Auto-launch orchestrator pipeline
+        try:
+            from .epics.execution import _launch_orchestrator
+            await _launch_orchestrator(mission_id)
+        except Exception as _le:
+            logger.warning("AC: orchestrator auto-launch: %s", _le)
+
+        # Update project state
+        def _update_state():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                conn.execute(
+                    "INSERT INTO ac_project_state (project_id, current_cycle, status, current_run_id, updated_at)"
+                    " VALUES (?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET"
+                    " current_cycle=excluded.current_cycle, status=excluded.status,"
+                    " current_run_id=excluded.current_run_id, updated_at=excluded.updated_at",
+                    (project_id, cycle_num, "running", mission_id, _time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+                )
+                conn.commit()
+            except Exception:
+                pass
+            conn.close()
+
+        await asyncio.to_thread(_update_state)
+        return JSONResponse(
+            {"run_id": mission_id, "cycle_num": cycle_num, "project_id": project_id,
+             "mission_url": f"/missions/{mission_id}/control"}
+        )
+
+    except Exception as exc:
+        logger.exception("AC start error: %s", exc)
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.post("/api/improvement/inject-cycle")
+async def api_improvement_inject_cycle(request: Request):
+    """Record a completed AC cycle — called by ac-cicd-agent after CI/CD."""
+    import time
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    project_id = body.get("project_id")
+    cycle_num = int(body.get("cycle_num", 0))
+    if not project_id or not cycle_num:
+        return JSONResponse(
+            {"error": "project_id and cycle_num required"}, status_code=400
+        )
+
+    git_sha = body.get("git_sha", "")
+    status = body.get("status", "completed")
+    phase_scores = body.get("phase_scores", {})
+    total_score = int(body.get("total_score", 0))
+    defect_count = int(body.get("defect_count", 0))
+    fix_summary = body.get("fix_summary", "")
+    adversarial_scores = body.get("adversarial_scores", {})
+    traceability_score = int(body.get("traceability_score", 0))
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _write():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            conn.execute(
+                "INSERT INTO ac_cycles (project_id, cycle_num, git_sha, status, phase_scores,"
+                " total_score, defect_count, fix_summary, adversarial_scores, traceability_score,"
+                " started_at, completed_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+                " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
+                " git_sha=excluded.git_sha, status=excluded.status, phase_scores=excluded.phase_scores,"
+                " total_score=excluded.total_score, defect_count=excluded.defect_count,"
+                " fix_summary=excluded.fix_summary, adversarial_scores=excluded.adversarial_scores,"
+                " traceability_score=excluded.traceability_score, completed_at=excluded.completed_at",
+                (
+                    project_id,
+                    cycle_num,
+                    git_sha,
+                    status,
+                    _json.dumps(phase_scores)
+                    if isinstance(phase_scores, dict)
+                    else phase_scores,
+                    total_score,
+                    defect_count,
+                    fix_summary,
+                    _json.dumps(adversarial_scores)
+                    if isinstance(adversarial_scores, dict)
+                    else adversarial_scores,
+                    traceability_score,
+                    now,
+                    now,
+                ),
+            )
+            # Update project state average score
+            conn.execute(
+                "INSERT INTO ac_project_state (project_id, current_cycle, status, total_score_avg,"
+                " last_git_sha, ci_status, updated_at)"
+                " VALUES (?,?,?,?,?,?,?)"
+                " ON CONFLICT(project_id) DO UPDATE SET"
+                " current_cycle=MAX(current_cycle, excluded.current_cycle),"
+                " status=CASE WHEN excluded.status='completed' THEN 'idle' ELSE excluded.status END,"
+                " last_git_sha=excluded.last_git_sha, ci_status=excluded.ci_status,"
+                " total_score_avg=("
+                "   SELECT AVG(total_score) FROM ac_cycles WHERE project_id=? AND total_score > 0"
+                " ), updated_at=excluded.updated_at",
+                (
+                    project_id,
+                    cycle_num,
+                    status,
+                    total_score,
+                    git_sha,
+                    "green" if status == "completed" else "red",
+                    now,
+                    project_id,
+                ),
+            )
+            conn.commit()
+        except Exception as e:
+            conn.close()
+            raise e
+        conn.close()
+
+    try:
+        await asyncio.to_thread(_write)
+
+        # ── Intelligence feedback loop (async, non-blocking) ──────────────────
+        async def _run_intelligence():
+            try:
+                from ...ac.reward import ac_reward_from_cycle, ac_rl_state
+                from ...ac.convergence import (
+                    ac_convergence_check,
+                    ac_check_skill_eval_trigger,
+                    ac_intervention_plan,
+                )
+
+                # Build cycle dict for reward computation
+                cycle_data = {
+                    "total_score": total_score,
+                    "adversarial_scores": adversarial_scores
+                    if isinstance(adversarial_scores, dict)
+                    else {},
+                    "traceability_score": traceability_score,
+                    "defect_count": defect_count,
+                    "veto_count": int(body.get("veto_count", 0)),
+                }
+
+                # Load previous cycle for regression detection
+                def _load_prev():
+                    conn2 = _ac_get_db()
+                    try:
+                        row = conn2.execute(
+                            "SELECT total_score FROM ac_cycles WHERE project_id=? AND cycle_num=?",
+                            (project_id, cycle_num - 1),
+                        ).fetchone()
+                        return dict(row) if row else None
+                    except Exception:
+                        return None
+                    finally:
+                        conn2.close()
+
+                prev_cycle = await asyncio.to_thread(_load_prev)
+                reward = ac_reward_from_cycle(cycle_data, prev_cycle)
+
+                # ── 1. RL: record experience ──────────────────────────────────
+                proj_meta = next((p for p in _AC_PROJECTS if p["id"] == project_id), {})
+                tier = proj_meta.get("tier", "simple")
+                state = ac_rl_state(
+                    project_id, cycle_num, total_score, defect_count, tier
+                )
+                next_state = ac_rl_state(
+                    project_id,
+                    cycle_num + 1,
+                    total_score,
+                    defect_count,
+                    tier,
+                )
+                try:
+                    from ...agents.rl_policy import get_rl_policy
+
+                    rl = get_rl_policy()
+                    rl.record_experience(
+                        mission_id=body.get(
+                            "platform_run_id", f"ac-{project_id}-{cycle_num}"
+                        ),
+                        state_dict=state,
+                        action="keep",
+                        reward=reward,
+                        next_state_dict=next_state,
+                    )
+
+                    # Persist reward back to cycle row
+                    def _update_reward():
+                        conn_r = _ac_get_db()
+                        try:
+                            conn_r.execute(
+                                "UPDATE ac_cycles SET rl_reward=? WHERE project_id=? AND cycle_num=?",
+                                (reward, project_id, cycle_num),
+                            )
+                        except Exception:
+                            pass
+                        finally:
+                            conn_r.close()
+
+                    await asyncio.to_thread(_update_reward)
+
+                    # Get recommendation for next cycle
+                    rec = rl.recommend(
+                        mission_id=f"ac-{project_id}-next",
+                        phase_id="ac-tdd-sprint",
+                        state_dict=next_state,
+                    )
+                    if rec.get("fired"):
+                        # Store RL hint in ac_project_state
+                        def _store_hint():
+                            import json as _j
+
+                            conn3 = _ac_get_db()
+                            try:
+                                conn3.execute(
+                                    "UPDATE ac_project_state SET next_cycle_hint=? WHERE project_id=?",
+                                    (_j.dumps(rec), project_id),
+                                )
+                            except Exception:
+                                pass
+                            finally:
+                                conn3.close()
+
+                        await asyncio.to_thread(_store_hint)
+                        log.info(
+                            "AC RL hint for %s cycle %d: %s (confidence=%.2f)",
+                            project_id,
+                            cycle_num + 1,
+                            rec["action"],
+                            rec["confidence"],
+                        )
+                except Exception as e:
+                    log.debug("AC RL feedback error: %s", e)
+
+                # ── 2. Convergence detection ──────────────────────────────────
+                def _load_scores():
+                    conn4 = _ac_get_db()
+                    try:
+                        rows = conn4.execute(
+                            "SELECT total_score FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                            (project_id,),
+                        ).fetchall()
+                        return [r["total_score"] for r in rows]
+                    except Exception:
+                        return []
+                    finally:
+                        conn4.close()
+
+                all_scores = await asyncio.to_thread(_load_scores)
+                if all_scores:
+                    conv = ac_convergence_check(all_scores)
+                    # intervention plan is logged; GA/skill-eval triggers follow
+                    ac_intervention_plan(conv["status"], project_id)
+                    log.info(
+                        "AC convergence %s: %s → %s (reward=%.3f)",
+                        project_id,
+                        conv["status"],
+                        conv["recommendation"],
+                        reward,
+                    )
+
+                    # Trigger GA evolution on plateau
+                    if conv["status"] == "plateau" and len(all_scores) >= 5:
+                        try:
+                            from ...agents.evolution import GAEngine
+
+                            def _ga_evolve():
+                                GAEngine().evolve(
+                                    "ac-improvement-cycle", generations=20
+                                )
+
+                            asyncio.ensure_future(asyncio.to_thread(_ga_evolve))
+                            log.info(
+                                "AC: triggered GA evolution for %s (plateau)",
+                                project_id,
+                            )
+                        except Exception as e:
+                            log.debug("AC GA trigger error: %s", e)
+
+                    # Skill eval trigger check
+                    eval_triggers = ac_check_skill_eval_trigger(cycle_num, {})
+                    if eval_triggers:
+                        log.info(
+                            "AC: skill eval triggered at cycle %d for: %s",
+                            cycle_num,
+                            eval_triggers,
+                        )
+
+                        # Store in ac_project_state for the next cycle inception to read
+                        def _store_eval_trigger():
+                            import json as _j
+
+                            conn5 = _ac_get_db()
+                            try:
+                                conn5.execute(
+                                    "UPDATE ac_project_state SET skill_eval_pending=? WHERE project_id=?",
+                                    (_j.dumps(eval_triggers), project_id),
+                                )
+                            except Exception:
+                                pass
+                            finally:
+                                conn5.close()
+
+                        await asyncio.to_thread(_store_eval_trigger)
+
+            except Exception as e:
+                log.debug("AC intelligence loop error: %s", e)
+
+        asyncio.ensure_future(_run_intelligence())
+
+        return JSONResponse(
+            {"ok": True, "project_id": project_id, "cycle_num": cycle_num}
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.get("/api/improvement/project/{project_id}")
+async def api_improvement_project_state(project_id: str):
+    """
+    Return current AC project state including RL hint, convergence, skill eval pending.
+    Called by ac-architect at the start of each cycle to get intelligence context.
+    """
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from ...ac.convergence import ac_convergence_check
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state_row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
+            ).fetchone()
+            cycles = conn.execute(
+                "SELECT cycle_num, total_score, defect_count, adversarial_scores, rl_reward "
+                "FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            state_row = None
+            cycles = []
+        finally:
+            conn.close()
+        return state_row, [dict(c) for c in cycles]
+
+    state_row, cycles = await asyncio.to_thread(_load)
+
+    scores = [c["total_score"] for c in cycles]
+    conv = (
+        ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
+    )
+
+    state = dict(state_row) if state_row else {}
+
+    # Parse JSON fields
+    for field in ("next_cycle_hint", "skill_eval_pending"):
+        raw = state.get(field)
+        if raw and isinstance(raw, str):
+            try:
+                state[field] = _json.loads(raw)
+            except Exception:
+                pass
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "current_cycle": state.get("current_cycle", 0),
+            "status": state.get("status", "idle"),
+            "total_score_avg": state.get("total_score_avg", 0),
+            "convergence": conv,
+            "next_cycle_hint": state.get("next_cycle_hint"),  # RL recommendation
+            "skill_eval_pending": state.get(
+                "skill_eval_pending"
+            ),  # skills needing eval
+            "last_git_sha": state.get("last_git_sha"),
+            "cycle_count": len(cycles),
+            "recent_scores": scores[-5:],
+        }
+    )
+
+
+@router.get("/api/improvement/scores/{project_id}")
+async def api_improvement_scores(project_id: str):
+    """Return aggregated intelligence metrics for the improvement dashboard."""
+    from fastapi.responses import JSONResponse
+    from ...ac.convergence import ac_convergence_check
+    from ...ac.skill_thompson import ac_skill_stats
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            cycles = conn.execute(
+                "SELECT cycle_num, total_score, defect_count, rl_reward, "
+                "adversarial_scores, traceability_score "
+                "FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            cycles = []
+        finally:
+            conn.close()
+        return [dict(c) for c in cycles]
+
+    cycles = await asyncio.to_thread(_load)
+    scores = [c["total_score"] for c in cycles]
+    rewards = [c.get("rl_reward", 0.0) for c in cycles]
+    conv = (
+        ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
+    )
+
+    # Thompson stats for AC skills
+    skill_stats = {}
+    for skill in [
+        "ac-architect",
+        "ac-codex",
+        "ac-adversarial",
+        "ac-qa-agent",
+        "ac-cicd-agent",
+    ]:
+        stats = await asyncio.to_thread(ac_skill_stats, skill, project_id)
+        if stats:
+            skill_stats[skill] = stats
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "cycles": cycles,
+            "convergence": conv,
+            "avg_reward": round(sum(rewards) / len(rewards), 3) if rewards else 0.0,
+            "skill_stats": skill_stats,
+        }
+    )
+
+
+# ── Skills Health API ──────────────────────────────────────────────────────────
+# WHY: Surfaces skill eval coverage + pass rates to the ART/Skills Health tab.
+# Based on philschmid.de/testing-skills — every skill ships with eval_cases.
+# Graduation rule: pass_rate == 1.0 → regression mode (model likely absorbed skill).
+# Retirement: skill passes every run without being loaded → retire it from library.
+
+def _skill_eval_ensure_table(conn) -> None:
+    """Idempotent — create skill_eval_runs if not exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_eval_runs (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_id  TEXT    NOT NULL,
+            ran_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            cases_total  INTEGER DEFAULT 0,
+            cases_passed INTEGER DEFAULT 0,
+            pass_rate    REAL,
+            verdict      TEXT,
+            notes        TEXT
+        )
+    """)
+    conn.commit()
+
+
+def _parse_eval_cases_count(content: str) -> int:
+    """Count eval_cases entries in YAML frontmatter of a skill markdown file.
+    Supports both `- input:` (philschmid style) and `- id:` / `- prompt:` styles.
+    """
+    if not content or "eval_cases:" not in content:
+        return 0
+    in_front = False
+    in_eval = False
+    count = 0
+    for line in content.splitlines():
+        if line.strip() == "---":
+            in_front = not in_front
+            if not in_front:
+                break
+            continue
+        if not in_front:
+            continue
+        if line.strip() == "eval_cases:":
+            in_eval = True
+            continue
+        if in_eval:
+            # Stop counting if we hit another top-level key (no leading spaces)
+            if line and not line[0].isspace() and not line.startswith("-"):
+                in_eval = False
+                continue
+            stripped = line.strip()
+            # Count list items that start a new case: '- input:', '- id:', '- prompt:'
+            if stripped.startswith("- input:") or stripped.startswith("- id:") or stripped.startswith("- prompt:"):
+                count += 1
+    return count
+
+
+def _load_local_skills_fs():
+    """
+    Load local platform skills directly from filesystem (not DB).
+    WHY: DB has 1300+ GitHub skills that don't have eval_cases; local skill .md files
+    are the source of truth for the Skills Health board.
+    Returns list of (skill_id, skill_name, eval_cases_count).
+    """
+    from ...config import LEGACY_SKILLS_DIR
+    results = []
+    skills_dir = LEGACY_SKILLS_DIR
+    if not skills_dir.exists():
+        return results
+    for path in sorted(skills_dir.glob("*.md")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        # Extract name from frontmatter or first heading
+        name = path.stem
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("name:"):
+                name = stripped[5:].strip().strip('"')
+                break
+            if stripped.startswith("# "):
+                name = stripped[2:].strip()
+                break
+        n_cases = _parse_eval_cases_count(text)
+        results.append({"id": path.stem, "name": name, "eval_cases": n_cases})
+    return results
+
+
+@router.get("/api/skills/eval")
+async def api_skills_eval_coverage():
+    """
+    Aggregate skill eval coverage stats.
+    WHY: ART Skills Health tab KPIs — total, coverage%, passing, run.
+    Reads from filesystem (not DB) so local skills with eval_cases are always current.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _skill_eval_ensure_table(conn)
+        try:
+            runs = conn.execute(
+                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
+                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
+            ).fetchall()
+        finally:
+            conn.close()
+        return {r["skill_id"]: dict(r) for r in runs}
+
+    runs = await asyncio.to_thread(_load)
+    skills = await asyncio.to_thread(_load_local_skills_fs)
+
+    total = len(skills)
+    with_evals = [s for s in skills if s["eval_cases"] > 0]
+    run_set = set(runs.keys())
+    passing_count = sum(
+        1 for s in with_evals
+        if runs.get(s["id"], {}).get("pass_rate") is not None
+        and runs[s["id"]]["pass_rate"] >= 0.8
+    )
+    without_evals = [s["name"] for s in skills if s["eval_cases"] == 0]
+
+    return JSONResponse({
+        "total": total,
+        "coverage_pct": round(len(with_evals) / total * 100) if total else 0,
+        "passing": passing_count,
+        "run": len([s for s in with_evals if s["id"] in run_set]),
+        "without_evals": without_evals[:50],
+    })
+
+
+@router.get("/api/skills/list")
+async def api_skills_list():
+    """
+    Per-skill eval status list.
+    WHY: ART Skills Health table — shows eval_cases count, pass rate, last run.
+    Returns JSON array (not object) for direct .filter() use on frontend.
+    Reads from filesystem so local skills with eval_cases are always current.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _skill_eval_ensure_table(conn)
+        try:
+            runs = conn.execute(
+                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
+                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
+            ).fetchall()
+        finally:
+            conn.close()
+        return {r["skill_id"]: dict(r) for r in runs}
+
+    runs = await asyncio.to_thread(_load)
+    skills = await asyncio.to_thread(_load_local_skills_fs)
+
+    result = []
+    for s in skills:
+        run_info = runs.get(s["id"], {})
+        pass_rate = run_info.get("pass_rate")
+        verdict = run_info.get("verdict")
+        if pass_rate is not None and pass_rate >= 1.0:
+            verdict = "regression"
+        result.append({
+            "id": s["id"],
+            "name": s["name"],
+            "has_evals": s["eval_cases"] > 0,
+            "eval_cases": s["eval_cases"],
+            "pass_rate": pass_rate,
+            "verdict": verdict,
+            "ran_at": run_info.get("ran_at"),
+        })
+
+    return JSONResponse(result)
+
+
+@router.get("/api/skills/eval/history")
+async def api_skills_eval_history():
+    """
+    Recent skill-eval mission runs history.
+    WHY: Skills Health Amélioration tab — shows past cycles launched.
+    Returns last 20 missions with workflow_id=skill-eval.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        try:
+            # missions table: id, name, status, created_at, config_json
+            rows = conn.execute(
+                "SELECT id, name, status, created_at, config_json FROM missions "
+                "WHERE workflow_id='skill-eval' OR config_json LIKE '%skill-eval%' "
+                "ORDER BY created_at DESC LIMIT 20"
+            ).fetchall()
+        except Exception:
+            try:
+                rows = conn.execute(
+                    "SELECT id, name, status, created_at FROM missions "
+                    "ORDER BY created_at DESC LIMIT 5"
+                ).fetchall()
+            except Exception:
+                rows = []
+        finally:
+            conn.close()
+        return [dict(r) for r in rows]
+
+    runs = await asyncio.to_thread(_load)
+    return JSONResponse({"runs": runs})
+
+
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""
     from starlette.responses import RedirectResponse
@@ -786,8 +1845,11 @@ async def ops_page(request: Request):
 @router.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     import json as _json
+    import os
+    import socket
 
     from ...config import get_config
+    from ...db.adapter import is_postgresql
     from ...db.migrations import get_db
     from ...llm.providers import list_providers
 
@@ -807,6 +1869,20 @@ async def settings_page(request: Request):
         integrations = []
     finally:
         db.close()
+
+    # Distributed infra status (read-only, shown in General tab)
+    infra = {
+        "db_type": "postgresql" if is_postgresql() else "sqlite",
+        "redis_url": os.environ.get("REDIS_URL") or "",
+        "node_id": os.environ.get("SF_NODE_ID")
+        or os.environ.get("HOSTNAME")
+        or socket.gethostname(),
+        "drain_timeout": int(os.environ.get("SF_DRAIN_TIMEOUT_S", "30")),
+        "pg_dsn": (os.environ.get("PG_DSN") or "")[:40]
+        + ("…" if len(os.environ.get("PG_DSN", "")) > 40 else ""),
+        "infisical": bool(os.environ.get("INFISICAL_TOKEN")),
+    }
+
     return _templates(request).TemplateResponse(
         "settings.html",
         {
@@ -815,6 +1891,7 @@ async def settings_page(request: Request):
             "config": cfg,
             "providers": list_providers(),
             "integrations": integrations,
+            "infra": infra,
         },
     )
 
@@ -823,7 +1900,7 @@ async def settings_page(request: Request):
 async def save_orchestrator_settings(request: Request):
     """Save mission concurrency + backpressure + worker_nodes settings and apply them live."""
     from ...config import get_config, save_config
-    from ..helpers import get_mission_semaphore
+    from .helpers import get_mission_semaphore
 
     body = await request.json()
     cfg = get_config()
@@ -897,6 +1974,40 @@ async def save_orchestrator_settings(request: Request):
     }
 
 
+@router.get("/api/settings/security")
+async def get_security_settings():
+    """Return current security settings + Landlock status."""
+    import os as _os
+
+    from ...config import get_config
+    from ...tools.sandbox import _LANDLOCK_DEFAULT, _LANDLOCK_PATH, _landlock_enabled
+
+    cfg = get_config()
+    binary_exists = bool(_LANDLOCK_PATH) and _os.path.isfile(_LANDLOCK_PATH)
+    binary_path = _LANDLOCK_PATH or _LANDLOCK_DEFAULT
+    return {
+        "landlock_enabled": cfg.security.landlock_enabled,
+        "landlock_active": _landlock_enabled(),
+        "landlock_binary_found": binary_exists,
+        "landlock_binary_path": binary_path,
+        "sandbox_enabled": _os.environ.get("SANDBOX_ENABLED", "false").lower()
+        in ("true", "1", "yes"),
+    }
+
+
+@router.post("/api/settings/security")
+async def save_security_settings(request: Request):
+    """Toggle security settings (Landlock, etc.)."""
+    from ...config import get_config, save_config
+
+    body = await request.json()
+    cfg = get_config()
+    if "landlock_enabled" in body:
+        cfg.security.landlock_enabled = bool(body["landlock_enabled"])
+    save_config(cfg)
+    return {"ok": True, "landlock_enabled": cfg.security.landlock_enabled}
+
+
 # ── Admin Users ──────────────────────────────────────────────────
 
 
@@ -946,16 +2057,16 @@ async def metier_page(request: Request):
     from datetime import timedelta
 
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_run_store
+    from ...epics.store import get_epic_run_store
     from ...sessions.store import get_session_store
     from ...workflows.store import get_workflow_store
 
     wf_store = get_workflow_store()
     session_store = get_session_store()
     agent_store = get_agent_store()
-    mission_store = get_mission_run_store()
+    epic_store = get_epic_run_store()
 
-    all_missions = mission_store.list_runs(limit=500)
+    all_missions = epic_store.list_runs(limit=500)
     all_sessions = session_store.list_all(limit=200)
     all_agents = agent_store.list_all()
     all_workflows = wf_store.list_all()
@@ -1180,17 +2291,17 @@ async def product_line_page(request: Request):
     """Product Line Manager — produits, roadmap, milestones, DORA."""
     from ...metrics.dora import get_dora_metrics
     from ...missions.product import get_product_backlog
-    from ...missions.store import get_mission_run_store, get_mission_store
+    from ...epics.store import get_epic_run_store, get_epic_store
     from ...projects.manager import LEAN_VALUES, get_project_store
 
     project_store = get_project_store()
-    mission_store = get_mission_store()
-    run_store = get_mission_run_store()
+    epic_store = get_epic_store()
+    run_store = get_epic_run_store()
     backlog = get_product_backlog()
     dora_engine = get_dora_metrics()
 
     all_projects = project_store.list_all()
-    all_missions = mission_store.list_missions()
+    all_missions = epic_store.list_missions()
     all_runs = run_store.list_runs(limit=200)
 
     # Group missions by project
@@ -1199,7 +2310,7 @@ async def product_line_page(request: Request):
         pid = m.project_id or "default"
         missions_by_project.setdefault(pid, []).append(m)
 
-    # Group mission_runs by project
+    # Group epic_runs by project
     runs_by_project: dict[str, list] = {}
     for r in all_runs:
         pid = r.project_id or "default"
@@ -1253,7 +2364,7 @@ async def product_line_page(request: Request):
                 }
             )
 
-        # Also include mission_runs as epics
+        # Also include epic_runs as epics
         for r in proj_runs:
             epic_name = r.brief.split(" - ")[0] if " - " in r.brief else r.brief[:50]
             done_phases = (
@@ -1400,15 +2511,15 @@ async def product_line_page(request: Request):
 async def product_page(request: Request):
     """Product backlog — Epic → Feature → User Story hierarchy."""
     from ...missions.product import get_product_backlog
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...projects.manager import get_project_store
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
     backlog = get_product_backlog()
     project_store = get_project_store()
 
     all_projects = project_store.list_all()
-    all_missions = mission_store.list_missions()
+    all_missions = epic_store.list_missions()
     filter_project = request.query_params.get("project", "")
 
     if filter_project:
@@ -1551,12 +2662,16 @@ async def analytics_page(request: Request):
 def _get_deploy_url(project_id: str) -> str:
     """Try to find deployed URL for a project."""
     import json as _json
+
     try:
         from ...db.migrations import get_db
+
         db = get_db()
         for table in ("projects", "project_missions"):
             try:
-                row = db.execute(f"SELECT config_json FROM {table} WHERE id=?", (project_id,)).fetchone()
+                row = db.execute(
+                    f"SELECT config_json FROM {table} WHERE id=?", (project_id,)
+                ).fetchone()
                 if row:
                     cfg = _json.loads(row["config_json"] or "{}")
                     url = cfg.get("deploy_url") or cfg.get("result_deploy_url", "")
@@ -1575,6 +2690,7 @@ async def annotation_studio(project_id: str, request: Request):
     templates = _templates(request)
     try:
         from ...projects.manager import get_project_store
+
         proj = get_project_store().get(project_id)
     except Exception:
         proj = None
@@ -1600,12 +2716,14 @@ async def annotation_studio(project_id: str, request: Request):
 async def annotation_proxy(project_id: str, path: str, request: Request):
     """HTTP proxy that injects annotation overlay script into the project's deployed app."""
     import httpx
-    from fastapi.responses import StreamingResponse, Response as FResponse
+    from fastapi.responses import Response as FResponse
 
     try:
         deploy_url = _get_deploy_url(project_id)
         if not deploy_url:
-            return HTMLResponse("<h1>No deployed URL for this project</h1>", status_code=404)
+            return HTMLResponse(
+                "<h1>No deployed URL for this project</h1>", status_code=404
+            )
 
         target = deploy_url.rstrip("/") + "/" + path
         qs = str(request.url.query)
@@ -1644,16 +2762,33 @@ async def annotation_proxy(project_id: str, path: str, request: Request):
             html = html.replace("href='/", f"href='/annotate/{project_id}/proxy/")
             html = html.replace("src='/", f"src='/annotate/{project_id}/proxy/")
 
-            resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in (
-                "x-frame-options", "content-security-policy", "content-length",
-                "transfer-encoding", "content-encoding",
-            )}
-            return HTMLResponse(content=html, status_code=resp.status_code, headers=resp_headers)
+            resp_headers = {
+                k: v
+                for k, v in resp.headers.items()
+                if k.lower()
+                not in (
+                    "x-frame-options",
+                    "content-security-policy",
+                    "content-length",
+                    "transfer-encoding",
+                    "content-encoding",
+                )
+            }
+            return HTMLResponse(
+                content=html, status_code=resp.status_code, headers=resp_headers
+            )
 
         # Pass through non-HTML responses
-        resp_headers = {k: v for k, v in resp.headers.items() if k.lower() not in (
-            "x-frame-options", "content-security-policy", "transfer-encoding",
-        )}
+        resp_headers = {
+            k: v
+            for k, v in resp.headers.items()
+            if k.lower()
+            not in (
+                "x-frame-options",
+                "content-security-policy",
+                "transfer-encoding",
+            )
+        }
         return FResponse(
             content=resp.content,
             status_code=resp.status_code,

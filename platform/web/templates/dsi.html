@@ -9,7 +9,7 @@
 {% endif %}
 {% endfor %}
 <a href="/epics?action=new" class="btn btn-ghost">
-    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Mission
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Épic
 </a>
 {% endblock %}
 
@@ -133,7 +133,7 @@
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(52,211,153,.15)"><svg style="color:var(--green)"><use href="#icon-activity"/></svg></div>
-        <div><div class="dsi-kpi-value">{{ active_missions }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
+        <div><div class="dsi-kpi-value">{{ active_epics }}</div><div class="dsi-kpi-label">{{ _("in_progress") }}</div></div>
     </div>
     <div class="dsi-kpi">
         <div class="dsi-kpi-icon" style="background:rgba(59,130,246,.15)"><svg style="color:var(--blue)"><use href="#icon-check"/></svg></div>
@@ -414,6 +414,7 @@ document.addEventListener('htmx:afterRequest', function(evt) {
 </div>
 
 <script>
+(function() {
 const agents = {{ strategic_agents | tojson }};
 function esc(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
 
@@ -451,5 +452,8 @@ function closeAgentPopover() {
     document.getElementById('agentOverlay').classList.remove('open');
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAgentPopover(); });
+window.showAgentPopover = showAgentPopover;
+window.closeAgentPopover = closeAgentPopover;
+})();
 </script>
 {% endblock %}

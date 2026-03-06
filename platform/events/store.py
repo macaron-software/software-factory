@@ -11,15 +11,13 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
+from ..db.adapter import get_connection
 
-DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "platform.db"
+logger = logging.getLogger(__name__)
 
 # Event types
 MISSION_STARTED = "mission.started"
@@ -44,16 +42,13 @@ INCIDENT_RESOLVED = "incident.resolved"
 
 
 class EventStore:
-    """Append-only event log backed by SQLite."""
+    """Append-only event log backed by PostgreSQL."""
 
-    def __init__(self, db_path: Path = DB_PATH):
-        self._db_path = db_path
+    def __init__(self):
         self._ensure_table()
 
-    def _conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(str(self._db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _conn(self):
+        return get_connection()
 
     def _ensure_table(self):
         conn = self._conn()
@@ -123,7 +118,13 @@ class EventStore:
                 ),
             )
             conn.commit()
-            logger.debug("Event %s: %s entity=%s/%s", event_id, event_type, entity_type, entity_id)
+            logger.debug(
+                "Event %s: %s entity=%s/%s",
+                event_id,
+                event_type,
+                entity_type,
+                entity_id,
+            )
             return event_id
         finally:
             conn.close()
@@ -200,7 +201,9 @@ class EventStore:
         where = " AND ".join(conditions) if conditions else "1=1"
         conn = self._conn()
         try:
-            return conn.execute(f"SELECT COUNT(*) FROM events WHERE {where}", params).fetchone()[0]
+            return conn.execute(
+                f"SELECT COUNT(*) FROM events WHERE {where}", params
+            ).fetchone()[0]
         finally:
             conn.close()
 
@@ -221,7 +224,7 @@ class EventStore:
             conn.close()
 
     @staticmethod
-    def _row_to_dict(row: sqlite3.Row) -> dict:
+    def _row_to_dict(row) -> dict:
         d = dict(row)
         if "data" in d and isinstance(d["data"], str):
             try:

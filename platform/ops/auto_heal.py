@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
 
+from ..db.adapter import get_connection
+
 logger = logging.getLogger(__name__)
 
 # ── Configuration ────────────────────────────────────────────────────
@@ -34,6 +36,9 @@ ENABLED = os.environ.get("AUTOHEAL_ENABLED", "1") == "1"
 
 # Severity ordering for filtering
 _SEV_ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+
+# Map P0-P3 → S1-S4 (used for suppression logic in ErrorStateManager)
+_P_TO_S = {"P0": "S1", "P1": "S2", "P2": "S3", "P3": "S4"}
 
 # Workflow ID for TMA missions
 TMA_WORKFLOW_ID = "tma-autoheal"
@@ -50,6 +55,8 @@ class IncidentGroup:
     count: int
     severity: str
     source: str
+    signature: str = ""  # natural-language cluster signature (from ErrorClusterer)
+    error_status: str = ""  # NEW / REGRESSION / ONGOING (from ErrorStateManager)
 
 
 def _get_db():
@@ -59,14 +66,8 @@ def _get_db():
 
         return get_db()
     except (ImportError, ValueError):
-        # Standalone mode — direct SQLite
-        import sqlite3
-        from pathlib import Path
-
-        db_path = Path(__file__).parent.parent.parent / "data" / "platform.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        return conn
+        # Standalone mode
+        return get_connection()
 
 
 def scan_open_incidents() -> list[IncidentGroup]:
@@ -79,7 +80,7 @@ def scan_open_incidents() -> list[IncidentGroup]:
                FROM platform_incidents
                WHERE status = 'open'
                  AND NOT EXISTS (
-                   SELECT 1 FROM missions m
+                   SELECT 1 FROM epics m
                    WHERE m.id = platform_incidents.mission_id
                      AND m.created_by = 'auto-heal'
                  )
@@ -116,15 +117,15 @@ def scan_open_incidents() -> list[IncidentGroup]:
 
 def create_heal_epic(group: IncidentGroup) -> str:
     """Create a mission (epic) for an incident group. Returns mission_id."""
-    from ..missions.store import get_mission_store, MissionDef
+    from ..epics.store import get_epic_store, MissionDef
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
 
     # Check if there's already an active TMA mission for this error type
     db = _get_db()
     try:
         existing = db.execute(
-            """SELECT id FROM missions
+            """SELECT id FROM epics
                WHERE type = 'bug' AND status IN ('planning', 'active')
                  AND name LIKE ?
                LIMIT 1""",
@@ -172,7 +173,7 @@ def create_heal_epic(group: IncidentGroup) -> str:
             "incident_ids": group.incident_ids[:20],
         },
     )
-    mission = mission_store.create_mission(mission)
+    mission = epic_store.create_mission(mission)
 
     # Link incidents to the new mission
     db = _get_db()
@@ -221,15 +222,15 @@ def _sev_to_wsjf(sev: str) -> float:
 
 async def launch_tma_workflow(mission_id: str) -> Optional[str]:
     """Launch the TMA workflow for a mission. Returns session_id."""
-    from ..missions.store import get_mission_store
+    from ..epics.store import get_epic_store
     from ..workflows.store import get_workflow_store
     from ..sessions.store import get_session_store, SessionDef
 
-    mission_store = get_mission_store()
+    epic_store = get_epic_store()
     wf_store = get_workflow_store()
     session_store = get_session_store()
 
-    mission = mission_store.get_mission(mission_id)
+    mission = epic_store.get_mission(mission_id)
     if not mission:
         logger.error("Auto-heal: mission %s not found", mission_id)
         return None
@@ -308,7 +309,7 @@ async def resolve_completed_missions():
         # Find completed TMA missions
         rows = db.execute(
             """SELECT m.id as mission_id, m.status
-               FROM missions m
+               FROM epics m
                WHERE m.type = 'bug' AND m.created_by = 'auto-heal'
                  AND m.status IN ('completed', 'failed')
                  AND EXISTS (
@@ -369,6 +370,87 @@ _last_cycle_ok: float = 0.0  # timestamp of last successful cycle
 _last_cycle_error: str = ""  # last error message if any
 
 
+async def _cluster_and_filter(groups: list[IncidentGroup]) -> list[IncidentGroup]:
+    """
+    Re-cluster incident groups using ErrorClusterer + apply suppression logic.
+
+    Falls back to original groups on any error so auto-heal is never broken.
+    """
+    try:
+        from .error_clustering import ErrorClusterer
+        from .error_state import get_error_state_manager
+
+        state = get_error_state_manager()
+        clusterer = ErrorClusterer()
+
+        # Build flat incident-like dicts for the clusterer
+        inc_dicts = [
+            {
+                "id": g.incident_ids[0] if g.incident_ids else "",
+                "error_type": g.error_type,
+                "error_detail": g.error_detail_sample,
+                "title": g.error_type,
+                "source": g.source,
+                "severity": g.severity,
+            }
+            for g in groups
+        ]
+
+        clusters = await clusterer.cluster(inc_dicts)
+
+        # Generate LLM signatures for clusters with >1 incident
+        result: list[IncidentGroup] = []
+        for cluster in clusters:
+            original_ids = cluster["incident_ids"]
+            # Collect all incident_ids from matched source groups
+            all_ids: list[str] = []
+            for gid in original_ids:
+                for g in groups:
+                    if gid in g.incident_ids:
+                        all_ids.extend(g.incident_ids)
+            all_ids = list(dict.fromkeys(all_ids))  # dedupe, preserve order
+
+            # Signature: use the cluster's built-in fallback signature
+            sig = cluster["signature"]
+
+            severity = cluster["severity"]
+            sev_s = _P_TO_S.get(severity, "S3")
+            error_status = state.determine_status(sig)
+
+            # Suppression check (sync — semantic mute matching via monitoring-ops agent)
+            should_alert, reason = state.should_alert(
+                signature=sig,
+                status=error_status,
+                severity=sev_s,
+            )
+            if not should_alert:
+                logger.info("Auto-heal suppressed cluster '%s': %s", sig[:60], reason)
+                continue
+
+            result.append(
+                IncidentGroup(
+                    error_type=cluster.get("error_class", groups[0].error_type),
+                    error_detail_sample=cluster["sample_messages"][0]
+                    if cluster["sample_messages"]
+                    else "",
+                    incident_ids=all_ids,
+                    count=len(all_ids),
+                    severity=severity,
+                    source=cluster["sources"][0] if cluster.get("sources") else "auto",
+                    signature=sig,
+                    error_status=error_status,
+                )
+            )
+
+        return result
+
+    except Exception as exc:
+        logger.warning(
+            "Auto-heal: cluster_and_filter failed (%s) — using original groups", exc
+        )
+        return groups
+
+
 async def heal_cycle():
     """One scan-create-launch cycle."""
     global _active_heals
@@ -383,7 +465,7 @@ async def heal_cycle():
     db = _get_db()
     try:
         rows = db.execute(
-            "SELECT id FROM missions WHERE created_by='auto-heal' AND status='active'"
+            "SELECT id FROM epics WHERE created_by='auto-heal' AND status='active'"
         ).fetchall()
         _active_heals = {r["id"] for r in rows}
     finally:
@@ -392,6 +474,12 @@ async def heal_cycle():
     # 4. Scan for new incidents
     groups = scan_open_incidents()
     if not groups:
+        return
+
+    # 4b. Cluster + suppression filtering (via ErrorClusterer + ErrorStateManager)
+    groups = await _cluster_and_filter(groups)
+    if not groups:
+        logger.info("Auto-heal: all incident groups suppressed — nothing to heal")
         return
 
     logger.info(
@@ -405,8 +493,10 @@ async def heal_cycle():
         from ..services.notifications import emit_notification
 
         for g in groups:
+            status_tag = g.error_status if hasattr(g, "error_status") else ""
+            label = f"[{status_tag}] " if status_tag else ""
             emit_notification(
-                f"Auto-heal: {g.count} new {g.error_type} incident(s)",
+                f"Auto-heal: {label}{g.count} new {g.error_type} incident(s)",
                 type="autoheal",
                 message=g.error_detail_sample[:100],
                 severity="warning" if g.severity in ("P0", "P1") else "info",
@@ -431,6 +521,13 @@ async def heal_cycle():
             session_id = await launch_tma_workflow(mission_id)
             if session_id:
                 _active_heals.add(mission_id)
+                # Mark alerted in error state tracker
+                try:
+                    from .error_state import get_error_state_manager
+
+                    get_error_state_manager().mark_alerted(group.signature)
+                except Exception:
+                    pass
 
 
 async def _recover_interrupted_heals():
@@ -442,7 +539,7 @@ async def _recover_interrupted_heals():
         try:
             stuck = db.execute(
                 """SELECT DISTINCT m.id as mission_id, m.name
-                   FROM missions m
+                   FROM epics m
                    WHERE m.created_by = 'auto-heal' AND m.status = 'active'
                      AND NOT EXISTS (
                          SELECT 1 FROM sessions s
@@ -521,16 +618,16 @@ def get_autoheal_stats() -> dict:
     db = _get_db()
     try:
         total = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal'"
         ).fetchone()["n"]
         active = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='active'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='active'"
         ).fetchone()["n"]
         completed = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='completed'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='completed'"
         ).fetchone()["n"]
         failed = db.execute(
-            "SELECT COUNT(*) as n FROM missions WHERE created_by='auto-heal' AND status='failed'"
+            "SELECT COUNT(*) as n FROM epics WHERE created_by='auto-heal' AND status='failed'"
         ).fetchone()["n"]
         open_incidents = db.execute(
             "SELECT COUNT(*) as n FROM platform_incidents WHERE status='open'"
@@ -557,7 +654,7 @@ def get_autoheal_stats() -> dict:
             "interval_s": SCAN_INTERVAL,
             "severity_threshold": SEVERITY_THRESHOLD,
             "max_concurrent": MAX_CONCURRENT_HEALS,
-            "missions": {
+            "epics": {
                 "total": total,
                 "active": active,
                 "completed": completed,

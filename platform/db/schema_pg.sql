@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS projects (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     git_url TEXT DEFAULT '',
-    container_url TEXT DEFAULT ''
+    container_url TEXT DEFAULT '',
+    starred BOOLEAN DEFAULT FALSE
 );
 
 -- ============================================================================
@@ -322,6 +323,9 @@ CREATE TABLE IF NOT EXISTS memory_project (
     confidence REAL DEFAULT 0.5,
     relevance_score REAL DEFAULT 0.5,
     source TEXT DEFAULT '',
+    agent_role TEXT DEFAULT '',
+    access_count INTEGER DEFAULT 0,
+    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     search_tsv tsvector GENERATED ALWAYS AS (
@@ -342,6 +346,8 @@ CREATE TABLE IF NOT EXISTS memory_global (
     relevance_score REAL DEFAULT 0.5,
     occurrences INTEGER DEFAULT 1,
     projects_json TEXT DEFAULT '[]',
+    access_count INTEGER DEFAULT 0,
+    last_read_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     search_tsv tsvector GENERATED ALWAYS AS (
@@ -545,7 +551,7 @@ CREATE INDEX IF NOT EXISTS idx_pi_art ON program_increments(art_id);
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS confluence_pages (
-    epic_id TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
     tab TEXT NOT NULL,
     confluence_page_id TEXT NOT NULL,
     last_synced TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -558,7 +564,7 @@ CREATE TABLE IF NOT EXISTS confluence_pages (
 
 CREATE TABLE IF NOT EXISTS support_tickets (
     id TEXT PRIMARY KEY,
-    epic_id TEXT NOT NULL,
+    mission_id TEXT NOT NULL,
     title TEXT NOT NULL,
     description TEXT DEFAULT '',
     severity TEXT DEFAULT 'P3',

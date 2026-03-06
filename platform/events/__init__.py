@@ -12,16 +12,14 @@ from __future__ import annotations
 
 import json
 import logging
-import sqlite3
 import time
 import uuid
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+
+
+from ..db.adapter import get_connection
 
 logger = logging.getLogger(__name__)
-
-_DB_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "platform.db"
 
 
 @dataclass
@@ -61,7 +59,7 @@ QUALITY_GATE_PASSED = "quality_gate_passed"
 QUALITY_GATE_FAILED = "quality_gate_failed"
 
 
-def _ensure_table(db: sqlite3.Connection) -> None:
+def _ensure_table(db) -> None:
     db.execute("""
         CREATE TABLE IF NOT EXISTS events (
             id             TEXT PRIMARY KEY,
@@ -73,22 +71,22 @@ def _ensure_table(db: sqlite3.Connection) -> None:
             timestamp      REAL NOT NULL
         )
     """)
-    db.execute("CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_type, aggregate_id)")
+    db.execute(
+        "CREATE INDEX IF NOT EXISTS idx_events_aggregate ON events(aggregate_type, aggregate_id)"
+    )
     db.execute("CREATE INDEX IF NOT EXISTS idx_events_type ON events(event_type)")
     db.execute("CREATE INDEX IF NOT EXISTS idx_events_ts ON events(timestamp)")
 
 
 class EventStore:
-    """Append-only event store backed by SQLite."""
+    """Append-only event store backed by PostgreSQL."""
 
-    def __init__(self, db_path: Path | str | None = None):
-        self._db_path = Path(db_path) if db_path else _DB_PATH
+    def __init__(self):
         self._listeners: list = []
         self._initialized = False
 
-    def _db(self) -> sqlite3.Connection:
-        db = sqlite3.connect(str(self._db_path))
-        db.row_factory = sqlite3.Row
+    def _db(self):
+        db = get_connection()
         if not self._initialized:
             _ensure_table(db)
             self._initialized = True
@@ -209,7 +207,9 @@ class EventStore:
         where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
         db = self._db()
         try:
-            return db.execute(f"SELECT COUNT(*) FROM events {where}", params).fetchone()[0]
+            return db.execute(
+                f"SELECT COUNT(*) FROM events {where}", params
+            ).fetchone()[0]
         finally:
             db.close()
 

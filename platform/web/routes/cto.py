@@ -382,12 +382,12 @@ async def cto_search(q: str = ""):
 @router.get("/api/cto/chips", response_class=JSONResponse)
 async def cto_chips():
     """Return dynamic contextual chips based on active missions and platform state."""
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...projects.manager import get_project_store
 
     chips = []
     try:
-        ms = get_mission_store()
+        ms = get_epic_store()
         ps = get_project_store()
         # Active missions → chips to dive in
         running = ms.list_missions(status="running", limit=5)
@@ -602,10 +602,10 @@ def _resolve_mentions(content: str) -> tuple[str, str]:
         return content, ""
     try:
         from ...projects.manager import get_project_store
-        from ...missions.store import get_mission_store
+        from ...epics.store import get_epic_store
 
         ps = get_project_store()
-        ms = get_mission_store()
+        ms = get_epic_store()
         all_projects = ps.list_all()
         blocks = []
         for mention in mentions:
@@ -850,7 +850,7 @@ async def cto_message(request: Request):
                         pid = tc_res.get("project_id", "")
                         pname = html_mod.escape(tc_res.get("name", ""))
                         scaffold = tc_res.get("scaffold", [])
-                        missions = tc_res.get("missions", [])
+                        missions = tc_res.get("epics", [])
                         scaffold_text = (
                             ", ".join(scaffold) if scaffold else "workspace prêt"
                         )
@@ -884,7 +884,7 @@ async def cto_message(request: Request):
                     elif tc_name == "create_mission":
                         mid = tc_res.get("mission_id", "")
                         mname = html_mod.escape(tc_res.get("name", ""))
-                        run_id = tc_res.get("mission_run_id", "")
+                        run_id = tc_res.get("epic_run_id", "")
                         run_badge = (
                             '<span class="cto-creation-badge">🚀 lancée</span>'
                             if run_id
@@ -915,7 +915,7 @@ async def cto_message(request: Request):
                     elif tc_name == "create_domain":
                         did = tc_res.get("domain_id", "")
                         dname = html_mod.escape(tc_res.get("name", ""))
-                        missions = tc_res.get("missions", [])
+                        missions = tc_res.get("epics", [])
                         sub_projects = tc_res.get("sub_projects", [])
                         missions_html = "".join(
                             f'<a class="cto-mission-chip" href="/missions/{html_mod.escape(m.get("mission_id", ""))}" target="_blank">'

@@ -35,6 +35,10 @@ class WorkflowPhase:
     retry_count: int = 1  # max retries on failure (0 = no retry)
     skip_on_failure: bool = False  # skip phase after all retries exhausted
     timeout: int = 0  # per-phase timeout override (0 = use global default)
+    # Scale-adaptive planning (BMAD-inspired): phase only runs at or above this complexity.
+    # Values: "simple" | "standard" | "enterprise" | "" (empty = always run).
+    # Example: set min_complexity="enterprise" on heavyweight planning phases.
+    min_complexity: str = ""
 
 
 @dataclass
@@ -328,7 +332,7 @@ def _reset_stuck_phases(store, session_id: str):
 
         db = get_db()
         rows = db.execute(
-            "SELECT id, phases_json FROM mission_runs WHERE session_id=? AND phases_json LIKE '%\"running\"%'",
+            "SELECT id, phases_json FROM epic_runs WHERE session_id=? AND phases_json LIKE '%\"running\"%'",
             (session_id,),
         ).fetchall()
         for row in rows:
@@ -345,7 +349,7 @@ def _reset_stuck_phases(store, session_id: str):
                     fixed = True
             if fixed:
                 db.execute(
-                    "UPDATE mission_runs SET phases_json=? WHERE id=?",
+                    "UPDATE epic_runs SET phases_json=? WHERE id=?",
                     (_json.dumps(phases, default=str), row[0]),
                 )
         db.commit()
@@ -397,7 +401,7 @@ async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, 
 
         db = _gdb()
         row = db.execute(
-            "SELECT workspace_path FROM mission_runs WHERE session_id=? LIMIT 1",
+            "SELECT workspace_path FROM epic_runs WHERE session_id=? LIMIT 1",
             (session_id,),
         ).fetchone()
         db.close()
@@ -491,7 +495,7 @@ def _find_main_py(workspace: str) -> str:
 # ── Workflow Engine ──────────────────────────────────────────────
 
 
-PHASE_TIMEOUT_SECONDS = 172800  # 48h max per phase — no artificial cap on long-running workflows
+PHASE_TIMEOUT_SECONDS = 172800  # 48h — industrial pipeline, never stop
 
 
 async def run_workflow(
@@ -500,11 +504,15 @@ async def run_workflow(
     initial_task: str,
     project_id: str = "",
     resume_from: int = 0,
+    complexity: str = "standard",
 ) -> WorkflowRun:
     """Execute a workflow — RTE facilitates each phase transition.
 
     Args:
         resume_from: phase index to resume from (skip completed phases).
+        complexity: scale-adaptive level — "simple" | "standard" | "enterprise".
+            Phases with min_complexity higher than this level are skipped.
+            Inspired by BMAD scale-domain-adaptive planning.
     """
     run = WorkflowRun(
         workflow=workflow,
@@ -552,6 +560,10 @@ async def run_workflow(
             project_id=project_id,
         )
 
+    # Complexity levels for scale-adaptive planning (BMAD-inspired)
+    _COMPLEXITY_ORDER = {"simple": 0, "standard": 1, "enterprise": 2}
+    _run_complexity_level = _COMPLEXITY_ORDER.get(complexity, 1)
+
     accumulated_context = []
     for i, phase in enumerate(workflow.phases):
         # Skip already-completed phases on resume
@@ -560,6 +572,19 @@ async def run_workflow(
                 {"phase": phase.name, "success": True, "skipped": True}
             )
             continue
+
+        # Scale-adaptive: skip phases requiring higher complexity than requested
+        if phase.min_complexity:
+            _phase_level = _COMPLEXITY_ORDER.get(phase.min_complexity, 1)
+            if _phase_level > _run_complexity_level:
+                run.phase_results.append({
+                    "phase": phase.name,
+                    "success": True,
+                    "skipped": True,
+                    "reason": f"min_complexity={phase.min_complexity} > run complexity={complexity}",
+                })
+                continue
+
         run.current_phase = i
 
         phase_agents = phase.config.get("agents", [])
@@ -694,17 +719,24 @@ async def run_workflow(
 
         except WorkflowPaused:
             # Human-in-the-loop requested a pause — save checkpoint at current phase
-            _save_checkpoint(store, session_id, i)  # i not i+1: re-run this phase on resume
+            _save_checkpoint(
+                store, session_id, i
+            )  # i not i+1: re-run this phase on resume
             run.status = "paused"
             run.phase_results.append(
-                {"phase": phase.name, "success": False, "paused": True, "error": "Awaiting human validation"}
+                {
+                    "phase": phase.name,
+                    "success": False,
+                    "paused": True,
+                    "error": "Awaiting human validation",
+                }
             )
             logger.info("Workflow paused at phase %s (%d)", phase.name, i)
             break
 
         except asyncio.TimeoutError:
-            logger.warning(
-                "Workflow phase %s timed out after %ds — continuing (industrial pipeline, no stop)",
+            logger.error(
+                "Workflow phase %s timed out after %ds",
                 phase.name,
                 phase_timeout,
             )
@@ -718,11 +750,25 @@ async def run_workflow(
                     "timeout": True,
                 }
             )
-            # Always continue — this is an industrial pipeline, timeouts never stop the chain
+            # Timeouts: continue if gate allows or skip_on_failure
+            if (
+                phase.gate in ("always", "no_veto", "best_effort")
+                or phase.skip_on_failure
+            ):
+                await _rte_facilitate(
+                    session_id,
+                    f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
+                    f"{'skip_on_failure' if phase.skip_on_failure else f'gate={phase.gate}'}, on continue.\n{_last_summary}",
+                    to_agent=leader,
+                    project_id=project_id,
+                )
+                _save_checkpoint(store, session_id, i + 1)
+                continue
+            # Critical phase timeout — always continue (industrial pipeline, never stop)
             await _rte_facilitate(
                 session_id,
-                f"⏱️ La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
-                f"On passe à la suite — pipeline industriel, pas d'arrêt.\n{_last_summary}",
+                f"La phase **{phase.name}** a dépassé le timeout ({phase_timeout}s). "
+                f"On continue malgré tout (pipeline industriel).\n{_last_summary}",
                 to_agent=leader,
                 project_id=project_id,
             )

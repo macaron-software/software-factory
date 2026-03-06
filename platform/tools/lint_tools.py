@@ -18,13 +18,26 @@ EXT_LANG = {
     ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
     ".ts": "typescript", ".tsx": "typescript",
     ".go": "go",
+    ".rs": "rust",
 }
 
+# Ruff rules: E=style, F=pyflakes, C901=complexity, S=security(bandit), B=bugbear, PERF=perf, SIM=simplify
+# S rules catch: eval, exec, shell=True, pickle, weak crypto, hardcoded passwords, assert in prod, etc.
+_RUFF_SELECT = "E,F,C901,S,B,PERF,SIM"
+_RUFF_MAX_COMPLEXITY = "10"
+
 LINT_CONFIG = {
-    "python": {"bin": "ruff", "check": lambda p: ["ruff", "check", p], "fix": lambda p: ["ruff", "check", "--fix", p]},
+    "python": {
+        "bin": "ruff",
+        "check": lambda p: ["ruff", "check", "--select", _RUFF_SELECT,
+                            "--per-file-ignores", "__init__.py:F401",
+                            "--max-doc-length", "120", p],
+        "fix":  lambda p: ["ruff", "check", "--fix", "--select", _RUFF_SELECT, p],
+    },
     "javascript": {"bin": "eslint", "check": lambda p: ["eslint", p], "fix": lambda p: ["eslint", "--fix", p]},
     "typescript": {"bin": "eslint", "check": lambda p: ["eslint", p], "fix": lambda p: ["eslint", "--fix", p]},
-    "go": {"bin": "golint", "check": lambda p: ["golint", p], "fix": None},
+    "go": {"bin": "go", "check": lambda p: ["go", "vet", "./..."], "fix": None},
+    "rust": {"bin": "cargo", "check": lambda p: ["cargo", "clippy", "--", "-D", "warnings"], "fix": None},
 }
 
 

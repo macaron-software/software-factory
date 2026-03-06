@@ -1,7 +1,7 @@
 """Auto-resume missions and background agents after container restart.
 
 Called from server.py lifespan. Runs as a periodic watchdog every 5 minutes:
-- Resumes paused mission_runs (all of them, batched with stagger)
+- Resumes paused epic_runs (all of them, batched with stagger)
 - Retries failed continuous background missions (TMA, security, self-healing, debt…)
 - Launches unstarted continuous missions (first run ever)
 - Hourly: cleans up orphaned workspaces + old llm_traces + cancelled run records
@@ -101,9 +101,9 @@ def _is_continuous(mission_name: str, mission_type: str) -> bool:
     return any(kw in name_lower or kw in type_lower for kw in _CONTINUOUS_KEYWORDS)
 
 
-async def auto_resume_missions() -> None:
+async def auto_resume_epics() -> None:
     """
-    Watchdog loop: resumes paused/failed mission_runs and launches unstarted continuous missions.
+    Watchdog loop: resumes paused/failed epic_runs and launches unstarted continuous missions.
     First pass is aggressive (all paused, 1.5s stagger), then gentle (5-min checks).
     """
     if os.environ.get("PLATFORM_AUTO_RESUME_ENABLED", "1") == "0":
@@ -189,8 +189,8 @@ async def _resume_batch(stagger: float = 3.0) -> int:
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active'),
                    COALESCE(mr.resume_attempts, 0)
-            FROM mission_runs mr
-            LEFT JOIN missions m ON m.id = mr.session_id
+            FROM epic_runs mr
+            LEFT JOIN epics m ON m.id = mr.session_id
             WHERE mr.status = 'paused' AND mr.workflow_id IS NOT NULL
               AND COALESCE(mr.human_input_required, 0) = 0
               AND mr.updated_at >= datetime('now', '-48 hours')
@@ -202,8 +202,8 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         pending_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
-            FROM mission_runs mr
-            LEFT JOIN missions m ON m.id = mr.session_id
+            FROM epic_runs mr
+            LEFT JOIN epics m ON m.id = mr.session_id
             WHERE mr.status = 'pending' AND mr.workflow_id IS NOT NULL
               AND mr.created_at <= datetime('now', '-10 minutes')
               AND (m.status IS NULL OR m.status = 'active')
@@ -215,18 +215,18 @@ async def _resume_batch(stagger: float = 3.0) -> int:
         failed_rows = db.execute("""
             SELECT mr.id, mr.workflow_id,
                    COALESCE(m.name, ''), COALESCE(m.type, ''), COALESCE(m.status, 'active')
-            FROM mission_runs mr
-            LEFT JOIN missions m ON m.id = mr.session_id
+            FROM epic_runs mr
+            LEFT JOIN epics m ON m.id = mr.session_id
             WHERE mr.status = 'failed' AND mr.workflow_id IS NOT NULL
               AND (m.status IS NULL OR m.status = 'active')
               AND mr.created_at >= datetime('now', '-7 days')
               AND mr.id = (
-                SELECT mr2.id FROM mission_runs mr2
+                SELECT mr2.id FROM epic_runs mr2
                 WHERE mr2.session_id = mr.session_id
                 ORDER BY mr2.created_at DESC LIMIT 1
               )
               AND NOT EXISTS (
-                SELECT 1 FROM mission_runs mr3
+                SELECT 1 FROM epic_runs mr3
                 WHERE mr3.session_id = mr.session_id
                   AND mr3.status IN ('pending', 'running')
               )
@@ -239,10 +239,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     continuous_paused, others_paused, continuous_failed, stuck_pending = [], [], [], []
     # Map run_id → resume_attempts for backoff filtering
     _attempts: dict[str, int] = {}
+    _run_workflow: dict[str, str] = {}  # run_id → workflow_id for circuit breaker
     for run_id, wf_id, mname, mtype, mstatus, attempts in paused_rows:
         if mstatus not in ("active", None, ""):
             continue
         _attempts[run_id] = attempts
+        _run_workflow[run_id] = wf_id
         if _is_continuous(mname, mtype):
             continuous_paused.append(run_id)
         else:
@@ -251,10 +253,12 @@ async def _resume_batch(stagger: float = 3.0) -> int:
     for run_id, wf_id, mname, mtype, mstatus in pending_rows:
         if mstatus in ("active", None, ""):
             stuck_pending.append(run_id)
+            _run_workflow[run_id] = wf_id
 
     for run_id, wf_id, mname, mtype, mstatus in failed_rows:
         if _is_continuous(mname, mtype):
             continuous_failed.append(run_id)
+            _run_workflow[run_id] = wf_id
 
     # Apply exponential backoff: skip missions with too many recent attempts
     # Attempt 0-2: always retry; attempt 3: skip 50% chance (use mod); attempt 4+: skip unless low load
@@ -321,6 +325,20 @@ async def _resume_batch(stagger: float = 3.0) -> int:
                 effective_stagger,
             )
         try:
+            # Circuit breaker: skip if workflow has too many recent failures
+            wf_id = _run_workflow.get(run_id, "")
+            if wf_id:
+                from ..db.migrations import get_db as _get_db
+                _cb_db = _get_db()
+                try:
+                    if _is_circuit_open(wf_id, _cb_db):
+                        logger.warning(
+                            "auto_resume: circuit OPEN for workflow=%s (>=%d fails in %dmin) — skipping run %s",
+                            wf_id, _CB_MAX_FAILS, _CB_WINDOW_MINUTES, run_id,
+                        )
+                        continue
+                finally:
+                    _cb_db.close()
             # Try to dispatch to a less-loaded worker node first
             dispatched = await _try_dispatch_to_worker(run_id)
             if not dispatched:
@@ -403,17 +421,38 @@ async def _try_dispatch_to_worker(run_id: str) -> bool:
     return False
 
 
+# Circuit breaker: skip workflow if N consecutive failures in last WINDOW
+_CB_MAX_FAILS = int(os.environ.get("CIRCUIT_BREAKER_MAX_FAILS", "5"))
+_CB_WINDOW_MINUTES = int(os.environ.get("CIRCUIT_BREAKER_WINDOW_MINUTES", "60"))
+
+
+def _is_circuit_open(workflow_id: str, db) -> bool:
+    """Return True if this workflow_id has too many recent failures (circuit open)."""
+    try:
+        row = db.execute(
+            """SELECT COUNT(*) as cnt FROM epic_runs
+               WHERE workflow_id = ? AND status IN ('failed', 'abandoned')
+               AND updated_at >= datetime('now', ?)""",
+            (workflow_id, f"-{_CB_WINDOW_MINUTES} minutes"),
+        ).fetchone()
+        if row and int(row["cnt"] or 0) >= _CB_MAX_FAILS:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 async def _launch_run(run_id: str) -> None:
-    """Launch a single mission_run via the orchestrator."""
+    """Launch a single epic_run via the orchestrator."""
     from ..agents.store import get_agent_store
-    from ..missions.store import get_mission_run_store
-    from ..models import MissionStatus
-    from ..services.mission_orchestrator import MissionOrchestrator
+    from ..epics.store import get_epic_run_store
+    from ..models import EpicStatus
+    from ..services.epic_orchestrator import EpicOrchestrator
     from ..sessions.runner import _push_sse
     from ..web.routes.helpers import _active_mission_tasks, get_mission_semaphore
     from ..workflows.store import get_workflow_store
 
-    run_store = get_mission_run_store()
+    run_store = get_epic_run_store()
     mission = run_store.get(run_id)
     if not mission:
         raise ValueError(f"Run {run_id} not found")
@@ -427,7 +466,7 @@ async def _launch_run(run_id: str) -> None:
     if not wf:
         raise ValueError(f"Workflow {mission.workflow_id} not found for run {run_id}")
 
-    # Ensure a session row exists for this mission_run (needed for messages FK)
+    # Ensure a session row exists for this epic_run (needed for messages FK)
     if mission.session_id:
         from ..db.migrations import get_db as _get_db
 
@@ -518,7 +557,7 @@ async def _launch_run(run_id: str) -> None:
     orch_role = orch_agent.role if orch_agent else "cdp"
     orch_avatar = f"/static/avatars/{orch_id}.svg"
 
-    orchestrator = MissionOrchestrator(
+    orchestrator = EpicOrchestrator(
         mission=mission,
         workflow=wf,
         run_store=run_store,
@@ -534,11 +573,12 @@ async def _launch_run(run_id: str) -> None:
     async def _safe_run():
         try:
             async with get_mission_semaphore():
-                logger.warning("auto_resume: mission_run=%s acquired semaphore", run_id)
+                logger.warning("auto_resume: epic_run=%s acquired semaphore", run_id)
                 await orchestrator.run_phases()
         except Exception as exc:
             import traceback
 
+            err_summary = f"{type(exc).__name__}: {exc}"
             logger.error(
                 "auto_resume: run=%s CRASHED: %s\n%s",
                 run_id,
@@ -546,12 +586,13 @@ async def _launch_run(run_id: str) -> None:
                 traceback.format_exc(),
             )
             try:
-                mission.status = MissionStatus.FAILED
+                mission.status = EpicStatus.FAILED
+                mission.cancel_reason = err_summary[:500]
                 run_store.update(mission)
             except Exception:
                 pass
 
-    mission.status = MissionStatus.RUNNING
+    mission.status = EpicStatus.RUNNING
     run_store.update(mission)
 
     task = asyncio.create_task(_safe_run())
@@ -567,7 +608,7 @@ _MAX_RETRIES = 3  # after that, don't auto-retry
 
 async def handle_failed_runs() -> int:
     """
-    Repair failed mission_runs so the watchdog can retry them.
+    Repair failed epic_runs so the watchdog can retry them.
     - Init failures (no progress) → reset to paused, reset pending phases
     - Phase failures (had progress) → reset to paused + create TMA incident run
     - Phantom running runs (stale > 30min) → reset to paused immediately
@@ -580,7 +621,7 @@ async def handle_failed_runs() -> int:
     try:
         # First: reset phantom running runs (stale > 30min) → paused so watchdog picks them up
         phantom = db.execute("""
-            UPDATE mission_runs SET status='paused', updated_at=datetime('now')
+            UPDATE epic_runs SET status='paused', updated_at=datetime('now')
             WHERE status = 'running'
             AND workflow_id IS NOT NULL
             AND (updated_at IS NULL OR updated_at < datetime('now', '-30 minutes'))
@@ -597,8 +638,8 @@ async def handle_failed_runs() -> int:
             SELECT mr.id, mr.workflow_id, mr.workflow_name, mr.current_phase,
                    mr.phases_json, mr.project_id, mr.brief,
                    COALESCE(m.name, ''), COALESCE(m.type, '')
-            FROM mission_runs mr
-            LEFT JOIN missions m ON m.id = mr.session_id
+            FROM epic_runs mr
+            LEFT JOIN epics m ON m.id = mr.session_id
             WHERE mr.status = 'failed' AND mr.workflow_id IS NOT NULL
             ORDER BY mr.created_at DESC
             LIMIT 200
@@ -637,7 +678,7 @@ async def handle_failed_runs() -> int:
             db2 = get_db()
             try:
                 db2.execute(
-                    "UPDATE mission_runs SET status='paused', phases_json=? WHERE id=?",
+                    "UPDATE epic_runs SET status='paused', phases_json=? WHERE id=?",
                     (new_phases_json, run_id),
                 )
                 db2.commit()
@@ -652,7 +693,7 @@ async def handle_failed_runs() -> int:
                 db3 = get_db()
                 try:
                     existing = db3.execute(
-                        "SELECT id FROM mission_runs WHERE parent_mission_id=? AND workflow_id=?",
+                        "SELECT id FROM epic_runs WHERE parent_epic_id=? AND workflow_id=?",
                         (run_id, _TMA_WORKFLOW_ID),
                     ).fetchone()
                 finally:
@@ -705,7 +746,7 @@ async def _create_tma_incident(
     project_id: str,
     original_brief: str,
 ) -> None:
-    """Create a TMA incident mission_run for a failed execution phase."""
+    """Create a TMA incident epic_run for a failed execution phase."""
     import uuid
     from ..db.migrations import get_db
 
@@ -721,9 +762,9 @@ async def _create_tma_incident(
     try:
         db.execute(
             """
-            INSERT INTO mission_runs
+            INSERT INTO epic_runs
               (id, workflow_id, workflow_name, project_id, status, current_phase,
-               phases_json, brief, parent_mission_id, created_at, updated_at)
+               phases_json, brief, parent_epic_id, created_at, updated_at)
             VALUES (?, ?, ?, ?, 'pending', '',
                     '[]', ?, ?, datetime('now'), datetime('now'))
         """,
@@ -752,7 +793,7 @@ async def _create_tma_incident(
 
 async def auto_launch_continuous_missions() -> int:
     """
-    Find active continuous missions (security, debt, TMA…) that have NO mission_run yet
+    Find active continuous missions (security, debt, TMA…) that have NO epic_run yet
     and launch them. Called by the watchdog loop after handling paused/failed.
     Returns count of missions launched.
     """
@@ -765,13 +806,13 @@ async def auto_launch_continuous_missions() -> int:
             SELECT m.id, m.name, m.type, m.workflow_id,
                    COALESCE(m.project_id, ''), COALESCE(m.description, ''),
                    COALESCE(m.goal, m.description, m.name)
-            FROM missions m
+            FROM epics m
             WHERE m.status = 'active'
               AND m.workflow_id IS NOT NULL AND m.workflow_id != ''
               AND NOT EXISTS (
-                SELECT 1 FROM mission_runs mr
+                SELECT 1 FROM epic_runs mr
                 WHERE mr.session_id = m.id
-                   OR mr.parent_mission_id = m.id
+                   OR mr.parent_epic_id = m.id
               )
             ORDER BY m.created_at DESC
             LIMIT 200
@@ -829,13 +870,13 @@ async def _launch_new_run(
     brief: str,
     mission_name: str,
 ) -> str:
-    """Create a new MissionRun for a backlog mission and launch it."""
+    """Create a new EpicRun for a backlog mission and launch it."""
     import os
     import subprocess
     import uuid
 
-    from ..models import MissionRun, MissionStatus, PhaseRun, PhaseStatus
-    from ..missions.store import get_mission_run_store
+    from ..models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+    from ..epics.store import get_epic_run_store
     from ..workflows.store import get_workflow_store
 
     wf = get_workflow_store().get(workflow_id)
@@ -879,12 +920,12 @@ async def _launch_new_run(
             },
         )
 
-    run = MissionRun(
+    run = EpicRun(
         id=run_id,
         workflow_id=workflow_id,
         workflow_name=wf.name,
         brief=brief[:500],
-        status=MissionStatus.PENDING,
+        status=EpicStatus.PENDING,
         phases=phases,
         project_id=project_id,
         workspace_path=ws_base,
@@ -892,7 +933,7 @@ async def _launch_new_run(
         session_id=mission_id,  # links run → mission in missions table
     )
 
-    get_mission_run_store().create(run)
+    get_epic_run_store().create(run)
     await _launch_run(run_id)
     return run_id
 
@@ -964,7 +1005,9 @@ async def _cleanup_disk() -> None:
         db = get_db()
 
         # 1. Remove workspaces for non-active sessions
-        ws_dir = os.path.join(os.path.dirname(__file__), "..", "..", "data", "workspaces")
+        ws_dir = os.path.join(
+            os.path.dirname(__file__), "..", "..", "data", "workspaces"
+        )
         ws_dir = os.path.normpath(ws_dir)
         if not os.path.isdir(ws_dir):
             # Try absolute path used in container
@@ -973,19 +1016,24 @@ async def _cleanup_disk() -> None:
             active_sessions = {
                 r[0]
                 for r in db.execute(
-                    "SELECT session_id FROM mission_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
+                    "SELECT session_id FROM epic_runs WHERE status IN ('running','pending','paused') AND session_id IS NOT NULL"
                 ).fetchall()
             }
             removed_ws = 0
+            ws_ttl = int(os.environ.get("WORKSPACE_TTL_DAYS", "7"))
+            cutoff_mtime = time.time() - ws_ttl * 86400
             for ws_name in os.listdir(ws_dir):
-                if ws_name not in active_sessions:
+                ws_path = os.path.join(ws_dir, ws_name)
+                if ws_name not in active_sessions or os.path.getmtime(ws_path) < cutoff_mtime:
                     try:
-                        shutil.rmtree(os.path.join(ws_dir, ws_name))
+                        shutil.rmtree(ws_path)
                         removed_ws += 1
                     except Exception:
                         pass
             if removed_ws:
-                logger.warning("cleanup_disk: removed %d orphaned workspaces", removed_ws)
+                logger.warning(
+                    "cleanup_disk: removed %d orphaned/expired workspaces (ttl=%dd)", removed_ws, ws_ttl
+                )
 
         # 2. Purge LLM traces older than 14 days (keep recent for observability)
         deleted_traces = db.execute(
@@ -997,18 +1045,34 @@ async def _cleanup_disk() -> None:
 
         # 3. Purge cancelled run records older than 7 days
         deleted_runs = db.execute(
-            "DELETE FROM mission_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
+            "DELETE FROM epic_runs WHERE status = 'cancelled' AND updated_at < datetime('now', '-7 days')"
         ).rowcount
         if deleted_runs:
             db.commit()
             logger.warning("cleanup_disk: purged %d cancelled runs >7d", deleted_runs)
 
-        # 4. SQLite VACUUM to reclaim space after mass deletes
         if deleted_traces + deleted_runs > 100:
             db.execute("VACUUM")
             logger.warning(
-                "cleanup_disk: VACUUM done after %d deletes", deleted_traces + deleted_runs
+                "cleanup_disk: VACUUM done after %d deletes",
+                deleted_traces + deleted_runs,
             )
+
+        # 4. Cost alert: warn if 24h LLM cost exceeds threshold
+        try:
+            cost_threshold_usd = float(os.environ.get("COST_ALERT_THRESHOLD_USD", "5.0"))
+            cost_row = db.execute(
+                "SELECT COALESCE(SUM(llm_cost_usd), 0) AS total"
+                " FROM epic_runs WHERE created_at >= NOW() - INTERVAL '24 hours'"
+                " AND llm_cost_usd IS NOT NULL"
+            ).fetchone()
+            if cost_row and float(cost_row["total"] or 0) > cost_threshold_usd:
+                logger.error(
+                    "cleanup_disk: COST ALERT — 24h LLM spend $%.2f > threshold $%.2f",
+                    float(cost_row["total"]), cost_threshold_usd,
+                )
+        except Exception:
+            pass
     except Exception:
         pass
     finally:

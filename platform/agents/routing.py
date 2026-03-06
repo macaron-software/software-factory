@@ -1,24 +1,23 @@
 """LLM routing — model/provider selection for agents.
 
-Extracted from executor.py. Handles Darwin LLM Thompson Sampling + DB routing config
-+ hardcoded role/tag fallbacks.
+One provider per environment — nothing hardcoded, everything from env/Settings DB.
+Zero fallback — fail fast if the provider is unavailable.
 
-Public API:
-  _route_provider(agent, tools, ...) → (provider, model)
-  _invalidate_routing_cache()
+  Azure prod   (AZURE_DEPLOY=1):  azure-openai
+    reasoning/leadership → gpt-5.2
+    code/tests           → gpt-5.2-codex
+    small talk/default   → gpt-5-mini
 
-Azure model tiers:
-  small talk / default  → azure-openai  gpt-5-mini
-  pilotage / leadership → azure-openai  gpt-5.2
-  code / tests          → azure-openai  gpt-5.1-codex  (or gpt-5.2-codex via AZURE_CODEX_MODEL)
-OVH: minimax MiniMax-M2.5
-Local: local-mlx Qwen3.5-35B-A3B-4bit
-All: RTK prompt compression enabled by default
+  OVH demo     (PLATFORM_LLM_PROVIDER=minimax):  MiniMax-M2.5
+  Local dev    (PLATFORM_LLM_PROVIDER=local-mlx): Qwen3.5-35B
+
+  Settings DB (session_state key='llm_routing') overrides defaults per category.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -27,39 +26,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Provider for tool-calling agents (OpenAI models handle tools reliably)
-TOOL_PROVIDER = "azure-openai"
+# Provider for tool-calling agents (OpenAI-compatible models)
+TOOL_PROVIDER = os.environ.get("PLATFORM_LLM_PROVIDER", "azure-openai")
 TOOL_MODEL = "gpt-5-mini"
 # Providers that support native function calling
-TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama"}
+TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama", "minimax"}
 
-# Backward-compat aliases (executor.py used underscore-prefixed names)
+# Backward-compat aliases
 _TOOL_PROVIDER = TOOL_PROVIDER
 _TOOL_MODEL = TOOL_MODEL
 _TOOL_CAPABLE_PROVIDERS = TOOL_CAPABLE_PROVIDERS
 
-# Cheap-mode: tools that don't require strong reasoning — can use MiniMax to save cost
-CHEAP_TOOLS = frozenset(
-    {
-        "memory_search",
-        "memory_store",
-        "memory_list",
-        "list_files",
-        "read_file",
-        "grep",
-        "find_files",
-        "git_log",
-        "git_status",
-        "git_diff",
-        "search_confluence",
-        "lrm_search",
-        "get_ticket",
-        "list_tickets",
-    }
-)
-# Provider/model to use for cheap (non-code) tasks
-CHEAP_PROVIDER = "minimax"
-CHEAP_MODEL = "MiniMax-M2.5"
+# Backward-compat — kept for executor.py import; cheap_mode is now a no-op (no downgrade)
+CHEAP_TOOLS: frozenset[str] = frozenset()
+CHEAP_PROVIDER = TOOL_PROVIDER
+CHEAP_MODEL = TOOL_MODEL
 
 # Multi-model routing — roles/tags → (provider, model)
 _REASONING_ROLES = {
@@ -153,36 +134,26 @@ def _select_model_for_agent(
     pattern_id: str = "",
     mission_id: str | None = None,
 ) -> tuple[str, str]:
-    """Select (provider, model) using routing config + Darwin LLM Thompson Sampling.
+    """Select (provider, model) from Settings DB → role/tag defaults.
 
     Priority:
-    1. Darwin LLM Thompson Sampling (if multiple models tested for this agent×context)
-    2. DB routing config (Settings → LLM tab)
-    3. Hardcoded role/tag defaults
-    Falls back to minimax on local dev (AZURE_DEPLOY unset).
+    1. DB routing config (Settings → LLM tab)
+    2. Role/tag defaults
+
+    Provider always comes from PLATFORM_LLM_PROVIDER env var.
+    On Azure (AZURE_DEPLOY=1): model varies by agent role (gpt-5.2 / gpt-5.2-codex / gpt-5-mini).
+    On OVH/local: single model from PLATFORM_LLM_MODEL.
     """
-    import os
+    prov = os.environ.get("PLATFORM_LLM_PROVIDER") or (
+        "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
+    )
 
     if not os.environ.get("AZURE_DEPLOY", ""):
-        # Local multi-LLM routing: code/QA → local-mlx (Qwen), pilotage/reasoning → azure-openai,
-        # small talk / cheap ops → minimax
-        _local_primary = os.environ.get("PLATFORM_LLM_PROVIDER", "local-mlx")
-        _local_model = os.environ.get("PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
-        role_l = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
-        tags_l = {t.lower() for t in (agent.tags or [])}
-        if role_l in _CODE_ROLES or tags_l & _CODE_TAGS:
-            # Code generation, tests, QA → Qwen (local-mlx)
-            return _local_primary, _local_model
-        elif role_l in _REASONING_ROLES or tags_l & _REASONING_TAGS:
-            # Architecture, planning, pilotage → azure-openai fallback
-            _az_provider = "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
-            _az_model = os.environ.get("DEFAULT_MODEL", "gpt-5-mini")
-            return _az_provider, _az_model
-        else:
-            # Small talk, generic → minimax (cheap)
-            return CHEAP_PROVIDER, CHEAP_MODEL
+        # OVH demo or local dev — single model, no per-role dispatch
+        model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
+        return prov, model
 
-    azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
+    # Azure prod — route by agent role/tags, overridable via Settings DB
     role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
     tags = {t.lower() for t in (agent.tags or [])}
 
@@ -195,52 +166,15 @@ def _select_model_for_agent(
 
     routing = _load_routing_config()
     heavy_cfg = routing.get(category_heavy, {})
-    light_cfg = routing.get(category_light, {})
 
-    candidates: list[tuple[str, str]] = []
-    # Model tiers (all on azure-openai endpoint):
-    #   reasoning/leadership → gpt-5
-    #   code/tests           → gpt-5.1-codex
-    #   small talk/default   → gpt-5-mini
-    codex_model = os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
-    h_model_reasoning = "gpt-5.2"
-    h_model_code = codex_model
-    if azure_ai_key:
-        h_provider = heavy_cfg.get("provider", "azure-openai")
-        h_model = heavy_cfg.get(
-            "model",
-            h_model_reasoning if category_heavy == "reasoning_heavy" else h_model_code,
-        )
-        l_provider = light_cfg.get("provider", "azure-openai")
-        l_model = light_cfg.get("model", "gpt-5-mini")
-        candidates = [(h_model, h_provider), (l_model, l_provider)]
-    else:
-        candidates = [("gpt-5-mini", "azure-openai")]
-
-    if pattern_id and azure_ai_key and len(candidates) > 1:
-        try:
-            from ..patterns.team_selector import LLMTeamSelector
-
-            model, provider = LLMTeamSelector.select_model(
-                agent_id=agent.id,
-                pattern_id=pattern_id,
-                technology=technology,
-                phase_type=phase_type,
-                candidate_models=candidates,
-                mission_id=mission_id,
-            )
-            if model and model != "default":
-                return provider, model
-        except Exception as exc:
-            logger.debug("LLMTeamSelector.select_model error: %s", exc)
-
-    if heavy_cfg.get("provider") and azure_ai_key:
+    if heavy_cfg.get("provider"):
         return heavy_cfg["provider"], heavy_cfg.get("model", "gpt-5-mini")
 
+    codex_model = os.environ.get("AZURE_CODEX_MODEL", "gpt-5.2-codex")
     if role in _REASONING_ROLES or tags & _REASONING_TAGS:
         return "azure-openai", "gpt-5.2"
     if role in _CODE_ROLES or tags & _CODE_TAGS:
-        return "azure-openai", os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
+        return "azure-openai", codex_model
     return "azure-openai", "gpt-5-mini"
 
 
@@ -253,20 +187,13 @@ def _route_provider(
     mission_id: str | None = None,
     cheap_mode: bool = False,
 ) -> tuple[str, str]:
-    """Route to the best provider+model using Darwin LLM Thompson Sampling + routing config.
+    """Route to provider+model from Settings DB → role/tag defaults.
 
     Priority:
-    1. Cheap-mode: if last round only used cheap tools (memory_search, read_file…) → MiniMax
-    2. Darwin LLM Thompson Sampling (same team, competing models)
-    3. DB routing config (Settings → LLM tab)
-    4. Hardcoded role/tag defaults (gpt-5.2 / gpt-5.1-codex / gpt-5-mini)
-    Overrides: tool-calling → must use _TOOL_CAPABLE_PROVIDERS; high rejection → escalate
+    1. DB routing config (Settings → LLM tab)
+    2. Role/tag defaults (gpt-5.2 / gpt-5.2-codex / gpt-5-mini on Azure)
+    cheap_mode is ignored — no downgrade to cheaper provider.
     """
-    import os
-
-    # Cheap-mode: route simple info-retrieval rounds to MiniMax to save cost
-    if cheap_mode and os.environ.get("AZURE_DEPLOY", ""):
-        return CHEAP_PROVIDER, CHEAP_MODEL
 
     best_provider, best_model = _select_model_for_agent(
         agent,
@@ -275,22 +202,6 @@ def _route_provider(
         pattern_id=pattern_id,
         mission_id=mission_id,
     )
-
-    if tools and best_provider not in _TOOL_CAPABLE_PROVIDERS:
-        return _TOOL_PROVIDER, _TOOL_MODEL
-
-    if best_provider not in _TOOL_CAPABLE_PROVIDERS:
-        try:
-            from .selection import rejection_rate
-
-            if rejection_rate(agent.id) > 0.40:
-                logger.debug(
-                    "Escalating %s to azure-openai (high rejection rate)", agent.id
-                )
-                return _TOOL_PROVIDER, _TOOL_MODEL
-        except Exception:
-            pass
-
     return best_provider, best_model
 
 

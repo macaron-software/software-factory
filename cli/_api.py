@@ -30,6 +30,10 @@ class APIBackend:
 
     # ── helpers ──
 
+    def _auth_headers(self) -> dict:
+        """Return auth headers for use with external streaming calls (e.g. _stream.print_stream)."""
+        return dict(self._client.headers)
+
     def _get(self, path: str, params: dict | None = None) -> Any:
         r = self._client.get(path, params=params)
         r.raise_for_status()
@@ -127,13 +131,13 @@ class APIBackend:
     def project_chat_url(self, pid: str) -> str:
         return f"{self.base_url}/api/projects/{pid}/chat/stream"
 
-    # ── Missions ──  # SAFe: epics
+    # ── Missions ──
 
     def missions_list(
         self, project: str | None = None, status: str | None = None
     ) -> list:
         data = self._get("/api/missions")
-        missions = data.get("missions", data) if isinstance(data, dict) else data
+        missions = data.get("epics", data) if isinstance(data, dict) else data
         if project:
             missions = [m for m in missions if m.get("project_id") == project]
         if status:
@@ -152,7 +156,7 @@ class APIBackend:
     def mission_start(self, mid: str) -> dict:
         return self._post(f"/api/missions/{mid}/start")
 
-    def mission_run(self, mid: str) -> dict:
+    def epic_run(self, mid: str) -> dict:
         return self._post(f"/api/missions/{mid}/run")
 
     def mission_reset(self, mid: str) -> dict:
@@ -177,7 +181,7 @@ class APIBackend:
     def mission_chat_url(self, mid: str) -> str:
         return f"{self.base_url}/api/missions/{mid}/chat/stream"
 
-    def mission_run_sse_url(self, mid: str) -> str:
+    def epic_run_sse_url(self, mid: str) -> str:
         return f"{self.base_url}/api/sessions/{mid}/stream"
 
     # ── Features ──
@@ -340,6 +344,19 @@ class APIBackend:
 
     def ideation_session_url(self, session_id: str) -> str:
         return f"{self.base_url}/api/sessions/{session_id}/sse"
+
+    # ── CTO / Jarvis ──
+
+    def cto_new_session(self, title: str = "") -> dict:
+        """Create a new CTO chat session (visible in Jarvis history UI)."""
+        return self._post("/api/cto/sessions/new", {"title": title} if title else {})
+
+    def cto_sessions(self) -> list:
+        """List CTO sessions."""
+        return self._get("/api/cto/sessions") or []
+
+    def cto_message_url(self) -> str:
+        return f"{self.base_url}/api/cto/message"
 
     # ── Metrics ──
 

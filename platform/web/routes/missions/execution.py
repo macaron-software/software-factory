@@ -867,6 +867,46 @@ async def api_mission_reset(request: Request, mission_id: str):
     return JSONResponse({"status": "reset", "mission_id": mission_id})
 
 
+@router.post("/api/missions/{run_id}/retry")
+async def api_mission_retry(request: Request, run_id: str):
+    """Watchdog retry endpoint: if the mission task is still alive, just touch updated_at
+    to reset the stall timer. If the task is gone (zombie), mark as paused so auto_resume
+    can pick it up.
+    """
+    from ....db.migrations import get_db
+    from ....missions.store import get_mission_run_store
+
+    run_store = get_mission_run_store()
+    mission = run_store.get(run_id)
+    if not mission:
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    task = _active_mission_tasks.get(run_id)
+    if task and not task.done():
+        # Mission is actively running — just refresh updated_at to suppress false stall
+        try:
+            db = get_db()
+            db.execute("UPDATE epic_runs SET updated_at=datetime('now') WHERE id=?", (run_id,))
+            db.commit()
+            db.close()
+        except Exception:
+            pass
+        return JSONResponse({"status": "alive", "run_id": run_id})
+
+    # No active task — mission is a zombie: mark paused so auto_resume relaunches it
+    try:
+        db = get_db()
+        db.execute(
+            "UPDATE epic_runs SET status='paused', updated_at=datetime('now') WHERE id=? AND status='running'",
+            (run_id,),
+        )
+        db.commit()
+        db.close()
+    except Exception:
+        pass
+    return JSONResponse({"status": "paused_for_resume", "run_id": run_id})
+
+
 # ── Confluence Sync ──────────────────────────────────────────
 
 

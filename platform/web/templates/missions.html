@@ -88,14 +88,14 @@
     {% else %}
     <div class="empty-state">
         <p>{{ _('no_epic') }}</p>
-        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_missions") }}</p>
+        <p style="color:var(--text-secondary);font-size:0.82rem">{{ _("les_agents_strategiques_creent_des_epics") }}</p>
         <a href="/epics?action=new" class="btn btn-primary" style="margin-top:0.5rem">{{ _('create_manually') }}</a>
     </div>
     {% endfor %}
 </div>
 
 {% if show_new_form %}
-<div class="new-mission-overlay" onclick="if(event.target===this)location.href='/missions'">
+<div class="new-mission-overlay" onclick="if(event.target===this)location.href='/epics'">
     <form class="new-mission-form" id="newMissionForm">
         <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _("new_mission") }}</h3>
         <div class="nmf-field">

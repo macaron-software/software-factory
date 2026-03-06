@@ -54,6 +54,7 @@
 .llm-prov-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
 .llm-prov-name{font-weight:700;font-size:0.9rem;color:var(--text-primary)}
 .llm-prov-models{font-size:0.73rem;color:var(--text-secondary);margin-top:2px}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 .routing-select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.6rem;font-size:0.81rem;font-family:inherit;outline:none;min-width:200px}
 .routing-select:focus{border-color:var(--purple)}
 .routing-row td{padding:0.55rem 0.8rem;border-bottom:1px solid rgba(255,255,255,0.04)}
@@ -86,9 +87,7 @@
         <button class="settings-tab" onclick="showSettingsTab('modules')">
             <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
         </button>
-        <button class="settings-tab" onclick="showSettingsTab('deploy')">
-            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cloud"/></svg> Deploy Targets
-        </button>
+        <button class="settings-tab" onclick="showSettingsTab('security')">Security</button>
     </div>
 
     <!-- ═══ General ═══ -->
@@ -289,6 +288,62 @@
 
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
+              <!-- AC Quality Thresholds -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Quality Gates — AC / Hardening</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem;margin-bottom:0.6rem">
+                Seuils du cycle d'Amélioration Continue. Si le <code>total_score</code> d'un cycle est inférieur au seuil,
+                un <strong>Hardening Sprint</strong> est déclenché automatiquement (<code>no_slop</code> + architecture + over_engineering).
+              </div>
+              <div id="quality-settings-form" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:640px">
+                <div class="form-group">
+                  <label>Seuil Hardening Sprint <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-hardening-threshold" min="50" max="100" step="1" style="width:80px"
+                      value="85">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">déclenche refactoring si score &lt; seuil</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Warn <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-warn" min="0" max="100" step="5" style="width:80px"
+                      value="60">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">jaune en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Fail <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-fail" min="0" max="100" step="5" style="width:80px"
+                      value="40">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">rouge en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Max Hardenings / cycle</label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-max-hardening" min="1" max="5" step="1" style="width:80px"
+                      value="1">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">force progression après N sprints</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.8rem;margin-top:0.3rem">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.88rem">
+                  <input type="checkbox" id="qs-auto-hardening" checked>
+                  <span>Auto-hardening activé</span>
+                </label>
+              </div>
+              <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.8rem">
+                <button type="button" onclick="saveQualitySettings()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.4rem 1.1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">
+                  Save Quality Gates
+                </button>
+                <span id="quality-save-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
               <!-- Worker nodes -->
               <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
@@ -374,7 +429,7 @@
                         <div class="integ-field">
                             <label>{{ key|replace('_',' ')|title }}</label>
                             {% if 'token' in key or 'secret' in key or 'password' in key or 'api_key' in key or 'key_id' in key or 'client_secret' in key %}
-                            <input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            <form onsubmit="return false"><input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}"></form>
                             {% elif 'url' in key or key == 'instance' or key == 'domain' %}
                             <input type="url" placeholder="https://..." value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
                             {% elif val is sameas true or val is sameas false %}
@@ -592,6 +647,94 @@
             </div>
         </section>
 
+        <!-- Image Generation -->
+        <section class="settings-section" style="margin-top:2rem">
+            <h3>Image Generation</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem">Providers used by agents to generate visual assets (sprites, backgrounds, concept art). Used in game dev and design workflows.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem" id="image-gen-grid">
+                <!-- fal.ai / Flux -->
+                <div class="llm-provider-card" id="imgprov-falai">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🌊 fal.ai — Flux</div>
+                            <div class="llm-prov-models">flux-pro · flux-dev · flux-schnell</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-falai-toggle" onchange="saveImageProviderKey('falai', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Best quality for general assets, backgrounds, concept art. ~$0.05/image.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('falai')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('falai')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- PixelLab -->
+                <div class="llm-provider-card" id="imgprov-pixellab">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🎮 PixelLab</div>
+                            <div class="llm-prov-models">sprites · tilesets · animations</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-pixellab-toggle" onchange="saveImageProviderKey('pixellab', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Purpose-built for pixel art game assets. Sprite sheets, rotations, animation frames.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('pixellab')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('pixellab')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- Gemini Image (Nano Banana) -->
+                <div class="llm-provider-card" id="imgprov-gemini-image">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🍌 Gemini Image (Nano Banana)</div>
+                            <div class="llm-prov-models">gemini-2.5-flash · imagen-3</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-gemini-image-toggle" onchange="saveImageProviderKey('gemini-image', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">UI mockups, screens & flows. Generate full interface designs from a prompt, then feed image to Claude to implement. Uses your existing GEMINI_API_KEY.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('gemini-image')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('gemini-image')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- Replicate -->
+                <div class="llm-provider-card" id="imgprov-replicate">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">🔁 Replicate</div>
+                            <div class="llm-prov-models">flux · sdxl · custom LoRA</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-replicate-toggle" onchange="saveImageProviderKey('replicate', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Access to all open models (Flux, SDXL + LoRAs). Good for experimentation and style-consistent asset libraries.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('replicate')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('replicate')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+            </div>
+        </section>
+
         <!-- Darwin LLM Thompson Sampling -->
         <section class="settings-section" style="margin-top:2rem">
             <h3>Darwin LLM A/B</h3>
@@ -614,12 +757,52 @@
                     <h3 style="margin:0">Optional Modules</h3>
                     <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
                 </div>
-                <button class="btn btn-sm" onclick="document.getElementById('modules-container').dataset.loaded='';loadModulesTab()">
-                    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Refresh
-                </button>
             </div>
             <div id="modules-container">
                 <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══ Security ═══ -->
+    <div class="settings-panel" id="panel-security">
+        <section class="settings-section">
+            <h3>Agent Sandbox</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1.2rem">
+                Isolement filesystem des commandes shell exécutées par les agents. Chaque agent est restreint à son workspace projet — accès à la source platform et aux autres workspaces bloqué.
+            </p>
+
+            <!-- Landlock card -->
+            <div class="integ-card" id="landlock-card" style="max-width:560px">
+                <div style="display:flex;align-items:flex-start;gap:1rem">
+                    <div style="font-size:2rem;line-height:1;margin-top:2px;color:var(--text-secondary);font-weight:700">[LL]</div>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
+                            <span style="font-weight:700;font-size:0.95rem">Landlock Filesystem Sandbox</span>
+                            <span id="landlock-status-badge" class="ck-badge badge-off" style="font-size:0.65rem">Chargement…</span>
+                        </div>
+                        <p style="font-size:0.78rem;color:var(--text-secondary);margin:0 0 0.6rem 0;line-height:1.5">
+                            Linux Security Module (kernel ≥ 5.13). Sandbox léger kernel-level — zéro overhead contrairement au Docker sandbox. Restreint l'accès fichiers de chaque shell agent à son workspace + chemins système en lecture seule.
+                        </p>
+                        <div id="landlock-binary-info" style="font-size:0.72rem;color:var(--text-secondary);font-family:monospace;margin-bottom:0.8rem">—</div>
+                        <div style="display:flex;align-items:center;gap:1rem">
+                            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;font-weight:600">
+                                <div class="toggle-switch" id="landlock-toggle" onclick="toggleLandlock()" style="position:relative;width:40px;height:22px;cursor:pointer">
+                                    <input type="checkbox" id="landlock-checkbox" style="opacity:0;width:0;height:0;position:absolute">
+                                    <span id="landlock-slider" style="position:absolute;inset:0;border-radius:22px;background:var(--border);transition:.3s;display:flex;align-items:center">
+                                        <span id="landlock-knob" style="width:16px;height:16px;border-radius:50%;background:#fff;margin-left:3px;transition:transform .3s;display:block;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+                                    </span>
+                                </div>
+                                <span id="landlock-toggle-label">—</span>
+                            </label>
+                            <span id="landlock-save-hint" style="font-size:0.72rem;color:var(--purple);display:none">Saved</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);font-size:0.75rem;color:var(--text-secondary)">
+                    <strong>Politique appliquée :</strong>
+                    <span style="margin-left:0.4rem">workspace → RW · /bin /usr /lib /etc /tmp → RO · /app/platform + autres workspaces → <span style="color:#ef4444;font-weight:600">BLOQUÉ</span></span>
+                </div>
             </div>
         </section>
     </div>
@@ -647,21 +830,30 @@
 
 <script>
 const _CAT_LABELS = {
-  'ux-design':'🎨 UX / Design','development':'💻 Development','security':'🔒 Security',
-  'legal':'⚖️ Legal / Compliance','marketing-seo':'📣 Marketing / SEO','data':'🗄️ Data','ai-llm':'🤖 AI / LLM'
+  'ux-design':'UX / Design','development':'Development','security':'Security',
+  'infra':'Infra / DevOps','browser':'Browser','ai-llm':'AI / LLM','knowledge':'Knowledge','legal':'Legal','marketing-seo':'Marketing','data':'Data'
 };
 
-async function loadModulesTab() {
+async function loadModulesTab(force) {
     const container = document.getElementById('modules-container');
-    if (!container || container.dataset.loaded) return;
+    if (!container || (container.dataset.loaded && !force)) return;
     container.dataset.loaded = '1';
     try {
         const r = await fetch('/api/modules');
         const modules = await r.json();
         renderModules(modules);
     } catch(e) {
-        container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
+        if (!force) container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
     }
+}
+
+let _modulesPoller = null;
+function _startModulesPoller() {
+    if (_modulesPoller) return;
+    _modulesPoller = setInterval(() => loadModulesTab(true), 30000);
+}
+function _stopModulesPoller() {
+    if (_modulesPoller) { clearInterval(_modulesPoller); _modulesPoller = null; }
 }
 
 function renderModules(modules) {
@@ -674,7 +866,7 @@ function renderModules(modules) {
         byCat[c].push(m);
     });
 
-    const catOrder = ['ux-design','development','security','legal','marketing-seo','data','ai-llm','other'];
+    const catOrder = ['ux-design','development','security','infra','browser','ai-llm','knowledge','legal','marketing-seo','data','other'];
     let html = '';
     catOrder.filter(c => byCat[c]).forEach(cat => {
         const label = _CAT_LABELS[cat] || cat;
@@ -698,7 +890,7 @@ function moduleCard(m) {
     return `
     <div class="module-card ${m.enabled?'enabled':''}" id="module-card-${m.id}">
         <div class="module-card-header">
-            <span class="module-icon">${m.icon||'🔧'}</span>
+            <span class="module-icon"><svg class="icon" style="width:20px;height:20px;opacity:.8"><use href="#icon-${m.icon||'plug'}"/></svg></span>
             <div class="module-info">
                 <div class="module-name">${m.name}</div>
                 <div class="module-desc">${m.description}</div>
@@ -709,7 +901,7 @@ function moduleCard(m) {
                 </div>
                 ${tools?`<div class="module-tools">Tools: ${tools}</div>`:''}
             </div>
-            <label style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
+            <label title="${m.builtin?'Built-in — always loaded at startup':'Toggle to enable/disable in MCP LRM (restart required)'}" style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
                 <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${m.enabled?'var(--purple)':'var(--border)'};transition:background .2s" id="mod-track-${m.id}">
                     <span style="position:absolute;top:2px;left:${m.enabled?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mod-thumb-${m.id}"></span>
                 </span>
@@ -749,7 +941,7 @@ async function installModule(id, btn) {
             btn.textContent = '✓ Done';
             btn.style.color = 'var(--green)';
             // Reload to refresh installed status
-            setTimeout(() => { document.getElementById('modules-container').dataset.loaded=''; loadModulesTab(); }, 1000);
+            setTimeout(() => loadModulesTab(true), 1000);
         } else {
             btn.textContent = '✗ Failed';
             btn.style.color = 'var(--red)';
@@ -768,8 +960,9 @@ function showSettingsTab(id) {
     event.target.closest('.settings-tab').classList.add('active');
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
-    if (id === 'orchestrator') refreshLoad();
-    if (id === 'modules') loadModulesTab();
+    if (id === 'orchestrator') { refreshLoad(); loadQualitySettings(); }
+    if (id === 'modules') { loadModulesTab(); _startModulesPoller(); }
+    else _stopModulesPoller();
 }
 // Restore last tab
 try {
@@ -792,6 +985,53 @@ async function saveOrchSettings() {
   try {
     const r = await fetch('/api/settings/orchestrator', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    const j = await r.json();
+    if (j.ok) {
+      st.style.color = 'var(--green, #4ade80)';
+      st.textContent = 'Saved — applied live';
+      setTimeout(() => { st.textContent = ''; }, 3000);
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Error: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Quality Gates (AC Hardening) ─────────────────────────────────────────────
+async function loadQualitySettings() {
+  try {
+    const r = await fetch('/api/settings/quality');
+    const j = await r.json();
+    if (!j.ok) return;
+    const s = j.settings;
+    const el = (id) => document.getElementById(id);
+    if (s.ac_hardening_threshold) el('qs-hardening-threshold').value = s.ac_hardening_threshold;
+    if (s.ac_adversarial_warn)    el('qs-adversarial-warn').value    = s.ac_adversarial_warn;
+    if (s.ac_adversarial_fail)    el('qs-adversarial-fail').value    = s.ac_adversarial_fail;
+    if (s.ac_max_hardening_per_cycle) el('qs-max-hardening').value   = s.ac_max_hardening_per_cycle;
+    if (s.ac_auto_hardening_enabled !== undefined)
+      el('qs-auto-hardening').checked = (s.ac_auto_hardening_enabled === 'true');
+  } catch(e) { /* silent */ }
+}
+
+async function saveQualitySettings() {
+  const el = (id) => document.getElementById(id);
+  const data = {
+    ac_hardening_threshold:    parseInt(el('qs-hardening-threshold').value, 10),
+    ac_adversarial_warn:       parseInt(el('qs-adversarial-warn').value, 10),
+    ac_adversarial_fail:       parseInt(el('qs-adversarial-fail').value, 10),
+    ac_max_hardening_per_cycle:parseInt(el('qs-max-hardening').value, 10),
+    ac_auto_hardening_enabled: String(el('qs-auto-hardening').checked),
+  };
+  const st = el('quality-save-status');
+  st.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/settings/quality', {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
     });
     const j = await r.json();
     if (j.ok) {
@@ -851,7 +1091,7 @@ async function refreshLoad() {
     const cpu = d.cpu_percent ?? '—';
     const ram = d.ram_percent ?? '—';
     const score = d.load_score ?? '—';
-    const missions = d.active_missions ?? '—';
+    const missions = d.active_epics ?? '—';
     document.getElementById('li-cpu').textContent = cpu + '%';
     document.getElementById('li-ram').textContent = ram + '%';
     document.getElementById('li-missions').textContent = missions;
@@ -875,7 +1115,7 @@ async function pingWorkers() {
       if (!r.ok) return `<span style="color:#f87171">${url} — HTTP ${r.status}</span>`;
       const d = await r.json();
       const color = d.load_score >= 85 ? '#f87171' : d.load_score >= 70 ? '#facc15' : '#4ade80';
-      return `<span style="color:${color}">${url} — CPU ${d.cpu_percent}% RAM ${d.ram_percent}% score ${d.load_score} (${d.active_missions} missions)</span>`;
+      return `<span style="color:${color}">${url} — CPU ${d.cpu_percent}% RAM ${d.ram_percent}% score ${d.load_score} (${d.active_epics} missions)</span>`;
     } catch(e) {
       return `<span style="color:#f87171">${url} — unreachable: ${e.message}</span>`;
     }
@@ -1075,6 +1315,51 @@ async function deleteCustomProvider(id) {
 
 // ── LLM Tab ──────────────────────────────────────────────────────────────
 
+// Image Generation providers — keys stored as integrations
+const _IMAGE_PROVIDERS = {
+    falai:          { integ_id: 'image-gen-falai',         env_key: 'FAL_KEY' },
+    pixellab:       { integ_id: 'image-gen-pixellab',      env_key: 'PIXELLAB_API_KEY' },
+    'gemini-image': { integ_id: 'image-gen-gemini-image',  env_key: 'GEMINI_API_KEY' },
+    replicate:      { integ_id: 'image-gen-replicate',     env_key: 'REPLICATE_API_TOKEN' },
+};
+
+function markImageProviderDirty(id) {
+    const btn = document.querySelector(`#imgprov-${id} button`);
+    if (btn) btn.style.opacity = '1';
+}
+
+async function saveImageProviderKey(id, enabled) {
+    const keyInput = document.getElementById(`imgprov-${id}-key`);
+    const toggle = document.getElementById(`imgprov-${id}-toggle`);
+    const { integ_id, env_key } = _IMAGE_PROVIDERS[id];
+    const key = keyInput ? keyInput.value.trim() : '';
+    const isEnabled = enabled !== undefined ? enabled : (toggle ? toggle.checked : false);
+    const cfg = { env_key };
+    if (key) cfg.api_key = key;
+    await fetch(`/api/integrations/${integ_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: isEnabled, config: cfg }),
+    });
+    if (keyInput && key) { keyInput.value = ''; keyInput.placeholder = '••••••••  (saved)'; }
+}
+
+async function loadImageGenProviders() {
+    try {
+        const r = await fetch('/api/integrations');
+        const rows = await r.json();
+        for (const [id, { integ_id }] of Object.entries(_IMAGE_PROVIDERS)) {
+            const row = rows.find(r => r.id === integ_id);
+            if (row) {
+                const toggle = document.getElementById(`imgprov-${id}-toggle`);
+                const card = document.getElementById(`imgprov-${id}`);
+                if (toggle) toggle.checked = !!row.enabled;
+                if (card) card.classList.toggle('active', !!row.enabled);
+            }
+        }
+    } catch(e) { /* silent */ }
+}
+
 let _llmModels = [];
 const _ROUTING_ROWS = [
     {key_heavy:'reasoning_heavy', key_light:'reasoning_light', label:'Reasoning', sub:'Architecture, planning, strategy'},
@@ -1091,6 +1376,7 @@ async function loadLLMTab() {
         renderProviders(d.providers || []);
         renderRoutingTable(d.routing || {});
         loadLLMABTests();
+        loadImageGenProviders();
     } catch(e) {
         document.getElementById('llm-providers-grid').innerHTML = '<p style="color:var(--red)">Failed to load: ' + e.message + '</p>';
     }
@@ -1099,8 +1385,10 @@ async function loadLLMTab() {
 function renderProviders(providers) {
     const grid = document.getElementById('llm-providers-grid');
     if (!providers.length) { grid.innerHTML = '<p style="color:var(--text-secondary)">No providers configured</p>'; return; }
-    const colors = {'azure-ai':'rgba(0,120,212,.15)','azure-openai':'rgba(0,120,212,.12)','minimax':'rgba(34,197,94,.12)','nvidia':'rgba(118,185,0,.12)'};
-    const textColors = {'azure-ai':'#0078d4','azure-openai':'#0065b3','minimax':'#22c55e','nvidia':'#76b900'};
+    const colors = {'azure-ai':'rgba(0,120,212,.15)','azure-openai':'rgba(0,120,212,.12)','minimax':'rgba(34,197,94,.12)','nvidia':'rgba(118,185,0,.12)','opencode':'rgba(124,58,237,.12)','local-mlx':'rgba(234,179,8,.12)','ollama':'rgba(20,184,166,.12)'};
+    const textColors = {'azure-ai':'#0078d4','azure-openai':'#0065b3','minimax':'#22c55e','nvidia':'#76b900','opencode':'#7c3aed','local-mlx':'#eab308','ollama':'#14b8a6'};
+    // Providers that support live model fetching
+    const liveModelProviders = new Set(['azure-ai','azure-openai','ollama','local-mlx','opencode']);
     grid.innerHTML = providers.map(p => {
         const canToggle = p.has_key;
         const statusLabel = !p.has_key ? 'no key' : (p.manually_disabled ? 'disabled' : 'active');
@@ -1108,6 +1396,13 @@ function renderProviders(providers) {
         const toggleChecked = p.enabled ? 'checked' : '';
         const toggleDisabled = !p.has_key ? 'disabled' : '';
         const toggleTitle = !p.has_key ? `Set ${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY to enable` : (p.enabled ? 'Click to disable' : 'Click to enable');
+        const hasLiveFetch = liveModelProviders.has(p.id);
+        const modelsDisplay = p.models && p.models.length ? p.models.join(' · ') : '—';
+        const refreshBtn = hasLiveFetch ? `
+            <button onclick="refreshProviderModels('${p.id}')" id="refresh-btn-${p.id}"
+                title="Fetch models from ${p.name} API"
+                style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-secondary);opacity:.7;font-size:0.9rem;line-height:1"
+                >↻</button>` : '';
         return `
         <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}" id="prov-card-${p.id}">
             <div class="llm-prov-header">
@@ -1115,7 +1410,7 @@ function renderProviders(providers) {
                     <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
                     <div>
                         <div class="llm-prov-name">${p.name}</div>
-                        <div class="llm-prov-models">${p.models.join(' · ')}</div>
+                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}</div>
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.7rem">
@@ -1142,6 +1437,45 @@ function renderProviders(providers) {
             ${!p.has_key ? `<p style="font-size:0.72rem;color:var(--text-secondary);margin:0.4rem 0 0">Set <code>${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY</code> env var to enable</p>` : ''}
         </div>`;
     }).join('');
+}
+
+// Live model fetch for a provider — updates card + routing selects.
+// WHY: Azure Foundry, ollama, opencode expose a /models or /api/tags endpoint.
+// Polling it lets the routing table show real deployed models without code change.
+async function refreshProviderModels(providerId) {
+    const btn = document.getElementById('refresh-btn-' + providerId);
+    const modelsDiv = document.getElementById('prov-models-' + providerId);
+    if (btn) { btn.style.opacity = '0.3'; btn.style.animation = 'spin 1s linear infinite'; }
+    try {
+        const r = await fetch(`/api/llm/providers/${providerId}/models`);
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'failed');
+        const models = d.models || [];
+        if (!models.length) { if (btn) { btn.style.opacity='0.7'; btn.style.animation=''; } return; }
+        // Update _llmModels for this provider
+        _llmModels = _llmModels.filter(m => m.provider !== providerId);
+        models.forEach(m => _llmModels.push({
+            value: `${providerId}::${m}`,
+            label: `${d.provider_id || providerId} / ${m}`,
+            provider: providerId,
+            model: m,
+            enabled: true,
+        }));
+        // Re-render routing selects without full reload
+        const routing = {};
+        document.querySelectorAll('[data-routing-key]').forEach(sel => {
+            const [prov, mod] = sel.value.split('::');
+            routing[sel.dataset.routingKey] = {provider: prov, model: mod};
+        });
+        renderRoutingTable(routing);
+        // Update the model list text in the card
+        const refreshBtn = btn ? btn.outerHTML : '';
+        modelsDiv.innerHTML = models.join(' · ') + refreshBtn;
+    } catch(e) {
+        console.error('refreshProviderModels', providerId, e);
+    } finally {
+        if (btn) { btn.style.opacity='0.7'; btn.style.animation=''; }
+    }
 }
 
 async function toggleProvider(event, providerId) {
@@ -1246,311 +1580,6 @@ async function loadLLMABTests() {
     } catch(e) { console.error(e); }
 }
 </script>
-
-<!-- ═══ Deploy Targets Panel ═══ -->
-<div class="settings-panel" id="panel-deploy" style="display:none">
-<section class="settings-section">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-        <div>
-            <h3 style="margin:0 0 0.25rem">Deploy Targets</h3>
-            <p style="margin:0;color:var(--text-secondary);font-size:0.82rem">Configure deployment platforms. Assign targets to projects &amp; domains.</p>
-        </div>
-        <button class="btn btn-primary btn-sm" onclick="dtOpenAdd()">+ Add Target</button>
-    </div>
-    <div id="dt-list">Loading…</div>
-</section>
-</div>
-
-<!-- Deploy Target Modal -->
-<div id="dt-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;display:flex;align-items:center;justify-content:center">
-    <div style="background:var(--bg-card);border-radius:12px;padding:1.5rem;width:500px;max-width:95vw;max-height:80vh;overflow-y:auto">
-        <h3 id="dt-modal-title" style="margin:0 0 1rem">Add Deploy Target</h3>
-        <form id="dt-form" onsubmit="dtSave(event)">
-            <label style="display:block;margin-bottom:0.75rem">
-                <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">Name *</span>
-                <input id="dt-name" type="text" class="settings-input" placeholder="my-azure-vm" required style="width:100%;margin-top:0.25rem">
-            </label>
-            <label style="display:block;margin-bottom:0.75rem">
-                <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">Driver *</span>
-                <select id="dt-driver" class="settings-input" onchange="dtBuildConfigFields()" style="width:100%;margin-top:0.25rem">
-                    <option value="">Select a driver…</option>
-                    <option value="docker_local">Docker Local</option>
-                    <option value="ssh_docker">SSH + Docker (VPS / VM)</option>
-                    <option value="aws_ecs">AWS ECS Fargate</option>
-                    <option value="azure_aca">Azure Container Apps</option>
-                    <option value="gcp_cloudrun">GCP Cloud Run</option>
-                    <option value="k8s">Kubernetes / Helm</option>
-                </select>
-            </label>
-            <div id="dt-config-fields"></div>
-            <input type="hidden" id="dt-edit-id">
-            <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="dtCloseModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">Save</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-<script>
-// ─── Deploy Targets UI ────────────────────────────────────────────────────────
-const DT_CONFIG_SCHEMAS = {
-    ssh_docker: [
-        {key:'host', label:'Host / IP', type:'text', required:true},
-        {key:'port', label:'SSH Port', type:'number', placeholder:'22'},
-        {key:'user', label:'SSH User', type:'text', placeholder:'root'},
-        {key:'key_path', label:'Private Key Path', type:'text', placeholder:'~/.ssh/id_rsa'},
-        {key:'remote_dir', label:'Remote Directory', type:'text', placeholder:'/opt/macaron-apps'},
-        {key:'host_port', label:'Exposed Port (0=auto)', type:'number', placeholder:'0'},
-    ],
-    aws_ecs: [
-        {key:'region', label:'Region', type:'text', placeholder:'us-east-1', required:true},
-        {key:'cluster', label:'ECS Cluster', type:'text', required:true},
-        {key:'service', label:'Service Name', type:'text'},
-        {key:'ecr_registry', label:'ECR Registry URL', type:'text'},
-        {key:'role_arn', label:'IAM Role ARN', type:'text'},
-    ],
-    azure_aca: [
-        {key:'subscription_id', label:'Subscription ID', type:'text', required:true},
-        {key:'resource_group', label:'Resource Group', type:'text', required:true},
-        {key:'environment', label:'Container Apps Env', type:'text'},
-        {key:'location', label:'Region', type:'text', placeholder:'francecentral'},
-    ],
-    gcp_cloudrun: [
-        {key:'project_id', label:'GCP Project ID', type:'text', required:true},
-        {key:'region', label:'Region', type:'text', placeholder:'europe-west1'},
-        {key:'service_account_json', label:'Service Account JSON (path or inline)', type:'textarea'},
-    ],
-    k8s: [
-        {key:'kubeconfig_path', label:'Kubeconfig Path', type:'text', placeholder:'~/.kube/config'},
-        {key:'namespace', label:'Namespace', type:'text', placeholder:'default'},
-        {key:'helm_chart', label:'Helm Chart (optional)', type:'text'},
-    ],
-};
-
-let _dtTargets = [];
-let _dtEditId = null;
-
-async function dtLoad() {
-    const res = await fetch('/api/deploy-targets');
-    _dtTargets = await res.json();
-    const list = document.getElementById('dt-list');
-    if (!_dtTargets.length) { list.innerHTML = '<p style="color:var(--text-secondary)">No targets configured.</p>'; return; }
-    list.innerHTML = _dtTargets.map(t => `
-        <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem;border:1px solid var(--border);border-radius:8px;margin-bottom:0.5rem">
-            <div style="flex:1;min-width:0">
-                <div style="font-weight:600;font-size:0.85rem">${t.name} ${t.is_default?'<span class="badge badge-idle" style="font-size:0.65rem">default</span>':''}</div>
-                <div style="font-size:0.75rem;color:var(--text-secondary)">${t.label || t.driver}</div>
-            </div>
-            <span class="badge ${t.status==='ok'?'badge-success':t.status==='error'?'badge-error':'badge-idle'}" style="font-size:0.7rem">${t.status}</span>
-            ${t.id!=='docker-local'?`
-            ${t.driver==='ssh_docker'?`<button class="btn btn-primary btn-sm" style="padding:0.25rem 0.6rem;font-size:0.72rem" onclick="dtOpenProvision('${t.id}','${t.name}')">⚡ Provision</button>`:''}
-            <button class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem;font-size:0.72rem" onclick="dtTest('${t.id}')">Test</button>
-            <button class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem;font-size:0.72rem" onclick="dtEdit('${t.id}')">Edit</button>
-            <button class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem;font-size:0.72rem;color:var(--red)" onclick="dtDelete('${t.id}','${t.name}')">Delete</button>
-            `:`<button class="btn btn-secondary btn-sm" style="padding:0.25rem 0.6rem;font-size:0.72rem" onclick="dtTest('docker-local')">Test</button>`}
-        </div>`).join('');
-}
-
-function dtOpenAdd() {
-    _dtEditId = null;
-    document.getElementById('dt-modal-title').textContent = 'Add Deploy Target';
-    document.getElementById('dt-name').value = '';
-    document.getElementById('dt-driver').value = '';
-    document.getElementById('dt-config-fields').innerHTML = '';
-    document.getElementById('dt-edit-id').value = '';
-    document.getElementById('dt-modal').style.display = 'flex';
-}
-
-function dtCloseModal() { document.getElementById('dt-modal').style.display = 'none'; }
-
-function dtBuildConfigFields() {
-    const driver = document.getElementById('dt-driver').value;
-    const schema = DT_CONFIG_SCHEMAS[driver] || [];
-    const container = document.getElementById('dt-config-fields');
-    container.innerHTML = schema.map(f => `
-        <label style="display:block;margin-bottom:0.75rem">
-            <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary)">${f.label}${f.required?' *':''}</span>
-            ${f.type==='textarea'
-                ? `<textarea id="dtf-${f.key}" class="settings-input" rows="3" placeholder="${f.placeholder||''}" style="width:100%;margin-top:0.25rem;font-family:monospace;font-size:0.75rem" ${f.required?'required':''}></textarea>`
-                : `<input id="dtf-${f.key}" type="${f.type||'text'}" class="settings-input" placeholder="${f.placeholder||f.default||''}" style="width:100%;margin-top:0.25rem" ${f.required?'required':''}>`
-            }
-        </label>`).join('');
-}
-
-async function dtEdit(id) {
-    const t = _dtTargets.find(x => x.id === id);
-    if (!t) return;
-    _dtEditId = id;
-    document.getElementById('dt-modal-title').textContent = 'Edit Deploy Target';
-    document.getElementById('dt-name').value = t.name;
-    document.getElementById('dt-driver').value = t.driver;
-    document.getElementById('dt-edit-id').value = id;
-    dtBuildConfigFields();
-    const cfg = JSON.parse(t.config_json || '{}');
-    for (const [k, v] of Object.entries(cfg)) {
-        const el = document.getElementById('dtf-' + k);
-        if (el) el.value = v;
-    }
-    document.getElementById('dt-modal').style.display = 'flex';
-}
-
-async function dtSave(e) {
-    e.preventDefault();
-    const id = document.getElementById('dt-edit-id').value;
-    const name = document.getElementById('dt-name').value.trim();
-    const driver = document.getElementById('dt-driver').value;
-    const schema = DT_CONFIG_SCHEMAS[driver] || [];
-    const config = {};
-    for (const f of schema) {
-        const el = document.getElementById('dtf-' + f.key);
-        if (el && el.value) config[f.key] = el.value;
-    }
-    const body = {name, driver, config};
-    const url = id ? `/api/deploy-targets/${id}` : '/api/deploy-targets';
-    const method = id ? 'PUT' : 'POST';
-    const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-    const data = await res.json();
-    if (data.error) { alert('Error: ' + data.error); return; }
-    dtCloseModal();
-    dtLoad();
-}
-
-async function dtDelete(id, name) {
-    if (!confirm(`Delete target "${name}"?`)) return;
-    await fetch(`/api/deploy-targets/${id}`, {method:'DELETE'});
-    dtLoad();
-}
-
-async function dtTest(id) {
-    const res = await fetch(`/api/deploy-targets/${id}/test`, {method:'POST'});
-    const data = await res.json();
-    alert(`${data.ok ? '✅' : '❌'} ${data.message}`);
-    dtLoad();
-}
-
-// ─── Provision VM ─────────────────────────────────────────────────────────────
-let _dtProvisionId = null;
-
-function dtOpenProvision(id, name) {
-    _dtProvisionId = id;
-    document.getElementById('dt-prov-title').textContent = `Provision VM for "${name}"`;
-    document.getElementById('dt-prov-log').innerHTML = '';
-    document.getElementById('dt-prov-form').style.display = '';
-    document.getElementById('dt-prov-modal').style.display = 'flex';
-}
-
-function dtCloseProvision() {
-    document.getElementById('dt-prov-modal').style.display = 'none';
-}
-
-async function dtRunProvision(e) {
-    e.preventDefault();
-    const body = {
-        tenant_id: document.getElementById('prov-tenant').value.trim(),
-        client_id: document.getElementById('prov-client-id').value.trim(),
-        client_secret: document.getElementById('prov-client-secret').value.trim(),
-        subscription_id: document.getElementById('prov-sub').value.trim(),
-        resource_group: document.getElementById('prov-rg').value.trim() || 'macaron-sandbox-rg',
-        location: document.getElementById('prov-location').value.trim() || 'francecentral',
-        vm_name: document.getElementById('prov-vmname').value.trim() || 'macaron-sandbox',
-    };
-    document.getElementById('dt-prov-form').style.display = 'none';
-    const log = document.getElementById('dt-prov-log');
-    log.innerHTML = '<div style="color:var(--text-secondary);font-size:0.8rem">Starting provisioning…</div>';
-
-    const res = await fetch(`/api/deploy-targets/${_dtProvisionId}/provision`, {
-        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
-    });
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buf = '';
-
-    while (true) {
-        const {done, value} = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, {stream: true});
-        const lines = buf.split('\n');
-        buf = lines.pop();
-        for (const line of lines) {
-            if (!line.startsWith('data:')) continue;
-            const raw = line.slice(5).trim();
-            if (raw === '[DONE]') { dtLoad(); break; }
-            try {
-                const d = JSON.parse(raw);
-                const icon = d.error ? '❌' : d.done ? '✅' : '⏳';
-                const color = d.error ? 'var(--red)' : d.done ? 'var(--green)' : 'var(--text-primary)';
-                const html = `<div style="color:${color};font-size:0.8rem;margin-bottom:2px">${icon} <b>${d.step}</b>: ${d.message}</div>`;
-                if (d.step === 'complete') {
-                    log.innerHTML += html;
-                    setTimeout(dtCloseProvision, 3000);
-                } else {
-                    log.innerHTML += html;
-                }
-                log.scrollTop = log.scrollHeight;
-            } catch(_) {}
-        }
-    }
-}
-
-// Load on tab activation
-const _origShowSettingsTab = window.showSettingsTab;
-window.showSettingsTab = function(tab) {
-    _origShowSettingsTab && _origShowSettingsTab(tab);
-    if (tab === 'deploy') dtLoad();
-};
-</script>
-
-<!-- Provision VM Modal -->
-<div id="dt-prov-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1001;align-items:center;justify-content:center">
-    <div style="background:var(--bg-card);border-radius:12px;padding:1.5rem;width:520px;max-width:95vw;max-height:85vh;overflow-y:auto">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
-            <h3 id="dt-prov-title" style="margin:0">Provision Azure VM</h3>
-            <button onclick="dtCloseProvision()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--text-secondary)">✕</button>
-        </div>
-        <form id="dt-prov-form" onsubmit="dtRunProvision(event)">
-            <p style="font-size:0.8rem;color:var(--text-secondary);margin:0 0 1rem">Crée une VM Ubuntu 22.04 (Standard_B2s) sur Azure, installe Docker et configure ce deploy target automatiquement.</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Subscription ID *</span>
-                    <input id="prov-sub" type="text" class="settings-input" placeholder="xxxxxxxx-xxxx-..." required style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Tenant ID *</span>
-                    <input id="prov-tenant" type="text" class="settings-input" placeholder="xxxxxxxx-xxxx-..." required style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Client ID (SP) *</span>
-                    <input id="prov-client-id" type="text" class="settings-input" required style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Client Secret *</span>
-                    <input id="prov-client-secret" type="password" class="settings-input" required style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Resource Group</span>
-                    <input id="prov-rg" type="text" class="settings-input" placeholder="macaron-sandbox-rg" style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Région</span>
-                    <input id="prov-location" type="text" class="settings-input" placeholder="francecentral" style="width:100%;margin-top:0.2rem">
-                </label>
-                <label style="display:block;grid-column:span 2">
-                    <span style="font-size:0.75rem;font-weight:600;color:var(--text-secondary)">Nom de la VM</span>
-                    <input id="prov-vmname" type="text" class="settings-input" placeholder="macaron-sandbox" style="width:100%;margin-top:0.2rem">
-                </label>
-            </div>
-            <div style="margin-top:0.75rem;padding:0.6rem;background:rgba(124,58,237,.08);border-radius:6px;font-size:0.75rem;color:var(--text-secondary)">
-                💡 Créer un Service Principal : <code>az ad sp create-for-rbac --role Contributor --scopes /subscriptions/{sub-id}</code>
-            </div>
-            <div style="display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="dtCloseProvision()">Annuler</button>
-                <button type="submit" class="btn btn-primary btn-sm">⚡ Lancer le provisioning</button>
-            </div>
-        </form>
-        <div id="dt-prov-log" style="font-family:monospace;max-height:300px;overflow-y:auto;padding:0.5rem;background:var(--bg-secondary);border-radius:6px;margin-top:0.5rem;display:block"></div>
-    </div>
-</div>
 
 <!-- Integration Stats Modal -->
 <div id="integ-stats-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
@@ -1683,6 +1712,98 @@ function setSelfAnnotation(enabled) {
     body: JSON.stringify({self_annotation_enabled: enabled ? 'true' : 'false'})
   });
 }
+</script>
+
+<script>
+// ── Security tab — Landlock ──────────────────────────────────────
+let _landlock_state = false;
+
+async function loadSecurityTab() {
+    try {
+        const r = await fetch('/api/settings/security');
+        const d = await r.json();
+        _landlock_state = d.landlock_enabled;
+        renderLandlock(d);
+    } catch(e) {
+        console.warn('Security settings load failed', e);
+    }
+}
+
+function renderLandlock(d) {
+    const card = document.getElementById('landlock-card');
+    const badge = document.getElementById('landlock-status-badge');
+    const binaryInfo = document.getElementById('landlock-binary-info');
+    const slider = document.getElementById('landlock-slider');
+    const knob = document.getElementById('landlock-knob');
+    const label = document.getElementById('landlock-toggle-label');
+    if (!card) return;
+
+    const active = d.landlock_active;
+    const enabled = d.landlock_enabled;
+    const found = d.landlock_binary_found;
+
+    // Badge
+    if (active) {
+        badge.className = 'ck-badge badge-ok';
+        badge.textContent = 'active';
+    } else if (found && !enabled) {
+        badge.className = 'ck-badge badge-warn';
+        badge.textContent = 'disabled';
+    } else {
+        badge.className = 'ck-badge badge-off';
+        badge.textContent = found ? 'off' : 'binary missing';
+    }
+
+    // Card border
+    card.className = 'integ-card' + (active ? ' enabled' : '');
+
+    // Binary path
+    binaryInfo.textContent = found ? d.landlock_binary_path : 'binary not found — Linux kernel required';
+
+    // Toggle
+    if (enabled) {
+        slider.style.background = 'var(--purple)';
+        knob.style.transform = 'translateX(18px)';
+    } else {
+        slider.style.background = 'var(--border)';
+        knob.style.transform = 'translateX(0)';
+    }
+    label.textContent = enabled ? 'Activé' : 'Désactivé';
+
+    if (!found) {
+        document.getElementById('landlock-toggle').style.opacity = '0.5';
+        document.getElementById('landlock-toggle').style.pointerEvents = 'none';
+    }
+}
+
+async function toggleLandlock() {
+    _landlock_state = !_landlock_state;
+    try {
+        const r = await fetch('/api/settings/security', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({landlock_enabled: _landlock_state})
+        });
+        const d = await r.json();
+        // Reload full status
+        const r2 = await fetch('/api/settings/security');
+        const d2 = await r2.json();
+        renderLandlock(d2);
+        const hint = document.getElementById('landlock-save-hint');
+        hint.style.display = 'inline';
+        setTimeout(() => { hint.style.display = 'none'; }, 2000);
+    } catch(e) {
+        console.error('Toggle failed', e);
+        _landlock_state = !_landlock_state; // revert
+    }
+}
+
+// Hook into tab switching
+const _secOrigShow = window.showSettingsTab;
+window.showSettingsTab = function(tab) {
+    _secOrigShow && _secOrigShow(tab);
+    if (tab === 'security') loadSecurityTab();
+};
 </script>
 
 {% endblock %}

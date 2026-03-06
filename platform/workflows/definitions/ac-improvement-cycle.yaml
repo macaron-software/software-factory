@@ -1,0 +1,127 @@
+id: ac-improvement-cycle
+name: AC — Cycle d'Amélioration Continue
+description: >
+  Cycle automatisé d'amélioration continue d'un projet pilote.
+  Inception → Dev TDD → Adversarial → Scan déterministe (Lighthouse/axe/lint) → CI/CD → Enregistrement → Apprentissage.
+  Les scores collectés alimentent Thompson Sampling, RL et GA pour améliorer la SF elle-même.
+icon: refresh-cw
+is_builtin: true
+phases:
+- id: ac-inception
+  pattern_id: solo
+  name: Inception — Lecture contexte
+  description: >
+    Le lead lit le brief du cycle (project_id, cycle_num, stack, tier).
+    Si cycle > 1 : chercher en mémoire les résultats adversariaux du cycle précédent (ADVERSARIAL_N-1),
+    les défauts CI/CD (CICD_FAILURE_N-1), et les scores RL/Thompson passés.
+    Produire : 1) liste des 3 axes d'amélioration prioritaires issus des cycles passés,
+    2) objectifs chiffrés du cycle (score cible, nb défauts max, couverture min),
+    3) décision stack/outil (confirmer ou ajuster selon skill_eval).
+    Stocker dans memory_project : AC_PLAN_cycle_{N}.
+  gate: always
+  config:
+    agents:
+    - lead-dev
+    - architecte
+
+- id: ac-dev-sprint
+  pattern_id: loop
+  name: Dev TDD Sprint
+  description: >
+    Implémentation TDD du projet pilote selon le brief du cycle.
+    Si cycle 1 : créer le projet from scratch selon la stack.
+    Si cycle > 1 : lire le code existant (code_read/list_files), appliquer les corrections du plan d'inception.
+    RÈGLES :
+    - RED → GREEN → REFACTOR obligatoire.
+    - Toujours valider avec docker_deploy() — jamais de build natif.
+    - Screenshot obligatoire après chaque feature UI.
+    - Écrire les tests AVANT le code (TDD pur).
+    - Si build Docker échoue 2x : appeler deep_search("fix Docker {stack} error") et corriger.
+    - Stocker : GIT_SHA du commit dans memory_project.
+  gate: no_veto
+  config:
+    agents:
+    - lead-dev
+    - dev-1
+    - dev-2
+    - qa
+    max_iterations: 3
+    skill_agents:
+    - skill: developer
+    - skill: tester
+
+- id: ac-adversarial
+  pattern_id: sequential
+  name: Revue Adversariale
+  description: >
+    Revue adversariale multi-niveau du code produit.
+    L0 (déterministe) : SLOP, MOCK, FAKE_BUILD, HALLUCINATION, TOO_SHORT, ECHO.
+    L1 (LLM sémantique) : critique code critic → architecture critic.
+    Chaque reviewer doit noter (0-100) sur : qualité code, couverture tests, sécurité, maintenabilité.
+    Stocker dans memory_project : ADVERSARIAL_cycle_{N} avec scores par dimension.
+    Si score moyen < 60 : émettre VETO et lister les corrections obligatoires.
+    Si VETO : retourner en ac-dev-sprint avec les corrections prioritaires.
+  gate: all_approved
+  config:
+    agents:
+    - architecte
+    - lead-dev
+    - qa
+    dynamic_reviewers: true
+
+- id: ac-tools-scan
+  pattern_id: parallel
+  name: Scan Déterministe — Lighthouse · axe · lint · tests
+  description: >
+    Exécuter en parallèle tous les outils déterministes de qualité :
+    - Lighthouse : performance, accessibility, best-practices, SEO (score /100 chacun)
+    - axe-core : violations a11y (count critical/serious/moderate)
+    - ESLint / clippy / pylint selon la stack (nb erreurs, nb warnings)
+    - Tests unitaires + intégration : coverage % + nb tests passants
+    - Traceabilité : vérifier que chaque user story a au moins 1 test E2E associé (%)
+    Utiliser docker_deploy() pour démarrer le container avant Lighthouse/axe.
+    Stocker les scores bruts dans memory_project : TOOLS_SCAN_cycle_{N}.
+    Format attendu : {"lighthouse_perf":85,"lighthouse_a11y":92,"axe_critical":0,"lint_errors":3,"test_coverage":78,"traceability":100}
+  gate: always
+  config:
+    agents:
+    - qa
+    - dev-ops-lead
+
+- id: ac-record
+  pattern_id: solo
+  name: Enregistrement Métriques
+  description: >
+    Collecter tous les résultats du cycle et appeler POST /api/improvement/inject-cycle avec :
+    - project_id, cycle_num, git_sha
+    - total_score = moyenne pondérée (adversarial 40% + tools_scan 40% + traceabilité 20%)
+    - defect_count = nb défauts critiques adversariaux + axe_critical
+    - adversarial_scores = scores par dimension du cycle ac-adversarial
+    - phase_scores = {"inception":X,"dev":X,"adversarial":X,"tools":X}
+    - traceability_score = % user stories couvertes par E2E
+    - fix_summary = résumé 1 ligne des corrections appliquées
+    Vérifier que l'API retourne 200. Si erreur : réessayer 1 fois.
+    Stocker confirmation dans memory_project : CYCLE_RECORD_cycle_{N}.
+  gate: always
+  config:
+    agents:
+    - lead-dev
+
+- id: ac-learn
+  pattern_id: solo
+  name: Apprentissage — RL · Thompson · GA
+  description: >
+    Analyser les résultats du cycle pour alimenter les boucles d'apprentissage :
+    1. RL Reward : calculer reward = (total_score/100) - 0.1*defect_count + traceability_bonus
+       Stocker dans memory_global : RL_REWARD_cycle_{N}_{project_id}
+    2. Thompson Sampling : identifier quelle skill/agent variant a le mieux performé.
+       Mettre à jour wins/losses dans memory_global : THOMPSON_{skill}_{variant}
+    3. Tendance convergence : si 3 cycles consécutifs > 80 → statut "converging"
+       Si régression > 10 points → statut "regression" + alert
+    4. Générer plan suggestions pour cycle N+1 basé sur les patterns identifiés.
+    Stocker dans memory_project : AC_LEARN_cycle_{N}
+  gate: always
+  config:
+    agents:
+    - lead-dev
+    - product-owner

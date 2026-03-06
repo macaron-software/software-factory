@@ -8,10 +8,40 @@ Two-layer Swiss Cheese model:
 
 Runs INSIDE _execute_node() after agent produces output, BEFORE storing in memory.
 Rejects output with a reason; the pattern engine can retry or flag.
+
+SCOPE — what this guard covers (OUTPUT quality):
+-------------------------------------------------
+  ✓ Slop / filler / placeholder text
+  ✓ Mock/stub implementations (NotImplementedError, TODO, pass)
+  ✓ Fake build scripts (echo "BUILD SUCCESS")
+  ✓ Test cheating — skip/xtest/empty body/assert True/except:pass/coverage=0
+  ✓ Code slop — @ts-ignore, # type:ignore, !important, dead vendor prefixes
+  ✓ Hallucination — claims actions without tool evidence
+  ✓ Stack mismatch — wrong language for declared project tech stack
+  ✓ Missing tests when source files are written
+  ✓ L1: semantic review via a *different* LLM than the producer
+
+SCOPE — what is NOT here (see skills/qa-adversarial-llm.md):
+--------------------------------------------------------------
+  ✗ Prompt injection attacks on the platform itself (SBD-02)
+  ✗ System prompt leakage resistance (SBD-17)
+  ✗ RAG data isolation — cross-user retrieval (SBD-18)
+  ✗ LLM output → exec/DB injection (SBD-19)
+  ✗ Jailbreak / role-play bypasses
+  Those are in the qa-adversarial-llm skill and the security-hacking workflow.
+
+INSPIRATION:
+------------
+  Swiss Cheese model: James Reason (1990) — each layer catches what others miss.
+  L1 adversarial reviewer idea: inspired by Constitutional AI (Anthropic, 2022)
+  and adversarial collaboration pattern in GoodAI / Pentagi red-team workflows
+  (https://github.com/vxcontrol/pentagi). Our RSSI team (security-hacking.yaml)
+  is the offensive counterpart — agents actively attack the system they built.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -85,7 +115,72 @@ _FAKE_BUILD_PATTERNS = [
     (r"#!/bin/sh\s*\n\s*(?:echo|true|:)\s", "Empty shell script — does nothing"),
 ]
 
-# Hallucination patterns — claiming actions without evidence
+# Test integrity patterns — agents cheating tests so they pass
+# Applied ONLY to test files (path contains test/spec/__tests__)
+# SOURCE: internal rule — "do not cheat tests or test libraries so tests pass"
+# WHY: an agent that skips failing tests, weakens assertions, or mocks the SUT
+#      produces a false green CI. The bug is hidden, not fixed.
+_TEST_CHEAT_PATTERNS = [
+    # Skipping tests instead of fixing them
+    (r"@pytest\.mark\.skip\b", "pytest.mark.skip — test bypassed instead of fixed"),
+    (r"@pytest\.mark\.skipif\b", "pytest.mark.skipif — conditional test bypass"),
+    (r"\bxit\s*\(", "xit() — Jasmine/Jest skipped test"),
+    (r"\bxtest\s*\(", "xtest() — skipped test"),
+    (r"\bxdescribe\s*\(", "xdescribe() — skipped test suite"),
+    (r"test\.skip\s*\(", "test.skip() — Jest/Vitest skipped test"),
+    (r"it\.skip\s*\(", "it.skip() — Jest skipped test"),
+    (r"describe\.skip\s*\(", "describe.skip() — Jest skipped suite"),
+    # Trivially-passing (useless) assertions
+    (r"\bassert\s+True\s*(?:#|$)", "assert True — trivially passes, tests nothing"),
+    (r"\bassert\s+1\s*(?:#|$)", "assert 1 — trivially passes, tests nothing"),
+    (r"expect\([^)]+\)\.toBeTruthy\(\)\s*;?\s*$", "toBeTruthy() — weak, tests nothing concrete"),
+    # Empty test bodies — test exists but does nothing
+    (
+        r"def test_\w+\s*\([^)]*\)\s*:\s*\n\s+(?:pass|\.\.\.)$",
+        "Empty test function — passes trivially",
+    ),
+    (r"it\s*\([^,]+,\s*\(\)\s*=>\s*\{\s*\}\s*\)", "Empty Jest/Vitest test body"),
+    # Swallowing failures in test code
+    (
+        r"except\s+(?:Exception|BaseException|AssertionError)\s*:\s*\n\s+pass\s*$",
+        "except Exception: pass in test — silences assertion failures",
+    ),
+    # Coverage configuration lowered to pass
+    (r"--cov-fail-under\s*=\s*0\b", "Coverage threshold set to 0 — defeats coverage"),
+    (r"fail_under\s*=\s*0\b", "fail_under=0 in coverage config — defeats coverage"),
+    (r"--cov-fail-under\s*=\s*[1-9]\b", "Coverage threshold ≤9% — effectively zero"),
+    # Conditional bypass injected into source code (not test file) to make test pass
+    (
+        r"if\s+os\.(?:getenv|environ).*[\"'](?:TEST_MODE|CI_SKIP|SKIP_TESTS|TESTING_BYPASS)[\"']",
+        "TEST_MODE bypass in production code — cheats test by changing real behavior",
+    ),
+]
+
+# Code slop patterns — lazy shortcuts that produce unmaintainable code
+# Applied to ALL code_write files, lower score than test cheating
+# SOURCE: internal clean-code rules (see skills/clean-code.md)
+_CODE_SLOP_PATTERNS = [
+    # TypeScript/JavaScript — type safety suppression
+    (r"//\s*@ts-ignore\b", "@ts-ignore — TypeScript error suppressed instead of fixed"),
+    (r"//\s*@ts-nocheck\b", "@ts-nocheck — TypeScript disabled for entire file"),
+    (r"/\*\s*eslint-disable\b", "eslint-disable block — lint rules suppressed"),
+    # Python — type/error suppression
+    (r"#\s*type:\s*ignore\b", "# type: ignore — mypy error suppressed instead of fixed"),
+    (
+        r"except\s+(?:Exception|BaseException)\s*:\s*\n\s+pass\s*$",
+        "except Exception: pass — silently swallows all errors",
+    ),
+    # CSS — specificity hacks and unnecessary vendor prefixes
+    (r"!\s*important\b", "!important — lazy specificity override, fix the selector cascade"),
+    (
+        r"-webkit-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
+        "-webkit- vendor prefix not needed since 2017 (caniuse: >98%)",
+    ),
+    (
+        r"-moz-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
+        "-moz- vendor prefix not needed since 2020",
+    ),
+]
 _HALLUCINATION_PATTERNS = [
     (
         r"j'ai\s+(?:deploye|déployé|lancé|exécuté|testé|vérifié|créé le fichier|commit)",
@@ -112,6 +207,52 @@ _LIE_PATTERNS = [
         r"(?:http|https)://(?:staging|prod|api)\.\S+(?:\.local|\.internal)",
         "Invented internal URL",
     ),
+]
+
+# Security vulnerability patterns — hardcoded secrets and unsafe code
+# SOURCE: OWASP Top 10 + internal security rules
+_HARDCODED_SECRET_PATTERNS = [
+    (r"""(?:password|passwd|pwd)\s*=\s*['"][^'"]{4,}['"]""", "Hardcoded password literal"),
+    (r"""(?:api_key|apikey|api-key)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded API key"),
+    (r"""(?:secret|token|auth_token)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded secret/token"),
+    (r"""(?:private_key|privatekey)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded private key"),
+    (r"""-----BEGIN (?:RSA |EC )?PRIVATE KEY-----""", "Private key embedded in code"),
+    (r"""(?:access_key_id|aws_access)\s*=\s*['"][A-Z0-9]{16,}['"]""", "Hardcoded AWS access key"),
+]
+
+# Security vulnerability patterns — unsafe operations
+_SECURITY_VULN_PATTERNS = [
+    (r"""\beval\s*\(""", "eval() — arbitrary code execution risk"),
+    (r"""\bexec\s*\(""", "exec() — arbitrary code execution risk"),
+    (r"""\bpickle\.loads?\s*\(""", "pickle.loads() — deserialization RCE risk"),
+    (r"""\bos\.system\s*\(""", "os.system() — shell injection risk, use subprocess"),
+    (r"""cursor\.execute\s*\(f['"]""", "SQL f-string injection — use parameterized queries"),
+    (r"""cursor\.execute\s*\(['"].*?%\s*(?:str|repr|format)""", "SQL string format — injection risk"),
+    (r"""\bsubprocess\.(?:call|run|Popen)\s*\([^)]*shell\s*=\s*True""", "subprocess shell=True — shell injection"),
+    (r"""__import__\s*\(\s*(?:input|request)""", "Dynamic import from user input — RCE risk"),
+]
+
+# Architecture violation patterns — structural anti-patterns
+# SOURCE: clean architecture rules (see CLAUDE.md / SPECS.md)
+_ARCHITECTURE_VIOLATION_PATTERNS = [
+    (r"""(?:import|from)\s+.*(?:sqlite3|sqlalchemy|psycopg|pymysql).*\n.*(?:render_template|jinja2|Jinja2)""",
+     "DB driver imported in template layer — violates clean architecture", True),
+    (r"""cursor\.execute|conn\.execute|db\.execute""",
+     "Direct SQL in non-store file — use the store layer", False),
+    (r"""requests\.(?:get|post|put|delete)\s*\((?!.*test)""",
+     "Raw HTTP call — use the LLM client or dedicated service layer", False),
+]
+
+# False fallback patterns — agents using stubs in production code
+_FALSE_FALLBACK_PATTERNS = [
+    (r"""raise\s+NotImplementedError\s*(?:\([^)]*\))?\s*#?\s*(?:TODO|FIXME|later|implement)""",
+     "NotImplementedError with TODO — stub not replaced by real implementation"),
+    (r"""#\s*TODO:\s*(?:implement|add|fix|handle|replace)\s+(?:this|later|me)""",
+     "TODO comment in production code — work not complete"),
+    (r"""return\s+(?:None|False|0|\[\]|\{\}|\"\"\|'')\s*#\s*(?:TODO|FIXME|placeholder|stub)""",
+     "Stub return value — placeholder not replaced"),
+    (r"""pass\s*#\s*(?:TODO|FIXME|implement|placeholder)""",
+     "pass with TODO — implementation missing"),
 ]
 
 # Stack mismatch detection — backend code in wrong language
@@ -202,19 +343,6 @@ def check_l0(
         tool_names
         & {"code_write", "code_edit", "git_commit", "deploy_azure", "docker_build"}
     )
-    has_test_tool = bool(
-        tool_names
-        & {
-            "test",
-            "build",
-            "playwright_test",
-            "android_build",
-            "android_test",
-            "android_lint",
-            "android_emulator_test",
-        }
-    )
-
     # Check stack mismatch — wrong language for declared project stack
     stack_issues = _check_stack_mismatch(tool_calls, task)
     for si in stack_issues:
@@ -266,6 +394,30 @@ def check_l0(
                 issues.append(f"MOCK_IN_CODE: {desc} in {file_path}")
                 score += 3
                 break  # one mock per file is enough
+        # Check test cheating patterns — only in test files
+        is_test_file = any(
+            kw in file_path.lower()
+            for kw in ["test_", "_test.", "/test/", "/tests/", ".spec.", ".test.", "__tests__"]
+        )
+        if is_test_file:
+            for pattern, desc in _TEST_CHEAT_PATTERNS:
+                if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"TEST_CHEAT: {desc} in {file_path}")
+                    score += 5  # hard reject — cheated test = hidden bug
+                    break  # one cheat per file flagged
+        # Check code slop patterns — all code files (lower score, warning)
+        is_code_file = file_path.lower().endswith(
+            (".py", ".ts", ".tsx", ".js", ".jsx", ".css", ".scss", ".less")
+        )
+        if is_code_file:
+            slop_hits = 0
+            for pattern, desc in _CODE_SLOP_PATTERNS:
+                if re.search(pattern, file_content, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"CODE_SLOP: {desc} in {file_path}")
+                    score += 2
+                    slop_hits += 1
+                    if slop_hits >= 3:
+                        break  # cap at 3 slop warnings per file
 
     # Quality checks — no tests in code_write, high complexity indicators
     if has_write_tool:
@@ -343,7 +495,7 @@ def check_l0(
 
     # Check for copy-paste of task (agent echoing the prompt)
     # Heuristic: if >70% of content is a quote block, it's probably echo
-    quote_lines = sum(1 for l in content.split("\n") if l.strip().startswith(">"))
+    quote_lines = sum(1 for line in content.split("\n") if line.strip().startswith(">"))
     total_lines = max(len(content.split("\n")), 1)
     if quote_lines / total_lines > 0.7 and total_lines > 5:
         issues.append("ECHO: Agent mostly quoted the task back")
@@ -351,11 +503,11 @@ def check_l0(
 
     # Check for suspicious repeated blocks (copy-paste slop)
     # Use higher threshold for structured content (tables, org charts)
-    lines = [l.strip() for l in content.split("\n") if len(l.strip()) > 20]
+    lines = [line.strip() for line in content.split("\n") if len(line.strip()) > 20]
     if len(lines) > 10:
         seen = {}
-        for l in lines:
-            seen[l] = seen.get(l, 0) + 1
+        for line in lines:
+            seen[line] = seen.get(line, 0) + 1
         repeated = sum(1 for c in seen.values() if c > 3)
         if repeated > 5:
             issues.append(f"REPETITION: {repeated} lines repeated >3 times")
@@ -400,6 +552,112 @@ def check_l0(
                 f"(requirements.txt/package.json/go.mod/Cargo.toml)"
             )
             score += 2  # warning, not hard reject
+
+        # Detect fake test files — markdown/plan files created inside tests/ directory
+        for tc in tool_calls:
+            if tc.get("name") not in ("code_write", "code_edit"):
+                continue
+            fp = str(
+                tc.get("args", {}).get("path", "")
+                or tc.get("args", {}).get("file_path", "")
+            ).lower()
+            if (
+                "tests/" in fp or "/test/" in fp or fp.startswith("test")
+            ) and fp.endswith((".md", ".txt", ".plan", ".todo")):
+                issues.append(
+                    f"FAKE_TESTS: Non-code file '{fp}' created in test directory — use actual test code"
+                )
+                score += 6  # hard reject
+
+    # ── NEW L0 CHECKS ────────────────────────────────────────────────────────
+
+    # HARDCODED_SECRET: credentials hardcoded in source files (not .env/.example)
+    for tc in tool_calls:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc or any(x in fp.lower() for x in [".env.example", ".env.sample", ".md", "readme"]):
+            continue
+        for pattern, desc in _HARDCODED_SECRET_PATTERNS:
+            if re.search(pattern, fc, re.IGNORECASE):
+                issues.append(f"HARDCODED_SECRET: {desc} in {fp}")
+                score += 8  # near-hard-reject: security risk
+
+    # SECURITY_VULN: unsafe operations in non-test code
+    for tc in tool_calls:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc:
+            continue
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", "/test/", "/tests/", ".spec."])
+        for pattern, desc in _SECURITY_VULN_PATTERNS:
+            if re.search(pattern, fc, re.IGNORECASE | re.MULTILINE):
+                if is_test and "eval" in pattern:
+                    continue  # eval in test fixtures is acceptable
+                issues.append(f"SECURITY_VULN: {desc} in {fp}")
+                score += 6
+
+    # FALSE_FALLBACK: stubs/placeholders left in production code
+    for tc in tool_calls:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc:
+            continue
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec."])
+        if not is_test:
+            for pattern, desc in _FALSE_FALLBACK_PATTERNS:
+                if re.search(pattern, fc, re.IGNORECASE | re.MULTILINE):
+                    issues.append(f"FALSE_FALLBACK: {desc} in {fp}")
+                    score += 4
+                    break  # one per file
+
+    # MISSING_TRACEABILITY: code written without any reference comment
+    # Only for non-trivial source files (>30 lines), not config/migration/test files
+    _TRACE_PATTERN = re.compile(
+        r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC|Traceability|TODO-\d+|JIRA)[\s:\-]",
+        re.IGNORECASE,
+    )
+    _SKIP_TRACE_EXTS = {".md", ".txt", ".json", ".yml", ".yaml", ".env", ".toml", ".cfg", ".ini", ".lock"}
+    for tc in tool_calls:
+        if tc.get("name") != "code_write":  # only NEW files, not edits
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc or not fp:
+            continue
+        ext = "." + fp.rsplit(".", 1)[-1].lower() if "." in fp else ""
+        is_config = any(kw in fp.lower() for kw in ["migration", "conftest", "settings", "__init__", "config."])
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec."])
+        if ext in _SKIP_TRACE_EXTS or is_config or is_test:
+            continue
+        lines = fc.count("\n") + 1
+        if lines < 30:
+            continue  # small files exempt
+        if not _TRACE_PATTERN.search(fc[:1500]):  # check header only (first 1500 chars)
+            issues.append(
+                f"MISSING_TRACEABILITY: No # Ref/Feature/Story comment in {fp} "
+                f"({lines} lines) — add '# Ref: FEAT-xxx — <feature name>' at top"
+            )
+            score += 3  # warning: encourages but doesn't block
+
+    # Check build tool failures — if any build/test tool returned [FAIL], force rejection
+    if tool_calls:
+        for tc in tool_calls:
+            if tc.get("name") not in ("build", "test", "lint"):
+                continue
+            result_str = str(tc.get("result", ""))
+            if "[FAIL]" in result_str or "command not found" in result_str.lower():
+                cmd = str(tc.get("args", {}).get("command", "?"))[:80]
+                issues.append(
+                    f"BUILD_FAILED: Tool '{tc.get('name')}' failed: {cmd!r} — "
+                    f"fix errors before approving"
+                )
+                score += 7  # hard reject — broken build cannot be approved
 
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
@@ -562,6 +820,87 @@ Respond ONLY with JSON:
         logger.warning(f"L1 adversarial check failed: {e}")
         # On failure, don't block — L0 is the safety net
         return GuardResult(passed=True, score=0, issues=[], level="L1-skipped")
+
+
+def record_guard_event(
+    run_id: str,
+    agent_name: str,
+    agent_role: str,
+    guard_result: "GuardResult",
+) -> None:
+    """Persist adversarial guard result to adversarial_events table (best-effort)."""
+    try:
+        from ..db.migrations import get_db
+        # Extract dominant check type from first issue prefix
+        check_type = "PASS"
+        if guard_result.issues:
+            first = guard_result.issues[0]
+            check_type = first.split(":")[0].strip() if ":" in first else first[:30]
+        db = get_db()
+        try:
+            db.execute(
+                """INSERT INTO adversarial_events
+                   (run_id, agent_name, agent_role, check_type, score, passed, issues_json, level)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id or "",
+                    agent_name or "",
+                    agent_role or "",
+                    check_type,
+                    guard_result.score,
+                    guard_result.passed,
+                    json.dumps(guard_result.issues[:10]),
+                    guard_result.level,
+                ),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug("record_guard_event failed: %s", e)
+
+
+def record_code_traceability(
+    run_id: str,
+    agent_name: str,
+    file_path: str,
+    content: str,
+    epic_id: str = "",
+    feature_id: str = "",
+) -> None:
+    """Extract traceability refs from a written file and store in code_traceability."""
+    try:
+        import re as _re
+        # Parse ref tags from file header (first 2000 chars)
+        header = content[:2000]
+        ref_pattern = _re.compile(
+            r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC)[\s:\-]+([A-Za-z0-9\-_\.]+)",
+            _re.IGNORECASE,
+        )
+        refs = ref_pattern.findall(header)
+        ref_tag = refs[0] if refs else ""
+
+        # Extract feature_id from ref if not provided
+        if not feature_id and refs:
+            for ref in refs:
+                if ref.lower().startswith("feat-") or ref.lower().startswith("feature-"):
+                    feature_id = ref
+                    break
+
+        from ..db.migrations import get_db
+        db = get_db()
+        try:
+            db.execute(
+                """INSERT INTO code_traceability
+                   (run_id, epic_id, feature_id, file_path, ref_tag, agent_name)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (run_id or "", epic_id or "", feature_id or "", file_path, ref_tag, agent_name or ""),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug("record_code_traceability failed: %s", e)
 
 
 async def run_guard(

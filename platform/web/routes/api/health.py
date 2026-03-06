@@ -41,7 +41,11 @@ async def health_check():
 
     from ....db.migrations import get_db
 
-    node_id = os.environ.get("SF_NODE_ID") or os.environ.get("HOSTNAME") or socket.gethostname()
+    node_id = (
+        os.environ.get("SF_NODE_ID")
+        or os.environ.get("HOSTNAME")
+        or socket.gethostname()
+    )
     mode = os.environ.get("PLATFORM_MODE", "full")
 
     try:
@@ -52,14 +56,15 @@ async def health_check():
             db.close()
         return JSONResponse({"status": "ok", "node": node_id, "mode": mode})
     except Exception as e:
-        return JSONResponse({"status": "error", "node": node_id, "mode": mode, "detail": str(e)}, status_code=503)
+        return JSONResponse(
+            {"status": "error", "node": node_id, "mode": mode, "detail": str(e)},
+            status_code=503,
+        )
 
 
 @router.get("/api/cluster/nodes")
 async def cluster_nodes():
     """List all cluster nodes with heartbeat status."""
-    import os
-    from datetime import timedelta
 
     from ....db.migrations import get_db
 
@@ -77,30 +82,33 @@ async def cluster_nodes():
     nodes = []
     for r in rows:
         try:
-            last_seen_dt = datetime.fromisoformat(str(r["last_seen"]).replace("Z", "").split(".")[0])
+            last_seen_dt = datetime.fromisoformat(
+                str(r["last_seen"]).replace("Z", "").split(".")[0]
+            )
             age_s = (now - last_seen_dt).total_seconds()
         except Exception:
             age_s = 9999
         status = r["status"] if age_s < 60 else "stale"
-        nodes.append({
-            "node_id": r["node_id"],
-            "role": r["role"],
-            "mode": r["mode"],
-            "url": r["url"],
-            "last_seen": str(r["last_seen"]),
-            "age_s": int(age_s),
-            "status": status,
-            "cpu_pct": r["cpu_pct"],
-            "mem_pct": r["mem_pct"],
-            "version": r["version"],
-        })
+        nodes.append(
+            {
+                "node_id": r["node_id"],
+                "role": r["role"],
+                "mode": r["mode"],
+                "url": r["url"],
+                "last_seen": str(r["last_seen"]),
+                "age_s": int(age_s),
+                "status": status,
+                "cpu_pct": r["cpu_pct"],
+                "mem_pct": r["mem_pct"],
+                "version": r["version"],
+            }
+        )
     return JSONResponse({"nodes": nodes, "count": len(nodes)})
 
 
 @router.post("/api/cluster/heartbeat")
 async def cluster_heartbeat(request: Request):
     """Node self-registration and heartbeat update."""
-    import os
 
     from ....db.migrations import get_db
 
@@ -119,14 +127,17 @@ async def cluster_heartbeat(request: Request):
 
     db = get_db()
     try:
-        db.execute("""
+        db.execute(
+            """
             INSERT INTO platform_nodes (node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version)
             VALUES (?, ?, ?, ?, NOW(), 'online', ?, ?, ?)
             ON CONFLICT(node_id) DO UPDATE SET
                 role=EXCLUDED.role, mode=EXCLUDED.mode, url=EXCLUDED.url,
                 last_seen=NOW(), status='online',
                 cpu_pct=EXCLUDED.cpu_pct, mem_pct=EXCLUDED.mem_pct, version=EXCLUDED.version
-        """, (node_id, role, mode, url, cpu_pct, mem_pct, version))
+        """,
+            (node_id, role, mode, url, cpu_pct, mem_pct, version),
+        )
         db.commit()
     except Exception as e:
         db.rollback()
@@ -139,8 +150,7 @@ async def cluster_heartbeat(request: Request):
 
 @router.get("/api/cluster/nodes-badge", response_class=None)
 async def cluster_nodes_badge():
-    """HTML fragment for topbar — compact list of cluster nodes with heartbeat dots."""
-    from datetime import timedelta
+    """HTML fragment for topbar — compact list of cluster nodes with click-to-popover."""
 
     from fastapi.responses import HTMLResponse
 
@@ -149,7 +159,7 @@ async def cluster_nodes_badge():
     db = get_db()
     try:
         rows = db.execute(
-            "SELECT node_id, role, mode, last_seen, status, cpu_pct, mem_pct FROM platform_nodes ORDER BY role DESC, node_id"
+            "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version FROM platform_nodes ORDER BY role DESC, node_id"
         ).fetchall()
     except Exception:
         rows = []
@@ -163,24 +173,45 @@ async def cluster_nodes_badge():
     parts = []
     for r in rows:
         try:
-            last_seen_dt = datetime.fromisoformat(str(r["last_seen"]).replace("Z", "").split(".")[0])
+            last_seen_dt = datetime.fromisoformat(
+                str(r["last_seen"]).replace("Z", "").split(".")[0]
+            )
             age_s = int((now - last_seen_dt).total_seconds())
         except Exception:
             age_s = 9999
         is_online = age_s < 60
         dot_color = "#22c55e" if is_online else "#ef4444"
+        status_label = "online" if is_online else "stale"
         label = r["node_id"]
         role = r["role"]
         mode = r["mode"]
-        cpu = int(r["cpu_pct"] or 0)
-        mem = int(r["mem_pct"] or 0)
-        age_label = f"{age_s}s ago" if age_s < 120 else f"{age_s//60}m ago"
-        title = f"{label} | {role}/{mode} | CPU {cpu}% MEM {mem}% | {age_label}"
+        url = r["url"] or "—"
+        cpu = r["cpu_pct"] or 0
+        mem = r["mem_pct"] or 0
+        version = r["version"] or "—"
+        age_label = f"{age_s}s" if age_s < 120 else f"{age_s // 60}m"
+        node_id_safe = label.replace("-", "_")
+        popover_id = f"cnpop_{node_id_safe}"
         parts.append(
-            f'<span class="cluster-node-badge" title="{title}">'
+            f'<div class="cluster-node-wrapper" style="position:relative">'
+            f'<span class="cluster-node-badge" onclick="sfToggleNodePop(\'{popover_id}\')">'
             f'<span class="cluster-dot" style="background:{dot_color}"></span>'
             f'<span class="cluster-label">{label}</span>'
-            f'</span>'
+            f"</span>"
+            f'<div class="cluster-node-pop" id="{popover_id}" style="display:none">'
+            f'<div class="cnp-header">'
+            f'<span class="cnp-dot" style="background:{dot_color}"></span>'
+            f"<strong>{label}</strong>"
+            f'<span class="cnp-status cnp-status-{"ok" if is_online else "err"}">{status_label}</span>'
+            f"</div>"
+            f'<div class="cnp-row"><span>Role</span><span>{role} / {mode}</span></div>'
+            f'<div class="cnp-row"><span>URL</span><span>{url}</span></div>'
+            f'<div class="cnp-row"><span>CPU</span><span>{cpu:.1f}%</span></div>'
+            f'<div class="cnp-row"><span>MEM</span><span>{mem:.1f}%</span></div>'
+            f'<div class="cnp-row"><span>Last seen</span><span>{age_label} ago</span></div>'
+            f'<div class="cnp-row"><span>Version</span><span>{version}</span></div>'
+            f"</div>"
+            f"</div>"
         )
 
     html = '<div class="cluster-nodes-inner">' + "".join(parts) + "</div>"
@@ -476,7 +507,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             tables = [
                 r[0]
                 for r in db.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                    "SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE 'pg_%' ORDER BY table_name"
                 ).fetchall()
             ]
             # Single query for all table counts via UNION ALL
@@ -570,32 +601,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             rlm_cache = (
                 pathlib.Path(__file__).resolve().parents[4] / "data" / "rlm_cache.db"
             )
-        if rlm_cache.exists():
-            import sqlite3
-
-            cdb = sqlite3.connect(str(rlm_cache))
-            cdb.row_factory = sqlite3.Row
-            try:
-                cc = cdb.execute("SELECT COUNT(*) as cnt FROM rlm_cache").fetchone()
-                # Anonymization stats from RLM cache
-                anon_stats = {}
-                try:
-                    anon_rows = cdb.execute(
-                        "SELECT COALESCE(scope, 'default') as scope, COUNT(*) as cnt "
-                        "FROM rlm_cache GROUP BY scope"
-                    ).fetchall()
-                    anon_stats = {r["scope"]: r["cnt"] for r in anon_rows}
-                except Exception:
-                    pass
-                mcp_status["rlm_cache"] = {
-                    "status": "ok",
-                    "entries": cc["cnt"] if cc else 0,
-                    "size_mb": round(rlm_cache.stat().st_size / 1024 / 1024, 2),
-                    "by_scope": anon_stats,
-                }
-            except Exception:
-                mcp_status["rlm_cache"] = {"status": "empty", "entries": 0}
-            cdb.close()
+        # rlm_cache is a SQLite file (out of scope for platform DB)
     except Exception as e:
         mcp_status["error"] = str(e)
 
@@ -991,7 +997,7 @@ async def monitoring_live(request: Request, hours: int = 24):
             "storage_account": "macaronbackups",
             "replication": "GRS (francesouth)",
             "containers": ["db-backups", "pg-dumps", "secrets"],
-            "sqlite_dbs": 7,
+            "sqlite_dbs": 0,
             "retention": {"daily": "90d", "weekly": "365d", "monthly": "forever"},
         }
         # Servers running on VM (probe ports)

@@ -164,6 +164,16 @@ class OrchestratorConfig:
 
 
 @dataclass
+class SecurityConfig:
+    """Security & sandbox configuration."""
+
+    # Landlock filesystem sandbox — restricts agent shell commands to workspace only
+    landlock_enabled: bool = (
+        True  # auto (enabled if binary found); set False to disable
+    )
+
+
+@dataclass
 class PlatformConfig:
     """Root configuration object."""
 
@@ -172,6 +182,7 @@ class PlatformConfig:
     agents: AgentConfig = field(default_factory=AgentConfig)
     a2a: A2AConfig = field(default_factory=A2AConfig)
     orchestrator: OrchestratorConfig = field(default_factory=OrchestratorConfig)
+    security: SecurityConfig = field(default_factory=SecurityConfig)
 
 
 def _apply_section(obj, raw: dict):

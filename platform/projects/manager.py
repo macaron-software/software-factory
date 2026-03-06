@@ -77,6 +77,9 @@ class Project:
         default_factory=list
     )  # [{id, name, icon, mission_types_active[]}]
     owner_id: str = ""  # User ID of the owner (empty = shared/admin-only)
+    starred: bool = False  # Pinned/featured project
+    client_domain: str = ""  # Portfolio domain label (e.g. "LA POSTE", "MARATHON")
+    container_url: str = ""  # Live URL (production VPS / container)
     created_at: str = ""
     updated_at: str = ""
 
@@ -588,6 +591,7 @@ class ProjectStore:
             ("current_phase", "''"),
             ("phases_json", "'[]'"),
             ("owner_id", "''"),
+            ("client_domain", "''"),
         ]:
             if col not in cols:
                 try:
@@ -704,8 +708,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json, owner_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id, starred, container_url, client_domain)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -724,6 +728,9 @@ class ProjectStore:
                 p.current_phase or "",
                 json.dumps(p.phases),
                 p.owner_id or "",
+                bool(p.starred),
+                p.container_url or "",
+                p.client_domain or "",
             ),
         )
         conn.commit()
@@ -736,15 +743,15 @@ class ProjectStore:
             logger.warning("scaffold_project failed for %s: %s", p.id, e)
         # Provision baseline missions (TMA + Security + Debt + MVP if applicable)
         try:
-            self.heal_missions(p)
+            self.heal_epics(p)
         except Exception as e:
-            logger.warning("heal_missions failed for %s: %s", p.id, e)
+            logger.warning("heal_epics failed for %s: %s", p.id, e)
         return p
 
     def get_phase_gate(self, project_id: str, target_phase: str) -> dict:
         """Check if project can transition to target_phase.
         Returns {allowed: bool, blockers: list[str]}."""
-        from ..missions.store import get_mission_store
+        from ..epics.store import get_epic_store
 
         # Gates: to enter mvp, Architecture + Audit Sécurité must be done/completed
         PHASE_GATES: dict[str, list[str]] = {
@@ -755,7 +762,7 @@ class ProjectStore:
         if not required_types:
             return {"allowed": True, "blockers": [], "target_phase": target_phase}
 
-        ms = get_mission_store()
+        ms = get_epic_store()
         missions = ms.list_missions(limit=500)
         proj_missions = [m for m in missions if m.project_id == project_id]
         proj_types = {m.type: m for m in proj_missions}
@@ -801,10 +808,10 @@ class ProjectStore:
         if proj:
             # Recompute mission statuses for new phase
             try:
-                self.heal_missions(proj)
+                self.heal_epics(proj)
             except Exception as e:
                 logger.warning(
-                    "heal_missions after set_phase failed for %s: %s", project_id, e
+                    "heal_epics after set_phase failed for %s: %s", project_id, e
                 )
         return proj
 
@@ -813,9 +820,9 @@ class ProjectStore:
 
         Idempotent: skips workflow_ids already present for this project.
         """
-        from ..missions.store import MissionDef, get_mission_store
+        from ..epics.store import MissionDef, get_epic_store
 
-        ms = get_mission_store()
+        ms = get_epic_store()
 
         # Idempotency: skip workflow_ids already present for this project
         existing_workflows = {
@@ -886,14 +893,14 @@ class ProjectStore:
                 )
         return created
 
-    def heal_missions(self, proj: "Project") -> list[str]:
+    def heal_epics(self, proj: "Project") -> list[str]:
         """Ensure every project has TMA + Security + Debt missions (phase-aware).
         MVP/ideation projects also get a MVP Réalisation mission.
         System mission statuses are adjusted based on current_phase.
         Returns list of mission names created or updated."""
-        from ..missions.store import MissionDef, get_mission_store
+        from ..epics.store import MissionDef, get_epic_store
 
-        ms = get_mission_store()
+        ms = get_epic_store()
         existing = ms.list_missions(limit=2000)
         proj_m = [m for m in existing if m.project_id == proj.id]
         proj_types = {m.type: m for m in proj_m}  # type → mission
@@ -1043,10 +1050,10 @@ class ProjectStore:
                 try:
                     ms.create_mission(m)
                     created.append(f"+{m.name}")
-                    logger.info("heal_missions: created '%s' for %s", m.name, proj.id)
+                    logger.info("heal_epics: created '%s' for %s", m.name, proj.id)
                 except Exception as e:
                     logger.warning(
-                        "heal_missions: failed '%s' for %s: %s", m.name, proj.id, e
+                        "heal_epics: failed '%s' for %s: %s", m.name, proj.id, e
                     )
             else:
                 # Update status if phase changed and mission is system-managed
@@ -1105,7 +1112,8 @@ class ProjectStore:
             UPDATE projects SET
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
-                active_pattern_id=?, status=?, updated_at=CURRENT_TIMESTAMP
+                active_pattern_id=?, status=?, starred=?, container_url=?, client_domain=?,
+                updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """,
             (
@@ -1120,6 +1128,9 @@ class ProjectStore:
                 json.dumps(p.agents),
                 p.active_pattern_id,
                 p.status,
+                bool(p.starred),
+                p.container_url or "",
+                p.client_domain or "",
                 p.id,
             ),
         )
@@ -1429,6 +1440,9 @@ class ProjectStore:
             phases=json.loads(row["phases_json"] if "phases_json" in keys else "[]")
             or [],
             owner_id=row["owner_id"] if "owner_id" in keys else "",
+            starred=bool(row["starred"]) if "starred" in keys else False,
+            client_domain=row["client_domain"] if "client_domain" in keys else "",
+            container_url=row["container_url"] if "container_url" in keys else "",
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
             arch_domain=arch_domain,

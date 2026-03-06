@@ -97,29 +97,123 @@ def _build_summary(db) -> dict[str, Any]:
 
 
 def _get_pipeline(db) -> dict:
-    row = db.execute(
+    # Epics (missions table)
+    epics = db.execute(
         "SELECT "
         "  COUNT(*) FILTER (WHERE status IN ('active','running')) AS active,"
         "  COUNT(*) AS total,"
         "  COUNT(*) FILTER (WHERE status='completed') AS completed,"
         "  COUNT(*) FILTER (WHERE status='planning') AS planning"
-        " FROM missions"
+        " FROM epics"
     ).fetchone()
+    # Features
+    feats = db.execute(
+        "SELECT "
+        "  COUNT(*) FILTER (WHERE status IN ('active','running','in_progress')) AS active,"
+        "  COUNT(*) AS total,"
+        "  COUNT(*) FILTER (WHERE status='completed') AS completed"
+        " FROM features"
+    ).fetchone()
+    # Tasks
+    tsk = _safe(
+        lambda: db.execute(
+            "SELECT "
+            "  COUNT(*) FILTER (WHERE status IN ('active','running','in_progress')) AS active,"
+            "  COUNT(*) AS total"
+            " FROM tasks"
+        ).fetchone(),
+        None,
+    )
     ideation = db.execute(
         "SELECT COUNT(*) AS n FROM ideation_sessions WHERE status='active'"
     ).fetchone()
     deploys = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '1 day'"
     ).fetchone()
+    # Epic run stats (24h)
+    run_stats = _safe(
+        lambda: db.execute(
+            "SELECT"
+            "  COUNT(*) FILTER (WHERE status='completed') AS completed_24h,"
+            "  COUNT(*) FILTER (WHERE status='failed') AS failed_24h,"
+            "  COUNT(*) FILTER (WHERE status='cancelled') AS cancelled_24h,"
+            "  COUNT(*) AS total_24h,"
+            "  COALESCE(AVG(llm_cost_usd) FILTER (WHERE status='completed' AND llm_cost_usd IS NOT NULL), 0) AS avg_cost_usd"
+            " FROM epic_runs"
+            " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+        ).fetchone(),
+        None,
+    )
+    top_failing = _safe(
+        lambda: db.execute(
+            "SELECT workflow_id, COUNT(*) AS fail_count"
+            " FROM epic_runs"
+            " WHERE status='failed' AND created_at >= NOW() - INTERVAL '24 hours'"
+            " GROUP BY workflow_id ORDER BY fail_count DESC LIMIT 5"
+        ).fetchall(),
+        [],
+    )
+    adv_stats = _safe(
+        lambda: db.execute(
+            "SELECT check_type, COUNT(*) AS cnt,"
+            " SUM(CASE WHEN NOT passed THEN 1 ELSE 0 END) AS rejects"
+            " FROM adversarial_events"
+            " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+            " GROUP BY check_type ORDER BY rejects DESC LIMIT 10"
+        ).fetchall(),
+        [],
+    )
+    trace_coverage = _safe(
+        lambda: db.execute(
+            "SELECT COUNT(*) AS total,"
+            " SUM(CASE WHEN ref_tag != '' THEN 1 ELSE 0 END) AS with_ref"
+            " FROM code_traceability"
+            " WHERE created_at >= NOW() - INTERVAL '7 days'"
+        ).fetchone(),
+        None,
+    )
     return {
         "ideation_active": ideation["n"] if ideation else 0,
-        "missions_total": row["total"] if row else 0,
-        "missions_active": row["active"] if row else 0,
-        "missions_planning": row["planning"] if row else 0,
-        "missions_completed": row["completed"] if row else 0,
+        # Epics (formerly missions)
+        "epics_total": epics["total"] if epics else 0,
+        "epics_active": epics["active"] if epics else 0,
+        "epics_planning": epics["planning"] if epics else 0,
+        "epics_completed": epics["completed"] if epics else 0,
+        # Features
+        "features_total": feats["total"] if feats else 0,
+        "features_active": feats["active"] if feats else 0,
+        "features_completed": feats["completed"] if feats else 0,
+        # Tasks
+        "tasks_total": tsk["total"] if tsk else 0,
+        "tasks_active": tsk["active"] if tsk else 0,
+        # Legacy keys for backwards compat
+        "missions_total": epics["total"] if epics else 0,
+        "missions_active": epics["active"] if epics else 0,
+        "missions_planning": epics["planning"] if epics else 0,
+        "missions_completed": epics["completed"] if epics else 0,
         "deploys_today": deploys["n"] if deploys else 0,
+        # Epic run health (24h)
+        "runs_completed_24h": run_stats["completed_24h"] if run_stats else 0,
+        "runs_failed_24h": run_stats["failed_24h"] if run_stats else 0,
+        "runs_cancelled_24h": run_stats["cancelled_24h"] if run_stats else 0,
+        "runs_total_24h": run_stats["total_24h"] if run_stats else 0,
+        "runs_avg_cost_usd": round(float(run_stats["avg_cost_usd"]), 4)
+        if run_stats
+        else 0,
+        "top_failing_workflows": [
+            {"workflow_id": r["workflow_id"], "fail_count": r["fail_count"]}
+            for r in (top_failing or [])
+        ],
+        # Adversarial guard stats (24h)
+        "adv_stats_24h": [
+            {"check_type": r["check_type"], "total": r["cnt"], "rejects": r["rejects"]}
+            for r in (adv_stats or [])
+        ],
+        # Traceability coverage (7d)
+        "trace_total_7d": trace_coverage["total"] if trace_coverage else 0,
+        "trace_with_ref_7d": trace_coverage["with_ref"] if trace_coverage else 0,
     }
 
 
@@ -127,98 +221,78 @@ def _get_pipeline(db) -> dict:
 
 
 def _get_environments() -> list[dict]:
-    import httpx
+    """Read cluster nodes from platform_nodes registry instead of hardcoded envs."""
+    from datetime import datetime
 
-    cluster_role = os.environ.get("CLUSTER_ROLE", "")  # "master" / "slave" / ""
-    is_cluster = bool(cluster_role)
+    db = None
+    rows = []
+    try:
+        from ....db.migrations import get_db
 
-    # In cluster mode: probe cluster nodes from PLATFORM_WORKER_NODES env
-    if is_cluster:
-        try:
-            from ..missions.dispatch import _get_worker_urls
+        db = get_db()
+        rows = db.execute(
+            "SELECT node_id, role, mode, url, last_seen, status, cpu_pct, mem_pct, version"
+            " FROM platform_nodes ORDER BY role DESC, node_id"
+        ).fetchall()
+    except Exception as _exc:
+        logger.warning("_get_environments DB error: %s", _exc)
+        rows = []
+    finally:
+        if db is not None:
+            try:
+                db.close()
+            except Exception:
+                pass
 
-            urls = _get_worker_urls()
-            results = []
-            for idx, url in enumerate(urls):
-                node_id = f"node-{idx + 1}"
-                try:
-                    r = httpx.get(f"{url}/api/health", timeout=2.0)
-                    data = r.json() if r.status_code == 200 else {}
-                    status = "online" if data.get("status") == "ok" else "degraded"
-                    version = data.get("version")
-                    node_name = data.get("node", node_id)
-                except Exception:
-                    status = "offline"
-                    version = None
-                    node_name = node_id
+    if not rows:
+        # Fallback: no nodes registered yet — show static config if env vars set
+        results = []
+        for id_, name, env_var in [
+            ("ovh", "OVH Demo", "OVH_PLATFORM_URL"),
+            ("azure", "Azure Prod", "AZURE_PLATFORM_URL"),
+        ]:
+            url = os.environ.get(env_var, "")
+            if url:
                 results.append(
                     {
-                        "id": node_id,
-                        "name": node_name,
+                        "id": id_,
+                        "name": name,
                         "url": url,
-                        "status": status,
-                        "version": version,
-                        "role": cluster_role if idx == 0 else "slave",
+                        "status": "not_configured",
+                        "version": None,
                     }
                 )
-            if results:
-                return results
-        except Exception:
-            pass
+        return results
 
-    # Local env — we're running on this server, mark as online directly
-    local_version = None
-    try:
-        import importlib.metadata
-
-        local_version = importlib.metadata.version("macaron-platform")
-    except Exception:
-        pass
-
-    envs_remote = [
-        {
-            "id": "ovh",
-            "name": "OVH Demo",
-            "url": os.environ.get("OVH_PLATFORM_URL", ""),
-        },
-        {
-            "id": "azure",
-            "name": "Azure Prod",
-            "url": os.environ.get("AZURE_PLATFORM_URL", ""),
-        },
-    ]
-    results = [
-        {
-            "id": "local",
-            "name": "Local Dev",
-            "url": "http://localhost:8099",
-            "status": "online",
-            "version": local_version,
-        },
-    ]
-    for env in envs_remote:
-        url = env["url"]
-        if not url:
-            results.append({**env, "status": "not_configured", "version": None})
-            continue
+    now = datetime.utcnow()
+    results = []
+    for r in rows:
+        db_status = r["status"] or "unknown"
         try:
-            r = httpx.get(f"{url}/api/health", timeout=2.0)
-            data = (
-                r.json()
-                if r.headers.get("content-type", "").startswith("application/json")
-                else {}
+            last_seen_dt = datetime.fromisoformat(
+                str(r["last_seen"]).replace("Z", "").split(".")[0]
             )
-            results.append(
-                {
-                    **env,
-                    "status": "online"
-                    if r.status_code == 200 and data.get("status") == "ok"
-                    else "degraded",
-                    "version": data.get("version"),
-                }
-            )
+            age_s = int((now - last_seen_dt).total_seconds())
+            # Consider online if DB says so AND heartbeat within last 3 minutes
+            is_online = db_status == "online" and age_s < 180
         except Exception:
-            results.append({**env, "status": "offline", "version": None})
+            age_s = 9999
+            is_online = db_status == "online"
+        role = r["role"] or ""
+        mode = r["mode"] or ""
+        name = f"{r['node_id']} ({role}/{mode})"
+        results.append(
+            {
+                "id": r["node_id"],
+                "name": name,
+                "url": r["url"] or "",
+                "status": "online" if is_online else "offline",
+                "version": r["version"],
+                "cpu_pct": round(r["cpu_pct"] or 0, 1),
+                "mem_pct": round(r["mem_pct"] or 0, 1),
+                "age_s": age_s,
+            }
+        )
     return results
 
 
@@ -294,23 +368,38 @@ def _get_daemons() -> list[dict]:
 
 
 def _get_llm_status() -> list[dict]:
+    """Return status of configured LLM providers in fallback-chain order.
+
+    WHY: Previously iterated ALL _PROVIDERS and filtered by has_key — this showed
+    all 6 providers as '✓ OK' because key files exist locally for all of them.
+    Now uses _FALLBACK_CHAIN (the ordered list of providers actually configured for
+    this deployment) so the cockpit reflects real production config.
+    Shows provider display name + active model instead of just the provider ID.
+    """
     try:
-        from ....llm.client import get_llm_client
+        from ....llm.client import get_llm_client, _FALLBACK_CHAIN, _primary, _PROVIDERS
 
         client = get_llm_client()
     except Exception:
         return []
 
-    providers = ["minimax", "azure-openai", "azure-ai", "openai"]
-    result = []
     now = time.monotonic()
-    for prov in providers:
-        cb_open = client._cb_open_until.get(prov, 0) > now
-        cooldown = client._provider_cooldown.get(prov, 0) > now
-        failures = len(client._cb_failures.get(prov, []))
+    avail = {p["id"]: p for p in client.available_providers() if p.get("has_key")}
+    result = []
+    seen: set[str] = set()
+    for pid in _FALLBACK_CHAIN:
+        if pid in seen or pid not in avail:
+            continue
+        seen.add(pid)
+        pcfg = _PROVIDERS.get(pid, {})
+        cb_open = client._cb_open_until.get(pid, 0) > now
+        cooldown = client._provider_cooldown.get(pid, 0) > now
+        failures = len(client._cb_failures.get(pid, []))
         result.append(
             {
-                "provider": prov,
+                "provider": pcfg.get("name", pid),
+                "model": pcfg.get("default", ""),
+                "primary": pid == _primary,
                 "circuit_open": cb_open,
                 "cooldown": cooldown,
                 "recent_failures": failures,
@@ -325,16 +414,17 @@ def _get_llm_status() -> list[dict]:
 
 def _get_projects(db) -> list[dict]:
     rows = db.execute(
-        "SELECT p.id, p.name,"
+        "SELECT p.id, p.name, COALESCE(p.starred, FALSE) AS starred,"
+        "  COALESCE(p.container_url, '') AS container_url,"
         "  COUNT(m.id) AS total_missions,"
         "  COUNT(m.id) FILTER (WHERE m.status IN ('active','running')) AS active_missions,"
         "  COUNT(m.id) FILTER (WHERE m.status='completed') AS done_missions,"
         "  MAX(m.created_at) AS last_activity"
         " FROM projects p"
-        " LEFT JOIN missions m ON m.project_id = p.id"
-        " GROUP BY p.id, p.name"
-        " ORDER BY last_activity DESC NULLS LAST"
-        " LIMIT 8"
+        " LEFT JOIN epics m ON m.project_id = p.id"
+        " GROUP BY p.id, p.name, p.starred, p.container_url"
+        " ORDER BY p.starred DESC NULLS LAST, last_activity DESC NULLS LAST"
+        " LIMIT 12"
     ).fetchall()
     result = []
     for r in rows:
@@ -345,6 +435,8 @@ def _get_projects(db) -> list[dict]:
             {
                 "id": r["id"],
                 "name": r["name"],
+                "starred": bool(r["starred"]),
+                "container_url": r["container_url"] or "",
                 "total_missions": total,
                 "active_missions": r["active_missions"] or 0,
                 "done_missions": done,
@@ -424,7 +516,7 @@ def _get_incidents(db) -> dict:
     ah_active = 0
     try:
         ah_row = db.execute(
-            "SELECT COUNT(*) AS n FROM missions"
+            "SELECT COUNT(*) AS n FROM epics"
             " WHERE created_by='auto-heal' AND status='active'"
         ).fetchone()
         ah_active = ah_row["n"] if ah_row else 0
@@ -444,19 +536,19 @@ def _get_incidents(db) -> dict:
 def _get_dora(db) -> dict:
     """Approximate DORA metrics from missions data."""
     deploys_week = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '7 days'"
     ).fetchone()
     deploys_today = db.execute(
-        "SELECT COUNT(*) AS n FROM missions"
+        "SELECT COUNT(*) AS n FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '1 day'"
     ).fetchone()
     # Lead time: avg(completed_at - created_at) for completed missions this week
     lt_row = db.execute(
         "SELECT AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600) AS avg_h"
-        " FROM missions"
+        " FROM epics"
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '7 days'"
     ).fetchone()

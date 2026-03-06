@@ -1,0 +1,1 @@
+import pytest\nfrom unittest.mock import MagicMock, patch\n\nclass TestRachidMansouriAgent:\n    \

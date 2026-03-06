@@ -27,38 +27,6 @@ STALE_PROJECT_DAYS = 60  # days before low-confidence entries expire
 LOW_CONF_THRESHOLD = 0.4
 
 
-import decimal
-
-
-def _sanitize(obj):
-    """Recursively convert non-JSON-serializable types (Decimal, datetime) to primitives."""
-    if isinstance(obj, dict):
-        return {k: _sanitize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_sanitize(i) for i in obj]
-    if isinstance(obj, decimal.Decimal):
-        return float(obj)
-    if hasattr(obj, "isoformat"):
-        return obj.isoformat()
-    return obj
-
-
-def _round_sql(expr: str, digits: int) -> str:
-    """Return SQL expression for rounding, compatible with SQLite and PostgreSQL."""
-    from ..db.adapter import is_postgresql
-    if is_postgresql():
-        return f"round(({expr})::numeric, {digits})"
-    return f"round({expr}, {digits})"
-
-
-def _age_expr(col: str, days: int) -> str:
-    """Return SQL expression for 'column is older than N days', compatible with SQLite and PostgreSQL."""
-    from ..db.adapter import is_postgresql
-    if is_postgresql():
-        return f"EXTRACT(EPOCH FROM (NOW() - {col})) / 86400 > {days}"
-    return f"julianday('now') - julianday({col}) > {days}"
-
-
 @dataclass
 class CompactionStats:
     pattern_pruned: int = 0
@@ -90,7 +58,7 @@ def run_compaction() -> CompactionStats:
         try:
             result = conn.execute(
                 f"DELETE FROM memory_pattern WHERE "
-                f"{_age_expr('created_at', MAX_PATTERN_AGE_DAYS)}"
+                f"julianday('now') - julianday(created_at) > {MAX_PATTERN_AGE_DAYS}"
             )
             stats.pattern_pruned = result.rowcount
             conn.commit()
@@ -102,7 +70,7 @@ def run_compaction() -> CompactionStats:
             result = conn.execute(
                 f"DELETE FROM memory_project WHERE "
                 f"confidence < {LOW_CONF_THRESHOLD} AND "
-                f"{_age_expr('updated_at', STALE_PROJECT_DAYS)}"
+                f"julianday('now') - julianday(updated_at) > {STALE_PROJECT_DAYS}"
             )
             stats.project_pruned = result.rowcount
             conn.commit()
@@ -133,7 +101,7 @@ def run_compaction() -> CompactionStats:
                 SELECT key, COUNT(*) as cnt
                 FROM memory_global
                 GROUP BY key
-                HAVING COUNT(*) > 1
+                HAVING cnt > 1
                 """
             ).fetchall()
             for dupe in dupes:
@@ -253,6 +221,14 @@ def run_compaction() -> CompactionStats:
 def get_memory_health() -> dict:
     """Return a health snapshot of all memory layers."""
     from ..db.migrations import get_db
+    from ..db.adapter import is_postgresql
+
+    _pg = is_postgresql()
+
+    def _stale_clause(col: str, days: int) -> str:
+        if _pg:
+            return f"NOW() - {col} > INTERVAL '{days} days'"
+        return f"julianday('now') - julianday({col}) > {days}"
 
     conn = get_db()
     try:
@@ -273,7 +249,7 @@ def get_memory_health() -> dict:
         project_stale = (
             q(
                 f"SELECT count(*) as n FROM memory_project WHERE "
-                f"{_age_expr('updated_at', STALE_PROJECT_DAYS)}"
+                f"{_stale_clause('updated_at', STALE_PROJECT_DAYS)}"
             )
             or {}
         ).get("n", 0)
@@ -286,7 +262,7 @@ def get_memory_health() -> dict:
         try:
             project_avg_rel = (
                 conn.execute(
-                    f"SELECT {_round_sql('avg(COALESCE(relevance_score,confidence))', 3)} as v FROM memory_project"
+                    "SELECT round(avg(COALESCE(relevance_score,confidence)),3) as v FROM memory_project"
                 ).fetchone()
                 or {}
             ).get("v", 0)
@@ -312,7 +288,7 @@ def get_memory_health() -> dict:
         project_by_cat = [
             dict(r)
             for r in conn.execute(
-                f"SELECT category, count(*) as n, {_round_sql('avg(confidence)', 2)} as avg_conf "
+                "SELECT category, count(*) as n, round(avg(confidence),2) as avg_conf "
                 "FROM memory_project GROUP BY category ORDER BY n DESC"
             ).fetchall()
         ]
@@ -320,15 +296,15 @@ def get_memory_health() -> dict:
         global_total = (q("SELECT count(*) as n FROM memory_global") or {}).get("n", 0)
         global_dupes = (
             q(
-                "SELECT count(*) as n FROM (SELECT key FROM memory_global GROUP BY key HAVING count(*)>1) x"
+                "SELECT count(*) as n FROM (SELECT key FROM memory_global GROUP BY key HAVING count(*)>1)"
             )
             or {}
         ).get("n", 0)
         global_by_cat = [
             dict(r)
             for r in conn.execute(
-                f"SELECT category, count(*) as n, {_round_sql('avg(confidence)', 2)} as avg_conf, "
-                f"{_round_sql('avg(occurrences)', 1)} as avg_occ "
+                "SELECT category, count(*) as n, round(avg(confidence),2) as avg_conf, "
+                "round(avg(occurrences),1) as avg_occ "
                 "FROM memory_global GROUP BY category ORDER BY n DESC"
             ).fetchall()
         ]
@@ -339,7 +315,7 @@ def get_memory_health() -> dict:
         pattern_old = (
             q(
                 f"SELECT count(*) as n FROM memory_pattern WHERE "
-                f"{_age_expr('created_at', MAX_PATTERN_AGE_DAYS)}"
+                f"{_stale_clause('created_at', MAX_PATTERN_AGE_DAYS)}"
             )
             or {}
         ).get("n", 0)
@@ -356,7 +332,7 @@ def get_memory_health() -> dict:
     finally:
         conn.close()
 
-    return _sanitize({
+    return {
         "project": {
             "total": project_total,
             "low_confidence": project_low_conf,
@@ -383,7 +359,7 @@ def get_memory_health() -> dict:
             "low_conf_threshold": LOW_CONF_THRESHOLD,
             "max_value_len": MAX_VALUE_LEN,
         },
-    })
+    }
 
 
 async def memory_compactor_loop() -> None:

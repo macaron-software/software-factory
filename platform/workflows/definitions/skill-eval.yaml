@@ -1,0 +1,117 @@
+# Skill Eval Loop — based on Anthropic skill-creator eval pattern (MIT)
+# Ref: https://github.com/anthropics/skills/tree/main/skills/skill-creator
+# Adaptation: eval_cases in frontmatter (not evals.json), grading via skill-grader skill,
+# no claude -p CLI, uses SF agent patterns (solo/parallel/human-in-the-loop).
+id: skill-eval
+name: Skill Evaluation Loop
+description: 'Eval loop for SF skills: write eval_cases, execute each case, grade outputs with skill-grader, human review, iterate. Based on Anthropic skill-creator eval pattern (MIT).'
+icon: workflow
+is_builtin: true
+phases:
+- id: write-eval-cases
+  pattern_id: solo
+  name: Write Eval Cases
+  description: >
+    Review the target skill. Write or update eval_cases in its YAML frontmatter:
+    happy path, anti-pattern case, edge case. Each case needs specific verifiable
+    expectations (not trivially satisfied). See skills/skill-creator.md STEP 3.
+  gate: eval_cases written — at least 2 cases, each with at least 2 expectations
+  config:
+    agents:
+    - lead-dev
+    - qa
+- id: execute-cases
+  pattern_id: parallel
+  name: Execute Eval Cases
+  description: >
+    For each eval_case in the skill frontmatter, run the skill: send the prompt
+    to the target agent with the skill loaded, capture the full output. Record
+    which tools were called, any errors, the complete response text.
+    Save each result as eval_output_{case_id}.json.
+  gate: All eval cases executed, outputs saved as eval_output_*.json
+  config:
+    agents:
+    - dev-1
+    - qa
+- id: grade-outputs
+  pattern_id: solo
+  name: Grade Outputs
+  description: >
+    Using skills/skill-grader.md: for each eval_output, grade every expectation
+    PASS/FAIL with cited evidence. Extract implicit claims. Critique weak assertions.
+    Produce grading.json. Flag superficial compliance (outputs that appear correct
+    but do not actually complete the task — stub/promise/placeholder detection).
+  gate: grading.json produced with pass_rate field
+  config:
+    agents:
+    - qa
+    skill_agents:
+    - skill: skill-grader
+- id: review-and-iterate
+  pattern_id: human-in-the-loop
+  name: Human Review + Iterate
+  description: >
+    Review grading.json. Decide: (A) pass_rate >= 0.8 — skill is ready to ship,
+    (B) specific failures — fix the skill rules and re-run from execute-cases,
+    (C) weak assertions flagged in eval_feedback — improve eval_cases first, then re-run.
+    Bump skill version on each iteration. Stop when pass_rate >= 0.8.
+  gate: checkpoint
+  config:
+    agents:
+    - po
+    - lead-dev
+config:
+  schedule: on-demand
+  graph:
+    nodes:
+    - id: n1
+      agent_id: lead-dev
+      x: 100
+      y: 150
+      label: Write Evals
+      phase: write-eval-cases
+    - id: n2
+      agent_id: dev-1
+      x: 300
+      y: 100
+      label: Execute Cases
+      phase: execute-cases
+    - id: n3
+      agent_id: qa
+      x: 300
+      y: 200
+      label: Execute Cases
+      phase: execute-cases
+    - id: n4
+      agent_id: qa
+      x: 500
+      y: 150
+      label: Grade (skill-grader)
+      phase: grade-outputs
+    - id: n5
+      agent_id: po
+      x: 700
+      y: 150
+      label: Review + Iterate
+      phase: review-and-iterate
+    edges:
+    - from: n1
+      to: n2
+      label: eval_cases ready
+      color: '#6366f1'
+    - from: n1
+      to: n3
+      label: eval_cases ready
+      color: '#6366f1'
+    - from: n2
+      to: n4
+      label: outputs
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: outputs
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: grading.json
+      color: '#d29922'

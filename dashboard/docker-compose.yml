@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  dashboard:
+    build: .
+    image: sf-dashboard:latest
+    container_name: sf-dashboard
+    
+    ports:
+      - "8080:8080"
+    
+    volumes:
+      # Persist data
+      - ./data:/app/data
+      # Project configurations
+      - ./projects:/app/projects
+      # Logs
+      - dashboard-logs:/app/logs
+    
+    environment:
+      - DASHBOARD_PORT=8080
+      - DASHBOARD_HOST=0.0.0.0
+      - DASHBOARD_DEBUG=false
+      - DASHBOARD_LOG_LEVEL=info
+      # Azure environment
+      - AZURE_PLATFORM_URL=${AZURE_PLATFORM_URL:-}
+      - AZURE_SSH_HOST=${AZURE_SSH_HOST:-}
+      - AZURE_SSH_USER=${AZURE_SSH_USER:-macaron}
+      # OVH environment
+      - OVH_PLATFORM_URL=${OVH_PLATFORM_URL:-}
+      - OVH_SSH_HOST=${OVH_SSH_HOST:-}
+      - OVH_SSH_USER=${OVH_SSH_USER:-debian}
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    networks:
+      - sf-network
+
+volumes:
+  dashboard-logs:
+    driver: local
+
+networks:
+  sf-network:
+    driver: bridge

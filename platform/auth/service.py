@@ -177,6 +177,17 @@ def _ensure_personal_space(user: "User") -> None:
         logging.getLogger(__name__).warning("_ensure_personal_space failed: %s", e)
 
 
+def force_reset_password(email: str, new_password: str) -> None:
+    """Force-reset a user's password (used by demo_login when hash is stale)."""
+    pw_hash = _hash_password(new_password)
+    with get_db() as db:
+        db.execute(
+            "UPDATE users SET password_hash=? WHERE email=?",
+            (pw_hash, email.strip().lower()),
+        )
+        db.commit()
+
+
 def register(
     email: str,
     password: str,
@@ -376,18 +387,21 @@ def get_project_role(user_id: str, project_id: str) -> str:
 
 def get_user_projects(user_id: str) -> list[dict]:
     """Get all project roles for a user."""
-    with get_db() as db:
-        rows = db.execute(
-            "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
-            (user_id,),
-        ).fetchall()
-    return [
-        {
-            "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
-            "role": r[1] if isinstance(r, tuple) else r["role"],
-        }
-        for r in rows
-    ]
+    try:
+        with get_db() as db:
+            rows = db.execute(
+                "SELECT project_id, role FROM user_project_roles WHERE user_id=?",
+                (user_id,),
+            ).fetchall()
+        return [
+            {
+                "project_id": r[0] if isinstance(r, tuple) else r["project_id"],
+                "role": r[1] if isinstance(r, tuple) else r["role"],
+            }
+            for r in rows
+        ]
+    except Exception:
+        return []
 
 
 def remove_project_role(user_id: str, project_id: str):

@@ -16,7 +16,7 @@ from .cli import router as cli_router
 from .helpers import _active_mission_tasks, serve_workspace_file
 from .group_ideation import router as group_ideation_router
 from .ideation import router as ideation_router
-from .missions import router as missions_router
+from .epics import router as epics_router
 from .pages import router as pages_router
 from .projects import router as projects_router
 from .sessions import router as sessions_router
@@ -25,12 +25,13 @@ from .notifications import router as notifications_router
 from .tma import router as tma_router
 from .wiki import router as wiki_router
 from .workflows import router as workflows_router
+from .a2a_server import router as a2a_router
 
 router = APIRouter()
 
 router.include_router(pages_router)
 router.include_router(projects_router)
-router.include_router(missions_router)
+router.include_router(epics_router)
 router.include_router(agents_router)
 router.include_router(sessions_router)
 router.include_router(workflows_router)
@@ -48,9 +49,10 @@ router.include_router(evals_router)
 router.include_router(marketplace_router)
 router.include_router(metrics_router)
 router.include_router(tool_builder_router)
+router.include_router(a2a_router)
 
 # Workspace file serving (needs to be on the main router)
 router.add_api_route("/workspace/{path:path}", serve_workspace_file, methods=["GET"])
 
 # Re-export for backward compatibility
-__all__ = ["router", "api_mission_run", "_active_mission_tasks"]
+__all__ = ["router", "api_epic_run", "_active_mission_tasks"]

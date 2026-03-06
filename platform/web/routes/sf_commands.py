@@ -64,18 +64,18 @@ def format_table(headers: list[str], rows: list[list[str]]) -> str:
 async def cmd_platform_status() -> SFCommandResponse:
     """Get platform status."""
     from ...agents.store import get_agent_store
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
     from ...projects.manager import get_project_store
     from ...skills.library import get_skill_library
 
     try:
         agent_store = get_agent_store()
-        mission_store = get_mission_store()
+        epic_store = get_epic_store()
         project_store = get_project_store()
         skill_library = get_skill_library()
 
         agents = agent_store.list_all()
-        missions = mission_store.list_missions(limit=500)
+        missions = epic_store.list_missions(limit=500)
         projects = project_store.list_all()
         skills = skill_library.scan_all()
 
@@ -107,7 +107,7 @@ Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             output=output,
             data={
                 "agents": len(agents),
-                "missions": len(missions),
+                "epics": len(missions),
                 "projects": len(projects),
                 "skills": len(skills),
                 "running_missions": running,
@@ -120,10 +120,10 @@ Last check: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
 async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
     """List missions with filters."""
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
 
     try:
-        store = get_mission_store()
+        store = get_epic_store()
         limit = 20
         status_filter = None
 
@@ -180,10 +180,10 @@ async def cmd_missions_list(args: list[str]) -> SFCommandResponse:
 
 async def cmd_missions_show(mission_id: str) -> SFCommandResponse:
     """Show mission details."""
-    from ...missions.store import get_mission_store
+    from ...epics.store import get_epic_store
 
     try:
-        store = get_mission_store()
+        store = get_epic_store()
         mission = store.get(mission_id)
 
         if not mission:
@@ -441,9 +441,9 @@ async def cmd_db_status() -> SFCommandResponse:
 
         # Query table stats
         tables_query = """
-            SELECT name FROM sqlite_master 
-            WHERE type='table' AND name NOT LIKE 'sqlite_%'
-            ORDER BY name
+            SELECT table_name FROM information_schema.tables
+            WHERE table_schema='public' AND table_name NOT LIKE 'pg_%'
+            ORDER BY table_name
         """
         tables = db.execute(tables_query).fetchall()
 
@@ -480,6 +480,395 @@ async def cmd_db_status() -> SFCommandResponse:
         return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
 
 
+async def cmd_guide(args: list[str]) -> SFCommandResponse:
+    """Context-aware guidance on what to do next.
+    Inspired by BMAD /bmad-help — reads current state, recommends next steps.
+    Usage: guide [context hint, e.g. 'I just finished architecture, what next?']
+    """
+    from ...epics.store import get_epic_store
+    from ...projects.manager import get_project_store
+
+    context_hint = " ".join(args) if args else ""
+
+    try:
+        project_store = get_project_store()
+        epic_store = get_epic_store()
+
+        projects = project_store.list_all()
+        missions = epic_store.list_missions(limit=50)
+
+        running = [m for m in missions if m.status in ["running", "in_progress"]]
+        pending = [m for m in missions if m.status == "pending"]
+        done = [m for m in missions if m.status in ["completed", "done"]]
+
+        output = "SF Guide — What's next?\n"
+        output += "========================\n\n"
+
+        if context_hint:
+            output += f"Context: {context_hint}\n\n"
+
+        # Situation
+        output += "Current state:\n"
+        output += f"  • {len(projects)} project(s)\n"
+        output += f"  • {len(running)} mission(s) running  |  {len(pending)} pending  |  {len(done)} done\n"
+
+        if running:
+            for m in running[:3]:
+                name = getattr(m, "name", getattr(m, "title", "untitled"))
+                output += f"    → {name[:40]} [{m.status}]\n"
+        output += "\n"
+
+        # Recommendations based on state
+        output += "Recommended next steps:\n"
+        output += "-----------------------\n"
+
+        if not projects:
+            output += "1. Create a project: Projects → New Project\n"
+            output += "2. Pick a workflow: Workflows → Browse 46 workflows\n"
+            output += "3. Launch first mission\n"
+        elif not missions:
+            output += "1. Launch first mission via a workflow:\n"
+            output += "   → ideation-to-prod   full lifecycle (5 phases)\n"
+            output += "   → feature-sprint     implement a feature (TDD)\n"
+            output += "   → skill-eval         test skill quality\n"
+        elif running:
+            output += "1. Monitor missions: sf$ missions list --status=running\n"
+            output += "2. Review agent outputs in project chat\n"
+            output += "3. Respond to human-in-the-loop checkpoints if blocked\n"
+            output += "4. Use complexity=simple for quick tasks, complexity=enterprise for big ones\n"
+        else:
+            output += "1. Review completed missions for follow-up actions\n"
+            output += "2. Launch next workflow phase\n"
+            output += "3. Run skill-eval to verify skill quality\n"
+
+        # Context-specific advice
+        if context_hint:
+            kw = context_hint.lower()
+            output += "\n"
+            if any(w in kw for w in ["architect", "design", "system", "archi"]):
+                output += "For architecture:\n"
+                output += "  → Agent: architecte + skills/architecture-review.md\n"
+                output += "  → Workflow: feature-sprint (phase solutioning)\n"
+            elif any(w in kw for w in ["test", "qa", "quality", "eval"]):
+                output += "For QA / testing:\n"
+                output += "  → Workflow: test-campaign or skill-eval\n"
+                output += "  → Skills: tdd.md, qa-adversarial-llm.md\n"
+            elif any(w in kw for w in ["deploy", "prod", "release", "ship"]):
+                output += "For deployment:\n"
+                output += "  → Workflow: canary-deployment (1%→10%→50%→100% + HITL)\n"
+                output += "  → Agents: sre + devops\n"
+            elif any(w in kw for w in ["security", "audit", "pentest", "vuln"]):
+                output += "For security:\n"
+                output += (
+                    "  → Workflow: security-hacking (8 phases: recon→exploit→report)\n"
+                )
+                output += "  → Skills: security-audit.md, qa-adversarial-llm.md\n"
+            elif any(w in kw for w in ["skill", "agent", "prompt"]):
+                output += "For skill/agent improvement:\n"
+                output += (
+                    "  → Workflow: skill-eval (write eval_cases → grade → iterate)\n"
+                )
+                output += "  → Workflow: skill-evolution (audit all agents, extract best practices)\n"
+            elif any(w in kw for w in ["simple", "quick", "small", "bug", "fix"]):
+                output += "For quick tasks (simple complexity):\n"
+                output += "  → Launch workflow with complexity=simple\n"
+                output += "  → Heavy planning phases (min_complexity=enterprise) are auto-skipped\n"
+            elif any(w in kw for w in ["enterprise", "big", "large", "complex"]):
+                output += "For large projects (enterprise complexity):\n"
+                output += "  → Launch workflow with complexity=enterprise\n"
+                output += "  → All phases including heavyweight planning are included\n"
+
+        output += "\nTip: ask any agent in chat for deeper context-aware guidance.\n"
+        output += (
+            "     'sf$ missions list', 'sf$ agents list', 'sf$ skills search <topic>'\n"
+        )
+
+        return SFCommandResponse(
+            success=True,
+            output=output,
+            data={
+                "running": len(running),
+                "pending": len(pending),
+                "projects": len(projects),
+            },
+        )
+    except Exception as e:
+        logger.exception("Error in guide command")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
+async def cmd_ac_list() -> SFCommandResponse:
+    """List all AC pilot projects with current state."""
+    try:
+        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
+
+        def _load():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                states = {
+                    r["project_id"]: dict(r)
+                    for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
+                }
+            except Exception:
+                states = {}
+            conn.close()
+            return states
+
+        import asyncio
+        states = await asyncio.to_thread(_load)
+
+        headers = ["ID", "Nom", "Tier", "Cycle", "Statut", "Score moy.", "Convergence"]
+        rows = []
+        for p in _AC_PROJECTS:
+            s = states.get(p["id"], {})
+            rows.append([
+                p["id"],
+                p["name"],
+                p["tier"],
+                f"{s.get('current_cycle', 0)}/{p['max_cycles']}",
+                s.get("status", "idle"),
+                f"{s.get('total_score_avg') or 0:.1f}",
+                s.get("convergence_status", "cold_start"),
+            ])
+
+        output = format_table(headers, rows)
+        output += f"\n\n{len(_AC_PROJECTS)} projets pilotes. Commandes: ac status <id> · ac start <id> · ac history <id>"
+        return SFCommandResponse(success=True, output=output)
+    except Exception as e:
+        logger.exception("ac list error")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
+async def cmd_ac_status(project_id: str) -> SFCommandResponse:
+    """Show detailed status for one AC project."""
+    try:
+        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
+        import json as _json
+
+        proj = next((p for p in _AC_PROJECTS if p["id"] == project_id), None)
+        if not proj:
+            ids = ", ".join(p["id"] for p in _AC_PROJECTS)
+            return SFCommandResponse(
+                success=False, output="", error=f"Projet inconnu: {project_id}. IDs valides: {ids}"
+            )
+
+        def _load():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                state = dict(conn.execute(
+                    "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
+                ).fetchone() or {})
+            except Exception:
+                state = {}
+            try:
+                last = conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 1",
+                    (project_id,),
+                ).fetchone()
+                last = dict(last) if last else None
+            except Exception:
+                last = None
+            conn.close()
+            return state, last
+
+        import asyncio
+        state, last = await asyncio.to_thread(_load)
+
+        lines = [
+            f"Amélioration Continue — {proj['name']}",
+            "=" * 50,
+            f"  ID        : {proj['id']}",
+            f"  Tier      : {proj['tier_label']} ({proj['tier']})",
+            f"  Tech      : {', '.join(proj['tech'])}",
+            f"  Cycle     : {state.get('current_cycle', 0)}/{proj['max_cycles']}",
+            f"  Statut    : {state.get('status', 'idle')}",
+            f"  Run actif : {state.get('current_run_id', '—')}",
+            f"  Score moy.: {state.get('total_score_avg') or 0:.1f}/100",
+            f"  Convergence: {state.get('convergence_status', 'cold_start')}",
+            f"  CI status : {state.get('ci_status', 'unknown')}",
+            f"  Mis à jour: {state.get('updated_at', '—')}",
+        ]
+
+        if last:
+            try:
+                adv = _json.loads(last.get("adversarial_scores") or "{}") if isinstance(last.get("adversarial_scores"), str) else (last.get("adversarial_scores") or {})
+            except Exception:
+                adv = {}
+            lines += [
+                "",
+                f"Dernier cycle #{last.get('cycle_num', '?')}:",
+                f"  Score     : {last.get('total_score', 0)}/100",
+                f"  RL Reward : {last.get('rl_reward', 0):.3f}",
+                f"  Défauts   : {last.get('defect_count', 0)}",
+                f"  Traçab.   : {last.get('traceability_score', 0)}%",
+                f"  Git SHA   : {(last.get('git_sha') or '—')[:12]}",
+                f"  Statut    : {last.get('status', '—')}",
+            ]
+            if adv:
+                lines.append("  Adversarial:")
+                for dim, score in list(adv.items())[:6]:
+                    bar = "█" * int(score / 10) + "░" * (10 - int(score / 10))
+                    lines.append(f"    {dim[:16]:<16} [{bar}] {score}")
+        else:
+            lines.append("\nAucun cycle enregistré — utiliser: ac start " + project_id)
+
+        return SFCommandResponse(success=True, output="\n".join(lines))
+    except Exception as e:
+        logger.exception("ac status error")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
+async def cmd_ac_start(project_id: str) -> SFCommandResponse:
+    """Launch next AC improvement cycle for a project."""
+    try:
+        from .pages import api_improvement_start
+        resp = await api_improvement_start(project_id)
+        data = resp.body if hasattr(resp, "body") else b"{}"
+        import json as _json
+        d = _json.loads(data)
+        if "error" in d:
+            return SFCommandResponse(success=False, output="", error=d["error"])
+        output = (
+            f"Cycle AC démarré\n"
+            f"  Projet : {d.get('project_id')}\n"
+            f"  Cycle  : #{d.get('cycle_num')}\n"
+            f"  Run ID : {d.get('run_id')}\n"
+            f"\nSuivi: missions list --status=running"
+        )
+        return SFCommandResponse(success=True, output=output, data=d)
+    except Exception as e:
+        logger.exception("ac start error")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
+async def cmd_ac_history(args: list[str]) -> SFCommandResponse:
+    """Show cycle history for a project."""
+    try:
+        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
+        import json as _json
+
+        project_id = args[0] if args else None
+        if not project_id:
+            return SFCommandResponse(
+                success=False, output="", error="Usage: ac history <project_id>"
+            )
+
+        proj = next((p for p in _AC_PROJECTS if p["id"] == project_id), None)
+        if not proj:
+            return SFCommandResponse(
+                success=False, output="", error=f"Projet inconnu: {project_id}"
+            )
+
+        limit = 10
+        for a in args[1:]:
+            if a.startswith("--limit="):
+                try:
+                    limit = int(a.split("=")[1])
+                except ValueError:
+                    pass
+
+        def _load():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                rows = conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT ?",
+                    (project_id, limit),
+                ).fetchall()
+                return [dict(r) for r in rows]
+            except Exception:
+                return []
+            finally:
+                conn.close()
+
+        import asyncio
+        cycles = await asyncio.to_thread(_load)
+
+        if not cycles:
+            return SFCommandResponse(
+                success=True, output=f"Aucun cycle pour {project_id}. Démarrer: ac start {project_id}"
+            )
+
+        headers = ["#", "Score", "RL Reward", "Défauts", "Traçab.", "Statut", "SHA", "Fix"]
+        rows = []
+        for c in reversed(cycles):
+            rows.append([
+                str(c.get("cycle_num", "?")),
+                f"{c.get('total_score', 0)}/100",
+                f"{c.get('rl_reward', 0):.3f}",
+                str(c.get("defect_count", 0)),
+                f"{c.get('traceability_score', 0)}%",
+                c.get("status", "—"),
+                (c.get("git_sha") or "—")[:7],
+                (c.get("fix_summary") or "—")[:30],
+            ])
+
+        output = f"Historique AC — {proj['name']} ({len(cycles)} cycles)\n\n"
+        output += format_table(headers, rows)
+        return SFCommandResponse(success=True, output=output)
+    except Exception as e:
+        logger.exception("ac history error")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
+async def cmd_ac_stats() -> SFCommandResponse:
+    """Show global AC statistics."""
+    try:
+        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
+
+        def _load():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                total = conn.execute("SELECT COUNT(*) as n FROM ac_cycles").fetchone()["n"]
+                running = conn.execute(
+                    "SELECT COUNT(*) as n FROM ac_project_state WHERE status='running'"
+                ).fetchone()["n"]
+                avg = conn.execute(
+                    "SELECT AVG(total_score) as v FROM ac_cycles WHERE total_score > 0"
+                ).fetchone()["v"] or 0
+                best = conn.execute(
+                    "SELECT project_id, MAX(total_score) as s FROM ac_cycles GROUP BY project_id ORDER BY s DESC LIMIT 1"
+                ).fetchone()
+                states = {
+                    r["project_id"]: dict(r)
+                    for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
+                }
+            except Exception as e:
+                total = running = avg = 0; best = None; states = {}
+            conn.close()
+            return total, running, avg, best, states
+
+        import asyncio
+        total, running, avg, best, states = await asyncio.to_thread(_load)
+
+        lines = [
+            "Amélioration Continue — Statistiques globales",
+            "=" * 50,
+            f"  Projets pilotes : {len(_AC_PROJECTS)}",
+            f"  Cycles exécutés : {total}",
+            f"  En cours        : {running}",
+            f"  Score moyen     : {avg:.1f}/100",
+            f"  Meilleur projet : {best['project_id'] if best else '—'} ({best['s'] if best else 0}/100)",
+            "",
+            "Par projet:",
+        ]
+        for p in _AC_PROJECTS:
+            s = states.get(p["id"], {})
+            status_icon = "▶" if s.get("status") == "running" else ("✓" if s.get("status") == "completed" else "·")
+            lines.append(
+                f"  {status_icon} {p['id']:<25} cycle {s.get('current_cycle', 0):>2}/{p['max_cycles']}  "
+                f"score {s.get('total_score_avg') or 0:>5.1f}  {s.get('convergence_status', 'cold_start')}"
+            )
+
+        return SFCommandResponse(success=True, output="\n".join(lines))
+    except Exception as e:
+        logger.exception("ac stats error")
+        return SFCommandResponse(success=False, output="", error=str(e))
+
+
 async def cmd_help() -> SFCommandResponse:
     """Show SF CLI help."""
     output = """Software Factory CLI Help
@@ -508,9 +897,19 @@ PROJECTS:
   
 DATABASE:
   db status                          Show database tables and row counts
+
+AMÉLIORATION CONTINUE:
+  ac list                            List all AC pilot projects + state
+  ac stats                           Global AC statistics
+  ac status <project_id>             Detailed status for one project
+  ac start <project_id>              Launch next improvement cycle
+  ac history <project_id>            Cycle history (scores, RL, adversarial)
+  ac history <id> --limit=20         Limit history rows
   
 SYSTEM:
   help                               Show this help message
+  guide                              What's next? Context-aware guidance (inspired by BMAD /bmad-help)
+  guide <context>                    Guidance with context (e.g. guide I just finished architecture)
   clear                              Clear terminal
 
 Examples:
@@ -519,6 +918,9 @@ Examples:
   sf$ agents show product-manager
   sf$ skills search "react"
   sf$ db status
+  sf$ ac list
+  sf$ ac start ac-hello-html
+  sf$ ac history ac-fullstack-rs --limit=5
   
 Tips:
   • Use ↑/↓ arrows for command history
@@ -534,7 +936,7 @@ SF_COMMANDS = {
     "platform": {
         "status": cmd_platform_status,
     },
-    "missions": {
+    "epics": {
         "list": cmd_missions_list,
         "show": cmd_missions_show,
     },
@@ -552,6 +954,14 @@ SF_COMMANDS = {
     "db": {
         "status": cmd_db_status,
     },
+    "ac": {
+        "list": cmd_ac_list,
+        "stats": cmd_ac_stats,
+        "status": cmd_ac_status,
+        "start": cmd_ac_start,
+        "history": cmd_ac_history,
+    },
+    "guide": cmd_guide,
     "help": cmd_help,
 }
 
@@ -565,7 +975,7 @@ async def execute_sf_command(request: SFCommandRequest) -> SFCommandResponse:
             return SFCommandResponse(success=False, output="", error="Empty command")
 
         # Parse command
-        cmd_group = cmd_parts[0]  # e.g., "platform", "missions"
+        cmd_group = cmd_parts[0]  # e.g., "platform", "epics"
         cmd_action = cmd_parts[1] if len(cmd_parts) > 1 else None
         cmd_args = cmd_parts[2:] if len(cmd_parts) > 2 else []
         cmd_args.extend(request.args)  # Add args from API

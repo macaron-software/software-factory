@@ -20,6 +20,47 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+# Module IDs that are enabled by default — derived from registry.yaml (builtin: true).
+# Used as fallback when DB settings table is empty (fresh install).
+# This set is computed once at import time; the authoritative source is the registry.
+def _load_builtin_ids() -> frozenset:
+    try:
+        import yaml
+        from pathlib import Path as _Path
+
+        reg = _Path(__file__).parent.parent / "modules" / "registry.yaml"
+        if reg.exists():
+            data = yaml.safe_load(reg.read_text())
+            return frozenset(
+                m["id"] for m in data.get("modules", []) if m.get("builtin")
+            )
+    except Exception:
+        pass
+    # Hard fallback if registry.yaml unreadable
+    return frozenset({"component-gallery", "rtk", "error-monitoring", "playwright-mcp"})
+
+
+_BUILTIN_MODULE_IDS: frozenset = _load_builtin_ids()
+
+
+def _is_module_enabled(module_id: str) -> bool:
+    """Check if an optional module is enabled in DB settings (live, per call)."""
+    try:
+        from ..db.migrations import get_db
+
+        db = get_db()
+        row = db.execute(
+            "SELECT value FROM settings WHERE key='enabled_modules'"
+        ).fetchone()
+        if row:
+            import json as _json
+
+            return module_id in _json.loads(row[0])
+    except Exception:
+        pass
+    return module_id in _BUILTIN_MODULE_IDS
+
+
 def _get_tool_registry():
     """Lazy import to avoid circular imports."""
     from ..tools.build_tools import register_build_tools
@@ -31,6 +72,13 @@ def _get_tool_registry():
     register_code_tools(reg)
     register_git_tools(reg)
     register_build_tools(reg)
+    try:
+        if _is_module_enabled("trivy"):
+            from ..tools.sast_tools import register_sast_tools
+
+            register_sast_tools(reg)
+    except Exception:
+        pass
     try:
         from ..tools.mcp_bridge import register_mcp_tools
 
@@ -112,6 +160,101 @@ def _get_tool_registry():
         from ..tools.project_tools import register_project_tools
 
         register_project_tools(reg)
+    except Exception:
+        pass
+    # Agent plan tools (TodoList middleware)
+    try:
+        from ..tools.plan_tools import register_plan_tools
+
+        register_plan_tools(reg)
+    except Exception:
+        pass
+    # Pentest / offensive tools
+    try:
+        from ..tools.security_pentest_tools import register_pentest_tools
+
+        register_pentest_tools(reg)
+    except Exception:
+        pass
+    # Browser exploration tools (agent-browser / headless Chromium) — guarded by browser-cli module
+    try:
+        if _is_module_enabled("browser-cli"):
+            from ..tools.browser_tools import register_browser_tools
+
+            register_browser_tools(reg)
+    except Exception:
+        pass
+    try:
+        if _is_module_enabled("infisical"):
+            from ..tools.infisical_tools import register_infisical_tools
+
+            register_infisical_tools(reg)
+    except Exception:
+        pass
+    # Error monitoring tools — guarded by error-monitoring module
+    try:
+        if _is_module_enabled("error-monitoring"):
+            from ..tools.monitoring_tools import register_monitoring_tools
+
+            register_monitoring_tools(reg)
+    except Exception:
+        pass
+    # Sandbox / Landlock tools — builtin, always loaded
+    try:
+        from ..tools.sandbox_tools import register_sandbox_tools
+
+        register_sandbox_tools(reg)
+    except Exception:
+        pass
+    # RTK token compression tools — builtin, always loaded
+    try:
+        from ..tools.rtk_tools import register_rtk_tools
+
+        register_rtk_tools(reg)
+    except Exception:
+        pass
+    # mflux image generation — guarded by mflux module (macOS Apple Silicon)
+    try:
+        if _is_module_enabled("mflux"):
+            from ..tools.mflux_tools import register_mflux_tools
+
+            register_mflux_tools(reg)
+    except Exception:
+        pass
+    # Package registry tools (npm, PyPI) — guarded by their modules
+    try:
+        if _is_module_enabled("npm-registry") or _is_module_enabled("pypi-registry"):
+            from ..tools.package_tools import register_package_tools
+
+            register_package_tools(reg)
+    except Exception:
+        pass
+    # Knowledge tools (snyk, HuggingFace, scrapy) — guarded by their modules
+    try:
+        if (
+            _is_module_enabled("snyk-vuln")
+            or _is_module_enabled("huggingface-models")
+            or _is_module_enabled("scrapy")
+        ):
+            from ..tools.knowledge_tools import register_knowledge_tools
+
+            register_knowledge_tools(reg)
+    except Exception:
+        pass
+    # GSD context engineering tools — guarded by gsd module
+    try:
+        if _is_module_enabled("gsd"):
+            from ..tools.gsd_tools import register_gsd_tools
+
+            register_gsd_tools(reg)
+    except Exception:
+        pass
+    # Performance audit tools (chrome-devtools-mcp) — guarded by perf-auditor module
+    try:
+        if _is_module_enabled("perf-auditor"):
+            from ..tools.perf_audit_tools import register_perf_audit_tools
+
+            register_perf_audit_tools(reg)
     except Exception:
         pass
     return reg
@@ -445,7 +588,7 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     """Run a mission phase via pattern engine."""
     from datetime import datetime
 
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
     from ..models import PhaseStatus
     from ..patterns.engine import run_pattern
     from ..patterns.store import get_pattern_store
@@ -456,8 +599,8 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
     if not phase_id:
         return "Error: phase_id is required"
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission. Start a mission first."
 
@@ -585,11 +728,11 @@ async def _tool_run_phase(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_get_phase_status(args: dict, ctx: ExecutionContext) -> str:
     """Get status of a specific phase."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
 
     phase_id = args.get("phase_id", "")
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission"
 
@@ -612,10 +755,10 @@ async def _tool_get_phase_status(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
     """List all phases with status."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
     if not mission:
         return "Error: no active mission"
 
@@ -639,15 +782,15 @@ async def _tool_list_phases(args: dict, ctx: ExecutionContext) -> str:
 
 async def _tool_request_validation(args: dict, ctx: ExecutionContext) -> str:
     """Request human validation — emit SSE checkpoint event."""
-    from ..missions.store import get_mission_run_store
+    from ..epics.store import get_epic_run_store
     from ..models import PhaseStatus
     from ..sessions.store import MessageDef, get_session_store
 
     question = args.get("question", "Proceed?")
     options = args.get("options", "GO,NOGO,PIVOT")
 
-    run_store = get_mission_run_store()
-    mission = run_store.get(ctx.mission_run_id) if ctx.mission_run_id else None
+    run_store = get_epic_run_store()
+    mission = run_store.get(ctx.epic_run_id) if ctx.epic_run_id else None
 
     # Update current phase to waiting
     if mission and mission.current_phase:
@@ -988,7 +1131,7 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
         return "Error: ticket title required"
     tid = str(uuid.uuid4())[:8]
     agent_id = ctx.agent.id if ctx.agent else "unknown"
-    mission_id = getattr(ctx, "mission_run_id", "") or ""
+    mission_id = getattr(ctx, "epic_run_id", "") or ""
     try:
         db = get_db()
         db.execute(
@@ -1553,6 +1696,7 @@ async def _tool_mcp_dynamic(name: str, args: dict, ctx: ExecutionContext) -> str
         "memory": "mcp-memory",
         "playwright": "mcp-playwright",
         "github": "mcp-github",
+        "cdp": "mcp-chrome-devtools",
     }
     mcp_id = mcp_id_map.get(server_short, f"mcp-{server_short}")
 
@@ -1585,7 +1729,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 missions = db.execute(
-                    "SELECT id, name, type, status, category FROM missions WHERE project_id=? ORDER BY status",
+                    "SELECT id, name, type, status, category FROM epics WHERE project_id=? ORDER BY status",
                     (project_id,),
                 ).fetchall()
             finally:
@@ -1623,12 +1767,12 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
                 db.commit()
             finally:
                 db.close()
-            # Trigger heal_missions to re-evaluate system mission statuses
+            # Trigger heal_epics to re-evaluate system mission statuses
             try:
-                from ..ops.auto_heal import heal_missions
+                from ..ops.auto_heal import heal_epics
 
                 await asyncio.get_event_loop().run_in_executor(
-                    None, heal_missions, project_id
+                    None, heal_epics, project_id
                 )
             except Exception:
                 pass
@@ -1641,7 +1785,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 existing = db.execute(
-                    "SELECT name, type, status FROM missions WHERE project_id=? ORDER BY status",
+                    "SELECT name, type, status FROM epics WHERE project_id=? ORDER BY status",
                     (project_id,),
                 ).fetchall()
             finally:
@@ -1682,7 +1826,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 cur = db.execute(
-                    "UPDATE missions SET status=? WHERE id=?",
+                    "UPDATE epics SET status=? WHERE id=?",
                     (new_status, mission_id),
                 )
                 db.commit()
@@ -1701,7 +1845,7 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
             db = get_db()
             try:
                 failed = db.execute(
-                    "SELECT name FROM missions WHERE project_id=? AND status='failed'",
+                    "SELECT name FROM epics WHERE project_id=? AND status='failed'",
                     (project_id,),
                 ).fetchall()
             finally:
@@ -1838,6 +1982,18 @@ async def _execute_tool(
         return await _tool_memory_search(args, ctx)
     if name == "memory_store":
         return await _tool_memory_store(args, ctx)
+    if name in ("plan_create", "plan_update", "plan_get"):
+        from ..tools.plan_tools import (
+            _tool_plan_create,
+            _tool_plan_update,
+            _tool_plan_get,
+        )
+
+        if name == "plan_create":
+            return await _tool_plan_create(args, ctx)
+        if name == "plan_update":
+            return await _tool_plan_update(args, ctx)
+        return await _tool_plan_get(args, ctx)
     if name == "deep_search":
         return await _tool_deep_search(args, ctx)
     # Phase orchestration tools (mission control)
@@ -1879,13 +2035,69 @@ async def _execute_tool(
     ):
         return await _tool_security_chaos(name, args, ctx)
 
+    # ── Pentest / offensive tools ──
+    if name in (
+        "recon_portscan",
+        "recon_subdomain",
+        "recon_fingerprint",
+        "pentest_fuzz_api",
+        "pentest_inject",
+        "pentest_auth",
+        "pentest_ssrf",
+    ):
+        from ..tools.security_pentest_tools import (
+            PortScanTool,
+            SubdomainScanTool,
+            FingerprintTool,
+            ApiFuzzTool,
+            InjectTestTool,
+            AuthBypassTool,
+            SsrfTestTool,
+        )
+
+        _PENTEST_MAP = {
+            "recon_portscan": PortScanTool,
+            "recon_subdomain": SubdomainScanTool,
+            "recon_fingerprint": FingerprintTool,
+            "pentest_fuzz_api": ApiFuzzTool,
+            "pentest_inject": InjectTestTool,
+            "pentest_auth": AuthBypassTool,
+            "pentest_ssrf": SsrfTestTool,
+        }
+        if "cwd" not in args and ctx.workspace_path:
+            if os.path.isdir(ctx.workspace_path):
+                args["cwd"] = ctx.workspace_path
+        tool = _PENTEST_MAP[name]()
+        return await tool.execute(args)
+
     # ── Ticket/Incident management ──
     if name == "create_ticket":
         return await _tool_create_ticket(args, ctx)
 
-    # ── Backlog tools (create_feature, create_story) — handled by platform_tools registry ──
+    # ── Backlog tools (create_feature, create_story, create_sprint) — handled by platform_tools registry ──
     if name in ("create_feature", "create_story"):
         return await _tool_platform_backlog(name, args, ctx)
+
+    if name == "create_sprint":
+        from ..tools.platform_tools import PlatformCreateSprintTool
+
+        return await PlatformCreateSprintTool().execute(args, ctx.agent)
+
+    # ── Orchestration tools (Jarvis/RTE: launch, resume, check runs) ──
+    if name == "launch_epic_run":
+        from ..tools.platform_tools import PlatformLaunchEpicRunTool
+
+        return await PlatformLaunchEpicRunTool().execute(args, ctx.agent)
+
+    if name == "resume_run":
+        from ..tools.platform_tools import PlatformResumeRunTool
+
+        return await PlatformResumeRunTool().execute(args, ctx.agent)
+
+    if name == "check_run_status":
+        from ..tools.platform_tools import PlatformCheckRunTool
+
+        return await PlatformCheckRunTool().execute(args, ctx.agent)
 
     # ── Local CI pipeline ──
     if name == "local_ci":

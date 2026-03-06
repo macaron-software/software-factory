@@ -146,7 +146,7 @@ async def autoheal_heartbeat():
     stats = get_autoheal_stats()
     hb = stats.get("heartbeat", "starting")
     inc = stats["incidents"]
-    mis = stats["missions"]
+    mis = stats["epics"]
     active = stats["active_heals"]
 
     if not stats["enabled"]:

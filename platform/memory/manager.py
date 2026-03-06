@@ -60,17 +60,71 @@ class MemoryEntry:
     created_at: str = ""
 
 
+_MEMORY_COMPRESS_THRESHOLD = int(__import__("os").environ.get("MEMORY_COMPRESS_THRESHOLD", "50"))
+_MEMORY_COMPRESS_KEEP = 20  # Keep the N most recent after compression
+
+
+def _maybe_compress_project_memory(project_id: str) -> None:
+    """If project memory exceeds threshold, LLM-summarize oldest entries into one compressed record."""
+    try:
+        conn = get_db()
+        try:
+            count = conn.execute(
+                "SELECT COUNT(*) FROM memory_project WHERE project_id=?", (project_id,)
+            ).fetchone()[0]
+            if count <= _MEMORY_COMPRESS_THRESHOLD:
+                return
+            # Fetch oldest entries (exclude the most recent ones we want to keep)
+            old_rows = conn.execute(
+                "SELECT id, category, key, value FROM memory_project"
+                " WHERE project_id=?"
+                " ORDER BY COALESCE(updated_at, created_at) ASC"
+                f" LIMIT {count - _MEMORY_COMPRESS_KEEP}",
+                (project_id,),
+            ).fetchall()
+            if not old_rows:
+                return
+            old_ids = [r["id"] for r in old_rows]
+            # Build a summary text from old entries
+            snippets = [f"[{r['category']}/{r['key']}] {r['value'][:200]}" for r in old_rows]
+            combined_text = "\n".join(snippets)
+            # LLM summarization (non-blocking, best-effort)
+            try:
+                from ..llm.client import LLMMessage, get_llm_client
+                client = get_llm_client()
+                resp = client.chat(
+                    messages=[
+                        LLMMessage(role="user", content=(
+                            "Résume ces entrées de mémoire projet en un paragraphe dense "
+                            "(max 500 chars), conserve les faits clés:\n\n" + combined_text
+                        ))
+                    ],
+                    max_tokens=200,
+                )
+                summary = resp.content.strip() if resp and resp.content else combined_text[:500]
+            except Exception:
+                summary = combined_text[:500]
+            # Delete old entries and insert compressed summary
+            placeholders = ",".join("?" * len(old_ids))
+            conn.execute(f"DELETE FROM memory_project WHERE id IN ({placeholders})", old_ids)
+            conn.execute(
+                "INSERT INTO memory_project (project_id, category, key, value, confidence, source, relevance_score)"
+                " VALUES (?, 'context', '_compressed_summary', ?, 0.7, 'system', 0.7)",
+                (project_id, summary),
+            )
+            conn.commit()
+            logger.info(
+                "memory: compressed %d old entries for project %s → 1 summary",
+                len(old_ids), project_id,
+            )
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.debug("memory: compression skipped: %s", e)
+
+
 class MemoryManager:
     """Unified interface for all memory layers."""
-
-    @staticmethod
-    def _row(r) -> dict:
-        """Convert a DB row to a JSON-serializable dict (datetime → ISO str)."""
-        d = dict(r)
-        for k, v in d.items():
-            if hasattr(v, "isoformat"):
-                d[k] = v.isoformat()
-        return d
 
     # ── Pattern Memory (Layer 2) ────────────────────────────────
 
@@ -112,7 +166,7 @@ class MemoryManager:
         params.append(limit)
         rows = conn.execute(q, params).fetchall()
         conn.close()
-        return [self._row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     def pattern_search(
         self, session_id: str, query: str, limit: int = 20
@@ -124,7 +178,7 @@ class MemoryManager:
             (session_id, f"%{query}%", f"%{query}%", limit),
         ).fetchall()
         conn.close()
-        return [self._row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     # ── Project Memory (Layer 3) ────────────────────────────────
 
@@ -172,6 +226,8 @@ class MemoryManager:
             conn.commit()
             rid = cur.lastrowid
         conn.close()
+        # Compress if project memory is growing too large
+        _maybe_compress_project_memory(project_id)
         return rid
 
     def project_get(
@@ -182,7 +238,8 @@ class MemoryManager:
         agent_role: str = "",
     ) -> list[dict]:
         conn = get_db()
-        q = "SELECT * FROM memory_project WHERE project_id=?"
+        _cols = "id, project_id, category, key, value, confidence, source, agent_role, relevance_score, access_count, created_at, updated_at, last_read_at"
+        q = f"SELECT {_cols} FROM memory_project WHERE project_id=?"
         params: list = [project_id]
         if category:
             q += " AND category=?"
@@ -205,7 +262,14 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [self._row(r) for r in rows]
+        result = []
+        for r in rows:
+            row = dict(r)
+            for k, v in row.items():
+                if hasattr(v, "isoformat"):
+                    row[k] = v.isoformat()
+            result.append(row)
+        return result
 
     def project_search(
         self, project_id: str, query: str, limit: int = 20
@@ -252,7 +316,7 @@ class MemoryManager:
         except Exception:
             pass
         conn.close()
-        return [self._row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     # ── Global Memory (Layer 4) ──────────────────────────────────
 
@@ -308,7 +372,7 @@ class MemoryManager:
                 (limit,),
             ).fetchall()
         conn.close()
-        return [self._row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     def global_search(self, query: str, limit: int = 20) -> list[dict]:
         from ..db.adapter import is_postgresql
@@ -341,7 +405,7 @@ class MemoryManager:
                 (f"%{query}%", f"%{query}%", limit),
             ).fetchall()
         conn.close()
-        return [self._row(r) for r in rows]
+        return [dict(r) for r in rows]
 
     # ── Vector Search (semantic, embedding-based) ──────────────────
 
