@@ -139,6 +139,10 @@ def _load_skill_frontmatter(skill_name: str) -> tuple[dict, str]:
     Returns (frontmatter_dict, body_markdown).
     """
     path = LEGACY_SKILLS_DIR / f"{skill_name}.md"
+    # DATA_DIR/skills/ overrides image-baked skills (used for A/B testing and skill updates)
+    override = DATA_DIR / "skills" / f"{skill_name}.md"
+    if override.exists():
+        path = override
     if not path.exists():
         raise FileNotFoundError(f"Skill not found: {skill_name} ({path})")
     text = path.read_text(encoding="utf-8")
