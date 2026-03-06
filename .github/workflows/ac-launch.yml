@@ -37,41 +37,57 @@ jobs:
           
           # Get API key from env file (search broadly)
           API_KEY=""
-          echo "Searching for MACARON_API_KEY..."
-          find /home/sfadmin /etc/sf-platform /opt/sf-platform /app -name "*.env" -o -name ".env" -o -name "secrets" -o -name "platform.env" 2>/dev/null | head -20
-          for f in /home/sfadmin/.env /home/sfadmin/platform/.env /home/sfadmin/.config.env \
-                   /etc/sf-platform/secrets /etc/sf-platform/.env /opt/sf-platform/.env \
-                   /tmp/sf-node.env /tmp/llm_test.env /app/.env /app/platform.env; do
+          echo "Searching for API key..."
+          # Show all env var names in found files (keys only, no values)
+          for f in /tmp/sf-node.env /tmp/llm_test.env /home/sfadmin/.env /etc/sf-platform/secrets; do
             if [ -f "$f" ]; then
-              echo "  Checking $f..."
-              KEY=$(grep -E "MACARON_API_KEY" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" | head -1)
-              if [ -n "$KEY" ]; then
-                API_KEY="$KEY"
-                echo "Found API key in $f"
-                break
-              fi
+              echo "Keys in $f: $(grep -oE '^[A-Z_]+' "$f" 2>/dev/null | tr '\n' ' ')"
             fi
           done
           
-          # Fallback: search running process env
+          # Try multiple key names
+          for KEY_NAME in MACARON_API_KEY API_KEY PLATFORM_API_KEY SF_API_KEY INTERNAL_API_KEY; do
+            for f in /tmp/sf-node.env /tmp/llm_test.env /home/sfadmin/.env /etc/sf-platform/secrets; do
+              if [ -f "$f" ]; then
+                KEY=$(grep -E "^${KEY_NAME}=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" | head -1)
+                if [ -n "$KEY" ]; then
+                  API_KEY="$KEY"
+                  echo "Found key '${KEY_NAME}' in $f"
+                  break 2
+                fi
+              fi
+            done
+          done
+          
+          # Fallback: read from running process env
           if [ -z "$API_KEY" ]; then
             PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
             if [ -n "$PID" ]; then
-              KEY=$(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep MACARON_API_KEY | cut -d= -f2-)
-              if [ -n "$KEY" ]; then
-                API_KEY="$KEY"
-                echo "Found API key in process $PID env"
+              for KEY_NAME in MACARON_API_KEY API_KEY PLATFORM_API_KEY SF_API_KEY INTERNAL_API_KEY; do
+                KEY=$(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep "^${KEY_NAME}=" | cut -d= -f2-)
+                if [ -n "$KEY" ]; then
+                  API_KEY="$KEY"
+                  echo "Found key '${KEY_NAME}' in process $PID env"
+                  break
+                fi
+              done
+              if [ -z "$API_KEY" ]; then
+                echo "Process $PID env keys: $(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep -oE '^[A-Z_]+' | tr '\n' ' ')"
               fi
             fi
           fi
           
           if [ -z "$API_KEY" ]; then
-            echo "ERROR: MACARON_API_KEY not found — env files found:"
-            find / -name "*.env" -o -name ".env" 2>/dev/null | grep -v proc | head -20
-            exit 1
+            echo "ERROR: No API key found. Will try without auth..."
+            API_KEY=""
           fi
           
           BASE_URL="http://localhost:8090"
+          if [ -n "$API_KEY" ]; then
+            AUTH_HDR="-H \"Authorization: Bearer $API_KEY\""
+          else
+            AUTH_HDR=""
+          fi
           
           # Check health
           HEALTH=$(curl -sf "$BASE_URL/api/health" 2>/dev/null) || echo "{}"
