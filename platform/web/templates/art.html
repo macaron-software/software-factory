@@ -542,7 +542,7 @@ async function loadThompsonTab() {
 
         // Agent performance table
         if (!d.agents || !d.agents.length) {
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune donnée — les scores s\'accumulent en cours d'epic</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune donn\u00e9e \u2014 les scores s\'accumulent en cours d\'epic</td></tr>';
         } else {
             tbody.innerHTML = d.agents.map(a => {
                 const pct = a.success_pct ?? 0;

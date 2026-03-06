@@ -547,7 +547,7 @@ async def workflows_evolution(request: Request):
     runs = [
         dict(r)
         for r in db.execute(
-            "SELECT * FROM evolution_runs ORDER BY started_at DESC LIMIT 20"
+            "SELECT * FROM evolution_runs ORDER BY completed_at DESC LIMIT 20"
         ).fetchall()
     ]
     db.close()
