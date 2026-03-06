@@ -348,6 +348,7 @@
                     <option value="evals">With evals</option>
                     <option value="missing">Missing evals</option>
                     <option value="fail">Failing</option>
+                    <option value="tech">Tech stack</option>
                 </select>
             </label>
         </div>
@@ -1045,8 +1046,9 @@ function skRenderTable(skills) {
     const filter = document.getElementById('sk-filter')?.value || 'all';
     let rows = skills;
     if (filter === 'evals') rows = skills.filter(s => s.has_evals);
-    else if (filter === 'missing') rows = skills.filter(s => !s.has_evals);
+    else if (filter === 'missing') rows = skills.filter(s => !s.has_evals && s.source !== 'tech');
     else if (filter === 'fail') rows = skills.filter(s => s.has_evals && s.pass_rate != null && s.pass_rate < 0.8);
+    else if (filter === 'tech') rows = skills.filter(s => s.source === 'tech');
 
     if (!rows.length) {
         tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">No skills matching filter</td></tr>`;
@@ -1099,8 +1101,10 @@ function skRowHtml(s) {
 
     const caseCount = s.eval_cases ?? 0;
     const rowBg = s.has_evals && pr != null && pr < 0.6 ? 'background:rgba(239,68,68,0.04)' : '';
+    const techBadge = s.source === 'tech' ? `<span style="margin-left:6px;font-size:0.65rem;background:#1e3a5f;color:#60a5fa;border-radius:3px;padding:1px 5px">${s.stack || 'tech'}</span>` : '';
+    const descTip = s.description ? ` title="${s.description.replace(/"/g,'&quot;')}"` : '';
     return `<tr style="border-bottom:1px solid var(--border,#2d3748);${rowBg}" data-skill="${s.name}">
-        <td style="padding:7px 12px;font-weight:${s.has_evals?'500':'normal'}">${s.name}</td>
+        <td style="padding:7px 12px;font-weight:${s.has_evals?'500':'normal'}"${descTip}>${s.name}${techBadge}</td>
         <td style="text-align:center;padding:7px 8px;color:var(--text-secondary)">${caseCount || '—'}</td>
         <td style="text-align:center;padding:7px 8px">${det}</td>
         <td style="text-align:center;padding:7px 8px">${judge}</td>

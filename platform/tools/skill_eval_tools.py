@@ -207,10 +207,46 @@ def list_skills_with_evals() -> list[dict]:
     return skills
 
 
+def list_tech_skills() -> list[dict]:
+    """Return tech stack skills (skills/tech/*.yaml) for the skills health dashboard."""
+    from ..config import PLATFORM_ROOT
+    tech_dir = PLATFORM_ROOT / "skills" / "tech"
+    if not tech_dir.exists():
+        return []
+    skills = []
+    for path in sorted(tech_dir.glob("*.yaml")):
+        try:
+            with path.open() as f:
+                data = yaml.safe_load(f)
+            if not data:
+                continue
+            skills.append(
+                {
+                    "name": data.get("id", path.stem),
+                    "description": data.get("description", "")[:120],
+                    "category": "tech-stack",
+                    "source": "tech",
+                    "stack": data.get("stack", path.stem),
+                    "eval_cases": 0,
+                    "has_evals": False,
+                    "pass_rate": None,
+                    "verdict": None,
+                    "checks_pass_rate": None,
+                    "llm_judge_score": None,
+                    "ran_at": None,
+                    "status": "no_evals",
+                }
+            )
+        except Exception:
+            continue
+    return skills
+
+
 def coverage_summary() -> dict:
     """Skills eval coverage summary for /art dashboard."""
     skills = list_skills_with_evals()
-    total = len(skills)
+    tech = list_tech_skills()
+    total = len(skills) + len(tech)
     with_evals = sum(1 for s in skills if s["has_evals"])
     run = sum(1 for s in skills if s["pass_rate"] is not None)
     passing = sum(1 for s in skills if (s["pass_rate"] or 0) >= PASS_RATE_GREEN)
@@ -220,6 +256,7 @@ def coverage_summary() -> dict:
         "coverage_pct": round(100 * with_evals / total) if total else 0,
         "run": run,
         "passing": passing,
+        "tech_skills": len(tech),
         "needing_work": [
             s
             for s in skills
