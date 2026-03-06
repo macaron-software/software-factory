@@ -179,6 +179,18 @@ jobs:
           fi
           echo "platform-${INACTIVE} healthy ✓"
 
+          # ── Copy skills into container data volume (override baked-in skills) ─
+          CONTAINER_ID=$(docker compose ps -q platform-${INACTIVE} 2>/dev/null || docker ps -q --filter "name=platform-${INACTIVE}" 2>/dev/null || true)
+          if [ -n "$CONTAINER_ID" ] && [ -d "/opt/software-factory/skills" ]; then
+            docker exec "$CONTAINER_ID" mkdir -p /app/data/skills 2>/dev/null || true
+            for f in /opt/software-factory/skills/*.md; do
+              [ -f "$f" ] && docker cp "$f" "${CONTAINER_ID}:/app/data/skills/" 2>/dev/null || true
+            done
+            echo "Skills copied into container ✓ ($(ls /opt/software-factory/skills/*.md 2>/dev/null | wc -l) files)"
+          else
+            echo "WARNING: could not find container $CONTAINER_ID or skills dir — skipping skill copy"
+          fi
+
           # ── Swap nginx (zero-downtime) ───────────────────────────────────────
           # Deploy full nginx template (maintenance page, SSE config, timeouts)
           # then set the active port via sed
