@@ -1073,7 +1073,7 @@ async def api_improvement_inject_cycle(request: Request):
                 " last_git_sha, ci_status, updated_at)"
                 " VALUES (?,?,?,?,?,?,?)"
                 " ON CONFLICT(project_id) DO UPDATE SET"
-                " current_cycle=MAX(current_cycle, excluded.current_cycle),"
+                " current_cycle=GREATEST(ac_project_state.current_cycle, excluded.current_cycle),"
                 " status=CASE WHEN excluded.status='completed' THEN 'idle' ELSE excluded.status END,"
                 " last_git_sha=excluded.last_git_sha, ci_status=excluded.ci_status,"
                 " total_score_avg=("
