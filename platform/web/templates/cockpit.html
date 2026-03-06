@@ -301,8 +301,9 @@
         <text x="245" y="311" text-anchor="middle" fill="#6b7280" font-size="7">Guardrails</text>
 
         <!-- Skill/Agent store -->
-        <rect x="35" y="333" width="250" height="30" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
-        <text x="160" y="352" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skill Library · Agent Store · YAML specs</text>
+        <rect x="35" y="333" width="250" height="42" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="160" y="349" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skill Library · Agent Store · YAML specs</text>
+        <text x="160" y="362" text-anchor="middle" fill="#10b981" font-size="7" font-weight="600">⬡ Eval Engine — Prompt Set · Check Registry · Pass Rate</text>
 
         <!-- Pattern Engine -->
         <rect x="320" y="245" width="260" height="130" rx="8" fill="rgba(59,130,246,.07)" stroke="#2563eb" stroke-width="1.5"/>
@@ -462,7 +463,7 @@
       Agents · Skills · Teams · Workflows · Workspace
     </div>
     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <svg id="sf-agents-diagram" viewBox="0 0 960 620" xmlns="http://www.w3.org/2000/svg"
+      <svg id="sf-agents-diagram" viewBox="0 0 960 760" xmlns="http://www.w3.org/2000/svg"
            style="width:100%;min-width:780px;max-width:960px;display:block;margin:0 auto;font-family:inherit">
         <defs>
           <marker id="a2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto"><path d="M0,0 L0,6 L7,3 z" fill="#6b7280"/></marker>
@@ -810,17 +811,74 @@
         <rect x="332" y="195" width="170" height="18" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
         <text x="417" y="207" text-anchor="middle" fill="#fca5a5" font-size="7">A2A Bus · VETO · ESCALATE · NEGOTIATE</text>
 
+        <!-- ════════════════════════════════════════════════════════════
+             ZONE G — EVAL SKILL ENGINE  (philschmid.de/testing-skills)
+        ════════════════════════════════════════════════════════════ -->
+        <rect x="10" y="598" width="940" height="135" rx="8" fill="rgba(16,185,129,.05)" stroke="#10b981" stroke-width="1.5"/>
+        <text x="350" y="614" text-anchor="middle" fill="#10b981" font-size="8" font-weight="700" letter-spacing="2">EVAL SKILL ENGINE</text>
+        <text x="567" y="614" text-anchor="middle" fill="#64748b" font-size="7" font-style="italic">· SkillsBench: 47k+ skills — you wouldn't ship code without tests</text>
+
+        <!-- Prompt Set -->
+        <rect x="22" y="622" width="205" height="100" rx="5" fill="rgba(59,130,246,.1)" stroke="#3b82f6" stroke-width="1"/>
+        <text x="124" y="636" text-anchor="middle" fill="#93c5fd" font-size="7.5" font-weight="700">PROMPT SET</text>
+        <text x="124" y="648" text-anchor="middle" fill="#6b7280" font-size="6.5">10-20 tests / skill</text>
+        <text x="124" y="658" text-anchor="middle" fill="#6b7280" font-size="6.5">should_trigger: true / false</text>
+        <text x="124" y="668" text-anchor="middle" fill="#6b7280" font-size="6.5">expected_checks: [...]</text>
+        <text x="124" y="678" text-anchor="middle" fill="#6b7280" font-size="6.5">negative tests (ne doit PAS déclencher)</text>
+        <text x="124" y="690" text-anchor="middle" fill="#93c5fd" font-size="6" font-style="italic">Capability vs Preference skills</text>
+        <text x="124" y="700" text-anchor="middle" fill="#6b7280" font-size="6">core · guardrails · edge-cases · negative</text>
+        <text x="124" y="711" text-anchor="middle" fill="#6b7280" font-size="6">py_basic · multi_turn · deprecated_rejected…</text>
+
+        <!-- Check Registry -->
+        <rect x="237" y="622" width="205" height="100" rx="5" fill="rgba(168,85,247,.1)" stroke="#a855f7" stroke-width="1"/>
+        <text x="339" y="636" text-anchor="middle" fill="#d8b4fe" font-size="7.5" font-weight="700">CHECK REGISTRY</text>
+        <text x="339" y="648" text-anchor="middle" fill="#6b7280" font-size="6.5">validateurs déterministes (regex)</text>
+        <text x="339" y="658" text-anchor="middle" fill="#6b7280" font-size="6.5">correct_sdk · current_model</text>
+        <text x="339" y="668" text-anchor="middle" fill="#6b7280" font-size="6.5">no_old_sdk · interactions_api</text>
+        <text x="339" y="678" text-anchor="middle" fill="#6b7280" font-size="6.5">extract_code_blocks() → check(check_id)</text>
+        <text x="339" y="690" text-anchor="middle" fill="#d8b4fe" font-size="6" font-style="italic">dispatch by check_id — 11+ checks</text>
+        <text x="339" y="700" text-anchor="middle" fill="#6b7280" font-size="6">bool = CHECK_REGISTRY[id](code, lang)</text>
+        <text x="339" y="711" text-anchor="middle" fill="#6b7280" font-size="6">extensible · déterministe · pas de LLM judge</text>
+
+        <!-- Pass Rate + Loop -->
+        <rect x="452" y="622" width="205" height="100" rx="5" fill="rgba(245,158,11,.1)" stroke="#f59e0b" stroke-width="1"/>
+        <text x="554" y="636" text-anchor="middle" fill="#fde68a" font-size="7.5" font-weight="700">PASS RATE + DIMENSIONS</text>
+        <text x="554" y="648" text-anchor="middle" fill="#6b7280" font-size="6.5">Outcome (compile, API répond)</text>
+        <text x="554" y="658" text-anchor="middle" fill="#6b7280" font-size="6.5">Style / Instructions (conventions)</text>
+        <text x="554" y="668" text-anchor="middle" fill="#6b7280" font-size="6.5">Efficiency (tokens, retries)</text>
+        <text x="554" y="680" text-anchor="middle" fill="#fde68a" font-size="7" font-weight="600">66.7% → 100%  (itération)</text>
+        <text x="554" y="691" text-anchor="middle" fill="#6b7280" font-size="6">fix description → fix instructions → rescore</text>
+        <text x="554" y="701" text-anchor="middle" fill="#f59e0b" font-size="6" font-style="italic">Grade outcomes, not paths</text>
+        <text x="554" y="711" text-anchor="middle" fill="#6b7280" font-size="6">~20 runs · régression détectée automatiquement</text>
+
+        <!-- SF Integration -->
+        <rect x="667" y="622" width="272" height="100" rx="5" fill="rgba(34,197,94,.1)" stroke="#22c55e" stroke-width="1"/>
+        <text x="803" y="636" text-anchor="middle" fill="#86efac" font-size="7.5" font-weight="700">INTÉGRATION PLATFORM SF</text>
+        <text x="803" y="648" text-anchor="middle" fill="#6b7280" font-size="6.5">hardening-sprint déclenche l'eval harness</text>
+        <text x="803" y="658" text-anchor="middle" fill="#6b7280" font-size="6.5">eval_agent → run_agent_cli(prompt, skill)</text>
+        <text x="803" y="668" text-anchor="middle" fill="#6b7280" font-size="6.5">AC score ← pass_rate (Quality Gate)</text>
+        <text x="803" y="678" text-anchor="middle" fill="#6b7280" font-size="6.5">skill améliorée → re-injectée en Skill Library</text>
+        <text x="803" y="690" text-anchor="middle" fill="#86efac" font-size="6" font-style="italic">Skill Registry → Eval → fix loop → merge</text>
+        <text x="803" y="700" text-anchor="middle" fill="#6b7280" font-size="6">seuils configurables dans Settings / Quality Gates</text>
+        <text x="803" y="711" text-anchor="middle" fill="#6b7280" font-size="6">source: agentskills.io · github/gemini-skills</text>
+
+        <!-- Connector: Skill Library (Zone A) → Eval Engine (Zone G) -->
+        <path d="M 155 190 L 155 597" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3" fill="none" marker-end="url(#a2g)"/>
+        <text x="161" y="395" fill="#10b981" font-size="6.5" transform="rotate(-90,161,395)">skill → eval harness</text>
+        <!-- Connector: Eval → Skill Library (feedback) -->
+        <path d="M 22 672 Q 8 600 8 190 L 10 190" stroke="#22c55e" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#a2g)"/>
+
         <!-- Legend -->
-        <line x1="15" y1="607" x2="40" y2="607" stroke="#a855f7" stroke-width="1.5"/>
-        <text x="43" y="610" fill="#6b7280" font-size="7">agent flow</text>
-        <line x1="95" y1="607" x2="120" y2="607" stroke="#f59e0b" stroke-width="1.5"/>
-        <text x="123" y="610" fill="#6b7280" font-size="7">tool call</text>
-        <line x1="170" y1="607" x2="195" y2="607" stroke="#10b981" stroke-width="1.5"/>
-        <text x="198" y="610" fill="#6b7280" font-size="7">orchestration</text>
-        <line x1="260" y1="607" x2="285" y2="607" stroke="#4f46e5" stroke-width="1.5"/>
-        <text x="288" y="610" fill="#6b7280" font-size="7">workspace</text>
-        <line x1="340" y1="607" x2="365" y2="607" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
-        <text x="368" y="610" fill="#6b7280" font-size="7">dépendance</text>
+        <line x1="15" y1="747" x2="40" y2="747" stroke="#a855f7" stroke-width="1.5"/>
+        <text x="43" y="750" fill="#6b7280" font-size="7">agent flow</text>
+        <line x1="95" y1="747" x2="120" y2="747" stroke="#f59e0b" stroke-width="1.5"/>
+        <text x="123" y="750" fill="#6b7280" font-size="7">tool call</text>
+        <line x1="170" y1="747" x2="195" y2="747" stroke="#10b981" stroke-width="1.5"/>
+        <text x="198" y="750" fill="#6b7280" font-size="7">orchestration</text>
+        <line x1="260" y1="747" x2="285" y2="747" stroke="#4f46e5" stroke-width="1.5"/>
+        <text x="288" y="750" fill="#6b7280" font-size="7">workspace</text>
+        <line x1="340" y1="747" x2="365" y2="747" stroke="#6b7280" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="368" y="750" fill="#6b7280" font-size="7">dépendance</text>
       </svg>
     </div>
   </div>
