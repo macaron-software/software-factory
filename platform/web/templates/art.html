@@ -561,7 +561,38 @@
 
     try {
       const resp = await fetch(`/api/agents/${agentId}/details`);
-      if (!resp.ok) throw new Error('Not found');
+      if (!resp.ok) {
+        // Fallback: check AC_NODES for virtual agents not in the DB
+        const acNode = (typeof AC_NODES !== 'undefined') && AC_NODES.find(n => n.id === agentId);
+        if (acNode) {
+          document.getElementById('fhTitle').textContent = acNode.name;
+          let html = '<div class="fiche-header">';
+          html += `<div class="fiche-photo" style="background:${acNode.color}">`;
+          if (acNode.photo) html += `<img src="${acNode.photo}" alt="${acNode.name}">`;
+          else html += acNode.name.charAt(0);
+          html += `</div><div class="fiche-identity">`;
+          html += `<div class="fiche-name">${acNode.name}</div>`;
+          html += `<div class="fiche-role">${acNode.role}</div>`;
+          html += `<div class="fiche-tagline" style="color:${acNode.color}">Amélioration Continue</div>`;
+          html += `</div></div><div class="fiche-body">`;
+          if (acNode.persona) html += `<div class="fiche-section"><div class="fiche-section-title">Persona</div><div class="fiche-text">${esc(acNode.persona)}</div></div>`;
+          if (acNode.motivation) html += `<div class="fiche-section"><div class="fiche-section-title">Motivation</div><div class="fiche-text">${esc(acNode.motivation)}</div></div>`;
+          if (acNode.skills && acNode.skills.length) {
+            html += `<div class="fiche-section"><div class="fiche-section-title">Skills</div><div class="fiche-badges">`;
+            acNode.skills.forEach(s => { html += `<span class="fiche-badge">${esc(s)}</span>`; });
+            html += `</div></div>`;
+          }
+          if (acNode.tools && acNode.tools.length) {
+            html += `<div class="fiche-section"><div class="fiche-section-title">Tools</div><div class="fiche-badges">`;
+            acNode.tools.forEach(t => { html += `<span class="fiche-badge tool">${esc(t)}</span>`; });
+            html += `</div></div>`;
+          }
+          html += '</div>';
+          content.innerHTML = html;
+          return;
+        }
+        throw new Error('Not found');
+      }
       const a = await resp.json();
 
       document.getElementById('fhTitle').textContent = a.name;
@@ -652,17 +683,31 @@
 })();
 
 // ── AC Team Graph ─────────────────────────────────────────────────────────
-const AC_NW = 130, AC_NH = 56;
-const AC_NODES = [
-    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution',  role:'Scheduler nightly',  photo:'/static/avatars/solution_train_engineer.jpg'},
-    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',   role:'Monitor continu',    photo:'/static/avatars/sre.jpg'},
-    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',   role:'Sélection LLM',      photo:'/static/avatars/knowledge-manager.jpg'},
-    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin',     role:'Compétition équipes', photo:'/static/avatars/strat-cto.jpg'},
-    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy',  role:'Apprentissage cycle', photo:'/static/avatars/worker.jpg'},
-    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal',  role:'Self-healing 60s',   photo:'/static/avatars/threat-analyst.jpg'},
-    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge',  role:'Maintenance nightly', photo:'/static/avatars/knowledge-curator.jpg'},
+var AC_NW = 130, AC_NH = 56;
+var AC_NODES = [
+    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution',  role:'Scheduler nightly',  photo:'/static/avatars/solution_train_engineer.jpg',
+     persona:'Orchestre les cycles d\'évolution nocturnes — GA, RL, Thompson, Knowledge.', motivation:'Améliorer continuellement la plateforme sans intervention humaine.',
+     skills:['ga-evolution','thompson-sampling','rl-policy','nightly-jobs'], tools:['evolution_trigger','schedule_runner','fitness_eval']},
+    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',   role:'Monitor continu',    photo:'/static/avatars/sre.jpg',
+     persona:'Surveille en continu la santé du système — alertes, incidents, SLA.', motivation:'Zéro downtime, zéro régression silencieuse.',
+     skills:['monitoring','alerting','incident-detection'], tools:['health_check','alert_trigger','log_scan']},
+    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',   role:'Sélection LLM',      photo:'/static/avatars/knowledge-manager.jpg',
+     persona:'Sélectionne le meilleur variant skill/LLM par Thompson Sampling bayésien.', motivation:'Chaque token doit être optimal.',
+     skills:['thompson-sampling','bandit-algo','bayesian-stats'], tools:['variant_score','arm_select','reward_update']},
+    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin',     role:'Compétition équipes', photo:'/static/avatars/strat-cto.jpg',
+     persona:'Met en concurrence les équipes et patterns organisationnels — élimine le plus faible.', motivation:'Seuls les meilleurs patterns survivent.',
+     skills:['team-competition','org-fitness','elimination'], tools:['team_score','pattern_eval','survivor_select']},
+    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy',  role:'Apprentissage cycle', photo:'/static/avatars/worker.jpg',
+     persona:'Attribue des récompenses/pénalités aux agents, skills et workflows pour guider l\'apprentissage par renforcement.', motivation:'Chaque cycle améliore la politique.',
+     skills:['reinforcement-learning','reward-shaping','policy-gradient'], tools:['reward_assign','penalty_apply','policy_update']},
+    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal',  role:'Self-healing 60s',   photo:'/static/avatars/threat-analyst.jpg',
+     persona:'Détecte et corrige automatiquement les régressions et pannes en moins de 60 secondes.', motivation:'La plateforme se répare elle-même.',
+     skills:['self-healing','root-cause','auto-rollback'], tools:['regression_detect','hotfix_apply','rollback_trigger']},
+    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge',  role:'Maintenance nightly', photo:'/static/avatars/knowledge-curator.jpg',
+     persona:'Maintient et enrichit la base de connaissances — skills, patterns, mémoire projet.', motivation:'La connaissance partagée multiplie la performance.',
+     skills:['knowledge-management','skill-eval','memory-maintenance'], tools:['skill_challenge','kb_update','memory_prune']},
 ];
-const AC_EDGES = [
+var AC_EDGES = [
     {from:'evolution_scheduler', to:'thompson',   pat:'h', label:'tune'},
     {from:'evolution_scheduler', to:'darwin',     pat:'h', label:'evolve'},
     {from:'evolution_scheduler', to:'rl_policy',  pat:'h', label:'train'},
@@ -671,7 +716,7 @@ const AC_EDGES = [
     {from:'thompson',            to:'rl_policy',  pat:'n', label:'reward'},
     {from:'darwin',              to:'auto_heal',  pat:'n', label:'fitness'},
 ];
-const AC_PATS = {
+var AC_PATS = {
     h: {color:'#f59e0b', dash:'',    label:'Hierarchical'},
     n: {color:'#8b5cf6', dash:'2 4', label:'Network'},
     r: {color:'#ef4444', dash:'3 3', label:'Alert'},
