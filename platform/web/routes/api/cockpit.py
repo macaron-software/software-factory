@@ -132,6 +132,48 @@ def _get_pipeline(db) -> dict:
         " WHERE status='completed'"
         " AND completed_at >= NOW() - INTERVAL '1 day'"
     ).fetchone()
+    # Epic run stats (24h)
+    run_stats = _safe(
+        lambda: db.execute(
+            "SELECT"
+            "  COUNT(*) FILTER (WHERE status='completed') AS completed_24h,"
+            "  COUNT(*) FILTER (WHERE status='failed') AS failed_24h,"
+            "  COUNT(*) FILTER (WHERE status='cancelled') AS cancelled_24h,"
+            "  COUNT(*) AS total_24h,"
+            "  COALESCE(AVG(llm_cost_usd) FILTER (WHERE status='completed' AND llm_cost_usd IS NOT NULL), 0) AS avg_cost_usd"
+            " FROM epic_runs"
+            " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+        ).fetchone(),
+        None,
+    )
+    top_failing = _safe(
+        lambda: db.execute(
+            "SELECT workflow_id, COUNT(*) AS fail_count"
+            " FROM epic_runs"
+            " WHERE status='failed' AND created_at >= NOW() - INTERVAL '24 hours'"
+            " GROUP BY workflow_id ORDER BY fail_count DESC LIMIT 5"
+        ).fetchall(),
+        [],
+    )
+    adv_stats = _safe(
+        lambda: db.execute(
+            "SELECT check_type, COUNT(*) AS cnt,"
+            " SUM(CASE WHEN NOT passed THEN 1 ELSE 0 END) AS rejects"
+            " FROM adversarial_events"
+            " WHERE created_at >= NOW() - INTERVAL '24 hours'"
+            " GROUP BY check_type ORDER BY rejects DESC LIMIT 10"
+        ).fetchall(),
+        [],
+    )
+    trace_coverage = _safe(
+        lambda: db.execute(
+            "SELECT COUNT(*) AS total,"
+            " SUM(CASE WHEN ref_tag != '' THEN 1 ELSE 0 END) AS with_ref"
+            " FROM code_traceability"
+            " WHERE created_at >= NOW() - INTERVAL '7 days'"
+        ).fetchone(),
+        None,
+    )
     return {
         "ideation_active": ideation["n"] if ideation else 0,
         # Epics (formerly missions)
@@ -152,6 +194,26 @@ def _get_pipeline(db) -> dict:
         "missions_planning": epics["planning"] if epics else 0,
         "missions_completed": epics["completed"] if epics else 0,
         "deploys_today": deploys["n"] if deploys else 0,
+        # Epic run health (24h)
+        "runs_completed_24h": run_stats["completed_24h"] if run_stats else 0,
+        "runs_failed_24h": run_stats["failed_24h"] if run_stats else 0,
+        "runs_cancelled_24h": run_stats["cancelled_24h"] if run_stats else 0,
+        "runs_total_24h": run_stats["total_24h"] if run_stats else 0,
+        "runs_avg_cost_usd": round(float(run_stats["avg_cost_usd"]), 4)
+        if run_stats
+        else 0,
+        "top_failing_workflows": [
+            {"workflow_id": r["workflow_id"], "fail_count": r["fail_count"]}
+            for r in (top_failing or [])
+        ],
+        # Adversarial guard stats (24h)
+        "adv_stats_24h": [
+            {"check_type": r["check_type"], "total": r["cnt"], "rejects": r["rejects"]}
+            for r in (adv_stats or [])
+        ],
+        # Traceability coverage (7d)
+        "trace_total_7d": trace_coverage["total"] if trace_coverage else 0,
+        "trace_with_ref_7d": trace_coverage["with_ref"] if trace_coverage else 0,
     }
 
 
@@ -313,7 +375,9 @@ def _get_llm_status() -> list[dict]:
     except Exception:
         return []
 
-    providers = ["minimax", "azure-openai", "azure-ai", "openai"]
+    # Use real configured providers (not hardcoded list)
+    # WHY: on prod, only the active provider has a key — hardcoded list showed all 4 as OK
+    providers = [p["id"] for p in client.available_providers() if p.get("has_key")]
     result = []
     now = time.monotonic()
     for prov in providers:
@@ -376,16 +440,13 @@ def _get_projects(db) -> list[dict]:
 
 
 def _get_activity(db) -> list[dict]:
-    """Last 12 messages from active sessions with full agent info."""
+    """Last 12 messages from active sessions (agent tool calls + system events)."""
     rows = db.execute(
         "SELECT m.from_agent, m.content, m.timestamp, s.project_id,"
-        "  p.name AS project_name,"
-        "  a.name AS agent_name, a.avatar AS agent_avatar, a.color AS agent_color,"
-        "  a.role AS agent_role, a.is_builtin AS agent_is_builtin"
+        "  p.name AS project_name"
         " FROM messages m"
         " LEFT JOIN sessions s ON s.id = m.session_id"
         " LEFT JOIN projects p ON p.id = s.project_id"
-        " LEFT JOIN agents a ON a.id = m.from_agent"
         " WHERE m.from_agent NOT IN ('user','system')"
         " AND m.timestamp >= NOW() - INTERVAL '1 hour'"
         " ORDER BY m.timestamp DESC"
@@ -394,21 +455,10 @@ def _get_activity(db) -> list[dict]:
     result = []
     for r in rows:
         content = str(r["content"] or "")[:120]
-        agent_id = r["from_agent"] or ""
-        agent_name = r["agent_name"] or agent_id
-        agent_avatar = r["agent_avatar"] or (
-            agent_name[:2].upper() if agent_name else agent_id[:2].upper()
-        )
-        agent_color = r["agent_color"] or "#a855f7"
         result.append(
             {
                 "ts": str(r["timestamp"]),
-                "agent": agent_id,
-                "agent_name": agent_name,
-                "agent_avatar": agent_avatar,
-                "agent_color": agent_color,
-                "agent_role": r["agent_role"] or "",
-                "agent_is_builtin": bool(r["agent_is_builtin"]),
+                "agent": r["from_agent"],
                 "label": content,
                 "project_id": r["project_id"],
                 "project_name": r["project_name"],

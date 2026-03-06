@@ -3,9 +3,7 @@
 {% block topbar_actions %}
 {% if unread %}
 <button class="btn btn-sm btn-secondary"
-        hx-post="/api/notifications/read-all"
-        hx-swap="none"
-        hx-on::after-request="location.reload()">
+        onclick="fetch('/api/notifications/read-all',{method:'POST'}).then(()=>location.reload())">
     Mark all as read ({{ unread }})
 </button>
 {% endif %}

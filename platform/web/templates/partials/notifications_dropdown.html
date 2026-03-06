@@ -2,9 +2,9 @@
     <h4>Notifications{% if unread %} ({{ unread }}){% endif %}</h4>
     {% if unread %}
     <button class="notif-mark-all"
+            id="notifMarkAllBtn"
             hx-post="/api/notifications/read-all"
-            hx-swap="none"
-            hx-on::after-request="htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')">
+            hx-swap="none">
         Mark all read
     </button>
     {% endif %}
@@ -70,3 +70,16 @@
 <div class="notif-footer">
     <a href="/notifications">View all notifications</a>
 </div>
+<script>
+(function() {
+    var btn = document.getElementById('notifMarkAllBtn');
+    if (btn) {
+        btn.addEventListener('htmx:afterRequest', function() {
+            var dd = document.getElementById('notifDropdown');
+            var badge = document.getElementById('notifBadge');
+            if (dd) htmx.trigger(dd, 'notif-open');
+            if (badge) htmx.trigger(badge, 'htmx:load');
+        });
+    }
+})();
+</script>
