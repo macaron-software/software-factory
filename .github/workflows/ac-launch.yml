@@ -82,6 +82,10 @@ jobs:
               echo "Failed to create temp key (table may not exist or have different schema)"
               # Check the schema
               sqlite3 "$DB_PATH" ".schema platform_api_keys" 2>/dev/null || echo "No platform_api_keys table"
+              # List all tables
+              echo "All tables: $(sqlite3 "$DB_PATH" ".tables" 2>/dev/null)"
+              # Check users table
+              echo "Users: $(sqlite3 "$DB_PATH" "SELECT id,email,role FROM users LIMIT 5;" 2>/dev/null || echo 'no users table')"
             fi
           fi
           
