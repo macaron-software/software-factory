@@ -38,9 +38,9 @@ _FALSE_POSITIVE_INDICATORS = [
 
 
 def _get_db():
-    from ..database import get_db
+    from ..db.migrations import get_db
 
-    return next(get_db())
+    return get_db()
 
 
 def _has_ts_but_no_dist(workspace: str) -> bool:
@@ -227,17 +227,127 @@ async def watchdog_cycle():
             )
 
 
+async def resume_stuck_ac_cycles() -> int:
+    """Resume AC cycles whose state is 'running' but workflow task is dead (e.g. after restart).
+
+    Called once at startup and periodically by the watchdog loop.
+    Returns the number of cycles resumed.
+    """
+    resumed = 0
+    try:
+        from ..web.routes.pages import _ac_get_db, _ac_ensure_tables, _AC_PROJECTS
+
+        valid_ids = {p["id"] for p in _AC_PROJECTS}
+
+        def _find_stuck():
+            conn = _ac_get_db()
+            _ac_ensure_tables(conn)
+            try:
+                rows = conn.execute(
+                    "SELECT project_id, current_run_id, current_cycle, status "
+                    "FROM ac_project_state WHERE status='running' AND current_run_id IS NOT NULL"
+                ).fetchall()
+            except Exception:
+                rows = []
+            finally:
+                conn.close()
+            return rows
+
+        stuck = await asyncio.to_thread(_find_stuck)
+
+        for row in stuck:
+            project_id = row["project_id"] if hasattr(row, "__getitem__") else row[0]
+            run_id = row["current_run_id"] if hasattr(row, "__getitem__") else row[1]
+
+            if project_id not in valid_ids:
+                continue
+
+            # Check if an asyncio task is already running for this run
+            from ..web.routes.epics.execution import _active_mission_tasks
+
+            if run_id in _active_mission_tasks:
+                continue  # already running
+
+            logger.warning(
+                "watchdog: AC cycle stuck — project=%s run=%s → relaunching",
+                project_id,
+                run_id,
+            )
+
+            try:
+                from ..missions.store import get_mission_store
+                from ..workflows.store import get_workflow_store
+                from ..web.routes.epics.execution import (
+                    get_mission_semaphore,
+                    _run_workflow_background,
+                )
+
+                mission = await asyncio.to_thread(
+                    get_mission_store().get_mission, run_id
+                )
+                if not mission or mission.status not in (
+                    "active",
+                    "running",
+                    "planning",
+                ):
+                    logger.warning(
+                        "watchdog: AC run %s has status=%s, skipping resume",
+                        run_id,
+                        getattr(mission, "status", "?"),
+                    )
+                    continue
+
+                wf = get_workflow_store().get(
+                    mission.workflow_id or "ac-improvement-cycle"
+                )
+                if not wf:
+                    logger.warning("watchdog: workflow not found for run %s", run_id)
+                    continue
+
+                task_desc = mission.goal or mission.description or mission.name
+
+                async def _guarded(wf=wf, sid=run_id, desc=task_desc, pid=project_id):
+                    async with get_mission_semaphore():
+                        await _run_workflow_background(wf, sid, desc, pid)
+
+                task = asyncio.create_task(_guarded())
+                _active_mission_tasks[run_id] = task
+                task.add_done_callback(
+                    lambda t: _active_mission_tasks.pop(run_id, None)
+                )
+                resumed += 1
+                logger.warning(
+                    "watchdog: AC cycle resumed — project=%s run=%s", project_id, run_id
+                )
+            except Exception as exc:
+                logger.error("watchdog: failed to resume AC run %s: %s", run_id, exc)
+
+    except Exception as exc:
+        logger.error("watchdog: resume_stuck_ac_cycles failed: %s", exc)
+
+    return resumed
+
+
 async def platform_watchdog_loop():
-    """Background loop: every WATCHDOG_INTERVAL seconds, scan for false completions."""
+    """Background loop: every WATCHDOG_INTERVAL seconds, scan for false completions + resume stuck AC."""
     logger.warning(
         "Platform watchdog loop started (interval=%ds, project=%s, workflow=%s)",
         WATCHDOG_INTERVAL,
         SF_PROJECT_ID,
         QI_WORKFLOW_ID,
     )
+    # Resume any stuck AC cycles immediately at startup
+    n = await resume_stuck_ac_cycles()
+    if n:
+        logger.warning("watchdog: resumed %d stuck AC cycle(s) at startup", n)
+
     while True:
         await asyncio.sleep(WATCHDOG_INTERVAL)
         try:
             await watchdog_cycle()
         except Exception as e:
             logger.error("platform_watchdog: cycle error: %s", e)
+        try:
+            await resume_stuck_ac_cycles()
+        except Exception as e:
+            logger.error("platform_watchdog: ac resume error: %s", e)
