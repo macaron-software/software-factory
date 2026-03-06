@@ -745,6 +745,7 @@ def _ac_ensure_tables(conn) -> None:
                 conn.execute(alter)
             except Exception:
                 pass
+        conn.commit()
     except Exception:
         pass
 
