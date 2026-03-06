@@ -917,6 +917,7 @@ async def api_improvement_start(project_id: str):
             type="improvement",
             workflow_id="ac-improvement-cycle",
             status="active",
+            project_id=project_id,
             config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
         )
         created = await asyncio.to_thread(store.create_mission, mission_def)
