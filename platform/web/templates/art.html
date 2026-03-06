@@ -110,14 +110,21 @@
 .fiche-perm.no{background:rgba(148,163,184,.08);color:var(--text-muted)}
 .fiche-perm svg{width:11px;height:11px}
 .fiche-loading{text-align:center;padding:2rem;color:var(--text-muted);font-size:0.75rem}
+/* Amélioration Continue — sub-tabs + explainer cards */
+.tabs-sm{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)}
+.tab-sm{background:none;border:1px solid transparent;border-radius:.4rem;padding:.3rem .7rem;font-size:.78rem;cursor:pointer;color:var(--text-secondary);transition:all .15s}
+.tab-sm:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.tab-sm.active{background:var(--bg-tertiary);border-color:var(--border);color:var(--text-primary);font-weight:600}
+.explainer{background:var(--bg-secondary);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:6px;padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;gap:.75rem;align-items:flex-start}
+.explainer svg{flex-shrink:0;margin-top:1px;color:var(--purple)}
+.explainer strong{font-size:.82rem;color:var(--text-primary);display:block;margin-bottom:.2rem}
+.explainer p{margin:0;font-size:.78rem;color:var(--text-secondary);line-height:1.5}
 </style>
 
 <div class="tabs" style="margin-bottom:1rem">
     <button class="tab active" onclick="artSwitchTab(this, 'art-org')">Organisation</button>
     <button class="tab" onclick="artSwitchTab(this, 'art-mercato')" hx-get="/mercato/roster-partial" hx-target="#art-mercato-content" hx-swap="innerHTML" hx-trigger="click once">Mercato</button>
-    <button class="tab" onclick="artSwitchTab(this, 'art-thompson')" id="tab-thompson">Thompson Sampling</button>
-    <button class="tab" onclick="artSwitchTab(this, 'art-teams')" hx-get="/teams/partial" hx-target="#art-teams-content" hx-swap="innerHTML" hx-trigger="click once" id="tab-teams">Darwin Teams</button>
-    <button class="tab" onclick="artSwitchTab(this, 'art-skills')" id="tab-skills">Skills Health</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-ac')" id="tab-ac">Amélioration Continue</button>
 </div>
 <div id="art-org">
 <div class="art-dash">
@@ -239,94 +246,50 @@
     </div>
 </div>
 
-<!-- Thompson Sampling tab panel (hidden by default) -->
-<div id="art-thompson" style="display:none">
-    <!-- KPI cards -->
-    <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
-        <div class="stat-card">
-            <h3>Agents actifs</h3>
-            <p class="stat-value" id="ts-art-total">—</p>
-            <p class="stat-label">avec données LLM</p>
+<!-- Amélioration Continue — unified AC tab with 6 sub-tabs -->
+<div id="art-ac" style="display:none">
+    <div class="tabs-sm" id="ac-sub-tabs">
+        <button class="tab-sm active" onclick="acSubTab(this,'acsub-cycles')">Cycles AC</button>
+        <button class="tab-sm" onclick="acSubTab(this,'acsub-skills')" id="tab-skills">Skills Health</button>
+        <button class="tab-sm" onclick="acSubTab(this,'acsub-thompson')" id="tab-thompson">Thompson</button>
+        <button class="tab-sm" onclick="acSubTab(this,'acsub-teams')" id="tab-teams">Darwin Teams</button>
+        <button class="tab-sm" onclick="acSubTab(this,'acsub-evolution')">Evolution</button>
+        <button class="tab-sm" onclick="acSubTab(this,'acsub-rl')">RL</button>
+    </div>
+
+    <!-- ── Cycles AC ──────────────────────────────────────────────────────── -->
+    <div id="acsub-cycles">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <div>
+                <strong>Cycles AC — Amélioration Continue</strong>
+                <p>Pipeline automatique par projet pilote : TDD → Adversarial → QA → CI/CD → Deploy. Chaque cycle score les phases (0–100), accumule le RL reward et déclenche un sprint Hardening si score &lt; seuil. Thompson Sampling sélectionne les meilleurs variants de skill à chaque cycle.</p>
+            </div>
         </div>
-        <div class="stat-card">
-            <h3>Appels LLM totaux</h3>
-            <p class="stat-value" id="ts-art-accepted">—</p>
-            <p class="stat-label">toutes traces</p>
-        </div>
-        <div class="stat-card">
-            <h3>Erreurs LLM</h3>
-            <p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p>
-            <p class="stat-label">total tous agents</p>
-        </div>
-        <div class="stat-card">
-            <h3>Darwin Fitness</h3>
-            <p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p>
-            <p class="stat-label">scores accumulés</p>
+        <div id="acsub-cycles-content"
+             hx-get="/workflows/improvement"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement des projets AC…</p>
         </div>
     </div>
 
-    <!-- A/B provider comparison -->
-    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
-    <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
-
-    <!-- Agent performance table from llm_traces -->
-    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
-    <div style="overflow-x:auto">
-        <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
-            <thead>
-                <tr style="background:var(--bg-secondary,#1e293b)">
-                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
-                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider / Modèle</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Appels</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Erreurs</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Succès</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Durée moy.</th>
-                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
-                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
-                </tr>
-            </thead>
-            <tbody id="ts-art-tbody">
-                <tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Darwin fitness section -->
-    <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
-        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
-        <div style="overflow-x:auto">
-            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
-                <thead>
-                    <tr style="background:var(--bg-secondary,#1e293b)">
-                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
-                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Pattern</th>
-                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Tech</th>
-                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Phase</th>
-                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Wins</th>
-                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Losses</th>
-                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Fitness</th>
-                    </tr>
-                </thead>
-                <tbody id="ts-darwin-tbody"></tbody>
-            </table>
+    <!-- ── Skills Health ─────────────────────────────────────────────────── -->
+    <div id="acsub-skills" style="display:none">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div>
+                <strong>Skills Health — Évaluation des Skills YAML</strong>
+                <p>Couverture des evals par skill : taux de passage, cas de test, graduation (capability eval → regression tests) et détection de retraite (model absorbed). Inspiré de <em>philschmid.de/testing-skills</em> — "You wouldn't ship code without tests, but why ship skills without evals?"</p>
+            </div>
         </div>
-    </div>
-</div>
-
-<!-- Darwin Teams tab panel (hidden by default — loaded via HTMX) -->
-<div id="art-teams" style="display:none">
-    <div id="art-teams-content">
-        <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Darwin Teams…</p>
-    </div>
-</div>
-
-<!-- Skills Health tab panel (hidden by default)
-     WHY: Surface skill eval coverage + pass rates alongside team fitness.
-     Source: philschmid.de/testing-skills — "You wouldn't ship code without tests,
-     but why ship skills without evals?" We track: coverage %, pass rates, gaps.
--->
-<div id="art-skills" style="display:none">
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <div>
+                <strong>Skills Health — Évaluation des Skills YAML</strong>
+                <p>Couverture des evals par skill : taux de passage, cas de test, graduation (capability eval → regression tests) et détection de retraite (model absorbed). Inspiré de <em>philschmid.de/testing-skills</em> — "You wouldn't ship code without tests, but why ship skills without evals?"</p>
+            </div>
+        </div>
         <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
         <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
         <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
@@ -540,7 +503,154 @@
 
         </svg>
     </div>
+    </div>
+    </div>
+
+    <!-- ── Thompson ──────────────────────────────────────────────────────── -->
+    <div id="acsub-thompson" style="display:none">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <div>
+                <strong>Thompson Sampling — Sélection bandit multi-armed</strong>
+                <p>Chaque provider LLM est modélisé par une distribution Beta(α, β). À chaque appel agent, on sample la distribution et on choisit le provider avec le score le plus élevé. Chaque succès incrémente α, chaque échec incrémente β. L'algorithme converge automatiquement vers le meilleur provider par contexte.</p>
+            </div>
+        </div>
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <div>
+                <strong>Thompson Sampling — Sélection bandit multi-armed</strong>
+                <p>Chaque provider LLM est modélisé par une distribution Beta(α, β). À chaque appel agent, on sample la distribution et on choisit le provider avec le score le plus élevé. Chaque succès incrémente α, chaque échec incrémente β. L'algorithme converge automatiquement vers le meilleur provider par contexte.</p>
+            </div>
+        </div>
+    <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
+        <div class="stat-card">
+            <h3>Agents actifs</h3>
+            <p class="stat-value" id="ts-art-total">—</p>
+            <p class="stat-label">avec données LLM</p>
+        </div>
+        <div class="stat-card">
+            <h3>Appels LLM totaux</h3>
+            <p class="stat-value" id="ts-art-accepted">—</p>
+            <p class="stat-label">toutes traces</p>
+        </div>
+        <div class="stat-card">
+            <h3>Erreurs LLM</h3>
+            <p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p>
+            <p class="stat-label">total tous agents</p>
+        </div>
+        <div class="stat-card">
+            <h3>Darwin Fitness</h3>
+            <p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p>
+            <p class="stat-label">scores accumulés</p>
+        </div>
+    </div>
+
+    <!-- A/B provider comparison -->
+    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
+    <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
+
+    <!-- Agent performance table from llm_traces -->
+    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
+    <div style="overflow-x:auto">
+        <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
+            <thead>
+                <tr style="background:var(--bg-secondary,#1e293b)">
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider / Modèle</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Appels</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Erreurs</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Succès</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Durée moy.</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
+                </tr>
+            </thead>
+            <tbody id="ts-art-tbody">
+                <tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Darwin fitness section -->
+    <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+                <thead>
+                    <tr style="background:var(--bg-secondary,#1e293b)">
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Pattern</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Tech</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Phase</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Wins</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Losses</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Fitness</th>
+                    </tr>
+                </thead>
+                <tbody id="ts-darwin-tbody"></tbody>
+            </table>
+        </div>
+    </div>
 </div>
+
+    <!-- ── Darwin Teams ──────────────────────────────────────────────────────
+    <div id="acsub-teams" style="display:none">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <div>
+                <strong>Darwin Teams — Évolution darwinienne des équipes</strong>
+                <p>Sélection naturelle par fitness score : les équipes qui réussissent les tâches accumulent du score (wins/losses), les moins performantes sont reconfigurées. À chaque génération PI, les meilleures compositions de compétences survivent et se reproduisent. Fitness = f(qualité code, délai, défauts).</p>
+            </div>
+        </div>
+        <div id="art-teams-content"
+             hx-get="/art/darwin-teams"
+             hx-trigger="intersect once"
+             hx-swap="innerHTML">
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement Darwin Teams…</p>
+        </div>
+    </div>
+
+    <!-- ── Evolution ─────────────────────────────────────────────────────── -->
+    <div id="acsub-evolution" style="display:none">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <div>
+                <strong>Evolution — Progression long-terme du système</strong>
+                <p>Métriques d'évolution sur N semaines : throughput missions, qualité code, couverture tests, durée cycles, taux d'erreurs LLM. Graphiques de tendance pour identifier les regressions et les gains. Chaque sprint améliore les KPIs globaux du système — c'est la mesure de l'Amélioration Continue.</p>
+            </div>
+        </div>
+        <div id="acsub-evolution-content"
+             hx-get="/workflows/evolution"
+             hx-trigger="intersect once"
+             hx-swap="innerHTML">
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement de l'évolution…</p>
+        </div>
+    </div>
+
+    <!-- ── RL ────────────────────────────────────────────────────────────── -->
+    <div id="acsub-rl" style="display:none">
+        <div class="explainer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <div>
+                <strong>Reinforcement Learning — Optimisation par récompense</strong>
+                <p>L'agent RL observe les résultats AC (phase scores, défauts, coût fix), calcule le RL reward r = f(score, defects, efficiency) et met à jour la Q-table. Le hint suggère la prochaine action (exploit best skill vs explore new variant). L'exploitation rate augmente à mesure que le système converge.</p>
+            </div>
+        </div>
+        <div class="stats-grid" style="margin-bottom:1.5rem" id="rl-kpis">
+            <div class="stat-card"><h3>RL Reward moy.</h3><p class="stat-value" id="rl-reward-avg">—</p><p class="stat-label">derniers 10 cycles</p></div>
+            <div class="stat-card"><h3>Convergence</h3><p class="stat-value conv-cold_start" id="rl-convergence">—</p><p class="stat-label">status</p></div>
+            <div class="stat-card"><h3>Hint action</h3><p class="stat-value" style="font-size:0.9rem" id="rl-hint">—</p><p class="stat-label">prochaine suggestion</p></div>
+            <div class="stat-card"><h3>Exploitation</h3><p class="stat-value" id="rl-exploit-rate">—</p><p class="stat-label">exploit vs explore</p></div>
+        </div>
+        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);margin-bottom:0.5rem">Historique rewards (10 derniers cycles)</div>
+        <div style="display:flex;align-items:flex-end;gap:3px;height:48px;margin-bottom:1.5rem" id="rl-reward-chart">
+            <p style="color:var(--text-secondary);font-size:0.78rem;margin:auto">Sélectionner un projet dans Cycles AC pour afficher</p>
+        </div>
+        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);margin-bottom:0.5rem">Projets — état RL</div>
+        <div id="rl-projects-grid" class="stats-grid"></div>
+    </div>
+</div>
+
 
 {% block scripts %}
 <script>
@@ -713,11 +823,19 @@ function artSwitchTab(btn, panelId) {
     btn.classList.add('active');
     document.getElementById('art-org').style.display = panelId === 'art-org' ? '' : 'none';
     document.getElementById('art-mercato').style.display = panelId === 'art-mercato' ? '' : 'none';
-    document.getElementById('art-thompson').style.display = panelId === 'art-thompson' ? '' : 'none';
-    document.getElementById('art-teams').style.display = panelId === 'art-teams' ? '' : 'none';
-    document.getElementById('art-skills').style.display = panelId === 'art-skills' ? '' : 'none';
-    if (panelId === 'art-thompson') loadThompsonTab();
-    if (panelId === 'art-skills') loadSkillsTab();
+    document.getElementById('art-ac').style.display = panelId === 'art-ac' ? '' : 'none';
+}
+
+function acSubTab(btn, subId) {
+    document.querySelectorAll('#ac-sub-tabs .tab-sm').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    ['acsub-cycles','acsub-skills','acsub-thompson','acsub-teams','acsub-evolution','acsub-rl']
+        .forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = id === subId ? '' : 'none';
+        });
+    if (subId === 'acsub-thompson') loadThompsonTab();
+    if (subId === 'acsub-skills') loadSkillsTab();
 }
 
 async function loadThompsonTab() {
