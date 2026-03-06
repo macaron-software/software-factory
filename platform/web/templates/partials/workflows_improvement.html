@@ -25,91 +25,87 @@
 
 <style>
 .ac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; }
-.ac-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
-.ac-card:hover { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
-.ac-card.selected { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
-.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); }
-.ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; }
+.ac-card { background:var(--bg-tertiary); border:1px solid var(--border); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
+.ac-card:hover { box-shadow:0 0 0 2px var(--purple); }
+.ac-card.selected { box-shadow:0 0 0 2px var(--purple); background:var(--bg-secondary); }
+.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); }
+.ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; color:var(--text-primary); }
 .ac-card .score-big { font-size:1.8rem; font-weight:700; line-height:1; }
-.ac-bar { height:4px; border-radius:2px; background:var(--border,#2a2d3e); margin-top:.5rem; }
+.ac-bar { height:4px; border-radius:2px; background:var(--border); margin-top:.5rem; }
 .ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; }
-.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); margin-bottom:.5rem; }
+.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin-bottom:.5rem; }
 .ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
-.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-muted,#888); font-weight:500; border-bottom:1px solid var(--border,#2a2d3e); }
-.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border,#1a1c2a); }
-.score-green { color:#22c55e; font-weight:700; }
-.score-yellow { color:#f59e0b; font-weight:700; }
-.score-red { color:#ef4444; font-weight:700; }
+.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-secondary); font-weight:500; border-bottom:1px solid var(--border); }
+.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border); color:var(--text-primary); }
+.score-green { color:var(--green); font-weight:700; }
+.score-yellow { color:var(--yellow-deep); font-weight:700; }
+.score-red { color:var(--red); font-weight:700; }
 .verdict-pass { background:#14532d; color:#4ade80; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
 .verdict-warn { background:#78350f; color:#fcd34d; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
 .verdict-fail { background:#7f1d1d; color:#fca5a5; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
 .adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
-.adv-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem; }
-/* Intelligence panel */
+.adv-card { background:var(--bg-tertiary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem; }
+/* Intelligence panel — always visible */
 .intel-panel { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-top:.5rem; }
-.intel-metric { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem .75rem; }
-.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted,#888); margin-bottom:.2rem; }
-.intel-metric .value { font-size:1.1rem; font-weight:700; }
-.conv-improving { color:#22c55e; }
-.conv-plateau    { color:#f59e0b; }
-.conv-regression { color:#ef4444; }
-.conv-spike_failure { color:#ef4444; }
-.conv-cold_start { color:#888; }
-.conv-converging { color:#3b82f6; }
+.intel-metric { background:var(--bg-tertiary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem .75rem; }
+.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); margin-bottom:.2rem; }
+.intel-metric .value { font-size:1.1rem; font-weight:700; color:var(--text-primary); }
+.conv-improving { color:var(--green); }
+.conv-plateau    { color:var(--yellow-deep); }
+.conv-regression { color:var(--red); }
+.conv-spike_failure { color:var(--red); }
+.conv-cold_start { color:var(--text-secondary); }
+.conv-converging { color:var(--blue-bright); }
 /* mini sparkline */
 .sparkline { display:flex; align-items:flex-end; gap:2px; height:32px; margin-top:.3rem; }
-.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--accent,#6c63ff); opacity:.7; transition:opacity .15s; }
+.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--purple); opacity:.7; transition:opacity .15s; }
 .spark-bar:hover { opacity:1; }
 /* Thompson stats */
 .thompson-row td { font-size:.7rem; padding:.3rem .4rem; }
-.thompson-win { color:#22c55e; }
-.thompson-lose { color:#ef4444; }
+.thompson-win { color:var(--green); }
+.thompson-lose { color:var(--red); }
 /* Project detail modal */
 .ac-modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;display:flex;align-items:center;justify-content:center }
-.ac-modal { background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);border-radius:.75rem;width:min(780px,96vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column }
-.ac-modal-header { display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-bottom:1px solid var(--border,#2a2d3e);flex-shrink:0 }
+.ac-modal { background:var(--bg-secondary);border:1px solid var(--border);border-radius:.75rem;width:min(780px,96vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column }
+.ac-modal-header { display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0 }
 .ac-modal-body { overflow-y:auto;padding:1rem;flex:1 }
 .ac-modal-grid { display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem }
-.ac-modal-tile { background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;padding:.5rem .75rem }
-.ac-modal-tile .tl { font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.15rem }
-.ac-modal-tile .tv { font-size:1rem;font-weight:700 }
+.ac-modal-tile { background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.4rem;padding:.5rem .75rem }
+.ac-modal-tile .tl { font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.15rem }
+.ac-modal-tile .tv { font-size:1rem;font-weight:700;color:var(--text-primary) }
 /* Team diagram */
-.ac-team-diagram { background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:.75rem;margin-top:1rem }
+.ac-team-diagram { background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem;padding:.75rem;margin-top:1rem }
 </style>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
   <div style="display:flex;align-items:center;gap:.5rem">
     {{ fi('refresh-cw', 18) }}
     <strong>Amélioration Continue</strong>
-    <span style="font-size:.7rem;color:var(--text-muted,#888)">{{ projects|length }} projets · {{ projects|map(attribute='max_cycles')|max if projects else 20 }} cycles max · Thompson + RL + GA · Lighthouse · axe · lint · adversarial 14D · traceabilité · métriques</span>
+    <span style="font-size:.7rem;color:var(--text-secondary)">{{ projects|length }} projets · {{ projects|map(attribute='max_cycles')|max if projects else 20 }} cycles max · Thompson + RL + GA · Lighthouse · axe · lint · adversarial 14D · traceabilité · métriques</span>
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
-    <span style="font-size:.7rem;color:var(--accent,#6c63ff)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
-    <button id="ac-intel-toggle" onclick="acToggleIntel()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);border-radius:.3rem;cursor:pointer;font-size:.75rem">
-      {{ fi('cpu', 12) }} Intelligence
-    </button>
+    <span style="font-size:.7rem;color:var(--accent)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
     <button id="ac-start-btn" onclick="acStartCycle()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--purple);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('play', 12) }} Démarrer
     </button>
   </div>
 </div>
-<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;font-size:.75rem;color:var(--text-muted,#888)"></div>
+<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
 
 {# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
-<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem">
+<div id="ac-intel-panel" style="margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);display:flex;align-items:center;gap:.4rem">
+    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem">
       {{ fi('cpu', 12) }} Métriques Intelligence —
       <select id="ac-intel-proj-select" onchange="acIntelSwitchProject(this.value)"
-        style="background:var(--bg-secondary,#1a1128);border:1px solid var(--border,#2a2d3e);color:var(--accent,#6c63ff);font-size:.7rem;padding:.1rem .3rem;border-radius:.25rem;cursor:pointer">
+        style="background:var(--bg-tertiary);border:1px solid var(--border);color:var(--purple);font-size:.7rem;padding:.1rem .3rem;border-radius:.25rem;cursor:pointer">
         {% for p in projects %}
         <option value="{{ p.id }}">{{ p.name }}</option>
         {% endfor %}
       </select>
     </div>
-    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
+    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
       {{ fi('refresh-cw', 11) }} Actualiser
     </button>
   </div>
@@ -131,13 +127,13 @@
 
   {# Sparkline #}
   <div style="margin-top:.75rem">
-    <div style="font-size:.65rem;color:var(--text-muted,#888);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
+    <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
     <div class="sparkline" id="ac-sparkline"></div>
   </div>
 
   {# Thompson stats table #}
   <div style="margin-top:.75rem">
-    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.4rem">
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">
       {{ fi('activity', 11) }} Thompson Sampling — skills
     </div>
     <table class="ac-table">
@@ -147,7 +143,7 @@
         </tr>
       </thead>
       <tbody id="ac-thompson-tbody">
-        <tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
+        <tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
       </tbody>
     </table>
   </div>
@@ -169,21 +165,20 @@
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
       <div>
         {% for tech in p.tech[:3] %}
-        <span style="font-size:.65rem;background:var(--border,#2a2d3e);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+        <span style="font-size:.65rem;background:var(--border);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace;color:var(--text-secondary)">{{ tech }}</span>
         {% endfor %}
       </div>
       <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
     </div>
-    <div style="font-size:.7rem;color:var(--text-muted,#888);margin-bottom:.25rem">
+    <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
       Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
       &nbsp;·&nbsp;
-      <span style="color:{% if p.status == 'running' %}#22c55e{% elif p.status == 'completed' %}#3b82f6{% else %}#888{% endif %}">{{ p.status }}</span>
+      <span style="color:{% if p.status == 'running' %}var(--green){% elif p.status == 'completed' %}var(--blue-bright){% else %}var(--text-secondary){% endif %}">{{ p.status }}</span>
     </div>
     <div class="ac-bar"><div class="ac-bar-fill" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%;background:{{ border_color }}"></div></div>
-    <div style="font-size:.62rem;color:#555;margin-top:.4rem;text-align:right">double-clic → détail</div>
   </div>
   {% else %}
-  <div style="color:var(--text-muted,#888);font-size:.8rem;padding:2rem 0">
+  <div style="color:var(--text-secondary);font-size:.8rem;padding:2rem 0">
     Aucun projet actif — cliquer "Démarrer" pour lancer le premier cycle.
   </div>
   {% endfor %}
@@ -218,15 +213,15 @@
     </div>
     <div style="display:flex;gap:.4rem">
       <button onclick="acHistoryView('table')" id="ac-hview-table"
-        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:var(--accent,#6c63ff);color:#fff;border:none;cursor:pointer">
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:var(--purple);color:#fff;border:none;cursor:pointer">
         {{ fi('list', 11) }} Table
       </button>
       <button onclick="acHistoryView('topo')" id="ac-hview-topo"
-        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);cursor:pointer">
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">
         {{ fi('git-branch', 11) }} 360 Topo
       </button>
       <button onclick="acHistoryView('screens')" id="ac-hview-screens"
-        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);cursor:pointer">
+        style="font-size:.65rem;padding:.2rem .5rem;border-radius:.25rem;background:transparent;color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">
         {{ fi('layers', 11) }} Captures
       </button>
     </div>
@@ -263,7 +258,7 @@
         {% set lint_v = adv.get('lint', '—') %}
         <tr>
           <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
-          <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+          <td><code style="font-size:.7rem;background:var(--border);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
           {% for ph in phases %}
           {% set s = c.phase_scores_dict.get(ph) if c.phase_scores_dict is defined else none %}
           <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
@@ -286,24 +281,24 @@
       {% if p %}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:.5rem">
         {# Architecture topology card #}
-        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
-          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Stack Architecture</div>
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem">Stack Architecture</div>
           <div id="ac-topo-svg" style="min-height:120px;display:flex;flex-direction:column;gap:.5rem">
             {% for tech in p.tech %}
             <div style="display:flex;align-items:center;gap:.5rem">
               <div style="width:8px;height:8px;border-radius:50%;background:#6c63ff;flex-shrink:0"></div>
               <div style="font-family:monospace;font-size:.75rem;color:var(--text-primary)">{{ tech }}</div>
               {% if not loop.last %}
-              <div style="flex:1;height:1px;background:var(--border,#2a2d3e);margin-left:.25rem"></div>
-              <div style="font-size:.6rem;color:var(--text-muted,#888)">→</div>
+              <div style="flex:1;height:1px;background:var(--border);margin-left:.25rem"></div>
+              <div style="font-size:.6rem;color:var(--text-secondary)">→</div>
               {% endif %}
             </div>
             {% endfor %}
           </div>
         </div>
         {# Cycle progression card #}
-        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
-          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Progression Scores</div>
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem">Progression Scores</div>
           <div style="display:flex;align-items:flex-end;gap:3px;height:60px">
             {% for c in cycles[-15:] %}
             {% set h = ((c.total_score / 100) * 60)|int %}
@@ -311,31 +306,31 @@
             <div title="Cycle {{ c.cycle_num }}: {{ c.total_score }}"
               style="flex:1;height:{{ h if h > 2 else 2 }}px;background:{{ col }};border-radius:2px 2px 0 0;min-width:4px;opacity:.8"></div>
             {% else %}
-            <div style="color:var(--text-muted,#888);font-size:.75rem;align-self:center">Aucun cycle</div>
+            <div style="color:var(--text-secondary);font-size:.75rem;align-self:center">Aucun cycle</div>
             {% endfor %}
           </div>
-          <div style="font-size:.6rem;color:var(--text-muted,#888);margin-top:.25rem">{{ cycles|length }} cycles · score max {{ cycles|map(attribute='total_score')|max if cycles else 0 }}/100</div>
+          <div style="font-size:.6rem;color:var(--text-secondary);margin-top:.25rem">{{ cycles|length }} cycles · score max {{ cycles|map(attribute='total_score')|max if cycles else 0 }}/100</div>
         </div>
         {# Adversarial radar #}
-        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
-          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Dernières dimensions adversariales</div>
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem">Dernières dimensions adversariales</div>
           {% if adversarial %}
           <div style="display:flex;flex-wrap:wrap;gap:.3rem">
             {% for d in adversarial[:8] %}
             <div style="display:flex;align-items:center;gap:.25rem;background:var(--bg-secondary);border-radius:.25rem;padding:.2rem .4rem">
               <div style="width:24px;height:4px;border-radius:2px;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
-              <span style="font-size:.65rem;color:var(--text-muted,#888)">{{ d.dimension[:10] }}</span>
+              <span style="font-size:.65rem;color:var(--text-secondary)">{{ d.dimension[:10] }}</span>
               <span style="font-size:.65rem;font-weight:700">{{ d.score }}</span>
             </div>
             {% endfor %}
           </div>
           {% else %}
-          <div style="color:var(--text-muted,#888);font-size:.75rem">Aucune donnée adversariale</div>
+          <div style="color:var(--text-secondary);font-size:.75rem">Aucune donnée adversariale</div>
           {% endif %}
         </div>
         {# Tools health #}
-        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;padding:1rem">
-          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);margin-bottom:.75rem">Outils déterministes</div>
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.5rem;padding:1rem">
+          <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.75rem">Outils déterministes</div>
           {% set last = cycles[-1] if cycles else none %}
           {% set adv_last = last.adversarial_scores if last and last.adversarial_scores is mapping else {} %}
           <div style="display:flex;flex-direction:column;gap:.4rem">
@@ -355,15 +350,15 @@
     <div id="ac-hview-panel-screens" style="display:none">
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;margin-top:.5rem">
         {% for c in cycles[-6:]|reverse %}
-        <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;overflow:hidden">
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.5rem;overflow:hidden">
           {# Screenshot area — real screenshot if available, placeholder otherwise #}
           {% set screen_url = '/api/improvement/screenshot/' ~ (projects[0].id if projects else '') ~ '/' ~ c.cycle_num %}
-          <div style="width:100%;height:120px;background:var(--bg-secondary,#1a1128);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden"
+          <div style="width:100%;height:120px;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden"
                id="ac-screen-{{ c.cycle_num }}">
             <img src="{{ screen_url }}" alt="Cycle {{ c.cycle_num }}"
               onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
               style="width:100%;height:100%;object-fit:cover">
-            <div style="display:none;flex-direction:column;align-items:center;gap:.3rem;color:var(--text-muted,#888)">
+            <div style="display:none;flex-direction:column;align-items:center;gap:.3rem;color:var(--text-secondary)">
               {{ fi('layers', 24) }}
               <span style="font-size:.65rem">Capture indisponible</span>
             </div>
@@ -374,19 +369,19 @@
               {% set score = c.total_score|int %}
               <span style="font-size:.7rem;font-weight:700;color:{% if score >= 80 %}#22c55e{% elif score >= 60 %}#f59e0b{% else %}#ef4444{% endif %}">{{ score if score > 0 else '—' }}/100</span>
             </div>
-            <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.2rem">
+            <div style="font-size:.65rem;color:var(--text-secondary);margin-top:.2rem">
               {{ c.git_sha[:7] if c.git_sha else '—' }}
               · {{ c.status }}
             </div>
           </div>
         </div>
         {% else %}
-        <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+        <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
         {% endfor %}
       </div>
     </div>
     {% else %}
-    <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+    <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
     {% endif %}
   </div>
 </div>
@@ -403,10 +398,10 @@
         <span style="font-size:.75rem;font-weight:600">{{ d.dimension }}</span>
         <span class="{{ verdict_cls }}">{{ d.verdict }}</span>
       </div>
-      <div style="background:var(--border,#2a2d3e);border-radius:2px;height:3px">
+      <div style="background:var(--border);border-radius:2px;height:3px">
         <div style="height:100%;border-radius:2px;width:{{ d.score }}%;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
       </div>
-      <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.25rem">{{ d.score }}/100</div>
+      <div style="font-size:.65rem;color:var(--text-secondary);margin-top:.25rem">{{ d.score }}/100</div>
     </div>
     {% endfor %}
   </div>
@@ -415,8 +410,11 @@
 
 <script>
 let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
-let _acIntelOpen = false;
 let _acHistoryView = 'table';
+
+// Auto-load intel panel on init
+document.addEventListener('DOMContentLoaded', function() { acRefreshIntel(); });
+setTimeout(function() { acRefreshIntel(); }, 200);
 
 {# Serialize project data for JS modal #}
 const _AC_PROJECTS_DATA = {
@@ -460,10 +458,10 @@ async function acOpenModal(projectId) {
     <div class="ac-modal-header" style="border-left:4px solid ${bc}">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
       <strong style="font-size:.9rem">${proj.name}</strong>
-      <span style="font-size:.7rem;background:var(--bg-tertiary,#251a35);padding:.15rem .5rem;border-radius:.25rem;color:${bc}">${proj.tier_label}</span>
+      <span style="font-size:.7rem;background:var(--bg-tertiary);padding:.15rem .5rem;border-radius:.25rem;color:${bc}">${proj.tier_label}</span>
       <span style="font-size:.7rem;color:${statusColor};margin-left:auto">${proj.status}</span>
       <button onclick="document.getElementById('ac-detail-modal').remove()"
-        style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:1.2rem;padding:0 .25rem;margin-left:.5rem">✕</button>
+        style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.2rem;padding:0 .25rem;margin-left:.5rem">✕</button>
     </div>
     <div class="ac-modal-body">
       <div class="ac-modal-grid">
@@ -472,13 +470,13 @@ async function acOpenModal(projectId) {
         <div class="ac-modal-tile"><div class="tl">Score moyen</div><div class="tv" style="color:${proj.score_avg>=80?'#22c55e':proj.score_avg>=60?'#f59e0b':'#ef4444'}">${proj.score_avg>0?Math.round(proj.score_avg)+'<span style=\"font-size:.7rem\">/100</span>':'—'}</div></div>
         <div class="ac-modal-tile"><div class="tl">Convergence</div><div class="tv" style="font-size:.85rem">${proj.convergence}</div></div>
         <div class="ac-modal-tile"><div class="tl">CI Status</div><div class="tv" style="font-size:.85rem;color:${proj.ci_status==='green'?'#22c55e':proj.ci_status==='red'?'#ef4444':'#888'}">${proj.ci_status}</div></div>
-        <div class="ac-modal-tile"><div class="tl">Run actif</div><div class="tv" style="font-size:.72rem;font-family:monospace">${proj.run_id?'<a href="/missions/'+proj.run_id+'" target="_blank" style="color:var(--accent,#6c63ff)">'+proj.run_id.slice(0,8)+'↗</a>':'—'}</div></div>
+        <div class="ac-modal-tile"><div class="tl">Run actif</div><div class="tv" style="font-size:.72rem;font-family:monospace">${proj.run_id?'<a href="/missions/'+proj.run_id+'" target="_blank" style="color:var(--purple)">'+proj.run_id.slice(0,8)+'↗</a>':'—'}</div></div>
       </div>
 
       <!-- Progress bar -->
       <div style="margin-bottom:.75rem">
         <div style="font-size:.65rem;color:#888;margin-bottom:.25rem">Progression cycles</div>
-        <div style="background:var(--border,#2a2d3e);border-radius:3px;height:6px">
+        <div style="background:var(--border);border-radius:3px;height:6px">
           <div style="width:${Math.round((proj.current_cycle/proj.max_cycles)*100)}%;background:${bc};height:100%;border-radius:3px;transition:width .5s"></div>
         </div>
       </div>
@@ -529,7 +527,7 @@ async function acOpenModal(projectId) {
         + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:.4rem">'
         + m.map(([label,val,fn])=>{
           const col = fn&&val!=='—'?(fn(val)?'#22c55e':'#f59e0b'):'var(--text-primary)';
-          return `<div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.35rem;padding:.4rem .5rem">
+          return `<div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:.35rem;padding:.4rem .5rem">
             <div style="font-size:.6rem;color:#888;margin-bottom:.1rem">${label}</div>
             <div style="font-size:.9rem;font-weight:700;color:${col}">${val}</div>
           </div>`;
@@ -544,7 +542,7 @@ async function acOpenModal(projectId) {
             const col = pct>=80?'#22c55e':pct>=60?'#f59e0b':'#ef4444';
             return `<div style="display:flex;align-items:center;gap:.5rem;font-size:.7rem">
               <div style="width:100px;color:#888;flex-shrink:0">${dim.replace(/_/g,' ')}</div>
-              <div style="flex:1;background:var(--border,#2a2d3e);border-radius:2px;height:5px">
+              <div style="flex:1;background:var(--border);border-radius:2px;height:5px">
                 <div style="width:${pct}%;background:${col};height:100%;border-radius:2px"></div>
               </div>
               <div style="width:28px;text-align:right;color:${col};font-weight:700">${pct}</div>
@@ -559,7 +557,7 @@ async function acOpenModal(projectId) {
     if (histEl && cycles.length) {
       histEl.innerHTML = '<div style="font-size:.65rem;color:#888;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.05em">Historique cycles</div>'
         + '<table style="width:100%;font-size:.7rem;border-collapse:collapse">'
-        + '<thead><tr style="color:#888;border-bottom:1px solid var(--border,#2a2d3e)">'
+        + '<thead><tr style="color:#888;border-bottom:1px solid var(--border)">'
         + '<th style="text-align:left;padding:.25rem .4rem">#</th>'
         + '<th style="text-align:left;padding:.25rem .4rem">Score</th>'
         + '<th style="text-align:left;padding:.25rem .4rem">RL</th>'
@@ -571,7 +569,7 @@ async function acOpenModal(projectId) {
         + cycles.map(c=>{
           const sc = c.total_score||0;
           const col = sc>=80?'#22c55e':sc>=60?'#f59e0b':'#ef4444';
-          return `<tr style="border-bottom:1px solid var(--border,#1a1c2a)">
+          return `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:.25rem .4rem;color:#888">${c.cycle_num}</td>
             <td style="padding:.25rem .4rem;font-weight:700;color:${col}">${sc}/100</td>
             <td style="padding:.25rem .4rem;font-family:monospace">${(c.rl_reward||0).toFixed(3)}</td>
@@ -601,7 +599,7 @@ function acSelectProject(projectId, card) {
     swap: 'innerHTML'
   });
   document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
-  if (_acIntelOpen) acRefreshIntel();
+  acRefreshIntel();
 }
 
 function acIntelSwitchProject(projectId) {
@@ -615,13 +613,6 @@ function acIntelSwitchProject(projectId) {
   acRefreshIntel();
 }
 
-function acToggleIntel() {
-  const panel = document.getElementById('ac-intel-panel');
-  _acIntelOpen = !_acIntelOpen;
-  panel.style.display = _acIntelOpen ? 'block' : 'none';
-  if (_acIntelOpen) acRefreshIntel();
-}
-
 function acHistoryView(view) {
   _acHistoryView = view;
   ['table','topo','screens'].forEach(v => {
@@ -629,9 +620,9 @@ function acHistoryView(view) {
     const btn = document.getElementById('ac-hview-' + v);
     if (panel) panel.style.display = v === view ? '' : 'none';
     if (btn) {
-      btn.style.background = v === view ? 'var(--accent,#6c63ff)' : 'transparent';
-      btn.style.color = v === view ? '#fff' : 'var(--text-muted,#888)';
-      btn.style.border = v === view ? 'none' : '1px solid var(--border,#2a2d3e)';
+      btn.style.background = v === view ? 'var(--purple)' : 'transparent';
+      btn.style.color = v === view ? '#fff' : 'var(--text-secondary)';
+      btn.style.border = v === view ? 'none' : '1px solid var(--border)';
     }
   });
 }
@@ -725,7 +716,7 @@ async function acRefreshIntel() {
     }
     tbody.innerHTML = rows.length
       ? rows.join('')
-      : '<tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+      : '<tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
 
   } catch(e) {
     console.error('AC intel fetch error', e);
@@ -908,7 +899,7 @@ function _acRenderTeamDiagram() {
   agents.forEach(n => {
     const col = phaseColors[n.phase] || '#8b5cf6';
     svg += `<g transform="translate(${n.x},${n.y})">`;
-    svg += `<rect width="${NW}" height="${NH}" rx="4" fill="var(--bg-tertiary,#251a35)" stroke="var(--border,#2a2d3e)" stroke-width="1"/>`;
+    svg += `<rect width="${NW}" height="${NH}" rx="4" fill="var(--bg-tertiary)" stroke="var(--border)" stroke-width="1"/>`;
     svg += `<line x1="0" y1="0" x2="${NW}" y2="0" stroke="${col}" stroke-width="3"/>`;
     // Avatar circle
     svg += `<circle cx="18" cy="${NH/2}" r="12" fill="${col}" opacity=".15"/>`;

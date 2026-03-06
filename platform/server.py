@@ -1211,8 +1211,11 @@ def create_app() -> FastAPI:
                 "/redoc",
             )
         )
+        # HTMX partial requests should never be redirected to onboarding
+        is_htmx = request.headers.get("HX-Request") == "true"
         if (
             not skip
+            and not is_htmx
             and not request.cookies.get("onboarding_done")
             and os.environ.get("PLATFORM_ENV") != "test"
         ):
