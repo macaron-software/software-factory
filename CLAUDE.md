@@ -672,6 +672,43 @@ Migrations DB: ALTER TABLE ac_cycles ADD rolled_back INT, experiment_id TEXT
                CREATE TABLE ac_experiments(...)
 ```
 
+### ISOLATION DES RESPONSABILITÉS (règle absolue)
+```
+COUCHE PROJET  → agents dans le cycle AC (ac-codex, ac-qa-agent, ac-cicd-agent)
+  Scope: Dockerfile PROJET, npm/Playwright install, compilation, tests, screenshots
+  Exemples: Chromium manquant → ac-qa-agent fixe le Dockerfile du projet
+            build fail → ac-codex lit les logs et corrige src/ ou Dockerfile projet
+            .ts contient HTML → ac-codex corrige le fichier (mais = bug skill SF → voir SF)
+
+COUCHE SF      → quality-improvement déclenché par watchdog (platform_watchdog.py)
+  Scope: skills/*.md, agents/store.py system_prompts, workflows/definitions/*.yaml, patterns
+  Exemples: ac-codex écrit HTML dans .ts → fix skills/ac-codex.md (prompt manquant règle extensions)
+            ac-qa ne sait pas gérer Chromium absent → fix skills/ac-qa.md (ajouter procédure)
+  INTERDIT: toucher au Dockerfile SF/deploy/, résoudre des erreurs de BUILD projet
+
+WATCHDOG scan_ac_issues() — ne détecte QUE les bugs SF:
+  ✅ .ts contient <!DOCTYPE html> ou <html> → bug prompt ac-codex → trigger quality-improvement
+  ✅ QA_REPORT manquant après phase ac-qa → bug workflow phase → trigger quality-improvement
+  ❌ Chromium absent → projet → ac-qa-agent le gère dans son Dockerfile
+  ❌ Build no-op → projet → ac-codex le gère dans ses étapes
+  ❌ npm install fail → projet → agents du cycle le gèrent
+
+AGENTS AC — scopes par rôle:
+  ac-architect   → INCEPTION.md, specs TDD, tokens design → workspace seulement
+  ac-codex       → src/, tests/, Dockerfile PROJET, package.json → workspace seulement
+                   Si docker_deploy() fail → corriger Dockerfile PROJET, jamais SF
+  ac-adversarial → lecture seule → ADVERSARIAL_N.md → workspace seulement
+  ac-qa-agent    → docker_deploy() → tests → screenshots → si Chromium absent:
+                   ajouter RUN npx playwright install chromium --with-deps dans Dockerfile PROJET
+  ac-cicd-agent  → git commit/push workspace → POST /api/improvement/inject-cycle
+  ac-coach       → décision rollback/A-B → STRATEGY_N+1.md → workspace seulement
+
+QUALITY-IMPROVEMENT (workflow SF) — scope exclusif SF:
+  Fichiers autorisés: skills/*.md, platform/agents/store.py, platform/workflows/definitions/*.yaml
+  Fichiers INTERDITS: platform/deploy/*, platform/tools/*, data/*, projets workspaces/*
+  Déclencheur: watchdog détecte bug SF → brief clair "fix skill X, motif Y"
+```
+
 ## CHAOS MONKEY (ops/chaos_endurance.py)
 SCENARIOS_VM1: container_restart, cpu_stress_30s, network_latency_200ms,
                wal_checkpoint_truncate, memory_pressure_85pct, disk_fill_500mb
