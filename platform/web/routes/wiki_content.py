@@ -11,9 +11,9 @@ WIKI_PAGES = [
         "content": """\
 # Getting Started
 
-Welcome to the **Macaron Software Factory** — a multi-agent collaborative platform for autonomous software engineering.
+Welcome to the **Software Factory** — a multi-agent collaborative platform for software engineering.
 
-## Quick Start (local)
+## Quick Start
 
 ```bash
 # Clone & install
@@ -21,10 +21,10 @@ git clone https://github.com/macaron-software/software-factory.git
 cd software-factory/platform
 pip install -r requirements.txt
 
-# Run locally (from parent directory — NEVER use --reload)
-python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
+# Run locally
+python -m uvicorn platform.server:app --port 8090 --ws none
 
-# Open http://localhost:8099
+# Open http://localhost:8090
 ```
 
 ## Docker
@@ -36,42 +36,47 @@ make setup    # builds Docker image
 make run      # starts platform on port 8090
 ```
 
-## First Steps
+## Home Page — 8 Ideation Groups
 
-![Dashboard](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/home.png)
+The home page (`/`) provides 8 tabs covering the full strategic and technical cycle:
 
-1. **Complete onboarding** — The first screen guides you through initial setup
-2. **Create a project** — Go to Projects → New Project
-3. **Start a mission** — Open your project and type a message to the Agent Lead
-4. **Watch agents collaborate** — The session view shows real-time agent collaboration
+| Tab | Role |
+|-----|------|
+| **CTO Jarvis** | Strategic AI advisor — recommended entry point for new projects |
+| **Business Ideation** | 6-agent marketing team, SWOT/TAM/KPI plans |
+| **Project Ideation** | 5-agent tech team, SAFe Epic generation |
+| **Knowledge & Research** | Technology watch and document analysis |
+| **Architecture Committee** | Multi-agent architectural review and decisions |
+| **Security Council** | Security audit, SAST, CVE analysis |
+| **Data & AI** | Data analysis, MLOps, AI governance |
+| **PI Planning** | SAFe Program Increment planning |
 
-![Missions](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
+## Recommended Entry Point: CTO Jarvis
+
+Open the home page and use the **CTO Jarvis** tab to create a new project in one conversation:
+
+> *"Create a new project for an enterprise carpooling app with React and Python."*
+
+Jarvis (Gabriel Mercier, Strategic Orchestrator) will analyze your request, create the project,
+provision a SAFe backlog, and start the first missions automatically.
+
+## Other Entry Points
+
+- **Agent Marketplace** (`/marketplace`) — browse all 191 agents, filter by ART/role/skills, start a direct session
+- **Portfolio** (`/portfolio`) — manage epics, features, stories with WSJF prioritization
+- **Projects** (`/projects`) — create or manage projects manually
+- **Evaluations** (`/evals`) — run LLM-as-judge benchmarks on any agent
+- **Tool Builder** (`/tool-builder`) — create custom HTTP/SQL/shell tools without code
+- **Workspaces** (`/workspaces`) — manage isolated multi-tenant namespaces
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PLATFORM_LLM_PROVIDER` | `minimax` | LLM provider (minimax, azure-openai, azure-ai) |
+| `PLATFORM_LLM_PROVIDER` | `minimax` | LLM provider (minimax, openai-compatible, azure-openai) |
 | `PLATFORM_LLM_MODEL` | `MiniMax-M2.5` | Model name |
 | `PLATFORM_PORT` | `8090` | HTTP port |
-| `DATABASE_URL` | *(none)* | PostgreSQL URL — `postgresql://user:pass@host/db` |
-| `REDIS_URL` | *(none)* | Redis URL — `redis://host:6379/0` (optional, enables pub/sub) |
-| `PLATFORM_MODE` | `full` | Process mode: `full`, `factory` (headless), or `ui` (web only) |
-| `PLATFORM_DB_PATH` | `data/platform.db` | SQLite path (dev only, ignored when DATABASE_URL set) |
-
-## Important Caveats
-
-- **NEVER** use `--reload` with uvicorn (naming conflict with Python stdlib `platform` module)
-- **NEVER** `import platform` at top-level inside the package
-- **Always** run from the parent directory: `python -m uvicorn platform.server:app ...`
-- `--ws none` is mandatory (the platform uses SSE, not WebSockets)
-
-## Next Steps
-
-- [User Guide](user-guide) — walkthrough of every feature
-- [Settings Hub](settings-hub) — configure orchestration, LLM providers, integrations
-- [Mission Cockpit](mission-cockpit) — monitor and control running missions
-- [Core Concepts](concepts) — projects, agents, patterns, workflows
+| `DATABASE_URL` | (SQLite fallback) | PostgreSQL connection string |
 """,
     },
     {
@@ -132,213 +137,52 @@ Program Increments, Features & Epics with WSJF prioritization, ART (Agile Releas
         "content": """\
 # User Guide
 
-A practical walkthrough of every major section in the Software Factory.
-
----
-
 ## Dashboard
 
-![Dashboard](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/home.png)
-
-The Dashboard is your starting point. It adapts to your **perspective**:
-
-| Perspective | What you see |
-|-------------|-------------|
-| **DSI** | Portfolio overview, project health, budget |
-| **Product** | Backlog priority, feature pipeline |
-| **Engineering** | Active sessions, agent activity, recent missions |
-| **Scrum Master** | Velocity, team fitness, sprint progress |
-
-**How to use it:**
-1. Select your perspective from the top-right switcher.
-2. Click any card to drill into that project or mission.
-3. Use the global search bar (top center) to jump to any page.
-
----
+Personalized by perspective: **DSI** (portfolio), **Product** (backlog), **Engineering** (sessions), **Scrum Master** (velocity).
 
 ## Projects
 
-![Projects](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/projects.png)
-
-A Project is the top-level workspace. It holds agents, missions, memory, and artifacts.
-
-**Create a project:**
-1. Click **Projects** → **+ New Project**.
-2. Enter a name, description, and pick a color/avatar.
-3. Choose your **Agent Lead** (the agent that receives your messages).
-4. Optionally connect a Git repository.
-5. Click **Create** — you land in the project chat.
-
-**Inside a project** you have tabs: Chat, Missions, Backlog, Sessions, Agents, Memory, Workflows, Settings.
-
----
+1. Navigate to **Projects** → **New Project**
+2. Fill in name, description, select a color
+3. Choose Agent Lead, configure Git (optional)
+4. Use the chat to send missions
 
 ## Missions
 
-![Missions Board](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
-
-A Mission is a unit of work: your prompt → agent collaboration → result.
-
-**Start a mission:**
-1. Open a project.
-2. Type your request in the chat (e.g. *"Add user authentication with JWT"*).
-3. The Agent Lead creates a mission and dispatches agents.
-
-**Status flow:** `planning → active → review → completed` (or `failed` / `interrupted`)
-
-Each mission has **runs** (attempts) and **phases** (agent steps within a run). You can re-run a failed mission from the mission card.
-
----
-
-## Mission Cockpit
-
-![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
-
-The Cockpit gives you a real-time pipeline view of all running missions across the platform.
-
-- **Semaphore gauge** — shows how many missions run in parallel (configured in Settings → Orchestrator).
-- **Per-mission controls** — pause, stop, or inspect any running mission.
-- **Phase timeline** — each bar is an agent phase; hover for token cost and duration.
-
-Open it from the top nav **⚡ Cockpit** link or from any mission card.
-
----
-
-## Backlog
-
-![Backlog](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/backlog.png)
-
-WSJF-prioritized feature backlog using SAFe methodology.
-
-**How to use it:**
-1. Click **Backlog** inside a project.
-2. Use **+ Add Feature** to create items.
-3. Set **User Value**, **Time Criticality**, and **Risk Reduction** — WSJF score is computed automatically.
-4. Drag items to reorder or set priority manually.
-5. Click a feature to start a mission from it directly.
-
-**Ideation mode** (multi-agent brainstorming): type a prompt in the Ideation tab, agents collaborate to generate and score feature ideas.
-
----
+- **Status flow**: planning → active → review → completed
+- Each mission has runs (attempts) with phases (agent steps)
 
 ## Sessions
 
-Live agent collaboration view. Each message is color-coded by agent role.
+Live agent collaboration with real-time SSE streaming, color-coded by role.
 
-**How to read a session:**
-- **Blue** = Agent Lead (coordinator)
-- **Green** = Developer agents
-- **Orange** = Reviewer / QA agents
-- **Purple** = Architect agents
+## Backlog & Ideation
 
-Sessions stream in real-time via SSE. You can intervene with a message at any time — it goes to the Agent Lead.
-
----
+- **Backlog**: WSJF-prioritized features
+- **Ideation**: multi-agent brainstorming — type a prompt, agents collaborate
 
 ## Metrics
-
-![Metrics](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/metrics.png)
-
-Five tabs covering engineering performance:
 
 | Tab | Content |
 |-----|---------|
 | **DORA** | Deploy frequency, lead time, change failure rate, MTTR |
-| **Quality** | Code quality scores, test coverage, security findings |
-| **Analytics** | Mission stats, agent performance, cost per run |
+| **Quality** | Code quality scores, test coverage, security |
+| **Analytics** | Mission stats, agent performance, system health |
 | **Monitoring** | Real-time CPU, memory, request latency |
-| **Pipeline** | CI/CD pipeline performance and trends |
-
-LLM cost per mission is shown in **Analytics** → *Cost* column. See [LLM Cost Tracking](llm-cost-tracking) for details.
-
----
-
-## Settings Hub
-
-![Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings.png)
-
-Global platform configuration. Five tabs: **General**, **Orchestrator**, **LLM**, **Integrations**, **Notifications**.
-
-Key settings you'll use most:
-- **Orchestrator → Mission Semaphore** — max parallel missions.
-- **Orchestrator → Budget Cap** — max LLM cost per run (USD).
-- **Orchestrator → YOLO Mode** — agents proceed without approval gates.
-- **LLM → Provider Priority** — which LLM provider to use first.
-
-Full details in [Settings Hub](settings-hub).
-
----
-
-## Agents
-
-![Agents](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/agents.png)
-
-The agent catalog. Each agent has a role, system prompt, skills, tools, and LLM model.
-
-**How to use it:**
-1. Go to **Toolbox → Agents** (or **Projects → Agents** tab).
-2. Click an agent to view/edit its system prompt and skills.
-3. Use **+ New Agent** to create a custom agent.
-4. Assign agents to a project via the project's **Agents** tab.
-
----
-
-## Memory
-
-![Memory](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/memory.png)
-
-Persistent knowledge store for each project. Agents read from and write to memory automatically.
-
-**How to use it:**
-1. Open **Toolbox → Memory**.
-2. Search memory entries with the full-text search bar.
-3. Click an entry to view or edit it.
-4. Use **+ Add** to inject knowledge manually (e.g. architecture decisions, constraints).
-
-Memory entries are scoped per project. Agents reference them during planning phases.
-
----
-
-## Workflows
-
-![Workflows](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/workflows.png)
-
-Workflows chain **Patterns** (agent assemblies) into multi-step pipelines.
-
-**How to use it:**
-1. Go to **Projects → Workflows** tab.
-2. Click **+ New Workflow**.
-3. Add steps — each step picks a Pattern and configuration.
-4. Save and trigger the workflow from the chat (`/workflow <name>`).
-
-Common built-in workflows: `full-dev` (plan → code → review → test), `quick-fix` (code → review).
-
----
+| **Pipeline** | CI/CD pipeline performance |
 
 ## Toolbox
 
-The Toolbox collects platform-wide utilities:
-
-| Tab | Description |
-|-----|-------------|
-| **Skills** | Agent skill library — browse and assign skills |
-| **Memory** | Cross-project memory browser |
-| **MCPs** | MCP server connections — add/remove tool servers |
-| **Evals** | Run quality evaluations on agent outputs |
-| **API** | Interactive Swagger docs |
-| **CLI** | Web terminal for direct platform commands |
+| Tab | Content |
+|-----|---------|
+| **Skills** | Agent skill library |
+| **Memory** | Persistent memory browser |
+| **MCPs** | MCP server management |
+| **API** | Swagger interactive docs |
+| **CLI** | Web terminal |
 | **Design System** | UI component reference |
 | **Wiki** | This documentation |
-
----
-
-## Next Steps
-
-- [Mission Cockpit](mission-cockpit) — deep dive into the pipeline view
-- [Settings Hub](settings-hub) — configure orchestration, LLM, integrations
-- [LLM Cost Tracking](llm-cost-tracking) — understand and control costs
-- [Patterns Guide](patterns-guide) — orchestration patterns
-- [Workflows Guide](workflows-guide) — build pipelines
 """,
     },
     # ── Architecture ────────────────────────────────────────────
@@ -351,37 +195,26 @@ The Toolbox collects platform-wide utilities:
         "content": """\
 # Architecture Overview
 
-## Production Architecture (IHM/Factory decoupled)
-
 ```
-Browser
-  |
-  v
-nginx (port 80/443)  --  blue-green switch
-  +-- /* --> platform-web-blue/green:8090  (IHM, restartable)
-
-platform-web  --Redis sub-->  Redis pub/sub  <--Redis pub--  platform-factory
-                                                                    |
-                                                              PostgreSQL (shared)
+┌─── Web UI (HTMX + SSE) ────────────────────────────────┐
+│  Dashboard │ Projects │ Sessions │ Agents │ Metrics      │
+└─────────────────────────────────────────────────────────┘
+         │ SSE (real-time)          │ REST API
+┌────────┴──────────────────────────┴────────────────────┐
+│              ORCHESTRATOR (Python/FastAPI)               │
+│  Router │ Scheduler (WSJF) │ A2A Bus │ Pattern Engine   │
+└─────────────────────────────────────────────────────────┘
+         │
+┌────────┴────────────────────────────────────────────────┐
+│              AGENT RUNTIME                               │
+│  👔 Business  📋 PM  🏗️ Lead Dev  💻 Dev  🧪 Tester    │
+│  🔒 Security  🚀 DevOps  🏛️ Architect  🎨 UX  📊 Data │
+└─────────────────────────────────────────────────────────┘
+         │
+┌────────┴────────────────────────────────────────────────┐
+│  LLM Providers │ Memory (SQLite+FTS5) │ MCP Tools       │
+└─────────────────────────────────────────────────────────┘
 ```
-
-- **platform-factory** — headless agent engine, never restarts on UI changes
-  - Missions, patterns engine, orchestrator, watchdog, A2A bus
-  - Publishes events to Redis channel `a2a:events`
-- **platform-web** (blue/green) — IHM, hot-restartable
-  - Web routes, Jinja2 templates, static files, SSE streams
-  - Subscribes to Redis `a2a:events` and forwards to browser SSE
-- **Redis** — pub/sub bridge between factory and web containers
-- **PostgreSQL** — shared persistent storage (both containers read/write)
-- **nginx** — blue-green switch + TLS termination
-
-`PLATFORM_MODE` controls which subsystems start:
-
-| Mode | Factory (agents/missions) | Web (routes/UI) | Redis listener |
-|------|--------------------------|-----------------|----------------|
-| `full` | yes | yes | if REDIS_URL set |
-| `factory` | yes | no | publisher |
-| `ui` | no | yes | subscriber |
 
 ## Tech Stack
 
@@ -389,60 +222,39 @@ platform-web  --Redis sub-->  Redis pub/sub  <--Redis pub--  platform-factory
 |-------|-----------|
 | **Frontend** | HTMX + Jinja2 templates + SSE |
 | **Backend** | Python 3.12 + FastAPI + Uvicorn |
-| **Database** | PostgreSQL (prod) / SQLite WAL (dev) |
-| **Cache/Pub-sub** | Redis 7 (optional, fallback to in-memory) |
-| **LLM** | MiniMax M2.5, Azure OpenAI gpt-5-mini, Azure AI |
+| **Database** | SQLite (WAL) + FTS5 full-text search |
+| **LLM** | MiniMax M2.5, Azure OpenAI, Azure AI |
 | **Tools** | MCP protocol (fetch, memory, playwright, solaris) |
-| **Deploy** | Docker + docker-compose on Azure VM + OVH VPS |
-| **Reverse proxy** | nginx — blue-green + TLS + HSTS |
+| **Deploy** | Docker on Azure VM + nginx |
 | **Auth** | JWT (HttpOnly cookies) |
-| **i18n** | 18 languages via Accept-Language header |
 
 ## Directory Structure
 
 ```
 platform/
-|-- server.py          # FastAPI entry point + PLATFORM_MODE dispatch
-|-- config.py          # Configuration (7 classes)
-|-- models.py          # Pydantic models (~25)
-|-- web/
-|   |-- routes/        # 13 route modules + wiki, wiki_content
-|   |-- templates/     # Jinja2 HTML templates (64 files)
-|   +-- static/        # CSS, JS, images
-|-- agents/            # Agent loop, executor, store, tool_schemas
-|-- orchestrator/      # Mission orchestrator, WSJF
-|-- patterns/          # 15 orchestration patterns + engine
-|-- workflows/         # 36 built-in workflows
-|-- llm/               # Multi-provider LLM client (fallback chain)
-|-- tools/             # Code, git, deploy, memory, security, web, MCP
-|-- db/                # Migrations, PG adapter, pool management
-|-- a2a/               # Agent-to-Agent protocol + Redis pub/sub backend
-|-- missions/          # SAFe lifecycle (Epics, Features, Stories, Tasks)
-|-- mcps/              # MCP server manager
-|-- memory/            # 4-layer persistent memory (FTS5)
-|-- services/          # Notifications + mission orchestration
-|-- ops/               # Auto-heal, chaos, backup/restore
-|-- security/          # Auth, RBAC, permissions
-|-- i18n/              # Locale catalogs (18 languages)
-+-- deploy/            # Dockerfile, docker-compose-vm.yml, nginx configs
+├── server.py          # FastAPI entry point (port 8090)
+├── config.py          # Configuration
+├── models.py          # Pydantic models
+├── web/
+│   ├── routes/        # 13 route modules + API sub-package
+│   ├── templates/     # Jinja2 HTML templates
+│   └── static/        # CSS, JS, images
+├── agents/            # Agent loop, executor, store
+├── orchestrator/      # Mission orchestrator, WSJF
+├── patterns/          # 15 orchestration patterns
+├── workflows/         # 36 built-in workflows
+├── llm/               # Multi-provider LLM client
+├── tools/             # Code, git, deploy, memory, security
+├── db/                # Migrations and adapters
+├── a2a/               # Agent-to-Agent protocol
+├── missions/          # SAFe lifecycle
+├── mcps/              # MCP server manager
+├── memory/            # Persistent memory (FTS5)
+├── services/          # Notifications
+├── ops/               # Auto-heal, chaos, backup
+├── security/          # Auth, RBAC
+└── i18n/              # 8 languages
 ```
-
-## Agent Architecture
-
-```
-Pattern Engine (engine.py)
-  |
-  +-- Sequential: A -> B -> C
-  +-- Parallel: A | B | C -> merge
-  +-- Hierarchical: Lead -> [Dev1, Dev2, QA]
-  +-- Loop: iterate until quality gate passes
-  +-- Router: dispatch by content type
-  +-- Aggregator: synthesize multiple outputs
-  +-- Adversarial: L0 (deterministic) + L1 (LLM guard)
-  +-- Network: debate / human-in-the-loop
-```
-
-See [Orchestration Patterns](patterns) for details.
 """,
     },
     {
@@ -470,7 +282,7 @@ CREATE TABLE agents (
 
 ### missions
 ```sql
-CREATE TABLE epics (
+CREATE TABLE missions (
     id TEXT PRIMARY KEY, project_id TEXT,
     title TEXT, prompt TEXT NOT NULL,
     status TEXT DEFAULT 'planning',
@@ -501,7 +313,7 @@ CREATE TABLE users (
 
 ## Full Table List (~30 tables)
 
-`agents`, `missions`, `epic_runs`, `run_phases`, `projects`, `sessions`,
+`agents`, `missions`, `mission_runs`, `run_phases`, `projects`, `sessions`,
 `session_messages`, `memory_entries`, `features`, `feature_deps`,
 `program_increments`, `users`, `user_sessions`, `user_project_roles`,
 `agent_scores`, `retrospectives`, `quality_reports`, `quality_snapshots`,
@@ -717,15 +529,13 @@ sf projects create "My Project" --description "..."
 """,
     },
     {
-        "slug": "epics",
+        "slug": "missions",
         "title": "Missions & SAFe",
         "category": "Projects",
         "icon": "",
         "sort_order": 20,
         "content": """\
 # Missions & SAFe
-
-![Missions Board](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/missions.png)
 
 ## Mission Lifecycle
 
@@ -734,90 +544,6 @@ User Prompt → Planning → Active → Review → Completed
                                       ↓
                                    Failed / Interrupted
 ```
-
-Each mission has **runs** (attempts) and **phases** (agent steps per run). Failed missions can be retried from the mission card.
-
-## Mission Cockpit
-
-![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
-
-The Cockpit shows all running missions in a pipeline view. Use it to monitor progress, inspect phases, and intervene if needed. See [Mission Cockpit](mission-cockpit) for details.
-
-## Mission Replay
-
-![Mission Replay](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/mission_replay.png)
-
-Step through a completed mission phase by phase. Useful for debugging unexpected results.
-
-**How to use it:**
-1. Open a completed or failed mission.
-2. Click the **Replay** button.
-3. Use ◀ ▶ to step through each agent phase.
-4. Each phase shows the agent, its prompt, and its output.
-
----
-
-## Semaphore Control
-
-The **Mission Semaphore** limits how many missions run in parallel across the platform.
-
-- Default: `3` concurrent missions.
-- Higher values = more parallelism but more LLM API load.
-- Set it in **Settings → Orchestrator → Mission Semaphore**.
-
-**When to change it:**
-- Reduce to `1` when debugging a single mission and you want full resource focus.
-- Increase up to your LLM provider's rate limit to maximize throughput.
-
----
-
-## YOLO Mode
-
-YOLO Mode lets agents proceed through all phases **without waiting for human approval gates**.
-
-- **Disabled (default)**: agents pause at review checkpoints and wait for your ✅.
-- **Enabled**: agents skip approval steps and run fully autonomously end-to-end.
-
-**When to use it:**
-- Rapid prototyping where speed matters more than oversight.
-- Batch processing of many small missions.
-- Fully trusted workflows with well-tested patterns.
-
-**How to enable it:**
-1. Go to **Settings → Orchestrator**.
-2. Toggle **YOLO Mode** on.
-3. Save. Takes effect immediately for new missions.
-
-> ⚠️ Use with caution on production-critical projects.
-
----
-
-## Auto-Resume Watchdog
-
-The watchdog monitors stalled missions and resumes them automatically.
-
-- A mission is considered **stalled** if no agent has produced output for more than `N` minutes (configurable).
-- The watchdog re-dispatches the last active agent with the same context.
-- Prevents missions from hanging indefinitely due to LLM timeouts or transient errors.
-
-**Configure it** in **Settings → Orchestrator → Auto-Resume Watchdog** (enable/disable + timeout threshold).
-
----
-
-## Budget Cap
-
-Limit the maximum LLM spend per mission run.
-
-- Set in **Settings → Orchestrator → Budget Cap (USD)**.
-- When a run's `llm_cost_usd` reaches the cap, the mission is paused and marked `budget_exceeded`.
-- You can raise the cap and resume, or close the mission.
-- Default: no cap (`0` = unlimited).
-
-**Example:** set cap to `$0.50` for exploratory missions to avoid runaway costs.
-
-See [LLM Cost Tracking](llm-cost-tracking) for how costs are measured.
-
----
 
 ## SAFe Framework
 
@@ -843,208 +569,34 @@ Cost of Delay = User Value + Time Criticality + Risk Reduction
         "content": """\
 # Deployment Guide
 
-## Environments
-
-| Environment | URL | Server | Mode |
-|-------------|-----|--------|------|
-| Local dev | http://localhost:8099 | macOS, Python 3.12 | full |
-| OVH Demo | http://54.36.183.124 | Debian VPS | full |
-| Azure Prod | https://sf.macaron-software.com | Azure VM D4as_v5 4CPU/16GB | factory + web blue/green |
-
-## Local Development
-
-```bash
-cd software-factory/platform
-pip install -r requirements.txt
-
-# Run (NEVER --reload, ALWAYS --ws none, run from parent dir)
-python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
-
-# Tests
-python -m pytest tests/ -v                  # unit + integration
-cd tests/e2e && npx playwright test         # E2E (82+ tests)
-```
-
-## Docker (local or simple server)
+## Docker (Recommended)
 
 ```bash
 git clone https://github.com/macaron-software/software-factory.git
 cd software-factory
 docker compose up -d
-# -> http://localhost:8090
+# → http://localhost:8090
 ```
 
-## Azure Prod — Blue-Green Deployment
-
-Architecture: nginx -> blue/green swap. Factory never restarts for UI changes.
-
-```
-nginx:443 -> platform-web-blue:8090  (active)
-          -> platform-web-green:8090 (standby)
-platform-factory:8091               (always-on headless engine)
-redis:6379                          (pub/sub bridge)
-postgres:5432                       (shared DB)
-```
-
-### Full redeploy (rsync + rebuild)
+## Azure VM (Production)
 
 ```bash
-SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-rsync -azP --delete \
-  --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' \
-  platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
-  "cd /opt/macaron && docker compose --env-file .env \
-   -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
+# nginx reverse proxy → Docker container (port 8090)
+# Patches: /opt/macaron/patches → /patches in container
+# Backup: docker exec platform cp /app/data/platform.db /app/data/backup.db
 ```
 
-### Hotpatch (no rebuild, no factory restart)
+## Local Development
 
 ```bash
-# Fast: copy files, restart only web container
-tar cf /tmp/update.tar web/templates/ web/static/ web/routes/
-scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
-  "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && \
-   docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && \
-   docker restart deploy-platform-1"
+cd platform && pip install -r requirements.txt
+# NEVER --reload, ALWAYS --ws none
+python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
+
+# Tests
+python -m pytest tests/ -v                    # 52+ tests
+cd tests/e2e && npx playwright test           # 82+ E2E tests
 ```
-
-> Note: hotpatch content is lost on next `docker compose --build`. Always rsync before rebuild.
-
-### Blue-green switch (nginx)
-
-```bash
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \
-  "docker exec nginx-proxy sh -c 'ln -sf /etc/nginx/conf.d/blue.conf /etc/nginx/conf.d/active.conf && nginx -s reload'"
-```
-
-## OVH Demo
-
-```bash
-ssh debian@54.36.183.124
-cd /opt/software-factory
-docker compose pull && docker compose up -d
-```
-
-CI/CD: GitHub Actions `.github/workflows/deploy-demo.yml`
-Secrets: `OVH_SSH_KEY`, `OVH_IP`
-
-## CI/CD
-
-| Pipeline | Trigger | Actions |
-|----------|---------|---------|
-| `.github/workflows/deploy-demo.yml` | push to `main` | rsync + docker restart on OVH |
-| `.gitlab-ci.yml` | push to `main` | rsync + docker build on Azure |
-
-Smart deploy: if diff limited to `web/templates/`, `web/static/`, `web/routes/` only, factory is NOT restarted.
-""",
-    },
-    {
-        "slug": "resilience",
-        "title": "Resilience & Stability",
-        "category": "DevOps",
-        "icon": "",
-        "sort_order": 15,
-        "content": """\
-# Resilience & Stability
-
-## PostgreSQL Connection Pool
-
-The platform uses `psycopg_pool.ConnectionPool` (psycopg3 sync pool) with an asyncio FastAPI server.
-
-| Container | Pool size | Notes |
-|-----------|-----------|-------|
-| platform-factory | 20 | Runs missions, watchdog, auto-resume, auto-heal concurrently |
-| platform-web (blue/green) | 5 | Read-heavy, lighter load |
-
-### Connection Leak Prevention
-
-All DB connections MUST follow this pattern:
-
-```python
-db = None
-try:
-    db = get_db()
-    # ... work ...
-finally:
-    if db:
-        db.close()   # returns connection to pool via putconn()
-```
-
-A missing `finally` block = connection never returned to pool on exception.
-The `PgConnectionWrapper` has a `__del__` GC safety net, but GC is non-deterministic.
-
-### Symptoms of Pool Exhaustion
-
-```
-PoolTimeout: couldn't get a connection after 15.00 sec
-```
-
-This appears in logs when all connections are held (either active or leaked).
-Check with: `SELECT count(*), state FROM pg_stat_activity GROUP BY state;`
-
-## Blue-Green nginx Failover
-
-nginx upstream uses a health-checked blue-green switch:
-
-```nginx
-upstream platform_web {
-    server platform-blue:8090  max_fails=3 fail_timeout=10s;
-    server platform-green:8090 max_fails=3 fail_timeout=10s backup;
-}
-```
-
-Health endpoint: `GET /health` returns `{"status": "ok"}` with HTTP 200.
-nginx re-adds a recovered upstream automatically after `fail_timeout`.
-
-## IHM / Factory Decoupling
-
-**Problem:** Restarting the web container to deploy a UI change was interrupting running missions.
-
-**Solution:** `PLATFORM_MODE` splits the process:
-
-- `factory`: starts agents/missions/orchestrator, connects Redis as publisher, no HTTP routes
-- `ui`: starts web routes/templates/SSE, subscribes Redis for events, no agent execution
-- `full`: both (default, for dev or simple deployments)
-
-Redis pub/sub channel: `a2a:events` — factory publishes, web subscribes and forwards to browser SSE.
-Fallback: if `REDIS_URL` is not set, falls back to in-memory bus (no cross-process events, `full` mode only).
-
-## Stability Test Suite
-
-Located at `platform/tests/test_stability.py`. Run with:
-
-```bash
-STABILITY_TESTS=1 \
-STABILITY_AZ_HOST=https://sf.macaron-software.com \
-STABILITY_OVH_HOST=http://54.36.183.124 \
-python -m pytest tests/test_stability.py -v -m stability
-```
-
-| Test | What it checks |
-|------|---------------|
-| `test_health_az/ovh` | `/health` returns 200 |
-| `test_latency_p99` | p99 < 3s over 20 requests |
-| `test_concurrent_10/50` | 10/50 concurrent requests, < 5% error rate |
-| `test_rate_limit` | 429 returned when rate exceeded |
-| `test_pages_smoke` | 8 key pages return 200 |
-| `test_sse_connect` | SSE stream connects and sends `:ping` keepalive |
-| `test_disk_memory` | disk < 90%, memory < 90% |
-| `test_hot_restart` | container restart, service back in < 30s |
-| `test_nginx_failover` | stop blue, nginx switches to green, back in < 10s |
-| `test_cold_restart` | full server reboot, service back in < 120s |
-| `test_chaos_pause_resume` | docker pause/unpause mission container |
-
-## Auto-Heal
-
-`ops/auto_heal.py` monitors platform health every 60s and creates P1/P2 incidents for:
-
-- LLM provider failures (auto-switches provider)
-- PG pool exhaustion (logs alert, triggers incident)
-- Container memory > 90% (creates P0 incident)
-
-Incidents visible at `/toolbox` under the Incidents tab.
 """,
     },
     {
@@ -2078,7 +1630,7 @@ Mission created
         -> SSE events streamed to UI
         -> Session completed/failed
     -> Workflow phase transitions
--> Epic completed
+-> Mission completed
 ```
 
 ## Session Components
@@ -2213,7 +1765,7 @@ Individual dimension reports are stored per mission run:
 ```sql
 SELECT dimension, score, notes, agent_id
 FROM quality_reports
-WHERE epic_run_id = ?;
+WHERE mission_run_id = ?;
 ```
 
 ## Quality Gate Workflow
@@ -3398,870 +2950,6 @@ Five tabs accessible at `/teams`:
 - [Agents System](agents) — agent catalog and roles
 - [Orchestration Patterns](patterns) — where `skill:` prefix activates Darwin
 - [Metrics Guide](metrics-guide) — DORA and quality metrics
-""",
-    },
-    # ── Settings Hub ─────────────────────────────────────────────
-    {
-        "slug": "settings-hub",
-        "title": "Settings Hub",
-        "category": "Guide",
-        "icon": "⚙️",
-        "sort_order": 56,
-        "content": """\
-# Settings Hub
-
-![Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings.png)
-
-The Settings Hub is the global configuration centre for the platform. Access it from **⚙️ Settings** in the top nav.
-
-Five tabs: **General**, **Orchestrator**, **LLM**, **Integrations**, **Notifications**.
-
----
-
-## General Tab
-
-Basic platform identity and preferences:
-
-| Setting | Description |
-|---------|-------------|
-| **Platform Name** | Display name shown in the header and emails |
-| **Timezone** | Used for scheduling, metrics timestamps, and cron jobs |
-| **Theme** | Light / Dark / System |
-| **Default Perspective** | Which dashboard perspective loads on login |
-
----
-
-## Orchestrator Tab
-
-![Orchestrator Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-orchestrator.png)
-
-Controls how missions run at the platform level.
-
-### Mission Semaphore
-
-Maximum number of missions that run **in parallel** across all projects.
-
-- **Default:** `3`
-- Increase for high-throughput batch work (up to your LLM rate limit).
-- Decrease to `1` when debugging to avoid interference between missions.
-- The Cockpit's semaphore gauge reflects this value in real time.
-
-### Budget Cap (USD)
-
-Maximum LLM cost allowed for a single mission run.
-
-- **Default:** `0` (unlimited)
-- When a run's cost reaches the cap, it pauses with status `budget_exceeded`.
-- You can raise the cap and resume without losing progress.
-- Set to `$0.50`–`$2.00` for exploratory missions to control spend.
-
-### YOLO Mode
-
-When **enabled**, agents skip human approval gates and run end-to-end autonomously.
-
-- **Disabled (default):** agents pause at review checkpoints and wait for ✅.
-- **Enabled:** full autonomy — no interruptions.
-- Best for: rapid prototyping, trusted pipelines, batch processing.
-- ⚠️ Disable on production-critical projects where oversight is required.
-
-### Auto-Resume Watchdog
-
-Automatically resumes missions that have stalled (no agent output for N minutes).
-
-- **Enable/Disable** toggle.
-- **Timeout threshold** — minutes of inactivity before auto-resume triggers (default: `10`).
-- The watchdog re-dispatches the last active phase with the same context.
-- Prevents missions from hanging due to transient LLM timeouts.
-
----
-
-## LLM Tab
-
-![LLM Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-llm.png)
-
-Configure which LLM providers and models the platform uses.
-
-| Setting | Description |
-|---------|-------------|
-| **Provider Priority** | Ordered list of providers — first available wins |
-| **Default Model** | Model used when no agent-specific override is set |
-| **Fallback Model** | Used when the primary model returns a rate-limit error |
-| **Rate Limit Handling** | `retry` (back-off + retry) or `fallback` (switch provider) |
-| **Max Retries** | How many times to retry a rate-limited request before failing |
-| **Request Timeout** | Seconds before a single LLM request times out |
-
-**Provider setup:** each provider requires an API key, base URL, and optional deployment name. Keys are stored encrypted in the database (never in plaintext files).
-
-**Tips:**
-- Set MiniMax as primary and Azure OpenAI as fallback for cost/resilience balance.
-- Use `retry` mode for providers with burst limits; use `fallback` for strict quotas.
-
----
-
-## Integrations Tab
-
-![Integrations Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-integrations.png)
-
-30+ connectors organized by category.
-
-| Category | Examples |
-|----------|---------|
-| **Source Control** | GitHub, GitLab, Bitbucket, Azure DevOps |
-| **CI/CD** | GitHub Actions, GitLab CI, Jenkins, CircleCI |
-| **Issue Tracking** | Jira, Linear, GitHub Issues, Trello |
-| **Cloud** | AWS, Azure, GCP (credentials for deployment agents) |
-| **Databases** | PostgreSQL, MySQL, MongoDB, Redis |
-| **Communication** | Slack, Microsoft Teams, Discord |
-| **Monitoring** | Datadog, Grafana, PagerDuty, Sentry |
-| **Secrets** | HashiCorp Vault, AWS Secrets Manager |
-
-**How to configure a connector:**
-1. Click the connector card.
-2. Enter the required credentials (token, URL, org/project IDs).
-3. Click **Test Connection** — a green ✅ confirms it works.
-4. Save. The connector is now available to agents as a tool.
-
-Connectors are used by agents automatically when their skill set includes the matching tool category.
-
----
-
-## Notifications Tab
-
-![Notifications Settings](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/settings-notifications.png)
-
-Configure how and when the platform notifies you.
-
-| Channel | Configuration |
-|---------|--------------|
-| **Slack** | Webhook URL + channel name. Events: mission complete, failed, budget exceeded |
-| **Email** | SMTP settings + recipient list. Events: daily digest, critical failures |
-| **Webhook** | HTTP POST to any URL with JSON payload. Fully customizable event filter |
-
-**Event types you can subscribe to:**
-- `mission.completed` — mission finished successfully
-- `mission.failed` — mission failed after max retries
-- `mission.budget_exceeded` — run hit the budget cap
-- `mission.stalled` — watchdog triggered
-- `agent.error` — agent produced an error response
-- `platform.health` — system health alerts
-
-**How to configure Slack:**
-1. Create an incoming webhook in your Slack workspace.
-2. Paste the webhook URL in **Notifications → Slack → Webhook URL**.
-3. Set the channel (e.g. `#engineering-alerts`).
-4. Check the events you want.
-5. Click **Send Test** to verify.
-""",
-    },
-    # ── Mission Cockpit ──────────────────────────────────────────
-    {
-        "slug": "mission-cockpit",
-        "title": "Mission Cockpit",
-        "category": "Guide",
-        "icon": "🚀",
-        "sort_order": 57,
-        "content": """\
-# Mission Cockpit
-
-![Mission Cockpit](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/cockpit.png)
-
-The Mission Cockpit is the real-time control panel for all running missions across the platform.
-
-Access it from **⚡ Cockpit** in the top navigation bar.
-
----
-
-## What you see
-
-### Semaphore Gauge
-
-A circular gauge at the top showing:
-- **Running** — missions currently executing (green slice)
-- **Queued** — missions waiting for a semaphore slot (amber slice)
-- **Cap** — the configured maximum (set in Settings → Orchestrator)
-
-### Mission Pipeline View
-
-Each active mission is shown as a horizontal pipeline row:
-
-```
-[Mission Title]  [Project]  ████░░░░  Phase 3/7  ⏱ 2m 14s  💰 $0.12
-```
-
-Columns: title, project, progress bar, current phase, elapsed time, LLM cost so far.
-
-Click any mission row to open its full session view.
-
-### Per-Mission Controls
-
-Each row has action buttons:
-
-| Button | Action |
-|--------|--------|
-| **⏸ Pause** | Suspend the mission after the current phase completes |
-| **▶ Resume** | Resume a paused mission |
-| **⏹ Stop** | Terminate the mission immediately (marks as `interrupted`) |
-| **🔍 Inspect** | Open the live session transcript |
-| **🔁 Retry** | Re-run the last failed phase |
-
----
-
-## How to use the Cockpit
-
-**Monitor a long-running mission:**
-1. Open Cockpit.
-2. Find your mission in the pipeline view.
-3. Watch the phase progress bar advance.
-4. If it stalls, click **🔍 Inspect** to see what the agent is doing.
-
-**Intervene in a running mission:**
-1. Click **⏸ Pause** to pause after the current phase.
-2. Open **🔍 Inspect** to review the transcript.
-3. Send a correction message in the session.
-4. Click **▶ Resume** to continue.
-
-**Handle a budget warning:**
-- When the cost indicator turns amber (>80% of budget cap), consider pausing and reviewing.
-- If the mission exceeds the cap it stops automatically — raise the cap in Settings and resume.
-
----
-
-## Practical Tips
-
-- Keep the Cockpit open in a side monitor when running batch missions.
-- Use **Pause** rather than **Stop** — paused missions retain all progress.
-- The semaphore gauge tells you at a glance if you're hitting capacity limits.
-- Phase duration spikes often mean an LLM is slow or retrying — check the session transcript.
-- LLM cost shown is cumulative for the current run. See [LLM Cost Tracking](llm-cost-tracking) for full history.
-
----
-
-## Related Pages
-
-- [Missions & SAFe](missions) — mission lifecycle and controls
-- [Settings Hub](settings-hub) — configure semaphore, budget cap, YOLO mode
-- [LLM Cost Tracking](llm-cost-tracking) — understand run costs
-""",
-    },
-    # ── LLM Cost Tracking ────────────────────────────────────────
-    {
-        "slug": "llm-cost-tracking",
-        "title": "LLM Cost Tracking",
-        "category": "Guide",
-        "icon": "💰",
-        "sort_order": 58,
-        "content": """\
-# LLM Cost Tracking
-
-The platform tracks LLM spend per mission run in the `llm_cost_usd` field.
-
----
-
-## How costs are measured
-
-Every LLM call records:
-- **Input tokens** — prompt size (system prompt + context + history)
-- **Output tokens** — agent response size
-- **Cost** — `(input_tokens × input_price + output_tokens × output_price)` per provider pricing
-
-These are summed into `llm_cost_usd` on the run record. The Cockpit shows the running total in real time.
-
----
-
-## Viewing costs in Metrics
-
-![Metrics](https://raw.githubusercontent.com/wiki/macaron-software/software-factory/metrics.png)
-
-1. Go to **Metrics → Analytics**.
-2. The **Missions** table has a **Cost** column showing `llm_cost_usd` per run.
-3. Use the date filter to see costs over a time range.
-4. The **Cost by Provider** chart breaks down spend by LLM provider.
-5. The **Cost by Project** chart shows which projects consume the most budget.
-
----
-
-## Budget Cap
-
-Prevent runaway spend by setting a per-run maximum:
-
-1. Go to **Settings → Orchestrator → Budget Cap (USD)**.
-2. Enter a value, e.g. `1.00`.
-3. Save. New runs will pause and set status `budget_exceeded` when the cap is reached.
-4. To resume: raise the cap (or set to `0` for unlimited) and click **▶ Resume** in the Cockpit.
-
-**Recommended caps by mission type:**
-
-| Mission type | Suggested cap |
-|-------------|--------------|
-| Quick bug fix | $0.25 |
-| Feature implementation | $1.00 |
-| Full module with tests | $3.00 |
-| Architecture review | $2.00 |
-| No cap (trusted pipeline) | $0 (unlimited) |
-
----
-
-## Provider Comparison Tips
-
-Different providers have very different cost profiles:
-
-| Provider | Strength | Cost profile |
-|----------|----------|-------------|
-| **MiniMax M2.5** | Fast, cheap | Very low — good for high-volume missions |
-| **Azure OpenAI (GPT-4o)** | High quality | Medium — use for complex reasoning |
-| **Azure AI (DeepSeek)** | Long context | Low — good for large codebase analysis |
-
-**To minimize costs:**
-- Use MiniMax as primary provider for routine missions.
-- Reserve GPT-4o for review phases that need higher reasoning quality.
-- Set provider priority in **Settings → LLM → Provider Priority**.
-- Keep system prompts concise — input tokens are the biggest cost driver.
-- Use memory to avoid re-sending large context blocks on every turn.
-
----
-
-## Related Pages
-
-- [Settings Hub](settings-hub) — set budget cap and provider priority
-- [Mission Cockpit](mission-cockpit) — real-time cost gauge
-- [Metrics Guide](metrics-guide) — full analytics reference
-- [LLM Providers Guide](llm-guide) — provider configuration
-""",
-    },
-]
-
-# ── French translations ────────────────────────────────────────────────────────
-# Each entry overrides the EN page for French-speaking browsers.
-WIKI_TRANSLATIONS = [
-    {
-        "slug": "getting-started",
-        "lang": "fr",
-        "title": "Premiers pas",
-        "content": """\
-# Premiers pas
-
-Bienvenue dans la **Macaron Software Factory** — une plateforme multi-agents pour l'ingénierie logicielle autonome.
-
-## Démarrage rapide (local)
-
-```bash
-# Cloner et installer
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory/platform
-pip install -r requirements.txt
-
-# Lancer (depuis le répertoire parent — JAMAIS --reload)
-python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
-
-# Ouvrir http://localhost:8099
-```
-
-## Docker
-
-```bash
-git clone https://github.com/macaron-software/software-factory.git
-cd software-factory
-make setup    # construit l'image Docker
-make run      # démarre la plateforme sur le port 8090
-```
-
-## Premiers pas dans l'interface
-
-1. **Compléter l'onboarding** — le premier écran guide la configuration initiale
-2. **Créer un projet** — aller dans Projets → Nouveau projet
-3. **Lancer une mission** — ouvrir le projet et envoyer un message au Lead Agent
-4. **Observer la collaboration** — la vue session affiche la collaboration en temps réel via SSE
-
-## Variables d'environnement
-
-| Variable | Défaut | Description |
-|----------|--------|-------------|
-| `PLATFORM_LLM_PROVIDER` | `minimax` | Fournisseur LLM (minimax, azure-openai, azure-ai) |
-| `PLATFORM_LLM_MODEL` | `MiniMax-M2.5` | Nom du modèle |
-| `PLATFORM_PORT` | `8090` | Port HTTP |
-| `DATABASE_URL` | *(aucun)* | URL PostgreSQL — `postgresql://user:pass@host/db` |
-| `REDIS_URL` | *(aucun)* | URL Redis — `redis://host:6379/0` (optionnel, active le pub/sub) |
-| `PLATFORM_MODE` | `full` | Mode de process : `full`, `factory` (headless) ou `ui` (web uniquement) |
-| `PLATFORM_DB_PATH` | `data/platform.db` | Chemin SQLite (dev uniquement) |
-
-## Points importants
-
-- Ne **jamais** utiliser `--reload` avec uvicorn (conflit avec le module stdlib `platform`)
-- Ne **jamais** faire `import platform` en top-level dans le package
-- Toujours lancer depuis le répertoire parent : `python -m uvicorn platform.server:app ...`
-- `--ws none` est obligatoire (la plateforme utilise SSE, pas WebSocket)
-""",
-    },
-    {
-        "slug": "architecture",
-        "lang": "fr",
-        "title": "Architecture",
-        "content": """\
-# Architecture
-
-## Architecture de production (IHM/Factory découplées)
-
-```
-Navigateur
-  |
-  v
-nginx (port 80/443)  --  commutation blue-green
-  +-- /* --> platform-web-blue/green:8090  (IHM, redémarrable)
-
-platform-web  --Redis sub-->  Redis pub/sub  <--Redis pub--  platform-factory
-                                                                    |
-                                                              PostgreSQL (partagé)
-```
-
-- **platform-factory** — moteur d'agents headless, ne redémarre jamais pour une modif UI
-  - Missions, moteur de patterns, orchestrateur, watchdog, bus A2A
-  - Publie les events sur le canal Redis `a2a:events`
-- **platform-web** (blue/green) — IHM, redémarrable à chaud
-  - Routes web, templates Jinja2, fichiers statiques, flux SSE
-  - S'abonne à Redis `a2a:events` et relaie vers le navigateur via SSE
-- **Redis** — pont pub/sub entre les conteneurs factory et web
-- **PostgreSQL** — stockage persistant partagé
-- **nginx** — commutation blue-green + terminaison TLS
-
-`PLATFORM_MODE` contrôle les sous-systèmes démarrés :
-
-| Mode | Factory (agents/missions) | Web (routes/IHM) | Listener Redis |
-|------|--------------------------|-----------------|----------------|
-| `full` | oui | oui | si REDIS_URL défini |
-| `factory` | oui | non | publisher |
-| `ui` | non | oui | subscriber |
-
-## Stack technique
-
-| Couche | Technologie |
-|--------|-------------|
-| **Frontend** | HTMX + templates Jinja2 + SSE |
-| **Backend** | Python 3.12 + FastAPI + Uvicorn |
-| **Base de données** | PostgreSQL (prod) / SQLite WAL (dev) |
-| **Cache/Pub-sub** | Redis 7 (optionnel, fallback in-memory) |
-| **LLM** | MiniMax M2.5, Azure OpenAI gpt-5-mini, Azure AI |
-| **Outils** | Protocole MCP (fetch, memory, playwright, solaris) |
-| **Déploiement** | Docker + docker-compose sur Azure VM + OVH VPS |
-| **Reverse proxy** | nginx — blue-green + TLS + HSTS |
-| **Auth** | JWT (cookies HttpOnly) |
-| **i18n** | 18 langues via en-tête Accept-Language |
-
-## Architecture des agents
-
-```
-Moteur de patterns (engine.py)
-  |
-  +-- Sequential  : A -> B -> C
-  +-- Parallel    : A | B | C -> fusion
-  +-- Hierarchical: Lead -> [Dev1, Dev2, QA]
-  +-- Loop        : itère jusqu'au critère qualité
-  +-- Router      : dispatch par type de contenu
-  +-- Aggregator  : synthèse de sorties multiples
-  +-- Adversarial : L0 (déterministe) + L1 (garde LLM)
-  +-- Network     : débat / human-in-the-loop
-```
-
-Voir [Patterns d'orchestration](patterns) pour les détails.
-""",
-    },
-    {
-        "slug": "deployment",
-        "lang": "fr",
-        "title": "Guide de déploiement",
-        "content": """\
-# Guide de déploiement
-
-## Environnements
-
-| Environnement | URL | Serveur | Mode |
-|---------------|-----|---------|------|
-| Dev local | http://localhost:8099 | macOS, Python 3.12 | full |
-| OVH Démo | http://54.36.183.124 | VPS Debian | full |
-| Azure Prod | https://sf.macaron-software.com | Azure VM D4as_v5 4CPU/16GB | factory + web blue/green |
-
-## Développement local
-
-```bash
-cd software-factory/platform
-pip install -r requirements.txt
-
-# Lancer (JAMAIS --reload, TOUJOURS --ws none, depuis le répertoire parent)
-python -m uvicorn platform.server:app --port 8099 --ws none --log-level warning
-
-# Tests
-python -m pytest tests/ -v                  # tests unitaires + intégration
-cd tests/e2e && npx playwright test         # tests E2E (82+)
-```
-
-## Azure Prod — Déploiement Blue-Green
-
-Architecture : nginx -> commutation blue/green. La factory ne redémarre jamais pour une modif UI.
-
-```
-nginx:443 -> platform-web-blue:8090  (actif)
-          -> platform-web-green:8090 (standby)
-platform-factory:8091               (moteur headless toujours actif)
-redis:6379                          (pont pub/sub)
-postgres:5432                       (DB partagée)
-```
-
-### Déploiement complet (rsync + rebuild)
-
-```bash
-SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
-rsync -azP --delete \\
-  --exclude='__pycache__' --exclude='*.pyc' --exclude='data/' --exclude='.git' \\
-  platform/ -e "ssh -i $SSH_KEY" azureadmin@4.233.64.30:/opt/macaron/platform/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \\
-  "cd /opt/macaron && docker compose --env-file .env \\
-   -f platform/deploy/docker-compose-vm.yml up -d --build --no-deps platform"
-```
-
-### Hotpatch (sans rebuild, sans arrêt de la factory)
-
-```bash
-tar cf /tmp/update.tar web/templates/ web/static/ web/routes/
-scp -i "$SSH_KEY" /tmp/update.tar azureadmin@4.233.64.30:/tmp/
-ssh -i "$SSH_KEY" azureadmin@4.233.64.30 \\
-  "docker cp /tmp/update.tar deploy-platform-1:/tmp/ && \\
-   docker exec deploy-platform-1 bash -c 'cd /app/macaron_platform && tar xf /tmp/update.tar' && \\
-   docker restart deploy-platform-1"
-```
-
-## OVH Démo
-
-```bash
-ssh debian@54.36.183.124
-cd /opt/software-factory
-docker compose pull && docker compose up -d
-```
-
-CI/CD : GitHub Actions `.github/workflows/deploy-demo.yml`
-Secrets : `OVH_SSH_KEY`, `OVH_IP`
-
-## CI/CD
-
-| Pipeline | Déclencheur | Actions |
-|----------|-------------|---------|
-| `.github/workflows/deploy-demo.yml` | push sur `main` | rsync + docker restart sur OVH |
-| `.gitlab-ci.yml` | push sur `main` | rsync + docker build sur Azure |
-
-Déploiement intelligent : si le diff est limité à `web/templates/`, `web/static/`, `web/routes/`, la factory n'est PAS redémarrée.
-""",
-    },
-    {
-        "slug": "resilience",
-        "lang": "fr",
-        "title": "Résilience & Stabilité",
-        "content": """\
-# Résilience & Stabilité
-
-## Pool de connexions PostgreSQL
-
-La plateforme utilise `psycopg_pool.ConnectionPool` (pool synchrone psycopg3) avec un serveur FastAPI asyncio.
-
-| Conteneur | Taille du pool | Notes |
-|-----------|---------------|-------|
-| platform-factory | 20 | Exécute missions, watchdog, auto-resume, auto-heal en parallèle |
-| platform-web (blue/green) | 5 | Lecture dominante, charge plus légère |
-
-### Prévention des fuites de connexions
-
-Toutes les connexions DB DOIVENT suivre ce modèle :
-
-```python
-db = None
-try:
-    db = get_db()
-    # ... travail ...
-finally:
-    if db:
-        db.close()   # retourne la connexion au pool via putconn()
-```
-
-Un bloc `finally` manquant = connexion jamais retournée en cas d'exception.
-`PgConnectionWrapper` dispose d'un filet de sécurité GC via `__del__`, mais le GC est non-déterministe.
-
-### Symptômes d'épuisement du pool
-
-```
-PoolTimeout: couldn't get a connection after 15.00 sec
-```
-
-Vérifier avec : `SELECT count(*), state FROM pg_stat_activity GROUP BY state;`
-
-## Failover nginx Blue-Green
-
-L'upstream nginx utilise une commutation blue-green avec health check :
-
-```nginx
-upstream platform_web {
-    server platform-blue:8090  max_fails=3 fail_timeout=10s;
-    server platform-green:8090 max_fails=3 fail_timeout=10s backup;
-}
-```
-
-Endpoint de santé : `GET /health` retourne `{"status": "ok"}` avec HTTP 200.
-
-## Découplage IHM / Factory
-
-**Problème :** Redémarrer le conteneur web pour déployer une modif UI interrompait les missions en cours.
-
-**Solution :** `PLATFORM_MODE` divise le processus :
-
-- `factory` : démarre agents/missions/orchestrateur, publie sur Redis, pas de routes HTTP
-- `ui` : démarre routes web/templates/SSE, s'abonne à Redis pour les events, pas d'exécution d'agents
-- `full` : les deux (défaut, pour dev ou déploiements simples)
-
-Canal Redis pub/sub : `a2a:events` — factory publie, web s'abonne et relaie vers le SSE navigateur.
-Fallback : si `REDIS_URL` n'est pas défini, bascule sur le bus in-memory (mode `full` uniquement).
-
-## Suite de tests de stabilité
-
-Emplacement : `platform/tests/test_stability.py`. Lancer avec :
-
-```bash
-STABILITY_TESTS=1 \\
-STABILITY_AZ_HOST=https://sf.macaron-software.com \\
-STABILITY_OVH_HOST=http://54.36.183.124 \\
-python -m pytest tests/test_stability.py -v -m stability
-```
-
-| Test | Ce qu'il vérifie |
-|------|-----------------|
-| `test_health_az/ovh` | `/health` retourne 200 |
-| `test_latency_p99` | p99 < 3s sur 20 requêtes |
-| `test_concurrent_10/50` | 10/50 requêtes concurrentes, < 5% d'erreurs |
-| `test_rate_limit` | 429 retourné quand la limite est dépassée |
-| `test_pages_smoke` | 8 pages clés retournent 200 |
-| `test_sse_connect` | Le flux SSE se connecte et envoie le keepalive `:ping` |
-| `test_disk_memory` | disque < 90%, mémoire < 90% |
-| `test_hot_restart` | redémarrage du conteneur, service de retour en < 30s |
-| `test_nginx_failover` | arrêt blue, nginx bascule sur green, retour en < 10s |
-| `test_cold_restart` | redémarrage complet du serveur, service de retour en < 120s |
-| `test_chaos_pause_resume` | docker pause/unpause du conteneur mission |
-
-## Auto-Heal
-
-`ops/auto_heal.py` surveille la santé de la plateforme toutes les 60s et crée des incidents P1/P2 pour :
-
-- Échecs de fournisseur LLM (bascule automatique de provider)
-- Épuisement du pool PG (log d'alerte, déclenchement d'incident)
-- Mémoire du conteneur > 90% (crée un incident P0)
-
-Les incidents sont visibles dans `/toolbox` sous l'onglet Incidents.
-""",
-    },
-    {
-        "slug": "user-guide",
-        "lang": "fr",
-        "title": "Guide utilisateur",
-        "content": """\
-# Guide utilisateur
-
-## Tableau de bord
-
-Personnalisé par perspective : **DSI** (portfolio), **Produit** (backlog), **Engineering** (sessions), **Scrum Master** (vélocité).
-
-## Projets
-
-1. Aller dans **Projets** → **Nouveau projet**
-2. Renseigner le nom, la description, choisir une couleur
-3. Choisir le Lead Agent, configurer Git (optionnel)
-4. Utiliser le chat pour envoyer des missions
-
-## Missions
-
-- **Flux de statut** : planning → active → review → completed
-- Chaque mission a des runs (tentatives) avec des phases (étapes agents)
-
-## Sessions
-
-Collaboration d'agents en direct avec streaming SSE temps réel, code couleur par rôle.
-
-## Backlog & Idéation
-
-- **Backlog** : features priorisées par WSJF
-- **Idéation** : brainstorming multi-agents — taper un prompt, les agents collaborent
-
-## Métriques
-
-| Onglet | Contenu |
-|--------|---------|
-| **DORA** | Fréquence de déploiement, lead time, taux d'échec, MTTR |
-| **Qualité** | Scores de qualité de code, couverture de tests, sécurité |
-| **Analytics** | Stats missions, performance des agents, santé du système |
-| **Monitoring** | CPU, mémoire, latence des requêtes en temps réel |
-| **Pipeline** | Performance des pipelines CI/CD |
-
-## Boîte à outils
-
-| Onglet | Contenu |
-|--------|---------|
-| **Skills** | Bibliothèque de compétences des agents |
-| **Memory** | Navigateur de mémoire persistante |
-| **MCPs** | Gestion des serveurs MCP |
-| **API** | Documentation Swagger interactive |
-| **CLI** | Terminal web |
-| **Design System** | Référence des composants UI |
-| **Wiki** | Cette documentation |
-
-## Raccourcis clavier
-
-| Raccourci | Action |
-|-----------|--------|
-| `Ctrl+K` | Recherche rapide |
-| `Ctrl+Enter` | Envoyer un message |
-| `Esc` | Fermer un modal |
-""",
-    },
-    # ── Annotation Studio ─────────────────────────────────────────────────
-    {
-        "slug": "annotation-studio-safe-traceability",
-        "title": "Annotation Studio — Feedback Visuel & Traçabilité SAFe",
-        "category": "Guide",
-        "icon": "✏️",
-        "sort_order": 59,
-        "content": """\
-# Annotation Studio — Feedback Visuel & Traçabilité SAFe
-
-## Vue d'ensemble
-
-L'**Annotation Studio** est un layer de feedback visuel intégré à la Software Factory.
-Il permet à n'importe quel utilisateur (PM, designer, développeur, QA, stakeholder) d'annoter
-directement les pages de la plateforme sans quitter l'interface.
-
-Il s'auto-applique à la SF elle-même via le projet réservé `_sf` (rétro-ingénierie SAFe complète).
-
----
-
-## Activation
-
-Deux boutons sont disponibles dans la topbar de chaque page :
-
-| Icône | Action | Résultat |
-|-------|--------|----------|
-| 👤 Persona | Barre de traçabilité SAFe | Affiche Programme → Epic → Feature → Stories pour la page courante |
-| ⊞ Wireframe | Mode wireframe | Remplace le contenu par un squelette/shimmer pour inspection UX |
-
-### Mode Annotation
-
-Cliquez sur **✏️ Annoter** (bas-droite) pour activer le mode annotation :
-- Tous les clics sont interceptés (navigation bloquée)
-- Une bannière bleue confirme que le mode est actif
-- Cliquez sur n'importe quel élément → popover de saisie
-
----
-
-## Types d'annotations
-
-| Type | Usage |
-|------|-------|
-| Bug 🐛 | Défaut fonctionnel, comportement incorrect |
-| Commentaire 💬 | Note, question, suggestion libre |
-| Feature ✨ | Demande d'une nouvelle fonctionnalité |
-| Design 🎨 | Problème visuel, alignement, couleur |
-| Texte 📝 | Correction de copie, traduction |
-
-Chaque annotation capture : sélecteur CSS, texte visible, styles computed, URL + timestamp.
-
----
-
-## Barre de traçabilité SAFe
-
-La barre affiche la hiérarchie SAFe de la page courante :
-
-```
-┌─────────────────┬──────────────────┬──────────────────┬──────────────────────┐
-│   Programme     │      Epic        │     Feature      │   Stories / Tasks    │
-│ Software Factory│ Backlog & Planning│  Product Backlog │ · Prioriser stories  │
-│                 │                  │  status: active  │ · Affiner le backlog │
-│                 │                  │                  │ · Filtrer par epic   │
-└─────────────────┴──────────────────┴──────────────────┴──────────────────────┘
-  Persona: Product Owner  |  /backlog  |  ✏️ Annoter cette page  |  Backlog SAFe
-```
-
----
-
-## Rétro-ingénierie — Mapping SAFe de la SF
-
-Script : `platform/scripts/retro_sf_safe.py`
-
-La hiérarchie SAFe de la SF couvre **49 écrans** répartis en **8 epics** :
-
-| Epic | Features | Pages couvertes |
-|------|----------|-----------------|
-| Orchestration & Missions | 4 | /, /cockpit, /mission-control, /art, /live |
-| SAFe Backlog & Planning | 4 | /portfolio, /pi, /backlog, /projects |
-| Agent Factory | 4 | /agents, /skills, /workflows, /patterns |
-| Monitoring & Quality | 5 | /monitoring, /analytics, /quality, /memory, /ops |
-| Product Discovery | 3 | /ideation, /product-line, /generate |
-| Integrations & Marketplace | 3 | /marketplace, /mcps, /metier |
-| Platform Administration | 4 | /settings, /admin/users, /org, /notifications |
-| UX & Annotation Studio | 2 | /annotate, /design-system |
-
-**Total** : 8 epics · 29 features · 91 user stories · 49 écrans
-
-Pour ré-exécuter la rétro-ingénierie :
-```bash
-python3 platform/scripts/retro_sf_safe.py
-```
-
----
-
-## Mode Wireframe
-
-Le mode wireframe transforme les pages en squelette UX :
-
-- **TreeWalker** : parcourt les nœuds texte feuilles → `.sf-skel-bar` (shimmer)
-- **Blocs** : images, inputs, iframes → `.sf-skel-block`
-- **Périmètre** : `.main-area` uniquement (sidebar/topbar inchangées)
-- **Restauration** : `removeSkeleton()` restaure les nœuds DOM originaux
-- **Thème** : shimmer utilise `var(--bg-secondary/tertiary/border)` → light/dark compatible
-
----
-
-## API Endpoints
-
-| Endpoint | Méthode | Description |
-|----------|---------|-------------|
-| `/api/projects/{id}/annotations` | GET | Liste des annotations |
-| `/api/projects/{id}/annotations` | POST | Créer une annotation |
-| `/api/projects/{id}/annotations/{ann_id}` | PATCH | Mettre à jour |
-| `/api/projects/{id}/annotations/{ann_id}` | DELETE | Supprimer |
-| `/api/projects/{id}/annotations/export` | GET | Export JSON/CSV |
-| `/api/projects/{id}/screens/{screen_id}/traceability` | GET | SAFe traceability |
-| `/api/projects/{id}/screens/{screen_id}` | PATCH | Lier écran ↔ feature |
-
----
-
-## Architecture technique
-
-```
-sf-annotate.js (chargé sur toutes les pages via base.html)
-├── buildToolbar()       — barre flottante bas-droite (CSS vars)
-├── toggleAnnotate()     — active/désactive le mode + bannière
-├── captureClick()       — intercepte les clics (capture phase)
-├── showPopover()        — popover de saisie (CSS vars, thème-adaptatif)
-├── saveAnnotation()     — POST /api/projects/_sf/annotations
-└── renderMarkers()      — affiche les markers sur la page
-
-base.html
-├── toggleSpecBar()      — barre SAFe (Programme|Epic|Feature|Stories)
-├── loadSpecData()       — fetch traceability API → populate cards
-└── toggleWireframeMode() — TreeWalker skeleton + CSS vars shimmer
-```
-
-## Fichiers clés
-
-| Fichier | Rôle |
-|---------|------|
-| `platform/web/static/sf-annotate.js` | Toolbar, popover, markers, API calls |
-| `platform/web/templates/base.html` | SAFe bar, wireframe mode, topbar buttons |
-| `platform/web/templates/annotate.html` | Studio standalone `/annotate/{project_id}` |
-| `platform/web/routes/api/screens.py` | Endpoints annotation + traceability |
-| `platform/scripts/retro_sf_safe.py` | Rétro-ingénierie SAFe de la SF |
-| `platform/db/migrations.py` | Table `epics` (programme_id, name, description) |
 """,
     },
 ]

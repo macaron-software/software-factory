@@ -14,14 +14,13 @@ Cette plateforme permet l'orchestration d'agents IA autonomes pour accompagner l
 
 Elle s'inscrit dans le cadre de la demarche **UDD IA Native** et suit la methodologie SAFe (Scaled Agile Framework).
 
-### Chiffres cles v3.1.0
+### Chiffres cles v3.0.0
 
 - 191 agents IA specialises
 - 33 equipes agents
 - 10 ARTs (Agile Release Trains)
 - 8 groupes d'ideation sur la page d'accueil
 - 36 workflows de ceremonie
-- Cluster multi-noeuds PostgreSQL (master/slave)
 
 ---
 
@@ -141,88 +140,9 @@ Espaces de noms isoles avec donnees, agents et memoire separes. Permet d'onboard
 <img src="docs/screenshots/fr/tool_builder.png" alt="Constructeur Outils" width="100%">
 </td>
 </tr>
-<tr>
-<td width="50%">
-<strong>Centre de Configuration — Concurrence, Budget & Mode YOLO (/settings)</strong><br>
-<img src="docs/screenshots/fr/settings.png" alt="Paramètres" width="100%">
-</td>
-<td width="50%">
-<strong>Cockpit de Mission — Centre de Commandement Temps Réel (/cockpit)</strong><br>
-<img src="docs/screenshots/fr/cockpit.png" alt="Cockpit Mission" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Tableau de Bord Missions — Toutes Missions & Exécutions (/missions)</strong><br>
-<img src="docs/screenshots/fr/missions.png" alt="Tableau des Missions" width="100%">
-</td>
-<td width="50%">
-<strong>Mémoire & Connaissance — RAG 4 Couches (/memory)</strong><br>
-<img src="docs/screenshots/fr/memory.png" alt="Mémoire" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>Workflows — 36 Pipelines Intégrés (/workflows)</strong><br>
-<img src="docs/screenshots/fr/workflows.png" alt="Workflows" width="100%">
-</td>
-<td width="50%">
-<strong>OPS — Auto-Réparation & Infrastructure (/ops)</strong><br>
-<img src="docs/screenshots/fr/ops.png" alt="Dashboard OPS" width="100%">
-</td>
-</tr>
-<tr>
-<td width="50%">
-<strong>RBAC — Contrôle d'Accès Basé sur les Rôles (/rbac)</strong><br>
-<img src="docs/screenshots/fr/rbac.png" alt="RBAC" width="100%">
-</td>
-<td width="50%">
-<strong>Backlog Produit — Epics, Features & Stories (/backlog)</strong><br>
-<img src="docs/screenshots/fr/backlog.png" alt="Backlog" width="100%">
-</td>
-</tr>
 </table>
 
 ---
-
-### Centre de Configuration — Settings Hub
-
-Configuration centralisée à `/settings` :
-
-- **Concurrence des missions** — ajustez le sémaphore d'exécution (1–10 missions parallèles) en direct
-- **Plafond budgétaire** — budget LLM maximum par run ; les runs dépassant le budget sont mis en pause
-- **Watchdog d'auto-reprise** — reprend automatiquement les missions en pause au redémarrage
-- **Mode YOLO** — désactivez la validation pour des runs totalement autonomes
-- **Persistant** — tous les paramètres stockés en DB, survivent aux redémarrages
-
-### Cockpit de Mission
-
-Centre de commandement temps réel à `/cockpit` :
-
-- **Vue pipeline en direct** — idéation → missions → en cours → tests → déployé
-- **Statut par mission** — agent, appels outils en cours, coût LLM accumulé
-- **Jauge sémaphore** — slots libres vs occupés en un coup d'œil
-- **Contrôles rapides** — pause, reprise, annulation de toute mission depuis le cockpit
-
-### Suivi des Coûts LLM par Mission
-
-Visibilité granulaire des dépenses par run :
-
-- **`llm_cost_usd` par run** — chaque exécution enregistre le coût LLM exact en USD
-- **Alertes budgétaires** — avertissement ou arrêt forcé quand une mission atteint son plafond
-- **Comparaison de fournisseurs** — comparez le coût de la même tâche entre les fournisseurs configurés
-- **Tableaux de bord cumulatifs** — agrégation des coûts par projet, sprint ou plage de dates
-
-### Studio d'Annotation — Revue Visuelle Collaborative
-
-Une couche d'annotation visuelle intégrée pour les revues, la qualité UX et la traçabilité SAFe :
-
-- **Bouton ✏️ Annoter** — active le mode annotation sur n'importe quelle page
-- **Clic pour annoter** — cliquez sur tout élément : bug, commentaire, feature ou correction de texte
-- **Barre de traçabilité SAFe** — affiche **Programme → Epic → Feature → Stories** pour la page courante
-- **Mode wireframe** — vue squelette/shimmer pour inspection UX sans contenu
-- **Génération de tickets** — chaque annotation crée une mission de correction en un clic
-- **Thème adaptatif** — fonctionne en mode clair et sombre
 
 ## Intelligence Adaptative
 
@@ -334,36 +254,6 @@ LLM_API_KEY=...
 LLM_ENDPOINT=https://<endpoint-interne>/
 DATABASE_URL=postgresql://user:password@localhost:5432/software_factory
 ```
-
----
-
-## Nouveautes v3.1.0 (mars 2026)
-
-### Cluster multi-noeuds
-
-- **Topologie master/slave** — IHM + SSE sur le master uniquement ; appels API repartis via nginx `least_conn`
-- **PostgreSQL partage** — 100 % PostgreSQL, zero SQLite ; tous les noeuds partagent la meme base de donnees
-- **Failover passif** — nginx marque un noeud HS apres 3 echecs ; basculement automatique sur les noeuds sains
-- **Registre de noeuds** — table `platform_nodes` : role, mode, URL, CPU%, MEM%, version, heartbeat
-- **Badges live topbar** — chaque noeud affiche comme badge colore (vert = en ligne, rouge = inactif) avec popover diagnostics au clic
-- **Outil `platform_cluster`** — Jarvis peut interroger la sante du cluster et la repartition de charge
-
-### Securite & Sandbox
-
-- **Sandbox Landlock** — execution shell des agents confinee au workspace via Linux Landlock LSM
-- **Onglet Securite** — activer/desactiver la sandbox depuis Parametres → Securite
-- **Outils pentest** — nmap, subfinder, whatweb, schemathesis, injection SQL, detection SSRF
-
-### Qualite & LLM
-
-- **Durcissement qualite code** — SAST + complexite cyclomatique injectes dans le contexte avant chaque revue
-- **Resume de contexte DeerFlow** — compression recursive + extraction memoire (arXiv:2503.09516)
-- **Routage multi-modeles** — `gpt-5.2` raisonnement, `gpt-5.2-codex` code/TDD, `gpt-5-mini` discussion/docs
-
-### Plateforme & SAFe
-
-- **Terminologie SAFe** — missions renommees en epics dans l'interface ; stats portfolio en termes SAFe
-- **Escalade infra** — `ft-infra-lead` lance automatiquement si outils de build manquants
 
 ---
 

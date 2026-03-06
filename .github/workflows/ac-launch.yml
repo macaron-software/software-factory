@@ -35,64 +35,41 @@ jobs:
           set -e
           echo "=== AC Cycle Status ==="
           
-          # Get API key — query PostgreSQL DB via process env DATABASE_URL
-          API_KEY=""
-          echo "Searching for API key..."
-          
-          PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
-          DB_URL=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^DATABASE_URL=" | cut -d= -f2- | head -1)
-          
-          if [ -n "$DB_URL" ]; then
-            # Try existing API key
-            KEY=$(psql "$DB_URL" -t -c "SELECT key FROM platform_api_keys WHERE active=true LIMIT 1;" 2>/dev/null | tr -d ' \n' || true)
-            if [ -n "$KEY" ]; then
-              API_KEY="$KEY"
-              echo "Got existing API key from DB"
-            else
-              # Create temp key
-              TEMP_KEY="gh-dispatch-$(date +%s)"
-              psql "$DB_URL" -c "INSERT INTO platform_api_keys (key, name, active, created_at) VALUES ('$TEMP_KEY', 'gh-dispatch', true, NOW()) ON CONFLICT DO NOTHING;" 2>/dev/null || true
-              CHECK=$(psql "$DB_URL" -t -c "SELECT COUNT(*) FROM platform_api_keys WHERE key='$TEMP_KEY';" 2>/dev/null | tr -d ' \n' || echo "0")
-              if [ "$CHECK" = "1" ]; then
-                API_KEY="$TEMP_KEY"
-                echo "Created temp API key"
-              else
-                # Show tables for debugging
-                echo "DB tables: $(psql "$DB_URL" -t -c "\dt" 2>/dev/null | grep -E "api|key|user|auth" | head -5)"
-                # Get admin user email for JWT login
-                ADMIN_EMAIL=$(psql "$DB_URL" -t -c "SELECT email FROM users WHERE role='admin' LIMIT 1;" 2>/dev/null | tr -d ' \n' || true)
-                echo "Admin email found: $([ -n "$ADMIN_EMAIL" ] && echo $ADMIN_EMAIL || echo 'none')"
-              fi
-            fi
-          else
-            echo "No DATABASE_URL in process env"
-          fi
-          
-          echo "API key found: $([ -n "$API_KEY" ] && echo 'YES' || echo 'NO')"
-          
+          # Detect platform port
           BASE_URL="http://localhost:8091"
-          
-          # Detect actual platform port
-          echo ""
-          echo "=== Process & Port Detection ==="
-          ss -tlnp 2>/dev/null | grep -E "LISTEN.*:80|:88|:89|:90|:30|:81|:82" || true
-          PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
-          DOCKER_ID=$(docker ps --format "{{.ID}} {{.Ports}}" 2>/dev/null | grep -E "80|88|89|90" | head -3 || true)
-          echo "Uvicorn PID: $PLATFORM_PID"
-          echo "Docker containers: $DOCKER_ID"
-          
-          # Try common ports
-          for PORT in 8091 8090 8099 8080 80 3000; do
+          for PORT in 8091 8090 8099 8080 80; do
             RESP=$(curl -sf --max-time 2 "http://localhost:$PORT/api/health" 2>/dev/null)
             if echo "$RESP" | grep -q '"status"'; then
               BASE_URL="http://localhost:$PORT"
-              echo "Platform found at port $PORT"
+              echo "Platform on port $PORT"
               break
             fi
           done
           echo "Using: $BASE_URL"
           
-          # Helper function: curl with optional auth, never fails script
+          # JWT login with admin credentials
+          API_KEY=""
+          LOGIN_RESP=$(curl -s -X POST "$BASE_URL/auth/login" \
+            -H "Content-Type: application/json" \
+            -d '{"email":"admin@demo.local","password":"demo-admin-2026"}' 2>/dev/null || echo "{}")
+          JWT=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))" 2>/dev/null || true)
+          if [ -n "$JWT" ]; then
+            API_KEY="$JWT"
+            echo "JWT login: OK"
+          else
+            # Fallback: try MACARON_API_KEY from process env
+            PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
+            if [ -n "$PLATFORM_PID" ]; then
+              MACRO_KEY=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^MACARON_API_KEY=" | cut -d= -f2- | head -1)
+              if [ -n "$MACRO_KEY" ]; then
+                API_KEY="$MACRO_KEY"
+                echo "Got MACARON_API_KEY from process env"
+              fi
+            fi
+            echo "JWT login: FAILED — ${LOGIN_RESP:0:100}"
+          fi
+          
+          # Helper: curl with JWT bearer, never fails script
           do_api() {
             METHOD="$1"; URL="$2"; shift 2
             if [ -n "$API_KEY" ]; then
