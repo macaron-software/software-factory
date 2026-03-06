@@ -295,13 +295,20 @@ ROLE_TOOL_MAP["cto"] = delegation tools only (NO developer tools)
 
 ## ADAPTIVE INTELLIGENCE
 ```
-Layer 1 LIVE   Thompson Sampling   agents/selection.py     per-agent-slot Beta bandit
-Layer 2 PLAN   Genetic Algorithm   agents/evolution.py     nightly workflow evolution
-Layer 3 PLAN   Reinforcement Learning agents/rl_policy.py  mid-mission pattern adapt
+Thompson Sampling  agents/selection.py      per-agent-slot Beta bandit · wins/losses per skill variant
+Darwin Teams       agents/darwin.py         teams/patterns/orgs mis en concurrence → élimine le plus mauvais
+Evolution (GA)     agents/evolution.py      workflows évoluent par GA (genome=PhaseSpec[]) → garde les + perf
+RL                 agents/rl_policy.py      points +/- sur workflows/teams/agents/skills → Q-learning adapt
+Skills Health      agents/skill_health.py   challenge skills: outils déterministes + juge LLM → améliore
+Amélioration Continue  web/routes/pages.py  projets pilotes bout-en-bout en cycles · team agents améliore
+                       via métriques + tools + adversarial + GA + RL + SkillHealth
 ```
 **Thompson:** Beta(accepted+1, rejected+1) · cold-start <5 iter → uniform [0.4,0.6]
-**GA:** genome=PhaseSpec[] · fitness=success_rate×quality · population=40 · nightly 02:00
+**Darwin:** tournoi inter-équipes · élimine bottom-N · remplace par mutation du top · intervalle configurable
+**Evolution:** genome=PhaseSpec[] · fitness=success_rate×quality · population=40 · nightly 02:00
   leader election: only one node runs GA (Redis SETNX)
 **RL:** Q-learning · state=(wf_hash, phase_idx, reject_pct, quality) · ε=0.1
-**DB:** agent_scores · evolution_proposals · evolution_runs · rl_experience
+**Skills Health:** Lighthouse · axe · lint · tests · adversarial 14D · traçabilité
+**AC king:** 8 projets pilotes (simple→enterprise+games+migration) · 20 cycles max · metrics agrégées
+**DB:** agent_scores · evolution_proposals · evolution_runs · rl_experience · ac_cycles · ac_project_state
 
