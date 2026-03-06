@@ -1138,7 +1138,7 @@
         <rect width="1000" height="500" fill="#0f172a" rx="10"/>
 
         <!-- Title -->
-        <text x="500" y="24" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="bold">BOUCLE AMÉLIORATION CONTINUE — CYCLE COMPLET</text>
+        <text x="500" y="24" text-anchor="middle" fill="#e2e8f0" font-size="12" font-weight="bold">BOUCLE AMÉLIORATION CONTINUE — 7 PHASES + INTELLIGENCE FEEDBACK</text>
         <line x1="50" y1="30" x2="950" y2="30" stroke="#1e293b" stroke-width="1"/>
 
         <!-- === TOP ROW: 5 phases ============================================= -->
@@ -1194,7 +1194,30 @@
         <line x1="710" y1="84" x2="746" y2="84" stroke="#6b7280" stroke-width="1.5" marker-end="url(#aac)"/>
         <!-- VETO loop back -->
         <path d="M460 120 Q460 148 350 148 Q280 148 280 124" fill="none" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#aac)"/>
-        <text x="380" y="162" text-anchor="middle" fill="#ef4444" font-size="7">VETO → retour TDD sprint</text>
+        <text x="355" y="162" text-anchor="middle" fill="#ef4444" font-size="7">VETO → retour TDD sprint</text>
+
+        <!-- === POST-SPRINT HARDENING: phases 6 & 7 ============================= -->
+        <text x="770" y="128" text-anchor="middle" fill="#475569" font-size="7" font-weight="bold">POST-SPRINT HARDENING</text>
+        <!-- Phase 6: Refactoring -->
+        <rect x="575" y="132" width="185" height="48" rx="5" fill="#1e293b" stroke="#06b6d4" stroke-width="1.5"/>
+        <rect x="575" y="132" width="185" height="14" rx="5" fill="#164e63"/>
+        <text x="667" y="143" text-anchor="middle" fill="#67e8f9" font-size="7.5" font-weight="bold">6. REFACTORING</text>
+        <text x="667" y="156" text-anchor="middle" fill="#94a3b8" font-size="6.5">ac-refactor · code smells · tech debt</text>
+        <text x="667" y="166" text-anchor="middle" fill="#94a3b8" font-size="6.5">perf · dead code · deps · CC</text>
+        <text x="667" y="176" text-anchor="middle" fill="#06b6d4" font-size="6">refactoring_score → RL reward</text>
+        <!-- Phase 7: Security -->
+        <rect x="775" y="132" width="185" height="48" rx="5" fill="#1e293b" stroke="#f43f5e" stroke-width="1.5"/>
+        <rect x="775" y="132" width="185" height="14" rx="5" fill="#4c0519"/>
+        <text x="867" y="143" text-anchor="middle" fill="#fda4af" font-size="7.5" font-weight="bold">7. SECURITY — SecureByDesign</text>
+        <text x="867" y="156" text-anchor="middle" fill="#94a3b8" font-size="6.5">ac-security · 25 contrôles · OWASP</text>
+        <text x="867" y="166" text-anchor="middle" fill="#94a3b8" font-size="6.5">NIST CSF · ISO 27001 · CIS v8</text>
+        <text x="867" y="176" text-anchor="middle" fill="#f43f5e" font-size="6">VETO si score &lt; 60 (critique)</text>
+        <!-- Flow: Phase 5 CI/CD → Phase 7 Security -->
+        <line x1="820" y1="120" x2="867" y2="132" stroke="#f43f5e" stroke-width="1.2" marker-end="url(#aac)"/>
+        <!-- Flow: Phase 7 → Phase 6 (left) -->
+        <line x1="775" y1="156" x2="762" y2="156" stroke="#6b7280" stroke-width="1.2" marker-end="url(#aac)"/>
+        <!-- Flow: Phase 6 → Intelligence layer -->
+        <line x1="667" y1="180" x2="667" y2="185" stroke="#06b6d4" stroke-width="1.2" marker-end="url(#aac-b)"/>
 
         <!-- === INTELLIGENCE LAYER (middle) =================================== -->
         <rect x="15" y="185" width="970" height="22" rx="4" fill="#1e293b"/>

@@ -8,9 +8,10 @@ Provider : azure-openai
 
 ## Mission
 Analyser le code produit par le TDD Sprint sur 12 dimensions critiques.
+Les dimensions 13 (refactoring) et 14 (secure_by_design) sont évaluées dans les phases 6 et 7 dédiées (ac-refactor, ac-security) et reportées ici pour consolidation.
 Chaque dimension est scorée de 0 à 100 avec verdict pass/warn/fail et findings précis.
 
-## Les 12 dimensions
+## Les 12 dimensions (phases 1-5) + 2 phases dédiées (6-7)
 
 ### 1. SÉCURITÉ (seuil fail < 60)
 - Secrets dans le code (tokens, passwords, clés API en dur)
@@ -92,6 +93,8 @@ Fichier `ADVERSARIAL_{N}.md` dans le workspace :
 [par dimension]
 ## Veto
 VETO si : sécurité < 60, honnêteté < 60, no-slop < 60, no-mock-data < 60, no-hardcode < 60, qualité-tests < 60, traçabilité < 60
+Phase 6 (ac-refactor) : VETO si refactoring < 60
+Phase 7 (ac-security) : VETO si secure_by_design < 60 (SecureByDesign 25 contrôles)
 ```
 
 ## Tools autorisés

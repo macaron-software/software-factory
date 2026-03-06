@@ -3,12 +3,18 @@ platform/ac/reward.py — Unified reward function for AC improvement cycles.
 
 R ∈ [-1.0, +1.0] combining:
   - quality       40%  total_score/100
-  - adversarial   30%  weighted average of 12 dimensions (critical x2)
+  - adversarial   30%  weighted average of 14 dimensions (critical x2)
   - traceability  15%  traceability_score/100
   - efficiency    10%  penalty for veto count and TDD iterations
   - regression     5%  penalty if score dropped vs previous cycle
 
 Hard constraint: if ANY critical dimension < 60 → R = -1.0 (absolute veto)
+
+Adversarial dimensions (14 total):
+  Critical (weight=2.0, veto < 60): security, honesty, no_slop, no_mock_data,
+    no_hardcode, test_quality, traceability, secure_by_design
+  Warning (weight=1.0): architecture, fallback, over_engineering,
+    observability, resilience, refactoring
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ _CRITICAL_DIMS = {
     "no_hardcode",
     "test_quality",
     "traceability",
+    "secure_by_design",  # SecureByDesign 25-control audit (securebydesign.saccessa.com)
 }
 CRITICAL_THRESHOLD = 60  # below this → R = -1.0
 
@@ -38,6 +45,7 @@ _WARNING_DIMS = {
     "over_engineering",
     "observability",
     "resilience",
+    "refactoring",  # AC Refactor phase — code smells, tech debt, performance
 }
 
 # Total weight denominator for normalization
