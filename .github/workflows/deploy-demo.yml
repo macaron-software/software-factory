@@ -280,20 +280,37 @@ jobs:
           AZURE_USER: ${{ secrets.AZURE_SSH_USER }}
         run: |
           [ -z "$AZURE_IP" ] && echo "AZURE_IP secret not set, skipping" && exit 0
-          [ -z "$AZURE_USER" ] && AZURE_USER="macaron"
-          # Rsync skills and platform code
-          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/skills/ || true
-          rsync -az --checksum platform/ ${AZURE_USER}@${AZURE_IP}:/opt/macaron/platform/ || true
-          # Restart container (handles crash/OOM recovery) + copy skills into it
+          [ -z "$AZURE_USER" ] && AZURE_USER="sfadmin"
+          HOME_DIR="/home/${AZURE_USER}"
+          # Rsync skills and platform code to staging area
+          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:${HOME_DIR}/skills/ || true
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ ${AZURE_USER}@${AZURE_IP}:${HOME_DIR}/staging/ || true
+          # Blue-green swap + systemd restart
           ssh ${AZURE_USER}@${AZURE_IP} "
             set -e
-            cd /opt/macaron
+            cd ${HOME_DIR}
 
-            # Restart container to pick up new code (recreate if config changed)
-            docker compose restart platform 2>/dev/null || \
-              docker compose up -d --no-deps --force-recreate platform 2>/dev/null || \
-              docker restart deploy-platform-1 2>/dev/null || \
-              echo 'WARNING: could not restart platform container'
+            # Determine active/inactive slots
+            ACTIVE=\$(cat active-slot 2>/dev/null || echo blue)
+            INACTIVE=\$([ \"\$ACTIVE\" = 'blue' ] && echo green || echo blue)
+            SVC_NAME=\"macaron-platform-\${ACTIVE}.service\"
+
+            # Push staging to inactive slot
+            mkdir -p slots/\${INACTIVE}
+            rsync -a --delete ${HOME_DIR}/staging/ slots/\${INACTIVE}/ 2>/dev/null || true
+
+            # Swap symlink atomically
+            ln -sfn ${HOME_DIR}/slots/\${INACTIVE} ${HOME_DIR}/platform_new
+            mv -T ${HOME_DIR}/platform_new ${HOME_DIR}/platform 2>/dev/null || \
+              ln -sfn ${HOME_DIR}/slots/\${INACTIVE} ${HOME_DIR}/platform
+
+            # Reload systemd and restart active service
+            sudo systemctl daemon-reload 2>/dev/null || true
+            sudo systemctl restart \${SVC_NAME} 2>/dev/null || \
+              systemctl --user restart \${SVC_NAME} 2>/dev/null || \
+              echo 'WARNING: could not restart service'
 
             # Wait for health
             echo 'Waiting for platform health...'
@@ -305,10 +322,6 @@ jobs:
               if [ \"\$HTTP\" = '200' ] || [ \"\$HTTP\" = '302' ]; then OK=1; break; fi
             done
             [ \"\$OK\" = '1' ] && echo 'platform healthy ✓' || echo 'WARNING: health check timed out'
-
-            # Copy updated skills into running container
-            docker cp /opt/macaron/skills/. deploy-platform-1:/app/skills/ 2>/dev/null && \
-              echo 'skills copied ✓' || echo 'docker cp skipped (container name mismatch?)'
             echo 'Azure deploy complete'
           " || echo "WARNING: Azure SSH step failed (non-fatal)"
           echo "=== Azure deploy done ==="
