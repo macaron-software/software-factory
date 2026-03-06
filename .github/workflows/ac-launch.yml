@@ -131,7 +131,7 @@ jobs:
             echo "Active/running sessions:"
             psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status FROM sessions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
             echo "AC cycles scores:"
-            psql "$DB_URL" -t -c "SELECT project_id, cycle_num, score_moyen, status, LEFT(phases_json::text,200) FROM ac_cycles ORDER BY created_at DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no ac_cycles table or empty)"
+            psql "$DB_URL" -t -c "SELECT project_id, cycle_num, total_score, status, defect_count, veto_count, LEFT(phase_scores::text,200) FROM ac_cycles ORDER BY created_at DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no ac_cycles table or empty)"
             echo "Message count per AC session:"
             psql "$DB_URL" -t -c "SELECT s.id, LEFT(s.name,30), s.status, COUNT(m.id) as msgs FROM sessions s LEFT JOIN messages m ON m.session_id=s.id WHERE s.config_json LIKE '%ac-improvement-cycle%' AND s.created_at >= NOW() - INTERVAL '3 hours' GROUP BY s.id, s.name, s.status ORDER BY s.created_at DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || true
             echo "Latest messages (active AC hello-html session):"
