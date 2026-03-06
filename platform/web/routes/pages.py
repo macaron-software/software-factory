@@ -1038,6 +1038,16 @@ async def api_improvement_inject_cycle(request: Request):
         conn = _ac_get_db()
         _ac_ensure_tables(conn)
         try:
+            phase_scores_json = (
+                _json.dumps(phase_scores)
+                if isinstance(phase_scores, dict)
+                else phase_scores
+            )
+            adv_scores_json = (
+                _json.dumps(adversarial_scores)
+                if isinstance(adversarial_scores, dict)
+                else adversarial_scores
+            )
             conn.execute(
                 "INSERT INTO ac_cycles (project_id, cycle_num, git_sha, status, phase_scores,"
                 " total_score, defect_count, fix_summary, adversarial_scores, traceability_score,"
@@ -1053,39 +1063,44 @@ async def api_improvement_inject_cycle(request: Request):
                     cycle_num,
                     git_sha,
                     status,
-                    _json.dumps(phase_scores)
-                    if isinstance(phase_scores, dict)
-                    else phase_scores,
+                    phase_scores_json,
                     total_score,
                     defect_count,
                     fix_summary,
-                    _json.dumps(adversarial_scores)
-                    if isinstance(adversarial_scores, dict)
-                    else adversarial_scores,
+                    adv_scores_json,
                     traceability_score,
                     now,
                     now,
                 ),
             )
-            # Update project state average score
+            # Compute average from existing cycles
+            avg_row = conn.execute(
+                "SELECT AVG(total_score) as avg FROM ac_cycles WHERE project_id=? AND total_score > 0",
+                (project_id,),
+            ).fetchone()
+            avg_score = float(avg_row["avg"] or 0) if avg_row else 0.0
+            ci_status = "green" if status == "completed" else "red"
+            new_status = "idle" if status == "completed" else status
+            # Two-step upsert: INSERT then UPDATE — avoids GREATEST/MAX cross-DB issues
             conn.execute(
                 "INSERT INTO ac_project_state (project_id, current_cycle, status, total_score_avg,"
                 " last_git_sha, ci_status, updated_at)"
                 " VALUES (?,?,?,?,?,?,?)"
-                " ON CONFLICT(project_id) DO UPDATE SET"
-                " current_cycle=GREATEST(ac_project_state.current_cycle, excluded.current_cycle),"
-                " status=CASE WHEN excluded.status='completed' THEN 'idle' ELSE excluded.status END,"
-                " last_git_sha=excluded.last_git_sha, ci_status=excluded.ci_status,"
-                " total_score_avg=("
-                "   SELECT AVG(total_score) FROM ac_cycles WHERE project_id=? AND total_score > 0"
-                " ), updated_at=excluded.updated_at",
+                " ON CONFLICT(project_id) DO NOTHING",
+                (project_id, cycle_num, new_status, avg_score, git_sha, ci_status, now),
+            )
+            conn.execute(
+                "UPDATE ac_project_state SET"
+                " current_cycle=CASE WHEN current_cycle < ? THEN ? ELSE current_cycle END,"
+                " status=?, total_score_avg=?, last_git_sha=?, ci_status=?, updated_at=?"
+                " WHERE project_id=?",
                 (
-                    project_id,
                     cycle_num,
-                    status,
-                    total_score,
+                    cycle_num,
+                    new_status,
+                    avg_score,
                     git_sha,
-                    "green" if status == "completed" else "red",
+                    ci_status,
                     now,
                     project_id,
                 ),
