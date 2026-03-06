@@ -13,37 +13,45 @@ metadata:
     - "when user asks to fix a bug and wants a regression test"
     - "when user mentions red-green-refactor"
     - "when test coverage needs to increase"
+version: "1.1.0"
 # EVAL CASES — based on philschmid.de/testing-skills eval harness methodology
 # WHY: Skills shipped without evals = untested behavior. These cases verify
 # the skill correctly enforces Red-Green-Refactor and test-first discipline.
 # Ref: https://www.philschmid.de/testing-skills
 eval_cases:
   - id: tdd-new-feature
-    prompt: "Implement a function that calculates compound interest in Python."
+    prompt: |
+      Implement a function that calculates compound interest in Python.
+      Show all three TDD phases explicitly: RED (failing test), GREEN (minimal implementation), REFACTOR.
+      The output must include actual working implementation code, not just tests.
     should_trigger: true
     checks:
       - "regex:def test_|class Test"
       - "regex:assert|pytest"
-      - "regex:def.*compound|class.*compound"
-      - "no_placeholder"
+      - "regex:def compound_interest|def calculate_compound"
+      - "regex:return|principal|rate|years"
       - "length_min:200"
     expectations:
-      - "writes the failing test BEFORE the implementation"
-      - "test is specific and verifiable, not trivially satisfied"
-      - "implementation is minimal — just enough to pass the test"
+      - "Shows RED phase: writes a failing test BEFORE any implementation code"
+      - "Shows GREEN phase: writes minimal compound_interest() implementation that makes the test pass"
+      - "Implementation is concrete (no pass, no TODO, no raise NotImplementedError) — actual formula like principal * (1+rate)**years"
+      - "Shows REFACTOR phase or explains what would be refactored"
     tags: [basic, python]
   - id: tdd-bug-regression
-    prompt: "There's a bug: get_user(0) returns None instead of raising ValueError. Fix it with TDD."
+    prompt: |
+      There's a bug: get_user(0) returns None instead of raising ValueError. Fix it with TDD.
+      Show: RED phase (failing test), GREEN phase (minimal fix), result.
+      Do NOT use pass or TODO anywhere — write the actual implementation.
     should_trigger: true
     checks:
-      - "regex:def test_.*user|class Test.*User"
+      - "regex:def test_.*user|class Test.*User|test_get_user"
       - "regex:ValueError|raises"
       - "regex:get_user"
-      - "no_placeholder"
+      - "regex:raise ValueError|pytest.raises"
     expectations:
-      - "writes a failing test that reproduces the bug first"
-      - "test asserts that ValueError is raised for input 0"
-      - "fix is minimal — only what the test requires"
+      - "Writes a failing test reproducing the bug FIRST (test_get_user_raises_for_zero or similar)"
+      - "Test uses pytest.raises(ValueError) or assertRaises(ValueError)"
+      - "Implementation uses 'raise ValueError' for id=0 — actual code, not a stub"
     tags: [bug, regression]
   - id: tdd-no-trigger-doc
     prompt: "Write documentation for the compound_interest function."
