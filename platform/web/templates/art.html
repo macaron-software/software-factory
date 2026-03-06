@@ -669,10 +669,16 @@ async function loadSkillsTab() {
     const tbody = document.getElementById('sk-eval-tbody');
     if (tbody && tbody.dataset.loaded) return;
     try {
-        const [coverage, skillList] = await Promise.all([
-            fetch('/api/skills/eval').then(r => r.json()),
-            fetch('/api/skills/list').then(r => r.json()),
+        const [coverageResp, listResp] = await Promise.all([
+            fetch('/api/skills/eval'),
+            fetch('/api/skills/list'),
         ]);
+        if (!coverageResp.ok || !listResp.ok) {
+            const msg = `API error: ${coverageResp.status} / ${listResp.status}`;
+            if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">${msg}</td></tr>`;
+            return;
+        }
+        const [coverage, skillList] = await Promise.all([coverageResp.json(), listResp.json()]);
 
         // KPIs
         document.getElementById('sk-total').textContent = coverage.total;

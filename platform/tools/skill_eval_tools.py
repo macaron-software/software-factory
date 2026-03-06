@@ -145,6 +145,9 @@ def _load_skill_frontmatter(skill_name: str) -> tuple[dict, str]:
 
 def list_skills_with_evals() -> list[dict]:
     """Return all skills, annotated with eval_cases count and last result."""
+    if not LEGACY_SKILLS_DIR.exists():
+        logger.warning("LEGACY_SKILLS_DIR not found: %s", LEGACY_SKILLS_DIR)
+        return []
     skills = []
     for path in sorted(LEGACY_SKILLS_DIR.glob("*.md")):
         name = path.stem

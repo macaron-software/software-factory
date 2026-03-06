@@ -25,21 +25,31 @@ _RUNNING: dict[str, dict[str, Any]] = {}
 
 @router.get("/api/skills/eval", summary="Skill eval coverage summary")
 async def skill_eval_coverage() -> dict[str, Any]:
-    """Return eval coverage summary for all skills.
+    """Return eval coverage summary for all skills."""
+    try:
+        from ....tools.skill_eval_tools import coverage_summary
+        return coverage_summary()
+    except Exception as exc:
+        logger.error("skill_eval_coverage error: %s", exc, exc_info=True)
+        return {"error": str(exc), "total": 0, "with_evals": 0, "coverage_pct": 0,
+                "run": 0, "passing": 0, "needing_work": [], "without_evals": []}
 
-    Powers the Skills Health tab in /art:
-    - total skills, % with eval_cases, pass rates
-    - skills needing evals (no eval_cases)
-    - skills needing work (pass_rate < 80%)
-    """
-    from ..tools.skill_eval_tools import coverage_summary
-    return coverage_summary()
+
+@router.get("/api/skills/list", summary="List all skills with eval coverage")
+async def skill_list() -> list[dict[str, Any]]:
+    """List all skills with eval_cases count and last run status."""
+    try:
+        from ....tools.skill_eval_tools import list_skills_with_evals
+        return list_skills_with_evals()
+    except Exception as exc:
+        logger.error("skill_list error: %s", exc, exc_info=True)
+        return []
 
 
 @router.get("/api/skills/eval/{skill_name}", summary="Full eval result for one skill")
 async def skill_eval_result(skill_name: str) -> dict[str, Any]:
     """Return last eval result for a skill (or 404 if never run)."""
-    from ..tools.skill_eval_tools import load_eval_result, _load_skill_frontmatter
+    from ....tools.skill_eval_tools import load_eval_result, _load_skill_frontmatter
     # Verify skill exists
     try:
         fm, _ = _load_skill_frontmatter(skill_name)
@@ -71,7 +81,7 @@ async def skill_eval_run(
     Runs in background so the request returns fast (trials*cases can take 30-120s).
     """
     import uuid
-    from ..tools.skill_eval_tools import _load_skill_frontmatter
+    from ....tools.skill_eval_tools import _load_skill_frontmatter
 
     try:
         fm, _ = _load_skill_frontmatter(skill_name)
@@ -85,7 +95,7 @@ async def skill_eval_run(
     _RUNNING[job_id] = {"status": "running", "skill_name": skill_name, "started_at": _now()}
 
     async def _run():
-        from ..tools.skill_eval_tools import run_skill_eval
+        from ....tools.skill_eval_tools import run_skill_eval
         try:
             result = await run_skill_eval(skill_name, trials=trials)
             _RUNNING[job_id].update({
@@ -108,16 +118,6 @@ async def skill_eval_job_status(job_id: str) -> dict[str, Any]:
     if job_id not in _RUNNING:
         raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
     return _RUNNING[job_id]
-
-
-@router.get("/api/skills/list", summary="List all skills with eval coverage")
-async def skill_list() -> list[dict[str, Any]]:
-    """List all skills with eval_cases count and last run status.
-
-    Used by /art Skills tab table.
-    """
-    from ..tools.skill_eval_tools import list_skills_with_evals
-    return list_skills_with_evals()
 
 
 def _now() -> str:
