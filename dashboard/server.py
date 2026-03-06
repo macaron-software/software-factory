@@ -1627,6 +1627,28 @@ HARDENING_SCORE_THRESHOLD = int(os.environ.get("AC_HARDENING_THRESHOLD", "85"))
 _HARDENING_WORKFLOW = "hardening-sprint"
 
 
+def _get_ac_quality_settings() -> dict:
+    """Read AC quality thresholds live from platform_settings DB."""
+    defaults = {
+        "ac_hardening_threshold": "85",
+        "ac_adversarial_warn": "60",
+        "ac_adversarial_fail": "40",
+        "ac_max_hardening_per_cycle": "1",
+        "ac_auto_hardening_enabled": "true",
+    }
+    try:
+        db = get_db()
+        rows = db.execute(
+            "SELECT key, value FROM platform_settings WHERE key LIKE 'ac_%'"
+        ).fetchall()
+        db.close()
+        for r in rows:
+            defaults[r["key"]] = r["value"]
+    except Exception:
+        pass
+    return defaults
+
+
 async def _trigger_hardening_sprint(
     project_id: str, cycle_num: int, total_score: int, adversarial_scores: dict
 ) -> Optional[str]:
@@ -1639,9 +1661,9 @@ async def _trigger_hardening_sprint(
         low_dims_text = ", ".join(f"{d}={s}" for d, s in low_dims)
 
         brief = (
-            f"Hardening Sprint auto — cycle {cycle_num} score={total_score}/100 (<{HARDENING_SCORE_THRESHOLD}).\n"
+            f"Hardening Sprint auto — cycle {cycle_num} score={total_score}/100 (<seuil configuré).\n"
             f"Dimensions basses : {low_dims_text}.\n"
-            f"Objectif : passer le score >= {HARDENING_SCORE_THRESHOLD} en ciblant no_slop, "
+            f"Objectif : passer le score >= seuil configuré en ciblant no_slop, "
             f"architecture et over_engineering.\n"
             f"RÈGLE : ne pas modifier les APIs publiques ni les tests existants."
         )
@@ -1826,7 +1848,15 @@ async def api_improvement_inject_cycle(request: Request):
 
     # ── Auto-trigger hardening sprint if score below threshold ────────────────
     hardening_run_id = None
-    if project_id and not _is_hardening and total_score < HARDENING_SCORE_THRESHOLD:
+    _quality = _get_ac_quality_settings()
+    _hardening_threshold = int(_quality.get("ac_hardening_threshold", "85"))
+    _auto_enabled = _quality.get("ac_auto_hardening_enabled", "true") == "true"
+    if (
+        project_id
+        and not _is_hardening
+        and _auto_enabled
+        and total_score < _hardening_threshold
+    ):
         hardening_run_id = await _trigger_hardening_sprint(
             project_id, cycle_num, total_score, adversarial_scores
         )

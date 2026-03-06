@@ -287,6 +287,62 @@
 
               <hr style="border-color:var(--border);margin:0.2rem 0">
 
+              <!-- AC Quality Thresholds -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Quality Gates — AC / Hardening</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem;margin-bottom:0.6rem">
+                Seuils du cycle d'Amélioration Continue. Si le <code>total_score</code> d'un cycle est inférieur au seuil,
+                un <strong>Hardening Sprint</strong> est déclenché automatiquement (<code>no_slop</code> + architecture + over_engineering).
+              </div>
+              <div id="quality-settings-form" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:640px">
+                <div class="form-group">
+                  <label>Seuil Hardening Sprint <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-hardening-threshold" min="50" max="100" step="1" style="width:80px"
+                      value="85">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">déclenche refactoring si score &lt; seuil</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Warn <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-warn" min="0" max="100" step="5" style="width:80px"
+                      value="60">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">jaune en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Fail <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-fail" min="0" max="100" step="5" style="width:80px"
+                      value="40">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">rouge en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Max Hardenings / cycle</label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-max-hardening" min="1" max="5" step="1" style="width:80px"
+                      value="1">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">force progression après N sprints</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.8rem;margin-top:0.3rem">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.88rem">
+                  <input type="checkbox" id="qs-auto-hardening" checked>
+                  <span>Auto-hardening activé</span>
+                </label>
+              </div>
+              <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.8rem">
+                <button type="button" onclick="saveQualitySettings()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.4rem 1.1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">
+                  Save Quality Gates
+                </button>
+                <span id="quality-save-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
               <!-- Worker nodes -->
               <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
               <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
@@ -903,7 +959,7 @@ function showSettingsTab(id) {
     event.target.closest('.settings-tab').classList.add('active');
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
-    if (id === 'orchestrator') refreshLoad();
+    if (id === 'orchestrator') { refreshLoad(); loadQualitySettings(); }
     if (id === 'modules') { loadModulesTab(); _startModulesPoller(); }
     else _stopModulesPoller();
 }
@@ -928,6 +984,53 @@ async function saveOrchSettings() {
   try {
     const r = await fetch('/api/settings/orchestrator', {
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    const j = await r.json();
+    if (j.ok) {
+      st.style.color = 'var(--green, #4ade80)';
+      st.textContent = 'Saved — applied live';
+      setTimeout(() => { st.textContent = ''; }, 3000);
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Error: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Quality Gates (AC Hardening) ─────────────────────────────────────────────
+async function loadQualitySettings() {
+  try {
+    const r = await fetch('/api/settings/quality');
+    const j = await r.json();
+    if (!j.ok) return;
+    const s = j.settings;
+    const el = (id) => document.getElementById(id);
+    if (s.ac_hardening_threshold) el('qs-hardening-threshold').value = s.ac_hardening_threshold;
+    if (s.ac_adversarial_warn)    el('qs-adversarial-warn').value    = s.ac_adversarial_warn;
+    if (s.ac_adversarial_fail)    el('qs-adversarial-fail').value    = s.ac_adversarial_fail;
+    if (s.ac_max_hardening_per_cycle) el('qs-max-hardening').value   = s.ac_max_hardening_per_cycle;
+    if (s.ac_auto_hardening_enabled !== undefined)
+      el('qs-auto-hardening').checked = (s.ac_auto_hardening_enabled === 'true');
+  } catch(e) { /* silent */ }
+}
+
+async function saveQualitySettings() {
+  const el = (id) => document.getElementById(id);
+  const data = {
+    ac_hardening_threshold:    parseInt(el('qs-hardening-threshold').value, 10),
+    ac_adversarial_warn:       parseInt(el('qs-adversarial-warn').value, 10),
+    ac_adversarial_fail:       parseInt(el('qs-adversarial-fail').value, 10),
+    ac_max_hardening_per_cycle:parseInt(el('qs-max-hardening').value, 10),
+    ac_auto_hardening_enabled: String(el('qs-auto-hardening').checked),
+  };
+  const st = el('quality-save-status');
+  st.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/settings/quality', {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
     });
     const j = await r.json();
     if (j.ok) {
