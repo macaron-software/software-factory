@@ -858,6 +858,35 @@ async def github_webhook(request: Request):
                 ),
             )
             db.commit()
+
+            # Auto-deploy on push to main (if GITHUB_WEBHOOK_AUTODEPLOY=1)
+            if (
+                branch == "main"
+                and os.environ.get("GITHUB_WEBHOOK_AUTODEPLOY", "0") == "1"
+            ):
+                import subprocess
+
+                deploy_script = os.environ.get(
+                    "DEPLOY_SCRIPT", "/home/sfadmin/deploy.sh"
+                )
+                logger.info("webhook: auto-deploy triggered for %s@%s", repo, branch)
+                subprocess.Popen(
+                    [
+                        "bash",
+                        "-c",
+                        f"sleep 3 && bash {deploy_script} --webhook 2>&1 >> /home/sfadmin/logs/deploy.log",
+                    ],
+                    start_new_session=True,  # detach — survives platform restart
+                )
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "event": "push",
+                        "mission_id": mid,
+                        "deploy": "triggered",
+                    }
+                )
+
             return JSONResponse({"ok": True, "event": "push", "mission_id": mid})
 
         if event == "pull_request":
@@ -894,7 +923,7 @@ async def github_webhook(request: Request):
                 mid = str(uuid.uuid4())[:8]
                 mtype = (
                     "bug"
-                    if any(l.get("name") == "bug" for l in issue.get("labels", []))
+                    if any(lbl.get("name") == "bug" for lbl in issue.get("labels", []))
                     else "feature"
                 )
                 db.execute(

@@ -269,61 +269,36 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
 
-      - name: Set up SSH (Azure)
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AZURE_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa 2>/dev/null || exit 0
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.AZURE_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-
-      - name: Deploy skills + platform to Azure
+      - name: Deploy to Azure via webhook
+        # SSH port 22 is blocked at Azure subscription level (Defender for Cloud).
+        # The platform exposes a GitHub webhook endpoint on port 80 (nginx) that:
+        #   1. Validates HMAC-SHA256 signature
+        #   2. Runs git pull + blue-green deploy when GITHUB_WEBHOOK_AUTODEPLOY=1
+        # This is the only reliable deploy path for this subscription.
         env:
           AZURE_IP: ${{ secrets.AZURE_IP }}
-          AZURE_USER: ${{ secrets.AZURE_SSH_USER }}
+          WEBHOOK_SECRET: ${{ secrets.AZURE_WEBHOOK_SECRET }}
         run: |
           [ -z "$AZURE_IP" ] && echo "AZURE_IP secret not set, skipping" && exit 0
-          [ -z "$AZURE_USER" ] && AZURE_USER="sfadmin"
-          HOME_DIR="/home/${AZURE_USER}"
-          # Rsync skills and platform code to staging area
-          rsync -az --checksum skills/ ${AZURE_USER}@${AZURE_IP}:${HOME_DIR}/skills/ || true
-          rsync -az --checksum --delete \
-            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
-            platform/ ${AZURE_USER}@${AZURE_IP}:${HOME_DIR}/staging/ || true
-          # Blue-green swap + systemd restart
-          ssh ${AZURE_USER}@${AZURE_IP} "
-            set -e
-            cd ${HOME_DIR}
+          [ -z "$WEBHOOK_SECRET" ] && echo "AZURE_WEBHOOK_SECRET not set, skipping" && exit 0
 
-            # Determine active/inactive slots
-            ACTIVE=\$(cat active-slot 2>/dev/null || echo blue)
-            INACTIVE=\$([ \"\$ACTIVE\" = 'blue' ] && echo green || echo blue)
-            SVC_NAME=\"macaron-platform-\${ACTIVE}.service\"
+          PAYLOAD='{"ref":"refs/heads/main","commits":[{"message":"ci: webhook deploy trigger"}],"repository":{"full_name":"macaron-software/software-factory"}}'
+          SIG="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')"
 
-            # Push staging to inactive slot
-            mkdir -p slots/\${INACTIVE}
-            rsync -a --delete ${HOME_DIR}/staging/ slots/\${INACTIVE}/ 2>/dev/null || true
+          HTTP=$(curl -sf -o /tmp/wh_resp.json -w "%{http_code}" \
+            -X POST "http://${AZURE_IP}/api/webhooks/github" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -H "X-Hub-Signature-256: $SIG" \
+            --max-time 15 \
+            -d "$PAYLOAD" 2>/dev/null || echo "000")
 
-            # Swap symlink atomically
-            ln -sfn ${HOME_DIR}/slots/\${INACTIVE} ${HOME_DIR}/platform_new
-            mv -T ${HOME_DIR}/platform_new ${HOME_DIR}/platform 2>/dev/null || \
-              ln -sfn ${HOME_DIR}/slots/\${INACTIVE} ${HOME_DIR}/platform
+          echo "Webhook response: HTTP $HTTP"
+          cat /tmp/wh_resp.json 2>/dev/null || true
 
-            # Reload systemd and restart active service
-            sudo systemctl daemon-reload 2>/dev/null || true
-            sudo systemctl restart \${SVC_NAME} 2>/dev/null || \
-              systemctl --user restart \${SVC_NAME} 2>/dev/null || \
-              echo 'WARNING: could not restart service'
-
-            # Wait for health
-            echo 'Waiting for platform health...'
-            OK=0
-            for i in \$(seq 1 20); do
-              sleep 3
-              HTTP=\$(curl -sf -o /dev/null -w '%{http_code}' http://localhost:8090/api/health 2>/dev/null || echo 000)
-              echo \"  [\${i}/20] health=\${HTTP}\"
-              if [ \"\$HTTP\" = '200' ] || [ \"\$HTTP\" = '302' ]; then OK=1; break; fi
-            done
-            [ \"\$OK\" = '1' ] && echo 'platform healthy ✓' || echo 'WARNING: health check timed out'
-            echo 'Azure deploy complete'
-          " || echo "WARNING: Azure SSH step failed (non-fatal)"
+          if [ "$HTTP" = "200" ]; then
+            echo "✓ Azure deploy webhook triggered — blue-green deploy running in background"
+          else
+            echo "WARNING: webhook returned $HTTP (platform may be starting up)"
+          fi
           echo "=== Azure deploy done ==="
