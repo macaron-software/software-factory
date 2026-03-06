@@ -977,15 +977,32 @@ class AgentExecutor:
                         messages, self._llm, use_provider, use_model
                     )
 
-                # On penultimate round, disable tools to force synthesis next iteration
+                # On penultimate round, force synthesis or code-write depending on agent type
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    tools = None
-                    messages.append(
-                        LLMMessage(
-                            role="system",
-                            content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
-                        )
+                    _has_write_tools = ctx.allowed_tools and any(
+                        t in (ctx.allowed_tools or [])
+                        for t in ["code_write", "code_edit"]
                     )
+                    if _has_write_tools:
+                        # Keep tools enabled so the agent CAN call code_write
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content=(
+                                    "⚠️ DERNIER TOUR — tu dois maintenant ÉCRIRE le code avec code_write. "
+                                    "Crée chaque fichier requis (tests d'abord, puis implémentation). "
+                                    "Ne lis plus de fichiers — écris uniquement."
+                                ),
+                            )
+                        )
+                    else:
+                        tools = None
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
+                            )
+                        )
             else:
                 content = llm_resp.content or "(Max tool rounds reached)"
 
@@ -1306,7 +1323,23 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     yield ("tool", tc.function_name)
-                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # If tool schema was stripped to write-only, redirect read calls
+                    _allowed_tc_names = (
+                        {t.get("function", {}).get("name") for t in tools}
+                        if tools is not None
+                        else None
+                    )
+                    if (
+                        _allowed_tc_names is not None
+                        and tc.function_name not in _allowed_tc_names
+                        and tc.function_name in ("code_read", "list_files")
+                    ):
+                        result = (
+                            f"⚠️ '{tc.function_name}' n'est pas disponible à ce stade. "
+                            "Appelle code_write pour créer les fichiers maintenant."
+                        )
+                    else:
+                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     logger.warning(
                         "TOOL_EXEC agent=%s tool=%s args=%s result=%s",
                         agent.id,
