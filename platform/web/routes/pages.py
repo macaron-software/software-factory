@@ -1239,6 +1239,36 @@ async def api_improvement_start(project_id: str):
         created = await asyncio.to_thread(store.create_mission, mission_def)
         run_id = str(created.id)
 
+        # Create session + launch workflow
+        from ...sessions.store import get_session_store, SessionDef
+        from ...workflows.store import get_workflow_store
+        from .workflows import _run_workflow_background
+
+        wf_store = get_workflow_store()
+        wf = wf_store.get("ac-improvement-cycle")
+        sess_id = None
+        if wf:
+            sess = SessionDef(
+                name=f"AC {proj['name']} — Cycle {cycle_num}",
+                goal=brief,
+                project_id=project_id,
+                status="active",
+                config={
+                    "workflow_id": "ac-improvement-cycle",
+                    "mission_id": run_id,
+                    "ac": True,
+                    "cycle_num": cycle_num,
+                    "project_id": project_id,
+                    "skill_variants": _ac_select_skill_variants(project_id),
+                },
+            )
+            sess_store = get_session_store()
+            created_sess = await asyncio.to_thread(sess_store.create, sess)
+            sess_id = created_sess.id
+            asyncio.create_task(
+                _run_workflow_background(wf, sess_id, brief, project_id)
+            )
+
         # Update project state
         def _update_state():
             import time
@@ -1265,7 +1295,12 @@ async def api_improvement_start(project_id: str):
 
         await asyncio.to_thread(_update_state)
         return JSONResponse(
-            {"run_id": run_id, "cycle_num": cycle_num, "project_id": project_id}
+            {
+                "run_id": run_id,
+                "session_id": sess_id,
+                "cycle_num": cycle_num,
+                "project_id": project_id,
+            }
         )
 
     except Exception as exc:
