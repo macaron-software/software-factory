@@ -999,12 +999,79 @@ async def workflows_improvement(request: Request):
 
 @router.get("/workflows/improvement/cycles/{project_id}", response_class=HTMLResponse)
 async def workflows_improvement_cycles(request: Request, project_id: str):
-    """HTMX fragment: cycle table for a given project."""
+    """HTMX fragment: cycle table for a given project.
+
+    Also auto-backfills cycle records for missions that completed but whose
+    CI/CD agent never called inject-cycle (agent failure / timeout).
+    """
     import json as _json
 
     def _load():
         conn = _ac_get_db()
         _ac_ensure_tables(conn)
+        # ── Auto-backfill: record cycles from missions that were never injected ──
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            all_missions = store.list_missions(project_id=project_id, limit=200)
+            recorded = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT platform_run_id FROM ac_cycles WHERE project_id=?",
+                    (project_id,),
+                ).fetchall()
+                if row[0]
+            }
+            for m in all_missions:
+                cfg = getattr(m, "config", {}) or {}
+                if cfg.get("project_id") != project_id:
+                    continue
+                if not cfg.get("ac"):
+                    continue
+                run_id = str(m.id)
+                if run_id in recorded:
+                    continue
+                cycle_num = cfg.get("cycle_num")
+                if not cycle_num:
+                    # parse from name "AC … — Cycle N"
+                    import re
+
+                    nm = getattr(m, "name", "") or ""
+                    mo = re.search(r"Cycle\s+(\d+)", nm)
+                    cycle_num = int(mo.group(1)) if mo else None
+                if not cycle_num:
+                    continue
+                status = getattr(m, "status", "unknown") or "unknown"
+                started = getattr(m, "created_at", None)
+                completed = getattr(m, "completed_at", None)
+                if hasattr(started, "isoformat"):
+                    started = started.isoformat()
+                if hasattr(completed, "isoformat"):
+                    completed = completed.isoformat()
+                # Stub record — scores will be 0 (no inject-cycle was called)
+                conn.execute(
+                    "INSERT INTO ac_cycles (project_id, cycle_num, platform_run_id, status,"
+                    " phase_scores, total_score, defect_count, fix_summary, started_at, completed_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)"
+                    " ON CONFLICT(project_id, cycle_num) DO NOTHING",
+                    (
+                        project_id,
+                        cycle_num,
+                        run_id,
+                        status,
+                        "{}",
+                        0,
+                        0,
+                        f"Cycle {cycle_num} — {status} (scores non enregistrés)",
+                        started,
+                        completed,
+                    ),
+                )
+            conn.commit()
+        except Exception:
+            pass
+        # ── Load all cycles ──
         try:
             rows = conn.execute(
                 "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
@@ -1831,13 +1898,7 @@ async def api_improvement_screenshot(project_id: str, cycle_num: int):
     path = await asyncio.to_thread(_find_screenshot)
     if path:
         return FileResponse(path, media_type="image/png")
-    # 1×1 transparent PNG placeholder
-    _px = (
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
-        b"\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01"
-        b"\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
-    return Response(content=_px, media_type="image/png")
+    return Response(status_code=404)
 
 
 @router.get("/api/improvement/project/{project_id}")
