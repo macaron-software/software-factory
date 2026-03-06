@@ -1,6 +1,6 @@
 ---
 name: clean-code
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Enforces production-quality code: no slop, no fake data, no type suppressions,
   no test cheating, no dead code, no magic values. Use this skill whenever an
@@ -26,10 +26,13 @@ eval_cases:
       - "no_placeholder"
       - "regex:decode|jwt|base64|header|payload"
       - "not_regex:TODO|FIXME|return None  # TODO|raise NotImplementedError"
+      - "not_regex:\\.{3}\\s*#"
+      - "not_regex:pass\\s*#\\s*implement|pass\\s*#\\s*todo"
     expectations:
       - "generates real working implementation — not a stub or placeholder"
       - "does not return hardcoded fake data"
       - "imports a real JWT library or implements actual base64 decode logic"
+      - "no ellipsis+comment stubs (... # implement) anywhere in the output"
     tags: [basic, anti-stub]
   - id: no-mock-data
     prompt: "List the active users from the database."
@@ -75,6 +78,21 @@ are hard-rejected (score +5 each, threshold 5 = immediate retry).
 - `--cov-fail-under=0` or `fail_under = 0` — defeats coverage
 - Modifying the SYSTEM UNDER TEST to return a hardcoded value that matches the test expectation
 - Adding `if os.getenv("TEST_MODE"): return expected_value` to production code
+
+## RULE 1b — No Stub Bodies
+
+**NEVER** use stub bodies in implementation code:
+
+| FORBIDDEN | WHY |
+|-----------|-----|
+| `pass  # implement` | Empty function — not real code |
+| `pass  # TODO` | Deferred work disguised as delivery |
+| `...  # implement later` | Python Ellipsis stub |
+| `...  # TODO` | Same |
+| `raise NotImplementedError` | Skeleton, not implementation |
+| `return None  # TODO` | Incomplete logic |
+
+**Write the actual implementation.** If you cannot complete it, say so explicitly — never silently ship a stub.
 
 ### ALWAYS
 - Fix the underlying code when a test fails — do not fix the test to match broken behavior

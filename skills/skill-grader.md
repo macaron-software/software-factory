@@ -1,6 +1,6 @@
 ---
 name: skill-grader
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Grades skill eval outputs against their assertions. Evaluates each expectation
   as PASS/FAIL with cited evidence. Also critiques the assertions themselves
@@ -22,15 +22,17 @@ eval_cases:
     prompt: "Grade: expectation='identifies at least one SQL injection'. Output='Found SQL injection at line 42: user input not sanitized before DB query — use parameterized queries.'"
     checks:
       - "regex:PASS|pass"
+      - "regex:SQL inject|line 42|sanitiz|parameteriz|evidence|found|cited|quote"
       - "no_placeholder"
     expectations:
       - "verdict is PASS"
-      - "evidence quotes specific text from the output"
+      - "evidence quotes specific text from the output (line 42, SQL injection, parameterized)"
     tags: ["basic", "pass-case"]
   - id: grade-superficial-compliance
     prompt: "Grade: expectation='generates a migration script'. Output='I will generate the migration script now. The script should handle all edge cases.'"
     checks:
       - "regex:FAIL|fail"
+      - "regex:promise|promis|claims|will.*not|description|no.*actual|superficial|never.*deliver|intend|plan"
       - "no_placeholder"
     expectations:
       - "verdict is FAIL"
@@ -41,7 +43,7 @@ eval_cases:
     checks:
       - "regex:PASS|trivial|weak|non-empty|assertion|specific"
       - "length_min:50"
-      - "no_placeholder"
+      - "regex:suggest|replac|stronger|specific|better|improv|instead"
     expectations:
       - "grades PASS (technically satisfied)"
       - "eval_feedback flags this assertion as trivially satisfied"

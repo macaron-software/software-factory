@@ -13,6 +13,7 @@ metadata:
     - "when reviewing a pull request"
     - "when user wants to check code for bugs or security issues"
     - "when assessing code maintainability"
+version: "1.1.0"
 # EVAL CASES — philschmid.de/testing-skills
 # WHY: Verifies the review skill surfaces real issues (not just style), avoids
 # false positives on clean code, and never rubber-stamps broken code.
@@ -34,9 +35,12 @@ eval_cases:
     should_trigger: true
     checks:
       - "length_min:30"
+      - "not_regex:SQL inject|injection|vulnerability|security risk|dangerous|critical|bug found|broken"
+      - "regex:correct|clean|simple|LGTM|looks good|no.{0,20}issue|no.{0,20}bug|straightforward|fine|OK|minimal|well.written|good"
     expectations:
       - "does not flag false positives on clean, correct code"
       - "brief response — no major issues invented"
+      - "acknowledges the code is correct/clean (LGTM or equivalent)"
     tags: [clean, negative-issues]
   - id: review-performance
     prompt: "Review:\ndef find_user(name, users):\n    for u in users:\n        if u.name == name: return u\n    return None\n# called 10000x per request"

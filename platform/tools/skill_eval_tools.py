@@ -824,6 +824,25 @@ def _save_result(skill_name: str, result: SkillEvalResult) -> None:
         _result_path(skill_name).write_text(
             json.dumps(data, indent=2, ensure_ascii=False)
         )
+        # Append compact entry to history (JSONL — one line per run)
+        history_entry = {
+            "ran_at": result.ran_at,
+            "version": result.skill_version,
+            "pass_rate": result.pass_rate,
+            "duration_s": result.duration_s,
+            "cases": [
+                {
+                    "id": c.case_id,
+                    "pass_rate": c.overall_pass_rate,
+                    "checks": c.checks_pass_rate,
+                    "judge": c.llm_judge_score,
+                }
+                for c in result.case_results
+            ],
+        }
+        history_path = EVAL_RESULTS_DIR / f"{skill_name}_history.jsonl"
+        with history_path.open("a", encoding="utf-8") as hf:
+            hf.write(json.dumps(history_entry, ensure_ascii=False) + "\n")
     except Exception as exc:
         logger.warning("Could not save eval result for %s: %s", skill_name, exc)
 
