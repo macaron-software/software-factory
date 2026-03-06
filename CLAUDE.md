@@ -512,6 +512,10 @@ Source : https://github.com/Yems221/securebydesign-llmskill
 **L1 pattern** : inspiré de Constitutional AI (Anthropic 2022) — reviewer LLM différent du producteur.
 **Inspirations** : Pentagi red-team loops (vxcontrol/pentagi), adversarial collaboration GoodAI.
 **Ne couvre PAS** : prompt injection, system prompt leakage, RAG isolation → voir ci-dessous.
+**13 dimensions** (platform/ac/reward.py) — VETO si score dim <60 :
+  Critical (×2, VETO): security, honesty, no_slop, no_mock_data, no_hardcode, test_quality, traceability, secure_by_design
+  Warning (×1): architecture, fallback, over_engineering, observability, resilience, refactoring
+  Dim 13 (adversarial phase): SecureByDesign rapid scan — 6 red-flag controls (SBD-07 secrets, SBD-01 injection, SBD-04 auth, SBD-02 prompt injection, SBD-03 CSP, SBD-13 error disclosure)
 
 ### QA Adversarial LLM (skills/qa-adversarial-llm.md)
 Red-team offensif du système LLM lui-même (7 suites de tests) :
@@ -552,6 +556,7 @@ Chaque skill DOIT avoir eval_cases avec des expectations spécifiques et discrim
 - **Discriminant** : un output correct passe, un output faux échoue, un stub/placeholder échoue
 - **Pas trivial** : `"output is non-empty"` est interdit — satisfait par n'importe quoi
 - **Vérifiable** : le grader peut vérifier sans subjectivité
+2 formats supportés : `- input:` (philschmid) ou `- id:` / `- prompt:` + expectations (SF style)
 
 ### Philosophie Grader (portée de Anthropic grader.md)
 - Grade PASS/FAIL avec evidence citée (pas de partiel)
@@ -565,10 +570,68 @@ Chaque skill DOIT avoir eval_cases avec des expectations spécifiques et discrim
 - Pas de browser eval viewer — les résultats vont dans le dashboard SF
 - `skill-eval` est un workflow on-demand, pas un CI automatique (pour l'instant)
 
+### Skills Health — ART tab (/art → Skills Health)
+```
+API: GET /api/skills/eval  → {total, coverage_pct, passing, run, without_evals[]}
+     GET /api/skills/list  → [{id, name, has_evals, eval_cases, pass_rate, verdict, ran_at}]
+Source: filesystem (LEGACY_SKILLS_DIR = _SOFTWARE_FACTORY/skills/*.md) — NOT DB (DB = 1307 GitHub skills sans eval_cases)
+DB table: skill_eval_runs (id, skill_id, ran_at, cases_total, cases_passed, pass_rate, verdict)
+Graduation rule: pass_rate=1.0 → verdict="regression" (cas de régression, skill intégré au LLM)
+Retire rule: skill always passes without loading → verdict="retire"
+État actuel: 49 skills locaux, 6 avec eval_cases (coverage=12%) — llm-integration, perf-audit, sf-guide, skill-creator, skill-grader, spec-driven-quality
+```
+
+
+## AC — AMÉLIORATION CONTINUE (platform/ac/)
+
+Boucle d'intelligence auto-améliorante : RL (reward shaping) + Thompson Sampling (skill selection) + GA (Darwin Teams).
+5 projets pilotes : hello-html, hello-vue, rust+svelte, docusign-clone, e-commerce+solaris.
+
+### 7 phases (ac/reward.py + skills/ac-*.md)
+```
+1. Inception      → ac-architect.md    (archi + TDD specs)
+2. TDD Sprint     → ac-codex.md        (implémentation TDD)
+3. Adversarial    → ac-adversarial.md  (13 dims, VETO<60)
+4. QA Parallel    → ac-qa-agent.md     (tests parallèles)
+5. CI/CD + Record → ac-cicd-agent.md   (déploiement + enregistrement)
+6. Refactoring    → ac-refactor.md     (5 axes: code smells CC>10/DRY, tech debt, perf <250KB, SRP, linter)
+7. Security       → ac-security.md     (SecureByDesign 25 contrôles, 5 couches, VETO<60)
+Post-sprint = phases 6+7 (hardening après chaque sprint)
+```
+
+### Reward function (platform/ac/reward.py) — 14 dimensions
+```
+Critical (weight=2.0, VETO si <60): security, honesty, no_slop, no_mock_data, no_hardcode,
+                                    test_quality, traceability, secure_by_design
+Warning  (weight=1.0):              architecture, fallback, over_engineering, observability,
+                                    resilience, refactoring
+Score final: Σ(dim × weight) / Σ(weights). VETO absolu si dim critical <60.
+```
+
+### Intelligence (platform/ac/intelligence.py)
+```
+Thompson Sampling  → sélection probabiliste des skills (Beta distribution, wins/losses)
+RL reward shaping  → ajuste les poids par cycle (learning rate 0.1)
+Darwin Teams (GA)  → mutation des configs agents selon fitness (crossover + mutation)
+Skill Eval         → https://www.philschmid.de/testing-skills — pass_rate → graduation
+Graduation rule    → pass_rate=1.0 → mode régression. Skill absorbé par le LLM → retire.
+```
+
+### UI (platform/web/templates/workflows.html — onglet Amélioration Continue)
+```
+/workflows → onglet "Amélioration Continue" (+ onglet "Évolution")
+Cockpit    → /workflows → onglet Cockpit → diagramme SVG 7-phase
+ART tab    → /art → onglets: Organisation / Mercato / Thompson Sampling / Darwin Teams / Skills Health
+```
+
+### Traceability (pourquoi chaque feature, code, test)
+```
+Chaque cycle enregistre: skill utilisé, score par dimension, reward total, RL hint, Thompson proba
+Chaque dim adversariale = VETO traçable avec ref (SBD-07, OWASP, etc.)
+eval_cases dans frontmatter = lien skill ↔ test ↔ résultat
+```
 
 ## CHAOS MONKEY (ops/chaos_endurance.py)
-
-```
 SCENARIOS_VM1: container_restart, cpu_stress_30s, network_latency_200ms,
                wal_checkpoint_truncate, memory_pressure_85pct, disk_fill_500mb
 SCENARIOS_VM2: kill_app, network_partition_30s, disk_fill_200mb
