@@ -248,7 +248,7 @@
         </button>
         <button class="ac-stab" id="ac-stab-darwin" onclick="acSwitchTab(this,'ac-panel-darwin')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Darwin Teams
+            Darwin Teams <span style="font-size:0.65rem;opacity:0.6;margin-left:2px">GA</span>
         </button>
         <button class="ac-stab" id="ac-stab-evolution" onclick="acSwitchTab(this,'ac-panel-evolution')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -308,13 +308,74 @@
         <div style="font-size:0.75rem;color:var(--text-tertiary)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Graduation rule: once pass rate hits 100%, cases become regression tests. If skill passes without being loaded → retire it.
-            <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval →</a>
+        </div>
+        <!-- Testing pipeline diagram — philschmid.de/testing-skills -->
+        <div class="card" style="padding:1.25rem;margin-top:1.5rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:1rem">Testing pipeline</div>
+            <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;font-family:inherit">
+                <defs>
+                    <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/>
+                    </marker>
+                </defs>
+                <!-- boxes -->
+                <!-- Test Case -->
+                <rect x="10" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="55" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Test Case</text>
+                <text x="55" y="89" text-anchor="middle" font-size="9" fill="#6b7280">prompt</text>
+                <text x="55" y="100" text-anchor="middle" font-size="9" fill="#6b7280">checks · expect</text>
+                <!-- Skill Selector -->
+                <rect x="130" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="175" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Skill Selector</text>
+                <text x="175" y="90" text-anchor="middle" font-size="9" fill="#6b7280">trigger match?</text>
+                <text x="175" y="101" text-anchor="middle" font-size="9" fill="#6b7280">load / skip</text>
+                <!-- LLM -->
+                <rect x="250" y="55" width="80" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="290" y="78" text-anchor="middle" font-size="10" fill="#9ca3af">LLM</text>
+                <text x="290" y="93" text-anchor="middle" font-size="9" fill="#6b7280">± skill loaded</text>
+                <!-- Output -->
+                <rect x="360" y="55" width="70" height="50" rx="6" fill="none" stroke="#4b5563" stroke-width="1.5"/>
+                <text x="395" y="83" text-anchor="middle" font-size="10" fill="#d1d5db">Output</text>
+                <!-- Deterministic -->
+                <rect x="460" y="10" width="105" height="55" rx="6" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+                <text x="512" y="27" text-anchor="middle" font-size="9" fill="#93c5fd">Deterministic</text>
+                <text x="512" y="40" text-anchor="middle" font-size="8" fill="#6b7280">regex · length</text>
+                <text x="512" y="52" text-anchor="middle" font-size="8" fill="#6b7280">no_placeholder</text>
+                <text x="512" y="62" text-anchor="middle" font-size="8" fill="#4ade80">fast · free</text>
+                <!-- LLM Judge -->
+                <rect x="460" y="95" width="105" height="55" rx="6" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+                <text x="512" y="112" text-anchor="middle" font-size="9" fill="#c4b5fd">LLM Judge</text>
+                <text x="512" y="125" text-anchor="middle" font-size="8" fill="#6b7280">expectations</text>
+                <text x="512" y="137" text-anchor="middle" font-size="8" fill="#6b7280">outcome · style</text>
+                <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
+                <!-- Verdict -->
+                <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
+                <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80">✓ pass</text>
+                <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
+                <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171">✗ fail</text>
+                <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
+                <!-- arrows -->
+                <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <line x1="330" y1="80" x2="358" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- output → deterministic (up) -->
+                <line x1="430" y1="70" x2="458" y2="37" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- output → llm judge (down) -->
+                <line x1="430" y1="90" x2="458" y2="120" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- deterministic → verdict -->
+                <line x1="565" y1="37" x2="598" y2="68" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- llm judge → verdict -->
+                <line x1="565" y1="120" x2="598" y2="100" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- ref label -->
+                <text x="380" y="155" text-anchor="middle" font-size="8" fill="#4b5563">ref: philschmid.de/testing-skills</text>
+            </svg>
         </div>
     </div>
 
     <!-- Thompson Sampling sub-panel -->
     <div id="ac-panel-thompson" style="display:none">
-        <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
+        <div style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
             <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
             <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
             <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
@@ -643,7 +704,7 @@ async function loadThompsonTab() {
                 const lbl = labels[i] || String(i+1);
                 const calls = (p.accepted||0) + (p.rejected||0);
                 const pct = calls > 0 ? Math.round(100*(p.accepted||0)/calls) + '%' : '—';
-                const ms = p.avg_duration_ms ? Math.round(p.avg_duration_ms).toLocaleString() + 'ms' : '—';
+                const ms = p.avg_duration_ms ? (p.avg_duration_ms >= 1000 ? (p.avg_duration_ms/1000).toFixed(1)+'s' : Math.round(p.avg_duration_ms)+'ms') : '—';
                 return `<div class="stat-card" style="border:1px solid ${col};border-radius:8px;padding:0.8rem">
                     <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.6rem">
                         <span style="background:${col};color:#fff;border-radius:3px;padding:1px 7px;font-size:0.72rem;font-weight:700">${lbl}</span>
@@ -931,6 +992,119 @@ async function loadRlTab() {
         </div>`;
     } catch(e) {
         cont.innerHTML = `<div style="color:#ef4444;padding:1rem">Erreur chargement RL: ${e.message}</div>`;
+    }
+}
+
+// ── Darwin Teams GA ────────────────────────────────────────────────────────
+
+async function loadDarwinTab() {
+    const [runsRes, lbRes, propsRes, teamsRes] = await Promise.allSettled([
+        fetch('/api/evolution/runs?limit=10').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=15').then(r => r.json()),
+        fetch('/api/evolution/proposals?limit=5').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=1').then(r => r.json()), // just for count
+    ]);
+
+    // KPI: runs
+    const runs = runsRes.status === 'fulfilled' ? (runsRes.value.runs || []) : [];
+    document.getElementById('darwin-kpi-runs').textContent = runs.length || '0';
+
+    // KPI: best fitness
+    if (runs.length) {
+        const best = Math.max(...runs.map(r => r.best_fitness || 0));
+        document.getElementById('darwin-kpi-best').textContent = best > 0 ? best.toFixed(3) : '—';
+    }
+
+    // KPI: proposals pending review
+    const props = propsRes.status === 'fulfilled' ? (propsRes.value.proposals || []) : [];
+    const pending = props.filter(p => p.status === 'pending').length;
+    document.getElementById('darwin-kpi-props').textContent = pending;
+
+    // KPI: teams count
+    const lb = lbRes.status === 'fulfilled' ? (lbRes.value.teams || lbRes.value.leaderboard || []) : [];
+    const teamsCount = lbRes.status === 'fulfilled' ? (lbRes.value.total || lb.length) : '—';
+    document.getElementById('darwin-kpi-teams').textContent = teamsCount;
+
+    // GA runs table
+    const runsTbl = document.getElementById('darwin-runs-table');
+    if (!runs.length) {
+        runsTbl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucun run GA. Cliquez "Run GA now" pour démarrer.</p>';
+    } else {
+        runsTbl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Workflow</th>
+                <th style="text-align:right;padding:4px 8px">Best fitness</th>
+                <th style="text-align:right;padding:4px 8px">Générations</th>
+                <th style="text-align:right;padding:4px 8px">Démarré</th>
+            </tr></thead><tbody>
+            ${runs.map(r => `<tr style="border-top:1px solid var(--border)">
+                <td style="padding:4px 8px;font-family:monospace;font-size:0.72rem">${r.wf_id || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:#34d399">${r.best_fitness != null ? (+r.best_fitness).toFixed(3) : '—'}</td>
+                <td style="padding:4px 8px;text-align:right">${r.generations_run || r.generations || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${r.started_at ? r.started_at.slice(0,16).replace('T',' ') : '—'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+    }
+
+    // Leaderboard
+    const lbEl = document.getElementById('darwin-leaderboard');
+    if (!lb.length) {
+        lbEl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucune donnée fitness. Cliquez "Seed données" d\'abord.</p>';
+    } else {
+        lbEl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Agent</th>
+                <th style="text-align:left;padding:4px 8px">Pattern</th>
+                <th style="text-align:left;padding:4px 8px">Tech</th>
+                <th style="text-align:right;padding:4px 8px">Fitness</th>
+                <th style="text-align:right;padding:4px 8px">W/L</th>
+            </tr></thead><tbody>
+            ${lb.map(t => {
+                const fit = t.fitness_score || t.score || 0;
+                const color = fit >= 60 ? '#34d399' : fit >= 40 ? '#f59e0b' : '#ef4444';
+                return `<tr style="border-top:1px solid var(--border)">
+                    <td style="padding:4px 8px;font-size:0.72rem">${t.agent_id || t.agent || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.pattern_id || t.pattern || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.technology || '—'}</td>
+                    <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${(+fit).toFixed(1)}</td>
+                    <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${t.wins||0}/${t.losses||0}</td>
+                </tr>`;
+            }).join('')}
+            </tbody></table>`;
+    }
+}
+
+async function darwinRunGA() {
+    const btn = document.getElementById('darwin-run-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Running…';
+    st.style.display = ''; st.textContent = '⚙️ GA démarré en arrière-plan (20 générations, workflow: ac-improvement-cycle)…';
+    try {
+        const r = await fetch('/api/evolution/run/ac-improvement-cycle', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? '✓ GA lancé — résultats disponibles dans quelques secondes. Rafraîchissez.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 3000);
+    } catch(e) {
+        st.textContent = `✗ Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run GA now';
+    }
+}
+
+async function darwinSeed() {
+    const btn = document.getElementById('darwin-seed-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Seeding…';
+    st.style.display = ''; st.textContent = '⚙️ Seeding team_fitness warmup data…';
+    try {
+        const r = await fetch('/api/darwin/seed', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? '✓ Seed démarré en arrière-plan. Rafraîchissez dans 5s.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 5000);
+    } catch(e) {
+        st.textContent = `✗ Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Seed données';
     }
 }
 

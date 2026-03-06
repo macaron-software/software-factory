@@ -21,6 +21,10 @@ metadata:
 eval_cases:
   - id: lost-user-no-context
     prompt: "I just installed the platform, what should I do?"
+    checks:
+      - "regex:project|workflow|start|create|begin"
+      - "length_min:80"
+      - "no_placeholder"
     expectations:
       - "suggests creating a project first"
       - "mentions at least one concrete workflow name"
@@ -28,6 +32,10 @@ eval_cases:
     tags: ["basic", "onboarding"]
   - id: post-architecture
     prompt: "sf guide I just finished the architecture document, what next?"
+    checks:
+      - "regex:epic|stories|implementation|workflow|next"
+      - "length_min:80"
+      - "no_placeholder"
     expectations:
       - "suggests implementation or epics/stories creation"
       - "mentions a concrete workflow or agent"
@@ -35,6 +43,10 @@ eval_cases:
     tags: ["context-aware"]
   - id: complexity-guidance
     prompt: "sf guide quick bug fix, very simple change"
+    checks:
+      - "regex:simple|skip|lightweight|quick|minimal|straightforward"
+      - "length_min:50"
+      - "no_placeholder"
     expectations:
       - "suggests simple complexity level"
       - "mentions that heavyweight planning phases are skipped for simple tasks"

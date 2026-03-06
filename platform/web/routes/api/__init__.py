@@ -8,7 +8,6 @@ from .modules import router as modules_router
 from .analytics import router as analytics_router
 from .cockpit import router as cockpit_router
 from .screens import router as screens_router
-from .improvement import router as improvement_router
 from .api_keys import router as api_keys_router
 from .dashboard import router as dashboard_router
 from .deploy_targets import router as deploy_targets_router
@@ -23,6 +22,7 @@ from .search import router as search_router
 from .settings import router as settings_router
 from .simplify import router as simplify_router
 from .teams import router as teams_router
+from .skill_eval import router as skill_eval_router
 
 router = APIRouter()
 
@@ -45,4 +45,4 @@ router.include_router(teams_router)
 router.include_router(modules_router)
 router.include_router(cockpit_router)
 router.include_router(screens_router)
-router.include_router(improvement_router)
+router.include_router(skill_eval_router)

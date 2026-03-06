@@ -22,6 +22,10 @@ metadata:
 eval_cases:
   - id: create-basic-skill
     prompt: "Create a skill for generating database migration scripts"
+    checks:
+      - "regex:name:|version:|eval_cases:|triggers:"
+      - "length_min:200"
+      - "no_placeholder"
     expectations:
       - "skill has valid YAML frontmatter with name, version, description"
       - "frontmatter includes metadata.triggers with 3+ entries"
@@ -31,6 +35,10 @@ eval_cases:
     tags: ["basic", "creation"]
   - id: improve-existing-skill
     prompt: "The tdd skill produces test stubs without assertions — improve it"
+    checks:
+      - "regex:NEVER|MUST|PROHIBITED|assertion|version:"
+      - "length_min:150"
+      - "no_placeholder"
     expectations:
       - "identifies root cause (vague instructions in existing skill)"
       - "adds explicit prohibition against stubs (NEVER / MUST)"
@@ -39,6 +47,11 @@ eval_cases:
     tags: ["improvement", "anti-slop"]
   - id: weak-assertion-detection
     prompt: "Write eval_cases for a skill that formats JSON output"
+    checks:
+      - "not_regex:output is non-empty|output exists"
+      - "regex:key|field|schema|structure|specific|format"
+      - "length_min:100"
+      - "no_placeholder"
     expectations:
       - "does NOT include 'output is non-empty' as an expectation"
       - "does NOT include 'output exists' as an expectation"

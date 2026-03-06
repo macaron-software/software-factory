@@ -27,18 +27,30 @@ description: >
 
 eval_cases:
   - input: "Check the performance of http://localhost:8099"
+    checks:
+      - "regex:score|performance|lighthouse|suggest|accessib"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Calls perf_audit_lighthouse with url=http://localhost:8099
       - Reports performance score (0-100)
       - Lists top 3 actionable improvement suggestions
       - Flags any accessibility issues found
   - input: "Is the dashboard fast on mobile?"
+    checks:
+      - "regex:mobile|LCP|CLS|INP|threshold|device"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Calls perf_emulate_mobile first (device=Moto G4, network=fast-3g)
       - Then calls perf_audit_lighthouse
       - Compares mobile vs desktop context
       - Reports LCP/CLS/INP against Google thresholds
   - input: "Why is the page loading slowly?"
+    checks:
+      - "regex:resource|network|trace|insight|fix|slow"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Calls perf_trace_start with url
       - Calls perf_trace_stop after page load
