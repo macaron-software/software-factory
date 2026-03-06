@@ -76,6 +76,7 @@ class PatternRun:
     success: bool = False
     error: str = ""
     flow_step: str = ""
+    lineage: list[str] = field(default_factory=list)  # ancestry chain: Vision → Epic → Story → Task
 
 
 # SSE push (import from runner to share the same queues)
@@ -585,6 +586,7 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
+    lineage: list[str] | None = None,
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
@@ -594,6 +596,7 @@ async def run_pattern(
         project_path=project_path,
         phase_id=phase_id,
         max_iterations=pattern.config.get("max_iterations", 5),
+        lineage=lineage or [],
     )
 
     # Resolve agents for each node — Thompson Sampling when multiple candidates exist
@@ -673,6 +676,12 @@ async def run_pattern(
             await _impl_fractal_worktree(_engine_proxy, run, initial_task)
         elif ptype == "backprop-merge":
             await _impl_backprop_merge(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-stories":
+            await _impl_fractal_stories(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-tests":
+            await _impl_fractal_tests(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-qa":
+            await _impl_fractal_qa(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -764,6 +773,10 @@ async def _execute_node(
         except ImportError:
             pass
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
+    # Inject lineage context — tells agent WHY this task exists (fractal vertical traceability)
+    if run.lineage:
+        lineage_chain = " → ".join(run.lineage)
+        full_task += f"[WHY — Lineage]: {lineage_chain}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
     # Inject protocol — override takes precedence over role-based detection
@@ -1747,6 +1760,7 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         vision=vision,
         tools_enabled=tools_for_agent,
         allowed_tools=allowed_tools,
+        lineage=run.lineage,
     )
 
 
@@ -1765,6 +1779,9 @@ from .impls.solo import run_solo as _impl_solo
 from .impls.wave import run_wave as _impl_wave
 from .impls.fractal_worktree import run_fractal_worktree as _impl_fractal_worktree
 from .impls.backprop_merge import run_backprop_merge as _impl_backprop_merge
+from .impls.fractal_stories import run_fractal_stories as _impl_fractal_stories
+from .impls.fractal_tests import run_fractal_tests as _impl_fractal_tests
+from .impls.fractal_qa import run_fractal_qa as _impl_fractal_qa
 
 
 class _EngineProxy:

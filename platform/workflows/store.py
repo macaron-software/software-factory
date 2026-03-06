@@ -647,9 +647,18 @@ async def run_workflow(
         # Phase timeout: per-phase override or global default
         phase_timeout = phase.timeout if phase.timeout > 0 else PHASE_TIMEOUT_SECONDS
 
+        # Build lineage for traceability: agents know WHY they exist in this workflow phase
+        _lineage = []
+        if run.workflow:
+            _lineage.append(f"Workflow: {run.workflow.name or workflow.id}")
+        if phase.name:
+            _lineage.append(f"Phase: {phase.name}")
+        if initial_task and len(initial_task) < 120:
+            _lineage.append(f"Goal: {initial_task[:120]}")
+
         try:
             result = await asyncio.wait_for(
-                run_pattern(pattern, session_id, phase_task, project_id),
+                run_pattern(pattern, session_id, phase_task, project_id, lineage=_lineage),
                 timeout=phase_timeout,
             )
             run.phase_results.append(
@@ -812,7 +821,7 @@ async def run_workflow(
                     )
                     try:
                         result = await asyncio.wait_for(
-                            run_pattern(pattern, session_id, retry_task, project_id),
+                            run_pattern(pattern, session_id, retry_task, project_id, lineage=_lineage),
                             timeout=phase_timeout,
                         )
                         run.phase_results.append(

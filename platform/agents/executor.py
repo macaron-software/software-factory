@@ -106,6 +106,9 @@ class ExecutionContext:
     epic_run_id: str | None = None
     # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
     capability_grade: str = "executor"
+    # Lineage chain: explains WHY this agent is being called (fractal vertical traceability)
+    # Format: ["Vision: <v>", "Epic: <e>", "Story: <s>", "Task: <t>"]
+    lineage: list[str] = field(default_factory=list)
 
 
 @dataclass

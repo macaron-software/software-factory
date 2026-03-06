@@ -501,6 +501,54 @@ class PatternStore:
                 ],
                 config={"max_depth": 3, "max_children": 5},
             ),
+            # ── Fractal Stories: classify gate for product/story decomposition ──
+            PatternDef(
+                id="fractal-stories", name="Fractal Stories", type="fractal-stories",
+                description="Décomposition produit récursive avec classify gate (livrable en 1 sprint ?). Vision → Epic → Feature → Story. Chaque feuille = story atomique avec sa lignée.",
+                icon="layers", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "chef-projet", "label": "Story Writer A", "x": 150, "y": 260},
+                    {"id": "n3", "agent_id": "expert-metier", "label": "Story Writer B", "x": 450, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n1", "to": "n3", "type": "delegation"},
+                ],
+                config={"max_depth": 3, "max_children": 6},
+            ),
+            # ── Fractal Tests: generate test cases from acceptance criteria ──
+            PatternDef(
+                id="fractal-tests", name="Fractal Tests", type="fractal-tests",
+                description="Génère des cas de test depuis les critères d'acception par décomposition récursive. Chaque test inclut sa lignée dans le docstring (Why: Feature → Suite → Case).",
+                icon="flask", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Test Planner", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "testeur", "label": "Test Writer A", "x": 150, "y": 260},
+                    {"id": "n3", "agent_id": "testeur", "label": "Test Writer B", "x": 450, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n1", "to": "n3", "type": "delegation"},
+                ],
+                config={"max_depth": 3, "max_children": 5},
+            ),
+            # ── Fractal QA: atomic BDD/Gherkin scenarios from acceptance criteria ──
+            PatternDef(
+                id="fractal-qa", name="Fractal QA", type="fractal-qa",
+                description="Décompose les critères d'acception en scénarios BDD atomiques (Given/When/Then). Chaque scénario tracé avec son lineage complet. Rapport PASS/FAIL agrégé.",
+                icon="check-circle", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "QA Planner", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "testeur", "label": "QA Agent A", "x": 150, "y": 260},
+                    {"id": "n3", "agent_id": "testeur", "label": "QA Agent B", "x": 450, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n1", "to": "n3", "type": "delegation"},
+                ],
+                config={"max_depth": 3, "max_children": 5},
+            ),
         ]
 
         for p in builtins:

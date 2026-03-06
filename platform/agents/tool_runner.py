@@ -2167,6 +2167,32 @@ async def _execute_tool(
     if name.startswith("mcp_"):
         return await _tool_mcp_dynamic(name, args, ctx)
 
+    # ── Lineage injection into generated artifacts (traceability) ──
+    # When an agent has a lineage chain (fractal vertical context), prepend a
+    # "Why:" comment to every code_write output so files are self-documenting.
+    # Source: our own practice of documenting sources in code (ADR-0015, TinyAGI/fractals).
+    if name == "code_write":
+        lineage = getattr(ctx, "lineage", None)
+        content = args.get("content", "")
+        if lineage and content and "# Why:" not in content and "// Why:" not in content:
+            path = args.get("path", "")
+            chain = " → ".join(lineage)
+            comment = "// Why: " if path.endswith((".js", ".ts", ".jsx", ".tsx", ".java", ".cs", ".go")) else "# Why: "
+            args["content"] = f"{comment}{chain}\n{content}"
+        # Log artifact to traceability store
+        if lineage and args.get("path"):
+            try:
+                from ..traceability.store import log_artifact
+                log_artifact(
+                    ctx.session_id or "",
+                    "code",
+                    args["path"],
+                    lineage,
+                    f"Written by agent {getattr(ctx.agent, 'id', '?')}",
+                )
+            except Exception:
+                pass
+
     # Registry tools
     # Inject agent context for git branch isolation
     if name == "git_commit":

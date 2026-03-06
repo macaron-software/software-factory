@@ -383,6 +383,23 @@
         </div>
         {% endif %}
 
+        {# ── Traceability — why_log for this mission ── #}
+        <div class="ms-section">
+            <h4 style="cursor:pointer" onclick="toggleTraceability()">
+                <svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-git-branch"/></svg>
+                Traçabilité
+                <span id="traceToggle" style="font-size:0.7rem;color:var(--text-muted);float:right;margin-top:0.1rem">▼</span>
+            </h4>
+            <div id="traceabilityPanel" style="display:none">
+                <div id="traceabilityContent"
+                     hx-get="/api/traceability/{{ mission.session_id | default(mission.id) }}"
+                     hx-trigger="revealed"
+                     hx-swap="innerHTML">
+                    <p style="font-size:0.75rem;color:var(--text-muted)">Chargement...</p>
+                </div>
+            </div>
+        </div>
+
         {% if selected_sprint and selected_sprint.goal %}
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg> Sprint Goal</h4>
@@ -394,6 +411,41 @@
 
 <script src="/static/js/chart.umd.min.js"></script>
 <script>
+function toggleTraceability() {
+    const panel = document.getElementById('traceabilityPanel');
+    const toggle = document.getElementById('traceToggle');
+    const open = panel.style.display === 'none';
+    panel.style.display = open ? 'block' : 'none';
+    toggle.textContent = open ? '▲' : '▼';
+    if (open) htmx.process(document.getElementById('traceabilityContent'));
+}
+
+htmx.on('htmx:afterSwap', function(e) {
+    if (e.target && e.target.id === 'traceabilityContent') {
+        // Format JSON response as readable why-chain
+        try {
+            const data = JSON.parse(e.target.textContent);
+            if (data.artifacts) {
+                let html = '';
+                const typeIcon = {code: '📄', test: '🧪', story: '📋', decision: '📝', qa: '🔍'};
+                for (const [type, items] of Object.entries(data.artifacts)) {
+                    html += `<div style="margin-bottom:0.5rem"><strong style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">${typeIcon[type]||'•'} ${type}</strong>`;
+                    for (const item of items.slice(0, 5)) {
+                        html += `<div style="font-size:0.72rem;margin:0.2rem 0;padding:0.3rem;background:var(--bg-tertiary);border-radius:4px;border-left:2px solid var(--purple)">
+                            <div style="color:var(--text-secondary);word-break:break-word">${item.artifact_ref}</div>
+                            <div style="color:var(--text-muted);font-size:0.68rem;margin-top:0.2rem">↳ ${item.lineage_chain}</div>
+                        </div>`;
+                    }
+                    html += '</div>';
+                }
+                if (!html) html = '<p style="font-size:0.75rem;color:var(--text-muted)">Aucun artefact tracé pour cette mission.</p>';
+                e.target.innerHTML = html;
+            }
+        } catch(err) {
+            // Not JSON — display as-is
+        }
+    }
+});
 async function addTask() {
     const input = document.getElementById('newTaskTitle');
     const title = input.value.trim();

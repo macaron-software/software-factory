@@ -1063,6 +1063,13 @@ class EpicOrchestrator:
                     MAX_LLM_RETRIES = 2
                     LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
 
+                    # Build lineage for traceability
+                    _epic_lineage = [f"Epic: {mission.workflow_name or mission.id}"]
+                    if wf_phase.name:
+                        _epic_lineage.append(f"Phase: {wf_phase.name}")
+                    if mission.brief and len(mission.brief) < 120:
+                        _epic_lineage.append(f"Goal: {mission.brief[:120]}")
+
                     for llm_attempt in range(1, MAX_LLM_RETRIES + 1):
                         try:
                             result = await asyncio.wait_for(
@@ -1073,6 +1080,7 @@ class EpicOrchestrator:
                                     project_id=mission.project_id or mission.id,
                                     project_path=mission.workspace_path,
                                     phase_id=phase.phase_id,
+                                    lineage=_epic_lineage,
                                 ),
                                 timeout=PHASE_TIMEOUT,
                             )
@@ -1330,6 +1338,7 @@ class EpicOrchestrator:
                                         project_id=mission.project_id or mission.id,
                                         project_path=mission.workspace_path,
                                         phase_id=f"{phase.phase_id}-infra-fix",
+                                        lineage=_epic_lineage + ["Task: Infra Fix"],
                                     ),
                                     timeout=300,
                                 )
