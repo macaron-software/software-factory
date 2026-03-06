@@ -829,7 +829,18 @@ class LLMClient:
 
         if tools:
             body["tools"] = tools
-            body["tool_choice"] = "auto"
+            if provider == "minimax":
+                # MiniMax M2.5 ignores "auto"; force "required" or a specific tool when available
+                if len(tools) == 1:
+                    tool_name = tools[0].get("function", {}).get("name", "")
+                    body["tool_choice"] = {
+                        "type": "function",
+                        "function": {"name": tool_name},
+                    }
+                else:
+                    body["tool_choice"] = "required"
+            else:
+                body["tool_choice"] = "auto"
 
         t0 = time.monotonic()
 
