@@ -640,6 +640,30 @@ _AC_PROJECTS = [
         "tech": ["nextjs", "solaris", "stripe", "pg"],
         "max_cycles": 20,
     },
+    {
+        "id": "ac-game-threejs",
+        "name": "Jeu Three.js",
+        "tier": "game-browser",
+        "tier_label": "Jeu Simple",
+        "tech": ["threejs", "js", "webgl"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-game-native",
+        "name": "Jeu Natif Compilé",
+        "tier": "game-compiled",
+        "tier_label": "Jeu Compilé",
+        "tech": ["rust", "sdl2", "opengl"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-migration-php",
+        "name": "Migration PHP → FastAPI",
+        "tier": "migration",
+        "tier_label": "Migration",
+        "tech": ["php", "fastapi", "postgres"],
+        "max_cycles": 20,
+    },
 ]
 
 

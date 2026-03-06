@@ -37,6 +37,9 @@
 .ac-card.tier-medium          { border-left-color: var(--yellow-deep); }
 .ac-card.tier-complex         { border-left-color: var(--purple); }
 .ac-card.tier-enterprise      { border-left-color: var(--red); }
+.ac-card.tier-game-browser    { border-left-color: #06b6d4; }
+.ac-card.tier-game-compiled   { border-left-color: #f97316; }
+.ac-card.tier-migration       { border-left-color: #a78bfa; }
 .ac-bar { height:4px; border-radius:2px; background:var(--border); margin-top:.5rem; }
 .ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; background:var(--purple); }
 .ac-bar-fill.tier-simple          { background: var(--green); }
@@ -44,6 +47,9 @@
 .ac-bar-fill.tier-medium          { background: var(--yellow-deep); }
 .ac-bar-fill.tier-complex         { background: var(--purple); }
 .ac-bar-fill.tier-enterprise      { background: var(--red); }
+.ac-bar-fill.tier-game-browser    { background: #06b6d4; }
+.ac-bar-fill.tier-game-compiled   { background: #f97316; }
+.ac-bar-fill.tier-migration       { background: #a78bfa; }
 .ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin-bottom:.5rem; }
 .ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
 .ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-secondary); font-weight:500; border-bottom:1px solid var(--border); }
@@ -97,14 +103,10 @@
   <div style="display:flex;align-items:center;gap:.5rem">
     {{ fi('refresh-cw', 18) }}
     <strong>Amélioration Continue</strong>
-    <span style="font-size:.7rem;color:var(--text-secondary)">{{ projects|length }} projets · 20 cycles · Thompson + RL + GA</span>
+    <span style="font-size:.7rem;color:var(--text-secondary)">{{ projects|length }} projets · 20 cycles max · Thompson + RL + GA · Lighthouse · axe · lint · adversarial</span>
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
     <span style="font-size:.7rem;color:var(--purple)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
-    <button id="ac-intel-toggle" onclick="acToggleIntel()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:.3rem;cursor:pointer;font-size:.75rem">
-      {{ fi('cpu', 12) }} Intelligence
-    </button>
     <button id="ac-start-btn" onclick="acStartCycle()"
       style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--purple);color:var(--text-on-accent);border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('play', 12) }} Démarrer
@@ -113,8 +115,8 @@
 </div>
 <div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
 
-{# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
-<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
+{# ── Intelligence metrics panel (always open) ────────────────────────────── #}
+<div id="ac-intel-panel" style="margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
     <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem">
       {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--purple)">—</span>
@@ -164,7 +166,9 @@
   {% set score = p.total_score_avg|int %}
   {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
   <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
-       onclick="acSelectProject('{{ p.id }}', this)">
+       onclick="acSelectProject('{{ p.id }}', this)"
+       ondblclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+       title="Clic: sélectionner · Double-clic: détail">
     <div class="tier-label">{{ p.tier_label }}</div>
     <div class="proj-name">{{ p.name }}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
@@ -259,8 +263,7 @@
 {% endif %}
 
 <script>
-let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
-let _acIntelOpen = false;
+var _acSelectedProject = '{{ projects[0].id if projects else "" }}';
 
 function acSelectProject(projectId, card) {
   _acSelectedProject = projectId;
@@ -270,20 +273,73 @@ function acSelectProject(projectId, card) {
     target: '#ac-history-content',
     swap: 'innerHTML'
   });
-  document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
-  if (_acIntelOpen) acRefreshIntel();
+  const title = document.getElementById('ac-history-title');
+  if (title) title.textContent = 'Historique — ' + card.querySelector('.proj-name').textContent;
+  acRefreshIntel();
 }
 
-function acToggleIntel() {
-  const panel = document.getElementById('ac-intel-panel');
-  _acIntelOpen = !_acIntelOpen;
-  panel.style.display = _acIntelOpen ? 'block' : 'none';
-  if (_acIntelOpen) acRefreshIntel();
+async function acOpenModal(projectId, projectName) {
+  // Create or reuse overlay
+  let overlay = document.getElementById('ac-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ac-detail-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center';
+    overlay.addEventListener('click', e => { if(e.target===overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:.75rem;padding:1.5rem;min-width:360px;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;position:relative">
+    <button onclick="document.getElementById('ac-detail-overlay').remove()" style="position:absolute;top:.75rem;right:.75rem;background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.1rem">✕</button>
+    <div style="font-weight:700;font-size:1rem;margin-bottom:1rem">${projectName || projectId}</div>
+    <div id="ac-modal-body" style="color:var(--text-secondary);font-size:.8rem">Chargement…</div>
+  </div>`;
+  overlay.style.display = 'flex';
+
+  try {
+    const [stateRes, scoresRes] = await Promise.all([
+      fetch('/api/improvement/project/' + projectId),
+      fetch('/api/improvement/scores/' + projectId)
+    ]);
+    const state = await stateRes.json();
+    const scores = await scoresRes.json();
+    const conv = state.convergence || {};
+    const hint = state.next_cycle_hint || {};
+    const recent = state.recent_scores || [];
+    let html = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1rem">';
+    const kpi = (label, val, col) => `<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.5rem;text-align:center"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</div><div style="font-size:1.1rem;font-weight:700;color:${col||'var(--text-primary)'}">${val}</div></div>`;
+    html += kpi('Convergence', conv.status || 'cold_start', '#7c3aed');
+    html += kpi('Cycles', state.cycle_count || 0, 'var(--blue-bright)');
+    html += kpi('Score moy.', state.total_score_avg ? Math.round(state.total_score_avg) : '—', 'var(--green)');
+    html += kpi('RL Reward', scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—', '#f59e0b');
+    html += kpi('Statut', state.status || 'idle', 'var(--text-secondary)');
+    html += kpi('Hint RL', hint.action ? hint.action.substring(0,12) : '—', '#06b6d4');
+    html += '</div>';
+    if (recent.length) {
+      html += '<div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle (récents)</div>';
+      html += '<div style="display:flex;align-items:flex-end;gap:3px;height:36px;margin-bottom:1rem">';
+      const mx = Math.max(...recent, 1);
+      recent.forEach(s => {
+        const h = Math.round((s/mx)*32);
+        const c = s>=80?'var(--green)':s>=60?'var(--yellow-deep)':'var(--red)';
+        html += `<div style="flex:1;height:${h}px;background:${c};border-radius:1px" title="${s}/100"></div>`;
+      });
+      html += '</div>';
+    }
+    // Adversarial
+    const adv = state.last_adversarial || {};
+    if (adv.score !== undefined) {
+      html += `<div style="font-size:.7rem;color:var(--text-secondary)">Dernier adversarial : <strong style="color:${adv.score>=7?'var(--red)':'var(--green)'}">${adv.score}/14</strong> — ${adv.verdict||'—'}</div>`;
+    }
+    document.getElementById('ac-modal-body').innerHTML = html;
+  } catch(e) {
+    document.getElementById('ac-modal-body').textContent = 'Aucune donnée disponible pour ce projet.';
+  }
 }
 
 async function acRefreshIntel() {
   if (!_acSelectedProject) return;
-  document.getElementById('ac-intel-proj-label').textContent = _acSelectedProject;
+  const labelEl = document.getElementById('ac-intel-proj-label');
+  if (labelEl) labelEl.textContent = _acSelectedProject;
   try {
     const [stateRes, scoresRes] = await Promise.all([
       fetch('/api/improvement/project/' + _acSelectedProject),
@@ -292,69 +348,55 @@ async function acRefreshIntel() {
     const state = await stateRes.json();
     const scores = await scoresRes.json();
 
-    // Convergence
     const conv = state.convergence || {};
     const convEl = document.getElementById('im-conv');
-    convEl.textContent = conv.status || '—';
-    convEl.className = 'value conv-' + (conv.status || 'cold_start');
+    if (convEl) { convEl.textContent = conv.status || '—'; convEl.className = 'value conv-' + (conv.status || 'cold_start'); }
 
-    // RL reward
-    document.getElementById('im-reward').textContent =
-      scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—';
+    const rewardEl = document.getElementById('im-reward');
+    if (rewardEl) rewardEl.textContent = scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—';
 
-    // Cycles + avg score
-    document.getElementById('im-cycles').textContent = state.cycle_count || 0;
-    document.getElementById('im-avg').textContent =
-      state.total_score_avg ? Math.round(state.total_score_avg) : '—';
+    const cyclesEl = document.getElementById('im-cycles');
+    if (cyclesEl) cyclesEl.textContent = state.cycle_count || 0;
 
-    // RL hint
+    const avgEl = document.getElementById('im-avg');
+    if (avgEl) avgEl.textContent = state.total_score_avg ? Math.round(state.total_score_avg) : '—';
+
     const hint = state.next_cycle_hint;
-    document.getElementById('im-hint').textContent =
-      hint ? (hint.action || '—') + (hint.confidence ? ' (' + hint.confidence.toFixed(2) + ')' : '') : '—';
+    const hintEl = document.getElementById('im-hint');
+    if (hintEl) hintEl.textContent = hint ? (hint.action || '—') + (hint.confidence ? ' (' + hint.confidence.toFixed(2) + ')' : '') : '—';
 
-    // Skill eval
+    const evalEl = document.getElementById('im-eval');
     const evalPending = state.skill_eval_pending;
-    document.getElementById('im-eval').textContent =
-      evalPending && evalPending.length ? evalPending.join(', ') : 'aucun';
+    if (evalEl) evalEl.textContent = evalPending && evalPending.length ? evalPending.join(', ') : 'aucun';
 
-    // Sparkline
     const sparkEl = document.getElementById('ac-sparkline');
     const recent = state.recent_scores || [];
-    if (recent.length) {
-      const maxS = Math.max(...recent, 1);
-      sparkEl.innerHTML = recent.map(s => {
-        const h = Math.round((s / maxS) * 32);
-        const cls = s >= 80 ? 'spark-ok' : s >= 60 ? 'spark-warn' : 'spark-bad';
-        return `<div class="spark-bar ${cls}" style="height:${h}px" title="${s}/100"></div>`;
-      }).join('');
-    } else {
-      sparkEl.innerHTML = '<span style="color:var(--text-secondary);font-size:.7rem">pas de données</span>';
-    }
-
-    // Thompson stats
-    const tbody = document.getElementById('ac-thompson-tbody');
-    const skillStats = scores.skill_stats || {};
-    const rows = [];
-    for (const [skill, variants] of Object.entries(skillStats)) {
-      for (const [variant, stats] of Object.entries(variants)) {
-        const prob = stats.wins / Math.max(1, stats.wins + stats.losses);
-        rows.push(`<tr class="thompson-row">
-          <td style="font-family:monospace">${skill}</td>
-          <td style="font-family:monospace;font-size:.65rem">${variant}</td>
-          <td class="thompson-win">${stats.wins}</td>
-          <td class="thompson-lose">${stats.losses}</td>
-          <td>${stats.avg_score ? Math.round(stats.avg_score) : '—'}</td>
-          <td style="font-family:monospace">${(prob * 100).toFixed(1)}%</td>
-        </tr>`);
+    if (sparkEl) {
+      if (recent.length) {
+        const maxS = Math.max(...recent, 1);
+        sparkEl.innerHTML = recent.map(s => {
+          const h = Math.round((s/maxS)*32);
+          const cls = s>=80?'spark-ok':s>=60?'spark-warn':'spark-bad';
+          return `<div class="spark-bar ${cls}" style="height:${h}px" title="${s}/100"></div>`;
+        }).join('');
+      } else {
+        sparkEl.innerHTML = '<span style="color:var(--text-secondary);font-size:.7rem">pas de données</span>';
       }
     }
-    tbody.innerHTML = rows.length
-      ? rows.join('')
-      : '<tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
 
-  } catch(e) {
-    console.error('AC intel fetch error', e);
-  }
+    const tbody = document.getElementById('ac-thompson-tbody');
+    if (tbody) {
+      const skillStats = scores.skill_stats || {};
+      const rows = [];
+      for (const [skill, variants] of Object.entries(skillStats)) {
+        for (const [variant, stats] of Object.entries(variants)) {
+          const prob = stats.wins / Math.max(1, stats.wins + stats.losses);
+          rows.push(`<tr><td style="font-family:monospace">${skill}</td><td style="font-family:monospace;font-size:.65rem">${variant}</td><td class="thompson-win">${stats.wins}</td><td class="thompson-lose">${stats.losses}</td><td>${stats.avg_score ? Math.round(stats.avg_score) : '—'}</td><td style="font-family:monospace">${(prob*100).toFixed(1)}%</td></tr>`);
+        }
+      }
+      tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+    }
+  } catch(e) { console.error('AC intel fetch error', e); }
 }
 
 async function acStartCycle() {
@@ -381,4 +423,7 @@ async function acStartCycle() {
     btn.disabled = false;
   }
 }
+
+// Auto-refresh intel on load
+if (_acSelectedProject) acRefreshIntel();
 </script>

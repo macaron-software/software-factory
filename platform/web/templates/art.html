@@ -276,9 +276,8 @@
         </button>
         <button class="ac-stab" id="ac-stab-darwin" onclick="acSwitchTab(this,'ac-panel-darwin')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Darwin Teams <span style="font-size:0.65rem;opacity:0.6;margin-left:2px">GA</span>
-        </button>
-        <button class="ac-stab" id="ac-stab-evolution" onclick="acSwitchTab(this,'ac-panel-evolution')">
+            Darwin Teams
+        </button> onclick="acSwitchTab(this,'ac-panel-evolution')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             Evolution
         </button>
@@ -655,13 +654,13 @@
 // ── AC Team Graph ─────────────────────────────────────────────────────────
 const AC_NW = 130, AC_NH = 56;
 const AC_NODES = [
-    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution', role:'Scheduler nightly'},
-    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',  role:'Continuous monitor'},
-    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',  role:'LLM selection'},
-    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin GA', role:'Team evolution'},
-    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy', role:'Cycle learning'},
-    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal', role:'Self-healing 60s'},
-    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge', role:'Maintenance nightly'},
+    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution',  role:'Scheduler nightly',  photo:'/static/avatars/solution_train_engineer.jpg'},
+    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',   role:'Monitor continu',    photo:'/static/avatars/sre.jpg'},
+    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',   role:'Sélection LLM',      photo:'/static/avatars/knowledge-manager.jpg'},
+    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin',     role:'Compétition équipes', photo:'/static/avatars/strat-cto.jpg'},
+    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy',  role:'Apprentissage cycle', photo:'/static/avatars/worker.jpg'},
+    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal',  role:'Self-healing 60s',   photo:'/static/avatars/threat-analyst.jpg'},
+    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge',  role:'Maintenance nightly', photo:'/static/avatars/knowledge-curator.jpg'},
 ];
 const AC_EDGES = [
     {from:'evolution_scheduler', to:'thompson',   pat:'h', label:'tune'},
@@ -714,12 +713,17 @@ function renderAcGraph() {
         const col = n.color;
         const g = document.createElementNS('http://www.w3.org/2000/svg','g');
         g.setAttribute('class','ig-node'); g.setAttribute('transform',`translate(${n.x},${n.y})`);
-        const initials = n.name.substring(0,2);
+        g.style.cursor = 'pointer';
+        g.addEventListener('click', () => window.openFiche && window.openFiche(n.id));
+        const clipId = `acp-${n.id}`;
+        const cy = AC_NH/2;
         g.innerHTML = `
-            <rect class="ig-node-bg" width="${AC_NW}" height="${AC_NH}"/>
+            <defs><clipPath id="${clipId}"><circle cx="20" cy="${cy}" r="13"/></clipPath></defs>
+            <rect class="ig-node-bg" width="${AC_NW}" height="${AC_NH}" rx="4"/>
             <line class="ig-node-bar" x1="0" y1="0" x2="${AC_NW}" y2="0" stroke="${col}" stroke-width="3"/>
-            <circle cx="20" cy="${AC_NH/2}" r="14" fill="${col}" opacity="0.2"/>
-            <text x="20" y="${AC_NH/2+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${initials}</text>
+            <circle cx="20" cy="${cy}" r="13" fill="${col}" opacity="0.25"/>
+            ${n.photo ? `<image href="${n.photo}" x="7" y="${cy-13}" width="26" height="26" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>` : `<text x="20" y="${cy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${n.name.substring(0,2)}</text>`}
+            <circle cx="20" cy="${cy}" r="13" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.6"/>
             <text class="ig-node-name" x="40" y="22">${n.name}</text>
             <text class="ig-node-role" x="40" y="36">${n.role}</text>
             <circle class="ig-node-dot" cx="${AC_NW-12}" cy="14" fill="${col}" opacity="0.6"/>`;
