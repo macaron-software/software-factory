@@ -96,13 +96,12 @@ def _launch_quality_improvement(db, run_id: str, issues: list[str]) -> Optional[
             f"Source run: {run_id}\n"
             f"Detected at: {datetime.now(timezone.utc).isoformat()}\n\n"
             f"## Issues Found\n{issues_text}\n\n"
-            f"## Task\n"
-            f"1. Analyze the root cause in platform/services/evidence.py and/or epic_orchestrator.py\n"
-            f"2. Fix the issue (add missing checks, tighten criteria)\n"
-            f"3. Run pytest tests/ to validate\n"
-            f"4. git commit + push\n"
-            f"5. sudo systemctl restart macaron-platform-blue\n"
-            f"6. Verify the fix: check that a re-run of similar missions would now fail correctly\n"
+            f"## Task pour les agents AC (ac-architect + lead_dev)\n"
+            f"Analyser et corriger les problèmes détectés dans la SF elle-même:\n"
+            f"1. Lire les fichiers concernés: code_read('/app/platform/...') ou deploy/Dockerfile\n"
+            f"2. Modifier la SF: code_edit() ou code_write() sur /app/platform/ ou /app/deploy/\n"
+            f"3. Valider la correction et commiter\n\n"
+            f"⚠️ Ne pas modifier les fichiers projets/workspaces — modifier la plateforme SF.\n"
         )
 
         # Get quality-improvement phases
@@ -195,10 +194,86 @@ def scan_false_completions() -> list[dict]:
     return found
 
 
+def scan_ac_issues() -> list[dict]:
+    """Scan active AC cycles for structural issues and report them for quality-improvement.
+
+    Detects problems that require SF-level fixes (missing tools, wrong agents, etc.)
+    and returns them so watchdog_cycle() can trigger quality-improvement on the SF.
+    """
+    db = _get_db()
+    issues_found = []
+    try:
+        rows = db.execute(
+            "SELECT project_id, current_run_id, current_cycle FROM ac_project_state WHERE status='running'"
+        ).fetchall()
+    except Exception as e:
+        logger.warning("platform_watchdog: scan_ac_issues failed: %s", e)
+        return []
+
+    for row in rows:
+        project_id, run_id, cycle = row[0], row[1], row[2]
+        if not run_id:
+            continue
+        issues = []
+
+        # Check QA reports in workspaces for structural failures
+        try:
+            import glob as _glob
+
+            # Find workspace for this run
+            ws_candidates = _glob.glob(f"/app/data/workspaces/*/QA_REPORT_*.md")
+            for qa_path in ws_candidates:
+                try:
+                    content = open(qa_path).read()
+                    if "chromium because executable doesn't exist" in content:
+                        issues.append(
+                            f"AC cycle {project_id} cycle {cycle}: Playwright/Chromium absent du container "
+                            f"— QA screenshots impossible. Fix: ajouter 'npx playwright install chromium' "
+                            f"dans le Dockerfile de la plateforme (deploy/Dockerfile)."
+                        )
+                        break
+                    if "No build step needed" in content or "build script is echo" in content:
+                        issues.append(
+                            f"AC cycle {project_id} cycle {cycle}: build script no-op dans QA report "
+                            f"— les agents ne compilent pas réellement le code."
+                        )
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Check workspace for .ts file containing HTML (agent confusion)
+        try:
+            import glob as _glob
+
+            ts_files = _glob.glob(f"/app/data/workspaces/*/src/*.ts")
+            for ts_path in ts_files:
+                try:
+                    content = open(ts_path).read(500)
+                    if "<!DOCTYPE html" in content or "<html" in content:
+                        issues.append(
+                            f"AC cycle {project_id} cycle {cycle}: fichier .ts contient du HTML "
+                            f"— confusion d'extension dans les agents ac-codex/ac-architect. "
+                            f"Fix: renforcer les instructions d'extension dans skills/ac-codex.md."
+                        )
+                        break
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        if issues:
+            # Use run_id as dedup key so we don't re-trigger for same cycle
+            issues_found.append({"run_id": f"ac-{run_id}", "project_id": project_id, "issues": issues})
+
+    return issues_found
+
+
 async def watchdog_cycle():
     """One watchdog cycle: scan → detect → trigger quality-improvement if needed."""
     db = _get_db()
-    false_positives = scan_false_completions()
+    false_positives = scan_false_completions() + scan_ac_issues()
 
     if not false_positives:
         return
