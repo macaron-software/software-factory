@@ -248,7 +248,7 @@
         </button>
         <button class="ac-stab" id="ac-stab-darwin" onclick="acSwitchTab(this,'ac-panel-darwin')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            Darwin Teams
+            Darwin Teams <span style="font-size:0.65rem;opacity:0.6;margin-left:2px">GA</span>
         </button>
         <button class="ac-stab" id="ac-stab-evolution" onclick="acSwitchTab(this,'ac-panel-evolution')">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -375,7 +375,7 @@
 
     <!-- Thompson Sampling sub-panel -->
     <div id="ac-panel-thompson" style="display:none">
-        <div class="stats-grid" style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
+        <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
             <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
             <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
             <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
