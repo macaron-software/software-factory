@@ -115,15 +115,23 @@ _PROVIDERS = {
     # WHY: opencode is an OpenAI-compatible self-hosted inference server (Go).
     # Used on OVH demo env as primary provider; supports multiple models via /v1/models.
     # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
+    # Static list covers the standard opencode model profiles; ↻ in Settings fetches live list.
     "opencode": {
         "name": "OpenCode (Go)",
         "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
         "key_env": "OPENCODE_API_KEY",
-        # "coding" is the code-optimized inference mode; falls back to env or empty list
-        # (live models are also fetched from /v1/models in Settings UI)
-        "models": [
-            m for m in [os.environ.get("OPENCODE_DEFAULT_MODEL", "coding")] if m
-        ],
+        "models": sorted(
+            {
+                os.environ.get("OPENCODE_DEFAULT_MODEL", "coding"),
+                "coding",  # default code-optimized profile
+                "coding-fast",  # faster variant
+                "claude-sonnet-4-5",
+                "claude-haiku-4-5",
+                "gpt-4o",
+                "gpt-4o-mini",
+            }
+            - {""}  # remove empty string if OPENCODE_DEFAULT_MODEL unset
+        ),
         "default": os.environ.get("OPENCODE_DEFAULT_MODEL", "coding"),
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",

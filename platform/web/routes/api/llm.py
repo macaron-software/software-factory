@@ -203,7 +203,8 @@ async def get_llm_routing():
             )
     routing = _load_routing()
     return JSONResponse(
-        {"ok": True, "providers": providers, "models": all_models, "routing": routing}
+        {"ok": True, "providers": providers, "models": all_models, "routing": routing},
+        headers={"Cache-Control": "no-store"},
     )
 
 

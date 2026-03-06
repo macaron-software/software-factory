@@ -1272,6 +1272,39 @@ class AgentExecutor:
                         )
                         continue  # retry with nudge
 
+                    # If work was done (files written) but output is too short,
+                    # inject a synthesis prompt so the adversarial can evaluate.
+                    if (
+                        has_written
+                        and len(final_content.strip()) < 80
+                        and round_num < MAX_TOOL_ROUNDS - 1
+                    ):
+                        messages.append(
+                            LLMMessage(role="assistant", content=final_content)
+                        )
+                        written_files = list(
+                            {
+                                tc_rec["args"].get("path", "")
+                                for tc_rec in all_tool_calls
+                                if tc_rec["name"] in ("code_write", "code_edit")
+                                and tc_rec["args"].get("path")
+                            }
+                        )
+                        files_str = ", ".join(written_files[:3]) or "les fichiers créés"
+                        messages.append(
+                            LLMMessage(
+                                role="user",
+                                content=(
+                                    f"✅ Tu as écrit : {files_str}. "
+                                    "Maintenant affiche le CONTENU COMPLET de ce que tu as créé. "
+                                    "L'adversarial doit pouvoir lire et évaluer ton travail. "
+                                    "Minimum 200 mots décrivant ce qui a été produit."
+                                ),
+                            )
+                        )
+                        tools = None  # final synthesis round — no more tools
+                        continue
+
                     # Strip <think> blocks before chunking (tags would split across chunks)
                     import re as _re_exec
 
