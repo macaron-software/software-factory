@@ -110,4 +110,29 @@ jobs:
           curl -sf "$BASE_URL/api/health" 2>/dev/null | \
             python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (could not parse)"
           
+          echo ""
+          echo "=== Live Diagnostics ==="
+          for PROJECT in $(echo "$PROJECTS" | tr ',' ' '); do
+            PROJECT=$(echo "$PROJECT" | tr -d ' ')
+            echo "--- $PROJECT ---"
+            LIVE=$(do_api GET "$BASE_URL/api/improvement/live/$PROJECT" 2>/dev/null || echo "{}")
+            echo "$LIVE" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+print(f'  cycles: {len(d.get(\"cycles\",[]))}')
+if d.get('cycles'):
+    c=d['cycles'][0]
+    print(f'  latest cycle: #{c.get(\"cycle_num\")} status={c.get(\"status\")} score={c.get(\"total_score\")}')
+    print(f'  phase_scores: {c.get(\"phase_scores\",\"none\")}')
+    print(f'  run_id: {c.get(\"run_id\",\"none\")}')
+mission_status=d.get('mission_status','unknown')
+print(f'  mission_status: {mission_status}')
+" 2>/dev/null || echo "  (parse error) raw: ${LIVE:0:200}"
+          done
+          
+          echo ""
+          echo "=== Active missions ==="
+          HEALTH2=$(curl -sf "$BASE_URL/api/health" 2>/dev/null || echo "{}")
+          echo "$HEALTH2" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'  active_missions: {d.get(\"active_missions\",\"?\")}'); [print(f'  check: {k}={v}') for k,v in d.get('checks',{}).items()]" 2>/dev/null || true
+          
           REMOTE
