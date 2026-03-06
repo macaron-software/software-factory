@@ -1049,7 +1049,33 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                     started = started.isoformat()
                 if hasattr(completed, "isoformat"):
                     completed = completed.isoformat()
-                # Stub record — scores will be 0 (no inject-cycle was called)
+                # Try to extract phase scores + summary from sprints
+                phase_scores_dict = {}
+                fix_summary = f"Cycle {cycle_num} — {status}"
+                total_score = 0
+                try:
+                    sprints = store.list_sprints(run_id)
+                    if sprints:
+                        phase_scores_dict = {
+                            s.type: s.quality_score for s in sprints if s.quality_score
+                        }
+                        scored = [v for v in phase_scores_dict.values() if v]
+                        total_score = sum(scored) // len(scored) if scored else 0
+                        retros = [
+                            f"{s.type}:{s.quality_score}"
+                            + (f"/{s.retro_notes[:60]}" if s.retro_notes else "")
+                            for s in sprints
+                            if s.quality_score or s.retro_notes
+                        ]
+                        if retros:
+                            fix_summary = (
+                                f"Cycle {cycle_num} — " + " · ".join(retros)[:200]
+                            )
+                except Exception:
+                    pass
+                import json as _json2
+
+                # Stub record — backfilled from mission/sprint data
                 conn.execute(
                     "INSERT INTO ac_cycles (project_id, cycle_num, platform_run_id, status,"
                     " phase_scores, total_score, defect_count, fix_summary, started_at, completed_at)"
@@ -1060,10 +1086,10 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                         cycle_num,
                         run_id,
                         status,
-                        "{}",
+                        _json2.dumps(phase_scores_dict),
+                        total_score,
                         0,
-                        0,
-                        f"Cycle {cycle_num} — {status} (scores non enregistrés)",
+                        fix_summary,
                         started,
                         completed,
                     ),
