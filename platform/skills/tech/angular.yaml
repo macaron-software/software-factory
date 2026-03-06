@@ -1,0 +1,49 @@
+id: tech-angular
+name: "Angular"
+stack: angular
+description: "Angular 17+ production patterns — signals, standalone, testing"
+
+content: |
+  ## Build & Test
+  ng build --configuration production
+  ng test --no-watch --code-coverage
+  ng lint
+  ng e2e                     # Playwright or Cypress
+
+  ## Modern Angular (v17+)
+  - Standalone components: NO NgModule needed
+    @Component({ standalone: true, imports: [CommonModule, ...], template: `...` })
+  - Signals for reactive state (preferred over BehaviorSubject):
+    count = signal(0);
+    double = computed(() => this.count() * 2);
+    effect(() => console.log(this.count()));
+    this.count.set(1);  this.count.update(v => v + 1);
+  - inject() in constructor body: `private svc = inject(MyService)`
+  - OnPush change detection everywhere: `changeDetection: ChangeDetectionStrategy.OnPush`
+
+  ## Components
+  - Input: `@Input() title = input<string>('')`  (signal-based) or `@Input() title: string`
+  - Output: `clicked = output<void>()`  or `@Output() clicked = new EventEmitter<void>()`
+  - Two-way: `[(ngModel)]` or signal `model()`
+  - Template: `@if`, `@for`, `@switch` (v17 control flow — NO *ngIf / *ngFor)
+
+  ## Services
+  @Injectable({ providedIn: 'root' })
+  export class DataService {
+    private http = inject(HttpClient);
+    getItems() { return this.http.get<Item[]>('/api/items'); }
+  }
+
+  ## Routing
+  export const routes: Routes = [
+    { path: '', component: HomeComponent },
+    { path: 'items/:id', loadComponent: () => import('./item.component').then(m => m.ItemComponent) },
+  ];
+  - Lazy loading via loadComponent (standalone) or loadChildren (NgModule)
+  - Guards: `canActivate: [authGuard]` where `authGuard` is a functional guard
+
+  ## Testing
+  - Unit: TestBed.configureTestingModule({ imports: [ComponentUnderTest] })
+  - Spy: `const spy = spyOn(service, 'method').and.returnValue(of(data))`
+  - HttpClientTestingModule + HttpTestingController for HTTP
+  - Component harnesses (CDK) for reliable element queries

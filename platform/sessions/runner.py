@@ -282,6 +282,19 @@ async def _build_context(agent: AgentDef, session: SessionDef) -> ExecutionConte
         except Exception:
             pass
 
+    # Tech Skill Broker — inject stack-specific skills for dev/qa/lead roles
+    try:
+        from ..agents.skill_broker import detect_stack, load_tech_skills, should_inject
+
+        if should_inject(agent.role or "") and project_path:
+            techs = detect_stack(project_path=project_path or "")
+            if techs:
+                tech_skills = load_tech_skills(techs, max_chars=2000)
+                if tech_skills:
+                    skills_prompt = (skills_prompt + "\n\n" + tech_skills).strip()
+    except Exception:
+        pass
+
     # Load project memory files (CLAUDE.md, copilot-instructions.md, etc.)
     project_memory_str = ""
     if project_path:

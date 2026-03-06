@@ -1668,6 +1668,32 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         except Exception:
             pass
 
+    # ── Tech Skill Broker (Options A + C) ────────────────────────────────
+    # For dev/qa/lead roles: detect stack from project files + context,
+    # then inject tech-specific skills + dynamic context snippet.
+    try:
+        from ..agents.skill_broker import (
+            detect_stack,
+            load_tech_skills,
+            generate_dynamic_context,
+            should_inject,
+        )
+
+        if should_inject(agent.role or ""):
+            techs = detect_stack(
+                project_path=run.project_path or project_path or "",
+                specs_text=project_context[:4000],
+            )
+            if techs:
+                tech_skills = load_tech_skills(techs, max_chars=2500)
+                if tech_skills:
+                    skills_prompt = (skills_prompt + "\n\n" + tech_skills).strip()
+                dyn_ctx = generate_dynamic_context(techs)
+                if dyn_ctx:
+                    project_context += "\n\n" + dyn_ctx
+    except Exception:
+        pass
+
     # Inject global lessons from past epics (cross-epic learning)
     lessons_prompt = ""
     try:

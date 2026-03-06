@@ -1,0 +1,75 @@
+id: tech-nextjs
+name: "Next.js (App Router)"
+stack: nextjs
+description: "Next.js 14+ App Router patterns — RSC, data fetching, testing"
+
+content: |
+  ## Build & Test
+  npm run dev           # dev server (turbopack)
+  npm run build         # production build
+  npm run start         # production server
+  npm test -- --run     # vitest
+  npx playwright test   # E2E
+
+  ## App Router Structure
+  app/
+  ├── layout.tsx        # root layout (RootLayout)
+  ├── page.tsx          # home route
+  ├── (auth)/           # route group (no URL segment)
+  │   └── login/page.tsx
+  ├── api/
+  │   └── items/route.ts  # API route handler
+  └── items/
+      ├── page.tsx        # /items
+      └── [id]/page.tsx   # /items/:id
+
+  ## Server vs Client Components
+  // Server Component (default) — can be async
+  async function ItemList() {
+    const items = await db.query('SELECT * FROM items');  // direct DB access
+    return <ul>{items.map(i => <li key={i.id}>{i.name}</li>)}</ul>;
+  }
+  // Client Component — add 'use client' when: hooks, events, browser APIs
+  'use client';
+  function Counter() {
+    const [count, setCount] = useState(0);
+    return <button onClick={() => setCount(c => c+1)}>{count}</button>;
+  }
+  - Pass serializable data from Server to Client components as props (not functions)
+
+  ## Data Fetching
+  // Server Component fetch (auto-cached)
+  const data = await fetch('https://api.example.com/items', {
+    next: { revalidate: 60 }  // ISR: revalidate every 60s
+  }).then(r => r.json());
+  // Revalidate on demand: revalidateTag('items') / revalidatePath('/items')
+  // Client: TanStack Query or SWR for client-side fetching
+
+  ## API Routes
+  // app/api/items/route.ts
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    return Response.json({ items: [] });
+  }
+  export async function POST(request: Request) {
+    const body = await request.json();
+    return Response.json({ id: 1, ...body }, { status: 201 });
+  }
+
+  ## Server Actions
+  'use server';
+  export async function createItem(formData: FormData) {
+    const name = formData.get('name') as string;
+    await db.insert(items).values({ name });
+    revalidatePath('/items');
+  }
+  // Use in form: <form action={createItem}>
+
+  ## Testing (Vitest + RTL)
+  import { render, screen } from '@testing-library/react'
+  test('renders item', () => {
+    render(<ItemCard item={{ id: 1, name: 'Test' }} />)
+    expect(screen.getByText('Test')).toBeInTheDocument()
+  })
+  - Mock server components: test logic separately from UI
+  - E2E: Playwright `page.goto('/')`, `page.click('button')`
