@@ -607,6 +607,50 @@ _AC_PROJECTS = [
         "tier_label": "Simple",
         "tech": ["html", "css", "nginx"],
         "max_cycles": 20,
+        "description": "Page HTML statique servie par nginx. Affiche un message de bienvenue avec design soigné.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je vois un titre principal (h1) avec le message de bienvenue",
+            "US-02: En tant qu'utilisateur, la page se charge en < 1s et est accessible sans JS",
+            "US-03: En tant qu'utilisateur daltonien, je peux lire le contenu (contraste >= 4.5:1)",
+            "US-04: En tant qu'utilisateur au clavier, je peux naviguer sans souris (focus-visible)",
+            "US-05: En tant qu'utilisateur de lecteur d'écran, tous les éléments ont des labels ARIA",
+        ],
+        "a11y_requirements": [
+            "WCAG AA: contraste ratio >= 4.5:1 pour le texte normal, 3:1 pour le grand texte",
+            "focus-visible: outline visible sur tous les éléments interactifs",
+            "aria-label sur tous les éléments interactifs sans texte visible",
+            "lang='fr' sur la balise html",
+            "alt text sur toutes les images",
+            "Semantic HTML: h1>h2>h3, nav, main, footer",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-primary-hover": "#1e429f",
+            "--color-text": "#111928",
+            "--color-text-secondary": "#6b7280",
+            "--color-bg": "#ffffff",
+            "--color-bg-secondary": "#f9fafb",
+            "--color-border": "#e5e7eb",
+            "--color-focus-ring": "#3f83f8",
+            "--color-success": "#0e9f6e",
+            "--color-error": "#f05252",
+            "--spacing-xs": "0.25rem",
+            "--spacing-sm": "0.5rem",
+            "--spacing-md": "1rem",
+            "--spacing-lg": "1.5rem",
+            "--spacing-xl": "2rem",
+            "--font-size-sm": "0.875rem",
+            "--font-size-base": "1rem",
+            "--font-size-lg": "1.125rem",
+            "--font-size-xl": "1.25rem",
+            "--font-size-2xl": "1.5rem",
+            "--font-weight-normal": "400",
+            "--font-weight-medium": "500",
+            "--font-weight-bold": "700",
+            "--radius-sm": "0.25rem",
+            "--radius-md": "0.375rem",
+            "--radius-lg": "0.5rem",
+        },
     },
     {
         "id": "ac-hello-vue",
@@ -615,6 +659,26 @@ _AC_PROJECTS = [
         "tier_label": "Simple + Compile",
         "tech": ["vue", "vite", "node"],
         "max_cycles": 20,
+        "description": "Application Vue.js simple avec composant compteur interactif et routing basique.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je vois un compteur avec boutons +/- et valeur actuelle",
+            "US-02: En tant qu'utilisateur, le compteur se remet à zéro via un bouton Reset",
+            "US-03: En tant qu'utilisateur au clavier, tous les boutons sont accessibles (Tab, Enter, Space)",
+            "US-04: En tant qu'utilisateur de lecteur d'écran, le compteur annonce sa valeur (aria-live)",
+        ],
+        "a11y_requirements": [
+            "WCAG AA compliance",
+            "aria-live='polite' sur la valeur du compteur",
+            "Boutons avec aria-label explicite",
+            "focus-visible sur tous les éléments interactifs",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+            "--radius-md": "0.375rem",
+        },
     },
     {
         "id": "ac-fullstack-rs",
@@ -623,6 +687,25 @@ _AC_PROJECTS = [
         "tier_label": "Medium Fullstack",
         "tech": ["rust", "sveltekit", "postgres"],
         "max_cycles": 20,
+        "description": "API REST Rust (Axum) + frontend SvelteKit + PostgreSQL. CRUD complet, auth JWT.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je peux créer un compte et me connecter (JWT)",
+            "US-02: En tant qu'utilisateur authentifié, je peux créer/lire/modifier/supprimer des items",
+            "US-03: En tant qu'admin, je vois tous les items via une API paginée",
+            "US-04: En tant que développeur, l'API retourne des erreurs structurées (RFC 7807)",
+        ],
+        "a11y_requirements": [
+            "WCAG AA sur le frontend SvelteKit",
+            "Formulaires avec labels associés (htmlFor)",
+            "Messages d'erreur accessibles (role=alert)",
+            "Focus management après soumission de formulaire",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-docusign",
@@ -631,6 +714,24 @@ _AC_PROJECTS = [
         "tier_label": "Complex",
         "tech": ["react", "fastapi", "postgres"],
         "max_cycles": 20,
+        "description": "Clone simplifié DocuSign: upload PDF, signature électronique, workflow multi-signataires.",
+        "user_stories": [
+            "US-01: En tant qu'expéditeur, je peux uploader un PDF et désigner des signataires",
+            "US-02: En tant que signataire, je reçois un lien et peux signer le document",
+            "US-03: En tant qu'expéditeur, je vois l'état de signature en temps réel",
+            "US-04: En tant qu'auditeur, je peux télécharger le PDF signé avec piste d'audit",
+        ],
+        "a11y_requirements": [
+            "WCAG AA sur toute l'interface React",
+            "Drag-and-drop avec alternative clavier pour placement des champs de signature",
+            "Annonces ARIA pour les changements d'état de workflow",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-ecommerce",
@@ -639,6 +740,25 @@ _AC_PROJECTS = [
         "tier_label": "Enterprise",
         "tech": ["nextjs", "solaris", "stripe", "pg"],
         "max_cycles": 20,
+        "description": "E-commerce Next.js avec design system Solaris, Stripe, PostgreSQL. Catalogue, panier, checkout.",
+        "user_stories": [
+            "US-01: En tant que client, je peux parcourir le catalogue et filtrer par catégorie",
+            "US-02: En tant que client, je peux ajouter au panier et procéder au paiement (Stripe)",
+            "US-03: En tant que client, je reçois une confirmation email après achat",
+            "US-04: En tant qu'admin, je peux gérer le catalogue et voir les commandes",
+        ],
+        "a11y_requirements": [
+            "WCAG AA avec design system Solaris",
+            "Composants Solaris utilisés exclusivement (pas de CSS custom hors tokens)",
+            "Skip links pour navigation rapide",
+            "Panier accessible (live region pour le compteur)",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-game-threejs",
@@ -647,6 +767,24 @@ _AC_PROJECTS = [
         "tier_label": "Jeu Simple",
         "tech": ["threejs", "js", "webgl"],
         "max_cycles": 20,
+        "description": "Jeu browser 3D simple avec Three.js: contrôles clavier/souris, score, game over.",
+        "user_stories": [
+            "US-01: En tant que joueur, je peux déplacer mon personnage avec les flèches/WASD",
+            "US-02: En tant que joueur, je vois mon score en temps réel",
+            "US-03: En tant que joueur, je reçois un écran game over avec option restart",
+            "US-04: En tant que joueur mobile, les contrôles touch fonctionnent",
+        ],
+        "a11y_requirements": [
+            "Écran de titre accessible avec instructions clavier",
+            "Bouton Pause accessible (Escape ou bouton visible)",
+            "Score annoncé par aria-live au changement",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#0f172a",
+            "--color-text": "#f8fafc",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-game-native",
@@ -655,6 +793,18 @@ _AC_PROJECTS = [
         "tier_label": "Jeu Compilé",
         "tech": ["rust", "sdl2", "opengl"],
         "max_cycles": 20,
+        "description": "Jeu natif compilé en Rust avec SDL2/OpenGL: rendu 60fps, gestion collisions, score.",
+        "user_stories": [
+            "US-01: En tant que joueur, le jeu tourne à 60fps stables",
+            "US-02: En tant que joueur, les collisions sont détectées précisément",
+            "US-03: En tant que joueur, je peux quitter proprement (Escape ou fenêtre)",
+            "US-04: En tant que développeur, le binaire se compile sans warnings",
+        ],
+        "a11y_requirements": [
+            "Fenêtre avec titre descriptif",
+            "Gestion propre de la fermeture de fenêtre (signal SIGTERM)",
+        ],
+        "design_tokens": {},
     },
     {
         "id": "ac-migration-php",
@@ -663,6 +813,18 @@ _AC_PROJECTS = [
         "tier_label": "Migration",
         "tech": ["php", "fastapi", "postgres"],
         "max_cycles": 20,
+        "description": "Migration d'une API PHP legacy vers FastAPI Python. Parité fonctionnelle + tests de non-régression.",
+        "user_stories": [
+            "US-01: En tant que client API, tous les endpoints PHP sont disponibles en FastAPI avec la même interface",
+            "US-02: En tant que QA, les tests de non-régression couvrent 100% des endpoints",
+            "US-03: En tant qu'ops, la migration est documentée avec guide de rollback",
+            "US-04: En tant que développeur, le code FastAPI est < 500 LOC/fichier et typé",
+        ],
+        "a11y_requirements": [
+            "API: réponses d'erreur structurées RFC 7807",
+            "Documentation OpenAPI complète",
+        ],
+        "design_tokens": {},
     },
 ]
 
@@ -929,10 +1091,27 @@ async def api_improvement_start(project_id: str):
 
     # Build mission brief for the workflow
     proj = next(p for p in _AC_PROJECTS if p["id"] == project_id)
+
+    # Build enriched brief with user stories, a11y requirements, and design tokens
+    _stories = "\n".join(f"  - {s}" for s in proj.get("user_stories", []))
+    _a11y = "\n".join(f"  - {a}" for a in proj.get("a11y_requirements", []))
+    _tokens = "\n".join(f"  {k}: {v}" for k, v in proj.get("design_tokens", {}).items())
     brief = (
         f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
-        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n\n"
-        f"Cycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
+        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n"
+        + (f"Description : {proj['description']}\n" if proj.get("description") else "")
+        + (f"\nUser Stories:\n{_stories}\n" if _stories else "")
+        + (
+            f"\nExigences Accessibilité (WCAG AA obligatoire):\n{_a11y}\n"
+            if _a11y
+            else ""
+        )
+        + (
+            f"\nDesign Tokens CSS (utiliser UNIQUEMENT ces valeurs, aucune valeur hardcodée):\n{_tokens}\n"
+            if _tokens
+            else ""
+        )
+        + f"\nCycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
         f"Objectif : score > 80/100, 0 défauts critiques, traçabilité 100%.\n"
         f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections.\n"
         f"Workflow : ac-improvement-cycle"
@@ -1655,6 +1834,9 @@ async def api_improvement_project_state(project_id: str):
             except Exception:
                 pass
 
+    # Project metadata (user stories, a11y, design tokens)
+    proj_meta = next((p for p in _AC_PROJECTS if p["id"] == project_id), {})
+
     return JSONResponse(
         {
             "project_id": project_id,
@@ -1669,6 +1851,11 @@ async def api_improvement_project_state(project_id: str):
             "last_git_sha": state.get("last_git_sha"),
             "cycle_count": len(cycles),
             "recent_scores": scores[-5:],
+            # Project spec (read by ac-architect to generate INCEPTION.md)
+            "user_stories": proj_meta.get("user_stories", []),
+            "a11y_requirements": proj_meta.get("a11y_requirements", []),
+            "design_tokens": proj_meta.get("design_tokens", {}),
+            "description": proj_meta.get("description", ""),
         }
     )
 

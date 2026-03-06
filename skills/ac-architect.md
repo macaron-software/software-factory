@@ -33,10 +33,14 @@ file_read("STRATEGY_{N}.md")
 #   4. Points faibles à corriger (dimensions adversariales ciblées)
 ```
 
-**Ensuite seulement**, appelle `GET /api/improvement/project/{project_id}` et lis :
-- `next_cycle_hint` → recommandation RL (si STRATEGY_N.md absent ou incomplet)
+**Ensuite**, appelle `GET /api/improvement/project/{project_id}` et lis **TOUS** ces champs :
+- `user_stories` → **OBLIGATOIRE** — liste les user stories à implémenter (avec AC GIVEN/WHEN/THEN)
+- `a11y_requirements` → **OBLIGATOIRE** — exigences d'accessibilité WCAG AA à inclure dans INCEPTION.md
+- `design_tokens` → **OBLIGATOIRE** — tokens CSS à utiliser exclusivement (aucune valeur hardcodée permise)
+- `description` → description du projet
+- `next_cycle_hint` → recommandation RL
 - `convergence.status` → état des cycles (improving/plateau/regression/spike_failure)
-- `skill_eval_pending` → skills qui doivent être réévalués ce cycle
+- `skill_eval_pending` → skills à réévaluer ce cycle
 - `recent_scores` → scores des 5 derniers cycles
 
 Selon `convergence.status` (si pas déjà couvert par STRATEGY_N.md) :
@@ -62,8 +66,15 @@ Fichier `INCEPTION.md` dans le workspace avec :
 ## Persona
 ## User Stories
 | ID | Story | AC GIVEN/WHEN/THEN | REF |
-## Design Tokens
-## a11y Checklist
+[Reprendre EXACTEMENT les user_stories de l'API — ne pas inventer]
+## Design Tokens CSS (OBLIGATOIRE — aucune valeur hardcodée permise)
+[Reprendre EXACTEMENT les design_tokens de l'API]
+:root {
+  --color-primary: [valeur];
+  [...]
+}
+## a11y Checklist (WCAG AA — exigences non-négociables)
+[Reprendre EXACTEMENT les a11y_requirements de l'API]
 ## Architecture
 ## Traceability Matrix
 ```
