@@ -1052,8 +1052,14 @@ def _ac_select_skill_variants(project_id: str) -> dict[str, str]:
     try:
         from ...ac.skill_thompson import ac_skill_select_variant
 
+        # Look up tier for cross-project fallback
+        tier = next(
+            (p.get("tier") for p in _AC_PROJECTS if p["id"] == project_id), None
+        )
         return {
-            skill: ac_skill_select_variant(skill, variants, project_id=project_id)
+            skill: ac_skill_select_variant(
+                skill, variants, project_id=project_id, tier=tier
+            )
             for skill, variants in _AC_SKILL_VARIANTS.items()
         }
     except Exception:
