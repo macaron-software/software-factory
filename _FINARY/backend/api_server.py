@@ -7,11 +7,10 @@ Live market prices via yfinance.
 
 import json
 import math
-import random
 import time
 import threading
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import date
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from backend.insights_engine import (
@@ -262,7 +261,16 @@ def get_live_price(ticker: str) -> float | None:
 
 def get_eur_usd() -> float:
     rate = get_live_price("EURUSD=X")
-    return rate if rate else 1.08  # fallback
+    if not rate:
+        # Cache not yet populated — fetch directly (blocking)
+        import yfinance as yf
+
+        ticker = yf.Ticker("EURUSD=X")
+        info = ticker.fast_info
+        rate = float(info.last_price) if info.last_price else None
+    if not rate:
+        raise RuntimeError("EUR/USD live rate unavailable — yfinance fetch failed")
+    return rate
 
 
 # Fetch prices on startup + periodic refresh
@@ -512,10 +520,14 @@ def build_positions():
             elif ticker == "IUIT.L":
                 current_price = live / eur_usd  # USD → EUR
             elif ticker == "1211.HK":
-                hkd_eur = get_live_price("HKDEUR=X") or 0.107
+                hkd_eur = get_live_price("HKDEUR=X")
+                if not hkd_eur:
+                    raise RuntimeError("HKD/EUR live rate unavailable")
                 current_price = live * hkd_eur  # HKD → EUR
             elif ticker.endswith(".TO"):
-                cad_eur = get_live_price("CADEUR=X") or 0.617
+                cad_eur = get_live_price("CADEUR=X")
+                if not cad_eur:
+                    raise RuntimeError("CAD/EUR live rate unavailable")
                 current_price = live * cad_eur  # CAD → EUR
             else:
                 current_price = live / eur_usd  # USD → EUR
@@ -770,44 +782,23 @@ def get_networth():
 @app.get("/api/v1/networth/history")
 def get_networth_history(limit: int = Query(365)):
     """Real net worth history using Yahoo Finance historical prices."""
+    from fastapi import HTTPException
     from backend.history_manager import build_real_history
 
     try:
         history = build_real_history(limit)
         if history:
             return history
-    except Exception as e:
-        print(f"[history] Yahoo Finance fetch failed: {e}, falling back to mock")
-
-    # Fallback: deterministic mock if Yahoo fails
-    today = date.today()
-    t = P["totals"]
-    random.seed(42)
-    inv = t["total_investments"]
-    cash = t["total_bank_liquid"]
-    re = t["total_real_estate"]
-    debt = t["total_debt"]
-    points = []
-    for i in range(limit):
-        d = today - timedelta(days=i)
-        if i > 0:
-            inv *= 1 - (random.random() - 0.47) * 0.008
-            cash += (random.random() - 0.5) * 50
-        points.append(
-            {
-                "date": d.isoformat(),
-                "total_assets": round(inv + cash + re, 2),
-                "total_liabilities": round(debt, 2),
-                "net_worth": round(inv + cash + re - debt, 2),
-                "breakdown": {
-                    "investments": round(inv, 2),
-                    "cash": round(cash, 2),
-                    "real_estate": round(re, 2),
-                },
-            }
+        raise HTTPException(
+            status_code=503,
+            detail="Net worth history unavailable — no data returned from Yahoo Finance",
         )
-    points.reverse()
-    return points[:limit]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=503, detail=f"Net worth history unavailable: {e}"
+        )
 
 
 @app.get("/api/v1/accounts")

@@ -308,7 +308,68 @@
         <div style="font-size:0.75rem;color:var(--text-tertiary)">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Graduation rule: once pass rate hits 100%, cases become regression tests. If skill passes without being loaded → retire it.
-            <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval →</a>
+        </div>
+        <!-- Testing pipeline diagram — philschmid.de/testing-skills -->
+        <div class="card" style="padding:1.25rem;margin-top:1.5rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:1rem">Testing pipeline</div>
+            <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;font-family:inherit">
+                <defs>
+                    <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                        <path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/>
+                    </marker>
+                </defs>
+                <!-- boxes -->
+                <!-- Test Case -->
+                <rect x="10" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="55" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Test Case</text>
+                <text x="55" y="89" text-anchor="middle" font-size="9" fill="#6b7280">prompt</text>
+                <text x="55" y="100" text-anchor="middle" font-size="9" fill="#6b7280">checks · expect</text>
+                <!-- Skill Selector -->
+                <rect x="130" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="175" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Skill Selector</text>
+                <text x="175" y="90" text-anchor="middle" font-size="9" fill="#6b7280">trigger match?</text>
+                <text x="175" y="101" text-anchor="middle" font-size="9" fill="#6b7280">load / skip</text>
+                <!-- LLM -->
+                <rect x="250" y="55" width="80" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="290" y="78" text-anchor="middle" font-size="10" fill="#9ca3af">LLM</text>
+                <text x="290" y="93" text-anchor="middle" font-size="9" fill="#6b7280">± skill loaded</text>
+                <!-- Output -->
+                <rect x="360" y="55" width="70" height="50" rx="6" fill="none" stroke="#4b5563" stroke-width="1.5"/>
+                <text x="395" y="83" text-anchor="middle" font-size="10" fill="#d1d5db">Output</text>
+                <!-- Deterministic -->
+                <rect x="460" y="10" width="105" height="55" rx="6" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+                <text x="512" y="27" text-anchor="middle" font-size="9" fill="#93c5fd">Deterministic</text>
+                <text x="512" y="40" text-anchor="middle" font-size="8" fill="#6b7280">regex · length</text>
+                <text x="512" y="52" text-anchor="middle" font-size="8" fill="#6b7280">no_placeholder</text>
+                <text x="512" y="62" text-anchor="middle" font-size="8" fill="#4ade80">fast · free</text>
+                <!-- LLM Judge -->
+                <rect x="460" y="95" width="105" height="55" rx="6" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+                <text x="512" y="112" text-anchor="middle" font-size="9" fill="#c4b5fd">LLM Judge</text>
+                <text x="512" y="125" text-anchor="middle" font-size="8" fill="#6b7280">expectations</text>
+                <text x="512" y="137" text-anchor="middle" font-size="8" fill="#6b7280">outcome · style</text>
+                <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
+                <!-- Verdict -->
+                <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
+                <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80">✓ pass</text>
+                <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
+                <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171">✗ fail</text>
+                <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
+                <!-- arrows -->
+                <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <line x1="330" y1="80" x2="358" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- output → deterministic (up) -->
+                <line x1="430" y1="70" x2="458" y2="37" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- output → llm judge (down) -->
+                <line x1="430" y1="90" x2="458" y2="120" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- deterministic → verdict -->
+                <line x1="565" y1="37" x2="598" y2="68" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- llm judge → verdict -->
+                <line x1="565" y1="120" x2="598" y2="100" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                <!-- ref label -->
+                <text x="380" y="155" text-anchor="middle" font-size="8" fill="#4b5563">ref: philschmid.de/testing-skills</text>
+            </svg>
         </div>
     </div>
 

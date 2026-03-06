@@ -20,18 +20,28 @@ metadata:
 eval_cases:
   - id: grade-passing-output
     prompt: "Grade: expectation='identifies at least one SQL injection'. Output='Found SQL injection at line 42: user input not sanitized before DB query — use parameterized queries.'"
+    checks:
+      - "regex:PASS|pass"
+      - "no_placeholder"
     expectations:
       - "verdict is PASS"
       - "evidence quotes specific text from the output"
     tags: ["basic", "pass-case"]
   - id: grade-superficial-compliance
     prompt: "Grade: expectation='generates a migration script'. Output='I will generate the migration script now. The script should handle all edge cases.'"
+    checks:
+      - "regex:FAIL|fail"
+      - "no_placeholder"
     expectations:
       - "verdict is FAIL"
       - "reason mentions promise without delivery or superficial compliance"
     tags: ["edge", "superficial-compliance"]
   - id: critique-trivial-assertion
     prompt: "Grade assertion 'output is non-empty' against output 'x'"
+    checks:
+      - "regex:PASS|trivial|weak|non-empty|assertion|specific"
+      - "length_min:50"
+      - "no_placeholder"
     expectations:
       - "grades PASS (technically satisfied)"
       - "eval_feedback flags this assertion as trivially satisfied"

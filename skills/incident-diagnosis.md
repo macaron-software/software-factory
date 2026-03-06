@@ -8,6 +8,10 @@ description: >
 
 eval_cases:
   - input: "The dashboard is taking 8 seconds to load"
+    checks:
+      - "regex:latency|slow|query|hypothesis|root.?cause|index"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Runs diag_endpoint_latency on dashboard URL
       - Runs diag_logs to find slow query or error
@@ -15,6 +19,10 @@ eval_cases:
       - Runs diag_correlate with all findings
       - Produces ranked hypotheses with confidence levels
   - input: "Agents are stuck, missions not progressing"
+    checks:
+      - "regex:queue|mission|stuck|stall|memory|error"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Runs diag_queue_depth first
       - Checks for stalled missions (>30min no update)
@@ -22,6 +30,10 @@ eval_cases:
       - Runs diag_logs on platform container filtering for errors
       - Identifies if it's a queue, memory, or error loop issue
   - input: "Memory is growing over time, suspecting a leak"
+    checks:
+      - "regex:leak|memory|RSS|tracemalloc|OOM|GC"
+      - "length_min:80"
+      - "no_placeholder"
     expect:
       - Runs diag_process_stats with include_children=true
       - Notes RSS trend over multiple calls

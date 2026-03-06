@@ -330,7 +330,7 @@ export default function InsightsPage() {
           </div>
         </Section>
 
-        <Section title={<>Revenus passifs <SourceBadge source="hardcoded" /></>}>
+        <Section title={<>Revenus passifs <SourceBadge source="scraped" /></>}>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Rendement</span>
@@ -339,17 +339,6 @@ export default function InsightsPage() {
             <div className="flex items-center justify-between">
               <span className="text-body text-t-4">Projection (12 mois)</span>
               <span className="tnum text-body font-medium text-t-1">{formatEUR(annualDividends)}</span>
-            </div>
-            <div className="flex items-end gap-1 h-16 mt-2">
-              {["Jan", "Fév", "Mar", "Avr", "Mai", "Jun", "Jul", "Aoû", "Sep", "Oct", "Nov", "Déc"].map((m, i) => {
-                const h = 10 + ((i * 37 + 13) % 50);
-                return (
-                  <div key={m} className="flex-1 flex flex-col items-center gap-1">
-                    <div className="w-full rounded-sm" style={{ height: `${h}%`, background: CHART_COLORS[i % 10], opacity: 0.7 }} />
-                    <span className="text-[8px] text-t-6">{m.slice(0, 1)}</span>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </Section>

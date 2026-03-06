@@ -8,17 +8,29 @@ description: >
 
 eval_cases:
   - input: "Score the just-completed dev agent run"
+    checks:
+      - "regex:reward|score|composite"
+      - "length_min:50"
+      - "no_placeholder"
     expect:
       - Calls reward_score_run with run_id, agent_role=dev
       - Sets outcome based on mission completion status
       - Optionally passes quality/slop scores if those modules ran
       - Returns composite score with breakdown
   - input: "Show me which agent roles are degrading this month"
+    checks:
+      - "regex:composite|score|0\\.6|table|degrad"
+      - "length_min:50"
+      - "no_placeholder"
     expect:
       - Calls reward_summary(days=30)
       - Returns table sorted by avg composite score
       - Identifies roles with composite < 0.6
   - input: "Export trajectories for ART training"
+    checks:
+      - "regex:jsonl|JSONL|export|/tmp/|file"
+      - "length_min:50"
+      - "no_placeholder"
     expect:
       - Calls reward_export_art(n=200, min_score=0.7)
       - Writes ART-compatible JSONL to /tmp/
