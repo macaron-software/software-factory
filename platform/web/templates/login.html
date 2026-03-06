@@ -44,7 +44,7 @@
             <div class="error-msg" id="errorMsg"></div>
         </form>
         <div style="margin-top:1rem;text-align:center">
-            <button id="demoBtn" onclick="demoLogin()" style="background:none;border:1px solid var(--border-primary,#30363d);color:var(--text-secondary,#8b949e);padding:0.5rem 1.25rem;border-radius:6px;cursor:pointer;font-size:0.8125rem;min-width:100px">Skip (Demo)</button>
+            {% if demo_mode %}<button id="demoBtn" onclick="demoLogin()" style="background:none;border:1px solid var(--border-primary,#30363d);color:var(--text-secondary,#8b949e);padding:0.5rem 1.25rem;border-radius:6px;cursor:pointer;font-size:0.8125rem;min-width:100px">Skip (Demo)</button>{% endif %}
         </div>
         <div style="margin-top:1.5rem;border-top:1px solid var(--border-primary,#30363d);padding-top:1.25rem">
             <p style="text-align:center;font-size:0.8125rem;color:var(--text-secondary,#8b949e);margin:0 0 0.75rem">Or sign in with</p>

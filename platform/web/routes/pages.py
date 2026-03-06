@@ -29,8 +29,12 @@ logger = logging.getLogger(__name__)
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page."""
+    from ...demo import is_demo_mode
+
     templates = _templates(request)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(
+        "login.html", {"request": request, "demo_mode": is_demo_mode()}
+    )
 
 
 @router.get("/onboarding", response_class=HTMLResponse)
