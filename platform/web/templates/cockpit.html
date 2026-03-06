@@ -1682,6 +1682,7 @@
         <div class="ck-row">
           <div class="ck-row-left">
             <span class="ck-row-name">${l.provider}</span>
+            <span class="ck-row-sub">${l.model || ''}${l.primary ? ' · <strong>primaire</strong>' : ' · fallback'}</span>
             ${l.recent_failures > 0 ? `<span class="ck-row-sub" style="color:#ef4444">${l.recent_failures} erreur(s) récente(s)</span>` : ''}
           </div>
           ${badge(l.status)}

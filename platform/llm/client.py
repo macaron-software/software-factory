@@ -1127,15 +1127,25 @@ class LLMClient:
             logger.debug("Trace recording failed: %s", exc)
 
     def available_providers(self) -> list[dict]:
-        """List providers with availability status."""
+        """List providers with availability status.
+
+        WHY: local-mlx and ollama have no_auth=True which previously caused them
+        to always appear as has_key=True in the cockpit — showing '✓ OK' even when
+        the local servers weren't running. They now require their explicit enable flag
+        (LOCAL_MLX_ENABLED / OLLAMA_ENABLED) to be considered available.
+        """
         result = []
         for pid, pcfg in _PROVIDERS.items():
-            key = self._get_api_key(pcfg)
-            has_key = (
-                bool(key and key != "no-key")
-                or not pcfg.get("key_env")
-                or pcfg.get("no_auth")
-            )
+            # Local servers: only available if explicitly enabled
+            if pid == "local-mlx":
+                has_key = bool(os.environ.get("LOCAL_MLX_ENABLED"))
+            elif pid == "ollama":
+                has_key = bool(os.environ.get("OLLAMA_ENABLED"))
+            elif pcfg.get("no_auth"):
+                has_key = True  # other no-auth providers (none currently)
+            else:
+                key = self._get_api_key(pcfg)
+                has_key = bool(key and key != "no-key")
             result.append(
                 {
                     "id": pid,

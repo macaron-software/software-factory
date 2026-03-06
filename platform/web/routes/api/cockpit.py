@@ -368,25 +368,38 @@ def _get_daemons() -> list[dict]:
 
 
 def _get_llm_status() -> list[dict]:
+    """Return status of configured LLM providers in fallback-chain order.
+
+    WHY: Previously iterated ALL _PROVIDERS and filtered by has_key — this showed
+    all 6 providers as '✓ OK' because key files exist locally for all of them.
+    Now uses _FALLBACK_CHAIN (the ordered list of providers actually configured for
+    this deployment) so the cockpit reflects real production config.
+    Shows provider display name + active model instead of just the provider ID.
+    """
     try:
-        from ....llm.client import get_llm_client
+        from ....llm.client import get_llm_client, _FALLBACK_CHAIN, _primary, _PROVIDERS
 
         client = get_llm_client()
     except Exception:
         return []
 
-    # Use real configured providers (not hardcoded list)
-    # WHY: on prod, only the active provider has a key — hardcoded list showed all 4 as OK
-    providers = [p["id"] for p in client.available_providers() if p.get("has_key")]
-    result = []
     now = time.monotonic()
-    for prov in providers:
-        cb_open = client._cb_open_until.get(prov, 0) > now
-        cooldown = client._provider_cooldown.get(prov, 0) > now
-        failures = len(client._cb_failures.get(prov, []))
+    avail = {p["id"]: p for p in client.available_providers() if p.get("has_key")}
+    result = []
+    seen: set[str] = set()
+    for pid in _FALLBACK_CHAIN:
+        if pid in seen or pid not in avail:
+            continue
+        seen.add(pid)
+        pcfg = _PROVIDERS.get(pid, {})
+        cb_open = client._cb_open_until.get(pid, 0) > now
+        cooldown = client._provider_cooldown.get(pid, 0) > now
+        failures = len(client._cb_failures.get(pid, []))
         result.append(
             {
-                "provider": prov,
+                "provider": pcfg.get("name", pid),
+                "model": pcfg.get("default", ""),
+                "primary": pid == _primary,
                 "circuit_open": cb_open,
                 "cooldown": cooldown,
                 "recent_failures": failures,
