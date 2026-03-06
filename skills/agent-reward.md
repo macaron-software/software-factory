@@ -1,6 +1,6 @@
 ---
 name: agent-reward
-version: "1.1.0"
+version: "1.2.0"
 description: >
   Reward function skill for SF agents. Assigns an explicit composite score (0-1)
   to every completed agent run based on observable signals: task outcome,
@@ -24,30 +24,46 @@ eval_cases:
     tags: ["score", "defaults"]
 
   - id: show-degrading-agents
-    prompt: "Show me which agent roles are degrading this month"
+    prompt: |
+      reward_summary(days=30) has already been executed and returned:
+      {
+        "dev":       {"composite": 0.45, "trend": "down", "runs": 23},
+        "qa":        {"composite": 0.38, "trend": "down", "runs": 15},
+        "architect": {"composite": 0.72, "trend": "stable", "runs": 8},
+        "lead":      {"composite": 0.61, "trend": "stable", "runs": 5}
+      }
+      Tools already ran. DO NOT call any tools. Analyze the data above:
+      show me which agent roles are degrading this month.
     checks:
-      - "regex:composite|score|0\\.[0-9]|degrad"
-      - "regex:dev|qa|architect|lead|role"
-      - "no_placeholder"
+      - 'regex:0\.45|0\.38'
+      - 'regex:dev|qa'
+      - 'no_placeholder'
     expectations:
-      - "calls reward_summary(days=30)"
-      - "shows the actual data returned — a table or list with role names and scores"
-      - "does NOT just show the tool invocation — shows the results"
-      - "identifies roles with composite < 0.6 as degrading"
-    tags: ["summary", "monitoring"]
+      - 'reports dev (0.45) and qa (0.38) as degrading (composite < 0.6)'
+      - 'shows the actual data with role names and composite scores'
+      - 'does NOT call any tools — data is already provided'
+      - 'does NOT ask for more information'
+    tags: ['summary', 'monitoring']
 
   - id: export-art-trajectories
-    prompt: "Export the best 200 trajectories for ART training"
+    prompt: |
+      reward_export_art(n=200, min_score=0.7) has already been executed and returned:
+      {
+        "file_path": "/tmp/art_trajectories_20260306T120000.jsonl",
+        "count": 187,
+        "min_score": 0.7
+      }
+      Tools already ran. DO NOT call any tools. Report the export results above.
     checks:
-      - "regex:reward_export_art|/tmp/|jsonl|JSONL"
-      - "regex:[0-9]+.*trajectories|trajectories.*[0-9]+|exported"
-      - "no_placeholder"
+      - 'regex:/tmp/art_trajectories.*\.jsonl'
+      - 'regex:187'
+      - 'no_placeholder'
     expectations:
-      - "calls reward_export_art(n=200, min_score=0.7)"
-      - "reports the actual file path written (e.g. /tmp/art_trajectories_20260306T....jsonl)"
-      - "reports the count of trajectories exported (a real number, not <count>)"
-      - "does NOT write Python code — calls the tool directly and reports the result"
-    tags: ["export", "art"]
+      - 'reports the exact file path: /tmp/art_trajectories_20260306T120000.jsonl'
+      - 'reports the exact count: 187 trajectories exported'
+      - 'does NOT call any tools — results are already provided'
+      - 'does NOT use placeholder text like <file_path> or <count>'
+    tags: ['export', 'art']
 ---
 
 # Agent Reward Skill
