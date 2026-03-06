@@ -747,6 +747,7 @@ function toggleAcTeamGraph() {
 }
 
 
+function artSwitchTab(btn, panelId) {
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     ['art-org','art-amelio-container'].forEach(id => {
