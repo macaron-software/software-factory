@@ -159,7 +159,7 @@ Résultat: 4540 calls/24h, $7.72/24h visible en metrics
 │                │                         │   active-slot                    │
 ├────────────────┼─────────────────────────┼──────────────────────────────────┤
 │ Local Dev      │ http://localhost:8099    │ macOS, Python 3.12               │
-│                │ Dashboard: :8080        │ LLM: minimax / MiniMax-M2.5     │
+│                │ Dashboard: :8080        │ LLM: local-mlx / Qwen3.5-mlx    │
 │                │                         │ Module: platform                 │
 │                │                         │ DB: PostgreSQL localhost:5432     │
 │                │                         │   (DATABASE_URL dans .env)        │
@@ -191,16 +191,20 @@ python3 -m pytest tests/ -v                    # 52 tests
 cd platform/tests/e2e && npx playwright test   # 82 tests (9 specs)
 ```
 
-## LLM
+## LLM — CONFIG DÉFINITIVE (0 fallback, 1 provider/env)
 
 ```
-Default: PLATFORM_LLM_PROVIDER=minimax  PLATFORM_LLM_MODEL=MiniMax-M2.5
-Azure:   PLATFORM_LLM_PROVIDER=azure-openai  PLATFORM_LLM_MODEL=gpt-5-mini
+Local Dev:   PLATFORM_LLM_PROVIDER=local-mlx   MODEL=Qwen3.5-mlx  (port 8080, ollama-compat)
+OVH Demo:    PLATFORM_LLM_PROVIDER=minimax      MODEL=MiniMax-M2.5
+Azure Prod:  PLATFORM_LLM_PROVIDER=azure-openai MODEL=gpt-5-mini (default)
+             AZURE_DEPLOY=1 → routing: small=gpt-5-mini, reason=gpt-5.2, code=gpt-5.2-codex
+             Resource: opanai-flamme (swedencentral), 100req/min
 ```
 
-Fallback: minimax → azure-openai → azure-ai. Cooldown 90s on 429.
-Keys: `~/.config/factory/*.key` — NEVER `*_API_KEY=dummy`
-MiniMax: <think> consume tokens (min 16K). GPT-5-mini: NO temperature, max_completion_tokens≥8K.
+Quirks:
+- local-mlx: pas de streaming SSE, réponse JSON complète. Auto-launch si sollicité par SF.
+- MiniMax: <think> tokens (min 16K), strip_thinking(). json_object pas json_schema.
+- GPT-5.x: NO temperature, max_completion_tokens≥8K (pas max_tokens).
 
 ## AZURE (Innovation Nodes)
 
@@ -537,48 +541,54 @@ sans LangChain. Les agents utilisent les outils SF natifs (sast_tools, pentest_t
 
 ## SKILL QUALITY LOOP (skills/skill-creator.md + skill-grader.md + skill-eval workflow)
 
-Inspiré de Anthropic skill-creator (MIT) — https://github.com/anthropics/skills/tree/main/skills/skill-creator.
-Adaptations : pas de packaging .skill, pas de CLI claude -p, eval_cases dans le frontmatter YAML des skills.
+Inspiré Anthropic skill-creator (MIT) — eval_cases dans frontmatter YAML, pas de .skill packaging ni claude -p.
 
-### Pourquoi
-44 skills sans aucun moyen de vérifier qu'ils fonctionnent. Un skill peut drifter (LLM change, plateforme évolue)
-sans qu'on le sache. La boucle eval résout ce problème.
-
-### Loop : Draft → Eval Cases → Execute → Grade → Iterate
+### Loop complet
 ```
-skill-creator.md   → comment créer un skill + convention eval_cases dans frontmatter
-skill-grader.md    → grade chaque expectation PASS/FAIL + critique les assertions faibles
-skill-eval.yaml    → workflow 4 phases : write-eval-cases → execute-cases → grade-outputs → review-and-iterate
+skill-creator.md    → crée/améliore skill (draft → eval → grade → iterate)
+skill-grader.md     → LLM judge : grade chaque expectation PASS/FAIL + critique assertions faibles
+skill-eval.yaml     → workflow 4 phases : write-eval-cases → execute → grade → review-and-iterate (human gate)
+skill-evolution.yaml→ méta : audit agents → best practices → update skills → A/B validate
+skill-ab-test.yaml  → loop AUTONOME : identify → baseline → improve → A/B → ship/rollback (SANS human gate)
+skill-improver.md   → skill de l'agent qui pilote skill-ab-test (règles de décision A/B)
 ```
 
-### eval_cases — convention frontmatter
-Chaque skill DOIT avoir eval_cases avec des expectations spécifiques et discriminantes :
-- **Discriminant** : un output correct passe, un output faux échoue, un stub/placeholder échoue
-- **Pas trivial** : `"output is non-empty"` est interdit — satisfait par n'importe quoi
-- **Vérifiable** : le grader peut vérifier sans subjectivité
-2 formats supportés : `- input:` (philschmid) ou `- id:` / `- prompt:` + expectations (SF style)
-
-### Philosophie Grader (portée de Anthropic grader.md)
-- Grade PASS/FAIL avec evidence citée (pas de partiel)
-- Détecte la **compliance superficielle** : promise sans delivery → FAIL (même concept qu'adversarial.py mock detection)
-- Critique les assertions elles-mêmes : une assertion triviale crée une fausse confiance (pire qu'aucune assertion)
-- seuil de validation : pass_rate >= 0.8 pour shipper un skill
-
-### Choix d'implémentation
-- `eval_cases` dans le frontmatter YAML (pas dans un fichier evals.json séparé) → colocation skill + tests
-- grading.json comme output (même schema qu'Anthropic, adapté SF)
-- Pas de browser eval viewer — les résultats vont dans le dashboard SF
-- `skill-eval` est un workflow on-demand, pas un CI automatique (pour l'instant)
-
-### Skills Health — ART tab (/art → Skills Health)
+### eval_cases — format obligatoire (SF style)
+```yaml
+eval_cases:
+  - id: mon-cas          # obligatoire (pas input:)
+    prompt: "..."        # obligatoire (pas input:)
+    checks:              # déterministes (regex:, length_min:, no_placeholder, not_regex:)
+      - "regex:..."
+    expectations:        # LLM judge (pas expect:)
+      - "..."
+    tags: ["basic"]
 ```
-API: GET /api/skills/eval  → {total, coverage_pct, passing, run, without_evals[]}
-     GET /api/skills/list  → [{id, name, has_evals, eval_cases, pass_rate, verdict, ran_at}]
-Source: filesystem (LEGACY_SKILLS_DIR = _SOFTWARE_FACTORY/skills/*.md) — NOT DB (DB = 1307 GitHub skills sans eval_cases)
-DB table: skill_eval_runs (id, skill_id, ran_at, cases_total, cases_passed, pass_rate, verdict)
-Graduation rule: pass_rate=1.0 → verdict="regression" (cas de régression, skill intégré au LLM)
-Retire rule: skill always passes without loading → verdict="retire"
-État actuel: 49 skills locaux, 6 avec eval_cases (coverage=12%) — llm-integration, perf-audit, sf-guide, skill-creator, skill-grader, spec-driven-quality
+Règles : discriminant (stub → FAIL), pas trivial ("output is non-empty" interdit), vérifiable.
+Seuil : pass_rate ≥ 0.80 → ship. Grade = 0.6×checks + 0.4×llm_judge.
+
+### skill-improver — A/B autonome
+```
+Priorité cible  : pass_rate < 0.80 (le plus bas en premier) > jamais run
+Ship si         : Δ ≥ 10pp OU franchit 0.80
+Rollback si     : Δ < 10pp
+Auto-trigger    : tous les 5 cycles AC OU skills_health.passing_pct < 0.70
+Invariants      : jamais supprimer eval_cases, jamais baisser les expectations, toujours bump version
+Rapport         : stocké dans memory_global[skill_improver_last_run]
+```
+
+### Skills Health — /art → Skills Health tab
+```
+API: GET /api/skills/eval  → {total, with_evals, coverage_pct, passing, run, needing_work[]}
+     GET /api/skills/list  → [{name, has_evals, eval_cases, pass_rate, verdict, ran_at, status}]
+     POST /api/skills/eval/{name}/run → {job_id}
+     GET /api/skills/eval/job/{job_id} → {status, result}
+Source: LEGACY_SKILLS_DIR = _SOFTWARE_FACTORY/skills/*.md (60 skills locaux, PAS la DB GitHub)
+Résultats: DATA_DIR/skill_evals/{skill_name}.json
+État actuel (2026-03-06): 60 skills, 18 avec eval_cases (30%), 6 run, 3 passing ≥80%
+  passing: incident-diagnosis(1.0), sf-guide(1.0), skill-grader(1.0)
+  failing:  agent-reward(0.0), perf-audit(0.0), skill-creator(0.67)
+⚠️ Sync requis si skills/ du repo tracké ≠ skills/ de l'instance locale (_SOFTWARE_FACTORY/skills/)
 ```
 
 
@@ -629,6 +639,35 @@ ART tab    → /art → onglets: Organisation / Mercato / Thompson Sampling / Da
 Chaque cycle enregistre: skill utilisé, score par dimension, reward total, RL hint, Thompson proba
 Chaque dim adversariale = VETO traçable avec ref (SBD-07, OWASP, etc.)
 eval_cases dans frontmatter = lien skill ↔ test ↔ résultat
+```
+
+### AC Coach (platform/ac/experiments.py + skills/ac-coach.md) — phase 8
+```
+Problème: pipeline AC mesure mais ne décide rien entre cycles → scores stagnent
+Solution: ac-coach = 6ème phase du workflow (après ac-cicd), décideur post-cycle
+
+Workflow enrichi: Inception→TDD→Adversarial→QA→CI/CD→[AC Coach Review]→cycle suivant
+
+Logique coach:
+  score[N] < score[N-1] - 10pt → git revert workspace + DELETE ac_cycles[N] + état=idle
+  plateau (variance <5pt/5cycles) → bascule variante A/B (Thompson selection)
+  amélioration → renforce Thompson wins, écrit STRATEGY_N+1.md
+
+A/B Testing:
+  Table ac_experiments: experiment_key, variant_a/b, score_before/a/b, winner, rolled_back
+  Une expérience par cycle = 1 variable isolée (ex: "skill:ac-codex:v1→v2")
+  Variantes: ac-codex-v2.md (TDD strict), ac-adversarial-v2.md (sécurité+)
+  Thompson choisit v1 vs v2 chaque cycle basé sur wins/losses historiques
+
+Rollback API: POST /api/improvement/rollback/{project_id}
+  → git revert dernier commit workspace
+  → DELETE ac_cycles WHERE cycle_num=current
+  → UPDATE ac_project_state status=idle, current_cycle=N-1
+  → close_experiment(rolled_back=True)
+
+STRATEGY_N+1.md: écrit par coach dans workspace, lu par ac-architect en priorité absolue
+Migrations DB: ALTER TABLE ac_cycles ADD rolled_back INT, experiment_id TEXT
+               CREATE TABLE ac_experiments(...)
 ```
 
 ## CHAOS MONKEY (ops/chaos_endurance.py)
