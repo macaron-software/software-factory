@@ -678,14 +678,12 @@ class AgentExecutor:
                 # No tool calls → final response
                 if not llm_resp.tool_calls:
                     content = llm_resp.content
-                    # Tool nudge: if tools are available and the model wrote a short
-                    # introduction instead of calling tools (MiniMax common behavior),
-                    # inject a mandatory "call a tool NOW" message and retry.
-                    # Fires on rounds 0 and 1 (model sometimes needs two nudges).
+                    # Tool nudge: if tools are available and the model returned no tool calls,
+                    # inject a mandatory "call a tool NOW" message and retry (up to 3 times).
+                    # MiniMax M2.5 sometimes needs several nudges before it calls tools.
                     if (
                         tools
-                        and round_num <= 1
-                        and len(content or "") < 400
+                        and round_num <= 3
                         and not any(
                             t in (content or "").lower()
                             for t in ["```", "result:", "output:", "error:"]
@@ -1228,12 +1226,11 @@ class AgentExecutor:
                 # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
                     final_content = llm_resp.content or ""
-                    # Tool nudge: same as run() — if round 0 or 1, tools available, short output,
-                    # inject a "call a tool NOW" message and retry.
+                    # Tool nudge: same as run() — if tools available and no tool calls returned,
+                    # inject a "call a tool NOW" message and retry (up to 3 rounds).
                     if (
                         tools
-                        and round_num <= 1
-                        and len(final_content) < 400
+                        and round_num <= 3
                         and not any(
                             t in final_content.lower()
                             for t in ["```", "result:", "output:", "error:"]
