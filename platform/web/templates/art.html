@@ -232,6 +232,34 @@
 <!-- Amélioration Continue container — 4 sub-tabs -->
 <div id="art-amelio-container" style="display:none">
 
+    <!-- AC Team Graph Card -->
+    <div class="idea-graph" id="acTeamGraph" style="margin-bottom:1.25rem">
+        <div class="idea-graph-header" onclick="toggleAcTeamGraph()">
+            <div class="idea-graph-title">
+                <svg><use href="#icon-git-branch"/></svg> Équipe Amélioration Continue
+            </div>
+            <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="idea-graph-canvas" id="acGraphCanvas">
+            <svg id="acGraphSvg" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="ac-arrow-h" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+                    </marker>
+                    <marker id="ac-arrow-n" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/>
+                    </marker>
+                    <marker id="ac-arrow-r" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+                    </marker>
+                </defs>
+                <g id="acEdges"></g>
+                <g id="acNodes"></g>
+            </svg>
+        </div>
+        <div class="idea-graph-legend" id="acGraphLegend"></div>
+    </div>
+
     <!-- Sub-tab nav -->
     <div style="display:flex;gap:0.25rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border,#333);padding-bottom:0">
         <button class="ac-stab active" id="ac-stab-cycles" onclick="acSwitchTab(this,'ac-panel-cycles')">
@@ -637,6 +665,11 @@ function artSwitchTab(btn, panelId) {
         if (content && !content.dataset.loaded) {
             content.dataset.loaded = '1';
             htmx.ajax('GET', '/workflows/improvement', {target: '#art-amelio-content', swap: 'innerHTML'});
+        }
+        // Render AC team graph
+        if (!document.getElementById('acGraphSvg').dataset.rendered) {
+            renderAcGraph();
+            document.getElementById('acGraphSvg').dataset.rendered = '1';
         }
     }
 }
