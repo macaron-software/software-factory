@@ -13,7 +13,7 @@ metadata:
     - "when user asks to fix a bug and wants a regression test"
     - "when user mentions red-green-refactor"
     - "when test coverage needs to increase"
-version: "1.1.0"
+version: "1.2.0"
 # EVAL CASES — based on philschmid.de/testing-skills eval harness methodology
 # WHY: Skills shipped without evals = untested behavior. These cases verify
 # the skill correctly enforces Red-Green-Refactor and test-first discipline.
@@ -21,21 +21,34 @@ version: "1.1.0"
 eval_cases:
   - id: tdd-new-feature
     prompt: |
-      Implement a function that calculates compound interest in Python.
-      Show all three TDD phases explicitly: RED (failing test), GREEN (minimal implementation), REFACTOR.
-      The output must include actual working implementation code, not just tests.
+      TDD RED phase is done. Here is the failing test:
+
+      ```python
+      import pytest
+      from finance import compound_interest
+
+      def test_compound_interest_basic():
+          result = compound_interest(principal=1000, rate=0.05, years=3)
+          assert abs(result - 1157.625) < 0.01  # 1000 * (1.05)^3
+
+      def test_compound_interest_zero_years():
+          assert compound_interest(principal=500, rate=0.1, years=0) == 500.0
+      ```
+
+      This test FAILS because `compound_interest` doesn't exist yet.
+      Now show the GREEN phase (write the minimal implementation to pass both tests)
+      and then the REFACTOR phase (improve code while keeping tests green).
+      Do NOT rewrite the tests — just write the implementation.
     should_trigger: true
     checks:
-      - "regex:def test_|class Test"
-      - "regex:assert|pytest"
       - "regex:def compound_interest|def calculate_compound"
-      - "regex:return|principal|rate|years"
-      - "length_min:200"
+      - 'regex:return.*principal|return.*rate|return.*\*\*|\(1.*rate\)'
+      - "regex:refactor|REFACTOR|clean|improve|docstring|type hint"
+      - "length_min:100"
     expectations:
-      - "Shows RED phase: writes a failing test BEFORE any implementation code"
-      - "Shows GREEN phase: writes minimal compound_interest() implementation that makes the test pass"
-      - "Implementation is concrete (no pass, no TODO, no raise NotImplementedError) — actual formula like principal * (1+rate)**years"
-      - "Shows REFACTOR phase or explains what would be refactored"
+      - "Shows GREEN phase: writes minimal compound_interest() with actual formula (principal * (1+rate)**years)"
+      - "Does NOT rewrite the tests — just implements the function"
+      - "Shows REFACTOR phase: adds type hints, docstring, or error handling"
     tags: [basic, python]
   - id: tdd-bug-regression
     prompt: |
@@ -54,11 +67,11 @@ eval_cases:
       - "Implementation uses 'raise ValueError' for id=0 — actual code, not a stub"
     tags: [bug, regression]
   - id: tdd-no-trigger-doc
-    prompt: "Write documentation for the compound_interest function."
+    prompt: "Write documentation for a REST API endpoint that returns a list of users."
     should_trigger: false
     checks: []
     expectations:
-      - "produces documentation without forcing Red-Green-Refactor cycle"
+      - "produces API documentation without forcing Red-Green-Refactor cycle"
     tags: [negative]
 ---
 
