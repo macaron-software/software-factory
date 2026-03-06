@@ -1,0 +1,192 @@
+id: ac-improvement-cycle
+name: AC — Cycle d'Amélioration Continue
+description: >
+  Cycle complet pour un projet pilote : inception → TDD sprint → adversarial QA → CI/CD → deploy → scoring.
+  L'équipe AC vérifie que la chaîne de production logicielle fonctionne de bout en bout.
+  Chaque cycle produit un score, des défauts, et une correction automatique sur Git.
+  La boucle tourne 20 fois par projet pour mesurer la convergence qualité.
+icon: refresh-cw
+is_builtin: true
+phases:
+- id: ac-inception
+  pattern_id: sequential
+  name: Inception & User Stories
+  description: >
+    L'architecte AC définit le projet : tech stack, persona, user stories avec AC GIVEN/WHEN/THEN,
+    tracabilité vers les exigences (REF), et critères de sortie mesurables.
+    OBLIGATIONS :
+    1. PERSONA : qui utilise ce projet (nom, rôle, besoin concret)
+    2. USER STORIES : "En tant que [persona], je veux [action] afin de [bénéfice]"
+    3. AC testables (GIVEN/WHEN/THEN) pour CHAQUE story, avec REF unique (AC-XXX-001)
+    4. DESIGN TOKENS si frontend (couleurs, typographie, spacing en CSS custom properties)
+    5. a11y checklist WCAG 2.1 AA : ARIA roles, contraste, navigation clavier, focus visible
+    Sans ces 5 éléments, la phase est INCOMPLÈTE. Pas de code avant la fin de cette phase.
+    Output structuré : INCEPTION.md avec toutes les specs + traceability matrix.
+  gate: always
+  config:
+    agents:
+    - ac-architect
+- id: ac-tdd-sprint
+  pattern_id: loop
+  name: TDD Sprint — Code + Tests
+  description: >
+    Le codeur AC implémente en TDD strict : RED → GREEN → REFACTOR.
+    OBLIGATIONS :
+    1. Lire INCEPTION.md AVANT tout code
+    2. Écrire les tests AVANT le code (test first)
+    3. Aucun test.skip(), @ts-ignore, #[ignore]
+    4. Design tokens CSS appliqués (pas de valeurs hardcodées)
+    5. a11y : aria-label, role, tabindex, focus-visible sur chaque composant interactif
+    6. Zéro mock data, zéro hardcoded data (env vars obligatoires)
+    7. Chaque fichier créé doit avoir un commentaire // REF: AC-XXX-001 tracé vers l'AC de la story
+    8. Appeler docker_deploy() pour vérifier le build — BLOQUANT si fail
+    9. Corriger IMMÉDIATEMENT si CI échoue — pas de "ça marchera plus tard"
+    Si adversarial feedback disponible (ADVERSARIAL_N.md), l'intégrer comme priorité absolue.
+  gate: no_veto
+  config:
+    agents:
+    - ac-codex
+    max_iterations: 3
+    dynamic_team: false
+- id: ac-adversarial-check
+  pattern_id: sequential
+  name: Vérification Adversariale 12 Dimensions
+  description: >
+    Le QA adversarial vérifie les 12 dimensions critiques :
+    1. SÉCURITÉ : pas de secrets dans le code, SAST clean, headers HTTP corrects
+    2. ARCHITECTURE : découplage, SRP, pas de god-class, dépendances directionnelles
+    3. NO-SLOP : code utile, pas de commentaires génériques, pas de placeholder
+    4. FALLBACK : gestion d'erreur réelle (pas juste print(e)), retry logic si réseau
+    5. HONNÊTETÉ : pas de mocks qui passent des tests réels, assertions significatives
+    6. NO-MOCK-DATA : pas de données hardcodées, config via env vars
+    7. NO-HARDCODE : pas d'URL/secrets/configs en dur dans le code
+    8. QUALITÉ TESTS : 1 test = 1 AC, couverture > 80%, tests qui échouent vraiment si bug
+    9. NO-OVER-ENGINEERING : KISS, pas de patterns inutiles, < 500 LOC par fichier
+    10. OBSERVABILITÉ : logs structurés, health endpoint, traces utiles
+    11. RÉSILIENCE : timeout, circuit-breaker, retry sur dépendances externes
+    12. TRAÇABILITÉ : chaque feature → AC → test → commit, refs présentes
+    Output : ADVERSARIAL_N.md avec score/100 par dimension, verdict pass/warn/fail, findings précis.
+    VETO si score < 60 sur sécurité, honnêteté, ou qualité tests (non négociables).
+  gate: no_veto
+  config:
+    agents:
+    - ac-adversarial
+- id: ac-qa-sprint
+  pattern_id: parallel
+  name: QA Complète — a11y + Lighthouse + W3C
+  description: >
+    QA complète en parallèle :
+    - a11y : axe-core scan, WCAG 2.1 AA, contraste > 4.5:1, navigation clavier complète
+    - Lighthouse : Performance > 90, Accessibility > 95, Best Practices > 90, SEO > 80
+    - W3C Validator : HTML/CSS valide, pas d'erreurs
+    - Screenshots : capture de chaque vue (desktop + mobile) avec screenshot()
+    - E2E smoke test : chaque user story AC vérifié par un test playwright
+    OBLIGATIONS :
+    - Appeler docker_deploy() AVANT tout test
+    - Zéro failing test acceptable
+    - Screenshots OBLIGATOIRES pour documentation
+    Output : QA_REPORT_N.md avec tous les scores et screenshots référencés.
+  gate: all_approved
+  config:
+    agents:
+    - ac-qa-agent
+    - ft-e2e-ihm
+    max_iterations: 2
+- id: ac-cicd
+  pattern_id: sequential
+  name: CI/CD — Push + Attente GitHub Actions
+  description: >
+    L'agent CI/CD :
+    1. Commit et push les corrections sur Git (message structuré avec refs)
+    2. Attend que GitHub Actions termine (poll toutes les 30s, max 10 min)
+    3. Si CI vert : proceed, enregistre le SHA
+    4. Si CI rouge : lit les logs, crée CICD_FAILURE_N.md, VETO → retour tdd-sprint
+    5. Enregistre le cycle complet en DB : scores, défauts, SHA, adversarial results
+    OBLIGATIONS :
+    - Message commit format : "fix(ac-XXX): [description] [refs: AC-XXX-001, AC-XXX-002]"
+    - Ne jamais skip les CI checks
+    - Enregistrer le résultat même en cas d'échec (pour le scoring)
+  gate: no_veto
+  config:
+    agents:
+    - ac-cicd-agent
+config:
+  max_cycles: 20
+  auto_restart: true
+  projects:
+  - ac-hello-html
+  - ac-hello-vue
+  - ac-fullstack-rs
+  - ac-docusign
+  - ac-ecommerce
+  graph:
+    nodes:
+    - id: n0
+      agent_id: ac-architect
+      x: 400
+      y: 0
+      label: Inception
+      phase: ac-inception
+    - id: n1
+      agent_id: ac-codex
+      x: 400
+      y: 120
+      label: TDD Sprint
+      phase: ac-tdd-sprint
+    - id: n2
+      agent_id: ac-adversarial
+      x: 400
+      y: 240
+      label: Adversarial
+      phase: ac-adversarial-check
+    - id: n3
+      agent_id: ac-qa-agent
+      x: 280
+      y: 360
+      label: QA/a11y/Lighthouse
+      phase: ac-qa-sprint
+    - id: n4
+      agent_id: ft-e2e-ihm
+      x: 520
+      y: 360
+      label: E2E IHM
+      phase: ac-qa-sprint
+    - id: n5
+      agent_id: ac-cicd-agent
+      x: 400
+      y: 480
+      label: CI/CD + Record
+      phase: ac-cicd
+    edges:
+    - from: n0
+      to: n1
+      label: INCEPTION.md
+      color: '#6c63ff'
+    - from: n1
+      to: n2
+      label: code + tests
+      color: '#58a6ff'
+    - from: n2
+      to: n1
+      label: VETO → recode
+      color: '#ef4444'
+    - from: n2
+      to: n3
+      label: approved
+      color: '#22c55e'
+    - from: n2
+      to: n4
+      label: approved
+      color: '#22c55e'
+    - from: n3
+      to: n5
+      label: QA OK
+      color: '#f59e0b'
+    - from: n4
+      to: n5
+      label: E2E OK
+      color: '#f59e0b'
+    - from: n5
+      to: n1
+      label: next cycle
+      color: '#a855f7'

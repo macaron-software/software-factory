@@ -832,6 +832,192 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
     )
 
 
+@router.post("/api/improvement/start/{project_id}")
+async def api_improvement_start(project_id: str):
+    """Launch an AC improvement cycle for a project via the platform workflow engine."""
+    from fastapi.responses import JSONResponse
+
+    # Validate project_id
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    # Determine next cycle number
+    def _get_next_cycle():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            row = conn.execute(
+                "SELECT current_cycle FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            cycle_num = (row["current_cycle"] if row else 0) + 1
+        except Exception:
+            cycle_num = 1
+        conn.close()
+        return cycle_num
+
+    cycle_num = await asyncio.to_thread(_get_next_cycle)
+
+    # Build mission brief for the workflow
+    proj = next(p for p in _AC_PROJECTS if p["id"] == project_id)
+    brief = (
+        f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
+        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n\n"
+        f"Cycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
+        f"Objectif : score > 80/100, 0 défauts critiques, traçabilité 100%.\n"
+        f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections.\n"
+        f"Workflow : ac-improvement-cycle"
+    )
+
+    try:
+        from ...missions.store import get_mission_store
+        from ...epics.store import MissionDef
+
+        store = get_mission_store()
+        mission_def = MissionDef(
+            name=f"AC {proj['name']} — Cycle {cycle_num}",
+            description=brief,
+            goal=f"Score > 80/100, 0 défauts critiques, traçabilité 100% — cycle {cycle_num}/20",
+            type="improvement",
+            workflow_id="ac-improvement-cycle",
+            status="active",
+            config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
+        )
+        created = await asyncio.to_thread(store.create_mission, mission_def)
+        run_id = str(created.id)
+
+        # Update project state
+        def _update_state():
+            import time
+
+            conn = _ac_get_db()
+            try:
+                conn.execute(
+                    "INSERT INTO ac_project_state (project_id, current_cycle, status, current_run_id, updated_at)"
+                    " VALUES (?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET"
+                    " current_cycle=excluded.current_cycle, status=excluded.status,"
+                    " current_run_id=excluded.current_run_id, updated_at=excluded.updated_at",
+                    (
+                        project_id,
+                        cycle_num,
+                        "running",
+                        run_id,
+                        time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    ),
+                )
+            except Exception:
+                pass
+            conn.close()
+
+        await asyncio.to_thread(_update_state)
+        return JSONResponse(
+            {"run_id": run_id, "cycle_num": cycle_num, "project_id": project_id}
+        )
+
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.post("/api/improvement/inject-cycle")
+async def api_improvement_inject_cycle(request: Request):
+    """Record a completed AC cycle — called by ac-cicd-agent after CI/CD."""
+    import time
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    project_id = body.get("project_id")
+    cycle_num = int(body.get("cycle_num", 0))
+    if not project_id or not cycle_num:
+        return JSONResponse(
+            {"error": "project_id and cycle_num required"}, status_code=400
+        )
+
+    git_sha = body.get("git_sha", "")
+    status = body.get("status", "completed")
+    phase_scores = body.get("phase_scores", {})
+    total_score = int(body.get("total_score", 0))
+    defect_count = int(body.get("defect_count", 0))
+    fix_summary = body.get("fix_summary", "")
+    adversarial_scores = body.get("adversarial_scores", {})
+    traceability_score = int(body.get("traceability_score", 0))
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _write():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            conn.execute(
+                "INSERT INTO ac_cycles (project_id, cycle_num, git_sha, status, phase_scores,"
+                " total_score, defect_count, fix_summary, adversarial_scores, traceability_score,"
+                " started_at, completed_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+                " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
+                " git_sha=excluded.git_sha, status=excluded.status, phase_scores=excluded.phase_scores,"
+                " total_score=excluded.total_score, defect_count=excluded.defect_count,"
+                " fix_summary=excluded.fix_summary, adversarial_scores=excluded.adversarial_scores,"
+                " traceability_score=excluded.traceability_score, completed_at=excluded.completed_at",
+                (
+                    project_id,
+                    cycle_num,
+                    git_sha,
+                    status,
+                    _json.dumps(phase_scores)
+                    if isinstance(phase_scores, dict)
+                    else phase_scores,
+                    total_score,
+                    defect_count,
+                    fix_summary,
+                    _json.dumps(adversarial_scores)
+                    if isinstance(adversarial_scores, dict)
+                    else adversarial_scores,
+                    traceability_score,
+                    now,
+                    now,
+                ),
+            )
+            # Update project state average score
+            conn.execute(
+                "INSERT INTO ac_project_state (project_id, current_cycle, status, total_score_avg,"
+                " last_git_sha, ci_status, updated_at)"
+                " VALUES (?,?,?,?,?,?,?)"
+                " ON CONFLICT(project_id) DO UPDATE SET"
+                " current_cycle=MAX(current_cycle, excluded.current_cycle),"
+                " status=CASE WHEN excluded.status='completed' THEN 'idle' ELSE excluded.status END,"
+                " last_git_sha=excluded.last_git_sha, ci_status=excluded.ci_status,"
+                " total_score_avg=("
+                "   SELECT AVG(total_score) FROM ac_cycles WHERE project_id=? AND total_score > 0"
+                " ), updated_at=excluded.updated_at",
+                (
+                    project_id,
+                    cycle_num,
+                    status,
+                    total_score,
+                    git_sha,
+                    "green" if status == "completed" else "red",
+                    now,
+                    project_id,
+                ),
+            )
+        except Exception as e:
+            conn.close()
+            raise e
+        conn.close()
+
+    try:
+        await asyncio.to_thread(_write)
+        return JSONResponse(
+            {"ok": True, "project_id": project_id, "cycle_num": cycle_num}
+        )
+    except Exception as exc:
+        return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""
     from starlette.responses import RedirectResponse

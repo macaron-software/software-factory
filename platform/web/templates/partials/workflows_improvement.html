@@ -49,10 +49,15 @@
     <strong>Amélioration Continue</strong>
     <span style="font-size:.7rem;color:var(--text-muted,#888)">{{ projects|length }} projets · 20 cycles · Thompson + RL + GA</span>
   </div>
-  <span style="font-size:.7rem;color:var(--accent,#6c63ff)">
-    Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20
-  </span>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <span style="font-size:.7rem;color:var(--accent,#6c63ff)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+    <button id="ac-start-btn" onclick="acStartCycle()"
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      {{ fi('play', 12) }} Démarrer
+    </button>
+  </div>
 </div>
+<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;font-size:.75rem;color:var(--text-muted,#888)"></div>
 
 {# ── Project cards ─────────────────────────────────────────────────────────── #}
 <div class="ac-section-title">Projets pilotes</div>
@@ -154,14 +159,41 @@
 {% endif %}
 
 <script>
+let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
+
 function acSelectProject(projectId, card) {
+  _acSelectedProject = projectId;
   document.querySelectorAll('.ac-card').forEach(c => c.classList.remove('selected'));
   card.classList.add('selected');
-  // Load cycles for selected project via HTMX fragment
   htmx.ajax('GET', '/workflows/improvement/cycles/' + projectId, {
     target: '#ac-history-content',
     swap: 'innerHTML'
   });
   document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
+}
+
+async function acStartCycle() {
+  if (!_acSelectedProject) return;
+  const btn = document.getElementById('ac-start-btn');
+  const bar = document.getElementById('ac-status-bar');
+  btn.disabled = true;
+  bar.style.display = 'block';
+  bar.textContent = 'Démarrage du cycle AC pour ' + _acSelectedProject + '…';
+  try {
+    const res = await fetch('/api/improvement/start/' + _acSelectedProject, { method: 'POST' });
+    const data = await res.json();
+    if (data.run_id) {
+      bar.style.color = '#22c55e';
+      bar.textContent = 'Cycle ' + (data.cycle_num||'?') + ' démarré — run ' + data.run_id.slice(0,8) + '. Suivi : Missions';
+    } else {
+      bar.style.color = '#ef4444';
+      bar.textContent = 'Erreur : ' + (data.detail || data.error || 'unknown');
+      btn.disabled = false;
+    }
+  } catch(e) {
+    bar.style.color = '#ef4444';
+    bar.textContent = 'Erreur réseau : ' + e.message;
+    btn.disabled = false;
+  }
 }
 </script>
