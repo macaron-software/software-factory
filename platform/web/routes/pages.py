@@ -1640,7 +1640,55 @@ async def api_improvement_inject_cycle(request: Request):
                 except Exception as e:
                     log.debug("AC RL feedback error: %s", e)
 
-                # ── 2. Convergence detection ──────────────────────────────────
+                # ── 2. Thompson sampling feedback ─────────────────────────────
+                prev_score = prev_cycle["total_score"] if prev_cycle else None
+                if prev_score is not None:
+                    try:
+                        from ...ac.skill_thompson import ac_skill_record
+
+                        # Read skill_variants from the mission config (set at cycle start)
+                        def _load_variants():
+                            import json as _j
+
+                            conn_v = get_db()
+                            try:
+                                row = conn_v.execute(
+                                    "SELECT config_json FROM missions WHERE id=? LIMIT 1",
+                                    (platform_run_id,),
+                                ).fetchone()
+                                if row and row["config_json"]:
+                                    cfg = _j.loads(row["config_json"])
+                                    return cfg.get("skill_variants", {})
+                                return {}
+                            except Exception:
+                                return {}
+                            finally:
+                                conn_v.close()
+
+                        from ...db.migrations import get_db
+
+                        variants_used = await asyncio.to_thread(_load_variants)
+                        for skill_id, variant in variants_used.items():
+                            ac_skill_record(
+                                skill_id=skill_id,
+                                variant=variant,
+                                project_id=project_id,
+                                cycle_score=total_score,
+                                prev_cycle_score=prev_score,
+                                tier=tier,
+                            )
+                            log.info(
+                                "AC Thompson: recorded %s=%s score=%d prev=%d → %s",
+                                skill_id,
+                                variant,
+                                total_score,
+                                prev_score,
+                                "win" if total_score > prev_score else "loss",
+                            )
+                    except Exception as e:
+                        log.debug("AC Thompson record error: %s", e)
+
+                # ── 3. Convergence detection ──────────────────────────────────
                 def _load_scores():
                     conn4 = _ac_get_db()
                     try:
