@@ -374,7 +374,7 @@
         <svg class="icon-xs" style="vertical-align:middle;margin-right:3px"><use href="#icon-info"/></svg>
         Graduation rule: once pass rate hits 100%, cases become regression tests.
         If skill passes without being loaded → retire it (model absorbed the skill).
-        <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
+        <a href="/workflows" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
     </div>
 </div>
 
@@ -678,14 +678,17 @@ async function loadSkillsTab() {
             if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">${msg}</td></tr>`;
             return;
         }
-        const [coverage, skillList] = await Promise.all([coverageResp.json(), listResp.json()]);
+        const coverage = await coverageResp.json();
+        const listRaw = await listResp.json();
+        // Defensive: backend always returns array, but guard against errors
+        const skillList = Array.isArray(listRaw) ? listRaw : [];
 
         // KPIs
-        document.getElementById('sk-total').textContent = coverage.total;
-        document.getElementById('sk-coverage').textContent = coverage.coverage_pct + '%';
-        document.getElementById('sk-passing').textContent = coverage.passing;
-        document.getElementById('sk-run').textContent = coverage.run;
-        document.getElementById('sk-progress').style.width = coverage.coverage_pct + '%';
+        document.getElementById('sk-total').textContent = coverage.total ?? '–';
+        document.getElementById('sk-coverage').textContent = (coverage.coverage_pct ?? '–') + '%';
+        document.getElementById('sk-passing').textContent = coverage.passing ?? '–';
+        document.getElementById('sk-run').textContent = coverage.run ?? '–';
+        document.getElementById('sk-progress').style.width = (coverage.coverage_pct || 0) + '%';
 
         // Skills with evals table
         const withEvals = skillList.filter(s => s.has_evals);
@@ -695,16 +698,25 @@ async function loadSkillsTab() {
             } else {
                 tbody.innerHTML = withEvals.map(s => {
                     const pr = s.pass_rate;
-                    const prPct = pr !== null ? Math.round(pr * 100) : null;
-                    const color = pr === null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
-                    const badge = pr === null ? '<span style="color:#6b7280;font-size:0.75rem">not run</span>'
-                        : `<span style="font-weight:600;color:${color}">${prPct}%</span>`;
+                    const prPct = pr !== null && pr !== undefined ? Math.round(pr * 100) : null;
+                    const color = pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+                    // Graduation rule badge
+                    let badge;
+                    if (pr == null) {
+                        badge = '<span style="color:#6b7280;font-size:0.75rem">not run</span>';
+                    } else if (s.verdict === 'regression') {
+                        badge = '<span style="color:#6366f1;font-size:0.75rem;font-weight:600" title="100% pass — cases are now regression tests">regression</span>';
+                    } else if (s.verdict === 'retire') {
+                        badge = '<span style="color:#94a3b8;font-size:0.75rem;font-style:italic" title="Model absorbed this skill">retired</span>';
+                    } else {
+                        badge = `<span style="font-weight:600;color:${color}">${prPct}%</span>`;
+                    }
                     const ran = s.ran_at ? s.ran_at.substring(0,10) : '—';
                     return `<tr>
                         <td style="padding:5px 4px">${s.name}</td>
                         <td style="text-align:center;padding:5px 4px;color:var(--text-secondary)">${s.eval_cases}</td>
                         <td style="text-align:center;padding:5px 4px">${badge}
-                            ${pr !== null ? `<div style="background:var(--border);border-radius:2px;height:4px;margin-top:3px"><div style="background:${color};border-radius:2px;height:4px;width:${prPct}%"></div></div>` : ''}
+                            ${pr != null && s.verdict !== 'regression' && s.verdict !== 'retire' ? `<div style="background:var(--border);border-radius:2px;height:4px;margin-top:3px"><div style="background:${color};border-radius:2px;height:4px;width:${prPct}%"></div></div>` : ''}
                         </td>
                         <td style="text-align:center;padding:5px 4px;font-size:0.75rem;color:var(--text-tertiary)">${ran}</td>
                     </tr>`;

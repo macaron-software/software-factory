@@ -1330,6 +1330,147 @@ async def api_improvement_scores(project_id: str):
     )
 
 
+# ── Skills Health API ──────────────────────────────────────────────────────────
+# WHY: Surfaces skill eval coverage + pass rates to the ART/Skills Health tab.
+# Based on philschmid.de/testing-skills — every skill ships with eval_cases.
+# Graduation rule: pass_rate == 1.0 → regression mode (model likely absorbed skill).
+# Retirement: skill passes every run without being loaded → retire it from library.
+
+
+def _skill_eval_ensure_table(conn) -> None:
+    """Idempotent — create skill_eval_runs if not exists."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS skill_eval_runs (
+            id        INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill_id  TEXT    NOT NULL,
+            ran_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            cases_total  INTEGER DEFAULT 0,
+            cases_passed INTEGER DEFAULT 0,
+            pass_rate    REAL,
+            verdict      TEXT,
+            notes        TEXT
+        )
+    """)
+    conn.commit()
+
+
+def _parse_eval_cases_count(content: str) -> int:
+    """Count eval_cases entries in YAML frontmatter of a skill markdown file."""
+    if not content or "eval_cases:" not in content:
+        return 0
+    # Count '  - input:' lines in frontmatter (between --- markers)
+    in_front = False
+    count = 0
+    for line in content.splitlines():
+        if line.strip() == "---":
+            in_front = not in_front
+            if not in_front:
+                break
+            continue
+        if in_front and line.strip().startswith("- input:"):
+            count += 1
+    return count
+
+
+@router.get("/api/skills/eval")
+async def api_skills_eval_coverage():
+    """
+    Aggregate skill eval coverage stats.
+    WHY: ART Skills Health tab KPIs — total, coverage%, passing, run.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _skill_eval_ensure_table(conn)
+        try:
+            skills = conn.execute(
+                "SELECT id, name, content FROM skills ORDER BY name"
+            ).fetchall()
+            runs = conn.execute(
+                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
+                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
+            ).fetchall()
+        finally:
+            conn.close()
+        return [dict(s) for s in skills], {r["skill_id"]: dict(r) for r in runs}
+
+    skills, runs = await asyncio.to_thread(_load)
+
+    total = len(skills)
+    with_evals = [
+        s for s in skills if _parse_eval_cases_count(s.get("content", "")) > 0
+    ]
+    run_set = set(runs.keys())
+    passing_count = sum(
+        1
+        for s in with_evals
+        if runs.get(s["id"], {}).get("pass_rate") is not None
+        and runs[s["id"]]["pass_rate"] >= 0.8
+    )
+    without_evals = [s["name"] for s in skills if s not in with_evals]
+
+    return JSONResponse(
+        {
+            "total": total,
+            "coverage_pct": round(len(with_evals) / total * 100) if total else 0,
+            "passing": passing_count,
+            "run": len([s for s in with_evals if s["id"] in run_set]),
+            "without_evals": without_evals[:50],  # cap to 50 for payload size
+        }
+    )
+
+
+@router.get("/api/skills/list")
+async def api_skills_list():
+    """
+    Per-skill eval status list.
+    WHY: ART Skills Health table — shows eval_cases count, pass rate, last run.
+    Returns JSON array (not object) for direct .filter() use on frontend.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _skill_eval_ensure_table(conn)
+        try:
+            skills = conn.execute(
+                "SELECT id, name, content FROM skills ORDER BY name"
+            ).fetchall()
+            runs = conn.execute(
+                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
+                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
+            ).fetchall()
+        finally:
+            conn.close()
+        return [dict(s) for s in skills], {r["skill_id"]: dict(r) for r in runs}
+
+    skills, runs = await asyncio.to_thread(_load)
+
+    result = []
+    for s in skills:
+        n_cases = _parse_eval_cases_count(s.get("content", ""))
+        run_info = runs.get(s["id"], {})
+        pass_rate = run_info.get("pass_rate")
+        verdict = run_info.get("verdict")
+        # Graduation rule: 100% pass_rate → regression mode
+        if pass_rate is not None and pass_rate >= 1.0:
+            verdict = "regression"
+        result.append(
+            {
+                "id": s["id"],
+                "name": s["name"],
+                "has_evals": n_cases > 0,
+                "eval_cases": n_cases,
+                "pass_rate": pass_rate,
+                "verdict": verdict,
+                "ran_at": run_info.get("ran_at"),
+            }
+        )
+
+    return JSONResponse(result)  # always returns array
+
+
 @router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""
