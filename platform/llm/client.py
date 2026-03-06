@@ -1102,10 +1102,23 @@ class LLMClient:
                         d["content"] = f"[System instruction]: {d['content']}"
                         msgs.append(d)
                     continue
-                # MiniMax rejects tool messages — skip tool results and assistant tool_call messages
+                # MiniMax rejects tool messages — convert to user messages so model sees results
                 if d["role"] == "tool":
+                    tool_name = m.name or "tool"
+                    d["role"] = "user"
+                    d["content"] = f"[Résultat de {tool_name}]:\n{d['content']}"
+                    msgs.append(d)
                     continue
                 if d["role"] == "assistant" and getattr(m, "tool_calls", None):
+                    # Keep tool call intent visible but as assistant text
+                    tc_names = [
+                        tc.get("function", {}).get("name", "?")
+                        for tc in (m.tool_calls or [])
+                        if isinstance(tc, dict)
+                    ]
+                    d["content"] = f"[Appel outils: {', '.join(tc_names)}]"
+                    d.pop("tool_calls", None)
+                    msgs.append(d)
                     continue
             else:
                 if m.tool_call_id:
