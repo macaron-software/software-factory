@@ -704,7 +704,7 @@ async function loadThompsonTab() {
                 const lbl = labels[i] || String(i+1);
                 const calls = (p.accepted||0) + (p.rejected||0);
                 const pct = calls > 0 ? Math.round(100*(p.accepted||0)/calls) + '%' : '—';
-                const ms = p.avg_duration_ms ? Math.round(p.avg_duration_ms).toLocaleString() + 'ms' : '—';
+                const ms = p.avg_duration_ms ? Math.round(p.avg_duration_ms) + 'ms' : '—';
                 return `<div class="stat-card" style="border:1px solid ${col};border-radius:8px;padding:0.8rem">
                     <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.6rem">
                         <span style="background:${col};color:#fff;border-radius:3px;padding:1px 7px;font-size:0.72rem;font-weight:700">${lbl}</span>
