@@ -1164,20 +1164,20 @@ body.sf-wireframe #sfWireframeBtn {
 })();
 </script>
 <!-- HTMX / fetch error toast ─────────────────────────────────────────── -->
+<style>#sf-err-toast{display:none}#sf-err-toast.visible{display:flex}</style>
 <div id="sf-err-toast" style="
-  display:none;position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);
+  position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);
   background:var(--bg-secondary);border:1px solid var(--red-light);border-radius:8px;
   padding:0.75rem 1.2rem 0.75rem 1rem;
   color:var(--text-primary);font-size:0.88rem;line-height:1.4;
   box-shadow:0 4px 24px rgba(0,0,0,.35);z-index:99999;
-  display:flex;align-items:flex-start;gap:0.75rem;max-width:420px;
-  animation:none" aria-live="assertive" role="alert">
+  align-items:flex-start;gap:0.75rem;max-width:420px" aria-live="assertive" role="alert">
   <svg style="flex-shrink:0;margin-top:2px;color:var(--red-light)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
   <div style="flex:1">
     <div id="sf-err-toast-title" style="font-weight:600;margin-bottom:0.2rem">Temporary error</div>
     <div id="sf-err-toast-msg">We've been notified and are working on it — please try again in a few minutes.</div>
   </div>
-  <button onclick="document.getElementById('sf-err-toast').style.display='none'" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0;line-height:1;flex-shrink:0" aria-label="Dismiss">✕</button>
+  <button onclick="document.getElementById('sf-err-toast').classList.remove('visible')" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0;line-height:1;flex-shrink:0" aria-label="Dismiss">✕</button>
 </div>
 <script>
 (function(){
@@ -1190,9 +1190,9 @@ body.sf-wireframe #sfWireframeBtn {
     if (!toast) return;
     toastTitle.textContent = title || 'Temporary error';
     toastMsg.textContent = msg || 'We\'ve been notified and are working on it — please try again in a few minutes.';
-    toast.style.display = 'flex';
+    toast.classList.add('visible');
     clearTimeout(_hideTimer);
-    _hideTimer = setTimeout(function(){ toast.style.display = 'none'; }, 8000);
+    _hideTimer = setTimeout(function(){ toast.classList.remove('visible'); }, 8000);
   }
 
   // HTMX partial errors (4xx / 5xx on hx-get/hx-post)
