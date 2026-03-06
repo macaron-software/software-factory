@@ -47,36 +47,25 @@ jobs:
           done
           echo "Using: $BASE_URL"
           
-          # JWT login with admin credentials
+          # JWT login — tokens are httponly cookies
           API_KEY=""
-          LOGIN_RESP=$(curl -s -X POST "$BASE_URL/auth/login" \
+          LOGIN_RESP=$(curl -s -X POST "$BASE_URL/api/auth/login" \
             -H "Content-Type: application/json" \
-            -d '{"email":"admin@demo.local","password":"demo-admin-2026"}' 2>/dev/null || echo "{}")
-          JWT=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))" 2>/dev/null || true)
-          if [ -n "$JWT" ]; then
-            API_KEY="$JWT"
-            echo "JWT login: OK"
+            -d '{"email":"admin@demo.local","password":"demo-admin-2026"}' \
+            -c /tmp/sf-cookies.txt 2>/dev/null || echo "{}")
+          LOGIN_ERR=$(echo "$LOGIN_RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error',''))" 2>/dev/null || true)
+          if [ -z "$LOGIN_ERR" ] && grep -q "access_token" /tmp/sf-cookies.txt 2>/dev/null; then
+            echo "JWT login: OK (cookie)"
+            AUTH_OPTS="-b /tmp/sf-cookies.txt"
           else
-            # Fallback: try MACARON_API_KEY from process env
-            PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
-            if [ -n "$PLATFORM_PID" ]; then
-              MACRO_KEY=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^MACARON_API_KEY=" | cut -d= -f2- | head -1)
-              if [ -n "$MACRO_KEY" ]; then
-                API_KEY="$MACRO_KEY"
-                echo "Got MACARON_API_KEY from process env"
-              fi
-            fi
-            echo "JWT login: FAILED — ${LOGIN_RESP:0:100}"
+            echo "JWT login: FAILED — $LOGIN_ERR"
+            AUTH_OPTS=""
           fi
           
-          # Helper: curl with JWT bearer, never fails script
+          # Helper: curl with cookie auth, never fails script
           do_api() {
             METHOD="$1"; URL="$2"; shift 2
-            if [ -n "$API_KEY" ]; then
-              curl -s -X "$METHOD" "$URL" -H "Authorization: Bearer $API_KEY" "$@" 2>/dev/null || true
-            else
-              curl -s -X "$METHOD" "$URL" "$@" 2>/dev/null || true
-            fi
+            curl -s -X "$METHOD" "$URL" $AUTH_OPTS "$@" 2>/dev/null || true
           }
           
           # Check health
