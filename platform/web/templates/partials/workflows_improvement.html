@@ -1,0 +1,167 @@
+{# Amélioration Continue Tab — AC projects overview + cycle history #}
+
+{% macro fi(name, size=14) %}
+<svg xmlns="http://www.w3.org/2000/svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+  style="display:inline-block;vertical-align:middle;flex-shrink:0">
+  {% if name == 'refresh-cw' %}<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  {% elif name == 'play' %}<polygon points="5 3 19 12 5 21 5 3"></polygon>
+  {% elif name == 'check-circle' %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+  {% elif name == 'x-circle' %}<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
+  {% elif name == 'clock' %}<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+  {% elif name == 'shield-off' %}<path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"></path><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"></path><line x1="1" y1="1" x2="23" y2="23"></line>
+  {% elif name == 'trending-up' %}<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>
+  {% elif name == 'alert-triangle' %}<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+  {% elif name == 'layers' %}<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>
+  {% elif name == 'link' %}<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+  {% elif name == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+<style>
+.ac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; }
+.ac-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
+.ac-card:hover { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
+.ac-card.selected { box-shadow:0 0 0 2px var(--accent,#6c63ff); }
+.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); }
+.ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; }
+.ac-card .score-big { font-size:1.8rem; font-weight:700; line-height:1; }
+.ac-bar { height:4px; border-radius:2px; background:var(--border,#2a2d3e); margin-top:.5rem; }
+.ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; }
+.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted,#888); margin-bottom:.5rem; }
+.ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
+.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-muted,#888); font-weight:500; border-bottom:1px solid var(--border,#2a2d3e); }
+.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border,#1a1c2a); }
+.score-green { color:#22c55e; font-weight:700; }
+.score-yellow { color:#f59e0b; font-weight:700; }
+.score-red { color:#ef4444; font-weight:700; }
+.verdict-pass { background:#14532d; color:#4ade80; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-warn { background:#78350f; color:#fcd34d; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-fail { background:#7f1d1d; color:#fca5a5; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
+.adv-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem; }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+  <div style="display:flex;align-items:center;gap:.5rem">
+    {{ fi('refresh-cw', 18) }}
+    <strong>Amélioration Continue</strong>
+    <span style="font-size:.7rem;color:var(--text-muted,#888)">{{ projects|length }} projets · 20 cycles · Thompson + RL + GA</span>
+  </div>
+  <span style="font-size:.7rem;color:var(--accent,#6c63ff)">
+    Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20
+  </span>
+</div>
+
+{# ── Project cards ─────────────────────────────────────────────────────────── #}
+<div class="ac-section-title">Projets pilotes</div>
+<div class="ac-grid" id="ac-proj-grid">
+  {% for p in projects %}
+  {% set score = p.total_score_avg|int %}
+  {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+  {% set border_color = {'simple':'#22c55e','simple-compile':'#3b82f6','medium':'#f59e0b','complex':'#a855f7','enterprise':'#ef4444'}.get(p.tier, '#6b7280') %}
+  <div class="ac-card {% if loop.first %}selected{% endif %}"
+       style="border-left:3px solid {{ border_color }}"
+       onclick="acSelectProject('{{ p.id }}', this)">
+    <div class="tier-label">{{ p.tier_label }}</div>
+    <div class="proj-name">{{ p.name }}</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
+      <div>
+        {% for tech in p.tech[:3] %}
+        <span style="font-size:.65rem;background:var(--border,#2a2d3e);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+        {% endfor %}
+      </div>
+      <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
+    </div>
+    <div style="font-size:.7rem;color:var(--text-muted,#888);margin-bottom:.25rem">
+      Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
+      &nbsp;·&nbsp;
+      <span style="color:{% if p.status == 'running' %}#22c55e{% elif p.status == 'completed' %}#3b82f6{% else %}#888{% endif %}">{{ p.status }}</span>
+    </div>
+    <div class="ac-bar"><div class="ac-bar-fill" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%;background:{{ border_color }}"></div></div>
+  </div>
+  {% else %}
+  <div style="color:var(--text-muted,#888);font-size:.8rem;padding:2rem 0">
+    Aucun projet actif — cliquer "Démarrer" pour lancer le premier cycle.
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Cycle history for selected project ────────────────────────────────────── #}
+<div style="margin-top:1.5rem">
+  <div class="ac-section-title" id="ac-history-title">
+    Historique — {{ projects[0].name if projects else '—' }}
+  </div>
+  <div id="ac-history-content">
+    {% if cycles %}
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Git SHA</th>
+          {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
+          <th>Score</th>
+          <th>Défauts</th>
+          <th>Fix</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cycles[-10:]|reverse %}
+        {% set ps = c.phase_scores|tojson if c.phase_scores is string else '{}' %}
+        {% set score = c.total_score|int %}
+        {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+        <tr>
+          <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
+          <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+          {% for ph in phases %}
+          {% set s = c.phase_scores_dict.get(ph) if c.phase_scores_dict is defined else none %}
+          <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
+          {% endfor %}
+          <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
+          <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
+          <td style="font-size:.7rem;color:#f59e0b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Adversarial scores ─────────────────────────────────────────────────────── #}
+{% if adversarial %}
+<div style="margin-top:1.5rem">
+  <div class="ac-section-title">Dimensions Adversariales — dernier cycle</div>
+  <div class="adv-grid">
+    {% for d in adversarial %}
+    {% set verdict_cls = 'verdict-pass' if d.verdict == 'pass' else ('verdict-warn' if d.verdict == 'warn' else 'verdict-fail') %}
+    <div class="adv-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+        <span style="font-size:.75rem;font-weight:600">{{ d.dimension }}</span>
+        <span class="{{ verdict_cls }}">{{ d.verdict }}</span>
+      </div>
+      <div style="background:var(--border,#2a2d3e);border-radius:2px;height:3px">
+        <div style="height:100%;border-radius:2px;width:{{ d.score }}%;background:{% if d.score >= 80 %}#22c55e{% elif d.score >= 50 %}#f59e0b{% else %}#ef4444{% endif %}"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.25rem">{{ d.score }}/100</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+function acSelectProject(projectId, card) {
+  document.querySelectorAll('.ac-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  // Load cycles for selected project via HTMX fragment
+  htmx.ajax('GET', '/workflows/improvement/cycles/' + projectId, {
+    target: '#ac-history-content',
+    swap: 'innerHTML'
+  });
+  document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
+}
+</script>

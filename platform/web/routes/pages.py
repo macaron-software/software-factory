@@ -590,7 +590,248 @@ async def workflows_evolution(request: Request):
     )
 
 
-@router.get("/ceremonies", response_class=HTMLResponse)
+# ── AC_PHASES matching dashboard definition ──────────────────────────────────
+_AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
+
+_AC_PROJECTS = [
+    {
+        "id": "ac-hello-html",
+        "name": "Hello HTML",
+        "tier": "simple",
+        "tier_label": "Simple",
+        "tech": ["html", "css", "nginx"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-hello-vue",
+        "name": "Hello Vue.js",
+        "tier": "simple-compile",
+        "tier_label": "Simple + Compile",
+        "tech": ["vue", "vite", "node"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-fullstack-rs",
+        "name": "Fullstack Rust+Svelte",
+        "tier": "medium",
+        "tier_label": "Medium Fullstack",
+        "tech": ["rust", "sveltekit", "postgres"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-docusign",
+        "name": "DocuSign Clone",
+        "tier": "complex",
+        "tier_label": "Complex",
+        "tech": ["react", "fastapi", "postgres"],
+        "max_cycles": 20,
+    },
+    {
+        "id": "ac-ecommerce",
+        "name": "E-Commerce + Solaris",
+        "tier": "enterprise",
+        "tier_label": "Enterprise",
+        "tech": ["nextjs", "solaris", "stripe", "pg"],
+        "max_cycles": 20,
+    },
+]
+
+
+def _ac_get_db():
+    """Get DB connection — uses platform DB adapter (SQLite or PG via DATABASE_URL)."""
+    from ...db.migrations import get_db
+
+    return get_db()
+
+
+def _ac_ensure_tables(conn) -> None:
+    """Create AC tables if they don't exist (idempotent)."""
+    is_pg = False
+    try:
+        from ...db.adapter import is_postgresql
+
+        is_pg = is_postgresql()
+    except Exception:
+        pass
+
+    if is_pg:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS ac_cycles (
+                id SERIAL PRIMARY KEY, project_id TEXT NOT NULL, cycle_num INTEGER NOT NULL,
+                git_sha TEXT, platform_run_id TEXT, status TEXT DEFAULT 'pending',
+                phase_scores TEXT DEFAULT '{}', total_score INTEGER DEFAULT 0,
+                defect_count INTEGER DEFAULT 0, fix_commit TEXT, fix_summary TEXT,
+                adversarial_scores TEXT DEFAULT '{}', traceability_score INTEGER DEFAULT 0,
+                ga_fitness REAL DEFAULT 0, rl_reward REAL DEFAULT 0,
+                started_at TEXT, completed_at TEXT, UNIQUE(project_id, cycle_num))""",
+            """CREATE TABLE IF NOT EXISTS ac_project_state (
+                project_id TEXT PRIMARY KEY, current_cycle INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle', current_run_id TEXT,
+                total_score_avg REAL DEFAULT 0, last_git_sha TEXT,
+                ci_status TEXT DEFAULT 'unknown', started_at TEXT, updated_at TEXT)""",
+            """CREATE TABLE IF NOT EXISTS ac_adversarial (
+                id SERIAL PRIMARY KEY, project_id TEXT NOT NULL, cycle_num INTEGER NOT NULL,
+                dimension TEXT NOT NULL, score INTEGER DEFAULT 0, verdict TEXT DEFAULT 'pending',
+                findings TEXT DEFAULT '[]', checked_at TEXT,
+                UNIQUE(project_id, cycle_num, dimension))""",
+        ]
+    else:
+        stmts = [
+            """CREATE TABLE IF NOT EXISTS ac_cycles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
+                cycle_num INTEGER NOT NULL, git_sha TEXT, platform_run_id TEXT,
+                status TEXT DEFAULT 'pending', phase_scores TEXT DEFAULT '{}',
+                total_score INTEGER DEFAULT 0, defect_count INTEGER DEFAULT 0,
+                fix_commit TEXT, fix_summary TEXT,
+                adversarial_scores TEXT DEFAULT '{}', traceability_score INTEGER DEFAULT 0,
+                ga_fitness REAL DEFAULT 0, rl_reward REAL DEFAULT 0,
+                started_at TEXT, completed_at TEXT, UNIQUE(project_id, cycle_num))""",
+            """CREATE TABLE IF NOT EXISTS ac_project_state (
+                project_id TEXT PRIMARY KEY, current_cycle INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle', current_run_id TEXT,
+                total_score_avg REAL DEFAULT 0, last_git_sha TEXT,
+                ci_status TEXT DEFAULT 'unknown', started_at TEXT, updated_at TEXT)""",
+            """CREATE TABLE IF NOT EXISTS ac_adversarial (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, project_id TEXT NOT NULL,
+                cycle_num INTEGER NOT NULL, dimension TEXT NOT NULL,
+                score INTEGER DEFAULT 0, verdict TEXT DEFAULT 'pending',
+                findings TEXT DEFAULT '[]', checked_at TEXT,
+                UNIQUE(project_id, cycle_num, dimension))""",
+        ]
+    try:
+        for stmt in stmts:
+            conn.execute(stmt)
+        try:
+            conn.execute(
+                "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'"
+            )
+        except Exception:
+            pass
+        try:
+            conn.execute(
+                "ALTER TABLE ac_cycles ADD COLUMN traceability_score INTEGER DEFAULT 0"
+            )
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+@router.get("/workflows/improvement", response_class=HTMLResponse)
+async def workflows_improvement(request: Request):
+    """Partial: Amélioration Continue — project cards + cycle history."""
+    import json as _json
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            states = {
+                r["project_id"]: dict(r)
+                for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
+            }
+        except Exception:
+            states = {}
+        try:
+            adv = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT dimension, score, verdict, findings FROM ac_adversarial "
+                    "WHERE project_id = (SELECT project_id FROM ac_project_state ORDER BY updated_at DESC LIMIT 1) "
+                    "ORDER BY score ASC LIMIT 24"
+                ).fetchall()
+            ]
+        except Exception:
+            adv = []
+        try:
+            first_id = _AC_PROJECTS[0]["id"] if _AC_PROJECTS else None
+            cycles_raw = (
+                conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                    (first_id,),
+                ).fetchall()
+                if first_id
+                else []
+            )
+        except Exception:
+            cycles_raw = []
+        conn.close()
+        return states, adv, cycles_raw
+
+    states, adv, cycles_raw = await asyncio.to_thread(_load)
+
+    projects = []
+    for p in _AC_PROJECTS:
+        s = states.get(p["id"], {})
+        projects.append(
+            {
+                **p,
+                "current_cycle": s.get("current_cycle", 0),
+                "status": s.get("status", "idle"),
+                "total_score_avg": s.get("total_score_avg", 0),
+            }
+        )
+
+    cycles = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        cycles.append(row)
+
+    avg_cycle = (
+        sum(p["current_cycle"] for p in projects) / len(projects) if projects else 0
+    )
+
+    return _templates(request).TemplateResponse(
+        "partials/workflows_improvement.html",
+        {
+            "request": request,
+            "projects": projects,
+            "cycles": cycles,
+            "adversarial": adv,
+            "phases": _AC_PHASES,
+            "avg_cycle": avg_cycle,
+        },
+    )
+
+
+@router.get("/workflows/improvement/cycles/{project_id}", response_class=HTMLResponse)
+async def workflows_improvement_cycles(request: Request, project_id: str):
+    """HTMX fragment: cycle table for a given project."""
+    import json as _json
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            rows = conn.execute(
+                "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            rows = []
+        conn.close()
+        return rows
+
+    cycles_raw = await asyncio.to_thread(_load)
+    cycles = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        cycles.append(row)
+
+    return _templates(request).TemplateResponse(
+        "partials/workflows_improvement_cycles.html",
+        {"request": request, "cycles": cycles, "phases": _AC_PHASES},
+    )
+
+
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""
     from starlette.responses import RedirectResponse
