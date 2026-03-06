@@ -138,6 +138,14 @@ _ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _opencode_enabled = bool(
     os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
 )
+# ── LLM timeout settings (override via env vars) ──────────────────────────────
+# LLM_TIMEOUT_HTTP     : httpx total timeout per request (seconds). Default: 600.
+# LLM_TIMEOUT_CONNECT  : httpx connect timeout (seconds). Default: 30.
+# LLM_TIMEOUT_MLX_WAIT : max seconds to wait for local-mlx server to become ready. Default: 120.
+_LLM_TIMEOUT_HTTP = float(os.environ.get("LLM_TIMEOUT_HTTP", "600"))
+_LLM_TIMEOUT_CONNECT = float(os.environ.get("LLM_TIMEOUT_CONNECT", "30"))
+_LLM_TIMEOUT_MLX_WAIT = int(os.environ.get("LLM_TIMEOUT_MLX_WAIT", "120"))
+
 _fallback_env = os.environ.get("PLATFORM_LLM_FALLBACK", None)
 if _fallback_env is not None:
     # Explicit override: "" = no fallback, "p1,p2" = specific chain
@@ -220,10 +228,10 @@ def _ensure_mlx_server() -> None:
         )
         logger.warning("local-mlx: launched PID %d, model=%s", _mlx_proc.pid, mlx_model)
 
-        # Wait up to 60s for it to come up
+        # Wait up to _LLM_TIMEOUT_MLX_WAIT seconds for it to come up
         import time as _time
 
-        for _ in range(60):
+        for _ in range(_LLM_TIMEOUT_MLX_WAIT):
             _time.sleep(1)
             try:
                 urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
@@ -231,7 +239,9 @@ def _ensure_mlx_server() -> None:
                 return
             except Exception:
                 pass
-        logger.warning("local-mlx: server did not become ready after 60s")
+        logger.warning(
+            "local-mlx: server did not become ready after %ds", _LLM_TIMEOUT_MLX_WAIT
+        )
 
 
 class _RateLimiter:
@@ -387,7 +397,7 @@ class LLMClient:
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
-            self._http = httpx.AsyncClient(timeout=300.0)
+            self._http = httpx.AsyncClient(timeout=_LLM_TIMEOUT_HTTP)
         return self._http
 
     async def close(self):
@@ -1135,7 +1145,12 @@ class LLMClient:
 
         # Use a separate client for streaming to avoid blocking the shared client
         stream_http = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+            timeout=httpx.Timeout(
+                connect=_LLM_TIMEOUT_CONNECT,
+                read=_LLM_TIMEOUT_HTTP,
+                write=_LLM_TIMEOUT_CONNECT,
+                pool=_LLM_TIMEOUT_CONNECT,
+            )
         )
         try:
             async with stream_http.stream(
