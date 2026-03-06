@@ -961,3 +961,50 @@ CREATE TABLE IF NOT EXISTS platform_nodes (
     registered_at TIMESTAMPTZ DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_pnodes_status ON platform_nodes(status);
+
+-- Mercato (agent marketplace)
+CREATE TABLE IF NOT EXISTS project_wallets (
+    project_id TEXT PRIMARY KEY,
+    balance INTEGER NOT NULL DEFAULT 5000,
+    total_earned INTEGER NOT NULL DEFAULT 0,
+    total_spent INTEGER NOT NULL DEFAULT 0,
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS token_transactions (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    project_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    reason TEXT,
+    reference_id TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS agent_assignments (
+    agent_id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL,
+    assignment_type TEXT NOT NULL DEFAULT 'owned',
+    loan_expires_at TEXT,
+    loan_from_project TEXT,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS mercato_listings (
+    id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    seller_project TEXT NOT NULL,
+    listing_type TEXT NOT NULL DEFAULT 'transfer',
+    asking_price INTEGER NOT NULL DEFAULT 0,
+    loan_weeks INTEGER,
+    buyout_clause INTEGER,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    expires_at TEXT
+);
+CREATE TABLE IF NOT EXISTS mercato_transfers (
+    id TEXT PRIMARY KEY,
+    listing_id TEXT,
+    agent_id TEXT NOT NULL,
+    from_project TEXT NOT NULL,
+    to_project TEXT NOT NULL,
+    transfer_type TEXT NOT NULL,
+    price INTEGER NOT NULL DEFAULT 0,
+    completed_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
