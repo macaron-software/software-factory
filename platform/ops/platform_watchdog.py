@@ -279,6 +279,7 @@ async def resume_stuck_ac_cycles() -> int:
                 from ..workflows.store import get_workflow_store
                 from ..web.routes.epics.execution import (
                     get_mission_semaphore,
+                    _active_mission_tasks as _tasks,
                 )
 
                 mission = await asyncio.to_thread(
@@ -303,29 +304,119 @@ async def resume_stuck_ac_cycles() -> int:
                     logger.warning("watchdog: workflow not found for run %s", run_id)
                     continue
 
-                task_desc = mission.goal or mission.description or mission.name
-
-                # Find the actual session_id from sessions config (mission_id=run_id)
-                session_id = run_id  # fallback
+                # Find existing session_id for this run (config_json has mission_id=run_id)
+                session_id = None
                 try:
-                    from ..db.migrations import get_db as _get_db
+                    from ..db.migrations import get_db as _get_db_wd
 
                     def _find_session():
-                        conn = _get_db()
+                        conn = _get_db_wd()
                         try:
                             row = conn.execute(
-                                "SELECT id FROM sessions WHERE config LIKE ? ORDER BY created_at DESC LIMIT 1",
+                                "SELECT id FROM sessions WHERE config_json LIKE ?"
+                                " ORDER BY created_at DESC LIMIT 1",
                                 (f'%"mission_id": "{run_id}"%',),
                             ).fetchone()
                             return row["id"] if row else None
                         finally:
                             conn.close()
 
-                    found = await asyncio.to_thread(_find_session)
-                    if found:
-                        session_id = found
+                    session_id = await asyncio.to_thread(_find_session)
                 except Exception:
                     pass
+
+                # If session not found or already in tasks, relaunch via execution path
+                if session_id and session_id in _tasks:
+                    logger.warning(
+                        "watchdog: session %s already running for AC run %s",
+                        session_id,
+                        run_id,
+                    )
+                    continue
+
+                if not session_id:
+                    # No session exists — replicate launch_mission_workflow logic
+                    logger.warning(
+                        "watchdog: no session found for AC run %s — launching fresh",
+                        run_id,
+                    )
+                    try:
+                        from ..sessions.store import SessionDef, get_session_store
+                        from ..epics.store import get_epic_run_store
+                        from ..models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+                        from ..config import DATA_DIR
+                        import subprocess as _sp
+
+                        task_desc = mission.goal or mission.description or mission.name
+                        _sess_store = get_session_store()
+                        new_sess = _sess_store.create(
+                            SessionDef(
+                                name=mission.name,
+                                goal=mission.goal or "",
+                                project_id=project_id,
+                                status="active",
+                                config={"workflow_id": wf.id, "mission_id": run_id},
+                            )
+                        )
+                        ws_path = DATA_DIR / "workspaces" / new_sess.id
+                        ws_path.mkdir(parents=True, exist_ok=True)
+                        _sp.run(["git", "init"], cwd=str(ws_path), capture_output=True)
+                        phases = [
+                            PhaseRun(
+                                phase_id=p.id,
+                                phase_name=p.name,
+                                pattern_id=p.pattern_id,
+                                status=PhaseStatus.PENDING,
+                            )
+                            for p in wf.phases
+                        ]
+                        epic_run = EpicRun(
+                            id=new_sess.id,
+                            workflow_id=wf.id,
+                            workflow_name=wf.name,
+                            brief=task_desc,
+                            status=EpicStatus.PENDING,
+                            phases=phases,
+                            project_id=project_id,
+                            session_id=new_sess.id,
+                            parent_epic_id=run_id,
+                            workspace_path=str(ws_path),
+                        )
+                        try:
+                            get_epic_run_store().create(epic_run)
+                        except Exception:
+                            pass
+
+                        async def _guarded_fresh(
+                            wf=wf,
+                            sid=new_sess.id,
+                            desc=task_desc,
+                            pid=project_id,
+                        ):
+                            async with get_mission_semaphore():
+                                from ..web.routes.workflows import (
+                                    _run_workflow_background,
+                                )
+
+                                await _run_workflow_background(wf, sid, desc, pid)
+
+                        ftask = asyncio.create_task(_guarded_fresh())
+                        _tasks[new_sess.id] = ftask
+                        ftask.add_done_callback(lambda t: _tasks.pop(new_sess.id, None))
+                        resumed += 1
+                        logger.warning(
+                            "watchdog: AC cycle fresh-launched — project=%s new_session=%s run=%s",
+                            project_id,
+                            new_sess.id,
+                            run_id,
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "watchdog: failed to launch AC run %s: %s", run_id, exc
+                        )
+                    continue
+
+                task_desc = mission.goal or mission.description or mission.name
 
                 async def _guarded(
                     wf=wf, sid=session_id, desc=task_desc, pid=project_id
@@ -336,13 +427,14 @@ async def resume_stuck_ac_cycles() -> int:
                         await _run_workflow_background(wf, sid, desc, pid)
 
                 task = asyncio.create_task(_guarded())
-                _active_mission_tasks[run_id] = task
-                task.add_done_callback(
-                    lambda t: _active_mission_tasks.pop(run_id, None)
-                )
+                _tasks[session_id] = task
+                task.add_done_callback(lambda t: _tasks.pop(session_id, None))
                 resumed += 1
                 logger.warning(
-                    "watchdog: AC cycle resumed — project=%s run=%s", project_id, run_id
+                    "watchdog: AC cycle resumed — project=%s session=%s run=%s",
+                    project_id,
+                    session_id,
+                    run_id,
                 )
             except Exception as exc:
                 logger.error("watchdog: failed to resume AC run %s: %s", run_id, exc)

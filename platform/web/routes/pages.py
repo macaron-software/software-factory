@@ -740,6 +740,7 @@ def _ac_ensure_tables(conn) -> None:
             "ALTER TABLE ac_project_state ADD COLUMN next_cycle_hint TEXT",
             "ALTER TABLE ac_project_state ADD COLUMN skill_eval_pending TEXT",
             "ALTER TABLE ac_project_state ADD COLUMN convergence_status TEXT DEFAULT 'cold_start'",
+            "ALTER TABLE ac_project_state ADD COLUMN current_run_id TEXT",
         ]:
             try:
                 conn.execute(alter)
