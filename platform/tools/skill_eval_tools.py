@@ -210,6 +210,7 @@ def list_skills_with_evals() -> list[dict]:
 def list_tech_skills() -> list[dict]:
     """Return tech stack skills (skills/tech/*.yaml) for the skills health dashboard."""
     from ..config import PLATFORM_ROOT
+
     tech_dir = PLATFORM_ROOT / "skills" / "tech"
     if not tech_dir.exists():
         return []
@@ -471,6 +472,49 @@ async def run_skill_eval(
         checks_spec: list[str] = case.get("checks", [])
         expectations: list[str] = case.get("expectations") or case.get("expect") or []
         tags: list[str] = case.get("tags", [])
+        # tools: [tool_name, ...] — real tools the agent can call during eval
+        eval_tools: list[str] = case.get("tools") or []
+
+        # Build real OpenAI-format schemas from tool registry
+        tools_list: list[dict] | None = None
+        if eval_tools:
+            try:
+                from ..agents.tool_runner import _get_tool_registry
+                from ..agents.tool_schemas import _get_tool_schemas
+
+                # First try the full schema catalog (has parameter definitions)
+                all_schemas = _get_tool_schemas()
+                matched = [
+                    s
+                    for s in all_schemas
+                    if s.get("function", {}).get("name") in eval_tools
+                ]
+                # For tools not in schema catalog, build minimal schema from registry
+                matched_names = {s["function"]["name"] for s in matched}
+                reg = _get_tool_registry()
+                for tname in eval_tools:
+                    if tname not in matched_names:
+                        tool = reg.get(tname)
+                        if tool:
+                            matched.append(
+                                {
+                                    "type": "function",
+                                    "function": {
+                                        "name": tool.name,
+                                        "description": tool.description,
+                                        "parameters": {
+                                            "type": "object",
+                                            "properties": {},
+                                            "additionalProperties": True,
+                                        },
+                                    },
+                                }
+                            )
+                tools_list = matched if matched else None
+            except Exception as e:
+                logger.warning(
+                    "Could not build tool schemas for eval %s: %s", skill_name, e
+                )
 
         trial_check_rates: list[float] = []
         trial_judge_scores: list[float] = []
@@ -490,12 +534,79 @@ async def run_skill_eval(
             try:
                 t_start = time.time()
                 client = LLMClient()
+                msgs = [LLMMessage(role="user", content=prompt)]
+                # Don't pass tools via API — MiniMax uses XML format naturally
+                # (passing tools via API causes MiniMax to describe tool use instead of calling)
                 resp = await client.chat(
-                    messages=[LLMMessage(role="user", content=prompt)],
+                    messages=msgs,
                     system_prompt=system,
                     temperature=0.3,
                     max_tokens=2048,
                 )
+                # ── Real tool execution: execute tool calls against the platform registry ──
+                # Parse XML tool calls from content (MiniMax natural format)
+                effective_tool_calls = resp.tool_calls or []
+                if not effective_tool_calls and tools_list and resp.content:
+                    from ..agents.tool_runner import _parse_xml_tool_calls
+
+                    effective_tool_calls = _parse_xml_tool_calls(resp.content) or []
+                if effective_tool_calls and tools_list:
+                    try:
+                        from ..agents.tool_runner import _get_tool_registry
+
+                        reg = _get_tool_registry()
+                        # Add assistant message with tool calls to conversation
+                        tc_dicts = [
+                            {
+                                "id": tc.id or f"call_{i}_{tc.function_name}",
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function_name,
+                                    "arguments": json.dumps(tc.arguments),
+                                },
+                            }
+                            for i, tc in enumerate(effective_tool_calls)
+                        ]
+                        msgs.append(
+                            LLMMessage(
+                                role="assistant",
+                                content=resp.content or "",
+                                tool_calls=tc_dicts,
+                            )
+                        )
+                        # Execute each tool for real and inject result
+                        for i, tc in enumerate(effective_tool_calls):
+                            tool = reg.get(tc.function_name)
+                            if tool:
+                                try:
+                                    tool_result = await tool.execute(tc.arguments)
+                                except Exception as te:
+                                    tool_result = f"Tool error: {te}"
+                            else:
+                                tool_result = f"Unknown tool: {tc.function_name}"
+                            msgs.append(
+                                LLMMessage(
+                                    role="tool",
+                                    content=str(tool_result)[:2000],
+                                    tool_call_id=tc.id
+                                    or f"call_{i}_{tc.function_name}",
+                                    name=tc.function_name,
+                                )
+                            )
+                        # Second LLM call: agent sees real tool results, produces final answer
+                        resp = await client.chat(
+                            messages=msgs,
+                            system_prompt=system,
+                            temperature=0.3,
+                            max_tokens=2048,
+                        )
+                    except Exception as tex:
+                        logger.warning(
+                            "Tool execution error in eval %s/%s: %s",
+                            skill_name,
+                            case_id,
+                            tex,
+                        )
                 latency_ms = (time.time() - t_start) * 1000
                 output = resp.content
                 tokens = (resp.tokens_in or 0) + (resp.tokens_out or 0)

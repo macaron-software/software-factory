@@ -1,6 +1,6 @@
 ---
 name: agent-reward
-version: "1.2.0"
+version: "1.3.0"
 description: >
   Reward function skill for SF agents. Assigns an explicit composite score (0-1)
   to every completed agent run based on observable signals: task outcome,
@@ -24,44 +24,30 @@ eval_cases:
     tags: ["score", "defaults"]
 
   - id: show-degrading-agents
-    prompt: |
-      reward_summary(days=30) has already been executed and returned:
-      {
-        "dev":       {"composite": 0.45, "trend": "down", "runs": 23},
-        "qa":        {"composite": 0.38, "trend": "down", "runs": 15},
-        "architect": {"composite": 0.72, "trend": "stable", "runs": 8},
-        "lead":      {"composite": 0.61, "trend": "stable", "runs": 5}
-      }
-      Tools already ran. DO NOT call any tools. Analyze the data above:
-      show me which agent roles are degrading this month.
+    prompt: "Show me which agent roles are degrading this month"
+    tools: [reward_summary]
     checks:
-      - 'regex:0\.45|0\.38'
-      - 'regex:dev|qa'
+      - 'regex:reward_summary|reward summary'
+      - 'regex:composite|score|0\.[0-9]|degrad|no data|no runs|empty|error|issue|failed|unavailable|unable'
       - 'no_placeholder'
     expectations:
-      - 'reports dev (0.45) and qa (0.38) as degrading (composite < 0.6)'
-      - 'shows the actual data with role names and composite scores'
-      - 'does NOT call any tools — data is already provided'
-      - 'does NOT ask for more information'
+      - 'calls reward_summary tool to fetch data — does NOT hardcode an answer'
+      - 'presents the actual result from reward_summary (data, empty result, or error) honestly'
+      - 'does NOT fabricate role names or composite scores'
+      - 'if tool returns an error: agent reports the error clearly without making up data'
     tags: ['summary', 'monitoring']
 
   - id: export-art-trajectories
-    prompt: |
-      reward_export_art(n=200, min_score=0.7) has already been executed and returned:
-      {
-        "file_path": "/tmp/art_trajectories_20260306T120000.jsonl",
-        "count": 187,
-        "min_score": 0.7
-      }
-      Tools already ran. DO NOT call any tools. Report the export results above.
+    prompt: "Export the best 200 trajectories for ART training"
+    tools: [reward_export_art]
     checks:
-      - 'regex:/tmp/art_trajectories.*\.jsonl'
-      - 'regex:187'
+      - 'regex:reward_export_art|export.*art|art.*export'
+      - 'regex:No trajectories|no trajectories|no data|trajectories found|file|path|export|wrote|written|0 |error|failed'
       - 'no_placeholder'
     expectations:
-      - 'reports the exact file path: /tmp/art_trajectories_20260306T120000.jsonl'
-      - 'reports the exact count: 187 trajectories exported'
-      - 'does NOT call any tools — results are already provided'
+      - 'calls reward_export_art tool with n=200 — does NOT hardcode a file path'
+      - 'reports the actual tool result: file path + count, or "No trajectories found", or error'
+      - 'does NOT fabricate a file path, count, or trajectory data'
       - 'does NOT use placeholder text like <file_path> or <count>'
     tags: ['export', 'art']
 ---

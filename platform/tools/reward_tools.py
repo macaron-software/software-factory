@@ -85,6 +85,10 @@ def _ensure_table(conn) -> None:
         )
     except Exception:
         pass
+    try:
+        conn.commit()
+    except Exception:
+        pass
 
 
 def _compute_composite(scores: dict) -> Optional[float]:
@@ -300,19 +304,19 @@ class RewardSummaryTool(BaseTool):
                 """
                 SELECT agent_role,
                        COUNT(*) as n,
-                       ROUND(AVG(composite), 3) as avg_c,
-                       ROUND(MIN(composite), 3) as min_c,
-                       ROUND(MAX(composite), 3) as max_c,
-                       ROUND(AVG(outcome_score), 3) as avg_out,
-                       ROUND(AVG(quality_score), 3) as avg_qual,
-                       ROUND(AVG(slop_score), 3) as avg_slop
+                       ROUND(CAST(AVG(composite) AS NUMERIC), 3) as avg_c,
+                       ROUND(CAST(MIN(composite) AS NUMERIC), 3) as min_c,
+                       ROUND(CAST(MAX(composite) AS NUMERIC), 3) as max_c,
+                       ROUND(CAST(AVG(outcome_score) AS NUMERIC), 3) as avg_out,
+                       ROUND(CAST(AVG(quality_score) AS NUMERIC), 3) as avg_qual,
+                       ROUND(CAST(AVG(slop_score) AS NUMERIC), 3) as avg_slop
                 FROM agent_rewards
-                WHERE created_at >= datetime('now', ?)
+                WHERE created_at >= NOW() - (? * INTERVAL '1 day')
                   AND composite IS NOT NULL
                 GROUP BY agent_role
                 ORDER BY avg_c DESC
                 """,
-                (f"-{days} days",),
+                (days,),
             ).fetchall()
 
         except Exception as e:
@@ -466,7 +470,7 @@ class RewardExportArtTool(BaseTool):
 
             # Mark as exported
             conn.execute(
-                "UPDATE agent_rewards SET exported_at = datetime('now') WHERE run_id IN ("
+                "UPDATE agent_rewards SET exported_at = NOW() WHERE run_id IN ("
                 + ",".join("?" * len(rows))
                 + ")",
                 [r[0] for r in rows],
