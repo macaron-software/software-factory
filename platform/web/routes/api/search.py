@@ -836,7 +836,7 @@ async def github_webhook(request: Request):
     if event == "ping":
         return JSONResponse({"ok": True, "event": "ping"})
 
-    from ....db.connection import get_db
+    from ....db.migrations import get_db
 
     db = get_db()
     now = datetime.utcnow().isoformat()
