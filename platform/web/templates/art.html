@@ -110,21 +110,14 @@
 .fiche-perm.no{background:rgba(148,163,184,.08);color:var(--text-muted)}
 .fiche-perm svg{width:11px;height:11px}
 .fiche-loading{text-align:center;padding:2rem;color:var(--text-muted);font-size:0.75rem}
-/* Amélioration Continue — sub-tabs + explainer cards */
-.tabs-sm{display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:1rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)}
-.tab-sm{background:none;border:1px solid transparent;border-radius:.4rem;padding:.3rem .7rem;font-size:.78rem;cursor:pointer;color:var(--text-secondary);transition:all .15s}
-.tab-sm:hover{background:var(--bg-tertiary);color:var(--text-primary)}
-.tab-sm.active{background:var(--bg-tertiary);border-color:var(--border);color:var(--text-primary);font-weight:600}
-.explainer{background:var(--bg-secondary);border:1px solid var(--border);border-left:3px solid var(--purple);border-radius:6px;padding:.75rem 1rem;margin-bottom:1.25rem;display:flex;gap:.75rem;align-items:flex-start}
-.explainer svg{flex-shrink:0;margin-top:1px;color:var(--purple)}
-.explainer strong{font-size:.82rem;color:var(--text-primary);display:block;margin-bottom:.2rem}
-.explainer p{margin:0;font-size:.78rem;color:var(--text-secondary);line-height:1.5}
+.ac-stab{padding:0.35rem 0.9rem;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.82rem;background:transparent;color:var(--text-secondary);transition:background 0.15s}
+.ac-stab:hover{background:var(--bg-tertiary)}
+.ac-stab.active{background:var(--bg-secondary);border-color:var(--border,#333);color:var(--text-primary);font-weight:600}
 </style>
 
 <div class="tabs" style="margin-bottom:1rem">
     <button class="tab active" onclick="artSwitchTab(this, 'art-org')">Organisation</button>
-    <button class="tab" onclick="artSwitchTab(this, 'art-mercato')" hx-get="/mercato/roster-partial" hx-target="#art-mercato-content" hx-swap="innerHTML" hx-trigger="click once">Mercato</button>
-    <button class="tab" onclick="artSwitchTab(this, 'art-ac')" id="tab-ac">Amélioration Continue</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-amelio-container')" id="tab-amelio">Amélioration Continue</button>
 </div>
 <div id="art-org">
 <div class="art-dash">
@@ -236,325 +229,103 @@
 </div>
 </div><!-- /art-org -->
 
-<!-- Mercato tab panel (hidden by default) -->
-<div id="art-mercato" style="display:none">
-    <div id="art-mercato-content">
-        <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Mercato...</p>
-    </div>
-    <div style="text-align:center;margin-top:1rem">
-        <a href="/mercato" style="color:var(--purple-light);font-size:0.8rem">Open full Mercato page</a>
-    </div>
-</div>
+<!-- Amélioration Continue container — 4 sub-tabs -->
+<div id="art-amelio-container" style="display:none">
 
-<!-- Amélioration Continue — unified AC tab with 6 sub-tabs -->
-<div id="art-ac" style="display:none">
-    <div class="tabs-sm" id="ac-sub-tabs">
-        <button class="tab-sm active" onclick="acSubTab(this,'acsub-cycles')">Cycles AC</button>
-        <button class="tab-sm" onclick="acSubTab(this,'acsub-skills')" id="tab-skills">Skills Health</button>
-        <button class="tab-sm" onclick="acSubTab(this,'acsub-thompson')" id="tab-thompson">Thompson</button>
-        <button class="tab-sm" onclick="acSubTab(this,'acsub-teams')" id="tab-teams">Darwin Teams</button>
-        <button class="tab-sm" onclick="acSubTab(this,'acsub-evolution')">Evolution</button>
-        <button class="tab-sm" onclick="acSubTab(this,'acsub-rl')">RL</button>
+    <!-- Sub-tab nav -->
+    <div style="display:flex;gap:0.25rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border,#333);padding-bottom:0">
+        <button class="ac-stab active" id="ac-stab-cycles" onclick="acSwitchTab(this,'ac-panel-cycles')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Cycles AC
+        </button>
+        <button class="ac-stab" id="ac-stab-skills" onclick="acSwitchTab(this,'ac-panel-skills')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Skills Health
+        </button>
+        <button class="ac-stab" id="ac-stab-thompson" onclick="acSwitchTab(this,'ac-panel-thompson')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Thompson
+        </button>
+        <button class="ac-stab" id="ac-stab-darwin" onclick="acSwitchTab(this,'ac-panel-darwin')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Darwin Teams
+        </button>
+        <button class="ac-stab" id="ac-stab-evolution" onclick="acSwitchTab(this,'ac-panel-evolution')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Evolution
+        </button>
+        <button class="ac-stab" id="ac-stab-rl" onclick="acSwitchTab(this,'ac-panel-rl')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            RL
+        </button>
+        <button class="ac-stab" id="ac-stab-heal" onclick="acSwitchTab(this,'ac-panel-heal')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Self Healing
+        </button>
     </div>
 
-    <!-- ── Cycles AC ──────────────────────────────────────────────────────── -->
-    <div id="acsub-cycles">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            <div>
-                <strong>Cycles AC — Amélioration Continue</strong>
-                <p>Pipeline automatique par projet pilote : TDD → Adversarial → QA → CI/CD → Deploy. Chaque cycle score les phases (0–100), accumule le RL reward et déclenche un sprint Hardening si score &lt; seuil. Thompson Sampling sélectionne les meilleurs variants de skill à chaque cycle.</p>
+    <!-- Cycles AC sub-panel -->
+    <div id="ac-panel-cycles">
+        <div id="art-amelio-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                Chargement…
             </div>
         </div>
-        <div id="acsub-cycles-content"
-             hx-get="/workflows/improvement"
-             hx-trigger="load"
-             hx-swap="innerHTML">
-            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement des projets AC…</p>
-        </div>
     </div>
 
-    <!-- ── Skills Health ─────────────────────────────────────────────────── -->
-    <div id="acsub-skills" style="display:none">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <div>
-                <strong>Skills Health — Évaluation des Skills YAML</strong>
-                <p>Couverture des evals par skill : taux de passage, cas de test, graduation (capability eval → regression tests) et détection de retraite (model absorbed). Inspiré de <em>philschmid.de/testing-skills</em> — "You wouldn't ship code without tests, but why ship skills without evals?"</p>
-            </div>
+    <!-- Skills Health sub-panel -->
+    <div id="ac-panel-skills" style="display:none">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+            <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
+            <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
+            <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
+            <div class="art-kpi"><div class="num" id="sk-run">–</div><div class="lbl">Ever run</div></div>
         </div>
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <div>
-                <strong>Skills Health — Évaluation des Skills YAML</strong>
-                <p>Couverture des evals par skill : taux de passage, cas de test, graduation (capability eval → regression tests) et détection de retraite (model absorbed). Inspiré de <em>philschmid.de/testing-skills</em> — "You wouldn't ship code without tests, but why ship skills without evals?"</p>
-            </div>
+        <div style="background:var(--bg-secondary);border-radius:4px;height:8px;margin-bottom:1.5rem;overflow:hidden">
+            <div id="sk-progress" style="background:#6366f1;height:100%;width:0%;transition:width 0.4s"></div>
         </div>
-        <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
-        <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
-        <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
-        <div class="art-kpi"><div class="num" id="sk-run">–</div><div class="lbl">Ever run</div></div>
-    </div>
-
-    <!-- Progress bar -->
-    <div style="background:var(--bg-secondary);border-radius:4px;height:8px;margin-bottom:1.5rem;overflow:hidden">
-        <div id="sk-progress" style="background:var(--purple);height:100%;width:0%;transition:width 0.4s"></div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
-        <!-- Skills with evals table -->
-        <div class="card" style="padding:1rem">
-            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
-                Skills with evals
-            </div>
-            <table style="width:100%;font-size:0.82rem;border-collapse:collapse" id="sk-eval-table">
-                <thead>
-                    <tr style="color:var(--text-tertiary);font-size:0.7rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+            <div class="card" style="padding:1rem">
+                <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">Skills with evals</div>
+                <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+                    <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
                         <th style="text-align:left;padding:2px 4px">Skill</th>
                         <th style="text-align:center;padding:2px 4px">Cases</th>
                         <th style="text-align:center;padding:2px 4px">Pass rate</th>
                         <th style="text-align:center;padding:2px 4px">Run</th>
-                    </tr>
-                </thead>
-                <tbody id="sk-eval-tbody">
-                    <tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr>
-                </tbody>
-            </table>
-        </div>
-        <!-- Skills without evals -->
-        <div class="card" style="padding:1rem">
-            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
-                Skills missing evals <span id="sk-missing-count" style="color:var(--yellow-deep)"></span>
+                    </tr></thead>
+                    <tbody id="sk-eval-tbody"><tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr></tbody>
+                </table>
             </div>
-            <div id="sk-missing-list" style="font-size:0.82rem;line-height:1.8;color:var(--text-secondary)">
-                Loading…
+            <div class="card" style="padding:1rem">
+                <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                    Skills missing evals <span id="sk-missing-count" style="color:#f59e0b"></span>
+                </div>
+                <div id="sk-missing-list" style="font-size:0.82rem;line-height:1.8;color:var(--text-secondary)">Loading…</div>
             </div>
         </div>
-    </div>
-
-    <!-- Retirement detection info -->
-    <div style="font-size:0.75rem;color:var(--text-tertiary);margin-bottom:0.5rem">
-        <svg class="icon-xs" style="vertical-align:middle;margin-right:3px"><use href="#icon-info"/></svg>
-        Graduation rule: once pass rate hits 100%, cases become regression tests.
-        If skill passes without being loaded → retire it (model absorbed the skill).
-        <a href="/workflows" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
-    </div>
-
-    <!-- Skill Eval Engine — diagram inspired by philschmid.de/testing-skills -->
-    <div style="margin-top:1.5rem">
-        <div style="font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-secondary);margin-bottom:0.75rem">
-            Skill Eval Engine
-        </div>
-        <svg id="sf-skill-eval-diag" viewBox="0 0 880 390" width="100%" style="max-height:390px;display:block">
-        <defs>
-            <marker id="sk-arr" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#6b7280"/></marker>
-            <marker id="sk-arr-g" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#22c55e"/></marker>
-            <marker id="sk-arr-p" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M1,1 L6,3.5 L1,6 Z" fill="#a78bfa"/></marker>
-        </defs>
-        <style>
-            #sf-skill-eval-diag { font-family: var(--font-sans, system-ui, sans-serif); }
-            #sf-skill-eval-diag .sk-bg   { fill: var(--bg-secondary); stroke: var(--border); stroke-width:1; }
-            #sf-skill-eval-diag .sk-bg3  { fill: var(--bg-tertiary);  stroke: var(--border); stroke-width:1; }
-            #sf-skill-eval-diag .sk-txt  { fill: var(--text-primary);   font-size:8.5px; }
-            #sf-skill-eval-diag .sk-sub  { fill: var(--text-secondary); font-size:7.5px; }
-            #sf-skill-eval-diag .sk-sec  { fill: var(--text-secondary); font-size:7px; font-weight:700; letter-spacing:.08em; }
-            #sf-skill-eval-diag .sk-ttl  { fill: var(--text-primary);   font-size:9px; font-weight:700; }
-            #sf-skill-eval-diag .sk-arr  { stroke: var(--border); stroke-width:1.5; fill:none; marker-end:url(#sk-arr); }
-            #sf-skill-eval-diag .sk-arr-g{ stroke: #22c55e; stroke-width:1.5; fill:none; marker-end:url(#sk-arr-g); stroke-dasharray:4 3; }
-            #sf-skill-eval-diag .sk-arr-p{ stroke: #a78bfa; stroke-width:1.5; fill:none; marker-end:url(#sk-arr-p); }
-            #sf-skill-eval-diag .badge   { rx:3; ry:3; }
-        </style>
-
-        <!-- ── ROW 1: SKILL.md ANATOMY ───────────────────────────── -->
-        <text x="14" y="14" class="sk-sec">SKILL.md ANATOMY</text>
-        <!-- Box: Frontmatter -->
-        <rect x="10"  y="20" width="190" height="90" rx="6" class="sk-bg3" stroke="#a78bfa" stroke-width="1.5"/>
-        <text x="20"  y="36" class="sk-ttl">Frontmatter</text>
-        <text x="20"  y="50" class="sk-sub">name · description</text>
-        <text x="20"  y="63" class="sk-sub">→ trigger mechanism</text>
-        <rect x="16"  y="70" width="54" height="13" rx="3" fill="#a78bfa" opacity=".15"/>
-        <text x="43"  y="80" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-size="7px">YAML</text>
-        <rect x="76"  y="70" width="120" height="13" rx="3" fill="#a78bfa" opacity=".1"/>
-        <text x="136" y="80" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-size="7px">vague → won't trigger</text>
-        <text x="20"  y="101" class="sk-sub" font-style="italic">Most important piece</text>
-        <!-- Arrow → Body -->
-        <line x1="200" y1="65" x2="220" y2="65" class="sk-arr"/>
-        <!-- Box: Body -->
-        <rect x="220" y="20" width="190" height="90" rx="6" class="sk-bg3" stroke="#3b82f6" stroke-width="1.5"/>
-        <text x="230" y="36" class="sk-ttl">Body</text>
-        <text x="230" y="50" class="sk-sub">Instructions &amp; directives</text>
-        <text x="230" y="63" class="sk-sub">APIs · patterns · anti-patterns</text>
-        <rect x="226" y="70" width="90" height="13" rx="3" fill="#3b82f6" opacity=".15"/>
-        <text x="271" y="80" text-anchor="middle" class="sk-sub" fill="#3b82f6" font-size="7px">Capability skill</text>
-        <rect x="322" y="70" width="82" height="13" rx="3" fill="#3b82f6" opacity=".15"/>
-        <text x="363" y="80" text-anchor="middle" class="sk-sub" fill="#3b82f6" font-size="7px">Preference skill</text>
-        <text x="230" y="101" class="sk-sub" font-style="italic">Directives &gt; information</text>
-        <!-- Arrow → Resources -->
-        <line x1="410" y1="65" x2="430" y2="65" class="sk-arr"/>
-        <!-- Box: Resources -->
-        <rect x="430" y="20" width="160" height="90" rx="6" class="sk-bg3"/>
-        <text x="440" y="36" class="sk-ttl">Resources</text>
-        <text x="440" y="50" class="sk-sub">scripts/ · examples/</text>
-        <text x="440" y="63" class="sk-sub">references/ (optional)</text>
-        <text x="440" y="80" class="sk-sub">consulted during exec</text>
-        <text x="440" y="101" class="sk-sub" font-style="italic">Progressive disclosure</text>
-
-        <!-- Big arrow: Anatomy → Pipeline -->
-        <line x1="440" y1="110" x2="440" y2="128" class="sk-arr"/>
-
-        <!-- ── ROW 2: EVAL PIPELINE ─────────────────────────────── -->
-        <text x="14" y="142" class="sk-sec">EVAL PIPELINE</text>
-        <!-- Step 1: Define Success -->
-        <rect x="10"  y="148" width="185" height="100" rx="6" class="sk-bg"/>
-        <rect x="10"  y="148" width="185" height="18"  rx="6" fill="#a78bfa" opacity=".2"/>
-        <rect x="10"  y="157" width="185" height="9"   fill="#a78bfa" opacity=".2"/>
-        <text x="22"  y="162" class="sk-ttl">① Define Success Criteria</text>
-        <text x="20"  y="179" class="sk-sub">• Outcome — compiles / runs</text>
-        <text x="20"  y="191" class="sk-sub">• Style — conventions &amp; SDK</text>
-        <text x="20"  y="203" class="sk-sub">• Efficiency — tokens · latency</text>
-        <text x="20"  y="218" class="sk-sub" font-style="italic">Grade outcomes, not paths</text>
-        <text x="20"  y="238" class="sk-sub">Manual runs first ↓ surface</text>
-        <text x="20"  y="248" class="sk-sub">hidden assumptions</text>
-        <!-- Arrow 1→2 -->
-        <line x1="195" y1="198" x2="217" y2="198" class="sk-arr"/>
-        <!-- Step 2: Prompt Set -->
-        <rect x="217" y="148" width="185" height="100" rx="6" class="sk-bg"/>
-        <rect x="217" y="148" width="185" height="18"  rx="6" fill="#3b82f6" opacity=".2"/>
-        <rect x="217" y="157" width="185" height="9"   fill="#3b82f6" opacity=".2"/>
-        <text x="229" y="162" class="sk-ttl">② Prompt Set</text>
-        <text x="227" y="179" class="sk-sub">10–20 prompts minimum</text>
-        <text x="227" y="191" class="sk-sub">• should_trigger: true/false</text>
-        <text x="227" y="203" class="sk-sub">• expected_checks: [...]</text>
-        <text x="227" y="218" class="sk-sub" font-style="italic">Include negative tests!</text>
-        <text x="227" y="238" class="sk-sub">Each failure → new test case</text>
-        <text x="227" y="248" class="sk-sub">3–5 trials per prompt</text>
-        <!-- Arrow 2→3 -->
-        <line x1="402" y1="198" x2="424" y2="198" class="sk-arr"/>
-        <!-- Step 3: Run Agent -->
-        <rect x="424" y="148" width="185" height="100" rx="6" class="sk-bg"/>
-        <rect x="424" y="148" width="185" height="18"  rx="6" fill="#f59e0b" opacity=".2"/>
-        <rect x="424" y="157" width="185" height="9"   fill="#f59e0b" opacity=".2"/>
-        <text x="436" y="162" class="sk-ttl">③ Run Agent + Capture</text>
-        <text x="434" y="179" class="sk-sub">CLI / harness (isolated env)</text>
-        <text x="434" y="191" class="sk-sub">capture stdout + stats</text>
-        <text x="434" y="203" class="sk-sub">extract_code_blocks(output)</text>
-        <text x="434" y="218" class="sk-sub" font-style="italic">Isolate each run — no</text>
-        <text x="434" y="228" class="sk-sub" font-style="italic">context bleed</text>
-        <text x="434" y="248" class="sk-sub">Test across harnesses</text>
-        <!-- Arrow 3→4 -->
-        <line x1="609" y1="198" x2="631" y2="198" class="sk-arr"/>
-        <!-- Step 4: Score -->
-        <rect x="631" y="148" width="240" height="100" rx="6" class="sk-bg"/>
-        <rect x="631" y="148" width="240" height="18"  rx="6" fill="#22c55e" opacity=".2"/>
-        <rect x="631" y="157" width="240" height="9"   fill="#22c55e" opacity=".2"/>
-        <text x="643" y="162" class="sk-ttl">④ Score</text>
-        <!-- Deterministic column -->
-        <rect x="637" y="170" width="108" height="70" rx="4" fill="#22c55e" opacity=".07" stroke="#22c55e" stroke-width=".8"/>
-        <text x="691" y="182" text-anchor="middle" class="sk-sub" fill="#22c55e" font-weight="700">Deterministic</text>
-        <text x="641" y="194" class="sk-sub">regex → bool</text>
-        <text x="641" y="205" class="sk-sub">CHECK_REGISTRY</text>
-        <text x="641" y="216" class="sk-sub">fast · cheap</text>
-        <text x="641" y="230" class="sk-sub" font-style="italic">prefer first</text>
-        <!-- LLM-as-judge column -->
-        <rect x="751" y="170" width="112" height="70" rx="4" fill="#a78bfa" opacity=".07" stroke="#a78bfa" stroke-width=".8"/>
-        <text x="807" y="182" text-anchor="middle" class="sk-sub" fill="#a78bfa" font-weight="700">LLM-as-Judge</text>
-        <text x="755" y="194" class="sk-sub">structured output</text>
-        <text x="755" y="205" class="sk-sub">qualitative checks</text>
-        <text x="755" y="216" class="sk-sub">score 0–100</text>
-        <text x="755" y="230" class="sk-sub" font-style="italic">cost ↑ · selective</text>
-
-        <!-- Big arrow: Pipeline → Lifecycle -->
-        <line x1="440" y1="248" x2="440" y2="265" class="sk-arr"/>
-
-        <!-- ── ROW 3: EVAL LIFECYCLE ────────────────────────────── -->
-        <text x="14" y="280" class="sk-sec">EVAL LIFECYCLE</text>
-        <!-- Phase 1: Capability -->
-        <rect x="10"  y="286" width="250" height="90" rx="6" class="sk-bg" stroke="#f59e0b" stroke-width="1.5"/>
-        <text x="20"  y="302" class="sk-ttl" fill="#f59e0b">Capability Eval</text>
-        <text x="20"  y="318" class="sk-sub">Start at low pass rate</text>
-        <text x="20"  y="330" class="sk-sub">e.g. 66.7% → iterate → 100%</text>
-        <text x="20"  y="342" class="sk-sub">Fix description → directives</text>
-        <text x="20"  y="354" class="sk-sub">Each fix = new test case</text>
-        <text x="20"  y="366" class="sk-sub" font-style="italic">Hill-climbing toward 100%</text>
-        <!-- Arrow 1→2 -->
-        <line x1="260" y1="331" x2="282" y2="331" class="sk-arr"/>
-        <!-- Phase 2: Regression -->
-        <rect x="282" y="286" width="250" height="90" rx="6" class="sk-bg" stroke="#22c55e" stroke-width="1.5"/>
-        <text x="292" y="302" class="sk-ttl" fill="#22c55e">Regression Eval</text>
-        <text x="292" y="318" class="sk-sub">≥ 100% pass rate reached</text>
-        <text x="292" y="330" class="sk-sub">Cases protect backsliding</text>
-        <text x="292" y="342" class="sk-sub">Run on every skill change</text>
-        <text x="292" y="354" class="sk-sub">Track distribution over trials</text>
-        <text x="292" y="366" class="sk-sub" font-style="italic">Guard against regressions</text>
-        <!-- Arrow 2→3 -->
-        <line x1="532" y1="331" x2="554" y2="331" class="sk-arr"/>
-        <!-- Phase 3: Retirement -->
-        <rect x="554" y="286" width="280" height="90" rx="6" class="sk-bg" stroke="#a78bfa" stroke-width="1.5"/>
-        <text x="564" y="302" class="sk-ttl" fill="#a78bfa">Retirement Detection</text>
-        <text x="564" y="318" class="sk-sub">Run evals with skill unloaded</text>
-        <text x="564" y="330" class="sk-sub">Still passing? → model absorbed it</text>
-        <text x="564" y="342" class="sk-sub">skill.status = "retired"</text>
-        <text x="564" y="354" class="sk-sub">Free up context · reduce noise</text>
-        <text x="564" y="366" class="sk-sub" font-style="italic">Capability skills retire; preference skills endure</text>
-
-        <!-- Feedback arrow: Regression failure → back to Step 2 -->
-        <path d="M 407,331 Q 407,390 310,390 Q 213,390 213,280" stroke="#a78bfa" stroke-width="1.2" fill="none" marker-end="url(#sk-arr-p)" stroke-dasharray="5 3"/>
-        <text x="360" y="388" class="sk-sub" fill="#a78bfa" font-size="7px">new failure → new test case</text>
-
-        </svg>
-    </div>
-    </div>
-    </div>
-
-    <!-- ── Thompson ──────────────────────────────────────────────────────── -->
-    <div id="acsub-thompson" style="display:none">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <div>
-                <strong>Thompson Sampling — Sélection bandit multi-armed</strong>
-                <p>Chaque provider LLM est modélisé par une distribution Beta(α, β). À chaque appel agent, on sample la distribution et on choisit le provider avec le score le plus élevé. Chaque succès incrémente α, chaque échec incrémente β. L'algorithme converge automatiquement vers le meilleur provider par contexte.</p>
-            </div>
-        </div>
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            <div>
-                <strong>Thompson Sampling — Sélection bandit multi-armed</strong>
-                <p>Chaque provider LLM est modélisé par une distribution Beta(α, β). À chaque appel agent, on sample la distribution et on choisit le provider avec le score le plus élevé. Chaque succès incrémente α, chaque échec incrémente β. L'algorithme converge automatiquement vers le meilleur provider par contexte.</p>
-            </div>
-        </div>
-    <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
-        <div class="stat-card">
-            <h3>Agents actifs</h3>
-            <p class="stat-value" id="ts-art-total">—</p>
-            <p class="stat-label">avec données LLM</p>
-        </div>
-        <div class="stat-card">
-            <h3>Appels LLM totaux</h3>
-            <p class="stat-value" id="ts-art-accepted">—</p>
-            <p class="stat-label">toutes traces</p>
-        </div>
-        <div class="stat-card">
-            <h3>Erreurs LLM</h3>
-            <p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p>
-            <p class="stat-label">total tous agents</p>
-        </div>
-        <div class="stat-card">
-            <h3>Darwin Fitness</h3>
-            <p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p>
-            <p class="stat-label">scores accumulés</p>
+        <div style="font-size:0.75rem;color:var(--text-tertiary)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Graduation rule: once pass rate hits 100%, cases become regression tests. If skill passes without being loaded → retire it.
+            <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval →</a>
         </div>
     </div>
 
-    <!-- A/B provider comparison -->
-    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
-    <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
-
-    <!-- Agent performance table from llm_traces -->
-    <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
-    <div style="overflow-x:auto">
-        <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
-            <thead>
-                <tr style="background:var(--bg-secondary,#1e293b)">
+    <!-- Thompson Sampling sub-panel -->
+    <div id="ac-panel-thompson" style="display:none">
+        <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
+            <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
+            <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
+            <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
+            <div class="stat-card"><h3>Darwin Fitness</h3><p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p><p class="stat-label">scores accumulés</p></div>
+        </div>
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
+        <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
+                <thead><tr style="background:var(--bg-secondary,#1e293b)">
                     <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
                     <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider / Modèle</th>
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Appels</th>
@@ -563,21 +334,15 @@
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Durée moy.</th>
                     <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
                     <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
-                </tr>
-            </thead>
-            <tbody id="ts-art-tbody">
-                <tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr>
-            </tbody>
-        </table>
-    </div>
-
-    <!-- Darwin fitness section -->
-    <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
-        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
-        <div style="overflow-x:auto">
-            <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
-                <thead>
-                    <tr style="background:var(--bg-secondary,#1e293b)">
+                </tr></thead>
+                <tbody id="ts-art-tbody"><tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr></tbody>
+            </table>
+        </div>
+        <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
+            <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
+            <div style="overflow-x:auto">
+                <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+                    <thead><tr style="background:var(--bg-secondary,#1e293b)">
                         <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
                         <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Pattern</th>
                         <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Tech</th>
@@ -585,70 +350,50 @@
                         <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Wins</th>
                         <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Losses</th>
                         <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Fitness</th>
-                    </tr>
-                </thead>
-                <tbody id="ts-darwin-tbody"></tbody>
-            </table>
-        </div>
-    </div>
-</div>
-
-    <!-- ── Darwin Teams ──────────────────────────────────────────────────────
-    <div id="acsub-teams" style="display:none">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            <div>
-                <strong>Darwin Teams — Évolution darwinienne des équipes</strong>
-                <p>Sélection naturelle par fitness score : les équipes qui réussissent les tâches accumulent du score (wins/losses), les moins performantes sont reconfigurées. À chaque génération PI, les meilleures compositions de compétences survivent et se reproduisent. Fitness = f(qualité code, délai, défauts).</p>
+                    </tr></thead>
+                    <tbody id="ts-darwin-tbody"></tbody>
+                </table>
             </div>
-        </div>
-        <div id="art-teams-content"
-             hx-get="/art/darwin-teams"
-             hx-trigger="intersect once"
-             hx-swap="innerHTML">
-            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement Darwin Teams…</p>
         </div>
     </div>
 
-    <!-- ── Evolution ─────────────────────────────────────────────────────── -->
-    <div id="acsub-evolution" style="display:none">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            <div>
-                <strong>Evolution — Progression long-terme du système</strong>
-                <p>Métriques d'évolution sur N semaines : throughput missions, qualité code, couverture tests, durée cycles, taux d'erreurs LLM. Graphiques de tendance pour identifier les regressions et les gains. Chaque sprint améliore les KPIs globaux du système — c'est la mesure de l'Amélioration Continue.</p>
-            </div>
-        </div>
-        <div id="acsub-evolution-content"
-             hx-get="/workflows/evolution"
-             hx-trigger="intersect once"
-             hx-swap="innerHTML">
-            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Chargement de l'évolution…</p>
+    <!-- Darwin Teams sub-panel -->
+    <div id="ac-panel-darwin" style="display:none">
+        <div id="art-teams-content">
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Darwin Teams…</p>
         </div>
     </div>
 
-    <!-- ── RL ────────────────────────────────────────────────────────────── -->
-    <div id="acsub-rl" style="display:none">
-        <div class="explainer">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <div>
-                <strong>Reinforcement Learning — Optimisation par récompense</strong>
-                <p>L'agent RL observe les résultats AC (phase scores, défauts, coût fix), calcule le RL reward r = f(score, defects, efficiency) et met à jour la Q-table. Le hint suggère la prochaine action (exploit best skill vs explore new variant). L'exploitation rate augmente à mesure que le système converge.</p>
+    <!-- Evolution sub-panel — GA proposals + run history -->
+    <div id="ac-panel-evolution" style="display:none">
+        <div id="art-evolution-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
             </div>
         </div>
-        <div class="stats-grid" style="margin-bottom:1.5rem" id="rl-kpis">
-            <div class="stat-card"><h3>RL Reward moy.</h3><p class="stat-value" id="rl-reward-avg">—</p><p class="stat-label">derniers 10 cycles</p></div>
-            <div class="stat-card"><h3>Convergence</h3><p class="stat-value conv-cold_start" id="rl-convergence">—</p><p class="stat-label">status</p></div>
-            <div class="stat-card"><h3>Hint action</h3><p class="stat-value" style="font-size:0.9rem" id="rl-hint">—</p><p class="stat-label">prochaine suggestion</p></div>
-            <div class="stat-card"><h3>Exploitation</h3><p class="stat-value" id="rl-exploit-rate">—</p><p class="stat-label">exploit vs explore</p></div>
-        </div>
-        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);margin-bottom:0.5rem">Historique rewards (10 derniers cycles)</div>
-        <div style="display:flex;align-items:flex-end;gap:3px;height:48px;margin-bottom:1.5rem" id="rl-reward-chart">
-            <p style="color:var(--text-secondary);font-size:0.78rem;margin:auto">Sélectionner un projet dans Cycles AC pour afficher</p>
-        </div>
-        <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-secondary);margin-bottom:0.5rem">Projets — état RL</div>
-        <div id="rl-projects-grid" class="stats-grid"></div>
     </div>
+
+    <!-- RL sub-panel — reward policy stats -->
+    <div id="ac-panel-rl" style="display:none">
+        <div id="art-rl-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
+    <!-- Self Healing sub-panel -->
+    <div id="ac-panel-heal" style="display:none">
+        <div id="art-heal-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
 </div>
 
 
@@ -821,21 +566,57 @@
 function artSwitchTab(btn, panelId) {
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('art-org').style.display = panelId === 'art-org' ? '' : 'none';
-    document.getElementById('art-mercato').style.display = panelId === 'art-mercato' ? '' : 'none';
-    document.getElementById('art-ac').style.display = panelId === 'art-ac' ? '' : 'none';
+    ['art-org','art-amelio-container'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === panelId ? '' : 'none';
+    });
+    if (panelId === 'art-amelio-container') {
+        // Auto-load Cycles AC on first open
+        const content = document.getElementById('art-amelio-content');
+        if (content && !content.dataset.loaded) {
+            content.dataset.loaded = '1';
+            htmx.ajax('GET', '/workflows/improvement', {target: '#art-amelio-content', swap: 'innerHTML'});
+        }
+    }
 }
 
-function acSubTab(btn, subId) {
-    document.querySelectorAll('#ac-sub-tabs .tab-sm').forEach(t => t.classList.remove('active'));
+function acSwitchTab(btn, subId) {
+    document.querySelectorAll('.ac-stab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    ['acsub-cycles','acsub-skills','acsub-thompson','acsub-teams','acsub-evolution','acsub-rl']
-        .forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.style.display = id === subId ? '' : 'none';
-        });
-    if (subId === 'acsub-thompson') loadThompsonTab();
-    if (subId === 'acsub-skills') loadSkillsTab();
+    ['ac-panel-cycles','ac-panel-skills','ac-panel-thompson','ac-panel-darwin','ac-panel-evolution','ac-panel-rl','ac-panel-heal'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === subId ? '' : 'none';
+    });
+    if (subId === 'ac-panel-thompson') loadThompsonTab();
+    if (subId === 'ac-panel-skills') loadSkillsTab();
+    if (subId === 'ac-panel-darwin') {
+        const tc = document.getElementById('art-teams-content');
+        if (tc && !tc.dataset.loaded) {
+            tc.dataset.loaded = '1';
+            htmx.ajax('GET', '/teams/partial', {target: '#art-teams-content', swap: 'innerHTML'});
+        }
+    }
+    if (subId === 'ac-panel-evolution') {
+        const ec = document.getElementById('art-evolution-content');
+        if (ec && !ec.dataset.loaded) {
+            ec.dataset.loaded = '1';
+            htmx.ajax('GET', '/workflows/evolution', {target: '#art-evolution-content', swap: 'innerHTML'});
+        }
+    }
+    if (subId === 'ac-panel-rl') {
+        const rc = document.getElementById('art-rl-content');
+        if (rc && !rc.dataset.loaded) {
+            rc.dataset.loaded = '1';
+            loadRlTab();
+        }
+    }
+    if (subId === 'ac-panel-heal') {
+        const hc = document.getElementById('art-heal-content');
+        if (hc && !hc.dataset.loaded) {
+            hc.dataset.loaded = '1';
+            loadSelfHealTab();
+        }
+    }
 }
 
 async function loadThompsonTab() {
@@ -942,6 +723,20 @@ async function loadThompsonTab() {
     } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur réseau: ${e.message}</td></tr>`; }
 }
 
+// Skills Health — sub-tab switcher
+function skSwitchTab(tab) {
+    const isEtat = tab === 'etat';
+    document.getElementById('sk-panel-etat').style.display = isEtat ? '' : 'none';
+    document.getElementById('sk-panel-amelio').style.display = isEtat ? 'none' : '';
+    document.getElementById('sk-tab-etat').style.background = isEtat ? 'var(--purple,#a855f7)' : 'var(--bg-tertiary,#251a35)';
+    document.getElementById('sk-tab-etat').style.color = isEtat ? '#fff' : 'var(--text-secondary,#aaa)';
+    document.getElementById('sk-tab-etat').style.fontWeight = isEtat ? '600' : 'normal';
+    document.getElementById('sk-tab-amelio').style.background = isEtat ? 'var(--bg-tertiary,#251a35)' : 'var(--purple,#a855f7)';
+    document.getElementById('sk-tab-amelio').style.color = isEtat ? 'var(--text-secondary,#aaa)' : '#fff';
+    document.getElementById('sk-tab-amelio').style.fontWeight = isEtat ? 'normal' : '600';
+    if (!isEtat) loadSkillsAmelio();
+}
+
 // Skills Health tab loader
 // WHY: Surfaces skill eval coverage + pass rates from /api/skills/eval
 // so engineers can see which skills need evals at a glance — same dashboard
@@ -962,7 +757,6 @@ async function loadSkillsTab() {
         }
         const coverage = await coverageResp.json();
         const listRaw = await listResp.json();
-        // Defensive: backend always returns array, but guard against errors
         const skillList = Array.isArray(listRaw) ? listRaw : [];
 
         // KPIs
@@ -982,7 +776,6 @@ async function loadSkillsTab() {
                     const pr = s.pass_rate;
                     const prPct = pr !== null && pr !== undefined ? Math.round(pr * 100) : null;
                     const color = pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
-                    // Graduation rule badge
                     let badge;
                     if (pr == null) {
                         badge = '<span style="color:#6b7280;font-size:0.75rem">not run</span>';
@@ -1020,6 +813,293 @@ async function loadSkillsTab() {
     } catch(e) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">Error: ${e.message}</td></tr>`;
     }
+}
+
+// Skills Amélioration tab — priority backlog + run history
+async function loadSkillsAmelio() {
+    const amelioTbody = document.getElementById('sk-amelio-tbody');
+    if (!amelioTbody || amelioTbody.dataset.loaded) return;
+    amelioTbody.dataset.loaded = '1';
+    const historyEl = document.getElementById('sk-run-history');
+    try {
+        const [listResp, histResp] = await Promise.all([
+            fetch('/api/skills/list'),
+            fetch('/api/skills/eval/history'),
+        ]);
+        const skillList = listResp.ok ? (await listResp.json()) : [];
+        const histData = histResp.ok ? (await histResp.json()) : {};
+
+        // Build priority backlog: no evals first, then low pass rate, then not run
+        const prioritized = [...skillList].sort((a, b) => {
+            // Score: 0 evals = highest priority, then by pass_rate asc
+            const aScore = !a.has_evals ? 0 : (a.pass_rate == null ? 1 : a.pass_rate);
+            const bScore = !b.has_evals ? 0 : (b.pass_rate == null ? 1 : b.pass_rate);
+            return aScore - bScore;
+        }).slice(0, 25);
+
+        if (!prioritized.length) {
+            amelioTbody.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--text-secondary)">Aucun skill à améliorer</td></tr>';
+        } else {
+            amelioTbody.innerHTML = prioritized.map((s, i) => {
+                const pr = s.pass_rate;
+                const prPct = pr !== null && pr !== undefined ? Math.round(pr * 100) : null;
+                const noEvals = !s.has_evals;
+                const priority = noEvals
+                    ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#ef4444"><use href="#icon-alert-circle"/></svg><span style="color:#ef4444">Sans evals</span>'
+                    : (pr == null
+                        ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#f97316"><use href="#icon-alert-triangle"/></svg><span style="color:#f97316">Jamais run</span>'
+                        : (pr < 0.6
+                            ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#ef4444"><use href="#icon-alert-circle"/></svg><span style="color:#ef4444">Critique</span>'
+                            : pr < 0.8
+                                ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#f59e0b"><use href="#icon-alert-triangle"/></svg><span style="color:#f59e0b">À améliorer</span>'
+                                : '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#10b981"><use href="#icon-check-circle"/></svg><span style="color:#10b981">OK</span>'));
+                const prColor = noEvals || pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+                const prDisplay = noEvals ? '—' : (prPct !== null ? `<span style="color:${prColor};font-weight:600">${prPct}%</span>` : '—');
+                const action = noEvals ? 'Ajouter eval_cases' : (pr == null ? 'Lancer évaluation' : (pr < 0.8 ? 'Améliorer skill' : '—'));
+                return `<tr style="border-bottom:1px solid var(--border,#333)">
+                    <td style="padding:5px 6px;color:var(--text-tertiary);font-size:0.75rem">${i+1}</td>
+                    <td style="padding:5px 6px;font-weight:${noEvals || pr != null && pr < 0.8 ? '600' : 'normal'}">${s.name}</td>
+                    <td style="text-align:center;padding:5px 6px;font-size:0.78rem">${priority}</td>
+                    <td style="text-align:center;padding:5px 6px">${prDisplay}</td>
+                    <td style="padding:5px 6px;font-size:0.75rem;color:var(--text-tertiary)">${action}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Run history
+        const runs = histData.runs || [];
+        if (!runs.length) {
+            historyEl.textContent = 'Aucun cycle lancé — cliquer "Lancer skill-eval"';
+        } else {
+            historyEl.innerHTML = `<table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Mission</th>
+                    <th style="text-align:center;padding:3px 6px">Statut</th>
+                    <th style="text-align:center;padding:3px 6px">Skills run</th>
+                    <th style="text-align:right;padding:3px 6px">Date</th>
+                </tr></thead>
+                <tbody>${runs.map(r => {
+                    const statusColor = r.status === 'done' ? '#10b981' : r.status === 'running' ? '#6366f1' : '#6b7280';
+                    return `<tr style="border-bottom:1px solid var(--border,#333)">
+                        <td style="padding:4px 6px"><a href="/missions/${r.id}/control" style="color:var(--purple-light)">${(r.name||r.id).substring(0,35)}</a></td>
+                        <td style="text-align:center;padding:4px 6px"><span style="color:${statusColor};font-size:0.75rem">${r.status}</span></td>
+                        <td style="text-align:center;padding:4px 6px;color:var(--text-secondary)">${r.skills_run ?? '—'}</td>
+                        <td style="text-align:right;padding:4px 6px;color:var(--text-tertiary);font-size:0.75rem">${(r.created_at||'').substring(0,10)}</td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        }
+    } catch(e) {
+        if (amelioTbody) amelioTbody.innerHTML = `<tr><td colspan="5" style="padding:1rem;text-align:center;color:#ef4444">Erreur: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadRlTab() {
+    const cont = document.getElementById('art-rl-content');
+    if (!cont) return;
+    try {
+        const d = await fetch('/api/rl/policy/stats').then(r => r.json());
+        const fired = d.recommendations_fired || 0;
+        const total = d.recommendations_total || 0;
+        const pct = total > 0 ? Math.round(fired/total*100) : 0;
+        cont.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+            <div class="art-kpi"><div class="num">${d.states||0}</div><div class="lbl">États Q-table</div></div>
+            <div class="art-kpi"><div class="num">${d.total_experience||0}</div><div class="lbl">Expériences</div></div>
+            <div class="art-kpi"><div class="num">${fired}</div><div class="lbl">Reco appliquées</div></div>
+            <div class="art-kpi"><div class="num" style="color:${pct>=50?'#22c55e':'#f59e0b'}">${pct}%</div><div class="lbl">Taux adoption</div></div>
+        </div>
+        ${d.actions && d.actions.length ? `
+        <div class="card" style="padding:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Actions les plus recommandées
+            </div>
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Action</th>
+                    <th style="text-align:right;padding:3px 6px">Q-value</th>
+                </tr></thead>
+                <tbody>${d.actions.map(a => `<tr>
+                    <td style="padding:3px 6px;color:var(--text-primary)">${a.action||a}</td>
+                    <td style="padding:3px 6px;text-align:right;color:var(--purple-light);font-weight:600">${typeof a.q_value !== 'undefined' ? a.q_value.toFixed(3) : '–'}</td>
+                </tr>`).join('')}</tbody>
+            </table>
+        </div>` : `<div style="color:var(--text-secondary);font-size:0.82rem;padding:1rem 0">Pas encore d'expériences RL — les cycles AC accumuleront les rewards au fil du temps.</div>`}
+        <div style="margin-top:1rem;font-size:0.72rem;color:var(--text-tertiary)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Q-learning sur les phases des cycles AC : reward R ∈ [-1, +1] = f(qualité, adversarial, traceability, efficience, régression).
+        </div>`;
+    } catch(e) {
+        cont.innerHTML = `<div style="color:#ef4444;padding:1rem">Erreur chargement RL: ${e.message}</div>`;
+    }
+}
+
+async function loadSelfHealTab() {
+    // WHY: self-healing is part of the AC intelligence loop — incidents trigger auto-TMA missions,
+    // chaos monkey validates resilience. Surfaced here alongside RL/Thompson for full-loop visibility.
+    const cont = document.getElementById('art-heal-content');
+    if (!cont) return;
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const sev = s => ({critical:'#ef4444',high:'#f97316',medium:'#f59e0b',low:'#6b7280'}[s]||'#6b7280');
+    const sta = s => ({open:'#f59e0b',investigating:'#818cf8',resolved:'#22c55e',closed:'#6b7280'}[s]||'#6b7280');
+    const timeAgoH = ts => {
+        if (!ts) return '—';
+        const d = Math.floor((Date.now()-new Date(ts).getTime())/1000);
+        if (d<60) return `${d}s`;
+        if (d<3600) return `${Math.floor(d/60)}m`;
+        if (d<86400) return `${Math.floor(d/3600)}h`;
+        return `${Math.floor(d/86400)}d`;
+    };
+    try {
+        const [stats, incidents, chaos] = await Promise.all([
+            fetch('/api/autoheal/stats').then(r=>r.json()).catch(()=>({})),
+            fetch('/api/incidents?limit=10').then(r=>r.json()).catch(()=>[]),
+            fetch('/api/chaos/history').then(r=>r.json()).catch(()=>[]),
+        ]);
+        const inc = stats.incidents || {};
+        const epics = stats.epics || {};
+        const hb = stats.heartbeat || 'starting';
+        const hbColor = hb==='alive'?'#22c55e':hb==='stale'?'#ef4444':'#818cf8';
+        const hbLabel = hb==='alive'?'Alive':hb==='stale'?'Stale':'Starting';
+
+        const kpis = [
+            {n:inc.open||0, l:'Incidents open', c:inc.open>0?'#f59e0b':'var(--text-primary)'},
+            {n:inc.investigating||0, l:'Investigating', c:'#818cf8'},
+            {n:inc.resolved||0, l:'Résolus', c:'#22c55e'},
+            {n:epics.active||0, l:'Heals actifs', c:epics.active>0?'#f59e0b':'var(--text-primary)'},
+            {n:epics.completed||0, l:'Heals OK', c:'#22c55e'},
+            {n:epics.failed||0, l:'Heals KO', c:epics.failed>0?'#ef4444':'var(--text-primary)'},
+        ];
+        const kpiHtml = kpis.map(k=>`<div class="art-kpi"><div class="num" style="color:${k.c}">${k.n}</div><div class="lbl">${k.l}</div></div>`).join('');
+
+        const incHtml = Array.isArray(incidents) && incidents.length
+            ? `<table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Incident</th>
+                    <th style="padding:3px 6px">Sévérité</th>
+                    <th style="padding:3px 6px">Statut</th>
+                    <th style="text-align:right;padding:3px 6px">Age</th>
+                </tr></thead>
+                <tbody>${incidents.map(i=>`<tr>
+                    <td style="padding:3px 6px;color:var(--text-primary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||i.id)}</td>
+                    <td style="padding:3px 6px;text-align:center"><span style="color:${sev(i.severity)};font-weight:600;font-size:0.72rem">${esc(i.severity||'—')}</span></td>
+                    <td style="padding:3px 6px;text-align:center"><span style="color:${sta(i.status)};font-size:0.72rem">${esc(i.status||'—')}</span></td>
+                    <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${timeAgoH(i.created_at)}</td>
+                </tr>`).join('')}</tbody>
+               </table>`
+            : `<div style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem 0">Aucun incident enregistré.</div>`;
+
+        const chaosRows = Array.isArray(chaos) && chaos.length
+            ? chaos.slice(0,8).map(c=>`<tr>
+                <td style="padding:3px 6px;color:var(--text-primary)">${esc(c.scenario||'—')}</td>
+                <td style="padding:3px 6px;text-align:center">
+                    <span style="color:${c.success?'#22c55e':'#ef4444'};font-size:0.72rem">${c.success?'OK':'KO'}</span>
+                </td>
+                <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${c.mttr_ms!=null?c.mttr_ms+'ms':'—'}</td>
+                <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${timeAgoH(c.ran_at||c.timestamp)}</td>
+              </tr>`).join('')
+            : `<tr><td colspan="4" style="padding:0.5rem;color:var(--text-secondary)">Aucune exécution chaos.</td></tr>`;
+
+        cont.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:0.75rem;margin-bottom:1.25rem">
+            ${kpiHtml}
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.25rem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${hbColor}" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span style="font-size:0.8rem;color:${hbColor};font-weight:600">Auto-Heal ${hbLabel}</span>
+            <span style="font-size:0.72rem;color:var(--text-tertiary);margin-left:4px">· scan /${stats.interval_s||60}s · max ${stats.max_concurrent||3} concurrent</span>
+            <button onclick="triggerHeal(this)" style="margin-left:auto;font-size:0.72rem;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Trigger
+            </button>
+        </div>
+        <div class="card" style="padding:1rem;margin-bottom:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Incidents récents
+            </div>
+            ${incHtml}
+        </div>
+        <div class="card" style="padding:1rem">
+            <div style="display:flex;align-items:center;margin-bottom:0.75rem">
+                <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary)">Chaos Monkey</span>
+                <button onclick="triggerChaos(this)" style="margin-left:auto;font-size:0.72rem;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    Trigger
+                </button>
+            </div>
+            <table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Scénario</th>
+                    <th style="padding:3px 6px">Résultat</th>
+                    <th style="text-align:right;padding:3px 6px">MTTR</th>
+                    <th style="text-align:right;padding:3px 6px">Age</th>
+                </tr></thead>
+                <tbody>${chaosRows}</tbody>
+            </table>
+        </div>`;
+    } catch(e) {
+        cont.innerHTML = `<div style="color:#ef4444;padding:1rem">Erreur chargement Self Healing: ${e.message}</div>`;
+    }
+}
+
+async function triggerHeal(btn) {
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/autoheal/trigger', {method:'POST'}).then(r=>r.json());
+        btn.textContent = r.ok ? 'Triggered' : 'Erreur';
+        btn.style.color = r.ok ? '#22c55e' : '#ef4444';
+        setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Trigger'; btn.style.color=''; }, 3000);
+    } catch(e) { btn.disabled=false; }
+}
+
+async function triggerChaos(btn) {
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/chaos/trigger', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+        btn.textContent = r.ok ? `OK ${r.mttr_ms}ms` : 'Erreur';
+        btn.style.color = r.ok ? '#22c55e' : '#ef4444';
+        setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Trigger'; btn.style.color=''; }, 3000);
+    } catch(e) { btn.disabled=false; }
+}
+
+async function skLaunchCycle() {
+    const btn = document.getElementById('sk-run-btn');
+    const statusEl = document.getElementById('sk-run-status');
+    btn.disabled = true;
+    btn.textContent = 'Lancement…';
+    statusEl.style.display = 'none';
+    try {
+        const resp = await fetch('/api/missions/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                workflow_id: 'skill-eval',
+                brief: 'Skill Evaluation Loop — évaluer la couverture et les taux de passage de toutes les skills platform',
+            })
+        });
+        const data = await resp.json();
+        if (data.mission_id) {
+            statusEl.style.display = '';
+            statusEl.style.background = '#22c55e18';
+            statusEl.style.color = '#16a34a';
+            statusEl.innerHTML = `<svg width="13" height="13" style="vertical-align:middle;margin-right:4px"><use href="#icon-check-circle"/></svg> Cycle lancé — mission <a href="/missions/${data.mission_id}/control" style="color:#16a34a;font-weight:600">${data.mission_id}</a> · Suivi → <a href="/missions/${data.mission_id}/control" style="color:#16a34a">Missions</a>`;
+            // reset so next click reloads
+            const t = document.getElementById('sk-amelio-tbody');
+            if (t) delete t.dataset.loaded;
+        } else {
+            statusEl.style.display = '';
+            statusEl.style.background = '#ef444418';
+            statusEl.style.color = '#dc2626';
+            statusEl.textContent = 'Erreur: ' + (data.error || JSON.stringify(data));
+        }
+    } catch(e) {
+        statusEl.style.display = '';
+        statusEl.style.background = '#ef444418';
+        statusEl.style.color = '#dc2626';
+        statusEl.textContent = 'Erreur réseau: ' + e.message;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Lancer skill-eval';
 }
 </script>
 {% endblock %}
