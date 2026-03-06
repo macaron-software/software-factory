@@ -467,12 +467,26 @@ async def lifespan(app: FastAPI):
 
             _db_ac = _gdb_ac()
             try:
+                # Only resume the most recent interrupted session PER PROJECT
                 rows = _db_ac.execute(
-                    "SELECT id, goal, project_id, config_json FROM sessions"
+                    "SELECT DISTINCT ON (project_id) id, goal, project_id, config_json"
+                    " FROM sessions"
                     " WHERE status='interrupted' AND config_json LIKE '%\"ac\": true%'"
                     " AND created_at >= datetime('now', '-24 hours')"
-                    " ORDER BY created_at DESC LIMIT 20"
+                    " ORDER BY project_id, created_at DESC"
                 ).fetchall()
+            except Exception:
+                # SQLite fallback (DISTINCT ON not supported)
+                try:
+                    rows = _db_ac.execute(
+                        "SELECT id, goal, project_id, config_json FROM sessions"
+                        " WHERE status='interrupted' AND config_json LIKE '%\"ac\": true%'"
+                        " AND created_at >= datetime('now', '-24 hours')"
+                        " GROUP BY project_id"
+                        " HAVING created_at = MAX(created_at)"
+                    ).fetchall()
+                except Exception:
+                    rows = []
             finally:
                 _db_ac.close()
             return rows
