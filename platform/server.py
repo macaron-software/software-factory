@@ -959,6 +959,77 @@ def create_app() -> FastAPI:
         allow_credentials=True,
     )
 
+    # ── Custom error pages ──────────────────────────────────────────────────
+    from fastapi import Request as _Request
+    from fastapi.responses import HTMLResponse as _HTMLResponse
+    from starlette.exceptions import HTTPException as _StarletteHTTPException
+
+    def _error_html(code: int, title: str, message: str) -> str:
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{code} — Software Factory</title>
+  <link rel="stylesheet" href="/static/css/main.css">
+  <style>
+    .err-wrap{{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:1.2rem;text-align:center;padding:2rem}}
+    .err-code{{font-size:5rem;font-weight:800;color:var(--purple,#7c3aed);line-height:1}}
+    .err-title{{font-size:1.5rem;font-weight:600;color:var(--text,#f0f0f0)}}
+    .err-msg{{color:var(--text-muted,#888);max-width:36rem;line-height:1.6}}
+    .err-actions{{display:flex;gap:0.75rem;flex-wrap:wrap;justify-content:center;margin-top:0.5rem}}
+    .err-btn{{padding:0.5rem 1.2rem;border-radius:6px;font-size:0.9rem;cursor:pointer;border:none}}
+    .err-btn-primary{{background:var(--purple,#7c3aed);color:#fff}}
+    .err-btn-secondary{{background:var(--bg-card,#1e1e2e);color:var(--text,#f0f0f0);border:1px solid var(--border,#333)}}
+  </style>
+</head>
+<body>
+  <div class="err-wrap">
+    <div class="err-code">{code}</div>
+    <div class="err-title">{title}</div>
+    <div class="err-msg">{message}</div>
+    <div class="err-actions">
+      <button class="err-btn err-btn-primary" onclick="history.back()">← Go back</button>
+      <button class="err-btn err-btn-secondary" onclick="location.href='/'">Home</button>
+    </div>
+  </div>
+</body>
+</html>"""
+
+    @app.exception_handler(_StarletteHTTPException)
+    async def http_exception_handler(request: _Request, exc: _StarletteHTTPException):
+        # JSON API routes: return JSON
+        if request.url.path.startswith(
+            "/api/"
+        ) or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        if exc.status_code == 404:
+            html = _error_html(
+                404,
+                "Page not found",
+                "The page you're looking for doesn't exist or has been moved.",
+            )
+        else:
+            html = _error_html(
+                exc.status_code,
+                "Unexpected error",
+                "A temporary error occurred. We've been notified and are working on it — please try again in a few minutes.",
+            )
+        return _HTMLResponse(html, status_code=exc.status_code)
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(request: _Request, exc: Exception):
+        if request.url.path.startswith(
+            "/api/"
+        ) or "application/json" in request.headers.get("accept", ""):
+            return JSONResponse({"detail": "Internal server error"}, status_code=500)
+        html = _error_html(
+            500,
+            "Temporary error",
+            "Something went wrong on our end. We've been notified and are working on it — please try again in a few minutes.",
+        )
+        return _HTMLResponse(html, status_code=500)
+
     # ── Security: Response headers ──────────────────────────────────────────
     @app.middleware("http")
     async def security_headers(request, call_next):

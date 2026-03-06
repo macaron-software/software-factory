@@ -1163,5 +1163,56 @@ body.sf-wireframe #sfWireframeBtn {
   });
 })();
 </script>
+<!-- HTMX / fetch error toast ─────────────────────────────────────────── -->
+<div id="sf-err-toast" style="
+  display:none;position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);
+  background:#1e1e2e;border:1px solid #ef4444;border-radius:8px;
+  padding:0.75rem 1.2rem 0.75rem 1rem;
+  color:#f0f0f0;font-size:0.88rem;line-height:1.4;
+  box-shadow:0 4px 24px #0008;z-index:99999;
+  display:flex;align-items:flex-start;gap:0.75rem;max-width:420px;
+  animation:none" aria-live="assertive" role="alert">
+  <svg style="flex-shrink:0;margin-top:2px;color:#ef4444" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <div style="flex:1">
+    <div id="sf-err-toast-title" style="font-weight:600;margin-bottom:0.2rem">Temporary error</div>
+    <div id="sf-err-toast-msg">We've been notified and are working on it — please try again in a few minutes.</div>
+  </div>
+  <button onclick="document.getElementById('sf-err-toast').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;padding:0;line-height:1;flex-shrink:0" aria-label="Dismiss">✕</button>
+</div>
+<script>
+(function(){
+  var toast = document.getElementById('sf-err-toast');
+  var toastTitle = document.getElementById('sf-err-toast-title');
+  var toastMsg = document.getElementById('sf-err-toast-msg');
+  var _hideTimer = null;
+
+  function showErrToast(title, msg) {
+    if (!toast) return;
+    toastTitle.textContent = title || 'Temporary error';
+    toastMsg.textContent = msg || 'We\'ve been notified and are working on it — please try again in a few minutes.';
+    toast.style.display = 'flex';
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(function(){ toast.style.display = 'none'; }, 8000);
+  }
+
+  // HTMX partial errors (4xx / 5xx on hx-get/hx-post)
+  document.addEventListener('htmx:responseError', function(evt) {
+    var status = evt.detail && evt.detail.xhr && evt.detail.xhr.status;
+    if (!status) return;
+    if (status === 404) {
+      showErrToast('Page not found (404)', 'This section is not available yet. Try refreshing or come back later.');
+    } else if (status >= 500) {
+      showErrToast('Temporary error (' + status + ')', 'Something went wrong on our end — we\'ve been notified. Please try again in a few minutes.');
+    } else if (status >= 400) {
+      showErrToast('Request error (' + status + ')', 'The request could not be completed. Please try again.');
+    }
+  });
+
+  // Also catch htmx:sendError (network failure)
+  document.addEventListener('htmx:sendError', function() {
+    showErrToast('Network error', 'Could not reach the server. Check your connection and try again.');
+  });
+})();
+</script>
 </body>
 </html>
