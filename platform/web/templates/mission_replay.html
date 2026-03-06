@@ -77,8 +77,8 @@ function agentColor(name) {
 function statusIcon(status) {
     if (!status) return '⏳';
     const s = status.toLowerCase();
-    if (s === 'success' || s === 'completed' || s === 'done') return '✓';
-    if (s === 'error' || s === 'failed') return '✗';
+    if (s === 'success' || s === 'completed' || s === 'done') return '';
+    if (s === 'error' || s === 'failed') return '';
     if (s === 'running' || s === 'active') return '⏳';
     return '·';
 }
@@ -165,9 +165,9 @@ function renderTimeline(data) {
                     <span class="replay-status-icon" title="${escHtml(s.status)}">${icon}</span>
                 </div>
                 <div class="replay-step-meta">
-                    ${s.tokens != null ? `<span>🔤 ${s.tokens} tokens</span>` : ''}
+                    ${s.tokens != null ? `<span> ${s.tokens} tokens</span>` : ''}
                     ${s.duration_ms != null ? `<span>⏱ ${fmtDuration(s.duration_ms)}</span>` : ''}
-                    ${s.cost_usd != null ? `<span>💲 ${fmtCost(s.cost_usd)}</span>` : ''}
+                    ${s.cost_usd != null ? `<span> ${fmtCost(s.cost_usd)}</span>` : ''}
                 </div>
                 ${s.prompt ? `
                 <div class="replay-prompt" id="prompt-${stepId}" onclick="toggleText(this)">${escHtml(s.prompt.substring(0, 500))}${s.prompt.length > 500 ? '…' : ''}</div>

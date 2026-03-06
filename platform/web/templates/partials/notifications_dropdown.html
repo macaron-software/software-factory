@@ -27,19 +27,19 @@
                             hx-vals='{"decision":"GO"}'
                             hx-swap="none"
                             hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
-                            onclick="event.stopPropagation()">✅ GO</button>
+                            onclick="event.stopPropagation()"> GO</button>
                     <button class="notif-btn notif-btn-nogo"
                             hx-post="/api/missions/{{ n.ref_id }}/validate"
                             hx-vals='{"decision":"NOGO"}'
                             hx-swap="none"
                             hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
-                            onclick="event.stopPropagation()">🚫 NOGO</button>
+                            onclick="event.stopPropagation()"> NOGO</button>
                     <button class="notif-btn notif-btn-pivot"
                             hx-post="/api/missions/{{ n.ref_id }}/validate"
                             hx-vals='{"decision":"PIVOT"}'
                             hx-swap="none"
                             hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
-                            onclick="event.stopPropagation()">🔄 PIVOT</button>
+                            onclick="event.stopPropagation()"> PIVOT</button>
                     <a href="{{ n.url }}" style="font-size:11px;color:var(--purple-light);margin-left:auto" onclick="event.stopPropagation()">Voir la conversation →</a>
                 </div>
                 <div class="notif-time">{{ n.created_at | ts }}</div>

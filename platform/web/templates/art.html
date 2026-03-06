@@ -408,9 +408,9 @@
                     <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
                     <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
                     <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
-                    <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80">✓ pass</text>
+                    <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80"> pass</text>
                     <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
-                    <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171">✗ fail</text>
+                    <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171"> fail</text>
                     <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
                     <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
                     <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
@@ -1162,7 +1162,7 @@ async function skPollJob(skillName, jobId) {
                 }
                 const pr = job.pass_rate != null ? Math.round(job.pass_rate * 100) + '%' : '';
                 document.getElementById('sk-run-all-status').textContent =
-                    job.status === 'done' ? `✓ ${skillName}: ${pr} in ${job.duration_s?.toFixed(1)}s` : `✗ ${skillName}: error`;
+                    job.status === 'done' ? ` ${skillName}: ${pr} in ${job.duration_s?.toFixed(1)}s` : ` ${skillName}: error`;
                 return;
             }
         } catch(_) { break; }
@@ -1190,7 +1190,7 @@ async function skRunAllNext() {
     if (_skRunAllIdx >= _skRunAllQueue.length) {
         const btn = document.getElementById('sk-run-all-btn');
         btn.disabled = false; btn.textContent = '▶ Run all evals';
-        document.getElementById('sk-run-all-status').textContent = `✓ All ${_skRunAllQueue.length} skills evaluated`;
+        document.getElementById('sk-run-all-status').textContent = ` All ${_skRunAllQueue.length} skills evaluated`;
         return;
     }
     const name = _skRunAllQueue[_skRunAllIdx];
@@ -1249,7 +1249,7 @@ async function skShowDetail(skillName) {
                     <span style="color:var(--text-tertiary)">${d.eval_cases_total} cases · ${d.trials_per_case||3} trials · ${d.duration_s?.toFixed(1)||'?'}s</span>
                 </div>
                 <button onclick="skRunOne('${skillName}')" style="background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:pointer">▶ Re-run</button>
-                <button onclick="document.getElementById('sk-case-detail').style.display='none'" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1rem">✕</button>
+                <button onclick="document.getElementById('sk-case-detail').style.display='none'" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1rem"></button>
             </div>
             ${cases.map(c => {
                 const cColor = c.overall_pass_rate >= 0.8 ? '#10b981' : c.overall_pass_rate >= 0.6 ? '#f59e0b' : '#ef4444';
@@ -1261,13 +1261,13 @@ async function skShowDetail(skillName) {
                         <div style="flex:1">
                             <div style="font-size:0.82rem;color:var(--text-primary);margin-bottom:0.35rem;font-style:italic">"${c.prompt?.substring(0,120)||''}"</div>
                             <div style="display:flex;gap:1rem;font-size:0.75rem">
-                                <span style="color:#3b82f6">🔧 Determ: ${detPct}%</span>
+                                <span style="color:#3b82f6"> Determ: ${detPct}%</span>
                                 ${judPct !== null ? `<span style="color:#8b5cf6">⚖ Judge: ${judPct}%</span>` : ''}
                                 <span style="color:var(--text-tertiary)">${c.trials} trials</span>
                                 ${!c.should_trigger ? '<span style="color:#f59e0b">negative test</span>' : ''}
                             </div>
                             ${(c.check_details||c.checks_details) ? `<div style="margin-top:0.35rem;display:flex;flex-wrap:wrap;gap:0.3rem">
-                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}">${ch.passed?'✓':'✗'} ${ch.check_spec?.substring(0,30)||ch.spec?.substring(0,30)||''}</span>`).join('')}
+                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}">${ch.passed?'':''} ${ch.check_spec?.substring(0,30)||ch.spec?.substring(0,30)||''}</span>`).join('')}
                             </div>` : ''}
                         </div>
                     </div>
@@ -1487,10 +1487,10 @@ async function darwinRunGA() {
     try {
         const r = await fetch('/api/evolution/run/ac-improvement-cycle', {method:'POST'});
         const d = await r.json();
-        st.textContent = d.ok ? '✓ GA lancé — résultats disponibles dans quelques secondes. Rafraîchissez.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        st.textContent = d.ok ? ' GA lancé — résultats disponibles dans quelques secondes. Rafraîchissez.' : `⚠ ${d.detail || JSON.stringify(d)}`;
         setTimeout(() => loadDarwinTab(), 3000);
     } catch(e) {
-        st.textContent = `✗ Erreur: ${e.message}`;
+        st.textContent = ` Erreur: ${e.message}`;
     } finally {
         btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run GA now';
     }
@@ -1504,10 +1504,10 @@ async function darwinSeed() {
     try {
         const r = await fetch('/api/darwin/seed', {method:'POST'});
         const d = await r.json();
-        st.textContent = d.ok ? '✓ Seed démarré en arrière-plan. Rafraîchissez dans 5s.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        st.textContent = d.ok ? ' Seed démarré en arrière-plan. Rafraîchissez dans 5s.' : `⚠ ${d.detail || JSON.stringify(d)}`;
         setTimeout(() => loadDarwinTab(), 5000);
     } catch(e) {
-        st.textContent = `✗ Erreur: ${e.message}`;
+        st.textContent = ` Erreur: ${e.message}`;
     } finally {
         btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Seed données';
     }

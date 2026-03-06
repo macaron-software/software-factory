@@ -30,17 +30,17 @@
                             hx-post="/api/missions/{{ n.ref_id }}/validate"
                             hx-vals='{"decision":"GO"}'
                             hx-swap="none"
-                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'">✅ GO</button>
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> GO</button>
                     <button class="notif-btn notif-btn-nogo"
                             hx-post="/api/missions/{{ n.ref_id }}/validate"
                             hx-vals='{"decision":"NOGO"}'
                             hx-swap="none"
-                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'">🚫 NOGO</button>
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> NOGO</button>
                     <button class="notif-btn notif-btn-pivot"
                             hx-post="/api/missions/{{ n.ref_id }}/validate"
                             hx-vals='{"decision":"PIVOT"}'
                             hx-swap="none"
-                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'">🔄 PIVOT</button>
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> PIVOT</button>
                     <a href="{{ n.url }}" style="font-size:12px;color:var(--purple-light);margin-left:auto">Voir la conversation de l'équipe →</a>
                 </div>
             </div>

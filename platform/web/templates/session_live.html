@@ -513,7 +513,7 @@ function appendComplianceAlert(data){
   const div = document.createElement('div');
   div.className = 'mu mu--system';
   div.style.cssText = 'border-left:3px solid var(--red);padding:8px 12px;background:rgba(255,60,60,.08);margin:4px 0;border-radius:4px;';
-  div.innerHTML = `<strong style="color:var(--red)">🚫 Compliance Blocking</strong> — milestone ${data.milestone_id||''} stopped by ${data.agent_id||'compliance agent'}`;
+  div.innerHTML = `<strong style="color:var(--red)"> Compliance Blocking</strong> — milestone ${data.milestone_id||''} stopped by ${data.agent_id||'compliance agent'}`;
   feed.appendChild(div);
   feed.scrollTop = feed.scrollHeight;
 }

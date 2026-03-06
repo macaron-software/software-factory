@@ -56,11 +56,11 @@
                         {# Status badge #}
                         <div style="width:70px;flex-shrink:0">
                             {% if status == 'completed' %}
-                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#22c55e20;color:#16a34a;border-radius:10px">✓ done</span>
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#22c55e20;color:#16a34a;border-radius:10px"> done</span>
                             {% elif status == 'running' %}
                             <span style="font-size:.68rem;padding:.1rem .4rem;background:#6c63ff20;color:#6c63ff;border-radius:10px">▶ run</span>
                             {% elif status == 'failed' %}
-                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#ef444420;color:#dc2626;border-radius:10px">✗ fail</span>
+                            <span style="font-size:.68rem;padding:.1rem .4rem;background:#ef444420;color:#dc2626;border-radius:10px"> fail</span>
                             {% elif status == 'skipped' %}
                             <span style="font-size:.68rem;padding:.1rem .4rem;background:#f5f5f5;color:#aaa;border-radius:10px">⏭ skip</span>
                             {% else %}
@@ -77,9 +77,9 @@
                 {% set done_phases = phases | selectattr('status', 'equalto', 'completed') | list %}
                 {% set running_phases = phases | selectattr('status', 'equalto', 'running') | list %}
                 {% set failed_phases = phases | selectattr('status', 'equalto', 'failed') | list %}
-                <div style="font-size:.78rem"><span style="color:#16a34a;font-weight:600">✓ {{ done_phases | length }}</span> terminées</div>
+                <div style="font-size:.78rem"><span style="color:#16a34a;font-weight:600"> {{ done_phases | length }}</span> terminées</div>
                 <div style="font-size:.78rem"><span style="color:#6c63ff;font-weight:600">▶ {{ running_phases | length }}</span> en cours</div>
-                <div style="font-size:.78rem"><span style="color:#dc2626;font-weight:600">✗ {{ failed_phases | length }}</span> échouées</div>
+                <div style="font-size:.78rem"><span style="color:#dc2626;font-weight:600"> {{ failed_phases | length }}</span> échouées</div>
                 <div style="font-size:.78rem;color:var(--text-muted,#888)">{{ phases | length }} phases total</div>
             </div>
             {% endif %}

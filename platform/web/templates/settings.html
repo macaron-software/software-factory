@@ -383,17 +383,17 @@
         <!-- Category filter tabs -->
         <div id="integ-cat-tabs" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.2rem">
             <button class="btn btn-sm integ-cat-btn active" data-cat="all" onclick="filterIntegCat('all',this)">All</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="devops" onclick="filterIntegCat('devops',this)">🎯 Dev/DevOps</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="communication" onclick="filterIntegCat('communication',this)">💬 Communication</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="monitoring" onclick="filterIntegCat('monitoring',this)">📈 Monitoring</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="security" onclick="filterIntegCat('security',this)">🛡️ Security</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="itsm" onclick="filterIntegCat('itsm',this)">🏢 ITSM/TMA</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="marketing" onclick="filterIntegCat('marketing',this)">📊 Marketing</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="infra" onclick="filterIntegCat('infra',this)">☁️ Cloud/Infra</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="testing" onclick="filterIntegCat('testing',this)">🧪 Testing</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">🎨 Design</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">📐 Architecture</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">🐙 GitHub OSS</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="devops" onclick="filterIntegCat('devops',this)">Dev/DevOps</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="communication" onclick="filterIntegCat('communication',this)">Communication</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="monitoring" onclick="filterIntegCat('monitoring',this)">Monitoring</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="security" onclick="filterIntegCat('security',this)">Security</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="itsm" onclick="filterIntegCat('itsm',this)">ITSM/TMA</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="marketing" onclick="filterIntegCat('marketing',this)">Marketing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="infra" onclick="filterIntegCat('infra',this)">Cloud/Infra</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="testing" onclick="filterIntegCat('testing',this)">Testing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">Design</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">Architecture</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">GitHub OSS</button>
             <button class="btn btn-sm integ-cat-btn" data-cat="platform" onclick="filterIntegCat('platform',this)">⚙️ Platform</button>
         </div>
 
@@ -405,9 +405,9 @@
                     <div class="integ-icon-emoji">
                         {% if integ.icon and integ.icon.startswith('http') %}
                         <img src="{{ integ.icon }}" style="width:28px;height:28px;object-fit:contain;border-radius:4px" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" alt="">
-                        <span style="display:none">🔌</span>
+                        
                         {% else %}
-                        {{ integ.icon or '🔌' }}
+                        {{ integ.icon or '' }}
                         {% endif %}
                     </div>
                     <div class="integ-info">
@@ -598,9 +598,9 @@
               body: JSON.stringify({channel, slack_url: document.getElementById('notif-slack-url')?.value, webhook_url: document.getElementById('notif-webhook-url')?.value})
             });
             const d = await r.json();
-            if(el) el.textContent = d.ok ? '✅ ' + (d.message||'Envoyé !') : '❌ ' + (d.error||'Erreur');
+            if(el) el.textContent = d.ok ? '' + (d.message||'Envoyé !') : 'Erreur: ' + (d.error||'Erreur');
           } catch(e) {
-            if(el) el.textContent = '❌ ' + e.message;
+            if(el) el.textContent = 'Erreur: ' + e.message;
           }
         }
 
@@ -661,7 +661,7 @@
                 <div class="llm-provider-card" id="imgprov-falai">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🌊 fal.ai — Flux</div>
+                            <div class="llm-prov-name">fal.ai — Flux</div>
                             <div class="llm-prov-models">flux-pro · flux-dev · flux-schnell</div>
                         </div>
                         <label class="integ-toggle">
@@ -681,7 +681,7 @@
                 <div class="llm-provider-card" id="imgprov-pixellab">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🎮 PixelLab</div>
+                            <div class="llm-prov-name">PixelLab</div>
                             <div class="llm-prov-models">sprites · tilesets · animations</div>
                         </div>
                         <label class="integ-toggle">
@@ -701,7 +701,7 @@
                 <div class="llm-provider-card" id="imgprov-gemini-image">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🍌 Gemini Image (Nano Banana)</div>
+                            <div class="llm-prov-name">Gemini Image (Nano Banana)</div>
                             <div class="llm-prov-models">gemini-2.5-flash · imagen-3</div>
                         </div>
                         <label class="integ-toggle">
@@ -721,7 +721,7 @@
                 <div class="llm-provider-card" id="imgprov-replicate">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🔁 Replicate</div>
+                            <div class="llm-prov-name">Replicate</div>
                             <div class="llm-prov-models">flux · sdxl · custom LoRA</div>
                         </div>
                         <label class="integ-toggle">
@@ -1503,19 +1503,19 @@ async function ensureLocalServer() {
         const r = await fetch('/api/llm/local/ensure', {method: 'POST'});
         const d = await r.json();
         if (d.status === 'running' || d.status === 'started') {
-            btn.textContent = '✅ ' + (d.status === 'running' ? 'Running' : 'Started');
+            btn.textContent = '' + (d.status === 'running' ? 'Running' : 'Started');
             btn.style.color = 'var(--green, #22c55e)';
             // Refresh models list
             refreshProviderModels('local-mlx');
         } else if (d.status === 'disabled') {
             btn.textContent = '—';
         } else {
-            btn.textContent = '❌ Failed';
+            btn.textContent = 'Erreur: Failed';
             btn.style.color = 'var(--red, #ef4444)';
             btn.title = d.message || 'Server did not start';
         }
     } catch(e) {
-        btn.textContent = '❌ Error';
+        btn.textContent = 'Erreur: Error';
         console.error('ensureLocalServer', e);
     } finally {
         btn.disabled = false;
