@@ -112,6 +112,18 @@ _PROVIDERS = {
         "auth_prefix": "Bearer ",
         "no_auth": True,
     },
+    # WHY: opencode is an OpenAI-compatible self-hosted inference server (Go).
+    # Used on OVH demo env as primary provider; supports multiple models via /v1/models.
+    # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
+    "opencode": {
+        "name": "OpenCode (Go)",
+        "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
+        "key_env": "OPENCODE_API_KEY",
+        "models": [],  # fetched live from /v1/models; populated on first Settings load
+        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", ""),
+        "auth_header": "Authorization",
+        "auth_prefix": "Bearer ",
+    },
 }
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
@@ -120,16 +132,20 @@ _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
     "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
 )
 _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
-# On local dev, include local-mlx or ollama in Thompson candidates if available
+# Local inference servers require explicit opt-in
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
 _ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
+_opencode_enabled = bool(
+    os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
+)
 _FALLBACK_CHAIN = [_primary] + [
     p
     for p in (
         (["local-mlx"] if _local_mlx_enabled else [])
         + (["ollama"] if _ollama_enabled else [])
+        + (["opencode"] if _opencode_enabled else [])
         + (
-            ["minimax", "azure-openai", "azure-ai", "openai"]
+            ["minimax", "azure-openai", "azure-ai"]
             if not _is_azure
             else ["azure-openai", "azure-ai"]
         )

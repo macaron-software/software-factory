@@ -203,3 +203,120 @@ async def toggle_provider(provider_id: str):
         )
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.get("/api/llm/providers/{provider_id}/models")
+async def get_provider_models_live(provider_id: str):
+    """Fetch available models for a provider live from its API.
+
+    WHY: Azure Foundry, ollama, opencode go and local-mlx all expose a model
+    discovery endpoint. Polling it lets Settings show the real available models
+    instead of the static list in _PROVIDERS. This is especially useful when
+    new deployments are added to Azure without updating the code.
+    Supported: azure-ai (GET /openai/models), azure-openai (GET /openai/deployments),
+    ollama (GET /api/tags), local-mlx / opencode (GET /v1/models OpenAI-compat).
+    """
+    import asyncio
+    import json as _json
+    import urllib.request
+    import urllib.error
+
+    from ....llm.client import _PROVIDERS
+
+    pcfg = _PROVIDERS.get(provider_id)
+    if not pcfg:
+        return JSONResponse({"ok": False, "error": "Unknown provider"}, status_code=404)
+
+    loop = asyncio.get_event_loop()
+
+    def _fetch():
+        base = pcfg.get("base_url", "").rstrip("/")
+        key_env = pcfg.get("key_env") or ""
+        api_key = os.environ.get(key_env, "") if key_env else ""
+        if not api_key:
+            # Try ~/.config/factory/<name>.key
+            name = key_env.replace("_API_KEY", "").replace("_", "-").lower()
+            try:
+                api_key = (
+                    open(os.path.expanduser(f"~/.config/factory/{name}.key"))
+                    .read()
+                    .strip()
+                )
+            except OSError:
+                pass
+
+        headers = {"Content-Type": "application/json"}
+        if api_key and not pcfg.get("no_auth"):
+            prefix = pcfg.get("auth_prefix", "Bearer ")
+            headers[pcfg.get("auth_header", "Authorization")] = f"{prefix}{api_key}"
+
+        if provider_id == "azure-ai":
+            # Azure AI Foundry: list models from the inference service
+            api_ver = pcfg.get("azure_api_version", "2024-10-21")
+            url = f"{base}/openai/models?api-version={api_ver}"
+            if api_key:
+                headers = {"api-key": api_key, "Content-Type": "application/json"}
+            req = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = _json.loads(resp.read())
+                return sorted({m["id"] for m in data.get("data", [])})
+            except Exception as e:
+                logger.warning("azure-ai model fetch: %s", e)
+                return pcfg.get("models", [])
+
+        if provider_id == "azure-openai":
+            # Azure OpenAI: list deployed models (deployments endpoint)
+            api_ver = pcfg.get("azure_api_version", "2024-10-21")
+            url = f"{base}/openai/deployments?api-version={api_ver}"
+            if api_key:
+                headers = {"api-key": api_key, "Content-Type": "application/json"}
+            req = urllib.request.Request(url, headers=headers)
+            try:
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = _json.loads(resp.read())
+                # deployment.properties.model.name → model id
+                models = []
+                for d in data.get("value", []):
+                    mid = (
+                        d.get("properties", {}).get("model", {}).get("name")
+                        or d.get("model", {}).get("name")
+                        or d.get("id", "")
+                    )
+                    if mid:
+                        models.append(mid)
+                return sorted(set(models)) or pcfg.get("models", [])
+            except Exception as e:
+                logger.warning("azure-openai deployments fetch: %s", e)
+                return pcfg.get("models", [])
+
+        if provider_id == "ollama":
+            # Ollama native tags API (GET /api/tags on the non-/v1 base)
+            ollama_base = base.rstrip("/v1").rstrip("/")
+            url = f"{ollama_base}/api/tags"
+            try:
+                with urllib.request.urlopen(
+                    urllib.request.Request(url), timeout=4
+                ) as resp:
+                    data = _json.loads(resp.read())
+                return [m["name"] for m in data.get("models", [])]
+            except Exception as e:
+                logger.warning("ollama tags fetch: %s", e)
+                return pcfg.get("models", [])
+
+        # Generic OpenAI-compatible /v1/models (local-mlx, opencode, etc.)
+        url = f"{base}/models"
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                data = _json.loads(resp.read())
+            return [m["id"] for m in data.get("data", [])]
+        except Exception as e:
+            logger.warning("%s model fetch: %s", provider_id, e)
+            return pcfg.get("models", [])
+
+    try:
+        models = await loop.run_in_executor(None, _fetch)
+        return JSONResponse({"ok": True, "provider_id": provider_id, "models": models})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
