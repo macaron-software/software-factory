@@ -957,7 +957,11 @@ function showSettingsTab(id) {
     document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-'+id).classList.add('active');
-    event.target.closest('.settings-tab').classList.add('active');
+    try { event.target.closest('.settings-tab').classList.add('active'); } catch(_) {
+        document.querySelectorAll('.settings-tab').forEach(function(t){
+            if ((t.getAttribute('onclick')||'').includes("'"+id+"'")) t.classList.add('active');
+        });
+    }
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
     if (id === 'orchestrator') { refreshLoad(); loadQualitySettings(); }
