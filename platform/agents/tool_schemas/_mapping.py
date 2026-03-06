@@ -3,6 +3,7 @@
 WHY: extracted from tool_schemas.py to isolate role-based access control logic.
 ROLE_TOOL_MAP determines which tools each agent role can call.
 """
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -212,6 +213,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "playwright_test",
         "build",
         "test",
+        "docker_deploy",
+        "docker_status",
         "browser_screenshot",
         "browse",
         "take_screenshot",
