@@ -76,7 +76,9 @@ class PatternRun:
     success: bool = False
     error: str = ""
     flow_step: str = ""
-    lineage: list[str] = field(default_factory=list)  # ancestry chain: Vision → Epic → Story → Task
+    lineage: list[str] = field(
+        default_factory=list
+    )  # ancestry chain: Vision → Epic → Story → Task
 
 
 # SSE push (import from runner to share the same queues)
@@ -1216,7 +1218,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 content = rejection + content
                 # Track rejection in agent scores + update quality_score
                 try:
-
                     db = get_db()
                     try:
                         db.execute(
@@ -1497,7 +1498,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
             # Record as tool_call for monitoring (auto-store counts as memory_store)
             try:
-
                 _db2 = get_db()
                 _db2.execute(
                     "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
@@ -1523,7 +1523,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
 
     # Track agent performance score with real quality_score
     try:
-
         db = get_db()
         # Compute quality signals: output length, tools used
         _output_len = len(content) if content else 0
@@ -1642,6 +1641,19 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     # For missions: prefer workspace_path (actual code) over project registry path
     if run.project_path:
         project_path = run.project_path
+
+    # Fallback: if project_path still empty and we have a session_id,
+    # check if a workspace directory exists at DATA_DIR/workspaces/{session_id}.
+    # This survives container restarts (workspace is on a shared volume).
+    if not project_path and run.session_id:
+        try:
+            from ..config import DATA_DIR
+
+            _ws = DATA_DIR / "workspaces" / run.session_id
+            if _ws.exists():
+                project_path = str(_ws)
+        except Exception:
+            pass
 
     skills_prompt = ""
     if agent.skills:
