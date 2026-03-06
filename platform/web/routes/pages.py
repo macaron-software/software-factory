@@ -1216,6 +1216,36 @@ async def api_improvement_start(project_id: str):
         f"Workflow : ac-improvement-cycle"
     )
 
+    # Ensure pilot project is registered in projects table with PILOTE domain + protected
+    def _ensure_pilot_project():
+        from ...projects.manager import get_project_store, Project
+        from ...config import DATA_DIR
+
+        ps = get_project_store()
+        existing = ps.get(project_id)
+        workspace = str(DATA_DIR / "workspaces" / project_id)
+        if not existing:
+            ps.create(
+                Project(
+                    id=project_id,
+                    name=proj["name"],
+                    description=proj.get("description", ""),
+                    factory_type="sf",
+                    domains=proj.get("tech", []),
+                    path=workspace,
+                    client_domain="PILOTE",
+                    is_protected=True,
+                )
+            )
+        elif not existing.is_protected or existing.client_domain != "PILOTE":
+            existing.client_domain = "PILOTE"
+            existing.is_protected = True
+            if not existing.path:
+                existing.path = workspace
+            ps.update(existing)
+
+    await asyncio.to_thread(_ensure_pilot_project)
+
     try:
         from ...missions.store import get_mission_store
         from ...epics.store import MissionDef

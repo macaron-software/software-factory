@@ -622,6 +622,13 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
+    # Projects: is_protected (added 2026-03)
+    try:
+        conn.execute(
+            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_protected BOOLEAN DEFAULT FALSE"
+        )
+    except Exception:
+        pass
 
     conn.commit()
 

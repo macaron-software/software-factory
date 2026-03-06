@@ -119,49 +119,15 @@ POST /api/missions/start → pg_run_lock(run_id) [PG advisory] → _safe_run()
 
 ---
 
-## BOUCLE SPRINT — Jarvis → Epic → Sprint → Feature
-
-```mermaid
-flowchart TD
-    J["🤖 Jarvis CTO"]
-    PM["📋 PO / Product Manager"]
-    RTE["🚂 RTE / Scrum Master"]
-    WF["📄 Workflow YAML\nPhases séquentielles"]
-
-    J -->|"create_project + create_epic"| PM
-    PM -->|"create_feature/story\nAC GIVEN/WHEN/THEN + WSJF"| RTE
-    RTE -->|"launch_epic_run"| WF
-
-    WF --> PN["Phase non-dev\ntriage / archi / deploy / QA\n→ 1 seul pass"]
-    WF --> PD["Phase dev / sprint / test\n→ for sprint_num in range(1, max+1)"]
-
-    PD --> S1["Sprint 1\n• MVP feature du backlog WSJF\n• features → in_progress"]
-    S1 --> R1["Rétrospective LLM auto"]
-    R1 --> SM["Sprint 2..N-1\n• Features WSJF suivantes\n• Code + mémoire projet injectés"]
-    SM --> R2["Rétrospective → contexte suivant"]
-    R2 --> SF["Sprint final\n• Finalisation + CI/CD handoff"]
-
-    SF -->|"✅ succès"| BRK["break — phase done"]
-    SF -->|"❌ échec"| RETRY["Retry + feedback correctif"]
-    RETRY --> SM
-    SF -->|"⚠️ max atteint\n(défaut: MAX_SPRINTS=20)"| CONT["continue — non-bloquant"]
-
-    BRK --> NXT["Phase suivante"]
-    CONT --> NXT
-
-    style J fill:#7c3aed,color:#fff
-    style PM fill:#7c3aed,color:#fff
-    style RTE fill:#7c3aed,color:#fff
-    style PD fill:#064e3b,color:#fff
-    style S1 fill:#065f46,color:#fff
-    style SM fill:#065f46,color:#fff
-    style SF fill:#065f46,color:#fff
-    style RETRY fill:#7f1d1d,color:#fff
-    style CONT fill:#78350f,color:#fff
+## BOUCLE SPRINT
 ```
-
-**Feature pull :** `product_backlog.list_features(epic_id)` trié WSJF → injecté en tête de prompt chaque sprint.  
-**Limits :** `MAX_SPRINTS_GATED=20` (TDD) · `MAX_SPRINTS_DEV=20` (autres dev) · override YAML `config.max_iterations: N`
+Jarvis → create_project/epic → PM → create_feature/story (WSJF) → RTE → launch_epic_run → Workflow YAML
+  Phase non-dev: 1 seul pass | Phase dev: for sprint in range(1, max+1)
+  Sprint N: MVP feature WSJF → rétro LLM → sprint N+1 → sprint final → CI/CD handoff
+  Failure → retry + feedback | max atteint → continue (non-bloquant)
+```
+Feature pull: `product_backlog.list_features(epic_id)` trié WSJF → head of prompt each sprint
+Limits: `MAX_SPRINTS_GATED=20` (TDD) · `MAX_SPRINTS_DEV=20` (dev) · override: `config.max_iterations: N`
 
 ---
 
@@ -280,6 +246,60 @@ ROLE_TOOL_MAP["cto"] = delegation tools only (NO developer tools)
   POST-RESTART: must re-run /tmp/fix_agent5.sql (tools_json+system_prompt update)
 ```
 
+## AGENT SCOPE MODEL
+```
+4 scopes — détermine ce qu'un agent peut lire/écrire/appeler
+
+platform  Jarvis/CTO            lit tous projets · NO code_write · NO build/test
+                                 outils: platform_agents, platform_missions, create_project, deploy_*
+                                 délègue vers: art | project | self
+
+art       Lead ART / RTE        lit projets de son ART · platform API read-only
+                                 délègue vers: project uniquement
+
+project   PM/dev/qa/docs/TMA/   scope = project_id de la session courante SEULEMENT
+          sécu/dette             can_write = workspace/{project_id}/ uniquement
+                                 build/test → exécution dans Docker du projet
+                                 platform_agents/platform_missions → INTERDIT (passer par Jarvis)
+                                 un agent peut être sur N projets, scope imposé par la session
+
+self      AC/Evolution/          project_id="self" = PLATFORM_ROOT (la SF elle-même)
+          Watchdog/Quality       R+W: skills/ templates/ workflows/ — PAS auth/ rbac/ data/platform.db
+                                 platform API read-only (metrics, sessions)
+```
+
+Clé enforcement — agents/permissions.py:
+```python
+# Scope résolu depuis: agent.permissions["scope"] + session.project_id
+# Layer 6 (NEW): check_scope(agent_scope, tool_name, session_project_id)
+#   scope=project → platform_agents/missions/create_project → DENIED
+#   scope=project → tool file args hors workspace/{project_id}/ → DENIED
+#   scope=self    → path hors PLATFORM_ROOT → DENIED ; auth/ rbac/ → DENIED
+
+# Hiérarchie délégation A2A (a2a/bus.py check_delegation_allowed):
+#   platform → tous | art → même ART | project → même projet | self → platform(R)+self
+```
+
+Fichiers clés scope:
+```
+agents/permissions.py      check_scope(), check_delegation() — Layer 6+7
+agents/store.py            AgentDef.permissions["scope"] — default "project"
+agents/tool_schemas/_mapping.py  ROLE_TOOL_MAP: cto=platform_*, dev=NO platform_*
+a2a/bus.py                 check_delegation_allowed()
+db/migrations.py           ensure_self_project() au bootstrap
+```
+
+Agents spécialisés (tous scope=project sauf mention):
+```
+docs      R workspace · W /docs/ uniquement · NO git_commit sur code
+security  R workspace · W rapport sécu · outils: trivy/bandit dans Docker projet
+tech-debt R only · peut créer issues/stories via backlog tools
+TMA       R+W code · git_commit · build/test Docker · NO deploy_* (CI/CD pipeline)
+AC/evo    scope=self · R+W skills/templates/workflows · NO data/platform.db
+```
+
+---
+
 ## KNOWN ISSUES / GOTCHAS
 - `NodeStatus`: PENDING/RUNNING/COMPLETED/VETOED/FAILED — **NO `DONE`**
 - HTTP 400 tool message ordering `role 'tool' must follow 'tool_calls'` — non-fatal
@@ -304,4 +324,109 @@ Layer 3 PLAN   Reinforcement Learning agents/rl_policy.py  mid-mission pattern a
   leader election: only one node runs GA (Redis SETNX)
 **RL:** Q-learning · state=(wf_hash, phase_idx, reject_pct, quality) · ε=0.1
 **DB:** agent_scores · evolution_proposals · evolution_runs · rl_experience
+
+---
+
+## AC — AMÉLIORATION CONTINUE
+
+### Architecture (scope séparation CRITIQUE)
+```
+AC self-improvement team (coach/watchdog/monitor)
+  → scope: platform/ code uniquement → commit → push GitHub → GH Actions → tous les serveurs
+
+AC cycle workflow (architect/codex/adversarial/qa/cicd)
+  → scope: pilot project workspace → code + tests + Docker
+  ⚠️ NE TOUCHE PAS platform/ — pas son scope
+
+Pilot projects (ac-hello-html, ac-fullstack-rs, ac-hello-vue)
+  → chacun: workspace dir + git init + Dockerfile + workspace_path en DB
+  → workspace RÉINIT à chaque cycle (git reset --hard <seed_sha>)
+```
+
+### Workflow ac-improvement-cycle (6 phases)
+```
+ac-inception → ac-tdd-sprint (loop, max_iter=3) → ac-adversarial-check
+  → ac-qa-sprint (parallel: ac-qa-agent + ft-e2e-ihm) → ac-cicd → ac-coach-review
+```
+- VETO → recode (tdd-sprint reloop) · rollback → git revert + cycle N-1
+- Coach lit scores N derniers cycles → écrit STRATEGY_N+1.md → architect lit au démarrage
+
+### DB Tables AC
+```
+ac_project_state  project_id, current_cycle, status, current_run_id, seed_sha
+ac_cycles         project_id, cycle_num, total_score, rl_reward, defect_count,
+                  experiment_id, rolled_back
+ac_experiments    project_id, cycle_num, experiment_key, variant_a, variant_b,
+                  score_before, score_a, score_b, winner, rolled_back, strategy_notes
+ac_skill_scores   skill_id, variant, wins, losses, avg_score, last_updated
+```
+
+### Pilot Projects — _AC_PROJECTS (pages.py:602)
+```
+ac-hello-html    tier=simple        html+css+nginx     max_cycles=20
+ac-hello-vue     tier=simple-compile vue+vite+node     max_cycles=20
+ac-fullstack-rs  tier=medium        rust+sveltekit+pg  max_cycles=20
+```
+- Définis dans _AC_PROJECTS list (NOT dans projects registry)
+- ⚠️ ROOT CAUSE "no software": workspace_path absent en DB → code_write ne sait où écrire
+- Fix requis: enregistrer en DB (projects table, path=DATA_DIR/workspaces/{project_id})
+  + scaffold_project() (idempotent) + seed commit + reinit chaque cycle
+
+### Workspace Flow par cycle
+```
+1. api_improvement_start → ensure project registered (projects table, path set)
+2. scaffold_project() si missing → git init + Dockerfile seed + README + git commit (seed_sha)
+3. Reinit: save ADVERSARIAL_{N-1}.md + CICD_FAILURE_{N-1}.md → git reset --hard seed_sha
+           → git clean -fd → restore feedback files
+4. Session créée avec project_id → runner.py charge project.path → injecté comme project_path
+5. ac-codex code_write → path DOIT être sous DATA_DIR/workspaces/ (allowed root)
+6. docker_deploy(cwd=workspace_path) → build + run container
+```
+
+### Intelligence AC (reward + RL + Thompson + GA + Convergence)
+```
+reward.py       ac_reward() → R∈[-1,+1] : quality(40%) + adversarial(30%) + trace(15%)
+                + efficiency(10%) + regression(5%) · VETO absolu si dim critique < 60
+rl_policy.py    record_experience() après inject_cycle · recommend() → next_cycle_hint
+                hint stocké dans ac_project_state.next_cycle_hint (JSON)
+skill_thompson  ac_skill_select_variant(skill_id) → Beta sampling · A/B: v1 vs v2 skills
+                ac_skill_record() dans inject_cycle · tier fallback inter-projets
+convergence.py  converging / plateau / regression / spike_failure / cold_start
+                plateau → GA evolve() immédiat · regression → adversarial deep-dive
+                spike_failure → skill eval sur tous les skills AC
+```
+
+### A/B Testing + Rollback
+```
+Experiments: record_experiment(project_id, cycle_num, key, variant_a, variant_b)
+Rollback trigger: score[N] < score[N-1] - 10 → POST /api/improvement/rollback/{project_id}
+  → git revert workspace + DELETE ac_cycles WHERE cycle_num=current + current_cycle=N-1
+Coach écrit: STRATEGY_N+1.md (variante gagnante + ajustements prompts)
+Skills v2: ac-codex-v2.md · ac-adversarial-v2.md (Thompson choisit chaque cycle)
+```
+
+### Auto-resume (server.py lifespan)
+```
+Après mark_orphaned_sessions() → trouve sessions AC interrompues (last 24h, config.ac=True)
+DISTINCT ON project_id → only most recent per project → _run_workflow_background()
+[skip deploy] tag sur commits → force deploy via commit vide séparé
+```
+
+### GH Actions (ac-launch.yml)
+```
+Actions: start-or-resume | status-only | force-restart
+Auth: JWT cookie jar /tmp/sf-cookies.txt
+Diagnostics: sessions + epic_runs + messages + ac_cycles scores + workspace paths + Docker
+Prod: SSH sfadmin@52.143.158.19 (SF_NODE1_IP) · port 8091 · PG 10.0.1.6:5432/sfplatform
+```
+
+### Dashboard AC (/art → Amélioration Continue)
+```
+Tabs: Intelligence | RL | Thompson | GA | Self Healing (NEW)
+Self Healing: /api/autoheal/stats + /api/incidents + /api/chaos/history
+  KPIs: incidents open/investigating/resolved + epics completed/failed + heartbeat
+  Manuel: POST /api/autoheal/trigger + POST /api/chaos/trigger
+Graph équipe: _AC_AGENTS_GRAPH → coach/architect/codex/adversarial/qa/cicd (PAS watchdog seul)
+Métrique "Score par cycle" : barre orange = 1 seul cycle → normal (cold_start)
+```
 

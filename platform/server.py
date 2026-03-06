@@ -321,6 +321,41 @@ async def lifespan(app: FastAPI):
     ps = get_project_store()
     ps.seed_from_registry()
 
+    # Seed SF self-project (the platform itself) — protected, domain SF
+    def _seed_sf_self():
+        from .projects.manager import Project
+        import os
+
+        sf_self_id = "software-factory"
+        existing = ps.get(sf_self_id)
+        sf_path = str(
+            os.environ.get("SF_ROOT", os.path.dirname(os.path.dirname(__file__)))
+        )
+        if not existing:
+            ps.create(
+                Project(
+                    id=sf_self_id,
+                    name="Software Factory Platform",
+                    description="La plateforme multi-agents AC — se code et s'améliore elle-même.",
+                    factory_type="sf",
+                    domains=["python", "fastapi", "htmx"],
+                    path=sf_path,
+                    client_domain="SF",
+                    is_protected=True,
+                )
+            )
+        elif not existing.is_protected or existing.client_domain != "SF":
+            existing.client_domain = "SF"
+            existing.is_protected = True
+            if not existing.path:
+                existing.path = sf_path
+            ps.update(existing)
+
+    try:
+        _seed_sf_self()
+    except Exception as _e:
+        logger.warning("seed_sf_self failed: %s", _e)
+
     async def _bg_heal_and_seed():
         import asyncio as _a
 

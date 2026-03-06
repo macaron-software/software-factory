@@ -80,6 +80,7 @@ class Project:
     starred: bool = False  # Pinned/featured project
     client_domain: str = ""  # Portfolio domain label (e.g. "LA POSTE", "MARATHON")
     container_url: str = ""  # Live URL (production VPS / container)
+    is_protected: bool = False  # Cannot be deleted (pilot, SF-self, La Poste)
     created_at: str = ""
     updated_at: str = ""
 
@@ -592,6 +593,7 @@ class ProjectStore:
             ("phases_json", "'[]'"),
             ("owner_id", "''"),
             ("client_domain", "''"),
+            ("is_protected", "FALSE"),
         ]:
             if col not in cols:
                 try:
@@ -708,8 +710,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json, owner_id, starred, container_url, client_domain)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id, starred, container_url, client_domain, is_protected)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -731,6 +733,7 @@ class ProjectStore:
                 bool(p.starred),
                 p.container_url or "",
                 p.client_domain or "",
+                bool(p.is_protected),
             ),
         )
         conn.commit()
@@ -1113,6 +1116,7 @@ class ProjectStore:
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
                 active_pattern_id=?, status=?, starred=?, container_url=?, client_domain=?,
+                is_protected=?,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """,
@@ -1131,6 +1135,7 @@ class ProjectStore:
                 bool(p.starred),
                 p.container_url or "",
                 p.client_domain or "",
+                bool(p.is_protected),
                 p.id,
             ),
         )
@@ -1443,6 +1448,7 @@ class ProjectStore:
             starred=bool(row["starred"]) if "starred" in keys else False,
             client_domain=row["client_domain"] if "client_domain" in keys else "",
             container_url=row["container_url"] if "container_url" in keys else "",
+            is_protected=bool(row["is_protected"]) if "is_protected" in keys else False,
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
             arch_domain=arch_domain,
