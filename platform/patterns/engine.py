@@ -669,6 +669,10 @@ async def run_pattern(
             await _impl_wave(_engine_proxy, run, initial_task)
         elif ptype == "human-in-the-loop":
             await _impl_human_in_the_loop(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-worktree":
+            await _impl_fractal_worktree(_engine_proxy, run, initial_task)
+        elif ptype == "backprop-merge":
+            await _impl_backprop_merge(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -1759,6 +1763,8 @@ from .impls.router import run_router as _impl_router
 from .impls.sequential import run_sequential as _impl_sequential
 from .impls.solo import run_solo as _impl_solo
 from .impls.wave import run_wave as _impl_wave
+from .impls.fractal_worktree import run_fractal_worktree as _impl_fractal_worktree
+from .impls.backprop_merge import run_backprop_merge as _impl_backprop_merge
 
 
 class _EngineProxy:

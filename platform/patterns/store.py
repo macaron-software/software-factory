@@ -460,6 +460,47 @@ class PatternStore:
                 ],
                 config={"event_driven": True},
             ),
+            # ── Fractal Worktree: recursive decompose + git worktrees per leaf ──
+            # Source: TinyAGI/fractals (MIT) — https://github.com/TinyAGI/fractals
+            # Key innovation: classify gate (atomic vs composite) before decomposing,
+            # then each leaf runs in an isolated git worktree → no parallel file conflicts.
+            PatternDef(
+                id="fractal-worktree", name="Fractal Worktree", type="fractal-worktree",
+                description="Décomposition récursive d'une tâche en arbre + exécution des feuilles en git worktrees isolés. Idéal pour la génération de code parallèle sans conflits.",
+                icon="git-branch", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "worker", "label": "Worker A", "x": 150, "y": 260},
+                    {"id": "n3", "agent_id": "worker", "label": "Worker B", "x": 450, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n1", "to": "n3", "type": "delegation"},
+                ],
+                config={"max_depth": 3, "max_children": 5},
+            ),
+            # ── Backpropagation Merge: bottom-up merge after parallel execution ──
+            # Source: TinyAGI/fractals roadmap "Backpropagation (merge agent)" (MIT)
+            # After leaf agents complete, a merge agent synthesizes results bottom-up:
+            # leaf1+leaf2 → merge(composite1) → leaf3+leaf4 → merge(composite2) → merge(root)
+            PatternDef(
+                id="backprop-merge", name="Backpropagation Merge", type="backprop-merge",
+                description="Décomposition fractale + fusion bottom-up des résultats. Chaque nœud composite reçoit la synthèse de ses enfants. Résout les conflits entre agents parallèles.",
+                icon="git-merge", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "worker", "label": "Worker A", "x": 100, "y": 260},
+                    {"id": "n3", "agent_id": "worker", "label": "Worker B", "x": 300, "y": 260},
+                    {"id": "n4", "agent_id": "chef-projet", "label": "Merger", "x": 500, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "delegation"},
+                    {"from": "n1", "to": "n3", "type": "delegation"},
+                    {"from": "n2", "to": "n4", "type": "report"},
+                    {"from": "n3", "to": "n4", "type": "report"},
+                ],
+                config={"max_depth": 3, "max_children": 5},
+            ),
         ]
 
         for p in builtins:

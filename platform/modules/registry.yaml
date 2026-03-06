@@ -543,3 +543,30 @@ modules:
       scrape_frequency: weekly
     requires:
       - "CONFLUENCE_TOKEN or GITLAB_TOKEN"
+
+  - id: fractal-worktree
+    name: "Fractal Worktree"
+    description: "Recursive task decomposition + git worktrees per leaf agent. Classify gate (atomic vs composite) before decomposing. Each leaf executes in an isolated git branch — no parallel file conflicts. Includes Backpropagation Merge pattern for bottom-up synthesis."
+    category: orchestration
+    icon: "git-branch"
+    builtin: true
+    source_url: "https://github.com/TinyAGI/fractals"
+    license: "MIT"
+    # SOURCE: TinyAGI/fractals (MIT) — https://github.com/TinyAGI/fractals
+    # DECISION: port two key innovations to SF's Python/AgentExecutor stack:
+    #   1. Classify gate (atomic vs composite) — deterministic, reviewable decomposition
+    #      before any code is written. Addresses "agent goes rogue" in unstructured parallel.
+    #   2. git worktrees per leaf — each code-writing agent works in isolation (own branch).
+    #      No FS conflicts in parallel missions. Ref: fractals executor.ts::runInWorktree()
+    #   3. Backpropagation merge — after leaves complete, merge agent synthesizes bottom-up.
+    #      Ref: fractals roadmap "Backpropagation (merge agent)" section.
+    # We do NOT spawn Claude/Codex CLI (fractals approach) — SF's AgentExecutor handles it.
+    # git worktrees degrade gracefully: if no git repo → plain parallel execution.
+    patterns:
+      - fractal-worktree
+      - backprop-merge
+    config:
+      max_depth: 3
+      max_children: 5
+      use_worktrees: true   # set false to disable git worktree isolation
+      worktree_base: ".git/fractal-worktrees"
