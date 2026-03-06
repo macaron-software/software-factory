@@ -97,29 +97,29 @@
   <div style="display:flex;align-items:center;gap:.5rem">
     {{ fi('refresh-cw', 18) }}
     <strong>Amélioration Continue</strong>
-    <span style="font-size:.7rem;color:var(--text-muted,#888)">{{ projects|length }} projets · 20 cycles · Thompson + RL + GA</span>
+    <span style="font-size:.7rem;color:var(--text-secondary)">{{ projects|length }} projets · 20 cycles · Thompson + RL + GA</span>
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
-    <span style="font-size:.7rem;color:var(--accent,#6c63ff)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+    <span style="font-size:.7rem;color:var(--purple)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
     <button id="ac-intel-toggle" onclick="acToggleIntel()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('cpu', 12) }} Intelligence
     </button>
     <button id="ac-start-btn" onclick="acStartCycle()"
-      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--purple);color:var(--text-on-accent);border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('play', 12) }} Démarrer
     </button>
   </div>
 </div>
-<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;font-size:.75rem;color:var(--text-muted,#888)"></div>
+<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
 
 {# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
-<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem">
+<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);display:flex;align-items:center;gap:.4rem">
-      {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--accent,#6c63ff)">—</span>
+    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem">
+      {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--purple)">—</span>
     </div>
-    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
+    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
       {{ fi('refresh-cw', 11) }} Actualiser
     </button>
   </div>
@@ -130,18 +130,18 @@
     <div class="intel-metric"><div class="label">Cycles total</div><div class="value" id="im-cycles">—</div></div>
     <div class="intel-metric"><div class="label">Score moy.</div><div class="value" id="im-avg">—</div></div>
     <div class="intel-metric"><div class="label">Hint RL</div><div class="value" style="font-size:.75rem" id="im-hint">—</div></div>
-    <div class="intel-metric"><div class="label">Skill Eval</div><div class="value" style="font-size:.7rem;color:#f59e0b" id="im-eval">—</div></div>
+    <div class="intel-metric"><div class="label">Skill Eval</div><div class="value" style="font-size:.7rem;color:var(--yellow-deep)" id="im-eval">—</div></div>
   </div>
 
   {# Sparkline #}
   <div style="margin-top:.75rem">
-    <div style="font-size:.65rem;color:var(--text-muted,#888);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
+    <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
     <div class="sparkline" id="ac-sparkline"></div>
   </div>
 
   {# Thompson stats table #}
   <div style="margin-top:.75rem">
-    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.4rem">
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">
       {{ fi('activity', 11) }} Thompson Sampling — skills
     </div>
     <table class="ac-table">
@@ -151,7 +151,7 @@
         </tr>
       </thead>
       <tbody id="ac-thompson-tbody">
-        <tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
+        <tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
       </tbody>
     </table>
   </div>
@@ -251,7 +251,7 @@
       <div style="background:var(--border);border-radius:2px;height:3px">
         <div style="height:100%;border-radius:2px;width:{{ d.score }}%" class="{% if d.score >= 80 %}spark-ok{% elif d.score >= 50 %}spark-warn{% else %}spark-bad{% endif %}"></div>
       </div>
-      <div style="font-size:.65rem;color:var(--text-muted,#888);margin-top:.25rem">{{ d.score }}/100</div>
+      <div style="font-size:.65rem;color:var(--text-secondary);margin-top:.25rem">{{ d.score }}/100</div>
     </div>
     {% endfor %}
   </div>
@@ -350,7 +350,7 @@ async function acRefreshIntel() {
     }
     tbody.innerHTML = rows.length
       ? rows.join('')
-      : '<tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+      : '<tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
 
   } catch(e) {
     console.error('AC intel fetch error', e);
