@@ -995,6 +995,119 @@ async function loadRlTab() {
     }
 }
 
+// ── Darwin Teams GA ────────────────────────────────────────────────────────
+
+async function loadDarwinTab() {
+    const [runsRes, lbRes, propsRes, teamsRes] = await Promise.allSettled([
+        fetch('/api/evolution/runs?limit=10').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=15').then(r => r.json()),
+        fetch('/api/evolution/proposals?limit=5').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=1').then(r => r.json()), // just for count
+    ]);
+
+    // KPI: runs
+    const runs = runsRes.status === 'fulfilled' ? (runsRes.value.runs || []) : [];
+    document.getElementById('darwin-kpi-runs').textContent = runs.length || '0';
+
+    // KPI: best fitness
+    if (runs.length) {
+        const best = Math.max(...runs.map(r => r.best_fitness || 0));
+        document.getElementById('darwin-kpi-best').textContent = best > 0 ? best.toFixed(3) : '—';
+    }
+
+    // KPI: proposals pending review
+    const props = propsRes.status === 'fulfilled' ? (propsRes.value.proposals || []) : [];
+    const pending = props.filter(p => p.status === 'pending').length;
+    document.getElementById('darwin-kpi-props').textContent = pending;
+
+    // KPI: teams count
+    const lb = lbRes.status === 'fulfilled' ? (lbRes.value.teams || lbRes.value.leaderboard || []) : [];
+    const teamsCount = lbRes.status === 'fulfilled' ? (lbRes.value.total || lb.length) : '—';
+    document.getElementById('darwin-kpi-teams').textContent = teamsCount;
+
+    // GA runs table
+    const runsTbl = document.getElementById('darwin-runs-table');
+    if (!runs.length) {
+        runsTbl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucun run GA. Cliquez "Run GA now" pour démarrer.</p>';
+    } else {
+        runsTbl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Workflow</th>
+                <th style="text-align:right;padding:4px 8px">Best fitness</th>
+                <th style="text-align:right;padding:4px 8px">Générations</th>
+                <th style="text-align:right;padding:4px 8px">Démarré</th>
+            </tr></thead><tbody>
+            ${runs.map(r => `<tr style="border-top:1px solid var(--border)">
+                <td style="padding:4px 8px;font-family:monospace;font-size:0.72rem">${r.wf_id || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:#34d399">${r.best_fitness != null ? (+r.best_fitness).toFixed(3) : '—'}</td>
+                <td style="padding:4px 8px;text-align:right">${r.generations_run || r.generations || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${r.started_at ? r.started_at.slice(0,16).replace('T',' ') : '—'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+    }
+
+    // Leaderboard
+    const lbEl = document.getElementById('darwin-leaderboard');
+    if (!lb.length) {
+        lbEl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucune donnée fitness. Cliquez "Seed données" d\'abord.</p>';
+    } else {
+        lbEl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Agent</th>
+                <th style="text-align:left;padding:4px 8px">Pattern</th>
+                <th style="text-align:left;padding:4px 8px">Tech</th>
+                <th style="text-align:right;padding:4px 8px">Fitness</th>
+                <th style="text-align:right;padding:4px 8px">W/L</th>
+            </tr></thead><tbody>
+            ${lb.map(t => {
+                const fit = t.fitness_score || t.score || 0;
+                const color = fit >= 60 ? '#34d399' : fit >= 40 ? '#f59e0b' : '#ef4444';
+                return `<tr style="border-top:1px solid var(--border)">
+                    <td style="padding:4px 8px;font-size:0.72rem">${t.agent_id || t.agent || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.pattern_id || t.pattern || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.technology || '—'}</td>
+                    <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${(+fit).toFixed(1)}</td>
+                    <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${t.wins||0}/${t.losses||0}</td>
+                </tr>`;
+            }).join('')}
+            </tbody></table>`;
+    }
+}
+
+async function darwinRunGA() {
+    const btn = document.getElementById('darwin-run-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Running…';
+    st.style.display = ''; st.textContent = '⚙️ GA démarré en arrière-plan (20 générations, workflow: ac-improvement-cycle)…';
+    try {
+        const r = await fetch('/api/evolution/run/ac-improvement-cycle', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? '✓ GA lancé — résultats disponibles dans quelques secondes. Rafraîchissez.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 3000);
+    } catch(e) {
+        st.textContent = `✗ Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run GA now';
+    }
+}
+
+async function darwinSeed() {
+    const btn = document.getElementById('darwin-seed-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Seeding…';
+    st.style.display = ''; st.textContent = '⚙️ Seeding team_fitness warmup data…';
+    try {
+        const r = await fetch('/api/darwin/seed', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? '✓ Seed démarré en arrière-plan. Rafraîchissez dans 5s.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 5000);
+    } catch(e) {
+        st.textContent = `✗ Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Seed données';
+    }
+}
+
 async function loadSelfHealTab() {
     // WHY: self-healing is part of the AC intelligence loop — incidents trigger auto-TMA missions,
     // chaos monkey validates resilience. Surfaced here alongside RL/Thompson for full-loop visibility.
