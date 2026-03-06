@@ -69,7 +69,7 @@ jobs:
           
           echo "API key found: $([ -n "$API_KEY" ] && echo 'YES' || echo 'NO')"
           
-          BASE_URL="http://localhost:8090"
+          BASE_URL="http://localhost:8091"
           
           # Detect actual platform port
           echo ""
@@ -81,7 +81,7 @@ jobs:
           echo "Docker containers: $DOCKER_ID"
           
           # Try common ports
-          for PORT in 8090 8099 8080 80 3000; do
+          for PORT in 8091 8090 8099 8080 80 3000; do
             RESP=$(curl -sf --max-time 2 "http://localhost:$PORT/api/health" 2>/dev/null)
             if echo "$RESP" | grep -q '"status"'; then
               BASE_URL="http://localhost:$PORT"
