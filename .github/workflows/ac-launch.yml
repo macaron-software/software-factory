@@ -1,0 +1,104 @@
+name: AC — Launch & Monitor Cycles
+
+on:
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Comma-separated project IDs (e.g. ac-hello-html,ac-fullstack-rs)"
+        required: false
+        default: "ac-hello-html,ac-fullstack-rs"
+      action:
+        description: "Action to perform"
+        required: false
+        default: "start-or-resume"
+        type: choice
+        options:
+          - start-or-resume
+          - status-only
+          - force-restart
+
+jobs:
+  ac-launch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
+          chmod 600 ~/.ssh/id_innovation
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Check & Launch AC cycles on Node 1
+        run: |
+          ssh -i ~/.ssh/id_innovation -o StrictHostKeyChecking=no \
+            sfadmin@${{ secrets.SF_NODE1_IP }} << 'REMOTE'
+          set -e
+          echo "=== AC Cycle Status ==="
+          
+          # Get API key from env file
+          API_KEY=""
+          for f in /home/sfadmin/.env /etc/sf-platform/secrets /home/sfadmin/platform/.env; do
+            if [ -f "$f" ]; then
+              KEY=$(grep -E "^MACARON_API_KEY=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+              if [ -n "$KEY" ]; then
+                API_KEY="$KEY"
+                echo "Found API key in $f"
+                break
+              fi
+            fi
+          done
+          
+          if [ -z "$API_KEY" ]; then
+            echo "ERROR: MACARON_API_KEY not found"
+            exit 1
+          fi
+          
+          BASE_URL="http://localhost:8090"
+          
+          # Check health
+          HEALTH=$(curl -sf "$BASE_URL/api/health" 2>/dev/null) || echo "{}"
+          echo "Health: $HEALTH" | python3 -c "import sys,json; d=json.loads(sys.stdin.read().split('Health: ',1)[1]); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (could not parse health)"
+          
+          PROJECTS="${{ inputs.projects }}"
+          ACTION="${{ inputs.action }}"
+          
+          IFS=',' read -ra PROJ_LIST <<< "$PROJECTS"
+          for PROJECT in "${PROJ_LIST[@]}"; do
+            PROJECT=$(echo "$PROJECT" | tr -d ' ')
+            echo ""
+            echo "=== Processing: $PROJECT ==="
+            
+            # Get current project status
+            STATUS=$(curl -sf "$BASE_URL/api/improvement/projects" -H "Authorization: Bearer $API_KEY" 2>/dev/null | \
+              python3 -c "import sys,json; d=json.load(sys.stdin); p=[x for x in d.get('projects',[]) if x['id']=='$PROJECT']; print(p[0]['status'] if p else 'unknown')" 2>/dev/null || echo "unknown")
+            echo "  Current status: $STATUS"
+            
+            if [ "$ACTION" = "status-only" ]; then
+              continue
+            fi
+            
+            # Start or resume based on status
+            if [ "$STATUS" = "idle" ] || [ "$STATUS" = "completed" ] || [ "$STATUS" = "unknown" ] || [ "$ACTION" = "force-restart" ]; then
+              echo "  Starting cycle for $PROJECT..."
+              RESP=$(curl -sf -X POST "$BASE_URL/api/improvement/start/$PROJECT" \
+                -H "Authorization: Bearer $API_KEY" \
+                -H "Content-Type: application/json" \
+                -d '{}' 2>/dev/null)
+              echo "  Response: $RESP"
+            elif [ "$STATUS" = "paused" ] || [ "$STATUS" = "running" ]; then
+              echo "  Resuming/injecting cycle for $PROJECT..."
+              # Try inject-cycle to unstick
+              RESP=$(curl -sf -X POST "$BASE_URL/api/improvement/inject-cycle/$PROJECT" \
+                -H "Authorization: Bearer $API_KEY" \
+                -H "Content-Type: application/json" \
+                -d '{}' 2>/dev/null)
+              echo "  Inject response: $RESP"
+            fi
+          done
+          
+          echo ""
+          echo "=== Final Status ==="
+          curl -sf "$BASE_URL/api/health" 2>/dev/null | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (could not parse)"
+          
+          REMOTE
