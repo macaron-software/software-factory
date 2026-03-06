@@ -3,16 +3,22 @@
 
 {% block content %}
 <div class="flex items-center justify-between mb-4">
-  <h1 class="text-xl font-bold">📡 Live Activity Feed</h1>
+  <h1 class="text-xl font-bold inline-flex items-center gap-2">
+    <i data-feather="radio" class="w-5 h-5"></i> Live Activity Feed
+  </h1>
   <div class="flex items-center gap-3">
     <span id="live-badge" class="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold bg-gray-200 text-gray-600">
       <span id="live-dot" class="inline-block w-2 h-2 rounded-full bg-gray-400"></span>
       CONNECTING
     </span>
-    <span class="text-xs text-gray-500">💰 LLM coût/h: <span id="llm-cost">—</span></span>
-    <span class="text-xs text-gray-500">👥 Agents: <span id="agent-count">—</span></span>
+    <span class="text-xs text-gray-500 inline-flex items-center gap-1">
+      <i data-feather="dollar-sign" class="w-3 h-3"></i> LLM coût/h: <span id="llm-cost">—</span>
+    </span>
+    <span class="text-xs text-gray-500 inline-flex items-center gap-1">
+      <i data-feather="users" class="w-3 h-3"></i> Agents: <span id="agent-count">—</span>
+    </span>
     <span class="text-xs text-gray-500 hidden sm:inline" title="RTK proxy — token compression on agent bash commands">
-      🗜️ RTK: <span id="rtk-pct" class="font-semibold text-green-600 dark:text-green-400">—</span>%
+      <i data-feather="minimize-2" class="w-3 h-3"></i> RTK: <span id="rtk-pct" class="font-semibold text-green-600 dark:text-green-400">—</span>%
       <span class="text-gray-400">(<span id="rtk-proxied">—</span>/<span id="rtk-total">—</span> cmds,
       <span id="rtk-tokens" class="text-green-500">—</span> tokens saved)</span>
     </span>
@@ -23,9 +29,15 @@
 <!-- Filter bar -->
 <div class="flex gap-2 mb-3">
   <button onclick="setFilter('all')" class="filter-btn active text-xs px-3 py-1 rounded-full border" data-filter="all">Tout</button>
-  <button onclick="setFilter('tool_call')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="tool_call">⚡ Tool calls</button>
-  <button onclick="setFilter('message')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="message">💬 Messages</button>
-  <button onclick="setFilter('commit')" class="filter-btn text-xs px-3 py-1 rounded-full border" data-filter="commit">🔀 Commits</button>
+  <button onclick="setFilter('tool_call')" class="filter-btn text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1" data-filter="tool_call">
+    <i data-feather="zap" class="w-3 h-3"></i> Tool calls
+  </button>
+  <button onclick="setFilter('message')" class="filter-btn text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1" data-filter="message">
+    <i data-feather="message-square" class="w-3 h-3"></i> Messages
+  </button>
+  <button onclick="setFilter('commit')" class="filter-btn text-xs px-3 py-1 rounded-full border inline-flex items-center gap-1" data-filter="commit">
+    <i data-feather="git-commit" class="w-3 h-3"></i> Commits
+  </button>
 </div>
 
 <!-- Feed -->
@@ -74,7 +86,12 @@ function renderFeed() {
   }
   el.innerHTML = rows.map(function(r) {
     var ts = r.ts ? r.ts.substring(11,19) : '';
-    var icon = r.type==='tool_call' ? '⚡' : r.type==='commit' ? '🔀' : '💬';
+    var _iconMap = {
+      tool_call: '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>',
+      commit:    '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline"><circle cx="12" cy="12" r="4"></circle><line x1="1.05" y1="12" x2="7" y2="12"></line><line x1="17.01" y1="12" x2="22.96" y2="12"></line></svg>',
+      message:   '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>'
+    };
+    var icon = _iconMap[r.type] || _iconMap.message;
     var ok = r.success===false ? ' feed-fail' : '';
     return '<div class="feed-row' + ok + '">'
       + '<span class="feed-ts">' + ts + '</span>'

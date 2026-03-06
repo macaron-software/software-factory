@@ -24,9 +24,13 @@
                 · local: <code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{{ env.local_version }}</code>
                 {% endif %}
                 {% if env.up_to_date == true %}
-                <span class="text-green-600 ml-1">✓ up-to-date</span>
+                <span class="text-green-600 ml-1 inline-flex items-center gap-1">
+                    <i data-feather="check" class="w-3 h-3"></i> up-to-date
+                </span>
                 {% elif env.up_to_date == false %}
-                <span class="text-orange-500 ml-1">⚡ outdated</span>
+                <span class="text-orange-500 ml-1 inline-flex items-center gap-1">
+                    <i data-feather="alert-triangle" class="w-3 h-3"></i> outdated
+                </span>
                 {% endif %}
             </div>
             {% endif %}
@@ -48,9 +52,13 @@
             </span>
             {% endif %}
             {% if env.ssh_ok %}
-            <span class="text-xs text-green-600">SSH ✓</span>
+            <span class="text-xs text-green-600 inline-flex items-center gap-1">
+                <i data-feather="terminal" class="w-3 h-3"></i> SSH OK
+            </span>
             {% elif env.ssh_host %}
-            <span class="text-xs text-red-500">SSH ✗</span>
+            <span class="text-xs text-red-500 inline-flex items-center gap-1">
+                <i data-feather="x" class="w-3 h-3"></i> SSH KO
+            </span>
             {% endif %}
         </div>
     </div>
@@ -277,22 +285,30 @@
 <h2 class="text-xl font-bold mb-4">Quick Actions</h2>
 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
     <a href="/tasks?status=pending" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
-        <div class="text-2xl mb-2">&#128203;</div>
+        <div class="flex items-center justify-center mb-2 text-gray-400">
+            <i data-feather="clipboard" class="w-8 h-8"></i>
+        </div>
         <div class="font-medium">Pending Tasks</div>
         <div class="text-sm text-gray-500">{{ "{:,}".format(stats.pending) }} tasks</div>
     </a>
     <a href="/tasks?status=build_failed" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
-        <div class="text-2xl mb-2">&#128679;</div>
+        <div class="flex items-center justify-center mb-2 text-gray-400">
+            <i data-feather="alert-octagon" class="w-8 h-8"></i>
+        </div>
         <div class="font-medium">Failed Builds</div>
         <div class="text-sm text-gray-500">{{ "{:,}".format(stats.failed) }} tasks</div>
     </a>
     <a href="/tasks?status=deployed" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
-        <div class="text-2xl mb-2">&#127881;</div>
+        <div class="flex items-center justify-center mb-2 text-gray-400">
+            <i data-feather="check-circle" class="w-8 h-8"></i>
+        </div>
         <div class="font-medium">Deployed</div>
         <div class="text-sm text-gray-500">{{ "{:,}".format(stats.deployed) }} tasks</div>
     </a>
     <a href="/tasks" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow text-center">
-        <div class="text-2xl mb-2">&#128269;</div>
+        <div class="flex items-center justify-center mb-2 text-gray-400">
+            <i data-feather="search" class="w-8 h-8"></i>
+        </div>
         <div class="font-medium">All Tasks</div>
         <div class="text-sm text-gray-500">Browse & filter</div>
     </a>

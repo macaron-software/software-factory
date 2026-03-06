@@ -10,7 +10,8 @@
   <div class="flex items-center justify-between">
     <div>
       <h1 class="text-2xl font-bold flex items-center gap-2">
-        🔄 Amélioration Continue
+        <i data-feather="refresh-cw" class="w-6 h-6"></i>
+        Amélioration Continue
         <span id="live-badge"
               class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
           <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>LIVE
@@ -21,8 +22,8 @@
       </p>
     </div>
     <button id="btn-start-all" onclick="startAllCycles()"
-            class="px-4 py-1.5 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium">
-      ▶ Démarrer tout
+            class="px-4 py-1.5 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium inline-flex items-center gap-2">
+      <i data-feather="play" class="w-3.5 h-3.5"></i> Démarrer tout
     </button>
   </div>
 
@@ -30,22 +31,22 @@
   <div class="border-b border-gray-200 dark:border-gray-700">
     <nav class="-mb-px flex gap-0" aria-label="Tabs amélioration continue" role="tablist">
       {% for tab in [
-        ('overview', '🏗️', 'Vue globale'),
-        ('cycle',    '🔍', 'Cycle actuel'),
-        ('adversarial', '⚔️', 'Adversarial'),
-        ('traceability', '🔗', 'Traçabilité'),
-        ('agents',   '🤖', 'Agents / IA'),
-        ('history',  '📜', 'Historique'),
-        ('live',     '📡', 'Live Log')
+        ('overview',     'layers',     'Vue globale'),
+        ('cycle',        'eye',        'Cycle actuel'),
+        ('adversarial',  'shield-off', 'Adversarial'),
+        ('traceability', 'link',       'Tracabilite'),
+        ('agents',       'cpu',        'Agents / IA'),
+        ('history',      'file-text',  'Historique'),
+        ('live',         'radio',      'Live Log')
       ] %}
       <button id="tab-btn-{{ tab[0] }}"
               role="tab"
               aria-selected="{{ 'true' if loop.first else 'false' }}"
               aria-controls="tab-panel-{{ tab[0] }}"
               onclick="switchTab('{{ tab[0] }}')"
-              class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+              class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap inline-flex items-center gap-1.5
                      {% if loop.first %}border-blue-500 text-blue-600 dark:text-blue-400{% else %}border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300{% endif %}">
-        {{ tab[1] }} {{ tab[2] }}
+        <i data-feather="{{ tab[1] }}" class="w-3.5 h-3.5"></i> {{ tab[2] }}
       </button>
       {% endfor %}
     </nav>
@@ -98,7 +99,7 @@
       <div class="flex items-center justify-between text-xs mb-1">
         <span id="cycle-label-{{ p.id }}" class="text-gray-500">Cycle {{ p.current_cycle }}/{{ p.max_cycles }}</span>
         <span id="status-{{ p.id }}" class="{% if p.status == 'running' %}text-green-500 font-medium{% else %}text-gray-400{% endif %}">
-          {% if p.status == 'running' %}● running{% elif p.status == 'completed' %}✓ done{% else %}○ idle{% endif %}
+          {% if p.status == 'running' %}<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>running</span>{% elif p.status == 'completed' %}<span class="inline-flex items-center gap-1"><i data-feather="check" class="w-3 h-3"></i>done</span>{% else %}<span class="inline-flex items-center gap-1"><span class="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>idle</span>{% endif %}
         </span>
       </div>
       <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5">
@@ -188,7 +189,10 @@
        class="tab-panel hidden">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="font-semibold">⚔️ Dimensions Adversariales — {{ adversarial | length }} checks</h2>
+        <h2 class="font-semibold inline-flex items-center gap-2">
+          <i data-feather="shield-off" class="w-4 h-4"></i>
+          Dimensions Adversariales — {{ adversarial | length }} checks
+        </h2>
         <p class="text-xs text-gray-400 mt-0.5">Évalués par agents LLM à chaque cycle sur le code, tests et config du workspace</p>
       </div>
       <select id="adv-project-select" onchange="loadAdversarial(this.value)"
@@ -206,7 +210,7 @@
            class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
         <div class="flex items-start justify-between mb-2">
           <div class="flex items-center gap-2">
-            <span class="text-xl" role="img" aria-label="{{ label }}">{{ icon }}</span>
+            <i data-feather="{{ icon }}" class="w-5 h-5 text-gray-500" aria-label="{{ label }}"></i>
             <div>
               <div class="font-semibold text-sm">{{ label }}</div>
               <div class="text-xs text-gray-400 font-mono">{{ key }}</div>
@@ -248,7 +252,10 @@
        class="tab-panel hidden">
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h2 class="font-semibold">🔗 Matrice de Traçabilité — Feature → Story → Code → Test</h2>
+        <h2 class="font-semibold inline-flex items-center gap-2">
+          <i data-feather="link" class="w-4 h-4"></i>
+          Matrice de Tracabilite — Feature &rarr; Story &rarr; Code &rarr; Test
+        </h2>
         <p class="text-xs text-gray-400 mt-0.5">
           100% des artefacts doivent avoir une référence amont et un <em>why</em>.
           Chaque fichier code → story, chaque test → AC GIVEN/WHEN/THEN.
@@ -302,9 +309,9 @@
 
     <!-- Coverage summary -->
     <div class="mt-3 grid grid-cols-4 gap-3" id="trace-coverage-grid">
-      {% for t_type, t_icon, t_color in [('feature','📋','purple'), ('story','📖','blue'), ('code','💻','green'), ('test','🧪','yellow')] %}
+      {% for t_type, t_icon, t_color in [('feature','clipboard','purple'), ('story','book','blue'), ('code','code','green'), ('test','activity','yellow')] %}
       <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-3 text-center">
-        <div class="text-xl mb-1">{{ t_icon }}</div>
+        <div class="flex justify-center mb-1 text-gray-400"><i data-feather="{{ t_icon }}" class="w-6 h-6"></i></div>
         <div class="font-semibold text-sm capitalize">{{ t_type }}</div>
         <div id="trace-cov-{{ t_type }}" class="text-2xl font-bold text-gray-300 mt-1">—</div>
         <div class="text-xs text-gray-400">avec ref</div>
@@ -324,8 +331,12 @@
       <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">Équipe Agents — Force Graph</div>
       <svg id="agent-graph" width="100%" height="340" class="block"></svg>
       <p class="text-xs text-gray-400 mt-2">
-        🔵 Manager &nbsp;|&nbsp; 🟢 Dev/QA &nbsp;|&nbsp; 🟡 Deploy/Security
-        &nbsp;— Arc = P(succès) Thompson
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-indigo-400 inline-block"></span> Manager</span>
+        &nbsp;|&nbsp;
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-green-400 inline-block"></span> Dev/QA</span>
+        &nbsp;|&nbsp;
+        <span class="inline-flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-yellow-400 inline-block"></span> Deploy/Security</span>
+        &nbsp;— Arc = P(succes) Thompson
       </p>
     </div>
 
@@ -393,7 +404,10 @@
        class="tab-panel hidden">
     <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
       <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
-        <h2 class="font-semibold text-sm">📜 Historique complet des cycles</h2>
+        <h2 class="font-semibold text-sm inline-flex items-center gap-2">
+          <i data-feather="file-text" class="w-4 h-4"></i>
+          Historique complet des cycles
+        </h2>
         <div class="flex items-center gap-3">
           <select id="history-project-select" onchange="loadHistoryForProject(this.value)"
                   class="text-xs px-2 py-1 border rounded dark:bg-gray-700 dark:border-gray-600">
@@ -456,6 +470,11 @@
 
 <!-- ── Scripts ─────────────────────────────────────────────────────── -->
 <script>
+// ─── Feather icon helper (for JS-generated HTML) ─────────────────────────────
+function fi(name, cls = 'inline w-3.5 h-3.5 align-middle') {
+  return feather?.icons?.[name]?.toSvg({ class: cls, 'stroke-width': 2 }) || '';
+}
+
 // ─── State ──────────────────────────────────────────────────────────────────
 const PHASES = {{ phases | tojson }};
 const PROJECTS = {{ projects_json | safe }};
@@ -519,7 +538,7 @@ function renderAdversarial(dimensions) {
     let findings = [];
     try { findings = JSON.parse(d.findings || '[]'); } catch(e) {}
     if (findings.length) {
-      findingsEl.innerHTML = findings.map(f => `<div class="flex gap-1"><span>⚠</span><span>${f}</span></div>`).join('');
+      findingsEl.innerHTML = findings.map(f => `<div class="flex gap-1"><span class="text-yellow-500">${fi('alert-triangle','inline w-3 h-3')}</span><span>${f}</span></div>`).join('');
       findingsEl.classList.remove('hidden');
     } else {
       findingsEl.classList.add('hidden');
@@ -578,12 +597,12 @@ function renderTraceability(items) {
     code:    'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
     test:    'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
   };
-  const typeIcons = { feature: '📋', story: '📖', code: '💻', test: '🧪' };
-  const statusIcon = { present: '✅', missing: '❌', partial: '⚠️' };
+  const typeIcons = { feature: fi('clipboard'), story: fi('book'), code: fi('code'), test: fi('activity') };
+  const statusIcon = { present: fi('check-circle','inline w-3.5 h-3.5 text-green-500'), missing: fi('x-circle','inline w-3.5 h-3.5 text-red-500'), partial: fi('alert-triangle','inline w-3.5 h-3.5 text-yellow-500') };
 
   tbody.innerHTML = items.map(item => {
     const tc = typeColors[item.artifact_type] || 'bg-gray-100 text-gray-600';
-    const icon = typeIcons[item.artifact_type] || '📄';
+    const icon = typeIcons[item.artifact_type] || fi('file');
     const si = statusIcon[item.status] || '·';
     const linkedBadge = item.linked_to
       ? `<span class="font-mono text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">${item.linked_type || ''} ${item.linked_to}</span>`
@@ -601,7 +620,7 @@ function renderTraceability(items) {
       <td class="px-3 py-2 font-mono text-xs text-gray-500 max-w-[120px] truncate"
           title="${item.artifact_ref || ''}">${item.artifact_ref || '—'}</td>
       <td class="px-3 py-2 text-xs text-gray-600 dark:text-gray-300 max-w-[240px]">
-        ${item.reason ? `<span title="${item.reason}">${item.reason.slice(0,60)}${item.reason.length > 60 ? '…' : ''}</span>` : '<span class="text-red-400 italic">⚠ raison manquante</span>'}
+        ${item.reason ? `<span title="${item.reason}">${item.reason.slice(0,60)}${item.reason.length > 60 ? '…' : ''}</span>` : '<span class="text-red-400 italic">raison manquante</span>'}
       </td>
       <td class="px-3 py-2">${linkedBadge}</td>
       <td class="px-3 py-2 text-center text-base">${si}</td>
@@ -654,6 +673,8 @@ function switchTab(tabId) {
     b.setAttribute('aria-selected', 'false');
   });
   document.getElementById(`tab-panel-${tabId}`)?.classList.remove('hidden');
+  // Re-init feather icons in newly visible tab panel
+  if (typeof feather !== 'undefined') feather.replace({ 'stroke-width': 1.5 });
   const btn = document.getElementById(`tab-btn-${tabId}`);
   if (btn) {
     btn.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
@@ -818,7 +839,7 @@ function renderHistoryTable(cycles) {
     const fix = c.fix_summary
       ? `<span class="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 px-1.5 py-0.5 rounded font-mono">${c.fix_summary}</span>`
       : '<span class="text-gray-400">—</span>';
-    const ciIcon = c.ci_status === 'success' ? '✅' : c.ci_status === 'failure' ? '❌' : c.ci_status === 'running' ? '⏳' : '·';
+    const ciIcon = c.ci_status === 'success' ? fi('check-circle','inline w-3.5 h-3.5 text-green-500') : c.ci_status === 'failure' ? fi('x-circle','inline w-3.5 h-3.5 text-red-500') : c.ci_status === 'running' ? fi('clock','inline w-3.5 h-3.5 text-yellow-500') : '·';
     const statusBg = c.status === 'running' ? 'bg-blue-50 dark:bg-blue-950' :
                      c.status === 'failed' ? 'bg-red-50 dark:bg-red-950' : '';
     return `<tr class="${statusBg} hover:bg-gray-50 dark:hover:bg-gray-750">
@@ -988,7 +1009,7 @@ function updateProjectCard(update) {
     scoreEl.className = `text-2xl font-bold ${s >= 80 ? 'text-green-500' : s >= 60 ? 'text-yellow-500' : s > 0 ? 'text-red-500' : 'text-gray-400'}`;
   }
   if (statusEl) {
-    const icons = { running: '● running', idle: '○ idle', waiting_ci: '⏳ CI', completed: '✓ done' };
+    const icons = { running: `${fi('circle','inline w-2 h-2 text-green-500 fill-current')} running`, idle: `${fi('circle','inline w-2 h-2 text-gray-400')} idle`, waiting_ci: `${fi('clock','inline w-3 h-3 text-yellow-500')} CI`, completed: `${fi('check','inline w-3 h-3 text-blue-500')} done` };
     const colors = { running: 'text-green-500 font-medium', idle: 'text-gray-400', waiting_ci: 'text-yellow-500', completed: 'text-blue-500' };
     statusEl.innerHTML = `<span class="${colors[update.status] || ''}">${icons[update.status] || update.status}</span>`;
   }
@@ -1008,681 +1029,21 @@ function scoreColor(score) {
 
 async function startAllCycles() {
   const btn = document.getElementById('btn-start-all');
-  btn.textContent = '⏳ Démarrage…'; btn.disabled = true;
+  btn.textContent = `${fi('loader')} Démarrage…`; btn.disabled = true;
   try {
     const res = await fetch('/api/improvement/start-all', { method: 'POST' });
     const data = await res.json();
     if (data.ok) {
       const started = Object.values(data.results || {}).filter(v => v === 'started').length;
-      btn.textContent = `✅ ${started}/5 lancés`;
+      btn.innerHTML = `${fi("check-circle","inline w-4 h-4")} ${started}/5 lancés`;
       setTimeout(() => { window.location.reload(); }, 2000);
     } else {
-      btn.textContent = `❌ ${data.error || 'Erreur'}`;
-      setTimeout(() => { btn.textContent = '▶ Démarrer tout'; btn.disabled = false; }, 4000);
+      btn.innerHTML = `${fi("x-circle","inline w-4 h-4")} ${data.error || "Erreur"}`;
+      setTimeout(() => { btn.textContent = fi('play')+'  Démarrer tout'; btn.disabled = false; }, 4000);
     }
   } catch(e) {
-    btn.textContent = '❌ Erreur réseau';
-    setTimeout(() => { btn.textContent = '▶ Démarrer tout'; btn.disabled = false; }, 4000);
-  }
-}
-</script>
-{% endblock %}
-
-<div class="space-y-6">
-
-  <!-- ── Header ─────────────────────────────────────────────────────── -->
-  <div class="flex items-center justify-between">
-    <div>
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        🔄 Amélioration Continue
-        <span id="live-badge"
-              class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
-          <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>LIVE
-        </span>
-      </h1>
-      <p class="text-sm text-gray-500 mt-1">
-        5 projets pilotes · 20 cycles chacun · Thompson Sampling + RL + GA · Git → CI → Relance auto
-      </p>
-    </div>
-    <div class="flex gap-2">
-      <button onclick="selectProject('all')"
-              class="px-3 py-1.5 text-sm rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 font-medium">
-        Vue globale
-      </button>
-      <button id="btn-start-all" onclick="startAllCycles()"
-              class="px-4 py-1.5 text-sm rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium">
-        ▶ Démarrer
-      </button>
-    </div>
-  </div>
-
-  <!-- ── Top Row : Projects + Cycle details + Agent graph ──────────── -->
-  <div class="grid grid-cols-12 gap-4">
-
-    <!-- Projects column -->
-    <div class="col-span-3 space-y-2" id="projects-column">
-      {% for p in projects %}
-      {% set tier_colors = {
-        'simple': 'border-green-400',
-        'simple-compile': 'border-blue-400',
-        'medium': 'border-orange-400',
-        'complex': 'border-purple-400',
-        'enterprise': 'border-red-400'
-      } %}
-      {% set score_color = 'text-gray-400' %}
-      {% if p.total_score_avg >= 80 %}{% set score_color = 'text-green-500' %}
-      {% elif p.total_score_avg >= 60 %}{% set score_color = 'text-yellow-500' %}
-      {% elif p.total_score_avg > 0 %}{% set score_color = 'text-red-500' %}{% endif %}
-
-      <div id="project-card-{{ p.id }}"
-           onclick="selectProject('{{ p.id }}')"
-           class="project-card border-l-4 {{ tier_colors.get(p.tier, 'border-gray-400') }}
-                  bg-white dark:bg-gray-800 rounded-lg p-3 cursor-pointer
-                  hover:shadow-md transition-all duration-200
-                  {% if loop.first %}ring-2 ring-blue-400{% endif %}">
-        <div class="flex items-start justify-between">
-          <div class="flex-1 min-w-0">
-            <div class="text-xs font-medium text-gray-400 uppercase tracking-wide">
-              {{ p.tier_label }}
-            </div>
-            <div class="font-semibold text-sm truncate">{{ p.name }}</div>
-            <div class="flex flex-wrap gap-1 mt-1">
-              {% for tech in p.tech[:3] %}
-              <span class="inline-block px-1.5 py-0.5 text-xs bg-gray-100 dark:bg-gray-700 rounded font-mono">
-                {{ tech }}
-              </span>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="text-right ml-2 flex-shrink-0">
-            <div class="text-lg font-bold {{ score_color }}" id="score-{{ p.id }}">
-              {% if p.total_score_avg > 0 %}{{ p.total_score_avg|int }}{% else %}—{% endif %}
-            </div>
-            <div class="text-xs text-gray-400">/100</div>
-          </div>
-        </div>
-        <!-- Cycle progress bar -->
-        <div class="mt-2">
-          <div class="flex justify-between text-xs text-gray-400 mb-0.5">
-            <span id="cycle-label-{{ p.id }}">Cycle {{ p.current_cycle }}/{{ p.max_cycles }}</span>
-            <span id="status-{{ p.id }}" class="capitalize">
-              {% if p.status == 'running' %}
-                <span class="text-green-500 font-medium">● running</span>
-              {% elif p.status == 'idle' %}
-                <span class="text-gray-400">○ idle</span>
-              {% elif p.status == 'waiting_ci' %}
-                <span class="text-yellow-500">⏳ CI</span>
-              {% elif p.status == 'completed' %}
-                <span class="text-blue-500">✓ done</span>
-              {% else %}
-                <span>{{ p.status }}</span>
-              {% endif %}
-            </span>
-          </div>
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
-            <div id="progress-{{ p.id }}"
-                 class="h-1.5 rounded-full bg-gradient-to-r from-blue-400 to-blue-600 transition-all duration-500"
-                 style="width: {{ ((p.current_cycle / p.max_cycles) * 100)|int }}%"></div>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Active cycle detail -->
-    <div class="col-span-5 bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold text-sm" id="detail-title">Sélectionner un projet</h2>
-        <div class="flex items-center gap-2 text-xs text-gray-400" id="detail-git-sha"></div>
-      </div>
-
-      <!-- Phase quality bar chart -->
-      <div id="phase-bars" class="space-y-2 mb-4">
-        {% for phase in phases %}
-        <div class="flex items-center gap-2">
-          <span class="text-xs w-24 text-gray-500 font-mono">{{ phase }}</span>
-          <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-4 relative overflow-hidden">
-            <div id="pbar-{{ loop.index }}"
-                 class="h-full rounded-full transition-all duration-700 bg-gray-300 dark:bg-gray-600"
-                 style="width:0%" data-phase="{{ phase }}">
-            </div>
-          </div>
-          <span class="text-xs w-8 text-right text-gray-500" id="pscore-{{ loop.index }}">—</span>
-        </div>
-        {% endfor %}
-      </div>
-
-      <!-- Heatmap title -->
-      <div class="border-t border-gray-100 dark:border-gray-700 pt-3">
-        <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-          Heatmap qualité × cycle
-        </div>
-        <div id="heatmap-container" class="overflow-x-auto">
-          <table class="text-xs w-full" id="heatmap-table">
-            <thead>
-              <tr>
-                <th class="text-left font-normal text-gray-400 pr-2 w-10">#</th>
-                {% for phase in phases %}
-                <th class="font-normal text-gray-400 text-center px-1">{{ phase[:3] }}</th>
-                {% endfor %}
-                <th class="font-normal text-gray-400 text-center px-1">SHA</th>
-                <th class="font-normal text-gray-400 text-center px-1">Fix</th>
-              </tr>
-            </thead>
-            <tbody id="heatmap-body">
-              <tr><td colspan="99" class="text-center text-gray-400 py-4 italic">Sélectionnez un projet</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- Agent graph + Thompson + RL -->
-    <div class="col-span-4 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <!-- D3 force graph -->
-      <div class="p-3 border-b border-gray-100 dark:border-gray-700">
-        <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Équipe Agents</div>
-        <svg id="agent-graph" width="100%" height="160" class="block"></svg>
-      </div>
-
-      <!-- Thompson sampling bars -->
-      <div class="p-3 border-b border-gray-100 dark:border-gray-700">
-        <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
-          Thompson Sampling P(succès)
-        </div>
-        <div class="space-y-1.5" id="thompson-bars">
-          {% for t in thompson %}
-          <div class="flex items-center gap-2">
-            <span class="text-xs font-mono w-28 truncate text-gray-600 dark:text-gray-300">
-              {{ t.agent_id.replace('plat-','') }}
-            </span>
-            <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-              <div class="h-full rounded-full transition-all duration-700"
-                   style="width: {{ (t.overall_prob * 100)|int }}%;
-                          background: hsl({{ (t.overall_prob * 120)|int }}, 70%, 50%)">
-              </div>
-            </div>
-            <span class="text-xs w-8 text-right font-mono text-gray-500">
-              {{ (t.overall_prob * 100)|int }}%
-            </span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-
-      <!-- RL + GA mini metrics -->
-      <div class="p-3 grid grid-cols-2 gap-3">
-        <div>
-          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">RL Reward</div>
-          <canvas id="rl-chart" height="60"></canvas>
-        </div>
-        <div>
-          <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">GA Fitness</div>
-          <div id="ga-stats" class="space-y-1">
-            <div class="flex justify-between text-xs">
-              <span class="text-gray-500">Génération</span>
-              <span id="ga-gen" class="font-mono font-medium">—</span>
-            </div>
-            <div class="flex justify-between text-xs">
-              <span class="text-gray-500">Fitness</span>
-              <span id="ga-fitness" class="font-mono font-medium text-green-500">—</span>
-            </div>
-            <div class="flex justify-between text-xs">
-              <span class="text-gray-500">Population</span>
-              <span id="ga-pop" class="font-mono font-medium">20</span>
-            </div>
-            <div class="flex justify-between text-xs">
-              <span class="text-gray-500">Mutation rate</span>
-              <span id="ga-mut" class="font-mono font-medium">0.05</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ── Bottom : History table + CI timeline ──────────────────────── -->
-  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-    <div class="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
-      <h2 class="font-semibold text-sm">📜 Historique des cycles</h2>
-      <div class="text-xs text-gray-400" id="history-project-label">—</div>
-    </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs">
-        <thead class="bg-gray-50 dark:bg-gray-750">
-          <tr>
-            <th class="px-3 py-2 text-left font-medium text-gray-500">#</th>
-            <th class="px-3 py-2 text-left font-medium text-gray-500">Git SHA</th>
-            {% for phase in phases %}
-            <th class="px-2 py-2 text-center font-medium text-gray-500">{{ phase[:4] }}</th>
-            {% endfor %}
-            <th class="px-3 py-2 text-center font-medium text-gray-500">Score</th>
-            <th class="px-3 py-2 text-center font-medium text-gray-500">Défauts</th>
-            <th class="px-3 py-2 text-center font-medium text-gray-500">RL Δ</th>
-            <th class="px-3 py-2 text-left font-medium text-gray-500">Fix committé</th>
-            <th class="px-3 py-2 text-center font-medium text-gray-500">CI</th>
-          </tr>
-        </thead>
-        <tbody id="history-body" class="divide-y divide-gray-100 dark:divide-gray-700">
-          <tr>
-            <td colspan="99" class="px-3 py-8 text-center text-gray-400 italic">
-              Sélectionnez un projet pour voir l'historique des cycles
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-</div><!-- /space-y-6 -->
-
-
-<!-- ── Scripts ─────────────────────────────────────────────────────── -->
-<script>
-// ─── State ──────────────────────────────────────────────────────────────────
-const PHASES = {{ phases | tojson }};
-const PROJECTS = {{ projects_json | safe }};
-let selectedProjectId = PROJECTS[0]?.id || null;
-let projectCycles = {};   // { project_id: [cycle, ...] }
-let rlChart = null;
-let forceSimulation = null;
-const agentsGraph = {{ agents_graph_json | safe }};
-
-// ─── Init ────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initForceGraph();
-  initRlChart();
-  if (selectedProjectId) {
-    selectProject(selectedProjectId);
-  }
-  startSseStream();
-});
-
-// ─── Project selection ───────────────────────────────────────────────────────
-function selectProject(projectId) {
-  selectedProjectId = projectId;
-  // Highlight card
-  document.querySelectorAll('.project-card').forEach(c => {
-    c.classList.remove('ring-2', 'ring-blue-400', 'shadow-lg');
-  });
-  const card = document.getElementById(`project-card-${projectId}`);
-  if (card) { card.classList.add('ring-2', 'ring-blue-400', 'shadow-lg'); }
-
-  const proj = PROJECTS.find(p => p.id === projectId);
-  if (!proj) return;
-
-  // Update detail header
-  document.getElementById('detail-title').textContent =
-    `${proj.name} — Cycle ${proj.current_cycle || 0}/${proj.max_cycles}`;
-
-  // Load cycle data
-  loadCycles(projectId);
-  document.getElementById('history-project-label').textContent = proj.name;
-}
-
-// ─── Load cycles from API ────────────────────────────────────────────────────
-async function loadCycles(projectId) {
-  try {
-    const res = await fetch(`/api/improvement/cycles/${projectId}`);
-    const cycles = await res.json();
-    projectCycles[projectId] = cycles;
-    renderPhaseBars(cycles);
-    renderHeatmap(cycles);
-    renderHistoryTable(cycles);
-    renderRlChart(cycles);
-    updateGaStats(cycles);
-  } catch(e) {
-    console.error('loadCycles error:', e);
-  }
-}
-
-// ─── Phase quality bars (latest cycle) ───────────────────────────────────────
-function renderPhaseBars(cycles) {
-  const latest = cycles.length ? cycles[cycles.length - 1] : null;
-  let phaseScores = {};
-  if (latest?.phase_scores) {
-    try { phaseScores = JSON.parse(latest.phase_scores); } catch(e) {}
-  }
-  PHASES.forEach((phase, i) => {
-    const score = phaseScores[phase];
-    const barEl = document.getElementById(`pbar-${i+1}`);
-    const scoreEl = document.getElementById(`pscore-${i+1}`);
-    if (!barEl || !scoreEl) return;
-    if (score !== undefined) {
-      barEl.style.width = `${score}%`;
-      barEl.style.background = scoreColor(score);
-      scoreEl.textContent = score;
-    } else {
-      barEl.style.width = '0%';
-      barEl.style.background = '';
-      scoreEl.textContent = '—';
-    }
-  });
-
-  // Update git SHA display
-  const shaEl = document.getElementById('detail-git-sha');
-  if (shaEl && latest?.git_sha) {
-    shaEl.innerHTML = `<span class="font-mono bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-xs">${latest.git_sha.slice(0,7)}</span>`;
-  }
-}
-
-// ─── Heatmap ─────────────────────────────────────────────────────────────────
-function renderHeatmap(cycles) {
-  const tbody = document.getElementById('heatmap-body');
-  if (!cycles.length) {
-    tbody.innerHTML = '<tr><td colspan="99" class="text-center text-gray-400 py-3 italic">Aucun cycle</td></tr>';
-    return;
-  }
-  tbody.innerHTML = cycles.slice(-10).map(c => {
-    let ps = {};
-    try { ps = JSON.parse(c.phase_scores || '{}'); } catch(e) {}
-    const phaseCells = PHASES.map(ph => {
-      const s = ps[ph];
-      const bg = s !== undefined ? `background:${scoreColorRaw(s)};opacity:0.85` : '';
-      const txt = s !== undefined ? s : '·';
-      return `<td class="text-center px-1 py-1 font-mono font-semibold rounded-sm" style="${bg}">${txt}</td>`;
-    }).join('');
-    const sha = c.git_sha ? `<span class="font-mono">${c.git_sha.slice(0,6)}</span>` : '—';
-    const fix = c.fix_summary
-      ? `<span class="bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300 px-1.5 rounded text-xs">${c.fix_summary.slice(0,20)}</span>`
-      : '—';
-    const rowClass = c.total_score >= 80 ? 'bg-green-50 dark:bg-green-950' :
-                     c.total_score >= 60 ? '' : 'bg-red-50 dark:bg-red-950';
-    return `<tr class="${rowClass}">
-      <td class="pr-2 font-mono font-semibold py-1 px-2">${c.cycle_num}</td>
-      ${phaseCells}
-      <td class="text-center px-1 text-gray-400">${sha}</td>
-      <td class="text-center px-1">${fix}</td>
-    </tr>`;
-  }).join('');
-}
-
-// ─── History table ────────────────────────────────────────────────────────────
-function renderHistoryTable(cycles) {
-  const tbody = document.getElementById('history-body');
-  if (!cycles.length) {
-    tbody.innerHTML = '<tr><td colspan="99" class="px-3 py-6 text-center text-gray-400 italic">Aucun cycle enregistré</td></tr>';
-    return;
-  }
-  tbody.innerHTML = [...cycles].reverse().slice(0, 20).map(c => {
-    let ps = {};
-    try { ps = JSON.parse(c.phase_scores || '{}'); } catch(e) {}
-
-    const phaseCells = PHASES.map(ph => {
-      const s = ps[ph];
-      if (s === undefined) return `<td class="px-2 py-2 text-center text-gray-300">—</td>`;
-      const color = s >= 80 ? 'text-green-600' : s >= 60 ? 'text-yellow-600' : 'text-red-600';
-      return `<td class="px-2 py-2 text-center font-mono ${color}">${s}</td>`;
-    }).join('');
-
-    const sha = c.git_sha
-      ? `<code class="text-xs bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">${c.git_sha.slice(0,7)}</code>`
-      : '<span class="text-gray-300">—</span>';
-
-    const scoreClass = c.total_score >= 80 ? 'text-green-600 font-bold' :
-                       c.total_score >= 60 ? 'text-yellow-600 font-bold' :
-                       c.total_score > 0   ? 'text-red-600 font-bold' : 'text-gray-400';
-
-    const rlDelta = c.rl_reward !== 0
-      ? `<span class="${c.rl_reward > 0 ? 'text-green-500' : 'text-red-500'} font-mono">${c.rl_reward > 0 ? '+' : ''}${c.rl_reward.toFixed(1)}</span>`
-      : '<span class="text-gray-300">—</span>';
-
-    const fix = c.fix_summary
-      ? `<span class="bg-yellow-50 dark:bg-yellow-950 text-yellow-700 dark:text-yellow-300 px-1.5 py-0.5 rounded text-xs font-mono">${c.fix_summary}</span>`
-      : '<span class="text-gray-400">—</span>';
-
-    const ciIcon = c.ci_status === 'success' ? '✅' :
-                   c.ci_status === 'failure' ? '❌' :
-                   c.ci_status === 'running' ? '⏳' : '·';
-
-    const statusBg = c.status === 'completed' ? 'bg-white dark:bg-gray-800' :
-                     c.status === 'running' ? 'bg-blue-50 dark:bg-blue-950' :
-                     c.status === 'failed' ? 'bg-red-50 dark:bg-red-950' : '';
-
-    return `<tr class="${statusBg} hover:bg-gray-50 dark:hover:bg-gray-750">
-      <td class="px-3 py-2 font-mono font-bold text-gray-700 dark:text-gray-200">${c.cycle_num}</td>
-      <td class="px-3 py-2">${sha}</td>
-      ${phaseCells}
-      <td class="px-3 py-2 text-center font-mono ${scoreClass}">${c.total_score || '—'}</td>
-      <td class="px-3 py-2 text-center font-mono ${c.defect_count > 5 ? 'text-red-500' : 'text-gray-600'}">${c.defect_count ?? '—'}</td>
-      <td class="px-3 py-2 text-center">${rlDelta}</td>
-      <td class="px-3 py-2">${fix}</td>
-      <td class="px-3 py-2 text-center text-base">${ciIcon}</td>
-    </tr>`;
-  }).join('');
-}
-
-// ─── RL Chart ────────────────────────────────────────────────────────────────
-function initRlChart() {
-  const ctx = document.getElementById('rl-chart').getContext('2d');
-  rlChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: [],
-      datasets: [{
-        data: [],
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,0.1)',
-        borderWidth: 2,
-        pointRadius: 2,
-        tension: 0.4,
-        fill: true,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { display: false },
-        y: { display: true, ticks: { font: { size: 9 }, maxTicksLimit: 3 } }
-      }
-    }
-  });
-}
-
-function renderRlChart(cycles) {
-  if (!rlChart) return;
-  const data = cycles.map(c => c.rl_reward);
-  const labels = cycles.map(c => `C${c.cycle_num}`);
-  rlChart.data.labels = labels;
-  rlChart.data.datasets[0].data = data;
-  rlChart.update('none');
-}
-
-// ─── GA Stats ────────────────────────────────────────────────────────────────
-function updateGaStats(cycles) {
-  // Simulate GA: generation = current cycle, fitness = normalized score trend
-  const n = cycles.length;
-  document.getElementById('ga-gen').textContent = n ? `${n}/20` : '—';
-  if (n >= 2) {
-    const recent = cycles.slice(-3).map(c => c.total_score || 0);
-    const fitness = recent.reduce((a, b) => a + b, 0) / (recent.length * 100);
-    const el = document.getElementById('ga-fitness');
-    el.textContent = fitness.toFixed(3);
-    el.className = `font-mono font-medium ${fitness > 0.8 ? 'text-green-500' : fitness > 0.6 ? 'text-yellow-500' : 'text-red-500'}`;
-  }
-}
-
-// ─── D3 Force Graph ───────────────────────────────────────────────────────────
-function initForceGraph() {
-  const svg = d3.select('#agent-graph');
-  const W = svg.node().getBoundingClientRect().width || 300;
-  const H = 160;
-  svg.attr('viewBox', `0 0 ${W} ${H}`);
-
-  const groupColors = { 1: '#6366f1', 2: '#22c55e', 3: '#f59e0b' };
-  const nodes = agentsGraph.nodes.map(d => ({...d}));
-  const links = agentsGraph.links.map(d => ({...d}));
-
-  forceSimulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(55).strength(d => d.strength * 0.4))
-    .force('charge', d3.forceManyBody().strength(-120))
-    .force('center', d3.forceCenter(W / 2, H / 2))
-    .force('collision', d3.forceCollide().radius(d => d.r + 4));
-
-  const g = svg.append('g');
-
-  const link = g.append('g')
-    .selectAll('line')
-    .data(links)
-    .join('line')
-    .attr('stroke', '#9ca3af')
-    .attr('stroke-opacity', 0.5)
-    .attr('stroke-width', d => (d.strength || 1) * 1.5);
-
-  const node = g.append('g')
-    .selectAll('g')
-    .data(nodes)
-    .join('g')
-    .call(d3.drag()
-      .on('start', (event, d) => {
-        if (!event.active) forceSimulation.alphaTarget(0.3).restart();
-        d.fx = d.x; d.fy = d.y;
-      })
-      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y; })
-      .on('end', (event, d) => {
-        if (!event.active) forceSimulation.alphaTarget(0);
-        d.fx = null; d.fy = null;
-      }));
-
-  node.append('circle')
-    .attr('r', d => d.r)
-    .attr('fill', d => groupColors[d.group] || '#6b7280')
-    .attr('fill-opacity', 0.85)
-    .attr('stroke', '#fff')
-    .attr('stroke-width', 1.5);
-
-  // Probability arc overlay
-  node.append('circle')
-    .attr('r', d => d.r)
-    .attr('fill', 'none')
-    .attr('stroke', '#fff')
-    .attr('stroke-opacity', 0.5)
-    .attr('stroke-dasharray', d => {
-      const prob = d.prob || 0.8;
-      const c = 2 * Math.PI * d.r;
-      return `${c * prob} ${c}`;
-    })
-    .attr('stroke-width', 3);
-
-  node.append('text')
-    .text(d => d.id.replace('plat-', '').slice(0, 7))
-    .attr('text-anchor', 'middle')
-    .attr('dy', '0.35em')
-    .attr('fill', '#fff')
-    .attr('font-size', '8px')
-    .attr('font-weight', '600')
-    .attr('pointer-events', 'none');
-
-  node.append('title').text(d => `${d.label}\nP(succès): ${((d.prob || 0.8) * 100).toFixed(0)}%`);
-
-  forceSimulation.on('tick', () => {
-    link
-      .attr('x1', d => d.source.x).attr('y1', d => d.source.y)
-      .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
-    node.attr('transform', d => `translate(${Math.max(d.r, Math.min(W - d.r, d.x))},${Math.max(d.r, Math.min(H - d.r, d.y))})`);
-  });
-}
-
-// ─── SSE Stream ───────────────────────────────────────────────────────────────
-function startSseStream() {
-  const es = new EventSource('/api/improvement/stream');
-  es.addEventListener('update', e => {
-    try {
-      const updates = JSON.parse(e.data);
-      updates.forEach(u => {
-        const proj = PROJECTS.find(p => p.id === u.id);
-        if (proj) {
-          proj.current_cycle = u.current_cycle;
-          proj.status = u.status;
-          proj.total_score_avg = u.total_score_avg;
-        }
-        updateProjectCard(u);
-      });
-      // Refresh selected project cycles periodically
-      if (selectedProjectId && Math.random() < 0.2) {
-        loadCycles(selectedProjectId);
-      }
-    } catch(e) { console.error(e); }
-  });
-  es.onerror = () => {
-    document.getElementById('live-badge').innerHTML =
-      '<span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>RECONNECTING';
-    setTimeout(startSseStream, 5000);
-    es.close();
-  };
-}
-
-function updateProjectCard(update) {
-  const cycleLabel = document.getElementById(`cycle-label-${update.id}`);
-  const progress = document.getElementById(`progress-${update.id}`);
-  const scoreEl = document.getElementById(`score-${update.id}`);
-  const statusEl = document.getElementById(`status-${update.id}`);
-  const max = PROJECTS.find(p => p.id === update.id)?.max_cycles || 20;
-
-  if (cycleLabel) cycleLabel.textContent = `Cycle ${update.current_cycle}/${max}`;
-  if (progress) progress.style.width = `${Math.round(update.current_cycle / max * 100)}%`;
-  if (scoreEl) {
-    scoreEl.textContent = update.total_score_avg > 0 ? Math.round(update.total_score_avg) : '—';
-    const s = update.total_score_avg;
-    scoreEl.className = `text-lg font-bold ${s >= 80 ? 'text-green-500' : s >= 60 ? 'text-yellow-500' : s > 0 ? 'text-red-500' : 'text-gray-400'}`;
-  }
-  if (statusEl) {
-    const icons = { running: '● running', idle: '○ idle', waiting_ci: '⏳ CI', completed: '✓ done' };
-    const colors = { running: 'text-green-500 font-medium', idle: 'text-gray-400', waiting_ci: 'text-yellow-500', completed: 'text-blue-500' };
-    statusEl.innerHTML = `<span class="${colors[update.status] || ''}">${icons[update.status] || update.status}</span>`;
-  }
-}
-
-// ─── Utils ────────────────────────────────────────────────────────────────────
-function scoreColorRaw(score) {
-  if (score >= 80) return 'hsl(120,60%,72%)';
-  if (score >= 60) return 'hsl(45,90%,65%)';
-  return 'hsl(0,70%,70%)';
-}
-
-function scoreColor(score) {
-  if (score >= 80) return 'linear-gradient(to right, #22c55e, #16a34a)';
-  if (score >= 60) return 'linear-gradient(to right, #f59e0b, #d97706)';
-  return 'linear-gradient(to right, #ef4444, #dc2626)';
-}
-
-async function startAllCycles() {
-  const btn = document.getElementById('btn-start-all');
-  btn.textContent = '⏳ Démarrage...';
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/improvement/start-all', { method: 'POST' });
-    const data = await res.json();
-    if (data.ok) {
-      const results = data.results || {};
-      const started = Object.entries(results).filter(([,v]) => v === 'started').length;
-      btn.textContent = `✅ ${started}/5 lancés`;
-      // Refresh project data
-      setTimeout(() => { window.location.reload(); }, 2000);
-    } else {
-      btn.textContent = `❌ ${data.error || 'Erreur'}`;
-      setTimeout(() => { btn.textContent = '▶ Démarrer'; btn.disabled = false; }, 4000);
-    }
-  } catch(e) {
-    btn.textContent = '❌ Erreur réseau';
-    setTimeout(() => { btn.textContent = '▶ Démarrer'; btn.disabled = false; }, 4000);
-  }
-}
-
-async function startProject(projectId) {
-  try {
-    const res = await fetch(`/api/improvement/start/${projectId}`, { method: 'POST' });
-    const data = await res.json();
-    if (data.ok) {
-      const card = document.getElementById(`project-card-${projectId}`);
-      if (card) card.classList.add('ring-2', 'ring-green-400');
-      const statusEl = document.getElementById(`status-${projectId}`);
-      if (statusEl) statusEl.innerHTML = '<span class="text-green-500 font-medium">● running</span>';
-    }
-  } catch(e) {
-    console.error('startProject error:', e);
+    btn.innerHTML = `${fi("x-circle","inline w-4 h-4")} Erreur réseau`;
+    setTimeout(() => { btn.textContent = fi('play')+'  Démarrer tout'; btn.disabled = false; }, 4000);
   }
 }
 </script>

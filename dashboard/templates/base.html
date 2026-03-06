@@ -14,6 +14,9 @@
     <!-- Chart.js for graphs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons/dist/feather.min.js"></script>
+
     <script>
         // Tailwind config for dark mode
         tailwind.config = {
@@ -71,7 +74,7 @@
             <div class="flex justify-between h-16">
                 <div class="flex items-center">
                     <a href="/" class="flex items-center space-x-2">
-                        <span class="text-2xl">&#127981;</span>
+                        <i data-feather="cpu" class="w-6 h-6 text-green-500"></i>
                         <span class="font-bold text-xl">Software Factory</span>
                     </a>
                     <div class="hidden md:flex ml-10 space-x-4">
@@ -86,14 +89,14 @@
                             Tasks
                         </a>
                         <a href="/live"
-                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700
+                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center gap-1.5
                                   {% if request.url.path == '/live' %}bg-gray-100 dark:bg-gray-700{% endif %}">
-                            📡 Live
+                            <i data-feather="radio" class="w-3.5 h-3.5"></i> Live
                         </a>
                         <a href="/improvement"
-                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700
+                           class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-700 inline-flex items-center gap-1.5
                                   {% if request.url.path == '/improvement' %}bg-gray-100 dark:bg-gray-700{% endif %}">
-                            🔄 Amélioration Continue
+                            <i data-feather="refresh-cw" class="w-3.5 h-3.5"></i> Amélioration Continue
                         </a>
                     </div>
                 </div>
@@ -130,6 +133,9 @@
         }
         updateClock();
         setInterval(updateClock, 1000);
+
+        // Init Feather icons
+        if (typeof feather !== 'undefined') feather.replace({ 'stroke-width': 1.5 });
 
         // Auto-refresh stats every 30 seconds
         setInterval(() => {
