@@ -15,6 +15,7 @@ Opens at http://localhost:8080
 
 import asyncio
 import json
+import logging
 import os
 import platform
 import sqlite3  # kept only for RTK history DB (external tool)
@@ -1143,6 +1144,8 @@ AC_PROJECTS = [
 ]
 
 AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
+# Hardening phase is auto-injected after deploy when total_score < AC_HARDENING_THRESHOLD
+AC_PHASES_WITH_HARDENING = AC_PHASES + ["hardening"]
 
 # Adversarial quality dimensions — measured by LLM agents reading code/tests/config
 AC_ADVERSARIAL = [
@@ -1620,6 +1623,68 @@ async def api_improvement_start_all():
     return {"ok": True, "results": results}
 
 
+HARDENING_SCORE_THRESHOLD = int(os.environ.get("AC_HARDENING_THRESHOLD", "85"))
+_HARDENING_WORKFLOW = "hardening-sprint"
+
+
+async def _trigger_hardening_sprint(
+    project_id: str, cycle_num: int, total_score: int, adversarial_scores: dict
+) -> Optional[str]:
+    """Launch a hardening-sprint run on the SF platform when total_score < threshold."""
+    try:
+        from .git_action_watcher import SF_PLATFORM_URL, _sf_headers
+
+        # Identify the 3 worst adversarial dimensions to focus on
+        low_dims = sorted(adversarial_scores.items(), key=lambda x: x[1])[:3]
+        low_dims_text = ", ".join(f"{d}={s}" for d, s in low_dims)
+
+        brief = (
+            f"Hardening Sprint auto — cycle {cycle_num} score={total_score}/100 (<{HARDENING_SCORE_THRESHOLD}).\n"
+            f"Dimensions basses : {low_dims_text}.\n"
+            f"Objectif : passer le score >= {HARDENING_SCORE_THRESHOLD} en ciblant no_slop, "
+            f"architecture et over_engineering.\n"
+            f"RÈGLE : ne pas modifier les APIs publiques ni les tests existants."
+        )
+        import httpx
+
+        resp = httpx.post(
+            f"{SF_PLATFORM_URL}/api/projects/{project_id}/run",
+            headers=_sf_headers(),
+            json={
+                "workflow_id": _HARDENING_WORKFLOW,
+                "brief": brief,
+                "cdp_agent_id": "plat-endurance-manager",
+                "config": {
+                    "source_cycle": cycle_num,
+                    "source_score": total_score,
+                    "target_score": HARDENING_SCORE_THRESHOLD,
+                    "triggered_by": "hardening_auto",
+                    "improvement_mode": True,
+                },
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201):
+            data = resp.json()
+            run_id = data.get("run_id") or data.get("id")
+            logging.getLogger(__name__).info(
+                "hardening-sprint triggered: project=%s cycle=%d score=%d run_id=%s",
+                project_id,
+                cycle_num,
+                total_score,
+                run_id,
+            )
+            return run_id
+        logging.getLogger(__name__).warning(
+            "hardening-sprint launch failed: project=%s status=%d",
+            project_id,
+            resp.status_code,
+        )
+    except Exception as e:
+        logging.getLogger(__name__).warning("hardening-sprint trigger error: %s", e)
+    return None
+
+
 @app.post("/api/improvement/inject-cycle")
 async def api_improvement_inject_cycle(request: Request):
     """Inject a cycle result — accepts adversarial scores + traceability links."""
@@ -1637,6 +1702,8 @@ async def api_improvement_inject_cycle(request: Request):
     run_id = body.get("run_id", "")
     fix_summary = body.get("fix_summary", "")
     traceability_score = body.get("traceability_score", 0)
+    # Don't auto-trigger hardening on hardening cycles themselves
+    _is_hardening = body.get("triggered_by") == "hardening_auto"
 
     if not project_id:
         return {"ok": False, "error": "project_id required"}
@@ -1756,7 +1823,20 @@ async def api_improvement_inject_cycle(request: Request):
         return avg_score
 
     avg = await asyncio.to_thread(_do_inject)
-    return {"ok": True, "avg_score": avg}
+
+    # ── Auto-trigger hardening sprint if score below threshold ────────────────
+    hardening_run_id = None
+    if project_id and not _is_hardening and total_score < HARDENING_SCORE_THRESHOLD:
+        hardening_run_id = await _trigger_hardening_sprint(
+            project_id, cycle_num, total_score, adversarial_scores
+        )
+
+    return {
+        "ok": True,
+        "avg_score": avg,
+        "hardening_triggered": hardening_run_id is not None,
+        "hardening_run_id": hardening_run_id,
+    }
 
 
 @app.get("/api/improvement/adversarial/{project_id}")
