@@ -1355,11 +1355,13 @@ def _skill_eval_ensure_table(conn) -> None:
 
 
 def _parse_eval_cases_count(content: str) -> int:
-    """Count eval_cases entries in YAML frontmatter of a skill markdown file."""
+    """Count eval_cases entries in YAML frontmatter of a skill markdown file.
+    Supports both `- input:` (philschmid style) and `- id:` / `- prompt:` styles.
+    """
     if not content or "eval_cases:" not in content:
         return 0
-    # Count '  - input:' lines in frontmatter (between --- markers)
     in_front = False
+    in_eval = False
     count = 0
     for line in content.splitlines():
         if line.strip() == "---":
@@ -1367,9 +1369,55 @@ def _parse_eval_cases_count(content: str) -> int:
             if not in_front:
                 break
             continue
-        if in_front and line.strip().startswith("- input:"):
-            count += 1
+        if not in_front:
+            continue
+        if line.strip() == "eval_cases:":
+            in_eval = True
+            continue
+        if in_eval:
+            # Stop counting if we hit another top-level key (no leading spaces)
+            if line and not line[0].isspace() and not line.startswith("-"):
+                in_eval = False
+                continue
+            stripped = line.strip()
+            # Count list items that start a new case: '- input:', '- id:', '- prompt:'
+            if (
+                stripped.startswith("- input:")
+                or stripped.startswith("- id:")
+                or stripped.startswith("- prompt:")
+            ):
+                count += 1
     return count
+
+
+def _load_local_skills_fs():
+    """
+    Load local platform skills directly from filesystem (not DB).
+    WHY: DB has 1300+ GitHub skills that don't have eval_cases; local skill .md files
+    are the source of truth for the Skills Health board.
+    Returns list of (skill_id, skill_name, eval_cases_count).
+    """
+    from ...config import LEGACY_SKILLS_DIR
+
+    results = []
+    skills_dir = LEGACY_SKILLS_DIR
+    if not skills_dir.exists():
+        return results
+    for path in sorted(skills_dir.glob("*.md")):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        # Extract name from frontmatter or first heading
+        name = path.stem
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("name:"):
+                name = stripped[5:].strip().strip('"')
+                break
+            if stripped.startswith("# "):
+                name = stripped[2:].strip()
+                break
+        n_cases = _parse_eval_cases_count(text)
+        results.append({"id": path.stem, "name": name, "eval_cases": n_cases})
+    return results
 
 
 @router.get("/api/skills/eval")
@@ -1377,6 +1425,7 @@ async def api_skills_eval_coverage():
     """
     Aggregate skill eval coverage stats.
     WHY: ART Skills Health tab KPIs — total, coverage%, passing, run.
+    Reads from filesystem (not DB) so local skills with eval_cases are always current.
     """
     from fastapi.responses import JSONResponse
 
@@ -1384,23 +1433,19 @@ async def api_skills_eval_coverage():
         conn = _ac_get_db()
         _skill_eval_ensure_table(conn)
         try:
-            skills = conn.execute(
-                "SELECT id, name, content FROM skills ORDER BY name"
-            ).fetchall()
             runs = conn.execute(
                 "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
                 "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
             ).fetchall()
         finally:
             conn.close()
-        return [dict(s) for s in skills], {r["skill_id"]: dict(r) for r in runs}
+        return {r["skill_id"]: dict(r) for r in runs}
 
-    skills, runs = await asyncio.to_thread(_load)
+    runs = await asyncio.to_thread(_load)
+    skills = await asyncio.to_thread(_load_local_skills_fs)
 
     total = len(skills)
-    with_evals = [
-        s for s in skills if _parse_eval_cases_count(s.get("content", "")) > 0
-    ]
+    with_evals = [s for s in skills if s["eval_cases"] > 0]
     run_set = set(runs.keys())
     passing_count = sum(
         1
@@ -1408,7 +1453,7 @@ async def api_skills_eval_coverage():
         if runs.get(s["id"], {}).get("pass_rate") is not None
         and runs[s["id"]]["pass_rate"] >= 0.8
     )
-    without_evals = [s["name"] for s in skills if s not in with_evals]
+    without_evals = [s["name"] for s in skills if s["eval_cases"] == 0]
 
     return JSONResponse(
         {
@@ -1416,7 +1461,7 @@ async def api_skills_eval_coverage():
             "coverage_pct": round(len(with_evals) / total * 100) if total else 0,
             "passing": passing_count,
             "run": len([s for s in with_evals if s["id"] in run_set]),
-            "without_evals": without_evals[:50],  # cap to 50 for payload size
+            "without_evals": without_evals[:50],
         }
     )
 
@@ -1427,6 +1472,7 @@ async def api_skills_list():
     Per-skill eval status list.
     WHY: ART Skills Health table — shows eval_cases count, pass rate, last run.
     Returns JSON array (not object) for direct .filter() use on frontend.
+    Reads from filesystem so local skills with eval_cases are always current.
     """
     from fastapi.responses import JSONResponse
 
@@ -1434,41 +1480,37 @@ async def api_skills_list():
         conn = _ac_get_db()
         _skill_eval_ensure_table(conn)
         try:
-            skills = conn.execute(
-                "SELECT id, name, content FROM skills ORDER BY name"
-            ).fetchall()
             runs = conn.execute(
                 "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
                 "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
             ).fetchall()
         finally:
             conn.close()
-        return [dict(s) for s in skills], {r["skill_id"]: dict(r) for r in runs}
+        return {r["skill_id"]: dict(r) for r in runs}
 
-    skills, runs = await asyncio.to_thread(_load)
+    runs = await asyncio.to_thread(_load)
+    skills = await asyncio.to_thread(_load_local_skills_fs)
 
     result = []
     for s in skills:
-        n_cases = _parse_eval_cases_count(s.get("content", ""))
         run_info = runs.get(s["id"], {})
         pass_rate = run_info.get("pass_rate")
         verdict = run_info.get("verdict")
-        # Graduation rule: 100% pass_rate → regression mode
         if pass_rate is not None and pass_rate >= 1.0:
             verdict = "regression"
         result.append(
             {
                 "id": s["id"],
                 "name": s["name"],
-                "has_evals": n_cases > 0,
-                "eval_cases": n_cases,
+                "has_evals": s["eval_cases"] > 0,
+                "eval_cases": s["eval_cases"],
                 "pass_rate": pass_rate,
                 "verdict": verdict,
                 "ran_at": run_info.get("ran_at"),
             }
         )
 
-    return JSONResponse(result)  # always returns array
+    return JSONResponse(result)
 
 
 @router.get("/ceremonies", response_class=HTMLResponse)
