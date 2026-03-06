@@ -5,18 +5,13 @@
     <button class="tab active" hx-get="/workflows/list" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("templates") }}</button>
     <button class="tab" hx-get="/patterns/list" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns") }}</button>
     <button class="tab" hx-get="/workflows/evolution" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">🧬 Évolution</button>
-    <button class="tab" onclick="switchTab(this); showImprovementBoard()">&#9654; Amélioration Continue</button>
+    <a class="tab" href="http://{{ request.headers.get('host', '').split(':')[0] }}:8080/improvement" target="_blank" rel="noopener">&#9654; Amélioration Continue</a>
 </div>
 <div id="tab-content"></div>
 <script>
 function switchTab(btn){
     document.querySelectorAll('.tabs .tab').forEach(t=>t.classList.remove('active'));
     btn.classList.add('active');
-}
-function showImprovementBoard(){
-    const BOARD_URL = window.location.protocol + '//' + window.location.hostname + ':8080/improvement';
-    document.getElementById('tab-content').innerHTML =
-        '<iframe src="' + BOARD_URL + '" style="width:100%;height:calc(100vh - 120px);border:none;border-radius:8px;" title="Amélioration Continue"></iframe>';
 }
 </script>
 {% endblock %}
