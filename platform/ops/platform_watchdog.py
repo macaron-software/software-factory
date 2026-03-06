@@ -277,10 +277,8 @@ async def resume_stuck_ac_cycles() -> int:
             try:
                 from ..missions.store import get_mission_store
                 from ..workflows.store import get_workflow_store
-                from ..web.routes.epics.execution import (
-                    get_mission_semaphore,
-                    _run_workflow_background,
-                )
+                from ..web.routes.epics.execution import get_mission_semaphore
+                from ..web.routes.workflows import _run_workflow_background
 
                 mission = await asyncio.to_thread(
                     get_mission_store().get_mission, run_id
