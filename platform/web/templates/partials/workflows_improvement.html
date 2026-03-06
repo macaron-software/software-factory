@@ -304,7 +304,7 @@ function acSelectProject(projectId, card) {
   });
   const title = document.getElementById('ac-history-title');
   if (title) title.textContent = 'Historique — ' + card.querySelector('.proj-name').textContent;
-  acRefreshIntel();
+  _acStartIntelPoll();
 }
 
 var _acModalPollId = null;
@@ -658,6 +658,14 @@ async function acStartCycle() {
   if (pid) acStartProject(pid);
 }
 
-// Auto-refresh intel on load
-if (_acSelectedProject) acRefreshIntel();
+// Auto-refresh intel on load + every 30s
+let _acIntelPollId = null;
+function _acStartIntelPoll() {
+  if (_acIntelPollId) clearInterval(_acIntelPollId);
+  if (_acSelectedProject) {
+    acRefreshIntel();
+    _acIntelPollId = setInterval(acRefreshIntel, 30000);
+  }
+}
+_acStartIntelPoll();
 </script>
