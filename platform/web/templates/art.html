@@ -652,7 +652,101 @@
   function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 })();
 
-function artSwitchTab(btn, panelId) {
+// ── AC Team Graph ─────────────────────────────────────────────────────────
+const AC_NW = 130, AC_NH = 56;
+const AC_NODES = [
+    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution', role:'Scheduler nightly'},
+    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',  role:'Continuous monitor'},
+    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',  role:'LLM selection'},
+    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin GA', role:'Team evolution'},
+    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy', role:'Cycle learning'},
+    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal', role:'Self-healing 60s'},
+    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge', role:'Maintenance nightly'},
+];
+const AC_EDGES = [
+    {from:'evolution_scheduler', to:'thompson',   pat:'h', label:'tune'},
+    {from:'evolution_scheduler', to:'darwin',     pat:'h', label:'evolve'},
+    {from:'evolution_scheduler', to:'rl_policy',  pat:'h', label:'train'},
+    {from:'evolution_scheduler', to:'knowledge',  pat:'h', label:'maintain'},
+    {from:'watchdog',            to:'auto_heal',  pat:'r', label:'alert'},
+    {from:'thompson',            to:'rl_policy',  pat:'n', label:'reward'},
+    {from:'darwin',              to:'auto_heal',  pat:'n', label:'fitness'},
+];
+const AC_PATS = {
+    h: {color:'#f59e0b', dash:'',    label:'Hierarchical'},
+    n: {color:'#8b5cf6', dash:'2 4', label:'Network'},
+    r: {color:'#ef4444', dash:'3 3', label:'Alert'},
+};
+
+function renderAcGraph() {
+    const svg = document.getElementById('acGraphSvg');
+    const W = 400, H = 280;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const edgesG = document.getElementById('acEdges');
+    edgesG.innerHTML = '';
+    const activePatterns = new Set();
+    AC_EDGES.forEach(e => {
+        const fn = AC_NODES.find(n=>n.id===e.from), tn = AC_NODES.find(n=>n.id===e.to);
+        if (!fn||!tn) return;
+        const pat = AC_PATS[e.pat] || AC_PATS.n;
+        activePatterns.add(e.pat);
+        const x1=fn.x+AC_NW/2, y1=fn.y+AC_NH, x2=tn.x+AC_NW/2, y2=tn.y;
+        const dy=tn.y-fn.y, co=Math.max(20,Math.abs(dy)*0.35);
+        const d = dy > 0
+            ? `M${x1},${y1} C${x1},${y1+co} ${x2},${y2-co} ${x2},${y2}`
+            : `M${x1},${fn.y} C${x1},${fn.y-co} ${x2},${tn.y+AC_NH+co} ${x2},${tn.y+AC_NH}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', d); path.setAttribute('class','ig-edge');
+        path.style.stroke = pat.color; path.style.markerEnd = `url(#ac-arrow-${e.pat})`;
+        if (pat.dash) path.style.strokeDasharray = pat.dash;
+        edgesG.appendChild(path);
+        if (e.label) {
+            const mx=(x1+x2)/2, my=(y1+y2)/2-4;
+            const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            lbl.setAttribute('class','ig-edge-label'); lbl.setAttribute('x',mx); lbl.setAttribute('y',my);
+            lbl.style.fill = pat.color; lbl.textContent = e.label;
+            edgesG.appendChild(lbl);
+        }
+    });
+    const nodesG = document.getElementById('acNodes');
+    nodesG.innerHTML = '';
+    AC_NODES.forEach(n => {
+        const col = n.color;
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.setAttribute('class','ig-node'); g.setAttribute('transform',`translate(${n.x},${n.y})`);
+        const initials = n.name.substring(0,2);
+        g.innerHTML = `
+            <rect class="ig-node-bg" width="${AC_NW}" height="${AC_NH}"/>
+            <line class="ig-node-bar" x1="0" y1="0" x2="${AC_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+            <circle cx="20" cy="${AC_NH/2}" r="14" fill="${col}" opacity="0.2"/>
+            <text x="20" y="${AC_NH/2+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${initials}</text>
+            <text class="ig-node-name" x="40" y="22">${n.name}</text>
+            <text class="ig-node-role" x="40" y="36">${n.role}</text>
+            <circle class="ig-node-dot" cx="${AC_NW-12}" cy="14" fill="${col}" opacity="0.6"/>`;
+        nodesG.appendChild(g);
+    });
+    const legendEl = document.getElementById('acGraphLegend');
+    legendEl.innerHTML = '';
+    activePatterns.forEach(p => {
+        const s = AC_PATS[p]; if (!s) return;
+        const item = document.createElement('div');
+        item.className = 'idea-graph-legend-item';
+        item.innerHTML = `<svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg><span>${s.label}</span>`;
+        legendEl.appendChild(item);
+    });
+}
+
+function toggleAcTeamGraph() {
+    const canvas = document.getElementById('acGraphCanvas');
+    const legend = document.getElementById('acGraphLegend');
+    const toggle = document.querySelector('#acTeamGraph .idea-graph-toggle');
+    const hidden = canvas.style.display === 'none';
+    canvas.style.display = hidden ? '' : 'none';
+    legend.style.display = hidden ? '' : 'none';
+    toggle.classList.toggle('open', hidden);
+}
+
+
     document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     ['art-org','art-amelio-container'].forEach(id => {
