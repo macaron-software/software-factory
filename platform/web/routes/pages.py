@@ -1645,6 +1645,7 @@ async def api_improvement_inject_cycle(request: Request):
                 if prev_score is not None:
                     try:
                         from ...ac.skill_thompson import ac_skill_record
+                        from ...db.migrations import get_db
 
                         # Read skill_variants from the mission config (set at cycle start)
                         def _load_variants():
@@ -1664,8 +1665,6 @@ async def api_improvement_inject_cycle(request: Request):
                                 return {}
                             finally:
                                 conn_v.close()
-
-                        from ...db.migrations import get_db
 
                         variants_used = await asyncio.to_thread(_load_variants)
                         for skill_id, variant in variants_used.items():
@@ -1938,8 +1937,8 @@ async def api_improvement_scores(project_id: str):
         ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
     )
 
-    # Thompson stats for AC skills
-    skill_stats = {}
+    # Thompson stats for AC skills — nested {skill: {variant: {wins, losses, avg_score}}}
+    skill_stats: dict = {}
     for skill in [
         "ac-architect",
         "ac-codex",
@@ -1947,9 +1946,16 @@ async def api_improvement_scores(project_id: str):
         "ac-qa-agent",
         "ac-cicd-agent",
     ]:
-        stats = await asyncio.to_thread(ac_skill_stats, skill, project_id)
-        if stats:
-            skill_stats[skill] = stats
+        stats_list = await asyncio.to_thread(ac_skill_stats, skill, project_id)
+        if stats_list:
+            skill_stats[skill] = {
+                row["variant"]: {
+                    "wins": row.get("wins", 0),
+                    "losses": row.get("losses", 0),
+                    "avg_score": row.get("avg_score", 0.0),
+                }
+                for row in stats_list
+            }
 
     return JSONResponse(
         {

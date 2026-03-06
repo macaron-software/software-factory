@@ -1231,35 +1231,21 @@ AC_ADVERSARIAL_KEYS = [d[0] for d in AC_ADVERSARIAL]
 
 _AC_AGENTS_GRAPH = {
     "nodes": [
-        {
-            "id": "plat-endurance-manager",
-            "label": "Endurance Manager",
-            "group": 1,
-            "r": 22,
-        },
-        {"id": "plat-cto", "label": "CTO Orchestrateur", "group": 1, "r": 20},
-        {"id": "plat-quality-analyst", "label": "Quality Analyst", "group": 2, "r": 16},
-        {"id": "plat-platform-dev", "label": "Platform Dev", "group": 2, "r": 16},
-        {"id": "plat-deploy-engineer", "label": "Deploy Engineer", "group": 3, "r": 16},
-        {"id": "plat-qa-validator", "label": "QA Validator", "group": 2, "r": 16},
+        {"id": "ac-coach", "label": "AC Coach", "group": 1, "r": 22},
+        {"id": "ac-architect", "label": "Architect", "group": 1, "r": 18},
+        {"id": "ac-codex", "label": "Codex", "group": 2, "r": 16},
+        {"id": "ac-adversarial", "label": "Adversarial", "group": 3, "r": 16},
+        {"id": "ac-qa-agent", "label": "QA Agent", "group": 2, "r": 16},
+        {"id": "ac-cicd-agent", "label": "CI/CD Agent", "group": 3, "r": 16},
     ],
     "links": [
-        {"source": "plat-endurance-manager", "target": "plat-cto", "strength": 2},
-        {"source": "plat-cto", "target": "plat-quality-analyst", "strength": 1},
-        {"source": "plat-cto", "target": "plat-platform-dev", "strength": 1},
-        {"source": "plat-cto", "target": "plat-deploy-engineer", "strength": 1},
-        {"source": "plat-cto", "target": "plat-qa-validator", "strength": 1},
-        {
-            "source": "plat-quality-analyst",
-            "target": "plat-platform-dev",
-            "strength": 0.5,
-        },
-        {"source": "plat-platform-dev", "target": "plat-qa-validator", "strength": 0.5},
-        {
-            "source": "plat-qa-validator",
-            "target": "plat-deploy-engineer",
-            "strength": 0.5,
-        },
+        {"source": "ac-coach", "target": "ac-architect", "strength": 1.5},
+        {"source": "ac-architect", "target": "ac-codex", "strength": 1},
+        {"source": "ac-architect", "target": "ac-adversarial", "strength": 1},
+        {"source": "ac-codex", "target": "ac-qa-agent", "strength": 1},
+        {"source": "ac-qa-agent", "target": "ac-cicd-agent", "strength": 1},
+        {"source": "ac-adversarial", "target": "ac-qa-agent", "strength": 0.5},
+        {"source": "ac-cicd-agent", "target": "ac-coach", "strength": 0.8},
     ],
 }
 
@@ -1395,40 +1381,41 @@ def _ac_get_cycles(project_id: str) -> List[Dict]:
 
 
 def _ac_get_thompson_probs() -> List[Dict]:
-    """Compute Thompson sampling probabilities from Beta distributions."""
+    """Compute Thompson sampling probabilities for AC skill variants from Beta distributions."""
     conn = get_db()
     try:
-        _ac_ensure_tables(conn)
-        rows = conn.execute(
-            "SELECT agent_id, phase_type, successes, failures FROM ac_thompson ORDER BY agent_id"
+        # Use ac_skill_scores (per-skill variant table from skill_thompson.py)
+        skill_rows = conn.execute(
+            "SELECT skill_id, variant, wins, losses, avg_score FROM ac_skill_scores ORDER BY skill_id"
         ).fetchall()
     except Exception:
-        rows = []
+        skill_rows = []
     finally:
         conn.close()
+
     results = {}
-    for r in rows:
-        key = r["agent_id"]
+    for r in skill_rows:
+        key = r["skill_id"]
         if key not in results:
             results[key] = {"agent_id": key, "phases": {}, "overall_prob": 0.5}
-        alpha = r["successes"] + 1
-        beta_v = r["failures"] + 1
-        # Expected value of Beta(α, β) = α / (α + β)
+        alpha = (r["wins"] or 0) + 1
+        beta_v = (r["losses"] or 0) + 1
         prob = alpha / (alpha + beta_v)
-        results[key]["phases"][r["phase_type"]] = round(prob, 3)
+        results[key]["phases"][r["variant"]] = round(prob, 3)
 
-    # Compute overall probability as mean across phases
+    # Compute overall probability as mean across variants
     for v in results.values():
         if v["phases"]:
             v["overall_prob"] = round(sum(v["phases"].values()) / len(v["phases"]), 3)
 
-    # Add default entries for our agents if not yet tracked
+    # Default entries for AC agents if not yet tracked
     default_agents = [
-        ("plat-cto", 0.90),
-        ("plat-quality-analyst", 0.82),
-        ("plat-platform-dev", 0.85),
-        ("plat-deploy-engineer", 0.78),
-        ("plat-qa-validator", 0.80),
+        ("ac-coach", 0.88),
+        ("ac-architect", 0.85),
+        ("ac-codex", 0.80),
+        ("ac-adversarial", 0.75),
+        ("ac-qa-agent", 0.82),
+        ("ac-cicd-agent", 0.78),
     ]
     for agent_id, default_prob in default_agents:
         if agent_id not in results:

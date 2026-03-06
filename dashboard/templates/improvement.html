@@ -346,13 +346,13 @@
       <!-- Thompson sampling -->
       <div class="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
         <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">
-          Thompson Sampling — P(succès) par agent
+          Thompson Sampling — Skills AC
         </div>
         <div class="space-y-2" id="thompson-bars">
           {% for t in thompson %}
           <div class="flex items-center gap-2">
             <span class="text-xs font-mono w-32 truncate text-gray-600 dark:text-gray-300">
-              {{ t.agent_id.replace('plat-','') }}
+              {{ t.agent_id.replace('ac-','') }}
             </span>
             <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-4 overflow-hidden">
               <div class="h-full rounded-full transition-all duration-700"
