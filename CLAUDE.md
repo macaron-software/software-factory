@@ -220,8 +220,10 @@ Service: systemd sf-platform.service
          ExecStart=/home/sfadmin/.venv/bin/python3 -m uvicorn platform.server:app \
            --host 0.0.0.0 --port 8090 --ws none --log-level warning
          User=sfadmin, Restart=always, EnvironmentFile=/etc/sf-platform/secrets
-Deploy:  rsync platform/ sfadmin@<IP>:/home/sfadmin/platform/
-         ssh sfadmin@<IP> "sudo systemctl restart sf-platform"
+Deploy:  git push → GitHub Actions → Azure auto-deploy (rsync + systemctl restart)
+         git push → sync-to-laposte.sh → GitLab Actions → OVH auto-deploy
+         ⚠️ Copies manuelles inutiles — le push suffit
+Auth:    admin@demo.local / demo-admin-2026 (Azure + OVH identiques)
 PG:      macaron-platform-pg.postgres.database.azure.com — B1ms PG17 32GB, pgvector, pg_trgm
          DB: macaron_platform, user: macaron, SSL required, dual adapter (adapter.py)
 LLM:     ascii-ui-openai (francecentral) — gpt-5-mini, 100req/min, 100K tok/min
@@ -234,11 +236,12 @@ DR:      L3 full 14/14 — blob GRS (macaronbackups), snapshots, PG PITR 7d
 ## DEPLOY WORKFLOW
 
 ```
-OVH:     rsync → blue-green slot swap (slots/blue/ ou slots/green/). Active slot dans active-slot.
-         Container restart: docker stop/rm old → docker run new → health check → switch active-slot
-Azure:   rsync platform/ sfadmin@<IP>:/home/sfadmin/platform/
-         → sudo systemctl restart sf-platform → wait 5s → health check
-         ⚠️ Module = platform (NOT macaron_platform)
+OVH:     git push → GitLab Actions auto-deploy (blue-green slot swap)
+         SSH direct: debian@54.36.183.124 -i ~/.ssh/github_actions_sf_demo
+         DB: PostgreSQL (macaron:macaron_pg_ovh_2024@postgres:5432/macaron_platform)
+Azure:   git push → GitHub Actions auto-deploy (rsync + systemctl restart)
+         SSH: bloqué NSG → az vm run-command invoke
+         ⚠️ Copies manuelles fichiers inutiles — le push suffit
 After:   clear __pycache__ → service restart → wait 15s → health check
 Auto-resume: lifespan restarts running missions on service restart.
 ```
@@ -585,10 +588,9 @@ API: GET /api/skills/eval  → {total, with_evals, coverage_pct, passing, run, n
      GET /api/skills/eval/job/{job_id} → {status, result}
 Source: LEGACY_SKILLS_DIR = _SOFTWARE_FACTORY/skills/*.md (60 skills locaux, PAS la DB GitHub)
 Résultats: DATA_DIR/skill_evals/{skill_name}.json
-État actuel (2026-03-06): 60 skills, 18 avec eval_cases (30%), 6 run, 3 passing ≥80%
-  passing: incident-diagnosis(1.0), sf-guide(1.0), skill-grader(1.0)
-  failing:  agent-reward(0.0), perf-audit(0.0), skill-creator(0.67)
-⚠️ Sync requis si skills/ du repo tracké ≠ skills/ de l'instance locale (_SOFTWARE_FACTORY/skills/)
+État actuel (2026-03-06): 57 skills, 30% avec eval_cases, run: perf-audit(1.0✅), tdd(1.0✅), sf-guide(1.0✅), skill-grader(1.0✅), incident-diagnosis(1.0✅), skill-creator(0.67), agent-reward(0.67)
+  Patterns fixes (MiniMax/GPT): embed données simulées (pas tool call), "DO NOT run tools", pré-fournir phase RED, single-quote regex backslash YAML
+DATA_DIR/skills/ override: copier skill.md → /app/data/skills/ (OVH) ou /home/sfadmin/data/skills/ (Azure) pour tester sans redéployer
 ```
 
 
