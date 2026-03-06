@@ -1407,6 +1407,11 @@ function renderProviders(providers) {
                 title="Fetch models from ${p.name} API"
                 style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-secondary);opacity:.7;font-size:0.9rem;line-height:1"
                 >↻</button>` : '';
+        const ensureBtn = p.id === 'local-mlx' ? `
+            <button onclick="ensureLocalServer()" id="ensure-local-btn"
+                title="Start / restart local MLX server"
+                style="font-size:0.7rem;padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;margin-left:4px"
+                >▶ Start</button>` : '';
         return `
         <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}" id="prov-card-${p.id}">
             <div class="llm-prov-header">
@@ -1414,7 +1419,7 @@ function renderProviders(providers) {
                     <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
                     <div>
                         <div class="llm-prov-name">${p.name}</div>
-                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}</div>
+                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}${ensureBtn}</div>
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.7rem">
@@ -1479,6 +1484,37 @@ async function refreshProviderModels(providerId) {
         console.error('refreshProviderModels', providerId, e);
     } finally {
         if (btn) { btn.style.opacity='0.7'; btn.style.animation=''; }
+    }
+}
+
+// Ensure local-mlx server is running — calls _ensure_mlx_server() on the platform.
+// Shows status inline in the button. Takes up to LLM_TIMEOUT_MLX_WAIT seconds.
+async function ensureLocalServer() {
+    const btn = document.getElementById('ensure-local-btn');
+    if (!btn) return;
+    btn.textContent = '⏳ Starting…';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/local/ensure', {method: 'POST'});
+        const d = await r.json();
+        if (d.status === 'running' || d.status === 'started') {
+            btn.textContent = '✅ ' + (d.status === 'running' ? 'Running' : 'Started');
+            btn.style.color = 'var(--green, #22c55e)';
+            // Refresh models list
+            refreshProviderModels('local-mlx');
+        } else if (d.status === 'disabled') {
+            btn.textContent = '—';
+        } else {
+            btn.textContent = '❌ Failed';
+            btn.style.color = 'var(--red, #ef4444)';
+            btn.title = d.message || 'Server did not start';
+        }
+    } catch(e) {
+        btn.textContent = '❌ Error';
+        console.error('ensureLocalServer', e);
+    } finally {
+        btn.disabled = false;
+        setTimeout(() => { if(btn){ btn.textContent='▶ Start'; btn.style.color=''; } }, 5000);
     }
 }
 

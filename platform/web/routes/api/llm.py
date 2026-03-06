@@ -368,3 +368,78 @@ async def get_provider_models_live(provider_id: str):
         return JSONResponse({"ok": True, "provider_id": provider_id, "models": models})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/llm/local/ensure")
+async def ensure_local_server():
+    """Ensure the local LLM server (local-mlx) is running, starting it if needed.
+
+    Runs _ensure_mlx_server() in a thread (it blocks during startup wait).
+    Returns: {ok, status: 'running'|'started'|'failed'|'disabled', url, models}
+    """
+    import asyncio
+    import urllib.request
+
+    from ....llm.client import _env_flag
+
+    # Re-read from env in case it was changed at runtime
+    enabled = _env_flag("LOCAL_MLX_ENABLED")
+    if not enabled:
+        return JSONResponse(
+            {
+                "ok": True,
+                "status": "disabled",
+                "message": "LOCAL_MLX_ENABLED is not set",
+            }
+        )
+
+    mlx_url = os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1")
+
+    def _check_up() -> bool:
+        try:
+            urllib.request.urlopen(f"{mlx_url}/models", timeout=5)
+            return True
+        except Exception:
+            return False
+
+    def _get_models() -> list:
+        import json as _json
+
+        try:
+            with urllib.request.urlopen(f"{mlx_url}/models", timeout=5) as r:
+                return [m["id"] for m in _json.loads(r.read()).get("data", [])]
+        except Exception:
+            return []
+
+    loop = asyncio.get_event_loop()
+
+    # Already up?
+    already_up = await loop.run_in_executor(None, _check_up)
+    if already_up:
+        models = await loop.run_in_executor(None, _get_models)
+        return JSONResponse(
+            {"ok": True, "status": "running", "url": mlx_url, "models": models}
+        )
+
+    # Start it
+    from ....llm.client import _ensure_mlx_server
+
+    await loop.run_in_executor(None, _ensure_mlx_server)
+
+    # Check again
+    now_up = await loop.run_in_executor(None, _check_up)
+    if now_up:
+        models = await loop.run_in_executor(None, _get_models)
+        return JSONResponse(
+            {"ok": True, "status": "started", "url": mlx_url, "models": models}
+        )
+
+    return JSONResponse(
+        {
+            "ok": False,
+            "status": "failed",
+            "url": mlx_url,
+            "message": f"Server did not respond on {mlx_url} after startup attempt",
+        },
+        status_code=503,
+    )
