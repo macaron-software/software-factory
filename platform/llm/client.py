@@ -155,6 +155,75 @@ _FALLBACK_CHAIN = [_primary] + [
 
 _rtk_cache: dict = {}
 
+_mlx_proc: "subprocess.Popen | None" = None  # noqa: F821
+_mlx_lock = asyncio.Lock() if False else __import__("threading").Lock()
+
+
+def _ensure_mlx_server() -> None:
+    """Start mlx_lm.server if LOCAL_MLX_ENABLED and not already responding."""
+    import subprocess
+
+    global _mlx_proc
+
+    mlx_url = os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1")
+    mlx_model = os.environ.get("LOCAL_MLX_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit")
+
+    # Quick health check — if responding, nothing to do
+    try:
+        import urllib.request
+
+        urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+        return  # already running
+    except Exception:
+        pass
+
+    with _mlx_lock:
+        # Double-check inside lock
+        try:
+            urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+            return
+        except Exception:
+            pass
+
+        # Already launched by us and still running?
+        if _mlx_proc is not None and _mlx_proc.poll() is None:
+            return
+
+        logger.warning(
+            "local-mlx: server not found on %s — auto-launching mlx_lm.server", mlx_url
+        )
+        try:
+            port = int(mlx_url.rstrip("/").rsplit(":", 1)[-1].split("/")[0])
+        except Exception:
+            port = 8080
+        _mlx_proc = subprocess.Popen(
+            [
+                "python3",
+                "-m",
+                "mlx_lm.server",
+                "--model",
+                mlx_model,
+                "--port",
+                str(port),
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        logger.warning("local-mlx: launched PID %d, model=%s", _mlx_proc.pid, mlx_model)
+
+        # Wait up to 60s for it to come up
+        import time as _time
+
+        for _ in range(60):
+            _time.sleep(1)
+            try:
+                urllib.request.urlopen(f"{mlx_url}/models", timeout=1)
+                logger.warning("local-mlx: server ready on %s", mlx_url)
+                return
+            except Exception:
+                pass
+        logger.warning("local-mlx: server did not become ready after 60s")
+
 
 class _RateLimiter:
     """Sliding window rate limiter with async queuing.
@@ -390,6 +459,11 @@ class LLMClient:
         if _is_azure:
             provider = "azure-openai"
         providers_to_try = [provider] + [p for p in _FALLBACK_CHAIN if p != provider]
+
+        # Auto-launch local MLX server if needed and not already running
+        if "local-mlx" in providers_to_try and _local_mlx_enabled:
+            _ensure_mlx_server()
+
         # Thompson Sampling: reorder by Beta-sampled quality (skip on Azure — forced)
         if not _is_azure and len(providers_to_try) > 1:
             try:
