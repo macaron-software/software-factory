@@ -216,38 +216,11 @@ def scan_ac_issues() -> list[dict]:
             continue
         issues = []
 
-        # Check QA reports in workspaces for structural failures
-        try:
-            import glob as _glob
-
-            # Find workspace for this run
-            ws_candidates = _glob.glob(f"/app/data/workspaces/*/QA_REPORT_*.md")
-            for qa_path in ws_candidates:
-                try:
-                    content = open(qa_path).read()
-                    if "chromium because executable doesn't exist" in content:
-                        issues.append(
-                            f"AC cycle {project_id} cycle {cycle}: Playwright/Chromium absent du container "
-                            f"— QA screenshots impossible. Fix: ajouter 'npx playwright install chromium' "
-                            f"dans le Dockerfile de la plateforme (deploy/Dockerfile)."
-                        )
-                        break
-                    if "No build step needed" in content or "build script is echo" in content:
-                        issues.append(
-                            f"AC cycle {project_id} cycle {cycle}: build script no-op dans QA report "
-                            f"— les agents ne compilent pas réellement le code."
-                        )
-                        break
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
         # Check workspace for .ts file containing HTML (agent confusion)
         try:
             import glob as _glob
 
-            ts_files = _glob.glob(f"/app/data/workspaces/*/src/*.ts")
+            ts_files = _glob.glob("/app/data/workspaces/*/src/*.ts")
             for ts_path in ts_files:
                 try:
                     content = open(ts_path).read(500)
@@ -265,7 +238,9 @@ def scan_ac_issues() -> list[dict]:
 
         if issues:
             # Use run_id as dedup key so we don't re-trigger for same cycle
-            issues_found.append({"run_id": f"ac-{run_id}", "project_id": project_id, "issues": issues})
+            issues_found.append(
+                {"run_id": f"ac-{run_id}", "project_id": project_id, "issues": issues}
+            )
 
     return issues_found
 

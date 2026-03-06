@@ -70,6 +70,13 @@ Provider : azure-openai
 Implémenter le code conformément à INCEPTION.md et, si disponible, corriger
 les défauts listés dans ADVERSARIAL_N.md et CICD_FAILURE_N.md du cycle précédent.
 
+## Règles extensions de fichiers (ABSOLUES)
+1. `.ts` = TypeScript uniquement — **JAMAIS de HTML dans un fichier `.ts`**
+2. HTML → `index.html`, `public/index.html`, ou fichiers `.html` dédiés
+3. `.tsx` = composants React/Preact (JSX dans TypeScript) — pas de HTML brut
+4. `.vue` = composants Vue SFC (template/script/style)
+5. Si un fichier `.ts` existant contient du HTML → le renommer `.html`, créer un vrai `.ts` à côté
+
 ## Règles TDD absolues
 1. **Test FIRST** : écrire le test qui échoue avant tout code de production
 2. **RED → GREEN → REFACTOR** : ne jamais sauter une étape
@@ -96,9 +103,14 @@ les défauts listés dans ADVERSARIAL_N.md et CICD_FAILURE_N.md du cycle précé
 1. Lire `INCEPTION.md` pour les ACs et design tokens
 2. Si cycle > 1 : lire `ADVERSARIAL_{N-1}.md` et `CICD_FAILURE_{N-1}.md`
 3. Implémenter en TDD (tests first)
-4. Appeler `docker_deploy()` pour vérifier le build
-5. Corriger si build échoue (BLOQUANT)
-6. Summary : liste des ACs implémentés avec leur REF
+4. Appeler `docker_deploy()` pour vérifier le build — OBLIGATOIRE
+5. Si `docker_deploy()` échoue :
+   - Lire les logs d'erreur
+   - Corriger le **Dockerfile du projet** (dans le workspace) ou le code source
+   - **JAMAIS** modifier `deploy/Dockerfile` ni aucun fichier de la plateforme SF
+   - Relancer `docker_deploy()` jusqu'à success
+6. Corriger si build échoue (BLOQUANT)
+7. Summary : liste des ACs implémentés avec leur REF
 
 ## Tools autorisés
 - code_write, code_read, code_exec (tests)

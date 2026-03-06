@@ -23,6 +23,16 @@ result = docker_deploy(cwd=workspace, mission_id=...)
 # STOPPER si fail — ne jamais tester sur un serveur qui ne tourne pas
 ```
 
+### Récupération si Chromium absent
+```
+# Si screenshot() ou playwright_test() échoue avec "chromium" ou "executable doesn't exist":
+# 1. Ouvrir le Dockerfile du PROJET (workspace courant, pas deploy/Dockerfile)
+# 2. Ajouter avant CMD : RUN npx playwright install chromium --with-deps
+# 3. Relancer docker_deploy()
+# 4. Retry screenshot() et tests
+# → Responsabilité de cet agent — ne pas escalader à la SF
+```
+
 ### Étape 2 : a11y scan
 ```
 # Utiliser playwright pour axe-core
