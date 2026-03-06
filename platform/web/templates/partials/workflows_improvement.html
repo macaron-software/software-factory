@@ -159,7 +159,7 @@
   <div class="ac-card {% if loop.first %}selected{% endif %}"
        style="border-left:3px solid {{ border_color }}"
        onclick="acSelectProject('{{ p.id }}', this)"
-       ondblclick="acOpenModal('{{ p.id }}')">
+       onclick="acOpenModal('{{ p.id }}')">
     <div class="tier-label">{{ p.tier_label }}</div>
     <div class="proj-name">{{ p.name }}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
