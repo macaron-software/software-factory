@@ -126,6 +126,10 @@ jobs:
             fi
             echo "LLM errors (last 10 min):"
             psql "$DB_URL" -t -c "SELECT provider, error_type, created_at FROM llm_errors ORDER BY created_at DESC LIMIT 3;" 2>/dev/null | grep -v "^$" || echo "  (no llm_errors table)"
+            echo "AC sessions config check:"
+            psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status, LEFT(config_json,80) FROM sessions WHERE status='interrupted' AND created_at >= NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "Active/running sessions:"
+            psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status FROM sessions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
           fi
           
           REMOTE
