@@ -18,6 +18,8 @@ from .helpers import (
     _templates,
 )
 
+log = logging.getLogger(__name__)
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -701,18 +703,20 @@ def _ac_ensure_tables(conn) -> None:
     try:
         for stmt in stmts:
             conn.execute(stmt)
-        try:
-            conn.execute(
-                "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'"
-            )
-        except Exception:
-            pass
-        try:
-            conn.execute(
-                "ALTER TABLE ac_cycles ADD COLUMN traceability_score INTEGER DEFAULT 0"
-            )
-        except Exception:
-            pass
+        # Idempotent column additions
+        for alter in [
+            "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'",
+            "ALTER TABLE ac_cycles ADD COLUMN traceability_score INTEGER DEFAULT 0",
+            "ALTER TABLE ac_cycles ADD COLUMN rl_reward REAL DEFAULT 0",
+            "ALTER TABLE ac_cycles ADD COLUMN veto_count INTEGER DEFAULT 0",
+            "ALTER TABLE ac_project_state ADD COLUMN next_cycle_hint TEXT",
+            "ALTER TABLE ac_project_state ADD COLUMN skill_eval_pending TEXT",
+            "ALTER TABLE ac_project_state ADD COLUMN convergence_status TEXT DEFAULT 'cold_start'",
+        ]:
+            try:
+                conn.execute(alter)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -1010,11 +1014,320 @@ async def api_improvement_inject_cycle(request: Request):
 
     try:
         await asyncio.to_thread(_write)
+
+        # ── Intelligence feedback loop (async, non-blocking) ──────────────────
+        async def _run_intelligence():
+            try:
+                from ...ac.reward import ac_reward_from_cycle, ac_rl_state
+                from ...ac.convergence import (
+                    ac_convergence_check,
+                    ac_check_skill_eval_trigger,
+                    ac_intervention_plan,
+                )
+
+                # Build cycle dict for reward computation
+                cycle_data = {
+                    "total_score": total_score,
+                    "adversarial_scores": adversarial_scores
+                    if isinstance(adversarial_scores, dict)
+                    else {},
+                    "traceability_score": traceability_score,
+                    "defect_count": defect_count,
+                    "veto_count": int(body.get("veto_count", 0)),
+                }
+
+                # Load previous cycle for regression detection
+                def _load_prev():
+                    conn2 = _ac_get_db()
+                    try:
+                        row = conn2.execute(
+                            "SELECT total_score FROM ac_cycles WHERE project_id=? AND cycle_num=?",
+                            (project_id, cycle_num - 1),
+                        ).fetchone()
+                        return dict(row) if row else None
+                    except Exception:
+                        return None
+                    finally:
+                        conn2.close()
+
+                prev_cycle = await asyncio.to_thread(_load_prev)
+                reward = ac_reward_from_cycle(cycle_data, prev_cycle)
+
+                # ── 1. RL: record experience ──────────────────────────────────
+                proj_meta = next((p for p in _AC_PROJECTS if p["id"] == project_id), {})
+                tier = proj_meta.get("tier", "simple")
+                state = ac_rl_state(
+                    project_id, cycle_num, total_score, defect_count, tier
+                )
+                next_state = ac_rl_state(
+                    project_id,
+                    cycle_num + 1,
+                    total_score,
+                    defect_count,
+                    tier,
+                )
+                try:
+                    from ...agents.rl_policy import get_rl_policy
+
+                    rl = get_rl_policy()
+                    rl.record_experience(
+                        mission_id=body.get(
+                            "platform_run_id", f"ac-{project_id}-{cycle_num}"
+                        ),
+                        state_dict=state,
+                        action="keep",
+                        reward=reward,
+                        next_state_dict=next_state,
+                    )
+
+                    # Persist reward back to cycle row
+                    def _update_reward():
+                        conn_r = _ac_get_db()
+                        try:
+                            conn_r.execute(
+                                "UPDATE ac_cycles SET rl_reward=? WHERE project_id=? AND cycle_num=?",
+                                (reward, project_id, cycle_num),
+                            )
+                        except Exception:
+                            pass
+                        finally:
+                            conn_r.close()
+
+                    await asyncio.to_thread(_update_reward)
+
+                    # Get recommendation for next cycle
+                    rec = rl.recommend(
+                        mission_id=f"ac-{project_id}-next",
+                        phase_id="ac-tdd-sprint",
+                        state_dict=next_state,
+                    )
+                    if rec.get("fired"):
+                        # Store RL hint in ac_project_state
+                        def _store_hint():
+                            import json as _j
+
+                            conn3 = _ac_get_db()
+                            try:
+                                conn3.execute(
+                                    "UPDATE ac_project_state SET next_cycle_hint=? WHERE project_id=?",
+                                    (_j.dumps(rec), project_id),
+                                )
+                            except Exception:
+                                pass
+                            finally:
+                                conn3.close()
+
+                        await asyncio.to_thread(_store_hint)
+                        log.info(
+                            "AC RL hint for %s cycle %d: %s (confidence=%.2f)",
+                            project_id,
+                            cycle_num + 1,
+                            rec["action"],
+                            rec["confidence"],
+                        )
+                except Exception as e:
+                    log.debug("AC RL feedback error: %s", e)
+
+                # ── 2. Convergence detection ──────────────────────────────────
+                def _load_scores():
+                    conn4 = _ac_get_db()
+                    try:
+                        rows = conn4.execute(
+                            "SELECT total_score FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                            (project_id,),
+                        ).fetchall()
+                        return [r["total_score"] for r in rows]
+                    except Exception:
+                        return []
+                    finally:
+                        conn4.close()
+
+                all_scores = await asyncio.to_thread(_load_scores)
+                if all_scores:
+                    conv = ac_convergence_check(all_scores)
+                    # intervention plan is logged; GA/skill-eval triggers follow
+                    ac_intervention_plan(conv["status"], project_id)
+                    log.info(
+                        "AC convergence %s: %s → %s (reward=%.3f)",
+                        project_id,
+                        conv["status"],
+                        conv["recommendation"],
+                        reward,
+                    )
+
+                    # Trigger GA evolution on plateau
+                    if conv["status"] == "plateau" and len(all_scores) >= 5:
+                        try:
+                            from ...agents.evolution import GAEngine
+
+                            def _ga_evolve():
+                                GAEngine().evolve(
+                                    "ac-improvement-cycle", generations=20
+                                )
+
+                            asyncio.ensure_future(asyncio.to_thread(_ga_evolve))
+                            log.info(
+                                "AC: triggered GA evolution for %s (plateau)",
+                                project_id,
+                            )
+                        except Exception as e:
+                            log.debug("AC GA trigger error: %s", e)
+
+                    # Skill eval trigger check
+                    eval_triggers = ac_check_skill_eval_trigger(cycle_num, {})
+                    if eval_triggers:
+                        log.info(
+                            "AC: skill eval triggered at cycle %d for: %s",
+                            cycle_num,
+                            eval_triggers,
+                        )
+
+                        # Store in ac_project_state for the next cycle inception to read
+                        def _store_eval_trigger():
+                            import json as _j
+
+                            conn5 = _ac_get_db()
+                            try:
+                                conn5.execute(
+                                    "UPDATE ac_project_state SET skill_eval_pending=? WHERE project_id=?",
+                                    (_j.dumps(eval_triggers), project_id),
+                                )
+                            except Exception:
+                                pass
+                            finally:
+                                conn5.close()
+
+                        await asyncio.to_thread(_store_eval_trigger)
+
+            except Exception as e:
+                log.debug("AC intelligence loop error: %s", e)
+
+        asyncio.ensure_future(_run_intelligence())
+
         return JSONResponse(
             {"ok": True, "project_id": project_id, "cycle_num": cycle_num}
         )
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.get("/api/improvement/project/{project_id}")
+async def api_improvement_project_state(project_id: str):
+    """
+    Return current AC project state including RL hint, convergence, skill eval pending.
+    Called by ac-architect at the start of each cycle to get intelligence context.
+    """
+    import json as _json
+    from fastapi.responses import JSONResponse
+    from ...ac.convergence import ac_convergence_check
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state_row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
+            ).fetchone()
+            cycles = conn.execute(
+                "SELECT cycle_num, total_score, defect_count, adversarial_scores, rl_reward "
+                "FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            state_row = None
+            cycles = []
+        finally:
+            conn.close()
+        return state_row, [dict(c) for c in cycles]
+
+    state_row, cycles = await asyncio.to_thread(_load)
+
+    scores = [c["total_score"] for c in cycles]
+    conv = (
+        ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
+    )
+
+    state = dict(state_row) if state_row else {}
+
+    # Parse JSON fields
+    for field in ("next_cycle_hint", "skill_eval_pending"):
+        raw = state.get(field)
+        if raw and isinstance(raw, str):
+            try:
+                state[field] = _json.loads(raw)
+            except Exception:
+                pass
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "current_cycle": state.get("current_cycle", 0),
+            "status": state.get("status", "idle"),
+            "total_score_avg": state.get("total_score_avg", 0),
+            "convergence": conv,
+            "next_cycle_hint": state.get("next_cycle_hint"),  # RL recommendation
+            "skill_eval_pending": state.get(
+                "skill_eval_pending"
+            ),  # skills needing eval
+            "last_git_sha": state.get("last_git_sha"),
+            "cycle_count": len(cycles),
+            "recent_scores": scores[-5:],
+        }
+    )
+
+
+@router.get("/api/improvement/scores/{project_id}")
+async def api_improvement_scores(project_id: str):
+    """Return aggregated intelligence metrics for the improvement dashboard."""
+    from fastapi.responses import JSONResponse
+    from ...ac.convergence import ac_convergence_check
+    from ...ac.skill_thompson import ac_skill_stats
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            cycles = conn.execute(
+                "SELECT cycle_num, total_score, defect_count, rl_reward, "
+                "adversarial_scores, traceability_score "
+                "FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            cycles = []
+        finally:
+            conn.close()
+        return [dict(c) for c in cycles]
+
+    cycles = await asyncio.to_thread(_load)
+    scores = [c["total_score"] for c in cycles]
+    rewards = [c.get("rl_reward", 0.0) for c in cycles]
+    conv = (
+        ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
+    )
+
+    # Thompson stats for AC skills
+    skill_stats = {}
+    for skill in [
+        "ac-architect",
+        "ac-codex",
+        "ac-adversarial",
+        "ac-qa-agent",
+        "ac-cicd-agent",
+    ]:
+        stats = await asyncio.to_thread(ac_skill_stats, skill, project_id)
+        if stats:
+            skill_stats[skill] = stats
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "cycles": cycles,
+            "convergence": conv,
+            "avg_reward": round(sum(rewards) / len(rewards), 3) if rewards else 0.0,
+            "skill_stats": skill_stats,
+        }
+    )
 
 
 @router.get("/ceremonies", response_class=HTMLResponse)

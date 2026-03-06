@@ -53,6 +53,7 @@ git push origin main
   "project_id": "ac-hello-html",
   "cycle_num": N,
   "git_sha": "abc1234",
+  "platform_run_id": "{mission_id}",   # IMPORTANT: pour traçabilité RL
   "status": "completed",  # ou "failed"
   "phase_scores": {
     "inception": X,
@@ -64,12 +65,21 @@ git push origin main
   },
   "total_score": X,
   "defect_count": N,
+  "veto_count": N,                      # IMPORTANT: pour reward RL
   "fix_summary": "Description courte des corrections",
   "adversarial_scores": {
-    "security": X, "architecture": X, "no_slop": X, ...
+    "security": X, "architecture": X, "no_slop": X,
+    "no_mock_data": X, "no_hardcode": X, "test_quality": X,
+    "traceability": X, "fallback": X, "over_engineering": X,
+    "observability": X, "resilience": X, "honesty": X
   },
   "traceability_score": X
 }
+# → La plateforme calcule automatiquement :
+#   rl_reward (R∈[-1,+1]) → enregistre RL record_experience()
+#   convergence → détecte plateau/regression → trigger GA si besoin
+#   skill_eval → si cycle 5/10/15 → programme évaluation des skills
+# → Lire la réponse et loguer "cycle N enregistré, reward=X.XX"
 ```
 
 ## Règles absolues
