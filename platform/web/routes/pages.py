@@ -1246,6 +1246,24 @@ async def api_improvement_start(project_id: str):
 
     await asyncio.to_thread(_ensure_pilot_project)
 
+    # Stop any existing active sessions for this project before starting a new one
+    def _stop_existing_sessions():
+        from ...sessions.store import get_session_store
+
+        ss = get_session_store()
+        existing = ss.list()
+        stopped = 0
+        for s in existing:
+            if getattr(s, "project_id", None) == project_id and s.status in (
+                "active",
+                "running",
+            ):
+                ss.update_status(s.id, "interrupted")
+                stopped += 1
+        return stopped
+
+    await asyncio.to_thread(_stop_existing_sessions)
+
     try:
         from ...missions.store import get_mission_store
         from ...epics.store import MissionDef
