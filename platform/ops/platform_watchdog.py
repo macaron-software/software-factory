@@ -277,8 +277,9 @@ async def resume_stuck_ac_cycles() -> int:
             try:
                 from ..missions.store import get_mission_store
                 from ..workflows.store import get_workflow_store
-                from ..web.routes.epics.execution import get_mission_semaphore
-                from ..web.routes.workflows import _run_workflow_background
+                from ..web.routes.epics.execution import (
+                    get_mission_semaphore,
+                )
 
                 mission = await asyncio.to_thread(
                     get_mission_store().get_mission, run_id
@@ -304,8 +305,34 @@ async def resume_stuck_ac_cycles() -> int:
 
                 task_desc = mission.goal or mission.description or mission.name
 
-                async def _guarded(wf=wf, sid=run_id, desc=task_desc, pid=project_id):
+                # Find the actual session_id from sessions config (mission_id=run_id)
+                session_id = run_id  # fallback
+                try:
+                    from ..db.migrations import get_db as _get_db
+
+                    def _find_session():
+                        conn = _get_db()
+                        try:
+                            row = conn.execute(
+                                "SELECT id FROM sessions WHERE config LIKE ? ORDER BY created_at DESC LIMIT 1",
+                                (f'%"mission_id": "{run_id}"%',),
+                            ).fetchone()
+                            return row["id"] if row else None
+                        finally:
+                            conn.close()
+
+                    found = await asyncio.to_thread(_find_session)
+                    if found:
+                        session_id = found
+                except Exception:
+                    pass
+
+                async def _guarded(
+                    wf=wf, sid=session_id, desc=task_desc, pid=project_id
+                ):
                     async with get_mission_semaphore():
+                        from ..web.routes.workflows import _run_workflow_background
+
                         await _run_workflow_background(wf, sid, desc, pid)
 
                 task = asyncio.create_task(_guarded())
