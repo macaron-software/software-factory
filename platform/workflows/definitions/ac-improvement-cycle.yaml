@@ -110,6 +110,26 @@ phases:
   config:
     agents:
     - ac-cicd-agent
+- id: ac-coach-review
+  pattern_id: sequential
+  name: Coach Review — Décision A/B + Rollback
+  description: >
+    Le Coach AC analyse les résultats du cycle N et décide de la stratégie cycle N+1.
+    LECTURE OBLIGATOIRE : scores N derniers cycles, convergence, adversarial findings, thompson stats.
+    DÉCISIONS :
+    1. score[N] < score[N-1] - 10pts → POST /api/improvement/rollback (git revert + reset DB)
+    2. plateau (variance < 5pts sur 5 cycles) → bascule variante A/B via Thompson
+    3. amélioration → enregistre win Thompson, renforce la stratégie gagnante
+    4. Toujours écrire STRATEGY_N+1.md dans le workspace (lu en priorité absolue par ac-architect)
+    OBLIGATIONS :
+    - Citer le score exact et la raison de la décision dans STRATEGY_N+1.md
+    - Enregistrer l'expérience : POST /api/improvement/experiment (experiment_key, variant_a, variant_b)
+    - Ne jamais rollback sans vérifier que last_git_sha est disponible
+    - Si rollback : écrire ROLLBACK_N.md avec raison + score attendu vs obtenu
+  gate: always
+  config:
+    agents:
+    - ac-coach
 config:
   max_cycles: 20
   auto_restart: true
@@ -157,6 +177,12 @@ config:
       y: 480
       label: CI/CD + Record
       phase: ac-cicd
+    - id: n6
+      agent_id: ac-coach
+      x: 400
+      y: 600
+      label: Coach Review
+      phase: ac-coach-review
     edges:
     - from: n0
       to: n1
@@ -187,6 +213,14 @@ config:
       label: E2E OK
       color: '#f59e0b'
     - from: n5
-      to: n1
+      to: n6
+      label: scores enregistrés
+      color: '#a855f7'
+    - from: n6
+      to: n0
       label: next cycle
       color: '#a855f7'
+    - from: n6
+      to: n1
+      label: rollback → recode
+      color: '#ef4444'
