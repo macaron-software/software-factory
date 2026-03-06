@@ -14,17 +14,65 @@ from ...schemas import LlmStatsResponse
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Default routing config
-_DEFAULT_ROUTING = {
-    "reasoning_heavy": {"provider": "azure-ai", "model": "gpt-5.2"},
-    "reasoning_light": {"provider": "azure-openai", "model": "gpt-5-mini"},
-    "production_heavy": {"provider": "azure-ai", "model": "gpt-5.1-codex"},
-    "production_light": {"provider": "azure-openai", "model": "gpt-5-mini"},
-    "tasks_heavy": {"provider": "azure-openai", "model": "gpt-5-mini"},
-    "tasks_light": {"provider": "azure-openai", "model": "gpt-5-mini"},
-    "redaction_heavy": {"provider": "azure-ai", "model": "gpt-5.1-codex"},
-    "redaction_light": {"provider": "azure-openai", "model": "gpt-5-mini"},
-}
+
+# Default routing derived from the active primary provider + fallback chain.
+# WHY: hardcoding Azure defaults breaks local-mlx and opencode environments where
+# azure-ai/azure-openai are not enabled — the selects would have no matching option.
+# We pick defaults that actually match what's available in each deployment.
+def _build_default_routing() -> dict:
+    from ....llm.client import _PROVIDERS, _primary, _FALLBACK_CHAIN
+
+    def _slot(provider_id: str, model: str) -> dict:
+        return {"provider": provider_id, "model": model}
+
+    p = _PROVIDERS.get(_primary, {})
+    default_model = p.get("default") or (p.get("models") or [""])[0]
+
+    # Azure prod: differentiate codex (heavy) vs gpt-5-mini (light)
+    if _primary in ("azure-openai", "azure-ai"):
+        az_openai = _PROVIDERS.get("azure-openai", {})
+        az_ai = _PROVIDERS.get("azure-ai", {})
+        codex = next(
+            (
+                m
+                for m in az_ai.get("models", []) + az_openai.get("models", [])
+                if "codex" in m
+            ),
+            az_openai.get("default", "gpt-5-mini"),
+        )
+        light = az_openai.get("default", "gpt-5-mini")
+        heavy_prov = "azure-ai" if "azure-ai" in _FALLBACK_CHAIN else "azure-openai"
+        heavy_model = (
+            az_ai.get("default", "gpt-5.2") if heavy_prov == "azure-ai" else codex
+        )
+        return {
+            "reasoning_heavy": _slot(heavy_prov, heavy_model),
+            "reasoning_light": _slot("azure-openai", light),
+            "production_heavy": _slot("azure-openai", codex),
+            "production_light": _slot("azure-openai", light),
+            "tasks_heavy": _slot("azure-openai", light),
+            "tasks_light": _slot("azure-openai", light),
+            "redaction_heavy": _slot("azure-openai", codex),
+            "redaction_light": _slot("azure-openai", light),
+        }
+
+    # All other envs (local-mlx, opencode, minimax, …): same model everywhere as starting point
+    return {
+        key: _slot(_primary, default_model)
+        for key in (
+            "reasoning_heavy",
+            "reasoning_light",
+            "production_heavy",
+            "production_light",
+            "tasks_heavy",
+            "tasks_light",
+            "redaction_heavy",
+            "redaction_light",
+        )
+    }
+
+
+_DEFAULT_ROUTING = _build_default_routing()
 
 
 def _get_db():
