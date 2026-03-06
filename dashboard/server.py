@@ -1144,6 +1144,88 @@ AC_PROJECTS = [
 
 AC_PHASES = ["inception", "tdd-sprint", "adversarial", "qa-sprint", "cicd", "deploy"]
 
+# Adversarial quality dimensions — measured by LLM agents reading code/tests/config
+AC_ADVERSARIAL = [
+    # ── Security ──────────────────────────────────────────────────────────────
+    (
+        "security",
+        "🔒",
+        "SAST + secrets scan + CVE deps",
+        "0 critical vulns, 0 secrets in code, all deps pinned",
+    ),
+    (
+        "architecture",
+        "🏛️",
+        "Coupling, complexity, SOLID violations",
+        "cyclomatic < 10, no God classes, clear layer separation",
+    ),
+    # ── Slop / Honesty ────────────────────────────────────────────────────────
+    (
+        "no_slop",
+        "🧹",
+        "No copy-paste, no dead code, no placeholders",
+        "0 TODO/FIXME in prod, 0 lorem ipsum, 0 unreachable code",
+    ),
+    (
+        "fallback",
+        "🛡️",
+        "Error handling completeness, no silent failures",
+        "no bare except, no swallowed exceptions, all errors logged",
+    ),
+    (
+        "honesty",
+        "🤥",
+        "No lies: comments match code, types match runtime",
+        "no misleading docstrings, no wrong return types, no phantom features",
+    ),
+    (
+        "mock_data",
+        "🎭",
+        "No hardcoded/fake data in production code",
+        "no fixtures in prod path, no static demo users, no seeded magic ids",
+    ),
+    (
+        "hardcoded",
+        "🔩",
+        "No magic numbers, hardcoded URLs, credentials",
+        "all config via env vars, no string literals for secrets or ports",
+    ),
+    (
+        "test_quality",
+        "🧪",
+        "No false tests, no shortcuts, real assertions",
+        "coverage ≥ 80%, every test has ≥1 assert, no mock-everything tests",
+    ),
+    # ── Depth ─────────────────────────────────────────────────────────────────
+    (
+        "over_engineering",
+        "🌀",
+        "YAGNI: no premature abstraction or generalization",
+        "no unused interfaces, no DI for trivial cases, < 3 levels abstraction",
+    ),
+    (
+        "observability",
+        "📡",
+        "Logging, metrics, health checks present",
+        "structured logs, /health endpoint, errors include context",
+    ),
+    (
+        "resilience",
+        "💪",
+        "Retry, timeout, graceful degradation",
+        "network calls have timeout, DB calls have retry, failures degrade gracefully",
+    ),
+    (
+        "traceability",
+        "🔗",
+        "Feature→Story→Code→Test refs 100% covered",
+        "every file has story ref, every test has AC ref, DELIVERY_REPORT complete",
+    ),
+]
+
+# Just the dimension keys for phase_scores JSON
+AC_ADVERSARIAL_KEYS = [d[0] for d in AC_ADVERSARIAL]
+
 _AC_AGENTS_GRAPH = {
     "nodes": [
         {
@@ -1218,6 +1300,35 @@ def _ac_ensure_tables(conn) -> None:
             started_at  TEXT,
             updated_at  TEXT
         )""",
+        # Adversarial scores per cycle (one row per dimension per cycle)
+        """CREATE TABLE IF NOT EXISTS ac_adversarial (
+            id          SERIAL PRIMARY KEY,
+            project_id  TEXT NOT NULL,
+            cycle_num   INTEGER NOT NULL,
+            dimension   TEXT NOT NULL,
+            score       INTEGER DEFAULT 0,
+            verdict     TEXT DEFAULT 'pending',
+            findings    TEXT DEFAULT '[]',
+            checked_at  TEXT,
+            UNIQUE(project_id, cycle_num, dimension)
+        )""",
+        # Traceability links: artifact chain feature→story→code→test
+        """CREATE TABLE IF NOT EXISTS ac_traceability (
+            id           SERIAL PRIMARY KEY,
+            project_id   TEXT NOT NULL,
+            cycle_num    INTEGER NOT NULL,
+            artifact_type TEXT NOT NULL,
+            artifact_id  TEXT NOT NULL,
+            artifact_ref TEXT,
+            reason       TEXT,
+            linked_to    TEXT,
+            linked_type  TEXT,
+            status       TEXT DEFAULT 'present',
+            created_at   TEXT
+        )""",
+        # Add traceability_score to ac_cycles if not present (idempotent)
+        """ALTER TABLE ac_cycles ADD COLUMN IF NOT EXISTS adversarial_scores TEXT DEFAULT '{}'""",
+        """ALTER TABLE ac_cycles ADD COLUMN IF NOT EXISTS traceability_score INTEGER DEFAULT 0""",
     ]
     with conn.cursor() as cur:
         for stmt in stmts:
@@ -1472,6 +1583,8 @@ async def improvement_page(request: Request):
             "projects_json": projects_json,
             "thompson": thompson,
             "phases": AC_PHASES,
+            "adversarial": AC_ADVERSARIAL,
+            "adversarial_keys": AC_ADVERSARIAL_KEYS,
         },
     )
 
@@ -1509,16 +1622,21 @@ async def api_improvement_start_all():
 
 @app.post("/api/improvement/inject-cycle")
 async def api_improvement_inject_cycle(request: Request):
-    """Manually inject a cycle result (for testing / SF webhook)."""
+    """Inject a cycle result — accepts adversarial scores + traceability links."""
     body = await request.json()
     project_id = body.get("project_id")
     cycle_num = body.get("cycle_num", 1)
     phase_scores = body.get("phase_scores", {})
+    adversarial_scores = body.get("adversarial_scores", {})  # {dimension: score}
+    traceability_items = body.get(
+        "traceability", []
+    )  # [{type, id, ref, reason, linked_to, linked_type}]
     total_score = body.get("total_score", 0)
     defect_count = body.get("defect_count", 0)
     git_sha = body.get("git_sha", "")
     run_id = body.get("run_id", "")
     fix_summary = body.get("fix_summary", "")
+    traceability_score = body.get("traceability_score", 0)
 
     if not project_id:
         return {"ok": False, "error": "project_id required"}
@@ -1527,21 +1645,24 @@ async def api_improvement_inject_cycle(request: Request):
         conn = get_db()
         _ac_ensure_tables(conn)
         now = datetime.utcnow().isoformat()
-        # Upsert cycle record
+
+        # ── 1. Upsert main cycle record ──────────────────────────────────────
         conn.execute(
             """
             INSERT INTO ac_cycles
             (project_id, cycle_num, git_sha, platform_run_id, status,
              phase_scores, total_score, defect_count, fix_summary,
-             completed_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+             adversarial_scores, traceability_score, completed_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             ON CONFLICT (project_id, cycle_num) DO UPDATE SET
                 git_sha=EXCLUDED.git_sha, platform_run_id=EXCLUDED.platform_run_id,
                 status=EXCLUDED.status, phase_scores=EXCLUDED.phase_scores,
                 total_score=EXCLUDED.total_score, defect_count=EXCLUDED.defect_count,
                 fix_summary=EXCLUDED.fix_summary,
+                adversarial_scores=EXCLUDED.adversarial_scores,
+                traceability_score=EXCLUDED.traceability_score,
                 completed_at=EXCLUDED.completed_at
-        """,
+            """,
             (
                 project_id,
                 cycle_num,
@@ -1552,10 +1673,61 @@ async def api_improvement_inject_cycle(request: Request):
                 total_score,
                 defect_count,
                 fix_summary,
+                json.dumps(adversarial_scores),
+                traceability_score,
                 now,
             ),
         )
-        # Compute new average
+
+        # ── 2. Upsert adversarial dimension rows ─────────────────────────────
+        for dimension, score in adversarial_scores.items():
+            findings = body.get("findings", {}).get(dimension, [])
+            verdict = "pass" if score >= 70 else "warn" if score >= 40 else "fail"
+            conn.execute(
+                """
+                INSERT INTO ac_adversarial
+                (project_id, cycle_num, dimension, score, verdict, findings, checked_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (project_id, cycle_num, dimension) DO UPDATE SET
+                    score=EXCLUDED.score, verdict=EXCLUDED.verdict,
+                    findings=EXCLUDED.findings, checked_at=EXCLUDED.checked_at
+                """,
+                (
+                    project_id,
+                    cycle_num,
+                    dimension,
+                    score,
+                    verdict,
+                    json.dumps(findings),
+                    now,
+                ),
+            )
+
+        # ── 3. Insert traceability links ──────────────────────────────────────
+        for item in traceability_items:
+            conn.execute(
+                """
+                INSERT INTO ac_traceability
+                (project_id, cycle_num, artifact_type, artifact_id,
+                 artifact_ref, reason, linked_to, linked_type, status, created_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ON CONFLICT DO NOTHING
+                """,
+                (
+                    project_id,
+                    cycle_num,
+                    item.get("type", "code"),
+                    item.get("id", ""),
+                    item.get("ref", ""),
+                    item.get("reason", ""),
+                    item.get("linked_to", ""),
+                    item.get("linked_type", ""),
+                    item.get("status", "present"),
+                    now,
+                ),
+            )
+
+        # ── 4. Update project state avg ───────────────────────────────────────
         all_scores_row = conn.execute(
             "SELECT AVG(total_score) AS avg_score FROM ac_cycles WHERE project_id=%s AND status='completed'",
             (project_id,),
@@ -1568,20 +1740,16 @@ async def api_improvement_inject_cycle(request: Request):
         ).fetchone()
         if existing:
             conn.execute(
-                """
-                UPDATE ac_project_state
-                SET current_cycle=%s, total_score_avg=%s, last_git_sha=%s, updated_at=%s
-                WHERE project_id=%s
-            """,
+                """UPDATE ac_project_state
+                   SET current_cycle=%s, total_score_avg=%s, last_git_sha=%s, updated_at=%s
+                   WHERE project_id=%s""",
                 (cycle_num, avg_score, git_sha, now, project_id),
             )
         else:
             conn.execute(
-                """
-                INSERT INTO ac_project_state
-                (project_id, current_cycle, status, total_score_avg, last_git_sha, updated_at)
-                VALUES (%s,%s,%s,%s,%s,%s)
-            """,
+                """INSERT INTO ac_project_state
+                   (project_id, current_cycle, status, total_score_avg, last_git_sha, updated_at)
+                   VALUES (%s,%s,%s,%s,%s,%s)""",
                 (project_id, cycle_num, "idle", avg_score, git_sha, now),
             )
         conn.close()
@@ -1589,6 +1757,70 @@ async def api_improvement_inject_cycle(request: Request):
 
     avg = await asyncio.to_thread(_do_inject)
     return {"ok": True, "avg_score": avg}
+
+
+@app.get("/api/improvement/adversarial/{project_id}")
+async def api_improvement_adversarial(project_id: str):
+    """Get latest adversarial dimension scores for a project."""
+
+    def _load():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        try:
+            rows = conn.execute(
+                """SELECT dimension, score, verdict, findings, checked_at
+                   FROM ac_adversarial
+                   WHERE project_id=%s
+                   ORDER BY cycle_num DESC, dimension""",
+                (project_id,),
+            ).fetchall()
+            # Keep only latest per dimension
+            seen, result = set(), []
+            for r in rows:
+                if r["dimension"] not in seen:
+                    seen.add(r["dimension"])
+                    result.append(dict(r))
+            return result
+        finally:
+            conn.close()
+
+    data = await asyncio.to_thread(_load)
+    return data
+
+
+@app.get("/api/improvement/traceability/{project_id}")
+async def api_improvement_traceability(project_id: str, cycle: int = 0):
+    """Get traceability matrix for a project (latest cycle or specific)."""
+
+    def _load():
+        conn = get_db()
+        _ac_ensure_tables(conn)
+        try:
+            if cycle:
+                rows = conn.execute(
+                    """SELECT * FROM ac_traceability
+                       WHERE project_id=%s AND cycle_num=%s
+                       ORDER BY artifact_type, artifact_id""",
+                    (project_id, cycle),
+                ).fetchall()
+            else:
+                max_cycle_row = conn.execute(
+                    "SELECT MAX(cycle_num) AS mc FROM ac_traceability WHERE project_id=%s",
+                    (project_id,),
+                ).fetchone()
+                mc = (max_cycle_row["mc"] or 1) if max_cycle_row else 1
+                rows = conn.execute(
+                    """SELECT * FROM ac_traceability
+                       WHERE project_id=%s AND cycle_num=%s
+                       ORDER BY artifact_type, artifact_id""",
+                    (project_id, mc),
+                ).fetchall()
+            return [dict(r) for r in rows]
+        finally:
+            conn.close()
+
+    data = await asyncio.to_thread(_load)
+    return data
 
 
 # ============================================================================
