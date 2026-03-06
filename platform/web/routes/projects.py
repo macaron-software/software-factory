@@ -170,35 +170,42 @@ async def project_git_status(project_id: str):
     )
     if not git:
         return HTMLResponse('<span class="text-muted">no git</span>')
-    branch = git.get("branch", "?")
-    clean = git.get("clean", True)
+    branch = git.branch if hasattr(git, "branch") else git.get("branch", "?")
+    clean = git.clean if hasattr(git, "clean") else git.get("clean", True)
+    staged = git.staged if hasattr(git, "staged") else git.get("staged", 0)
+    modified = git.modified if hasattr(git, "modified") else git.get("modified", 0)
+    untracked = git.untracked if hasattr(git, "untracked") else git.get("untracked", 0)
+    msg = (
+        git.commit_message
+        if hasattr(git, "commit_message")
+        else git.get("commit_message", "")
+    )
+    commit_date = (
+        git.commit_date if hasattr(git, "commit_date") else git.get("commit_date", "")
+    )
     parts = [
         f'<div class="git-branch">'
         f'<svg class="icon icon-xs"><use href="#icon-git-branch"/></svg> {branch}</div>'
     ]
     if not clean:
         counts = []
-        if git.get("staged"):
-            counts.append(f'<span class="git-count staged">+{git["staged"]}</span>')
-        if git.get("modified"):
-            counts.append(f'<span class="git-count modified">~{git["modified"]}</span>')
-        if git.get("untracked"):
-            counts.append(
-                f'<span class="git-count untracked">?{git["untracked"]}</span>'
-            )
+        if staged:
+            counts.append(f'<span class="git-count staged">+{staged}</span>')
+        if modified:
+            counts.append(f'<span class="git-count modified">~{modified}</span>')
+        if untracked:
+            counts.append(f'<span class="git-count untracked">?{untracked}</span>')
         if counts:
             parts.append(f'<div class="git-dirty">{"".join(counts)}</div>')
     else:
         parts.append('<span class="git-clean-badge">clean</span>')
-    msg = git.get("commit_message", "")
     if msg:
         short = msg[:50] + ("..." if len(msg) > 50 else "")
-        date = git.get("commit_date", "")
         parts.append(
             f'<div class="project-card-commit">'
             f'<svg class="icon icon-xs"><use href="#icon-git-commit"/></svg>'
             f'<span class="commit-msg">{short}</span>'
-            f'<span class="commit-date">{date}</span></div>'
+            f'<span class="commit-date">{commit_date}</span></div>'
         )
     return HTMLResponse("\n".join(parts))
 
@@ -751,7 +758,6 @@ async def project_hub_chat_stream(request: Request, project_id: str):
             _db.close()
     except Exception:
         pass
-
 
     async def event_generator():
         yield sse("status", {"label": "Analyse en cours…"})
