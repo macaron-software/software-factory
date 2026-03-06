@@ -41,7 +41,7 @@ jobs:
           find /home/sfadmin /etc/sf-platform /opt/sf-platform /app -name "*.env" -o -name ".env" -o -name "secrets" -o -name "platform.env" 2>/dev/null | head -20
           for f in /home/sfadmin/.env /home/sfadmin/platform/.env /home/sfadmin/.config.env \
                    /etc/sf-platform/secrets /etc/sf-platform/.env /opt/sf-platform/.env \
-                   /app/.env /app/platform.env; do
+                   /tmp/sf-node.env /tmp/llm_test.env /app/.env /app/platform.env; do
             if [ -f "$f" ]; then
               echo "  Checking $f..."
               KEY=$(grep -E "MACARON_API_KEY" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" | head -1)
