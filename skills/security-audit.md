@@ -87,6 +87,8 @@ eval_cases:
     should_trigger: true
     checks:
       - "length_min:50"
+      - "not_regex:SQL inject|XSS|CSRF|hardcoded secret|buffer overflow|remote code execution|critical.*vulnerability|high.*severity"
+      - "regex:IDOR|authorization|get_by_id|requester|check|depends|auth|looks good|no.*major|minimal|low risk"
     expectations:
       - "does NOT fabricate vulnerabilities that don't exist"
       - "may note that IDOR check depends on get_by_id implementation"

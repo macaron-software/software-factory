@@ -23,6 +23,7 @@
 # LICENSE: Apache 2.0 — free to adapt with attribution
 
 name: llm-integration
+version: "1.1.0"
 description: >
   Guidance for building code that calls the Anthropic API or SDK.
   Covers surface selection, model defaults, Opus 4.6 behavioural changes,
@@ -30,25 +31,55 @@ description: >
   Activate when: writing code that imports `anthropic`, builds tool-use loops,
   handles streaming, or integrates with the Anthropic Messages API.
 
+# EVAL CASES — philschmid.de/testing-skills format
+# WHY: LLM integration skill must prevent 5 documented anti-patterns (wrong
+# thinking param, no streaming for large outputs, deprecated output_format,
+# raw string tool inputs, infinite loops). Each causes runtime failures.
 eval_cases:
-  - input: "Write Python code to call Claude with structured output"
-    expect:
-      - Uses `output_config: {format: {...}}` not deprecated `output_format`
-      - Uses `client.messages.parse()` for auto-validation
-      - Sets `additionalProperties: false` on all objects in schema
-      - Does NOT use `budget_tokens` (deprecated on Opus 4.6 + Sonnet 4.6)
-  - input: "Make an agentic loop with tool calling in Python"
-    expect:
-      - Uses Tool Runner OR implements manual loop with `stop_reason == 'end_turn'`
-      - Handles `stop_reason: 'pause_turn'` for server-side tools
-      - Appends full `response.content` to preserve tool_use blocks
-      - Calls `json.loads()` on tool inputs (not raw string matching)
-      - Sets `max_continuations` limit to prevent infinite loops
-  - input: "Stream a long Claude response"
-    expect:
-      - Uses `.stream()` with `.get_final_message()` / `.finalMessage()`
-      - Does NOT call `messages.create()` directly for large max_tokens (timeout risk)
-      - Uses `thinking: {type: "adaptive"}` if on Opus 4.6 / Sonnet 4.6
+  - id: structured-output-python
+    prompt: "Write Python code to call Claude with structured output (return a User with name and age fields)."
+    should_trigger: true
+    checks:
+      - "regex:messages\\.create|client\\.messages|parse\\("
+      - "regex:json_schema|schema|additionalProperties|properties"
+      - "not_regex:output_format\\s*=|output_format.*:.*[\"']|\"output_format\"|'output_format'|budget_tokens\\s*=|\"budget_tokens\""
+      - "regex:import anthropic|from anthropic|anthropic\\.Anthropic"
+      - "length_min:80"
+    expectations:
+      - "uses client.messages.create() or client.messages.parse() — not raw HTTP"
+      - "defines a schema with name/age fields using json_schema or Pydantic"
+      - "does NOT use deprecated output_format or budget_tokens"
+    tags: [structured-output, python]
+
+  - id: agentic-tool-loop
+    prompt: "Write a Python agentic loop with tool calling (one tool: get_weather(city) -> str). Stop when Claude says end_turn."
+    should_trigger: true
+    checks:
+      - "regex:stop_reason|end_turn|tool_use"
+      - "regex:tool_use|tool_result|content"
+      - "regex:json\\.loads|\\[\"input\"\\]|input\\[|tool\\.input|\\.input"
+      - "regex:while|loop|continue|for.*message"
+      - "regex:max_iter|max_cont|max_turn|MAX_|limit|guard|break"
+      - "length_min:100"
+    expectations:
+      - "implements loop that continues until stop_reason == 'end_turn'"
+      - "appends full response.content to message history (preserves tool_use blocks)"
+      - "calls json.loads() on tool inputs — not raw string matching"
+      - "has a max_iterations/max_continuations guard to prevent infinite loops"
+    tags: [tool-use, agentic-loop]
+
+  - id: streaming-large-response
+    prompt: "Stream a Claude response that could be up to 8000 tokens. Show correct Python code."
+    should_trigger: true
+    checks:
+      - "regex:\\.stream|stream=True|stream\\("
+      - "regex:get_final_message|finalMessage|text_stream|stream_text"
+      - "not_regex:messages\\.create\\(.*max_tokens.*[89][0-9]{3}|messages\\.create\\(.*max_tokens.*[1-9][0-9]{4}"
+      - "length_min:50"
+    expectations:
+      - "uses .stream() context manager OR streaming=True — not direct messages.create() for large outputs"
+      - "collects final message with get_final_message() or equivalent"
+    tags: [streaming]
 ---
 
 # LLM Integration Skill
@@ -168,6 +199,24 @@ if '"action": "delete"' in tool_input:  # fragile, breaks on Opus 4.6
 # ✅ CORRECT
 parsed = json.loads(tool_input)
 if parsed.get("action") == "delete":
+```
+
+### 6. Agentic loop: ALWAYS set a max_continuations guard
+
+```python
+# ❌ WRONG — infinite loop if Claude keeps calling tools
+while True:
+    response = client.messages.create(...)
+    if response.stop_reason == "end_turn":
+        break
+
+# ✅ CORRECT — hard limit prevents runaway loops
+MAX_TURNS = 10
+for _ in range(MAX_TURNS):
+    response = client.messages.create(...)
+    if response.stop_reason == "end_turn":
+        break
+# If we exit the loop without end_turn: handle gracefully (return partial result or raise)
 ```
 
 ---
