@@ -1323,7 +1323,9 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     yield ("tool", tc.function_name)
-                    # If tool schema was stripped to write-only, redirect read calls
+                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # If schema was stripped to write-only but model still calls read tools,
+                    # append a write reminder to the result (don't block, give context + nudge)
                     _allowed_tc_names = (
                         {t.get("function", {}).get("name") for t in tools}
                         if tools is not None
@@ -1340,12 +1342,10 @@ class AgentExecutor:
                         and tc.function_name not in _allowed_tc_names
                         and tc.function_name in _read_tools
                     ):
-                        result = (
-                            f"⚠️ '{tc.function_name}' n'est pas disponible à ce stade. "
-                            "Appelle code_write pour créer les fichiers maintenant."
+                        result = result + (
+                            "\n⚠️ Tu as assez de contexte. "
+                            "Appelle code_write MAINTENANT pour créer les fichiers."
                         )
-                    else:
-                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     logger.warning(
                         "TOOL_EXEC agent=%s tool=%s args=%s result=%s",
                         agent.id,
