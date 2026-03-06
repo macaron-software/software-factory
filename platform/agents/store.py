@@ -1311,9 +1311,8 @@ class AgentStore:
                 hierarchy_rank=10,
                 is_builtin=True,
                 tags=["ac", "architecture", "specs", "traceability"],
-                permissions={"can_veto": False},
+                permissions={"can_veto": False, "scope": "project"},
                 system_prompt=(
-                    "Tu es Marc Tessier, Architecte AC de la Software Factory.\n"
                     "Rôle : définir les specs complètes d'un projet pilote AVANT tout code.\n"
                     "ÉTAPES OBLIGATOIRES — exécute dans cet ordre exact :\n"
                     "1. APPELLE list_files pour voir le workspace\n"
@@ -1345,9 +1344,8 @@ class AgentStore:
                 hierarchy_rank=30,
                 is_builtin=True,
                 tags=["ac", "tdd", "coding", "codex", "a11y", "design-tokens"],
-                permissions={},
+                permissions={"scope": "project"},
                 system_prompt=(
-                    "Tu es Léa Fontaine, développeuse TDD de l'équipe AC. Modèle : GPT-5.2 Codex.\n"
                     "ÉTAPES OBLIGATOIRES — exécute dans cet ordre exact :\n"
                     "1. APPELLE code_read avec path='INCEPTION.md' (OBLIGATOIRE en premier — lit les specs)\n"
                     "2. APPELLE code_write pour créer les FICHIERS DE TESTS d'abord (ex: src/index.test.ts)\n"
@@ -1393,9 +1391,12 @@ class AgentStore:
                 hierarchy_rank=20,
                 is_builtin=True,
                 tags=["ac", "adversarial", "security", "quality"],
-                permissions={"can_veto": True, "veto_level": "strong"},
+                permissions={
+                    "can_veto": True,
+                    "veto_level": "strong",
+                    "scope": "project",
+                },
                 system_prompt=(
-                    "Tu es Ibrahim Kamel, inspecteur adversarial de l'équipe AC.\n"
                     "Tu scores le code sur 12 dimensions (0-100) avec verdict pass/warn/fail.\n"
                     "VETO OBLIGATOIRE si l'une de ces dimensions < 60 :\n"
                     "- sécurité (secrets, SAST, headers)\n"
@@ -1426,7 +1427,11 @@ class AgentStore:
                 hierarchy_rank=35,
                 is_builtin=True,
                 tags=["ac", "qa", "a11y", "lighthouse", "w3c", "e2e"],
-                permissions={"can_veto": True, "veto_level": "strong"},
+                permissions={
+                    "can_veto": True,
+                    "veto_level": "strong",
+                    "scope": "project",
+                },
                 system_prompt=(
                     "Tu es Sophie Renard, QA de l'équipe AC.\n"
                     "WORKFLOW OBLIGATOIRE :\n"
@@ -1464,9 +1469,12 @@ class AgentStore:
                 hierarchy_rank=40,
                 is_builtin=True,
                 tags=["ac", "cicd", "git", "github-actions", "cycle-recorder"],
-                permissions={"can_veto": True, "veto_level": "strong"},
+                permissions={
+                    "can_veto": True,
+                    "veto_level": "strong",
+                    "scope": "project",
+                },
                 system_prompt=(
-                    "Tu es Karim Bouali, ingénieur CI/CD de l'équipe AC.\n"
                     "WORKFLOW :\n"
                     "1. Commit avec message structuré : 'fix(ac-{project}): {description}\\nCycle: N\\nACs: REF1, REF2'\n"
                     "2. Push et poll GitHub Actions toutes les 30s, max 10 minutes\n"
@@ -1502,6 +1510,7 @@ class AgentStore:
                     "can_veto": True,
                     "veto_level": "strong",
                     "can_rollback": True,
+                    "scope": "project",
                 },
                 system_prompt=(
                     "Tu es Jade Moreau, Coach AC de l'équipe d'amélioration continue.\n"

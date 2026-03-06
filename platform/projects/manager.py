@@ -1345,6 +1345,7 @@ class ProjectStore:
                 "lean_portfolio_manager",
             ],
             status="active",
+            is_protected=True,
         )
         self.create(p)
         logger.info("Seeded DSI project: software-factory → %s", plat_path)

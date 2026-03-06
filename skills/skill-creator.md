@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-version: "1.0.0"
+version: "1.1.0"
 description: >
   Creates and improves SF agent skills. Follows a draft → eval → grade → iterate
   quality loop: write the skill, define eval_cases, run them via skill-eval workflow,
@@ -34,16 +34,16 @@ eval_cases:
       - "at least one rule has a bad/good example"
     tags: ["basic", "creation"]
   - id: improve-existing-skill
-    prompt: "The tdd skill produces test stubs without assertions — improve it"
+    prompt: "The tdd skill produces test stubs without assertions — write the complete improved skill .md file"
     checks:
       - "regex:NEVER|MUST|PROHIBITED|assertion|version:"
-      - "length_min:150"
+      - "length_min:200"
       - "no_placeholder"
     expectations:
-      - "identifies root cause (vague instructions in existing skill)"
-      - "adds explicit prohibition against stubs (NEVER / MUST)"
-      - "adds an eval_case that would catch the stub anti-pattern"
-      - "increments version in frontmatter"
+      - "outputs a complete .md skill file with YAML frontmatter (name/version/eval_cases)"
+      - "adds explicit prohibition against stubs using NEVER or MUST keyword"
+      - "increments version in the frontmatter (e.g. 1.0.0 → 1.1.0)"
+      - "adds at least one eval_case targeting the stub anti-pattern"
     tags: ["improvement", "anti-slop"]
   - id: weak-assertion-detection
     prompt: "Write eval_cases for a skill that formats JSON output"
@@ -145,6 +145,19 @@ An expectation is **discriminating** when:
 An expectation is **trivially satisfied** (don't write these) when:
 - Any non-empty output passes it (`output is non-empty`, `response exists`)
 - A stub or placeholder passes it (`output mentions the topic`)
+
+---
+
+## OUTPUT RULE — ALWAYS OUTPUT THE COMPLETE FILE
+
+**NEVER** describe changes or list what to fix. **ALWAYS** output the complete `.md` file.
+
+| Mode | WRONG ❌ | RIGHT ✓ |
+|---|---|---|
+| Creating | "Here's how I'd structure a skill for X..." | Full `---\nname: x\n...---\n# X\n...` |
+| Improving | "Add a NEVER rule and bump version to 1.1.0" | Complete improved `.md` with the rule already applied |
+
+When improving a skill you don't have access to: **infer a plausible minimal version** then apply the fix. The output must be a real, runnable `.md` skill file.
 
 ---
 

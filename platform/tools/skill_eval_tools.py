@@ -383,6 +383,32 @@ Rules:
 - Grade outcomes, not paths (creative correct solutions = PASS)
 """
 
+    def _parse_judge_response(raw: str) -> tuple[float, str] | None:
+        """Parse judge JSON response. Returns None if unparseable."""
+        raw = raw.strip()
+        if not raw:
+            return None
+        # Strip markdown fences
+        if raw.startswith("```"):
+            raw = re.sub(r"^```[a-z]*\n?", "", raw)
+            raw = re.sub(r"\n?```$", "", raw)
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return None
+        grades = data.get("grades", [])
+        if not grades:
+            return None
+        passed = sum(1 for g in grades if g.get("passed", False))
+        score = passed / len(grades)
+        notes = data.get("overall_notes", "")
+        failed = [g for g in grades if not g.get("passed", False)]
+        if failed:
+            notes += " | FAILED: " + "; ".join(
+                g.get("evidence", "?") for g in failed[:2]
+            )
+        return score, notes
+
     try:
         client = LLMClient()
         resp = await client.chat(
@@ -390,25 +416,27 @@ Rules:
             temperature=0.1,
             max_tokens=1024,
         )
-        raw = resp.content.strip()
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = re.sub(r"^```[a-z]*\n?", "", raw)
-            raw = re.sub(r"\n?```$", "", raw)
-        data = json.loads(raw)
-        grades = data.get("grades", [])
-        if not grades:
-            return 0.5, "could not parse grades"
-        passed = sum(1 for g in grades if g.get("passed", False))
-        score = passed / len(grades)
-        notes = data.get("overall_notes", "")
-        # Add evidence summary
-        failed = [g for g in grades if not g.get("passed", False)]
-        if failed:
-            notes += " | FAILED: " + "; ".join(
-                g.get("evidence", "?") for g in failed[:2]
-            )
-        return score, notes
+        parsed = _parse_judge_response(resp.content)
+        if parsed is not None:
+            return parsed
+        # Retry: MiniMax sometimes returns empty — ask explicitly for JSON
+        retry_prompt = (
+            judge_prompt
+            + "\n\nIMPORTANT: Reply with ONLY the JSON object. No prose, no markdown."
+        )
+        resp2 = await client.chat(
+            messages=[LLMMessage(role="user", content=retry_prompt)],
+            temperature=0.1,
+            max_tokens=1024,
+        )
+        parsed2 = _parse_judge_response(resp2.content)
+        if parsed2 is not None:
+            return parsed2
+        logger.warning(
+            "LLM judge: empty/unparseable after retry (output len=%d)",
+            len(resp2.content),
+        )
+        return 0.5, "could not parse grades (empty after retry)"
     except Exception as exc:
         logger.warning("LLM judge failed: %s", exc)
         return 0.5, f"judge error: {exc}"
