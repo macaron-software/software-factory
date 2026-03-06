@@ -680,11 +680,12 @@ class AgentExecutor:
                     content = llm_resp.content
                     # Tool nudge: if tools are available and the model wrote a short
                     # introduction instead of calling tools (MiniMax common behavior),
-                    # inject a mandatory "call a tool NOW" message and retry once.
+                    # inject a mandatory "call a tool NOW" message and retry.
+                    # Fires on rounds 0 and 1 (model sometimes needs two nudges).
                     if (
                         tools
-                        and round_num == 0
-                        and len(content or "") < 250
+                        and round_num <= 1
+                        and len(content or "") < 400
                         and not any(
                             t in (content or "").lower()
                             for t in ["```", "result:", "output:", "error:"]
@@ -1227,12 +1228,12 @@ class AgentExecutor:
                 # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
                     final_content = llm_resp.content or ""
-                    # Tool nudge: same as run() — if round 0, tools available, short output,
+                    # Tool nudge: same as run() — if round 0 or 1, tools available, short output,
                     # inject a "call a tool NOW" message and retry.
                     if (
                         tools
-                        and round_num == 0
-                        and len(final_content) < 250
+                        and round_num <= 1
+                        and len(final_content) < 400
                         and not any(
                             t in final_content.lower()
                             for t in ["```", "result:", "output:", "error:"]
