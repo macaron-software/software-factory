@@ -458,6 +458,73 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
+    # Auto-resume interrupted AC (Amélioration Continue) sessions
+    try:
+        import asyncio as _asyncio
+
+        def _find_interrupted_ac_sessions():
+            from .db.migrations import get_db as _gdb_ac
+
+            _db_ac = _gdb_ac()
+            try:
+                rows = _db_ac.execute(
+                    "SELECT id, goal, project_id, config_json FROM sessions"
+                    " WHERE status='interrupted' AND config_json LIKE '%\"ac\": true%'"
+                    " AND created_at >= datetime('now', '-24 hours')"
+                    " ORDER BY created_at DESC LIMIT 20"
+                ).fetchall()
+            finally:
+                _db_ac.close()
+            return rows
+
+        _ac_interrupted = _find_interrupted_ac_sessions()
+        if _ac_interrupted:
+            import json as _json_ac
+            from .workflows.store import get_workflow_store as _gwfs_ac
+
+            async def _resume_ac_sessions():
+                from .web.routes.workflows import _run_workflow_background as _rwb
+                import asyncio as _a2
+
+                for _row in _ac_interrupted:
+                    try:
+                        _sid, _goal, _pid, _cfg_raw = _row
+                        _cfg = _json_ac.loads(_cfg_raw or "{}")
+                        _wf_id = _cfg.get("workflow_id", "ac-improvement-cycle")
+                        _ckpt = int(_cfg.get("workflow_checkpoint", 0))
+                        _wf = _gwfs_ac().get(_wf_id)
+                        if _wf:
+                            _a2.create_task(
+                                _rwb(
+                                    _wf,
+                                    _sid,
+                                    _goal or "",
+                                    _pid or "",
+                                    resume_from=_ckpt,
+                                )
+                            )
+                            logger.warning(
+                                "AC auto-resume: session=%s project=%s from phase=%d",
+                                _sid,
+                                _pid,
+                                _ckpt,
+                            )
+                        await _a2.sleep(2)  # stagger
+                    except Exception as _e:
+                        logger.warning(
+                            "AC auto-resume failed for %s: %s",
+                            _row[0] if _row else "?",
+                            _e,
+                        )
+
+            _asyncio.create_task(_resume_ac_sessions())
+            logger.warning(
+                "AC auto-resume: %d interrupted sessions scheduled",
+                len(_ac_interrupted),
+            )
+    except Exception as _ac_resume_err:
+        logger.warning("AC auto-resume startup hook failed: %s", _ac_resume_err)
+
     # Auto-resume watchdog: handles paused/failed runs + launches unstarted continuous missions
     import asyncio as _asyncio
     from .services.auto_resume import auto_resume_epics as _auto_resume_epics
