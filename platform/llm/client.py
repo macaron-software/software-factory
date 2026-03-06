@@ -721,11 +721,15 @@ class LLMClient:
                     except Exception:
                         pass
                     if is_rate_limit:
-                        # Shorter cooldown so fallback to next provider happens faster
-                        self._provider_cooldown[prov] = time.monotonic() + 30
+                        # Hard quota exhausted → long cooldown (1h); generic 429 → 30s
+                        is_quota_exhausted = "usage limit exceeded" in err_str.lower()
+                        cd = 3600 if is_quota_exhausted else 30
+                        self._provider_cooldown[prov] = time.monotonic() + cd
                         logger.warning(
-                            "LLM %s → cooldown 30s (rate limited), falling back to next provider",
+                            "LLM %s → cooldown %ds (%s), falling back to next provider",
                             prov,
+                            cd,
+                            "quota exhausted" if is_quota_exhausted else "rate limited",
                         )
                 continue
 
@@ -1094,7 +1098,15 @@ class LLMClient:
                     )
                     self._cb_record_failure(prov)
                     if is_rate_limit:
-                        self._provider_cooldown[prov] = time.monotonic() + 30
+                        is_quota_exhausted = "usage limit exceeded" in err_str.lower()
+                        cd = 3600 if is_quota_exhausted else 30
+                        self._provider_cooldown[prov] = time.monotonic() + cd
+                        logger.warning(
+                            "LLM %s stream → cooldown %ds (%s)",
+                            prov,
+                            cd,
+                            "quota exhausted" if is_quota_exhausted else "rate limited",
+                        )
                     break
 
         raise RuntimeError(f"All LLM providers failed for streaming {provider}/{model}")
