@@ -371,7 +371,8 @@
 
     <!-- Retirement detection info -->
     <div style="font-size:0.75rem;color:var(--text-tertiary);margin-bottom:0.5rem">
-        💡 Graduation rule: once pass rate hits 100%, cases become regression tests.
+        <svg class="icon-xs" style="vertical-align:middle;margin-right:3px"><use href="#icon-info"/></svg>
+        Graduation rule: once pass rate hits 100%, cases become regression tests.
         If skill passes without being loaded → retire it (model absorbed the skill).
         <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
     </div>
@@ -606,7 +607,7 @@ async function loadThompsonTab() {
                 const pct = a.success_pct ?? 0;
                 const color = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
                 const badge = a.rejection_pct > 40
-                    ? ' <span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px">⚠</span>' : '';
+                    ? ' <span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px"><svg style="width:10px;height:10px;vertical-align:middle"><use href="#icon-alert-triangle"/></svg></span>' : '';
                 const provColor = (a.provider||'').includes('minimax') ? '#6366f1' : '#0ea5e9';
                 const ms = a.avg_duration_ms ? Math.round(a.avg_duration_ms/1000).toFixed(1)+'s' : '—';
                 const tok = a.total_tokens ? (a.total_tokens/1000).toFixed(0)+'k' : '—';

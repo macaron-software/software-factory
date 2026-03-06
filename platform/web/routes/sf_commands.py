@@ -490,7 +490,7 @@ async def cmd_skills_eval(args: list[str]) -> SFCommandResponse:
             passed = 0
             for name in skills:
                 result = await run_skill_eval(name, trials=trials)
-                status = "✅" if result.pass_rate >= 0.8 else "⚠️ " if result.pass_rate >= 0.6 else "❌"
+                status = "[OK]  " if result.pass_rate >= 0.8 else "[WARN]" if result.pass_rate >= 0.6 else "[FAIL]"
                 out += f"  {status} {name}: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {result.duration_s}s)\n"
                 if result.pass_rate >= 0.8:
                     passed += 1
@@ -513,12 +513,12 @@ async def cmd_skills_eval(args: list[str]) -> SFCommandResponse:
         if result.status == "error":
             return SFCommandResponse(success=False, output="", error=result.error)
 
-        status_icon = "✅" if result.pass_rate >= 0.8 else "⚠️" if result.pass_rate >= 0.6 else "❌"
+        status_icon = "[OK] " if result.pass_rate >= 0.8 else "[WARN]" if result.pass_rate >= 0.6 else "[FAIL]"
         out = f"{status_icon} {skill_name} v{result.skill_version}\n"
         out += f"Pass rate: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {trials} trials, {result.duration_s}s)\n\n"
 
         for c in result.case_results:
-            icon = "✅" if c.overall_pass_rate >= 0.8 else "❌"
+            icon = "[OK] " if c.overall_pass_rate >= 0.8 else "[FAIL]"
             out += f"{icon} [{c.case_id}] overall={int(c.overall_pass_rate*100)}%"
             out += f"  checks={int(c.checks_pass_rate*100)}%"
             if c.llm_judge_score >= 0:
@@ -527,7 +527,7 @@ async def cmd_skills_eval(args: list[str]) -> SFCommandResponse:
             # Show failing checks
             for ch in c.check_details:
                 if not ch.passed:
-                    out += f"     ✗ {ch.check_spec}: {ch.notes}\n"
+                    out += f"     x {ch.check_spec}: {ch.notes}\n"
             if c.judge_notes and c.llm_judge_score < 0.8:
                 out += f"     judge: {c.judge_notes[:100]}\n"
 
