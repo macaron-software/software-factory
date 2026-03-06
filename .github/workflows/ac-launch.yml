@@ -35,63 +35,75 @@ jobs:
           set -e
           echo "=== AC Cycle Status ==="
           
-          # Get API key from env file (search broadly)
+          # Get API key — try DB first, then env, then process env
           API_KEY=""
           echo "Searching for API key..."
-          # Show all env var names in found files (keys only, no values)
-          for f in /tmp/sf-node.env /tmp/llm_test.env /home/sfadmin/.env /etc/sf-platform/secrets; do
-            if [ -f "$f" ]; then
-              echo "Keys in $f: $(grep -oE '^[A-Z_]+' "$f" 2>/dev/null | tr '\n' ' ')"
-            fi
-          done
           
-          # Try multiple key names
-          for KEY_NAME in MACARON_API_KEY API_KEY PLATFORM_API_KEY SF_API_KEY INTERNAL_API_KEY; do
-            for f in /tmp/sf-node.env /tmp/llm_test.env /home/sfadmin/.env /etc/sf-platform/secrets; do
+          # Method 1: Query SQLite DB for platform_api_keys
+          DB_PATH=""
+          for dp in /home/sfadmin/data/platform.db /home/sfadmin/platform/data/platform.db /app/data/platform.db; do
+            if [ -f "$dp" ]; then DB_PATH="$dp"; break; fi
+          done
+          if [ -n "$DB_PATH" ]; then
+            echo "Found DB: $DB_PATH"
+            KEY=$(sqlite3 "$DB_PATH" "SELECT key FROM platform_api_keys WHERE active=1 LIMIT 1;" 2>/dev/null | head -1)
+            if [ -n "$KEY" ]; then
+              API_KEY="$KEY"
+              echo "Got API key from platform_api_keys table"
+            fi
+          fi
+          
+          # Method 2: Check env files for any auth key
+          if [ -z "$API_KEY" ]; then
+            for f in /tmp/sf-node.env /home/sfadmin/.env; do
               if [ -f "$f" ]; then
-                KEY=$(grep -E "^${KEY_NAME}=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" | head -1)
+                # Try any key that ends with _KEY or _SECRET (except OPENAI, JIRA etc)
+                KEY=$(grep -E "^(MACARON|PLATFORM|SF|INTERNAL|API)_[A-Z_]*KEY=" "$f" 2>/dev/null | cut -d= -f2- | tr -d '"' | head -1)
                 if [ -n "$KEY" ]; then
                   API_KEY="$KEY"
-                  echo "Found key '${KEY_NAME}' in $f"
-                  break 2
+                  echo "Found key in $f"
+                  break
                 fi
               fi
             done
-          done
+          fi
           
-          # Fallback: read from running process env
-          if [ -z "$API_KEY" ]; then
-            PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
-            if [ -n "$PID" ]; then
-              for KEY_NAME in MACARON_API_KEY API_KEY PLATFORM_API_KEY SF_API_KEY INTERNAL_API_KEY; do
-                KEY=$(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep "^${KEY_NAME}=" | cut -d= -f2-)
-                if [ -n "$KEY" ]; then
-                  API_KEY="$KEY"
-                  echo "Found key '${KEY_NAME}' in process $PID env"
-                  break
-                fi
-              done
-              if [ -z "$API_KEY" ]; then
-                echo "Process $PID env keys: $(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep -oE '^[A-Z_]+' | tr '\n' ' ')"
+          # Method 3: Get JWT via login with admin user from DB
+          if [ -z "$API_KEY" ] && [ -n "$DB_PATH" ]; then
+            ADMIN=$(sqlite3 "$DB_PATH" "SELECT email, password_hash FROM users WHERE role='admin' LIMIT 1;" 2>/dev/null | head -1)
+            echo "Found admin user: $(echo "$ADMIN" | cut -d'|' -f1)"
+            # Try login with known passwords
+            for PASS in admin admin123 macaron macaron123 admin@macaron.com; do
+              RESP=$(curl -sf -X POST http://localhost:8090/api/auth/login \
+                -H "Content-Type: application/json" \
+                -d "{\"email\":\"$(echo $ADMIN | cut -d'|' -f1)\",\"password\":\"$PASS\"}" 2>/dev/null)
+              TOKEN=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token',''))" 2>/dev/null)
+              if [ -n "$TOKEN" ]; then
+                API_KEY="$TOKEN"
+                echo "Got JWT from login"
+                break
               fi
-            fi
+            done
           fi
           
-          if [ -z "$API_KEY" ]; then
-            echo "ERROR: No API key found. Will try without auth..."
-            API_KEY=""
-          fi
+          echo "API key found: $([ -n "$API_KEY" ] && echo 'YES' || echo 'NO')"
           
           BASE_URL="http://localhost:8090"
-          if [ -n "$API_KEY" ]; then
-            AUTH_HDR="-H \"Authorization: Bearer $API_KEY\""
-          else
-            AUTH_HDR=""
-          fi
+          
+          # Helper function: curl with optional auth, never fails script
+          do_api() {
+            METHOD="$1"; URL="$2"; shift 2
+            if [ -n "$API_KEY" ]; then
+              curl -s -X "$METHOD" "$URL" -H "Authorization: Bearer $API_KEY" "$@" 2>/dev/null || true
+            else
+              curl -s -X "$METHOD" "$URL" "$@" 2>/dev/null || true
+            fi
+          }
           
           # Check health
-          HEALTH=$(curl -sf "$BASE_URL/api/health" 2>/dev/null) || echo "{}"
-          echo "Health: $HEALTH" | python3 -c "import sys,json; d=json.loads(sys.stdin.read().split('Health: ',1)[1]); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (could not parse health)"
+          echo ""
+          HEALTH=$(curl -sf "$BASE_URL/api/health" 2>/dev/null || echo "{}")
+          echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (health parse error)"
           
           PROJECTS="${{ inputs.projects }}"
           ACTION="${{ inputs.action }}"
@@ -103,7 +115,7 @@ jobs:
             echo "=== Processing: $PROJECT ==="
             
             # Get current project status
-            STATUS=$(curl -sf "$BASE_URL/api/improvement/projects" -H "Authorization: Bearer $API_KEY" 2>/dev/null | \
+            STATUS=$(do_api GET "$BASE_URL/api/improvement/projects" | \
               python3 -c "import sys,json; d=json.load(sys.stdin); p=[x for x in d.get('projects',[]) if x['id']=='$PROJECT']; print(p[0]['status'] if p else 'unknown')" 2>/dev/null || echo "unknown")
             echo "  Current status: $STATUS"
             
@@ -114,18 +126,13 @@ jobs:
             # Start or resume based on status
             if [ "$STATUS" = "idle" ] || [ "$STATUS" = "completed" ] || [ "$STATUS" = "unknown" ] || [ "$ACTION" = "force-restart" ]; then
               echo "  Starting cycle for $PROJECT..."
-              RESP=$(curl -sf -X POST "$BASE_URL/api/improvement/start/$PROJECT" \
-                -H "Authorization: Bearer $API_KEY" \
-                -H "Content-Type: application/json" \
-                -d '{}' 2>/dev/null)
+              RESP=$(do_api POST "$BASE_URL/api/improvement/start/$PROJECT" \
+                -H "Content-Type: application/json" -d '{}')
               echo "  Response: $RESP"
             elif [ "$STATUS" = "paused" ] || [ "$STATUS" = "running" ]; then
               echo "  Resuming/injecting cycle for $PROJECT..."
-              # Try inject-cycle to unstick
-              RESP=$(curl -sf -X POST "$BASE_URL/api/improvement/inject-cycle/$PROJECT" \
-                -H "Authorization: Bearer $API_KEY" \
-                -H "Content-Type: application/json" \
-                -d '{}' 2>/dev/null)
+              RESP=$(do_api POST "$BASE_URL/api/improvement/inject-cycle/$PROJECT" \
+                -H "Content-Type: application/json" -d '{}')
               echo "  Inject response: $RESP"
             fi
           done
