@@ -144,7 +144,6 @@ def _get_rate_limit_setting(key: str, default: str) -> str:
     now = time.monotonic()
     if now - _settings_cache_ts > _SETTINGS_TTL:
         try:
-
             with get_db() as db:
                 rows = db.execute(
                     "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
@@ -264,7 +263,6 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
 def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
     """Update epic_runs.llm_cost_usd from llm_traces. Never raises."""
     try:
-
         with get_db() as db:
             mid = epic_run_id
             if not mid and session_id:
@@ -485,7 +483,6 @@ class AgentExecutor:
                 while True:
                     await asyncio.sleep(30)
                     try:
-
                         with get_db() as db:
                             db.execute(
                                 "UPDATE epic_runs SET updated_at=NOW() WHERE id=?",
@@ -681,6 +678,36 @@ class AgentExecutor:
                 # No tool calls → final response
                 if not llm_resp.tool_calls:
                     content = llm_resp.content
+                    # Tool nudge: if tools are available and the model wrote a short
+                    # introduction instead of calling tools (MiniMax common behavior),
+                    # inject a mandatory "call a tool NOW" message and retry once.
+                    if (
+                        tools
+                        and round_num == 0
+                        and len(content or "") < 250
+                        and not any(
+                            t in (content or "").lower()
+                            for t in ["```", "result:", "output:", "error:"]
+                        )
+                    ):
+                        messages.append(
+                            LLMMessage(role="assistant", content=content or "")
+                        )
+                        messages.append(
+                            LLMMessage(
+                                role="user",
+                                content=(
+                                    "⚠️ ARRÊTE — ne décris pas ce que tu vas faire. "
+                                    "APPELLE UN OUTIL MAINTENANT. "
+                                    "Premier action = tool call obligatoire. "
+                                    "Si tu es développeur : appelle code_write. "
+                                    "Si tu es architecte : appelle code_write pour créer INCEPTION.md. "
+                                    "Si tu es QA : appelle docker_deploy. "
+                                    "Pas de texte introductif — agis directement."
+                                ),
+                            )
+                        )
+                        continue  # retry with nudge
                     break
 
                 # Process tool calls
@@ -1200,6 +1227,36 @@ class AgentExecutor:
                 # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
                     final_content = llm_resp.content or ""
+                    # Tool nudge: same as run() — if round 0, tools available, short output,
+                    # inject a "call a tool NOW" message and retry.
+                    if (
+                        tools
+                        and round_num == 0
+                        and len(final_content) < 250
+                        and not any(
+                            t in final_content.lower()
+                            for t in ["```", "result:", "output:", "error:"]
+                        )
+                    ):
+                        messages.append(
+                            LLMMessage(role="assistant", content=final_content)
+                        )
+                        messages.append(
+                            LLMMessage(
+                                role="user",
+                                content=(
+                                    "⚠️ ARRÊTE — ne décris pas ce que tu vas faire. "
+                                    "APPELLE UN OUTIL MAINTENANT. "
+                                    "Premier action = tool call obligatoire. "
+                                    "Si tu es développeur : appelle code_write. "
+                                    "Si tu es architecte : appelle code_write pour créer INCEPTION.md. "
+                                    "Si tu es QA : appelle docker_deploy. "
+                                    "Pas de texte introductif — agis directement."
+                                ),
+                            )
+                        )
+                        continue  # retry with nudge
+
                     # Strip <think> blocks before chunking (tags would split across chunks)
                     import re as _re_exec
 
@@ -1268,7 +1325,6 @@ class AgentExecutor:
                     )
                     # Persist tool call to DB for monitoring
                     try:
-
                         with get_db() as db:
                             db.execute(
                                 "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
