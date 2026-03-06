@@ -38,7 +38,7 @@ jobs:
           # Detect platform port
           BASE_URL="http://localhost:8091"
           for PORT in 8091 8090 8099 8080 80; do
-            RESP=$(curl -sf --max-time 2 "http://localhost:$PORT/api/health" 2>/dev/null)
+            RESP=$(curl -sf --max-time 3 "http://localhost:$PORT/api/health" 2>/dev/null || true)
             if echo "$RESP" | grep -q '"status"'; then
               BASE_URL="http://localhost:$PORT"
               echo "Platform on port $PORT"
