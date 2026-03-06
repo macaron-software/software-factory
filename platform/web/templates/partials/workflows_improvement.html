@@ -164,47 +164,55 @@
   <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
        id="ac-card-{{ p.id }}"
        onclick="acSelectProject('{{ p.id }}', this)"
+       style="display:flex;flex-direction:column"
        title="Clic: sélectionner · Voir détail avec bouton ⤢">
+    {# Top: tier label + detail button #}
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div class="tier-label">{{ p.tier_label }}</div>
       <button onclick="event.stopPropagation();acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
         style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.65rem;padding:0;line-height:1"
         title="Voir détail / suivi live">⤢</button>
     </div>
-    <div class="proj-name">{{ p.name }}</div>
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
-      <div>
-        {% for tech in p.tech[:3] %}
-        <span style="font-size:.65rem;background:var(--bg-tertiary);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
-        {% endfor %}
+    {# Middle: name + tech + score — takes all remaining space #}
+    <div style="flex:1">
+      <div class="proj-name">{{ p.name }}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
+        <div>
+          {% for tech in p.tech[:3] %}
+          <span style="font-size:.65rem;background:var(--bg-tertiary);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+          {% endfor %}
+        </div>
+        <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
       </div>
-      <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
     </div>
-    <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
-      Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
-      &nbsp;·&nbsp;
-      <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}" id="ac-status-{{ p.id }}">{{ p.status }}</span>
-    </div>
-    <div class="ac-bar"><div class="ac-bar-fill tier-{{ p.tier }}" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%"></div></div>
-    {# Per-card controls #}
-    <div style="display:flex;gap:.4rem;margin-top:.5rem" onclick="event.stopPropagation()">
-      {% if p.status == 'running' %}
-      <button onclick="acStopProject('{{ p.id }}')"
-        style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.2rem .5rem;background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem">
-        {{ fi('x-circle', 11) }} Stop
-      </button>
-      {% else %}
-      <button onclick="acStartProject('{{ p.id }}')"
-        {% if p.current_cycle >= p.max_cycles %}disabled{% endif %}
-        style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.2rem .5rem;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem{% if p.current_cycle >= p.max_cycles %};opacity:.4;cursor:default{% endif %}">
-        {{ fi('play', 11) }} {% if p.current_cycle == 0 %}Démarrer{% else %}Cycle {{ p.current_cycle + 1 }}{% endif %}
-      </button>
-      {% endif %}
-      <button onclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
-        style="display:flex;align-items:center;justify-content:center;padding:.2rem .4rem;background:none;color:var(--text-secondary);border:1px solid var(--border);border-radius:.25rem;cursor:pointer;font-size:.65rem"
-        title="Suivi détaillé">
-        {{ fi('activity', 11) }}
-      </button>
+    {# Bottom: cycle info + bar + controls #}
+    <div>
+      <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
+        Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
+        &nbsp;·&nbsp;
+        <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}" id="ac-status-{{ p.id }}">{{ p.status }}</span>
+      </div>
+      <div class="ac-bar" style="margin-bottom:.5rem"><div class="ac-bar-fill tier-{{ p.tier }}" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%"></div></div>
+      {# Per-card controls #}
+      <div style="display:flex;gap:.4rem" onclick="event.stopPropagation()">
+        {% if p.status == 'running' %}
+        <button onclick="acStopProject('{{ p.id }}')"
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.25rem .5rem;background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem">
+          {{ fi('x-circle', 11) }} Stop
+        </button>
+        {% else %}
+        <button onclick="acStartProject('{{ p.id }}')"
+          {% if p.current_cycle >= p.max_cycles %}disabled{% endif %}
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.25rem .5rem;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem{% if p.current_cycle >= p.max_cycles %};opacity:.4;cursor:default{% endif %}">
+          {{ fi('play', 11) }} {% if p.current_cycle == 0 %}Démarrer{% else %}Cycle {{ p.current_cycle + 1 }}{% endif %}
+        </button>
+        {% endif %}
+        <button onclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+          style="display:flex;align-items:center;justify-content:center;padding:.25rem .4rem;background:none;color:var(--text-secondary);border:1px solid var(--border);border-radius:.25rem;cursor:pointer;font-size:.65rem"
+          title="Suivi détaillé">
+          {{ fi('activity', 11) }}
+        </button>
+      </div>
     </div>
   </div>
   {% else %}
