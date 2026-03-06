@@ -436,6 +436,8 @@ async def resume_stuck_ac_cycles() -> int:
                     session_id,
                     run_id,
                 )
+                # Stagger concurrent cycles to avoid LLM rate-limit collisions
+                await asyncio.sleep(60)
             except Exception as exc:
                 logger.error("watchdog: failed to resume AC run %s: %s", run_id, exc)
 
