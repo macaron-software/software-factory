@@ -7,6 +7,7 @@
       <th>Git SHA</th>
       {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
       <th>Score</th>
+      <th>RL R</th>
       <th>Défauts</th>
       <th>Fix</th>
     </tr>
@@ -15,6 +16,8 @@
     {% for c in cycles[-10:]|reverse %}
     {% set score = c.total_score|int %}
     {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+    {% set rl_r = c.rl_reward|float %}
+    {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
     <tr>
       <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
       <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
@@ -23,6 +26,7 @@
       <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
       {% endfor %}
       <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
+      <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
       <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
       <td style="font-size:.7rem;color:#f59e0b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
     </tr>

@@ -15,6 +15,10 @@
   {% elif name == 'layers' %}<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>
   {% elif name == 'link' %}<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
   {% elif name == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  {% elif name == 'bar-chart-2' %}<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+  {% elif name == 'activity' %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+  {% elif name == 'cpu' %}<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>
+  {% elif name == 'git-branch' %}<line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path>
   {% endif %}
 </svg>
 {% endmacro %}
@@ -41,6 +45,25 @@
 .verdict-fail { background:#7f1d1d; color:#fca5a5; font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
 .adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
 .adv-card { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem; }
+/* Intelligence panel */
+.intel-panel { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-top:.5rem; }
+.intel-metric { background:var(--surface,#1e2030); border:1px solid var(--border,#2a2d3e); border-radius:.4rem; padding:.6rem .75rem; }
+.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted,#888); margin-bottom:.2rem; }
+.intel-metric .value { font-size:1.1rem; font-weight:700; }
+.conv-improving { color:#22c55e; }
+.conv-plateau    { color:#f59e0b; }
+.conv-regression { color:#ef4444; }
+.conv-spike_failure { color:#ef4444; }
+.conv-cold_start { color:#888; }
+.conv-converging { color:#3b82f6; }
+/* mini sparkline */
+.sparkline { display:flex; align-items:flex-end; gap:2px; height:32px; margin-top:.3rem; }
+.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--accent,#6c63ff); opacity:.7; transition:opacity .15s; }
+.spark-bar:hover { opacity:1; }
+/* Thompson stats */
+.thompson-row td { font-size:.7rem; padding:.3rem .4rem; }
+.thompson-win { color:#22c55e; }
+.thompson-lose { color:#ef4444; }
 </style>
 
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
@@ -51,6 +74,10 @@
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
     <span style="font-size:.7rem;color:var(--accent,#6c63ff)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+    <button id="ac-intel-toggle" onclick="acToggleIntel()"
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-muted,#888);border:1px solid var(--border,#2a2d3e);border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      {{ fi('cpu', 12) }} Intelligence
+    </button>
     <button id="ac-start-btn" onclick="acStartCycle()"
       style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--accent,#6c63ff);color:#fff;border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('play', 12) }} Démarrer
@@ -58,6 +85,50 @@
   </div>
 </div>
 <div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.4rem;font-size:.75rem;color:var(--text-muted,#888)"></div>
+
+{# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
+<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted,#888);display:flex;align-items:center;gap:.4rem">
+      {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--accent,#6c63ff)">—</span>
+    </div>
+    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#888);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
+      {{ fi('refresh-cw', 11) }} Actualiser
+    </button>
+  </div>
+
+  <div class="intel-panel" id="ac-intel-metrics">
+    <div class="intel-metric"><div class="label">Convergence</div><div class="value conv-cold_start" id="im-conv">—</div></div>
+    <div class="intel-metric"><div class="label">RL Reward moy.</div><div class="value" id="im-reward">—</div></div>
+    <div class="intel-metric"><div class="label">Cycles total</div><div class="value" id="im-cycles">—</div></div>
+    <div class="intel-metric"><div class="label">Score moy.</div><div class="value" id="im-avg">—</div></div>
+    <div class="intel-metric"><div class="label">Hint RL</div><div class="value" style="font-size:.75rem" id="im-hint">—</div></div>
+    <div class="intel-metric"><div class="label">Skill Eval</div><div class="value" style="font-size:.7rem;color:#f59e0b" id="im-eval">—</div></div>
+  </div>
+
+  {# Sparkline #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;color:var(--text-muted,#888);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
+    <div class="sparkline" id="ac-sparkline"></div>
+  </div>
+
+  {# Thompson stats table #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted,#888);margin-bottom:.4rem">
+      {{ fi('activity', 11) }} Thompson Sampling — skills
+    </div>
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>Skill</th><th>Variant</th><th>Wins</th><th>Losses</th><th>Avg score</th><th>Thompson prob.</th>
+        </tr>
+      </thead>
+      <tbody id="ac-thompson-tbody">
+        <tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
 {# ── Project cards ─────────────────────────────────────────────────────────── #}
 <div class="ac-section-title">Projets pilotes</div>
@@ -107,6 +178,7 @@
           <th>Git SHA</th>
           {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
           <th>Score</th>
+          <th>RL R</th>
           <th>Défauts</th>
           <th>Fix</th>
         </tr>
@@ -116,6 +188,8 @@
         {% set ps = c.phase_scores|tojson if c.phase_scores is string else '{}' %}
         {% set score = c.total_score|int %}
         {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+        {% set rl_r = c.rl_reward|float %}
+        {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
         <tr>
           <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
           <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
@@ -124,6 +198,7 @@
           <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
           {% endfor %}
           <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
+          <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
           <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
           <td style="font-size:.7rem;color:#f59e0b;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
         </tr>
@@ -160,6 +235,7 @@
 
 <script>
 let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
+let _acIntelOpen = false;
 
 function acSelectProject(projectId, card) {
   _acSelectedProject = projectId;
@@ -170,6 +246,90 @@ function acSelectProject(projectId, card) {
     swap: 'innerHTML'
   });
   document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
+  if (_acIntelOpen) acRefreshIntel();
+}
+
+function acToggleIntel() {
+  const panel = document.getElementById('ac-intel-panel');
+  _acIntelOpen = !_acIntelOpen;
+  panel.style.display = _acIntelOpen ? 'block' : 'none';
+  if (_acIntelOpen) acRefreshIntel();
+}
+
+async function acRefreshIntel() {
+  if (!_acSelectedProject) return;
+  document.getElementById('ac-intel-proj-label').textContent = _acSelectedProject;
+  try {
+    const [stateRes, scoresRes] = await Promise.all([
+      fetch('/api/improvement/project/' + _acSelectedProject),
+      fetch('/api/improvement/scores/' + _acSelectedProject)
+    ]);
+    const state = await stateRes.json();
+    const scores = await scoresRes.json();
+
+    // Convergence
+    const conv = state.convergence || {};
+    const convEl = document.getElementById('im-conv');
+    convEl.textContent = conv.status || '—';
+    convEl.className = 'value conv-' + (conv.status || 'cold_start');
+
+    // RL reward
+    document.getElementById('im-reward').textContent =
+      scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—';
+
+    // Cycles + avg score
+    document.getElementById('im-cycles').textContent = state.cycle_count || 0;
+    document.getElementById('im-avg').textContent =
+      state.total_score_avg ? Math.round(state.total_score_avg) : '—';
+
+    // RL hint
+    const hint = state.next_cycle_hint;
+    document.getElementById('im-hint').textContent =
+      hint ? (hint.action || '—') + (hint.confidence ? ' (' + hint.confidence.toFixed(2) + ')' : '') : '—';
+
+    // Skill eval
+    const evalPending = state.skill_eval_pending;
+    document.getElementById('im-eval').textContent =
+      evalPending && evalPending.length ? evalPending.join(', ') : 'aucun';
+
+    // Sparkline
+    const sparkEl = document.getElementById('ac-sparkline');
+    const recent = state.recent_scores || [];
+    if (recent.length) {
+      const maxS = Math.max(...recent, 1);
+      sparkEl.innerHTML = recent.map(s => {
+        const h = Math.round((s / maxS) * 32);
+        const col = s >= 80 ? '#22c55e' : s >= 60 ? '#f59e0b' : '#ef4444';
+        return `<div class="spark-bar" style="height:${h}px;background:${col}" title="${s}/100"></div>`;
+      }).join('');
+    } else {
+      sparkEl.innerHTML = '<span style="color:#444;font-size:.7rem">pas de données</span>';
+    }
+
+    // Thompson stats
+    const tbody = document.getElementById('ac-thompson-tbody');
+    const skillStats = scores.skill_stats || {};
+    const rows = [];
+    for (const [skill, variants] of Object.entries(skillStats)) {
+      for (const [variant, stats] of Object.entries(variants)) {
+        const prob = stats.wins / Math.max(1, stats.wins + stats.losses);
+        rows.push(`<tr class="thompson-row">
+          <td style="font-family:monospace">${skill}</td>
+          <td style="font-family:monospace;font-size:.65rem">${variant}</td>
+          <td class="thompson-win">${stats.wins}</td>
+          <td class="thompson-lose">${stats.losses}</td>
+          <td>${stats.avg_score ? Math.round(stats.avg_score) : '—'}</td>
+          <td style="font-family:monospace">${(prob * 100).toFixed(1)}%</td>
+        </tr>`);
+      }
+    }
+    tbody.innerHTML = rows.length
+      ? rows.join('')
+      : '<tr><td colspan="6" style="color:var(--text-muted,#888);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+
+  } catch(e) {
+    console.error('AC intel fetch error', e);
+  }
 }
 
 async function acStartCycle() {
