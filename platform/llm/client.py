@@ -769,6 +769,22 @@ class LLMClient:
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
+            # MiniMax rejects tool messages — convert to user so model sees results
+            if provider == "minimax" and d["role"] == "tool":
+                d["role"] = "user"
+                d["content"] = f"[Résultat de {name or 'tool'}]:\n{content}"
+                msgs.append(d)
+                continue
+            if provider == "minimax" and role == "assistant" and tool_calls:
+                tc_names = [
+                    tc.get("function", {}).get("name", "?")
+                    if isinstance(tc, dict)
+                    else "?"
+                    for tc in (tool_calls or [])
+                ]
+                d["content"] = f"[Appel outils: {', '.join(tc_names)}]"
+                msgs.append(d)
+                continue
             if name:
                 d["name"] = name
             if tool_call_id:
