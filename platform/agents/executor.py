@@ -1274,8 +1274,13 @@ class AgentExecutor:
 
                     # If work was done (files written) but output is too short,
                     # inject a synthesis prompt so the adversarial can evaluate.
+                    _written_count = sum(
+                        1
+                        for tc_rec in all_tool_calls
+                        if tc_rec["name"] in ("code_write", "code_edit", "fractal_code")
+                    )
                     if (
-                        has_written
+                        _written_count > 0
                         and len(final_content.strip()) < 80
                         and round_num < MAX_TOOL_ROUNDS - 1
                     ):
