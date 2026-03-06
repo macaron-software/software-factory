@@ -119,8 +119,12 @@ _PROVIDERS = {
         "name": "OpenCode (Go)",
         "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
         "key_env": "OPENCODE_API_KEY",
-        "models": [],  # fetched live from /v1/models; populated on first Settings load
-        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", ""),
+        # "coding" is the code-optimized inference mode; falls back to env or empty list
+        # (live models are also fetched from /v1/models in Settings UI)
+        "models": [
+            m for m in [os.environ.get("OPENCODE_DEFAULT_MODEL", "coding")] if m
+        ],
+        "default": os.environ.get("OPENCODE_DEFAULT_MODEL", "coding"),
         "auth_header": "Authorization",
         "auth_prefix": "Bearer ",
     },
