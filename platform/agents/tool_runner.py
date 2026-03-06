@@ -273,6 +273,13 @@ def _get_tool_registry():
             register_reward_tools(reg)
     except Exception:
         pass
+    # AC tools — always available (no module guard)
+    try:
+        from ..tools.ac_tools import register_ac_tools
+
+        register_ac_tools(reg)
+    except Exception:
+        pass
     return reg
 
 
@@ -1970,6 +1977,7 @@ async def _execute_tool(
             project_path=ctx.project_path or "",
             permissions=perms_dict,
             session_id=ctx.session_id,
+            project_id=ctx.project_id or "",
         )
         if denied:
             return denied
@@ -2177,12 +2185,17 @@ async def _execute_tool(
         if lineage and content and "# Why:" not in content and "// Why:" not in content:
             path = args.get("path", "")
             chain = " → ".join(lineage)
-            comment = "// Why: " if path.endswith((".js", ".ts", ".jsx", ".tsx", ".java", ".cs", ".go")) else "# Why: "
+            comment = (
+                "// Why: "
+                if path.endswith((".js", ".ts", ".jsx", ".tsx", ".java", ".cs", ".go"))
+                else "# Why: "
+            )
             args["content"] = f"{comment}{chain}\n{content}"
         # Log artifact to traceability store
         if lineage and args.get("path"):
             try:
                 from ..traceability.store import log_artifact
+
                 log_artifact(
                     ctx.session_id or "",
                     "code",

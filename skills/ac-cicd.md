@@ -55,20 +55,19 @@ git push origin main
 
 ### Étape 4 : Enregistrement cycle en DB
 ```
-# Appeler POST /api/improvement/inject-cycle avec :
-{
-  "project_id": "ac-hello-html",
+# Utiliser l'outil ac_inject_cycle (outil direct, pas HTTP) :
+ac_inject_cycle({
+  "project_id": "ac-hello-html",      # ← adapter selon le projet
   "cycle_num": N,
   "git_sha": "abc1234",
   "platform_run_id": "{mission_id}",   # IMPORTANT: pour traçabilité RL
-  "status": "completed",  # ou "failed"
+  "status": "completed",               # ou "failed"
   "phase_scores": {
     "inception": X,
     "tdd-sprint": X,
     "adversarial": X,
     "qa-sprint": X,
-    "cicd": X,
-    "deploy": X
+    "cicd": X
   },
   "total_score": X,
   "defect_count": N,
@@ -81,13 +80,9 @@ git push origin main
     "observability": X, "resilience": X, "honesty": X
   },
   "traceability_score": X,
-  "screenshot_path": "screenshots/desktop-home.png"  # Chemin relatif dans le workspace (depuis QA_REPORT_N.md ou listing screenshots/)
-}
-# → La plateforme calcule automatiquement :
-#   rl_reward (R∈[-1,+1]) → enregistre RL record_experience()
-#   convergence → détecte plateau/regression → trigger GA si besoin
-#   skill_eval → si cycle 5/10/15 → programme évaluation des skills
-# → Lire la réponse et loguer "cycle N enregistré, reward=X.XX"
+  "screenshot_path": "screenshots/desktop-home.png"  # Chemin relatif dans le workspace
+})
+# → Loguer "cycle N enregistré, score=X"
 ```
 
 ## Règles absolues
@@ -104,12 +99,12 @@ git push origin main
 ## Output
 - Commit + push effectué
 - `CICD_FAILURE_{N}.md` si CI rouge
-- Cycle enregistré en DB (POST /api/improvement/inject-cycle)
+- Cycle enregistré en DB (via outil ac_inject_cycle)
 
 ## Tools autorisés
 - git_commit, git_push
-- http_get (GitHub Actions API pour poll CI)
-- http_post (pour enregistrement cycle)
+- ac_inject_cycle (enregistrement cycle en DB — outil direct)
+- ac_get_project_state (lire historique scores)
 - file_read, list_files (lire QA_REPORT_N.md + lister screenshots/)
 - file_write (CICD_FAILURE_N.md si fail)
 - memory_store (persist le SHA + résultat CI)

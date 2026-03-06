@@ -126,8 +126,7 @@ memory_store({
 - Aucun (le coach ne peut pas être vetoé — il est toujours la dernière phase)
 
 ## Tools autorisés
-- http_get (GET /api/improvement/project, /scores, /live)
-- http_post (POST /api/improvement/rollback, /experiment)
+- ac_get_project_state (lire scores + convergence + historique cycles)
 - file_read (ADVERSARIAL_N.md, QA_REPORT_N.md, ROLLBACK_N-1.md)
 - file_write (STRATEGY_{N+1}.md, ROLLBACK_{N}.md)
 - memory_store (traçabilité décisions)
