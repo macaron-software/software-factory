@@ -41,9 +41,38 @@ jobs:
           
           # Method 1: Query SQLite DB for platform_api_keys
           DB_PATH=""
-          for dp in /home/sfadmin/data/platform.db /home/sfadmin/platform/data/platform.db /app/data/platform.db; do
-            if [ -f "$dp" ]; then DB_PATH="$dp"; break; fi
-          done
+          # First try to get DB path from running process env
+          PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
+          if [ -n "$PLATFORM_PID" ]; then
+            DB_URL=$(cat /proc/$PLATFORM_PID/environ 2>/dev/null | tr '\0' '\n' | grep "^DATABASE_URL=" | cut -d= -f2- | head -1)
+            echo "Process DB URL: $DB_URL"
+            if echo "$DB_URL" | grep -q "sqlite"; then
+              DB_PATH=$(echo "$DB_URL" | sed 's|sqlite:///||' | sed 's|sqlite+aiosqlite:///||')
+              echo "Resolved DB path: $DB_PATH"
+            fi
+          fi
+          # Fallback: scan env files
+          if [ -z "$DB_PATH" ]; then
+            for f in /tmp/sf-node.env /home/sfadmin/.env; do
+              if [ -f "$f" ]; then
+                DB_URL=$(grep "^DATABASE_URL=" "$f" 2>/dev/null | cut -d= -f2-)
+                if echo "$DB_URL" | grep -q "sqlite"; then
+                  DB_PATH=$(echo "$DB_URL" | sed 's|sqlite:///||' | sed 's|sqlite+aiosqlite:///||')
+                  echo "DB from $f: $DB_PATH"
+                  break
+                fi
+              fi
+            done
+          fi
+          # Fallback: common paths
+          if [ -z "$DB_PATH" ] || [ ! -f "$DB_PATH" ]; then
+            for dp in /home/sfadmin/data/platform.db /home/sfadmin/platform/data/platform.db /app/data/platform.db /tmp/platform.db; do
+              if [ -f "$dp" ] && [ "$(sqlite3 "$dp" '.tables' 2>/dev/null | wc -c)" -gt "5" ]; then
+                DB_PATH="$dp"
+                break
+              fi
+            done
+          fi
           if [ -n "$DB_PATH" ]; then
             echo "Found DB: $DB_PATH"
             KEY=$(sqlite3 "$DB_PATH" "SELECT key FROM platform_api_keys WHERE active=1 LIMIT 1;" 2>/dev/null | head -1) || true
