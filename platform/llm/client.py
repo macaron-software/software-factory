@@ -138,20 +138,29 @@ _ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _opencode_enabled = bool(
     os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
 )
-_FALLBACK_CHAIN = [_primary] + [
-    p
-    for p in (
-        (["local-mlx"] if _local_mlx_enabled else [])
-        + (["ollama"] if _ollama_enabled else [])
-        + (["opencode"] if _opencode_enabled else [])
-        + (
-            ["minimax", "azure-openai", "azure-ai"]
-            if not _is_azure
-            else ["azure-openai", "azure-ai"]
+_fallback_env = os.environ.get("PLATFORM_LLM_FALLBACK", None)
+if _fallback_env is not None:
+    # Explicit override: "" = no fallback, "p1,p2" = specific chain
+    _FALLBACK_CHAIN = [_primary] + [
+        p.strip()
+        for p in _fallback_env.split(",")
+        if p.strip() and p.strip() != _primary
+    ]
+else:
+    _FALLBACK_CHAIN = [_primary] + [
+        p
+        for p in (
+            (["local-mlx"] if _local_mlx_enabled else [])
+            + (["ollama"] if _ollama_enabled else [])
+            + (["opencode"] if _opencode_enabled else [])
+            + (
+                ["minimax", "azure-openai", "azure-ai"]
+                if not _is_azure
+                else ["azure-openai", "azure-ai"]
+            )
         )
-    )
-    if p != _primary
-]
+        if p != _primary
+    ]
 
 _rtk_cache: dict = {}
 
