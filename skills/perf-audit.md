@@ -25,44 +25,68 @@ description: >
   Activate when: reviewing a deployed feature, validating perf budgets,
   debugging a slow page, or running perf acceptance criteria.
 
+version: "1.1.0"
+
 eval_cases:
-  - input: "Check the performance of http://localhost:8099"
+  - id: lighthouse-full-audit
+    prompt: "Run a full performance audit on http://localhost:8099 and give me the results."
     checks:
       - "regex:score|performance|lighthouse|suggest|accessib"
       - "length_min:80"
       - "no_placeholder"
-    expect:
+    expectations:
       - Calls perf_audit_lighthouse with url=http://localhost:8099
-      - Reports performance score (0-100)
-      - Lists top 3 actionable improvement suggestions
-      - Flags any accessibility issues found
-  - input: "Is the dashboard fast on mobile?"
+      - Reports the actual performance score (0-100) from the tool return value
+      - Lists at least 2 actionable improvement suggestions from the tool output
+      - Does NOT ask the user for more information
+      - Does NOT show only the tool invocation — shows what the tool returned
+  - id: mobile-audit
+    prompt: "Check if http://localhost:8099 is fast on mobile (Moto G4, fast-3g)."
     checks:
       - "regex:mobile|LCP|CLS|INP|threshold|device"
       - "length_min:80"
       - "no_placeholder"
-    expect:
-      - Calls perf_emulate_mobile first (device=Moto G4, network=fast-3g)
-      - Then calls perf_audit_lighthouse
-      - Compares mobile vs desktop context
-      - Reports LCP/CLS/INP against Google thresholds
-  - input: "Why is the page loading slowly?"
+    expectations:
+      - Calls perf_emulate_mobile first with device=Moto G4 and network=fast-3g
+      - Then calls perf_audit_lighthouse on http://localhost:8099
+      - Reports LCP/CLS/INP values from the returned audit results
+      - Compares values against Google Web Vitals thresholds (LCP<2.5s, CLS<0.1, INP<200ms)
+      - Does NOT ask for a URL — it was provided in the prompt
+  - id: slow-page-debug
+    prompt: "http://localhost:8099 is taking 8 seconds to load. Diagnose why using trace tools."
     checks:
       - "regex:resource|network|trace|insight|fix|slow"
       - "length_min:80"
       - "no_placeholder"
-    expect:
-      - Calls perf_trace_start with url
-      - Calls perf_trace_stop after page load
-      - Calls perf_analyze_insight for worst insight
+    expectations:
+      - Calls perf_trace_start with url=http://localhost:8099
+      - Calls perf_trace_stop to retrieve trace results
+      - Calls perf_analyze_insight for the worst insight from the trace
       - Calls perf_network_slow to find slow requests
-      - Provides concrete fix: which resource, which line, what to change
+      - Reports which specific resource is slowest and gives a concrete fix
+      - Does NOT ask for clarification — the URL is in the prompt
 ---
 
 # Performance Audit Skill
 
 Audit deployed web apps for performance, accessibility, and runtime errors
 using Chrome DevTools. Same tooling as a developer opening DevTools in Chrome.
+
+---
+
+## RULES
+
+**MUST:**
+- MUST call every tool listed in the workflow and **display the full returned data** in your response
+- MUST use `http://localhost:8099` as default URL when none is specified in the request
+- MUST report actual numbers from tool output (e.g. LCP=3.2s, score=74/100) — not hypothetical values
+- MUST complete the entire workflow before presenting results
+
+**NEVER:**
+- NEVER ask the user for the URL — infer from context or use `http://localhost:8099`
+- NEVER show only the tool invocation without showing what it returned
+- NEVER write code or mock audit results instead of calling the tools
+- NEVER say "I would call perf_audit_lighthouse" — just call it
 
 ---
 

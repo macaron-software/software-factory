@@ -327,6 +327,8 @@ async function acStartProject(projectId) {
     const data = await res.json();
     if (data.run_id) {
       if (statusEl) statusEl.textContent = 'running';
+      // Launch the workflow (required to actually execute phases)
+      await fetch('/api/missions/' + data.run_id + '/launch', { method: 'POST' });
       // Full partial reload to update card controls
       setTimeout(() => {
         const t = document.querySelector('[id$="amelio-container"]') || document.getElementById('ac-container');
@@ -446,13 +448,12 @@ async function acOpenModal(projectId, projectName) {
       var sparkHtml = '';
       var allScores = d.all_scores || [];
       if (allScores.length) {
-        var mx = Math.max.apply(null, allScores.concat([1]));
         sparkHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle</div>'
           + '<div style="display:flex;align-items:flex-end;gap:3px;height:40px">';
         allScores.forEach(function(s, i) {
-          var h = Math.max(3, Math.round((s/mx)*36));
+          var h = Math.max(3, Math.round((s/100)*36));
           var c = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
-          sparkHtml += '<div style="flex:1;height:' + h + 'px;background:' + c + ';border-radius:2px 2px 0 0;min-width:4px" title="Cycle ' + (i+1) + ': ' + s + '/100"></div>';
+          sparkHtml += '<div style="flex:0 0 10px;height:' + h + 'px;background:' + c + ';border-radius:2px 2px 0 0;min-width:10px" title="Cycle ' + (i+1) + ': ' + s + '/100"></div>';
         });
         sparkHtml += '</div></div>';
       }
@@ -635,11 +636,10 @@ async function acRefreshIntel() {
     const recent = state.recent_scores || [];
     if (sparkEl) {
       if (recent.length) {
-        const maxS = Math.max(...recent, 1);
         sparkEl.innerHTML = recent.map(s => {
-          const h = Math.round((s/maxS)*32);
+          const h = Math.round((s/100)*32);
           const cls = s>=80?'spark-ok':s>=60?'spark-warn':'spark-bad';
-          return `<div class="spark-bar ${cls}" style="height:${h}px" title="${s}/100"></div>`;
+          return `<div class="spark-bar ${cls}" style="height:${Math.max(h,3)}px;flex:0 0 8px;min-width:8px" title="${s}/100"></div>`;
         }).join('');
       } else {
         sparkEl.innerHTML = '<span style="color:var(--text-secondary);font-size:.7rem">pas de données</span>';
