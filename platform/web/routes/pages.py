@@ -874,6 +874,30 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
     )
 
 
+# Thompson variant selection constants — skills with A/B variants
+_AC_SKILL_VARIANTS: dict[str, list[str]] = {
+    "ac-codex": ["v1", "v2"],
+    "ac-adversarial": ["v1", "v2"],
+}
+
+
+def _ac_select_skill_variants(project_id: str) -> dict[str, str]:
+    """Select the best skill variant via Thompson Sampling for each AC skill.
+
+    Returns a dict like {"ac-codex": "v2", "ac-adversarial": "v1"}.
+    Falls back to "v1" if the module is unavailable.
+    """
+    try:
+        from ...ac.skill_thompson import ac_skill_select_variant
+
+        return {
+            skill: ac_skill_select_variant(skill, variants, project_id=project_id)
+            for skill, variants in _AC_SKILL_VARIANTS.items()
+        }
+    except Exception:
+        return {skill: "v1" for skill in _AC_SKILL_VARIANTS}
+
+
 @router.post("/api/improvement/start/{project_id}")
 async def api_improvement_start(project_id: str):
     """Launch an AC improvement cycle for a project via the platform workflow engine."""
@@ -927,7 +951,12 @@ async def api_improvement_start(project_id: str):
             workflow_id="ac-improvement-cycle",
             status="active",
             project_id=project_id,
-            config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
+            config={
+                "project_id": project_id,
+                "cycle_num": cycle_num,
+                "ac": True,
+                "skill_variants": _ac_select_skill_variants(project_id),
+            },
         )
         created = await asyncio.to_thread(store.create_mission, mission_def)
         run_id = str(created.id)

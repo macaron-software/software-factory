@@ -77,6 +77,29 @@ async def health_check():
             checks["redis"] = f"error: {e}"
             # Redis failure is non-fatal for liveness
 
+    # AC cycles summary (public — basic status only, no secrets)
+    ac_cycles: list[dict] = []
+    try:
+        db2 = get_db()
+        try:
+            rows = db2.execute(
+                "SELECT project_id, current_cycle, status, updated_at "
+                "FROM ac_project_state ORDER BY updated_at DESC LIMIT 20"
+            ).fetchall()
+            ac_cycles = [
+                {
+                    "project": r["project_id"],
+                    "cycle": r["current_cycle"],
+                    "status": r["status"],
+                    "updated_at": r["updated_at"],
+                }
+                for r in rows
+            ]
+        finally:
+            db2.close()
+    except Exception:
+        pass  # table may not exist on fresh instance
+
     status_code = 200 if ok else 503
     return JSONResponse(
         {
@@ -84,6 +107,7 @@ async def health_check():
             "node": node_id,
             "mode": mode,
             "checks": checks,
+            "ac_cycles": ac_cycles,
         },
         status_code=status_code,
     )
