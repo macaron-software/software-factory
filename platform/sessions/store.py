@@ -101,13 +101,15 @@ class SessionStore:
         finally:
             db.close()
 
-    def list_by_config_type(self, type_value: str, limit: int = 50) -> list[SessionDef]:
-        """Return sessions filtered by config->>'type', bypassing list_all(limit) cap."""
+    def list_by_config_type(
+        self, config_type: str, limit: int = 50
+    ) -> list[SessionDef]:
+        """Return sessions whose config JSON has type == config_type, newest first."""
         db = get_db()
         try:
             rows = db.execute(
-                "SELECT * FROM sessions WHERE config_json LIKE ? ORDER BY created_at DESC LIMIT ?",
-                (f'%"{type_value}"%', limit),
+                "SELECT * FROM sessions WHERE config_json::jsonb->>'type' = ? ORDER BY created_at DESC LIMIT ?",
+                (config_type, limit),
             ).fetchall()
             return [_row_to_session(r) for r in rows]
         finally:
