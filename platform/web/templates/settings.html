@@ -627,9 +627,14 @@
                     <h3 style="margin:0">Routing</h3>
                     <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Assign LLM models per task category. Darwin Thompson Sampling will learn which model performs best for each team × category.</p>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
-                    <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
-                </button>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-ghost btn-sm" onclick="resetLLMRouting()" id="routing-reset-btn" title="Reset to auto-detected defaults (primary provider)">
+                        <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
+                        <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
+                    </button>
+                </div>
             </div>
             <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:0.83rem" id="routing-table">
@@ -1547,7 +1552,11 @@ function _modelSelect(key, currentVal) {
         const val = m.provider + '::' + m.model;
         const cur = currentVal ? (currentVal.provider + '::' + currentVal.model) : '';
         const disabled = !m.enabled ? ' style="color:var(--text-secondary)"' : '';
-        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${m.label}</option>`;
+        // Short label: "ProviderName / model-basename" (strip HuggingFace org prefix)
+        const modelShort = m.model.includes('/') ? m.model.split('/').pop() : m.model;
+        const provShort = m.label.split(' / ')[0];
+        const displayLabel = provShort + ' / ' + modelShort;
+        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${displayLabel}</option>`;
     }).join('');
     return `<select class="routing-select" data-routing-key="${key}">${opts}</select>`;
 }
@@ -1588,6 +1597,21 @@ async function saveLLMRouting() {
     } catch(e) {
         alert(e.message); btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
     }
+}
+
+async function resetLLMRouting() {
+    if (!confirm('Réinitialiser le routing aux valeurs par défaut (provider primaire auto-détecté) ?')) return;
+    const btn = document.getElementById('routing-reset-btn');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/routing/reset', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) {
+            renderRoutingTable(j.routing || {});
+            btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-check"/></svg> Reset';
+            setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset'; }, 2000);
+        }
+    } catch(e) { console.error(e); btn.disabled=false; }
 }
 
 async function loadLLMABTests() {

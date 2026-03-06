@@ -228,6 +228,25 @@ async def save_llm_routing(payload: dict):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
+@router.post("/api/llm/routing/reset")
+async def reset_llm_routing():
+    """Reset routing to current auto-detected defaults (primary provider)."""
+    try:
+        db = _get_db()
+        db.execute("DELETE FROM session_state WHERE key='llm_routing'")
+        db.commit()
+        db.close()
+        try:
+            from ....agents.executor import _invalidate_routing_cache
+
+            _invalidate_routing_cache()
+        except Exception:
+            pass
+        return JSONResponse({"ok": True, "routing": _DEFAULT_ROUTING})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
 @router.post("/api/llm/providers/{provider_id}/toggle")
 async def toggle_provider(provider_id: str):
     """Enable or disable a provider (independent of API key presence)."""

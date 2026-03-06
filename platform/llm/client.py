@@ -128,8 +128,19 @@ _PROVIDERS = {
 
 # Fallback order driven by PLATFORM_LLM_PROVIDER (local=minimax first, azure=azure-openai first)
 # Auto-detect Azure when AZURE_DEPLOY=1 (not just from key presence)
+# LOCAL_MLX_ENABLED=1 takes priority over MINIMAX_API_KEY for primary detection
+_local_mlx_enabled = os.environ.get("LOCAL_MLX_ENABLED", "").strip().lower() not in (
+    "",
+    "0",
+    "false",
+    "no",
+)
 _primary = os.environ.get("PLATFORM_LLM_PROVIDER") or (
-    "azure-openai" if os.environ.get("AZURE_OPENAI_API_KEY") else "minimax"
+    "local-mlx"
+    if _local_mlx_enabled
+    else "azure-openai"
+    if os.environ.get("AZURE_OPENAI_API_KEY")
+    else "minimax"
 )
 _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
 
@@ -141,7 +152,6 @@ def _env_flag(name: str) -> bool:
     return v not in ("", "0", "false", "no")
 
 
-_local_mlx_enabled = _env_flag("LOCAL_MLX_ENABLED")
 _ollama_enabled = _env_flag("OLLAMA_ENABLED")
 _opencode_enabled = bool(
     os.environ.get("OPENCODE_API_KEY", "") or _env_flag("OPENCODE_ENABLED")
