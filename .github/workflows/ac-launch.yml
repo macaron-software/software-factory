@@ -90,6 +90,26 @@ jobs:
           
           BASE_URL="http://localhost:8090"
           
+          # Detect actual platform port
+          echo ""
+          echo "=== Process & Port Detection ==="
+          ss -tlnp 2>/dev/null | grep -E "LISTEN.*:80|:88|:89|:90|:30|:81|:82" || true
+          PLATFORM_PID=$(pgrep -f "uvicorn.*platform" 2>/dev/null | head -1)
+          DOCKER_ID=$(docker ps --format "{{.ID}} {{.Ports}}" 2>/dev/null | grep -E "80|88|89|90" | head -3 || true)
+          echo "Uvicorn PID: $PLATFORM_PID"
+          echo "Docker containers: $DOCKER_ID"
+          
+          # Try common ports
+          for PORT in 8090 8099 8080 80 3000; do
+            RESP=$(curl -sf --max-time 2 "http://localhost:$PORT/api/health" 2>/dev/null)
+            if echo "$RESP" | grep -q '"status"'; then
+              BASE_URL="http://localhost:$PORT"
+              echo "Platform found at port $PORT"
+              break
+            fi
+          done
+          echo "Using: $BASE_URL"
+          
           # Helper function: curl with optional auth, never fails script
           do_api() {
             METHOD="$1"; URL="$2"; shift 2
