@@ -411,16 +411,18 @@ async function acOpenModal(projectId, projectName) {
       });
       phaseHtml += '</div></div>';
 
-      // --- KPI grid ---
+      // --- KPI grid (row 1: scores / row 2: activity) ---
       var lc = d.latest_cycle || {};
       var conv = d.convergence || {};
+      var totalToolCalls = d.total_tool_calls || 0;
+      var agentsActive = d.agents_active || [];
       function kpi(label, val, col) {
         return '<div style="background:var(--bg-tertiary);border-radius:.35rem;padding:.5rem .75rem">'
           + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.2rem">' + label + '</div>'
           + '<div style="font-size:1.05rem;font-weight:700;color:' + (col||'var(--text-primary)') + '">' + val + '</div>'
           + '</div>';
       }
-      var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:1rem">';
+      var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.75rem">';
       kpiHtml += kpi('Score moy.', st.total_score_avg ? Math.round(st.total_score_avg) + '/100' : '—', st.total_score_avg >= 80 ? 'var(--green)' : 'var(--yellow-deep)');
       kpiHtml += kpi('Cycle', st.current_cycle + '/20', 'var(--blue-bright)');
       kpiHtml += kpi('Convergence', conv.status || 'cold_start', conv.status === 'improving' ? 'var(--green)' : conv.status === 'regression' ? 'var(--red)' : 'var(--yellow-deep)');
@@ -436,7 +438,7 @@ async function acOpenModal(projectId, projectName) {
       var allScores = d.all_scores || [];
       if (allScores.length) {
         var mx = Math.max.apply(null, allScores.concat([1]));
-        sparkHtml = '<div style="margin-bottom:1rem"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle</div>'
+        sparkHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle</div>'
           + '<div style="display:flex;align-items:flex-end;gap:3px;height:40px">';
         allScores.forEach(function(s, i) {
           var h = Math.max(3, Math.round((s/mx)*36));
@@ -450,20 +452,79 @@ async function acOpenModal(projectId, projectName) {
       var runHtml = '';
       var run = d.run || {};
       if (run.id) {
-        var runColor = run.status === 'running' ? 'var(--green)' : run.status === 'completed' ? 'var(--blue-bright)' : run.status === 'failed' ? 'var(--red)' : 'var(--text-secondary)';
-        runHtml = '<div style="margin-bottom:1rem;padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:.4rem;font-size:.72rem">'
+        var runColor = run.status === 'running' || run.status === 'active' ? 'var(--green)' : run.status === 'completed' ? 'var(--blue-bright)' : run.status === 'failed' ? 'var(--red)' : 'var(--text-secondary)';
+        runHtml = '<div style="margin-bottom:.75rem;padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:.4rem;font-size:.72rem">'
           + '<div style="display:flex;justify-content:space-between;margin-bottom:.25rem">'
-          + '<strong>Mission en cours</strong><span style="color:' + runColor + '">' + run.status + '</span></div>'
+          + '<strong>Mission</strong><span style="color:' + runColor + '">' + run.status + '</span></div>'
           + '<div style="color:var(--text-secondary)">' + run.name + '</div>'
-          + (run.current_phase ? '<div style="margin-top:.25rem">Phase : <strong>' + run.current_phase + '</strong></div>' : '')
-          + '<div style="margin-top:.2rem;color:var(--text-secondary);font-size:.65rem">démarré ' + (run.started_at || '—') + '</div>'
+          + (run.current_phase ? '<div style="margin-top:.25rem">Phase active : <strong style="color:var(--purple)">' + run.current_phase + '</strong></div>' : '')
+          + '<div style="margin-top:.2rem;color:var(--text-secondary);font-size:.65rem">run ' + run.id.slice(0,8) + ' · démarré ' + (run.started_at || '—').slice(0,19) + '</div>'
           + '</div>';
+      }
+
+      // --- Agents actifs + tools appelés ---
+      var activityHtml = '';
+      if (agentsActive.length || totalToolCalls > 0) {
+        activityHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">';
+        // Agents
+        activityHtml += '<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.6rem">';
+        activityHtml += '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">Agents actifs (' + agentsActive.length + ')</div>';
+        if (agentsActive.length) {
+          agentsActive.forEach(function(a) {
+            activityHtml += '<div style="display:flex;justify-content:space-between;font-size:.68rem;padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+              + '<span style="font-family:monospace;color:var(--text-primary)">' + a.id + '</span>'
+              + '<span style="color:var(--text-secondary)">' + a.activity + ' act.</span></div>';
+          });
+        } else {
+          activityHtml += '<div style="font-size:.68rem;color:var(--text-secondary)">En attente…</div>';
+        }
+        activityHtml += '</div>';
+        // Tools
+        var toolData = d.tool_activity || [];
+        activityHtml += '<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.6rem">';
+        activityHtml += '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">Outils appelés (' + totalToolCalls + ')</div>';
+        if (toolData.length) {
+          toolData.slice(0, 6).forEach(function(t) {
+            var tpct = totalToolCalls > 0 ? Math.round((t.count/totalToolCalls)*100) : 0;
+            activityHtml += '<div style="margin-bottom:.25rem">'
+              + '<div style="display:flex;justify-content:space-between;font-size:.68rem">'
+              + '<span style="font-family:monospace">' + t.tool + '</span>'
+              + '<span style="color:var(--text-secondary)">' + t.count + '</span></div>'
+              + '<div style="height:2px;background:var(--border);border-radius:1px;margin-top:2px">'
+              + '<div style="height:100%;width:' + tpct + '%;background:var(--purple);border-radius:1px"></div></div></div>';
+          });
+        } else {
+          activityHtml += '<div style="font-size:.68rem;color:var(--text-secondary)">En attente…</div>';
+        }
+        activityHtml += '</div>';
+        activityHtml += '</div>';
+      }
+
+      // --- Live events feed ---
+      var eventsHtml = '';
+      var evtsData = d.live_events || [];
+      if (evtsData.length) {
+        eventsHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Activité live</div>';
+        eventsHtml += '<div style="max-height:140px;overflow-y:auto;font-size:.68rem">';
+        evtsData.slice(0,15).forEach(function(e) {
+          var typeCol = e.type && e.type.includes('error') ? 'var(--red)' : e.type && e.type.includes('done') ? 'var(--green)' : 'var(--text-secondary)';
+          var ts = (e.ts || '').slice(11,19);
+          eventsHtml += '<div style="display:flex;gap:.5rem;padding:.15rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+            + '<span style="color:var(--text-secondary);font-family:monospace;flex-shrink:0">' + ts + '</span>'
+            + '<span style="color:' + typeCol + ';flex-shrink:0;font-family:monospace">' + (e.type||'').slice(0,16) + '</span>'
+            + (e.actor ? '<span style="color:var(--purple);flex-shrink:0">' + e.actor + '</span>' : '')
+            + '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (e.summary || e.tool || '') + '</span>'
+            + '</div>';
+        });
+        eventsHtml += '</div></div>';
+      } else if (isRunning) {
+        eventsHtml = '<div style="margin-bottom:.75rem;font-size:.68rem;color:var(--text-secondary);padding:.5rem;background:var(--bg-tertiary);border-radius:.3rem">En attente des premiers événements… (refresh auto toutes 4s)</div>';
       }
 
       // --- Fix summary ---
       var fixHtml = '';
       if (lc.fix_summary) {
-        fixHtml = '<div style="margin-bottom:1rem;padding:.6rem .75rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.72rem">'
+        fixHtml = '<div style="margin-bottom:.75rem;padding:.6rem .75rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.72rem">'
           + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.3rem">Fix Summary — cycle ' + lc.cycle_num + '</div>'
           + '<div style="color:var(--text-primary)">' + lc.fix_summary + '</div>'
           + (lc.git_sha ? '<div style="margin-top:.25rem;font-family:monospace;font-size:.65rem;color:var(--text-secondary)">git: ' + lc.git_sha.slice(0,12) + '</div>' : '')
@@ -474,7 +535,7 @@ async function acOpenModal(projectId, projectName) {
       var advHtml = '';
       var advData = d.adversarial || [];
       if (advData.length) {
-        advHtml = '<div style="margin-bottom:1rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Adversarial — derniers cycles</div>';
+        advHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Adversarial — derniers cycles</div>';
         advHtml += '<table style="width:100%;font-size:.7rem;border-collapse:collapse">';
         advHtml += '<thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Cycle</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Dimension</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Score</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Verdict</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Findings</th></tr></thead><tbody>';
         advData.slice(0, 15).forEach(function(r) {
@@ -512,7 +573,7 @@ async function acOpenModal(projectId, projectName) {
 
       var body = document.getElementById('ac-modal-body');
       if (body) {
-        body.innerHTML = phaseHtml + kpiHtml + sparkHtml + runHtml + fixHtml + advHtml + cyclesHtml;
+        body.innerHTML = phaseHtml + kpiHtml + sparkHtml + runHtml + activityHtml + eventsHtml + fixHtml + advHtml + cyclesHtml;
       }
 
       // Schedule next poll if running

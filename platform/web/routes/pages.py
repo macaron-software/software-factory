@@ -1497,8 +1497,11 @@ async def api_improvement_live(project_id: str):
         else {"status": "cold_start"}
     )
 
-    # Mission run status (live phase tracking)
+    # Mission run status + live activity (events + tool calls)
     run_status = {}
+    live_events = []
+    tool_activity = []
+    agents_active = []
     current_run_id = state.get("current_run_id")
     if current_run_id:
         try:
@@ -1517,6 +1520,82 @@ async def api_improvement_live(project_id: str):
                 }
         except Exception:
             pass
+
+        # Live events for this mission (last 30)
+        def _load_activity():
+            import json as _json
+            from ...db.migrations import get_db
+
+            db = get_db()
+            evts = []
+            tools = []
+            try:
+                rows = db.execute(
+                    "SELECT timestamp, event_type, actor, data FROM events "
+                    "WHERE mission_id=? ORDER BY timestamp DESC LIMIT 30",
+                    (current_run_id,),
+                ).fetchall()
+                for r in rows:
+                    try:
+                        d = _json.loads(r["data"] or "{}")
+                    except Exception:
+                        d = {}
+                    evts.append(
+                        {
+                            "ts": r["timestamp"],
+                            "type": r["event_type"],
+                            "actor": r["actor"],
+                            "summary": d.get("summary")
+                            or d.get("message")
+                            or d.get("content", "")[:120],
+                            "phase": d.get("phase", ""),
+                            "tool": d.get("tool_name", ""),
+                        }
+                    )
+            except Exception:
+                pass
+            # Tool calls linked to sessions of this mission
+            try:
+                tc_rows = db.execute(
+                    """SELECT tc.tool_name, tc.agent_id, tc.success, COUNT(*) as cnt
+                       FROM tool_calls tc
+                       WHERE tc.session_id IN (
+                           SELECT id FROM sessions WHERE config_json LIKE ?
+                       )
+                       GROUP BY tc.tool_name, tc.agent_id
+                       ORDER BY cnt DESC LIMIT 20""",
+                    (f"%{current_run_id}%",),
+                ).fetchall()
+                for r in tc_rows:
+                    tools.append(
+                        {
+                            "tool": r["tool_name"],
+                            "agent": r["agent_id"],
+                            "count": r["cnt"],
+                            "success": bool(r["success"]),
+                        }
+                    )
+            except Exception:
+                pass
+            db.close()
+            return evts, tools
+
+        live_events, tool_activity = await asyncio.to_thread(_load_activity)
+
+        # Aggregate active agents from events + tool_calls
+        seen = {}
+        for e in live_events:
+            a = e.get("actor", "")
+            if a and a != "system":
+                seen[a] = seen.get(a, 0) + 1
+        for t in tool_activity:
+            a = t.get("agent", "")
+            if a:
+                seen[a] = seen.get(a, 0) + t.get("count", 1)
+        agents_active = [
+            {"id": k, "activity": v}
+            for k, v in sorted(seen.items(), key=lambda x: -x[1])[:10]
+        ]
 
     # Latest cycle full detail
     latest = cycles[0] if cycles else {}
@@ -1580,6 +1659,10 @@ async def api_improvement_live(project_id: str):
             ],
             "phases": _AC_PHASES,
             "all_scores": all_scores,
+            "live_events": live_events[:20],
+            "tool_activity": tool_activity,
+            "agents_active": agents_active,
+            "total_tool_calls": sum(t.get("count", 0) for t in tool_activity),
         }
     )
 
