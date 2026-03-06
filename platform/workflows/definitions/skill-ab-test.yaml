@@ -1,0 +1,153 @@
+id: skill-ab-test
+name: Skill A/B Improvement
+description: 'Autonomous skill improvement: identify underperformer → baseline eval → generate improved version (skill-creator) → A/B eval → ship if +10pp. No human gate.'
+icon: workflow
+is_builtin: true
+phases:
+- id: identify-target
+  pattern_id: solo
+  name: Identify Target Skill
+  description: |
+    Call GET /api/skills/eval to get the Skills Health coverage data.
+    Select target skill using priority:
+      1. Lowest pass_rate among skills with eval_cases that have been run (pass_rate < 0.80)
+      2. Skills with eval_cases that have never been run (status: never_run)
+      3. Exit cleanly if all pass_rate >= 0.80
+    Log selected skill + rationale.
+  gate: target skill identified (name + current pass_rate or "never_run")
+  config:
+    agents:
+    - rte
+
+- id: baseline-eval
+  pattern_id: solo
+  name: Run Baseline Eval
+  description: |
+    Using skill-improver.md guidance:
+    If target skill has never been run OR last run > 48h ago:
+      POST /api/skills/eval/{skill_name}/run → poll job until done
+    Record baseline_pass_rate, checks_pass_rate, llm_judge_score.
+    If skill already has recent results: use existing data as baseline.
+  gate: baseline_pass_rate recorded
+  config:
+    agents:
+    - qa
+    skill_agents:
+    - skill: skill-improver
+
+- id: generate-improvement
+  pattern_id: solo
+  name: Generate Improved Skill (v+1)
+  description: |
+    Using skills/skill-creator.md + skills/skill-grader.md:
+    1. Load current skills/{skill_name}.md
+    2. Analyze eval failures: which cases failed? which checks? which expectations?
+    3. Root cause each failure (vague rule, missing example, ambiguous instruction)
+    4. Rewrite the skill: strengthen rules, add bad/good examples, tighten language
+    5. NEVER remove eval_cases, NEVER lower expectations
+    6. Bump version (1.0.0 → 1.1.0)
+    7. Write to skills/{skill_name}.candidate.md (do NOT overwrite original yet)
+  gate: skills/{skill_name}.candidate.md created with bumped version
+  config:
+    agents:
+    - lead-dev
+    skill_agents:
+    - skill: skill-creator
+    - skill: skill-grader
+
+- id: candidate-eval
+  pattern_id: solo
+  name: Run Candidate Eval (A/B)
+  description: |
+    Swap in candidate:
+      mv skills/{skill_name}.md skills/{skill_name}.baseline.md
+      cp skills/{skill_name}.candidate.md skills/{skill_name}.md
+    Run eval: POST /api/skills/eval/{skill_name}/run → poll until done
+    Record candidate_pass_rate, checks_pass_rate, llm_judge_score.
+    Restore: mv skills/{skill_name}.baseline.md skills/{skill_name}.md
+    (candidate.md stays for the decision phase)
+  gate: candidate_pass_rate recorded, original skill restored
+  config:
+    agents:
+    - qa
+
+- id: ship-or-rollback
+  pattern_id: solo
+  name: Ship or Rollback
+  description: |
+    Using skill-improver.md decision rules:
+    SHIP if:
+      candidate_pass_rate >= baseline_pass_rate + 0.10  (≥10pp gain)
+      OR (candidate_pass_rate >= 0.80 AND baseline_pass_rate < 0.80)  (crossed green)
+    ROLLBACK otherwise.
+
+    SHIP: overwrite skills/{skill_name}.md with candidate content
+    ROLLBACK: keep original, discard candidate
+
+    Either way:
+      - Delete skills/{skill_name}.candidate.md
+      - Delete skills/{skill_name}.baseline.md (if exists)
+      - Output summary: target, baseline%, candidate%, delta, decision, reason
+      - Store result in memory_global under 'skill_improver_last_run'
+  gate: always
+  config:
+    agents:
+    - rte
+    skill_agents:
+    - skill: skill-improver
+
+config:
+  schedule: on-demand
+  # Also auto-triggered by AC cycle when: cycle_count % 5 == 0 OR any skill pass_rate < 0.70
+  auto_trigger:
+    condition: "ac_cycle_count % 5 == 0 OR skills_health.passing_pct < 0.70"
+    max_concurrent: 1  # only one improvement run at a time
+  graph:
+    nodes:
+    - id: n1
+      agent_id: rte
+      x: 100
+      y: 150
+      label: Identify Target
+      phase: identify-target
+    - id: n2
+      agent_id: qa
+      x: 280
+      y: 150
+      label: Baseline Eval
+      phase: baseline-eval
+    - id: n3
+      agent_id: lead-dev
+      x: 460
+      y: 150
+      label: Generate v+1
+      phase: generate-improvement
+    - id: n4
+      agent_id: qa
+      x: 640
+      y: 150
+      label: Candidate Eval
+      phase: candidate-eval
+    - id: n5
+      agent_id: rte
+      x: 820
+      y: 150
+      label: Ship / Rollback
+      phase: ship-or-rollback
+    edges:
+    - from: n1
+      to: n2
+      label: target skill
+      color: '#6366f1'
+    - from: n2
+      to: n3
+      label: baseline recorded
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: candidate ready
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: A/B results
+      color: '#d29922'
