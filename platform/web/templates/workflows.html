@@ -3,9 +3,9 @@
 
 <div class="tabs">
     <button class="tab active" hx-get="/workflows/list" hx-target="#tab-content" hx-swap="innerHTML" hx-trigger="click, load" onclick="switchTab(this)">{{ _("templates") }}</button>
-    <button class="tab" hx-get="/patterns/list" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns") }}</button>
-    <button class="tab" hx-get="/workflows/evolution" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Évolution</button>
-    <button class="tab" hx-get="/workflows/improvement" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">Amélioration Continue</button>
+    <button class="tab" hx-get="/patterns/list" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("patterns_organisationnels") }}</button>
+    <button class="tab" hx-get="/workflows/evolution" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("evolution") }}</button>
+    <button class="tab" hx-get="/workflows/improvement" hx-target="#tab-content" hx-swap="innerHTML" onclick="switchTab(this)">{{ _("amelioration_continue") }}</button>
 </div>
 <div id="tab-content"></div>
 <script>

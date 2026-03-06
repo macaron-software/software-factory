@@ -34,6 +34,8 @@ SUPPORTED_LANGS = (
     "vi",
     "pl",
     "sv",
+    "cs",
+    "uk",
 )
 
 # In-memory catalog: {"en": {"key": "value"}, "fr": {"key": "valeur"}}
