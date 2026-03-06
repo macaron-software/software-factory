@@ -165,10 +165,25 @@ GAME_HTML5_CRITERIA = [
         {"pattern": "**/*.{js,ts}", "min": 3},
     ),
     Criterion(
+        "build-produces-js",
+        "Build produit des fichiers JS exécutables (dist/ compilé ou JS vanilla)",
+        "command_ok",
+        {
+            "command": (
+                "npm run build 2>&1 && ("
+                "find dist -name '*.js' 2>/dev/null | head -1 | grep . || "
+                "find . -maxdepth 3 -name '*.js' -not -path '*/node_modules/*' "
+                "  -not -name '*.test.js' -not -name '*.spec.js' | head -1 | grep ."
+                ")"
+            ),
+            "timeout": 120,
+        },
+    ),
+    Criterion(
         "npm-test",
         "npm test passe (au moins 1 test réel)",
         "command_ok",
-        {"command": "npm test 2>&1 || true", "cwd": "."},
+        {"command": "npm test 2>&1"},
     ),
 ]
 

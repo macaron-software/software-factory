@@ -55,6 +55,15 @@ DECISIONS ET CORRECTIFS (historique, ordre chronologique)
   Fix : base64.b64encode(brief) → string safe [A-Za-z0-9+/=] → passée en SSH →
   base64.b64decode() dans le container Python → string originale intacte.
 
+[Fix #9] Evidence gate trop laxiste — faux positifs HTML5 games (2026-03)
+  Symptôme : TypeScript jamais compilé, dist/ absent, game broken → run marqué completed score=83.
+  Cause 1  : criterion npm-test utilisait "npm test 2>&1 || true" → toujours exit 0.
+  Cause 2  : aucun criterion vérifiant dist/ ou fichiers JS compilés.
+  Cause 3  : exhaustion des sprints → phase_success=True même sur phase critique.
+  Fix 1    : suppression du "|| true" dans npm-test command.
+  Fix 2    : ajout criterion "build-produces-js" : npm run build + vérif dist/ ou JS.
+  Fix 3    : _CRITICAL_EVIDENCE_PHASES → phase_success=False si evidence gate exhaust.
+
 ═══════════════════════════════════════════════════════════════════════════════
 PRINCIPES D'ORCHESTRATION (décisions structurelles)
 ═══════════════════════════════════════════════════════════════════════════════
@@ -89,6 +98,9 @@ import logging
 import time
 import traceback
 from datetime import datetime
+
+# Phases where evidence gate failure at max_sprints = hard failure (not "continue with issues")
+_CRITICAL_EVIDENCE_PHASES = {"tdd-sprint", "feature-e2e", "qa-sprint", "game-tdd"}
 
 logger = logging.getLogger(__name__)
 
@@ -1439,10 +1451,14 @@ class EpicOrchestrator:
                         "Evidence gate FAILED for %s, max sprints exhausted — continuing with issues",
                         phase.phase_id,
                     )
-                    phase_success = True  # Continue pipeline despite evidence gap
-                    phase_error = (
-                        f"Evidence gate: {passed_count}/{total_count} criteria met"
-                    )
+                    if phase.phase_id in _CRITICAL_EVIDENCE_PHASES:
+                        phase_success = False  # Hard failure for critical phases
+                        phase_error = f"Evidence gate FAILED ({passed_count}/{total_count}) — phase critique, livraison bloquée"
+                    else:
+                        phase_success = True  # Continue pipeline despite evidence gap
+                        phase_error = (
+                            f"Evidence gate: {passed_count}/{total_count} criteria met"
+                        )
                     break
 
                 # Sprint succeeded but evidence gate was not applicable (no criteria).
