@@ -19,17 +19,35 @@ _RATE_LIMIT_DEFAULTS: dict[str, tuple[str, str]] = {
 
 # AC quality thresholds — stored in platform_settings, read live by dashboard + platform
 _AC_QUALITY_DEFAULTS: dict[str, tuple[str, str]] = {
-    "ac_hardening_threshold": ("85", "Score min avant déclenchement du Hardening Sprint (0-100)"),
-    "ac_adversarial_warn": ("60", "Score adversarial en-dessous duquel on passe en warn (0-100)"),
-    "ac_adversarial_fail": ("40", "Score adversarial en-dessous duquel on passe en fail (0-100)"),
-    "ac_max_hardening_per_cycle": ("1", "Nombre max de sprints hardening consécutifs avant de forcer la progression"),
-    "ac_auto_hardening_enabled": ("true", "Activer le déclenchement automatique du Hardening Sprint"),
+    "ac_hardening_threshold": (
+        "85",
+        "Score min avant déclenchement du Hardening Sprint (0-100)",
+    ),
+    "ac_adversarial_warn": (
+        "60",
+        "Score adversarial en-dessous duquel on passe en warn (0-100)",
+    ),
+    "ac_adversarial_fail": (
+        "40",
+        "Score adversarial en-dessous duquel on passe en fail (0-100)",
+    ),
+    "ac_max_hardening_per_cycle": (
+        "1",
+        "Nombre max de sprints hardening consécutifs avant de forcer la progression",
+    ),
+    "ac_auto_hardening_enabled": (
+        "true",
+        "Activer le déclenchement automatique du Hardening Sprint",
+    ),
 }
 
 
 def _ensure_defaults(db) -> None:
     """Seed missing default settings into platform_settings."""
-    for key, (value, description) in {**_RATE_LIMIT_DEFAULTS, **_AC_QUALITY_DEFAULTS}.items():
+    for key, (value, description) in {
+        **_RATE_LIMIT_DEFAULTS,
+        **_AC_QUALITY_DEFAULTS,
+    }.items():
         db.execute(
             "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
             (key, value, description),

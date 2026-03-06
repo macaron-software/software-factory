@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -93,7 +92,7 @@ async def missions_page(request: Request):
 async def mission_detail_page(request: Request, epic_id: str):
     """Mission cockpit — sprints, board, team."""
     from ....agents.store import get_agent_store
-    from ....epics.store import get_epic_run_store, get_epic_store
+    from ....epics.store import get_epic_store
     from ....projects.manager import get_project_store
 
     epic_store = get_epic_store()
@@ -147,49 +146,6 @@ async def mission_detail_page(request: Request, epic_id: str):
         if a.id.startswith(prefix + "-") or a.id.startswith(mission.project_id + "-")
     ]
 
-    # Project PM lead agent
-    lead_agent = None
-    lead_avatar_url = ""
-    _av_dir = Path(__file__).resolve().parent.parent.parent / "static" / "avatars"
-    if project and project.lead_agent_id:
-        lead_agent = agent_store.get(project.lead_agent_id)
-        if lead_agent:
-            for ext in ("jpg", "svg"):
-                if (_av_dir / f"{lead_agent.id}.{ext}").exists():
-                    lead_avatar_url = f"/static/avatars/{lead_agent.id}.{ext}"
-                    break
-
-    # Epic runs (workflow executions for this epic's project)
-    epic_runs = []
-    try:
-        run_store = get_epic_run_store()
-        all_runs = run_store.list_runs(project_id=mission.project_id, limit=20)
-        for r in all_runs:
-            phases = r.phases if r.phases else []
-            epic_runs.append({
-                "id": r.id,
-                "workflow_name": r.workflow_name,
-                "workflow_id": r.workflow_id,
-                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
-                "current_phase": r.current_phase,
-                "created_at": str(r.created_at)[:16] if r.created_at else "",
-                "phases": [
-                    {
-                        "phase_id": ph.phase_id,
-                        "phase_name": ph.phase_name or ph.phase_id,
-                        "status": ph.status.value if hasattr(ph.status, "value") else str(ph.status),
-                        "pattern_id": ph.pattern_id or "",
-                        "iteration": ph.iteration or 0,
-                        "sprint_count": ph.sprint_count or 0,
-                        "agent_count": ph.agent_count or 0,
-                        "summary": (ph.summary or "")[:120],
-                    }
-                    for ph in phases
-                ],
-            })
-    except Exception:
-        pass
-
     # Features linked to this epic (SAFe: Epic → Features → Stories)
     from ....missions.product import ProductBacklog
 
@@ -211,15 +167,12 @@ async def mission_detail_page(request: Request, epic_id: str):
             "selected_sprint": selected_sprint,
             "tasks_by_status": tasks_by_status,
             "team_agents": team_agents,
-            "lead_agent": lead_agent,
-            "lead_avatar_url": lead_avatar_url,
             "velocity_history": velocity_history,
             "total_velocity": total_velocity,
             "total_planned": total_planned,
             "avg_velocity": avg_velocity,
             "epic_features": epic_features,
             "epic_stories": epic_stories,
-            "epic_runs": epic_runs,
         },
     )
 

@@ -13,6 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from ....i18n import t
 from ...schemas import ErrorResponse, OkResponse
 from ..helpers import _active_mission_tasks, get_mission_semaphore, _parse_body
+from ..sse_utils import sse
 from .execution_helpers import build_epic_context, get_role_instruction
 
 router = APIRouter()
@@ -496,9 +497,6 @@ async def mission_chat_stream(request: Request, epic_id: str):
     async def event_generator():
         import markdown as md_lib
 
-        def sse(event: str, data: dict) -> str:
-            return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
-
         yield sse("status", {"label": "Analyse en cours..."})
 
         try:
@@ -863,46 +861,6 @@ async def api_mission_reset(request: Request, epic_id: str):
     return JSONResponse({"status": "reset", "mission_id": epic_id})
 
 
-@router.post("/api/epics/{run_id}/retry")
-@router.post("/api/missions/{run_id}/retry")
-async def api_mission_retry(request: Request, run_id: str):
-    """Watchdog retry endpoint: if the task is alive, touch updated_at to suppress false
-    stall alarms. If the task is gone (zombie), mark as paused for auto_resume.
-    """
-    from ....db.migrations import get_db
-    from ....epics.store import get_epic_run_store
-
-    run_store = get_epic_run_store()
-    mission = run_store.get(run_id)
-    if not mission:
-        return JSONResponse({"error": "Not found"}, status_code=404)
-
-    task = _active_mission_tasks.get(run_id)
-    if task and not task.done():
-        # Mission is actively running — refresh updated_at to suppress false stall
-        try:
-            db = get_db()
-            db.execute("UPDATE epic_runs SET updated_at=datetime('now') WHERE id=?", (run_id,))
-            db.commit()
-            db.close()
-        except Exception:
-            pass
-        return JSONResponse({"status": "alive", "run_id": run_id})
-
-    # No active task — zombie: mark paused so auto_resume relaunches it
-    try:
-        db = get_db()
-        db.execute(
-            "UPDATE epic_runs SET status='paused', updated_at=datetime('now') WHERE id=? AND status='running'",
-            (run_id,),
-        )
-        db.commit()
-        db.close()
-    except Exception:
-        pass
-    return JSONResponse({"status": "paused_for_resume", "run_id": run_id})
-
-
 # ── Confluence Sync ──────────────────────────────────────────
 
 
@@ -1046,8 +1004,13 @@ async def api_epic_run(request: Request, epic_id: str):
 
     Uses the REAL pattern engine (run_pattern) for each phase — agents
     think with LLM, stream their responses, and interact per pattern type.
+
+    Smart resume: phases already DONE are skipped; only FAILED/PENDING phases
+    are re-executed. This allows re-running a completed/failed run without
+    restarting from ideation.
     """
     from ....epics.store import get_epic_run_store
+    from ....models import PhaseStatus
 
     run_store = get_epic_run_store()
     mission = run_store.get(epic_id)
@@ -1060,8 +1023,36 @@ async def api_epic_run(request: Request, epic_id: str):
             {"status": "running", "mission_id": epic_id, "info": "already running"}
         )
 
+    # Reset FAILED phases → PENDING so they are re-executed.
+    # DONE/DONE_WITH_ISSUES phases stay as-is and will be skipped by the orchestrator.
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    from_phase: int = int(body.get("from_phase", -1))
+
+    reset_count = 0
+    for idx, phase in enumerate(mission.phases):
+        if from_phase >= 0 and idx >= from_phase:
+            # Hard reset from a specific phase index
+            phase.status = PhaseStatus.PENDING
+            reset_count += 1
+        elif phase.status == PhaseStatus.FAILED:
+            phase.status = PhaseStatus.PENDING
+            reset_count += 1
+
+    # Also reset the run status itself so the orchestrator picks it up
+    if mission.status in ("completed", "failed", "paused"):
+        mission.status = "running"
+        run_store.update(mission)
+    elif reset_count:
+        run_store.update(mission)
+
     await _launch_orchestrator(epic_id)
-    return JSONResponse({"status": "running", "mission_id": epic_id})
+    return JSONResponse(
+        {"status": "running", "mission_id": epic_id, "phases_reset": reset_count}
+    )
 
 
 async def _run_milestone_pipeline_background(
@@ -1332,6 +1323,36 @@ async def mission_replay(run_id: str, from_phase: int = 0):
     return JSONResponse(
         {"ok": True, "new_run_id": new_run.id, "from_phase": from_phase}
     )
+
+
+# ── Worker node: resume endpoint (used by multi-node dispatch) ────────────
+
+
+@router.post("/api/missions/runs/{run_id}/resume")
+async def worker_resume_run(run_id: str):
+    """Trigger local execution of a run dispatched from another node.
+
+    Called by auto_resume._try_dispatch_to_worker when this node is the
+    least-loaded worker. Equivalent to /api/missions/{id}/run but targeted
+    by run_id rather than epic_id and always resumes (no body required).
+    """
+    from ....epics.store import get_epic_run_store
+    from ....services.auto_resume import _launch_run
+
+    run_store = get_epic_run_store()
+    if not run_store.get(run_id):
+        return JSONResponse({"error": "Run not found"}, status_code=404)
+
+    existing = _active_mission_tasks.get(run_id)
+    if existing and not existing.done():
+        return JSONResponse({"status": "already_running", "run_id": run_id})
+
+    try:
+        await _launch_run(run_id)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+    return JSONResponse({"status": "launched", "run_id": run_id}, status_code=202)
 
 
 # ── Compliance Reports ────────────────────────────────────────────────

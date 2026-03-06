@@ -63,6 +63,10 @@
             hx-get="/metrics/tab/ops" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
         <svg class="icon"><use href="#icon-activity"/></svg> Ops
     </button>
+    <button class="metrics-tab" data-tab="modules"
+            hx-get="/metrics/tab/modules" hx-target="#metrics-content" hx-swap="innerHTML" hx-trigger="click">
+        <svg class="icon"><use href="#icon-package"/></svg> Modules
+    </button>
 </div>
 
 <div id="metrics-content"

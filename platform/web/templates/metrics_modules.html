@@ -1,0 +1,134 @@
+<style>
+.mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0.75rem;margin-top:0.75rem}
+.mod-row{display:flex;align-items:center;gap:0.6rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;font-size:0.82rem}
+.mod-row.enabled{border-color:rgba(139,92,246,.3);background:rgba(139,92,246,.05)}
+.mod-dot{width:7px;height:7px;border-radius:50%;background:var(--border);flex-shrink:0}
+.mod-dot.on{background:var(--purple)}
+.rtk-bar{height:6px;border-radius:3px;background:var(--purple);transition:width .4s ease}
+.rtk-bar-bg{height:6px;border-radius:3px;background:var(--border);overflow:hidden;flex:1}
+</style>
+
+<!-- KPIs -->
+<div class="metrics-kpi-row" id="mod-kpis">
+    <div class="metrics-kpi"><div class="kpi-label">RTK compressions (all time)</div><div class="kpi-value" id="mk-rtk-calls">—</div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Tokens saved (all time)</div><div class="kpi-value" id="mk-tokens-saved">—</div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Avg savings %</div><div class="kpi-value" id="mk-savings-pct">—</div></div>
+    <div class="metrics-kpi"><div class="kpi-label">Modules activés</div><div class="kpi-value" id="mk-enabled">—</div></div>
+</div>
+
+<!-- RTK by provider -->
+<div class="metrics-section">
+    <h4>RTK — compressions par provider (all time)</h4>
+    <div id="mod-rtk-table"><p style="color:var(--text-secondary);font-size:0.82rem">Chargement…</p></div>
+</div>
+
+<!-- RTK 7d sparkline -->
+<div class="metrics-section">
+    <h4>RTK — tokens sauvegardés / jour (7j)</h4>
+    <div id="mod-rtk-daily" style="display:flex;flex-direction:column;gap:0.5rem;padding-top:0.25rem"></div>
+</div>
+
+<!-- Module activation overview -->
+<div class="metrics-section">
+    <h4>État des modules</h4>
+    <div class="mod-grid" id="mod-list"></div>
+</div>
+
+<script>
+(function(){
+async function loadModuleMetrics() {
+    try {
+        const r = await fetch('/api/metrics/modules');
+        const d = await r.json();
+
+        // KPIs
+        const rtk = d.rtk;
+        document.getElementById('mk-rtk-calls').textContent = (rtk.total_calls || 0).toLocaleString();
+        document.getElementById('mk-tokens-saved').textContent = fmtN(rtk.total_tokens_saved);
+        document.getElementById('mk-savings-pct').textContent = (rtk.avg_savings_pct || 0) + '%';
+        document.getElementById('mk-enabled').textContent = `${d.enabled_count} / ${d.total_count}`;
+
+        // RTK by provider table
+        if (!rtk.by_provider || !rtk.by_provider.length) {
+            document.getElementById('mod-rtk-table').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Aucune donnée RTK.</p>';
+        } else {
+            let h = '<table class="metrics-table"><thead><tr><th>Provider</th><th>Calls</th><th>Tokens orig.</th><th>Tokens compressés</th><th>Sauvegardés</th><th>% moy.</th></tr></thead><tbody>';
+            const maxCalls = Math.max(...rtk.by_provider.map(r => r.calls));
+            for (const r of rtk.by_provider) {
+                const pct = maxCalls ? Math.round(r.calls / maxCalls * 100) : 0;
+                h += `<tr>
+                    <td><strong>${r.provider}</strong></td>
+                    <td>
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <div class="rtk-bar-bg"><div class="rtk-bar" style="width:${pct}%"></div></div>
+                            <span>${r.calls}</span>
+                        </div>
+                    </td>
+                    <td>${fmtN(r.orig_tokens)}</td>
+                    <td>${fmtN(r.comp_tokens)}</td>
+                    <td style="color:var(--green)">${fmtN(r.orig_tokens - r.comp_tokens)}</td>
+                    <td><strong>${Math.round(r.avg_pct)}%</strong></td>
+                </tr>`;
+            }
+            h += '</tbody></table>';
+            document.getElementById('mod-rtk-table').innerHTML = h;
+        }
+
+        // RTK 7d daily bars
+        const daily = rtk.daily_7d || [];
+        if (!daily.length) {
+            document.getElementById('mod-rtk-daily').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Pas de données sur 7j.</p>';
+        } else {
+            const maxSaved = Math.max(...daily.map(d => d.tokens_saved), 1);
+            let h = '';
+            for (const row of daily) {
+                const pct = Math.round(row.tokens_saved / maxSaved * 100);
+                h += `<div style="display:flex;align-items:center;gap:0.75rem;font-size:0.78rem">
+                    <span style="width:80px;color:var(--text-secondary);flex-shrink:0">${row.day}</span>
+                    <div class="rtk-bar-bg"><div class="rtk-bar" style="width:${pct}%"></div></div>
+                    <span style="width:80px;text-align:right;color:var(--text-secondary)">${fmtN(row.tokens_saved)} tk saved</span>
+                    <span style="color:var(--text-secondary)">${row.calls} calls</span>
+                </div>`;
+            }
+            document.getElementById('mod-rtk-daily').innerHTML = h;
+        }
+
+        // Module list
+        if (!d.modules || !d.modules.length) {
+            document.getElementById('mod-list').innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">Aucun module.</p>';
+        } else {
+            const grouped = {};
+            for (const m of d.modules) {
+                (grouped[m.category] = grouped[m.category] || []).push(m);
+            }
+            let h = '';
+            for (const [cat, mods] of Object.entries(grouped)) {
+                for (const m of mods) {
+                    h += `<div class="mod-row ${m.enabled ? 'enabled' : ''}">
+                        <div class="mod-dot ${m.enabled ? 'on' : ''}"></div>
+                        <span style="font-size:1rem">${m.icon}</span>
+                        <div style="flex:1;min-width:0">
+                            <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.name}</div>
+                            <div style="font-size:0.7rem;color:var(--text-secondary)">${m.category}</div>
+                        </div>
+                        <span style="font-size:0.68rem;font-weight:600;color:${m.enabled ? 'var(--purple)' : 'var(--text-secondary)'}">${m.enabled ? 'ON' : 'off'}</span>
+                    </div>`;
+                }
+            }
+            document.getElementById('mod-list').innerHTML = h;
+        }
+    } catch(e) {
+        document.getElementById('mod-kpis').innerHTML = `<p style="color:var(--text-secondary)">Erreur: ${e.message}</p>`;
+    }
+}
+
+function fmtN(n) {
+    n = n || 0;
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return n.toString();
+}
+
+loadModuleMetrics();
+})();
+</script>

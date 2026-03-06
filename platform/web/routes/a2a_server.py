@@ -38,6 +38,7 @@ _task_queues: dict[str, _queue_module.Queue] = {}
 
 # ── Agent Card ────────────────────────────────────────────────────────────────
 
+
 def _base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
@@ -46,69 +47,72 @@ def _base_url(request: Request) -> str:
 async def agent_card(request: Request):
     """A2A Agent Card — describes Jarvis capabilities for external discovery."""
     base = _base_url(request)
-    return JSONResponse({
-        "a2a_version": "1.0",
-        "id": "urn:agent:software-factory:jarvis",
-        "name": "Jarvis — Software Factory CTO",
-        "description": (
-            "Jarvis is the executive AI agent of the Software Factory. "
-            "He creates and orchestrates projects, epics, missions, sprints and teams. "
-            "Delegate any software delivery task to Jarvis."
-        ),
-        "version": "1.0.0",
-        "provider": {
-            "name": "Macaron Software",
-            "url": base,
-        },
-        "endpoints": {
-            "task_submit": f"{base}/a2a/tasks",
-            "task_get": f"{base}/a2a/tasks/{{task_id}}",
-            "task_cancel": f"{base}/a2a/tasks/{{task_id}}/cancel",
-            "events": f"{base}/a2a/events",
-        },
-        "capabilities": [
-            "create_project",
-            "create_mission",
-            "create_epic",
-            "launch_epic_run",
-            "check_run_status",
-            "delegate_to_rte",
-            "delegate_to_po",
-            "delegate_to_scrum_master",
-            "web_search",
-            "platform_metrics",
-        ],
-        "modalities": ["text/plain", "application/json"],
-        "defaultInputModes": ["text/plain"],
-        "defaultOutputModes": ["text/plain"],
-        "skills": [
-            {
-                "id": "project-creation",
-                "name": "Project Creation",
-                "description": "Create a new software project with team, workflow and first epic.",
-                "tags": ["project", "epic", "mission"],
+    return JSONResponse(
+        {
+            "a2a_version": "1.0",
+            "id": "urn:agent:software-factory:jarvis",
+            "name": "Jarvis — Software Factory CTO",
+            "description": (
+                "Jarvis is the executive AI agent of the Software Factory. "
+                "He creates and orchestrates projects, epics, missions, sprints and teams. "
+                "Delegate any software delivery task to Jarvis."
+            ),
+            "version": "1.0.0",
+            "provider": {
+                "name": "Macaron Software",
+                "url": base,
             },
-            {
-                "id": "delivery-orchestration",
-                "name": "Delivery Orchestration",
-                "description": "Launch and monitor epic runs, delegate to RTE, PO, Scrum Master.",
-                "tags": ["orchestration", "sprint", "agile"],
+            "endpoints": {
+                "task_submit": f"{base}/a2a/tasks",
+                "task_get": f"{base}/a2a/tasks/{{task_id}}",
+                "task_cancel": f"{base}/a2a/tasks/{{task_id}}/cancel",
+                "events": f"{base}/a2a/events",
             },
-            {
-                "id": "platform-status",
-                "name": "Platform Status",
-                "description": "Report on running missions, agent activity, and metrics.",
-                "tags": ["monitoring", "metrics"],
+            "capabilities": [
+                "create_project",
+                "create_mission",
+                "create_epic",
+                "launch_epic_run",
+                "check_run_status",
+                "delegate_to_rte",
+                "delegate_to_po",
+                "delegate_to_scrum_master",
+                "web_search",
+                "platform_metrics",
+            ],
+            "modalities": ["text/plain", "application/json"],
+            "defaultInputModes": ["text/plain"],
+            "defaultOutputModes": ["text/plain"],
+            "skills": [
+                {
+                    "id": "project-creation",
+                    "name": "Project Creation",
+                    "description": "Create a new software project with team, workflow and first epic.",
+                    "tags": ["project", "epic", "mission"],
+                },
+                {
+                    "id": "delivery-orchestration",
+                    "name": "Delivery Orchestration",
+                    "description": "Launch and monitor epic runs, delegate to RTE, PO, Scrum Master.",
+                    "tags": ["orchestration", "sprint", "agile"],
+                },
+                {
+                    "id": "platform-status",
+                    "name": "Platform Status",
+                    "description": "Report on running missions, agent activity, and metrics.",
+                    "tags": ["monitoring", "metrics"],
+                },
+            ],
+            "auth": {
+                "type": "cookie",
+                "description": "Requires active SF session cookie (POST /api/auth/demo for demo auth).",
             },
-        ],
-        "auth": {
-            "type": "cookie",
-            "description": "Requires active SF session cookie (POST /api/auth/demo for demo auth).",
-        },
-    })
+        }
+    )
 
 
 # ── Task helpers ───────────────────────────────────────────────────────────────
+
 
 def _make_task(message: str, context_id: str = "") -> dict:
     task_id = str(uuid.uuid4())
@@ -129,7 +133,9 @@ def _make_task(message: str, context_id: str = "") -> dict:
     return task
 
 
-def _update_task(task_id: str, state: str, output: str | None = None, metadata: dict | None = None):
+def _update_task(
+    task_id: str, state: str, output: str | None = None, metadata: dict | None = None
+):
     task = _tasks.get(task_id)
     if not task:
         return
@@ -151,6 +157,7 @@ def _update_task(task_id: str, state: str, output: str | None = None, metadata: 
 
 # ── Submit task ────────────────────────────────────────────────────────────────
 
+
 @router.post("/a2a/tasks")
 async def submit_task(request: Request):
     """Submit a task to Jarvis. Returns task object with id + submitted status."""
@@ -166,7 +173,9 @@ async def submit_task(request: Request):
         # Fallback: accept plain {"message": "..."}
         message = str(body.get("message") or body.get("text") or "").strip()
     if not message:
-        return JSONResponse({"error": "No text message provided in input.parts"}, status_code=422)
+        return JSONResponse(
+            {"error": "No text message provided in input.parts"}, status_code=422
+        )
 
     context_id = str(body.get("contextId") or "")
     task = _make_task(message, context_id)
@@ -211,26 +220,31 @@ async def _run_jarvis(task_id: str, message: str):
 
         if not existing:
             from ...sessions.store import SessionDef
-            session = store.create(SessionDef(
-                name=f"A2A task {task_id[:8]}",
-                goal="A2A task delegation to Jarvis",
-                status="active",
-                config={
-                    "lead_agent": _CTO_AGENT_ID,
-                    "type": "cto_chat",
-                    "a2a_context_id": context_id or task_id,
-                    "a2a_task_id": task_id,
-                },
-            ))
+
+            session = store.create(
+                SessionDef(
+                    name=f"A2A task {task_id[:8]}",
+                    goal="A2A task delegation to Jarvis",
+                    status="active",
+                    config={
+                        "lead_agent": _CTO_AGENT_ID,
+                        "type": "cto_chat",
+                        "a2a_context_id": context_id or task_id,
+                        "a2a_task_id": task_id,
+                    },
+                )
+            )
         else:
             session = existing
 
-        store.add_message(MessageDef(
-            session_id=session.id,
-            from_agent="user",
-            message_type="text",
-            content=message,
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=session.id,
+                from_agent="user",
+                message_type="text",
+                content=message,
+            )
+        )
 
         agent_store = get_agent_store()
         agent = agent_store.get(_CTO_AGENT_ID)
@@ -249,32 +263,43 @@ async def _run_jarvis(task_id: str, message: str):
                 q = _task_queues.get(task_id)
                 if q:
                     try:
-                        q.put_nowait({"event": "task.delta", "task_id": task_id, "delta": data})
+                        q.put_nowait(
+                            {"event": "task.delta", "task_id": task_id, "delta": data}
+                        )
                     except _queue_module.Full:
                         pass
             elif event_type == "tool":
                 q = _task_queues.get(task_id)
                 if q:
                     try:
-                        q.put_nowait({"event": "task.tool", "task_id": task_id, "tool": data})
+                        q.put_nowait(
+                            {"event": "task.tool", "task_id": task_id, "tool": data}
+                        )
                     except _queue_module.Full:
                         pass
             elif event_type == "result":
                 result_text = data.content if hasattr(data, "content") else str(data)
-                _update_task(task_id, "completed", result_text, {
-                    "model": getattr(data, "model", ""),
-                    "provider": getattr(data, "provider", ""),
-                    "tokens_in": getattr(data, "tokens_in", 0),
-                    "tokens_out": getattr(data, "tokens_out", 0),
-                })
+                _update_task(
+                    task_id,
+                    "completed",
+                    result_text,
+                    {
+                        "model": getattr(data, "model", ""),
+                        "provider": getattr(data, "provider", ""),
+                        "tokens_in": getattr(data, "tokens_in", 0),
+                        "tokens_out": getattr(data, "tokens_out", 0),
+                    },
+                )
 
-        store.add_message(MessageDef(
-            session_id=session.id,
-            from_agent=_CTO_AGENT_ID,
-            to_agent="user",
-            message_type="text",
-            content=result_text,
-        ))
+        store.add_message(
+            MessageDef(
+                session_id=session.id,
+                from_agent=_CTO_AGENT_ID,
+                to_agent="user",
+                message_type="text",
+                content=result_text,
+            )
+        )
 
         if _tasks.get(task_id, {}).get("status", {}).get("state") == "working":
             _update_task(task_id, "completed", result_text)
@@ -294,6 +319,7 @@ async def _run_jarvis(task_id: str, message: str):
 
 # ── Get task ───────────────────────────────────────────────────────────────────
 
+
 @router.get("/a2a/tasks/{task_id}")
 async def get_task(task_id: str):
     """Return current task state."""
@@ -312,6 +338,7 @@ async def list_tasks():
 
 # ── Cancel task ────────────────────────────────────────────────────────────────
 
+
 @router.post("/a2a/tasks/{task_id}/cancel")
 async def cancel_task(task_id: str):
     """Cancel a submitted or working task."""
@@ -320,18 +347,23 @@ async def cancel_task(task_id: str):
         return JSONResponse({"error": "Task not found"}, status_code=404)
     state = task.get("status", {}).get("state", "")
     if state in ("completed", "failed", "canceled"):
-        return JSONResponse({"ok": False, "error": f"Task already in terminal state: {state}"})
+        return JSONResponse(
+            {"ok": False, "error": f"Task already in terminal state: {state}"}
+        )
     _update_task(task_id, "canceled")
     return JSONResponse({"ok": True, "task_id": task_id, "status": "canceled"})
 
 
 # ── SSE events ─────────────────────────────────────────────────────────────────
 
+
 @router.get("/a2a/events")
 async def task_events(task_id: str = ""):
     """SSE stream for a task. Set task_id query param."""
     if not task_id or task_id not in _tasks:
-        return JSONResponse({"error": "task_id required and must exist"}, status_code=400)
+        return JSONResponse(
+            {"error": "task_id required and must exist"}, status_code=400
+        )
 
     async def generate() -> AsyncIterator[str]:
         q = _task_queues.get(task_id)
@@ -357,7 +389,7 @@ async def task_events(task_id: str = ""):
                     break
             except _queue_module.Empty:
                 # Keepalive ping
-                yield f": keepalive\n\n"
+                yield ": keepalive\n\n"
             except Exception:
                 break
 

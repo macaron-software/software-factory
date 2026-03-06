@@ -1177,6 +1177,14 @@ def create_app() -> FastAPI:
                     return JSONResponse(
                         {"detail": "Authentication required"}, status_code=401
                     )
+                # HTMX partial requests return 401 + HX-Redirect (avoids HTMX inserting login page)
+                if request.headers.get("HX-Request") == "true":
+                    from starlette.responses import Response
+
+                    return Response(
+                        status_code=401,
+                        headers={"HX-Redirect": f"/login?next={path}"},
+                    )
                 from starlette.responses import RedirectResponse
 
                 return RedirectResponse(url=f"/login?next={path}", status_code=302)

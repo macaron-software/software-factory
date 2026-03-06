@@ -101,6 +101,10 @@
   </div>
   <div style="display:flex;gap:.5rem;align-items:center">
     <span style="font-size:.7rem;color:var(--purple)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+    <button id="ac-intel-toggle" onclick="acToggleIntel()"
+      style="display:flex;align-items:center;gap:.3rem;padding:.3rem .6rem;background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:.3rem;cursor:pointer;font-size:.75rem">
+      {{ fi('cpu', 12) }} Intelligence
+    </button>
     <button id="ac-start-btn" onclick="acStartCycle()"
       style="display:flex;align-items:center;gap:.3rem;padding:.3rem .7rem;background:var(--purple);color:var(--text-on-accent);border:none;border-radius:.3rem;cursor:pointer;font-size:.75rem">
       {{ fi('play', 12) }} Démarrer
@@ -110,7 +114,7 @@
 <div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
 
 {# ── Intelligence metrics panel (collapsed by default) ──────────────────────── #}
-<div id="ac-intel-panel" style="margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
+<div id="ac-intel-panel" style="display:none;margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
     <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem">
       {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--purple)">—</span>
@@ -159,7 +163,8 @@
   {% for p in projects %}
   {% set score = p.total_score_avg|int %}
   {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
-  <div class="ac-card tier-{{ p.tier }}">
+  <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
+       onclick="acSelectProject('{{ p.id }}', this)">
     <div class="tier-label">{{ p.tier_label }}</div>
     <div class="proj-name">{{ p.name }}</div>
     <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
@@ -254,10 +259,27 @@
 {% endif %}
 
 <script>
-setTimeout(acRefreshIntel, 300);
 let _acSelectedProject = '{{ projects[0].id if projects else "" }}';
+let _acIntelOpen = false;
 
+function acSelectProject(projectId, card) {
+  _acSelectedProject = projectId;
+  document.querySelectorAll('.ac-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  htmx.ajax('GET', '/workflows/improvement/cycles/' + projectId, {
+    target: '#ac-history-content',
+    swap: 'innerHTML'
+  });
+  document.getElementById('ac-history-title').textContent = card.querySelector('.proj-name').textContent + ' — Historique';
+  if (_acIntelOpen) acRefreshIntel();
+}
 
+function acToggleIntel() {
+  const panel = document.getElementById('ac-intel-panel');
+  _acIntelOpen = !_acIntelOpen;
+  panel.style.display = _acIntelOpen ? 'block' : 'none';
+  if (_acIntelOpen) acRefreshIntel();
+}
 
 async function acRefreshIntel() {
   if (!_acSelectedProject) return;

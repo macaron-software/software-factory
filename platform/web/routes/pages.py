@@ -29,8 +29,12 @@ logger = logging.getLogger(__name__)
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page."""
+    from ...demo import is_demo_mode
+
     templates = _templates(request)
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(
+        "login.html", {"request": request, "demo_mode": is_demo_mode()}
+    )
 
 
 @router.get("/onboarding", response_class=HTMLResponse)
@@ -636,30 +640,6 @@ _AC_PROJECTS = [
         "tech": ["nextjs", "solaris", "stripe", "pg"],
         "max_cycles": 20,
     },
-    {
-        "id": "ac-game-threejs",
-        "name": "Jeu Three.js",
-        "tier": "game-simple",
-        "tier_label": "Jeu Simple",
-        "tech": ["threejs", "js", "webgl", "vite"],
-        "max_cycles": 20,
-    },
-    {
-        "id": "ac-game-native",
-        "name": "Jeu Natif Compilé",
-        "tier": "game-complex",
-        "tier_label": "Jeu Compilé",
-        "tech": ["rust", "sdl2", "opengl", "cargo"],
-        "max_cycles": 20,
-    },
-    {
-        "id": "ac-migration-php",
-        "name": "Migration PHP → FastAPI",
-        "tier": "migration",
-        "tier_label": "Migration",
-        "tech": ["php", "fastapi", "postgres", "alembic"],
-        "max_cycles": 20,
-    },
 ]
 
 
@@ -727,7 +707,6 @@ def _ac_ensure_tables(conn) -> None:
     try:
         for stmt in stmts:
             conn.execute(stmt)
-        conn.commit()
         # Idempotent column additions
         for alter in [
             "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'",
@@ -740,7 +719,6 @@ def _ac_ensure_tables(conn) -> None:
         ]:
             try:
                 conn.execute(alter)
-                conn.commit()
             except Exception:
                 pass
     except Exception:
@@ -809,11 +787,6 @@ async def workflows_improvement(request: Request):
             row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
         except Exception:
             row["phase_scores_dict"] = {}
-        try:
-            adv_raw = row.get("adversarial_scores") or "{}"
-            row["adversarial_scores"] = _json.loads(adv_raw) if isinstance(adv_raw, str) else adv_raw
-        except Exception:
-            row["adversarial_scores"] = {}
         cycles.append(row)
 
     avg_cycle = (
@@ -859,11 +832,6 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
             row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
         except Exception:
             row["phase_scores_dict"] = {}
-        try:
-            adv_raw = row.get("adversarial_scores") or "{}"
-            row["adversarial_scores"] = _json.loads(adv_raw) if isinstance(adv_raw, str) else adv_raw
-        except Exception:
-            row["adversarial_scores"] = {}
         cycles.append(row)
 
     return _templates(request).TemplateResponse(
@@ -875,9 +843,6 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
 @router.post("/api/improvement/start/{project_id}")
 async def api_improvement_start(project_id: str):
     """Launch an AC improvement cycle for a project via the platform workflow engine."""
-    import time as _time
-    import uuid
-    import subprocess
     from fastapi.responses import JSONResponse
 
     # Validate project_id
@@ -916,125 +881,51 @@ async def api_improvement_start(project_id: str):
     )
 
     try:
-        from ...workflows.store import get_workflow_store
-        from ...models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
-        from ...epics.store import MissionDef, get_epic_store as _get_epic_store, get_epic_run_store
-        from ...sessions.store import MessageDef, SessionDef, get_session_store
-        from ...agents.loop import get_loop_manager
-        from ...config import DATA_DIR
+        from ...missions.store import get_mission_store
+        from ...epics.store import MissionDef
 
-        wf = get_workflow_store().get("ac-improvement-cycle")
-        if not wf:
-            return JSONResponse(
-                {"error": "Workflow ac-improvement-cycle not found — server restart needed?"},
-                status_code=500,
-            )
-
-        # Build phase runs from workflow definition
-        phases = [
-            PhaseRun(
-                phase_id=wp.id,
-                phase_name=wp.name,
-                pattern_id=wp.pattern_id,
-                status=PhaseStatus.PENDING,
-            )
-            for wp in wf.phases
-        ]
-
-        mission_id = uuid.uuid4().hex[:8]
-
-        # Create workspace with git repo
-        workspace_root = DATA_DIR / "workspaces" / mission_id
-        workspace_root.mkdir(parents=True, exist_ok=True)
-        subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
-        subprocess.run(["git", "config", "user.email", "agents@macaron.ai"], cwd=str(workspace_root), capture_output=True)
-        subprocess.run(["git", "config", "user.name", "Macaron Agents"], cwd=str(workspace_root), capture_output=True)
-        (workspace_root / "README.md").write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {mission_id}\n")
-        (workspace_root / ".gitignore").write_text("node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n")
-        subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit — AC workspace"], cwd=str(workspace_root), capture_output=True)
-
-        orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
-        mission = EpicRun(
-            id=mission_id,
+        store = get_mission_store()
+        mission_def = MissionDef(
+            name=f"AC {proj['name']} — Cycle {cycle_num}",
+            description=brief,
+            goal=f"Score > 80/100, 0 défauts critiques, traçabilité 100% — cycle {cycle_num}/20",
+            type="improvement",
             workflow_id="ac-improvement-cycle",
-            workflow_name=wf.name,
-            brief=brief,
-            status=EpicStatus.RUNNING,
-            phases=phases,
-            project_id=project_id,
-            workspace_path=str(workspace_root),
-            cdp_agent_id=orchestrator_id,
+            status="active",
+            config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
         )
-        run_store = get_epic_run_store()
-        run_store.create(mission)
-
-        # Also create Epic record in missions table for backlog tracking
-        try:
-            epic = MissionDef(
-                id=mission_id,
-                project_id=project_id,
-                name=f"AC {proj['name']} — Cycle {cycle_num}",
-                description=brief,
-                goal=f"Score > 80/100, 0 défauts critiques — cycle {cycle_num}/20",
-                status="active",
-                type="improvement",
-                workflow_id="ac-improvement-cycle",
-                config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
-            )
-            await asyncio.to_thread(_get_epic_store().create_mission, epic)
-        except Exception as _e:
-            logger.warning("AC: could not create epic record: %s", _e)
-
-        # Create session and start orchestrator
-        session_store = get_session_store()
-        session_id = uuid.uuid4().hex[:8]
-        session_store.create(SessionDef(id=session_id, name=f"AC: {wf.name}", project_id=project_id, status="active"))
-        mission.session_id = session_id
-        run_store.update(mission)
-        session_store.add_message(MessageDef(
-            session_id=session_id, from_agent="user", to_agent=orchestrator_id,
-            message_type="instruction", content=brief,
-        ))
-
-        mgr = get_loop_manager()
-        try:
-            await mgr.start_agent(orchestrator_id, session_id, project_id, str(workspace_root))
-        except Exception as _ae:
-            logger.error("AC: Failed to start agent: %s", _ae)
-
-        # Auto-launch orchestrator pipeline
-        try:
-            from .epics.execution import _launch_orchestrator
-            await _launch_orchestrator(mission_id)
-        except Exception as _le:
-            logger.warning("AC: orchestrator auto-launch: %s", _le)
+        created = await asyncio.to_thread(store.create_mission, mission_def)
+        run_id = str(created.id)
 
         # Update project state
         def _update_state():
+            import time
+
             conn = _ac_get_db()
-            _ac_ensure_tables(conn)
             try:
                 conn.execute(
                     "INSERT INTO ac_project_state (project_id, current_cycle, status, current_run_id, updated_at)"
                     " VALUES (?,?,?,?,?) ON CONFLICT(project_id) DO UPDATE SET"
                     " current_cycle=excluded.current_cycle, status=excluded.status,"
                     " current_run_id=excluded.current_run_id, updated_at=excluded.updated_at",
-                    (project_id, cycle_num, "running", mission_id, _time.strftime("%Y-%m-%dT%H:%M:%SZ")),
+                    (
+                        project_id,
+                        cycle_num,
+                        "running",
+                        run_id,
+                        time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    ),
                 )
-                conn.commit()
             except Exception:
                 pass
             conn.close()
 
         await asyncio.to_thread(_update_state)
         return JSONResponse(
-            {"run_id": mission_id, "cycle_num": cycle_num, "project_id": project_id,
-             "mission_url": f"/missions/{mission_id}/control"}
+            {"run_id": run_id, "cycle_num": cycle_num, "project_id": project_id}
         )
 
     except Exception as exc:
-        logger.exception("AC start error: %s", exc)
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
@@ -1120,7 +1011,6 @@ async def api_improvement_inject_cycle(request: Request):
                     project_id,
                 ),
             )
-            conn.commit()
         except Exception as e:
             conn.close()
             raise e
@@ -1444,212 +1334,8 @@ async def api_improvement_scores(project_id: str):
     )
 
 
-# ── Skills Health API ──────────────────────────────────────────────────────────
-# WHY: Surfaces skill eval coverage + pass rates to the ART/Skills Health tab.
-# Based on philschmid.de/testing-skills — every skill ships with eval_cases.
-# Graduation rule: pass_rate == 1.0 → regression mode (model likely absorbed skill).
-# Retirement: skill passes every run without being loaded → retire it from library.
-
-def _skill_eval_ensure_table(conn) -> None:
-    """Idempotent — create skill_eval_runs if not exists."""
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS skill_eval_runs (
-            id        INTEGER PRIMARY KEY AUTOINCREMENT,
-            skill_id  TEXT    NOT NULL,
-            ran_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            cases_total  INTEGER DEFAULT 0,
-            cases_passed INTEGER DEFAULT 0,
-            pass_rate    REAL,
-            verdict      TEXT,
-            notes        TEXT
-        )
-    """)
-    conn.commit()
-
-
-def _parse_eval_cases_count(content: str) -> int:
-    """Count eval_cases entries in YAML frontmatter of a skill markdown file.
-    Supports both `- input:` (philschmid style) and `- id:` / `- prompt:` styles.
-    """
-    if not content or "eval_cases:" not in content:
-        return 0
-    in_front = False
-    in_eval = False
-    count = 0
-    for line in content.splitlines():
-        if line.strip() == "---":
-            in_front = not in_front
-            if not in_front:
-                break
-            continue
-        if not in_front:
-            continue
-        if line.strip() == "eval_cases:":
-            in_eval = True
-            continue
-        if in_eval:
-            # Stop counting if we hit another top-level key (no leading spaces)
-            if line and not line[0].isspace() and not line.startswith("-"):
-                in_eval = False
-                continue
-            stripped = line.strip()
-            # Count list items that start a new case: '- input:', '- id:', '- prompt:'
-            if stripped.startswith("- input:") or stripped.startswith("- id:") or stripped.startswith("- prompt:"):
-                count += 1
-    return count
-
-
-def _load_local_skills_fs():
-    """
-    Load local platform skills directly from filesystem (not DB).
-    WHY: DB has 1300+ GitHub skills that don't have eval_cases; local skill .md files
-    are the source of truth for the Skills Health board.
-    Returns list of (skill_id, skill_name, eval_cases_count).
-    """
-    from ...config import LEGACY_SKILLS_DIR
-    results = []
-    skills_dir = LEGACY_SKILLS_DIR
-    if not skills_dir.exists():
-        return results
-    for path in sorted(skills_dir.glob("*.md")):
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        # Extract name from frontmatter or first heading
-        name = path.stem
-        for line in text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("name:"):
-                name = stripped[5:].strip().strip('"')
-                break
-            if stripped.startswith("# "):
-                name = stripped[2:].strip()
-                break
-        n_cases = _parse_eval_cases_count(text)
-        results.append({"id": path.stem, "name": name, "eval_cases": n_cases})
-    return results
-
-
-@router.get("/api/skills/eval")
-async def api_skills_eval_coverage():
-    """
-    Aggregate skill eval coverage stats.
-    WHY: ART Skills Health tab KPIs — total, coverage%, passing, run.
-    Reads from filesystem (not DB) so local skills with eval_cases are always current.
-    """
-    from fastapi.responses import JSONResponse
-
-    def _load():
-        conn = _ac_get_db()
-        _skill_eval_ensure_table(conn)
-        try:
-            runs = conn.execute(
-                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
-                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
-            ).fetchall()
-        finally:
-            conn.close()
-        return {r["skill_id"]: dict(r) for r in runs}
-
-    runs = await asyncio.to_thread(_load)
-    skills = await asyncio.to_thread(_load_local_skills_fs)
-
-    total = len(skills)
-    with_evals = [s for s in skills if s["eval_cases"] > 0]
-    run_set = set(runs.keys())
-    passing_count = sum(
-        1 for s in with_evals
-        if runs.get(s["id"], {}).get("pass_rate") is not None
-        and runs[s["id"]]["pass_rate"] >= 0.8
-    )
-    without_evals = [s["name"] for s in skills if s["eval_cases"] == 0]
-
-    return JSONResponse({
-        "total": total,
-        "coverage_pct": round(len(with_evals) / total * 100) if total else 0,
-        "passing": passing_count,
-        "run": len([s for s in with_evals if s["id"] in run_set]),
-        "without_evals": without_evals[:50],
-    })
-
-
-@router.get("/api/skills/list")
-async def api_skills_list():
-    """
-    Per-skill eval status list.
-    WHY: ART Skills Health table — shows eval_cases count, pass rate, last run.
-    Returns JSON array (not object) for direct .filter() use on frontend.
-    Reads from filesystem so local skills with eval_cases are always current.
-    """
-    from fastapi.responses import JSONResponse
-
-    def _load():
-        conn = _ac_get_db()
-        _skill_eval_ensure_table(conn)
-        try:
-            runs = conn.execute(
-                "SELECT skill_id, pass_rate, verdict, ran_at FROM skill_eval_runs "
-                "WHERE id IN (SELECT MAX(id) FROM skill_eval_runs GROUP BY skill_id)"
-            ).fetchall()
-        finally:
-            conn.close()
-        return {r["skill_id"]: dict(r) for r in runs}
-
-    runs = await asyncio.to_thread(_load)
-    skills = await asyncio.to_thread(_load_local_skills_fs)
-
-    result = []
-    for s in skills:
-        run_info = runs.get(s["id"], {})
-        pass_rate = run_info.get("pass_rate")
-        verdict = run_info.get("verdict")
-        if pass_rate is not None and pass_rate >= 1.0:
-            verdict = "regression"
-        result.append({
-            "id": s["id"],
-            "name": s["name"],
-            "has_evals": s["eval_cases"] > 0,
-            "eval_cases": s["eval_cases"],
-            "pass_rate": pass_rate,
-            "verdict": verdict,
-            "ran_at": run_info.get("ran_at"),
-        })
-
-    return JSONResponse(result)
-
-
-@router.get("/api/skills/eval/history")
-async def api_skills_eval_history():
-    """
-    Recent skill-eval mission runs history.
-    WHY: Skills Health Amélioration tab — shows past cycles launched.
-    Returns last 20 missions with workflow_id=skill-eval.
-    """
-    from fastapi.responses import JSONResponse
-
-    def _load():
-        conn = _ac_get_db()
-        try:
-            # missions table: id, name, status, created_at, config_json
-            rows = conn.execute(
-                "SELECT id, name, status, created_at, config_json FROM missions "
-                "WHERE workflow_id='skill-eval' OR config_json LIKE '%skill-eval%' "
-                "ORDER BY created_at DESC LIMIT 20"
-            ).fetchall()
-        except Exception:
-            try:
-                rows = conn.execute(
-                    "SELECT id, name, status, created_at FROM missions "
-                    "ORDER BY created_at DESC LIMIT 5"
-                ).fetchall()
-            except Exception:
-                rows = []
-        finally:
-            conn.close()
-        return [dict(r) for r in rows]
-
-    runs = await asyncio.to_thread(_load)
-    return JSONResponse({"runs": runs})
-
-
+# ── Legacy redirects ─────────────────────────────────────────────────────────
+@router.get("/ceremonies", response_class=HTMLResponse)
 async def ceremonies_redirect(request: Request):
     """Legacy redirect — /ceremonies moved to /workflows."""
     from starlette.responses import RedirectResponse

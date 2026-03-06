@@ -166,47 +166,6 @@
         </div>
         {% endif %}
 
-        <!-- Workflow runs history for this project -->
-        {% if epic_runs %}
-        <div style="margin-bottom:1.25rem">
-            <details open>
-                <summary style="cursor:pointer;font-size:.82rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;padding:.4rem 0;list-style:none;display:flex;align-items:center;gap:.5rem">
-                    <svg class="icon icon-xs" style="width:14px;height:14px"><use href="#icon-zap"/></svg>
-                    Workflow Runs ({{ epic_runs|length }})
-                </summary>
-                <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.5rem">
-                {% for run in epic_runs %}
-                {% set s_color = 'var(--green)' if run.status=='done' else ('var(--blue)' if run.status in ('running','pending') else ('var(--red)' if run.status=='failed' else 'var(--text-secondary)')) %}
-                <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:.6rem .75rem">
-                    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
-                        <span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;background:{{ s_color }}"></span>
-                        <span style="font-size:.82rem;font-weight:600;color:var(--text-primary);flex:1">{{ run.workflow_name or run.workflow_id }}</span>
-                        <span style="font-size:.65rem;padding:.1rem .4rem;border-radius:4px;font-weight:600;text-transform:uppercase;background:{{ s_color }}20;color:{{ s_color }}">{{ run.status }}</span>
-                        <span style="font-size:.68rem;color:var(--text-tertiary)">{{ run.created_at }}</span>
-                    </div>
-                    {% if run.phases %}
-                    <div style="display:flex;align-items:center;gap:.2rem;flex-wrap:wrap;padding-left:1.1rem">
-                        {% for ph in run.phases %}
-                        {% set ph_color = 'var(--green)' if ph.status=='done' else ('var(--blue)' if ph.status in ('running','active') else ('var(--red)' if ph.status=='failed' else 'var(--text-secondary)')) %}
-                        <span title="{{ ph.phase_name }}{% if ph.iteration %} · iter {{ ph.iteration }}{% endif %}{% if ph.summary %} · {{ ph.summary }}{% endif %}"
-                              style="font-size:.65rem;padding:.1rem .38rem;border-radius:3px;background:{{ ph_color }}18;color:{{ ph_color }};border:1px solid {{ ph_color }}55;white-space:nowrap;cursor:default">
-                            {{ ph.phase_name[:15] }}{% if ph.iteration > 0 %} ×{{ ph.iteration }}{% endif %}
-                        </span>
-                        {% if not loop.last %}<span style="color:var(--text-tertiary);font-size:.7rem">→</span>{% endif %}
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                </div>
-                {% endfor %}
-                </div>
-            </details>
-        </div>
-        {% else %}
-        <div style="margin-bottom:1.25rem;padding:.75rem;background:var(--bg-secondary);border:1px dashed var(--border);border-radius:6px;text-align:center">
-            <p style="font-size:.78rem;color:var(--text-tertiary);margin:0">Aucun workflow lancé pour cet epic — utilisez le bouton <strong>Launch</strong> ci-dessus.</p>
-        </div>
-        {% endif %}
-
         <!-- Sprint timeline -->
         {% if sprints %}
         <div class="sprint-timeline">
@@ -387,21 +346,9 @@
         </div>
         {% endif %}
 
-        {% if team_agents or lead_agent %}
+        {% if team_agents %}
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-users"/></svg> Équipe</h4>
-            {% if lead_agent and lead_agent not in team_agents %}
-            <div class="ms-agent" style="border-bottom:1px solid var(--border);padding-bottom:.5rem;margin-bottom:.4rem">
-                <span class="ms-agent-avatar" style="background:{{ lead_agent.color }}20;border-color:{{ lead_agent.color }}">
-                    {% if lead_avatar_url %}<img src="{{ lead_avatar_url }}" style="width:100%;height:100%;border-radius:50%;object-fit:cover" alt="">
-                    {% else %}<svg class="icon icon-xs" style="color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar or lead_agent.icon or 'user' }}"/></svg>{% endif %}
-                </span>
-                <div class="ms-agent-info">
-                    <div class="ms-agent-name">{{ lead_agent.name }}</div>
-                    <div class="ms-agent-role" style="color:{{ lead_agent.color }}">{{ lead_agent.role or 'Product Manager' }} · Lead</div>
-                </div>
-            </div>
-            {% endif %}
             {% for a in team_agents %}
             <div class="ms-agent">
                 <span class="ms-agent-avatar" style="background:{{ a.color }}20;border-color:{{ a.color }}">
@@ -436,6 +383,23 @@
         </div>
         {% endif %}
 
+        {# ── Traceability — why_log for this mission ── #}
+        <div class="ms-section">
+            <h4 style="cursor:pointer" onclick="toggleTraceability()">
+                <svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-git-branch"/></svg>
+                Traçabilité
+                <span id="traceToggle" style="font-size:0.7rem;color:var(--text-muted);float:right;margin-top:0.1rem">▼</span>
+            </h4>
+            <div id="traceabilityPanel" style="display:none">
+                <div id="traceabilityContent"
+                     hx-get="/api/traceability/{{ mission.session_id | default(mission.id) }}"
+                     hx-trigger="revealed"
+                     hx-swap="innerHTML">
+                    <p style="font-size:0.75rem;color:var(--text-muted)">Chargement...</p>
+                </div>
+            </div>
+        </div>
+
         {% if selected_sprint and selected_sprint.goal %}
         <div class="ms-section">
             <h4><svg class="icon icon-xs" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-target"/></svg> Sprint Goal</h4>
@@ -447,6 +411,41 @@
 
 <script src="/static/js/chart.umd.min.js"></script>
 <script>
+function toggleTraceability() {
+    const panel = document.getElementById('traceabilityPanel');
+    const toggle = document.getElementById('traceToggle');
+    const open = panel.style.display === 'none';
+    panel.style.display = open ? 'block' : 'none';
+    toggle.textContent = open ? '▲' : '▼';
+    if (open) htmx.process(document.getElementById('traceabilityContent'));
+}
+
+htmx.on('htmx:afterSwap', function(e) {
+    if (e.target && e.target.id === 'traceabilityContent') {
+        // Format JSON response as readable why-chain
+        try {
+            const data = JSON.parse(e.target.textContent);
+            if (data.artifacts) {
+                let html = '';
+                const typeIcon = {code: '📄', test: '🧪', story: '📋', decision: '📝', qa: '🔍'};
+                for (const [type, items] of Object.entries(data.artifacts)) {
+                    html += `<div style="margin-bottom:0.5rem"><strong style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">${typeIcon[type]||'•'} ${type}</strong>`;
+                    for (const item of items.slice(0, 5)) {
+                        html += `<div style="font-size:0.72rem;margin:0.2rem 0;padding:0.3rem;background:var(--bg-tertiary);border-radius:4px;border-left:2px solid var(--purple)">
+                            <div style="color:var(--text-secondary);word-break:break-word">${item.artifact_ref}</div>
+                            <div style="color:var(--text-muted);font-size:0.68rem;margin-top:0.2rem">↳ ${item.lineage_chain}</div>
+                        </div>`;
+                    }
+                    html += '</div>';
+                }
+                if (!html) html = '<p style="font-size:0.75rem;color:var(--text-muted)">Aucun artefact tracé pour cette mission.</p>';
+                e.target.innerHTML = html;
+            }
+        } catch(err) {
+            // Not JSON — display as-is
+        }
+    }
+});
 async function addTask() {
     const input = document.getElementById('newTaskTitle');
     const title = input.value.trim();

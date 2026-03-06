@@ -408,6 +408,151 @@ async def cmd_projects_list() -> SFCommandResponse:
                 success=True, output="No projects found", data={"count": 0}
             )
 
+        headers = ["ID", "Name", "Type", "Status"]
+        rows = []
+        for p in projects[:30]:
+            rows.append([
+                p.id[:15],
+                p.name[:40],
+                getattr(p, "type", "unknown")[:15],
+                getattr(p, "status", "unknown")[:15],
+            ])
+
+        output = f"Projects ({len(projects)} total)\n\n"
+        output += format_table(headers, rows)
+        return SFCommandResponse(success=True, output=output, data={"count": len(projects)})
+    except Exception as e:
+        logger.exception("Error listing projects")
+        return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
+
+
+async def cmd_skills_coverage() -> SFCommandResponse:
+    """Show skill eval coverage summary.
+
+    WHY: Skills shipped without evals = technical debt. This gives a quick
+    snapshot of how many skills have eval_cases and their pass rates.
+    Ref: https://www.philschmid.de/testing-skills
+    """
+    from ...tools.skill_eval_tools import coverage_summary
+    try:
+        s = coverage_summary()
+        out = f"Skills Eval Coverage\n{'='*40}\n"
+        out += f"Total skills:      {s['total']}\n"
+        out += f"With eval_cases:   {s['with_evals']} ({s['coverage_pct']}%)\n"
+        out += f"Run at least once: {s['run']}\n"
+        out += f"Passing (≥80%):    {s['passing']}\n"
+        if s["needing_work"]:
+            out += f"\nNeeding work (pass_rate < 80%):\n"
+            for sk in s["needing_work"][:10]:
+                rate = f"{int((sk['pass_rate'] or 0)*100)}%" if sk['pass_rate'] is not None else "not run"
+                out += f"  • {sk['name']} — {rate}\n"
+        if s["without_evals"]:
+            out += f"\nWithout eval_cases ({len(s['without_evals'])}):\n"
+            for name in s["without_evals"][:15]:
+                out += f"  • {name}\n"
+        return SFCommandResponse(success=True, output=out, data=s)
+    except Exception as exc:
+        return SFCommandResponse(success=False, output="", error=str(exc))
+
+
+async def cmd_skills_eval(args: list[str]) -> SFCommandResponse:
+    """Run eval harness for a skill (or all skills).
+
+    Usage:
+      sf skills eval <skill-name>           run eval for one skill
+      sf skills eval --all                  run all skills with eval_cases
+      sf skills eval <name> --trials=5      use 5 trials per case (default: 3)
+
+    WHY: Deterministic checks + LLM-as-judge to measure skill quality.
+    Pass rate ≥ 80% = ready to ship. < 80% = iterate on the skill.
+    Ref: https://www.philschmid.de/testing-skills
+    """
+    import asyncio
+    from ...tools.skill_eval_tools import run_skill_eval, list_skills_with_evals
+
+    trials = 3
+    run_all = "--all" in args
+    skill_name = next((a for a in args if not a.startswith("--")), None)
+
+    for a in args:
+        if a.startswith("--trials="):
+            try:
+                trials = int(a.split("=")[1])
+            except ValueError:
+                pass
+
+    try:
+        if run_all:
+            skills = [s["name"] for s in list_skills_with_evals() if s["has_evals"]]
+            if not skills:
+                return SFCommandResponse(success=False, output="", error="No skills with eval_cases found")
+            out = f"Running evals for {len(skills)} skills ({trials} trials each)...\n\n"
+            passed = 0
+            for name in skills:
+                result = await run_skill_eval(name, trials=trials)
+                status = "[OK]  " if result.pass_rate >= 0.8 else "[WARN]" if result.pass_rate >= 0.6 else "[FAIL]"
+                out += f"  {status} {name}: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {result.duration_s}s)\n"
+                if result.pass_rate >= 0.8:
+                    passed += 1
+            out += f"\nResult: {passed}/{len(skills)} skills passing (≥80%)"
+            return SFCommandResponse(success=True, output=out)
+
+        if not skill_name:
+            return SFCommandResponse(
+                success=False, output="",
+                error="Usage: sf skills eval <skill-name> | --all"
+            )
+
+        result = await run_skill_eval(skill_name, trials=trials)
+
+        if result.status == "no_cases":
+            return SFCommandResponse(
+                success=False, output="",
+                error=f"Skill '{skill_name}' has no eval_cases. Add them to the frontmatter."
+            )
+        if result.status == "error":
+            return SFCommandResponse(success=False, output="", error=result.error)
+
+        status_icon = "[OK] " if result.pass_rate >= 0.8 else "[WARN]" if result.pass_rate >= 0.6 else "[FAIL]"
+        out = f"{status_icon} {skill_name} v{result.skill_version}\n"
+        out += f"Pass rate: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {trials} trials, {result.duration_s}s)\n\n"
+
+        for c in result.case_results:
+            icon = "[OK] " if c.overall_pass_rate >= 0.8 else "[FAIL]"
+            out += f"{icon} [{c.case_id}] overall={int(c.overall_pass_rate*100)}%"
+            out += f"  checks={int(c.checks_pass_rate*100)}%"
+            if c.llm_judge_score >= 0:
+                out += f"  judge={int(c.llm_judge_score*100)}%"
+            out += f"  ~{c.avg_tokens}tok {int(c.avg_latency_ms)}ms\n"
+            # Show failing checks
+            for ch in c.check_details:
+                if not ch.passed:
+                    out += f"     x {ch.check_spec}: {ch.notes}\n"
+            if c.judge_notes and c.llm_judge_score < 0.8:
+                out += f"     judge: {c.judge_notes[:100]}\n"
+
+        if result.coverage_gap:
+            out += f"\nCoverage gaps: {', '.join(result.coverage_gap)}"
+
+        return SFCommandResponse(success=True, output=out, data={
+            "skill_name": skill_name, "pass_rate": result.pass_rate,
+        })
+    except Exception as exc:
+        logger.exception("Error running skill eval")
+        return SFCommandResponse(success=False, output="", error=str(exc))
+
+    """List projects."""
+    from ...projects.manager import get_project_store
+
+    try:
+        store = get_project_store()
+        projects = store.list_all()
+
+        if not projects:
+            return SFCommandResponse(
+                success=True, output="No projects found", data={"count": 0}
+            )
+
         # Format as table
         headers = ["ID", "Name", "Type", "Status"]
         rows = []
@@ -597,278 +742,6 @@ async def cmd_guide(args: list[str]) -> SFCommandResponse:
         return SFCommandResponse(success=False, output="", error=str(e))
 
 
-async def cmd_ac_list() -> SFCommandResponse:
-    """List all AC pilot projects with current state."""
-    try:
-        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
-
-        def _load():
-            conn = _ac_get_db()
-            _ac_ensure_tables(conn)
-            try:
-                states = {
-                    r["project_id"]: dict(r)
-                    for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
-                }
-            except Exception:
-                states = {}
-            conn.close()
-            return states
-
-        import asyncio
-        states = await asyncio.to_thread(_load)
-
-        headers = ["ID", "Nom", "Tier", "Cycle", "Statut", "Score moy.", "Convergence"]
-        rows = []
-        for p in _AC_PROJECTS:
-            s = states.get(p["id"], {})
-            rows.append([
-                p["id"],
-                p["name"],
-                p["tier"],
-                f"{s.get('current_cycle', 0)}/{p['max_cycles']}",
-                s.get("status", "idle"),
-                f"{s.get('total_score_avg') or 0:.1f}",
-                s.get("convergence_status", "cold_start"),
-            ])
-
-        output = format_table(headers, rows)
-        output += f"\n\n{len(_AC_PROJECTS)} projets pilotes. Commandes: ac status <id> · ac start <id> · ac history <id>"
-        return SFCommandResponse(success=True, output=output)
-    except Exception as e:
-        logger.exception("ac list error")
-        return SFCommandResponse(success=False, output="", error=str(e))
-
-
-async def cmd_ac_status(project_id: str) -> SFCommandResponse:
-    """Show detailed status for one AC project."""
-    try:
-        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
-        import json as _json
-
-        proj = next((p for p in _AC_PROJECTS if p["id"] == project_id), None)
-        if not proj:
-            ids = ", ".join(p["id"] for p in _AC_PROJECTS)
-            return SFCommandResponse(
-                success=False, output="", error=f"Projet inconnu: {project_id}. IDs valides: {ids}"
-            )
-
-        def _load():
-            conn = _ac_get_db()
-            _ac_ensure_tables(conn)
-            try:
-                state = dict(conn.execute(
-                    "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
-                ).fetchone() or {})
-            except Exception:
-                state = {}
-            try:
-                last = conn.execute(
-                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 1",
-                    (project_id,),
-                ).fetchone()
-                last = dict(last) if last else None
-            except Exception:
-                last = None
-            conn.close()
-            return state, last
-
-        import asyncio
-        state, last = await asyncio.to_thread(_load)
-
-        lines = [
-            f"Amélioration Continue — {proj['name']}",
-            "=" * 50,
-            f"  ID        : {proj['id']}",
-            f"  Tier      : {proj['tier_label']} ({proj['tier']})",
-            f"  Tech      : {', '.join(proj['tech'])}",
-            f"  Cycle     : {state.get('current_cycle', 0)}/{proj['max_cycles']}",
-            f"  Statut    : {state.get('status', 'idle')}",
-            f"  Run actif : {state.get('current_run_id', '—')}",
-            f"  Score moy.: {state.get('total_score_avg') or 0:.1f}/100",
-            f"  Convergence: {state.get('convergence_status', 'cold_start')}",
-            f"  CI status : {state.get('ci_status', 'unknown')}",
-            f"  Mis à jour: {state.get('updated_at', '—')}",
-        ]
-
-        if last:
-            try:
-                adv = _json.loads(last.get("adversarial_scores") or "{}") if isinstance(last.get("adversarial_scores"), str) else (last.get("adversarial_scores") or {})
-            except Exception:
-                adv = {}
-            lines += [
-                "",
-                f"Dernier cycle #{last.get('cycle_num', '?')}:",
-                f"  Score     : {last.get('total_score', 0)}/100",
-                f"  RL Reward : {last.get('rl_reward', 0):.3f}",
-                f"  Défauts   : {last.get('defect_count', 0)}",
-                f"  Traçab.   : {last.get('traceability_score', 0)}%",
-                f"  Git SHA   : {(last.get('git_sha') or '—')[:12]}",
-                f"  Statut    : {last.get('status', '—')}",
-            ]
-            if adv:
-                lines.append("  Adversarial:")
-                for dim, score in list(adv.items())[:6]:
-                    bar = "█" * int(score / 10) + "░" * (10 - int(score / 10))
-                    lines.append(f"    {dim[:16]:<16} [{bar}] {score}")
-        else:
-            lines.append("\nAucun cycle enregistré — utiliser: ac start " + project_id)
-
-        return SFCommandResponse(success=True, output="\n".join(lines))
-    except Exception as e:
-        logger.exception("ac status error")
-        return SFCommandResponse(success=False, output="", error=str(e))
-
-
-async def cmd_ac_start(project_id: str) -> SFCommandResponse:
-    """Launch next AC improvement cycle for a project."""
-    try:
-        from .pages import api_improvement_start
-        resp = await api_improvement_start(project_id)
-        data = resp.body if hasattr(resp, "body") else b"{}"
-        import json as _json
-        d = _json.loads(data)
-        if "error" in d:
-            return SFCommandResponse(success=False, output="", error=d["error"])
-        output = (
-            f"Cycle AC démarré\n"
-            f"  Projet : {d.get('project_id')}\n"
-            f"  Cycle  : #{d.get('cycle_num')}\n"
-            f"  Run ID : {d.get('run_id')}\n"
-            f"\nSuivi: missions list --status=running"
-        )
-        return SFCommandResponse(success=True, output=output, data=d)
-    except Exception as e:
-        logger.exception("ac start error")
-        return SFCommandResponse(success=False, output="", error=str(e))
-
-
-async def cmd_ac_history(args: list[str]) -> SFCommandResponse:
-    """Show cycle history for a project."""
-    try:
-        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
-        import json as _json
-
-        project_id = args[0] if args else None
-        if not project_id:
-            return SFCommandResponse(
-                success=False, output="", error="Usage: ac history <project_id>"
-            )
-
-        proj = next((p for p in _AC_PROJECTS if p["id"] == project_id), None)
-        if not proj:
-            return SFCommandResponse(
-                success=False, output="", error=f"Projet inconnu: {project_id}"
-            )
-
-        limit = 10
-        for a in args[1:]:
-            if a.startswith("--limit="):
-                try:
-                    limit = int(a.split("=")[1])
-                except ValueError:
-                    pass
-
-        def _load():
-            conn = _ac_get_db()
-            _ac_ensure_tables(conn)
-            try:
-                rows = conn.execute(
-                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT ?",
-                    (project_id, limit),
-                ).fetchall()
-                return [dict(r) for r in rows]
-            except Exception:
-                return []
-            finally:
-                conn.close()
-
-        import asyncio
-        cycles = await asyncio.to_thread(_load)
-
-        if not cycles:
-            return SFCommandResponse(
-                success=True, output=f"Aucun cycle pour {project_id}. Démarrer: ac start {project_id}"
-            )
-
-        headers = ["#", "Score", "RL Reward", "Défauts", "Traçab.", "Statut", "SHA", "Fix"]
-        rows = []
-        for c in reversed(cycles):
-            rows.append([
-                str(c.get("cycle_num", "?")),
-                f"{c.get('total_score', 0)}/100",
-                f"{c.get('rl_reward', 0):.3f}",
-                str(c.get("defect_count", 0)),
-                f"{c.get('traceability_score', 0)}%",
-                c.get("status", "—"),
-                (c.get("git_sha") or "—")[:7],
-                (c.get("fix_summary") or "—")[:30],
-            ])
-
-        output = f"Historique AC — {proj['name']} ({len(cycles)} cycles)\n\n"
-        output += format_table(headers, rows)
-        return SFCommandResponse(success=True, output=output)
-    except Exception as e:
-        logger.exception("ac history error")
-        return SFCommandResponse(success=False, output="", error=str(e))
-
-
-async def cmd_ac_stats() -> SFCommandResponse:
-    """Show global AC statistics."""
-    try:
-        from .pages import _AC_PROJECTS, _ac_get_db, _ac_ensure_tables
-
-        def _load():
-            conn = _ac_get_db()
-            _ac_ensure_tables(conn)
-            try:
-                total = conn.execute("SELECT COUNT(*) as n FROM ac_cycles").fetchone()["n"]
-                running = conn.execute(
-                    "SELECT COUNT(*) as n FROM ac_project_state WHERE status='running'"
-                ).fetchone()["n"]
-                avg = conn.execute(
-                    "SELECT AVG(total_score) as v FROM ac_cycles WHERE total_score > 0"
-                ).fetchone()["v"] or 0
-                best = conn.execute(
-                    "SELECT project_id, MAX(total_score) as s FROM ac_cycles GROUP BY project_id ORDER BY s DESC LIMIT 1"
-                ).fetchone()
-                states = {
-                    r["project_id"]: dict(r)
-                    for r in conn.execute("SELECT * FROM ac_project_state").fetchall()
-                }
-            except Exception as e:
-                total = running = avg = 0; best = None; states = {}
-            conn.close()
-            return total, running, avg, best, states
-
-        import asyncio
-        total, running, avg, best, states = await asyncio.to_thread(_load)
-
-        lines = [
-            "Amélioration Continue — Statistiques globales",
-            "=" * 50,
-            f"  Projets pilotes : {len(_AC_PROJECTS)}",
-            f"  Cycles exécutés : {total}",
-            f"  En cours        : {running}",
-            f"  Score moyen     : {avg:.1f}/100",
-            f"  Meilleur projet : {best['project_id'] if best else '—'} ({best['s'] if best else 0}/100)",
-            "",
-            "Par projet:",
-        ]
-        for p in _AC_PROJECTS:
-            s = states.get(p["id"], {})
-            status_icon = "▶" if s.get("status") == "running" else ("✓" if s.get("status") == "completed" else "·")
-            lines.append(
-                f"  {status_icon} {p['id']:<25} cycle {s.get('current_cycle', 0):>2}/{p['max_cycles']}  "
-                f"score {s.get('total_score_avg') or 0:>5.1f}  {s.get('convergence_status', 'cold_start')}"
-            )
-
-        return SFCommandResponse(success=True, output="\n".join(lines))
-    except Exception as e:
-        logger.exception("ac stats error")
-        return SFCommandResponse(success=False, output="", error=str(e))
-
-
 async def cmd_help() -> SFCommandResponse:
     """Show SF CLI help."""
     output = """Software Factory CLI Help
@@ -897,14 +770,6 @@ PROJECTS:
   
 DATABASE:
   db status                          Show database tables and row counts
-
-AMÉLIORATION CONTINUE:
-  ac list                            List all AC pilot projects + state
-  ac stats                           Global AC statistics
-  ac status <project_id>             Detailed status for one project
-  ac start <project_id>              Launch next improvement cycle
-  ac history <project_id>            Cycle history (scores, RL, adversarial)
-  ac history <id> --limit=20         Limit history rows
   
 SYSTEM:
   help                               Show this help message
@@ -918,9 +783,6 @@ Examples:
   sf$ agents show product-manager
   sf$ skills search "react"
   sf$ db status
-  sf$ ac list
-  sf$ ac start ac-hello-html
-  sf$ ac history ac-fullstack-rs --limit=5
   
 Tips:
   • Use ↑/↓ arrows for command history
@@ -947,19 +809,14 @@ SF_COMMANDS = {
     "skills": {
         "sync": cmd_skills_sync,
         "search": cmd_skills_search,
+        "eval": cmd_skills_eval,
+        "coverage": cmd_skills_coverage,
     },
     "projects": {
         "list": cmd_projects_list,
     },
     "db": {
         "status": cmd_db_status,
-    },
-    "ac": {
-        "list": cmd_ac_list,
-        "stats": cmd_ac_stats,
-        "status": cmd_ac_status,
-        "start": cmd_ac_start,
-        "history": cmd_ac_history,
     },
     "guide": cmd_guide,
     "help": cmd_help,

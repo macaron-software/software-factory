@@ -22,7 +22,15 @@ async def list_integrations():
     db = get_db()
     try:
         rows = db.execute("SELECT * FROM integrations ORDER BY name").fetchall()
-        return JSONResponse([dict(r) for r in rows])
+        return JSONResponse(
+            [
+                {
+                    k: str(v) if hasattr(v, "isoformat") else v
+                    for k, v in dict(r).items()
+                }
+                for r in rows
+            ]
+        )
     finally:
         db.close()
 

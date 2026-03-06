@@ -52,7 +52,7 @@ async def project_memory(
 
 @router.post("/api/memory/project/{project_id}")
 async def project_memory_store(project_id: str, body: ProjectMemoryCreate):
-    """Store a project memory entry."""
+    """Store a project memory entry (upsert by project_id + category + key)."""
     from ....memory.manager import get_memory_manager
 
     get_memory_manager().project_store(
@@ -66,7 +66,6 @@ async def project_memory_store(project_id: str, body: ProjectMemoryCreate):
     return JSONResponse({"ok": True})
 
 
-@router.delete("/api/memory/project/{project_id}")
 async def delete_project_memory(project_id: str, category: str = "", role: str = ""):
     """Clear project memory, optionally filtered by category and/or agent role."""
     from ....db.migrations import get_db

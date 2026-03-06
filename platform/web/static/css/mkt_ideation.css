@@ -25,6 +25,8 @@
 .mkt-chat {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);

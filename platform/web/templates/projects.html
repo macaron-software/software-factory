@@ -32,6 +32,12 @@
 .domain-count{font-size:.75rem;color:var(--text-secondary)}
 .ungrouped-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;margin-top:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
 .ungrouped-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary)}
+.domain-edit-btn{background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text-secondary);opacity:.5;border-radius:3px;margin-left:auto}
+.domain-edit-btn:hover{opacity:1;background:var(--bg-secondary)}
+.domain-set-form{display:none;align-items:center;gap:.4rem;margin-left:auto}
+.domain-set-form.open{display:flex}
+.domain-set-inp{font-size:.75rem;padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);width:140px;outline:none}
+.domain-set-inp:focus{border-color:var(--accent)}
 </style>
 
 <form method="get" action="/projects" id="pjf">
@@ -58,7 +64,7 @@
 </form>
 
 {% macro project_card(proj) %}
-<a href="/projects/{{ proj.info.id }}" class="item-card{% if not proj.has_workspace %} ghost{% endif %}" data-lead="{{ proj.info.lead_agent_id or '' }}">
+<a href="/projects/{{ proj.info.id }}" class="item-card{% if not proj.has_workspace %} ghost{% endif %}" data-lead="{{ proj.info.lead_agent_id or '' }}" data-id="{{ proj.info.id }}" data-domain="{{ proj.info.client_domain or '' }}">
     <div class="item-icon">
         <span class="project-type-dot {{ proj.info.factory_type }}"></span>
     </div>
@@ -157,6 +163,21 @@ function filterProjects() {
     });
 }
 {% endif %}
+// Domain quick-assign: Shift+click on a card opens domain prompt
+document.addEventListener('click', async function(e) {
+    if (!e.shiftKey) return;
+    const card = e.target.closest('.item-card[data-id]');
+    if (!card) return;
+    e.preventDefault();
+    const domain = prompt('Domaine client (ex: La Poste, Finance, Santé…)', card.dataset.domain || '');
+    if (domain === null) return;
+    const res = await fetch('/api/projects/' + card.dataset.id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_domain: domain.trim()})
+    });
+    if (res.ok) location.reload();
+});
 </script>
 {% endblock %}
 

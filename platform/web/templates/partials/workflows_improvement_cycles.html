@@ -1,6 +1,5 @@
 {# Fragment: cycle history rows for a given project — HTMX swap target #}
 {% if cycles %}
-<div id="ac-hview-panel-table">
 <table class="ac-table">
   <thead>
     <tr>
@@ -9,9 +8,6 @@
       {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
       <th>Score</th>
       <th>RL R</th>
-      <th>Lighthouse</th>
-      <th>axe</th>
-      <th>Lint</th>
       <th>Défauts</th>
       <th>Fix</th>
     </tr>
@@ -22,67 +18,21 @@
     {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
     {% set rl_r = c.rl_reward|float %}
     {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
-    {% set adv = c.adversarial_scores if c.adversarial_scores is mapping else {} %}
-    {% set lh = adv.get('lighthouse', '—') %}
-    {% set axe_v = adv.get('axe', '—') %}
-    {% set lint_v = adv.get('lint', '—') %}
     <tr>
       <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
-      <td><code style="font-size:.7rem;background:var(--border,#2a2d3e);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+      <td><code style="font-size:.7rem;background:var(--bg-tertiary);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
       {% for ph in phases %}
       {% set s = c.phase_scores_dict.get(ph) %}
-      <td style="text-align:center;{% if s is not none %}color:{% if s >= 80 %}#22c55e{% elif s >= 60 %}#f59e0b{% else %}#ef4444{% endif %}{% else %}color:#444{% endif %}">{{ s if s is not none else '·' }}</td>
+      <td class="{% if s is not none %}{% if s >= 80 %}phase-ok{% elif s >= 60 %}phase-warn{% else %}phase-fail{% endif %}{% else %}phase-none{% endif %}">{{ s if s is not none else '·' }}</td>
       {% endfor %}
       <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
       <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
-      <td style="font-size:.7rem;color:{% if lh != '—' and lh|int >= 90 %}#22c55e{% elif lh != '—' %}#f59e0b{% else %}#444{% endif %}">{{ lh }}</td>
-      <td style="font-size:.7rem;color:{% if axe_v != '—' and axe_v|int == 0 %}#22c55e{% elif axe_v != '—' %}#ef4444{% else %}#444{% endif %}">{{ axe_v }}</td>
-      <td style="font-size:.7rem;color:{% if lint_v != '—' and lint_v|int == 0 %}#22c55e{% elif lint_v != '—' %}#f59e0b{% else %}#444{% endif %}">{{ lint_v }}</td>
-      <td style="color:{% if c.defect_count > 5 %}#ef4444{% else %}#888{% endif %}">{{ c.defect_count }}</td>
-      <td style="font-size:.7rem;color:#f59e0b;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+      <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
+      <td class="fix-label" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
-</div>
-<div id="ac-hview-panel-topo" style="display:none">
-  <div style="padding:.75rem;background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;margin-top:.25rem">
-    <div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-bottom:.5rem">
-      {% for c in cycles[-15:] %}
-      {% set h = ((c.total_score / 100) * 60)|int %}
-      {% set col = '#22c55e' if c.total_score >= 80 else ('#f59e0b' if c.total_score >= 60 else '#ef4444') %}
-      <div title="Cycle {{ c.cycle_num }}: {{ c.total_score }}"
-        style="flex:1;height:{{ h if h > 2 else 2 }}px;background:{{ col }};border-radius:2px 2px 0 0;min-width:4px;opacity:.8"></div>
-      {% else %}
-      <div style="color:var(--text-muted,#888);font-size:.75rem;align-self:center">Aucun cycle</div>
-      {% endfor %}
-    </div>
-    <div style="font-size:.6rem;color:var(--text-muted,#888)">{{ cycles|length }} cycles · score max {{ cycles|map(attribute='total_score')|max if cycles else 0 }}/100</div>
-  </div>
-</div>
-<div id="ac-hview-panel-screens" style="display:none">
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.75rem;margin-top:.5rem">
-    {% for c in cycles[-6:]|reverse %}
-    <div style="background:var(--surface,#1e2030);border:1px solid var(--border,#2a2d3e);border-radius:.5rem;overflow:hidden">
-      <div style="width:100%;height:100px;background:var(--bg-secondary,#1a1128);display:flex;align-items:center;justify-content:center;overflow:hidden">
-        <div style="display:flex;flex-direction:column;align-items:center;gap:.3rem;color:var(--text-muted,#888)">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-          <span style="font-size:.6rem">Capture cycle {{ c.cycle_num }}</span>
-        </div>
-      </div>
-      <div style="padding:.4rem .6rem">
-        <div style="display:flex;justify-content:space-between">
-          <span style="font-size:.72rem;font-weight:600">Cycle {{ c.cycle_num }}</span>
-          {% set score = c.total_score|int %}
-          <span style="font-size:.7rem;font-weight:700;color:{% if score >= 80 %}#22c55e{% elif score >= 60 %}#f59e0b{% else %}#ef4444{% endif %}">{{ score if score > 0 else '—' }}</span>
-        </div>
-        <div style="font-size:.62rem;color:var(--text-muted,#888)">{{ c.git_sha[:7] if c.git_sha else '—' }} · {{ c.status }}</div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-<script>if(window.acHistoryView && window._acHistoryView) acHistoryView(window._acHistoryView);</script>
 {% else %}
-<div style="color:var(--text-muted,#888);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
 {% endif %}
