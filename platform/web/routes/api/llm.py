@@ -89,8 +89,9 @@ def _builtin_providers() -> list[dict]:
     disabled = _load_disabled_providers()
     result = []
     for pid, pcfg in _PROVIDERS.items():
-        key_env = pcfg.get("key_env", "")
-        has_key = bool(os.environ.get(key_env, ""))
+        key_env = pcfg.get("key_env") or ""
+        no_auth = pcfg.get("no_auth", False)
+        has_key = no_auth or bool(os.environ.get(key_env, "") if key_env else False)
         result.append(
             {
                 "id": pid,
@@ -98,6 +99,7 @@ def _builtin_providers() -> list[dict]:
                 "models": pcfg.get("models", []),
                 "default_model": pcfg.get("default", pcfg.get("models", ["?"])[0]),
                 "has_key": has_key,
+                "no_auth": no_auth,
                 "manually_disabled": pid in disabled,
                 "enabled": has_key and pid not in disabled,
             }
