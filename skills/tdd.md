@@ -13,6 +13,45 @@ metadata:
     - "when user asks to fix a bug and wants a regression test"
     - "when user mentions red-green-refactor"
     - "when test coverage needs to increase"
+# EVAL CASES — based on philschmid.de/testing-skills eval harness methodology
+# WHY: Skills shipped without evals = untested behavior. These cases verify
+# the skill correctly enforces Red-Green-Refactor and test-first discipline.
+# Ref: https://www.philschmid.de/testing-skills
+eval_cases:
+  - id: tdd-new-feature
+    prompt: "Implement a function that calculates compound interest in Python."
+    should_trigger: true
+    checks:
+      - "regex:def test_|class Test"
+      - "regex:assert|pytest"
+      - "regex:def.*compound|class.*compound"
+      - "no_placeholder"
+      - "length_min:200"
+    expectations:
+      - "writes the failing test BEFORE the implementation"
+      - "test is specific and verifiable, not trivially satisfied"
+      - "implementation is minimal — just enough to pass the test"
+    tags: [basic, python]
+  - id: tdd-bug-regression
+    prompt: "There's a bug: get_user(0) returns None instead of raising ValueError. Fix it with TDD."
+    should_trigger: true
+    checks:
+      - "regex:def test_.*user|class Test.*User"
+      - "regex:ValueError|raises"
+      - "regex:get_user"
+      - "no_placeholder"
+    expectations:
+      - "writes a failing test that reproduces the bug first"
+      - "test asserts that ValueError is raised for input 0"
+      - "fix is minimal — only what the test requires"
+    tags: [bug, regression]
+  - id: tdd-no-trigger-doc
+    prompt: "Write documentation for the compound_interest function."
+    should_trigger: false
+    checks: []
+    expectations:
+      - "produces documentation without forcing Red-Green-Refactor cycle"
+    tags: [negative]
 ---
 
 # TDD Mastery

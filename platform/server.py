@@ -1559,6 +1559,7 @@ def create_app() -> FastAPI:
         ("tasks", ".web.routes.api.tasks", {}),
         ("modules", ".web.routes.api.modules", {}),
         ("traceability", ".web.routes.api.traceability", {}),
+        ("skill-eval", ".web.routes.api.skill_eval", {}),
         ("mkt_ideation", ".web.routes.mkt_ideation", {}),
         ("group_ideation", ".web.routes.group_ideation", {}),
     ]

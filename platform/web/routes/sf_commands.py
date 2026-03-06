@@ -408,6 +408,151 @@ async def cmd_projects_list() -> SFCommandResponse:
                 success=True, output="No projects found", data={"count": 0}
             )
 
+        headers = ["ID", "Name", "Type", "Status"]
+        rows = []
+        for p in projects[:30]:
+            rows.append([
+                p.id[:15],
+                p.name[:40],
+                getattr(p, "type", "unknown")[:15],
+                getattr(p, "status", "unknown")[:15],
+            ])
+
+        output = f"Projects ({len(projects)} total)\n\n"
+        output += format_table(headers, rows)
+        return SFCommandResponse(success=True, output=output, data={"count": len(projects)})
+    except Exception as e:
+        logger.exception("Error listing projects")
+        return SFCommandResponse(success=False, output="", error=f"Error: {str(e)}")
+
+
+async def cmd_skills_coverage() -> SFCommandResponse:
+    """Show skill eval coverage summary.
+
+    WHY: Skills shipped without evals = technical debt. This gives a quick
+    snapshot of how many skills have eval_cases and their pass rates.
+    Ref: https://www.philschmid.de/testing-skills
+    """
+    from ...tools.skill_eval_tools import coverage_summary
+    try:
+        s = coverage_summary()
+        out = f"Skills Eval Coverage\n{'='*40}\n"
+        out += f"Total skills:      {s['total']}\n"
+        out += f"With eval_cases:   {s['with_evals']} ({s['coverage_pct']}%)\n"
+        out += f"Run at least once: {s['run']}\n"
+        out += f"Passing (≥80%):    {s['passing']}\n"
+        if s["needing_work"]:
+            out += f"\nNeeding work (pass_rate < 80%):\n"
+            for sk in s["needing_work"][:10]:
+                rate = f"{int((sk['pass_rate'] or 0)*100)}%" if sk['pass_rate'] is not None else "not run"
+                out += f"  • {sk['name']} — {rate}\n"
+        if s["without_evals"]:
+            out += f"\nWithout eval_cases ({len(s['without_evals'])}):\n"
+            for name in s["without_evals"][:15]:
+                out += f"  • {name}\n"
+        return SFCommandResponse(success=True, output=out, data=s)
+    except Exception as exc:
+        return SFCommandResponse(success=False, output="", error=str(exc))
+
+
+async def cmd_skills_eval(args: list[str]) -> SFCommandResponse:
+    """Run eval harness for a skill (or all skills).
+
+    Usage:
+      sf skills eval <skill-name>           run eval for one skill
+      sf skills eval --all                  run all skills with eval_cases
+      sf skills eval <name> --trials=5      use 5 trials per case (default: 3)
+
+    WHY: Deterministic checks + LLM-as-judge to measure skill quality.
+    Pass rate ≥ 80% = ready to ship. < 80% = iterate on the skill.
+    Ref: https://www.philschmid.de/testing-skills
+    """
+    import asyncio
+    from ...tools.skill_eval_tools import run_skill_eval, list_skills_with_evals
+
+    trials = 3
+    run_all = "--all" in args
+    skill_name = next((a for a in args if not a.startswith("--")), None)
+
+    for a in args:
+        if a.startswith("--trials="):
+            try:
+                trials = int(a.split("=")[1])
+            except ValueError:
+                pass
+
+    try:
+        if run_all:
+            skills = [s["name"] for s in list_skills_with_evals() if s["has_evals"]]
+            if not skills:
+                return SFCommandResponse(success=False, output="", error="No skills with eval_cases found")
+            out = f"Running evals for {len(skills)} skills ({trials} trials each)...\n\n"
+            passed = 0
+            for name in skills:
+                result = await run_skill_eval(name, trials=trials)
+                status = "✅" if result.pass_rate >= 0.8 else "⚠️ " if result.pass_rate >= 0.6 else "❌"
+                out += f"  {status} {name}: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {result.duration_s}s)\n"
+                if result.pass_rate >= 0.8:
+                    passed += 1
+            out += f"\nResult: {passed}/{len(skills)} skills passing (≥80%)"
+            return SFCommandResponse(success=True, output=out)
+
+        if not skill_name:
+            return SFCommandResponse(
+                success=False, output="",
+                error="Usage: sf skills eval <skill-name> | --all"
+            )
+
+        result = await run_skill_eval(skill_name, trials=trials)
+
+        if result.status == "no_cases":
+            return SFCommandResponse(
+                success=False, output="",
+                error=f"Skill '{skill_name}' has no eval_cases. Add them to the frontmatter."
+            )
+        if result.status == "error":
+            return SFCommandResponse(success=False, output="", error=result.error)
+
+        status_icon = "✅" if result.pass_rate >= 0.8 else "⚠️" if result.pass_rate >= 0.6 else "❌"
+        out = f"{status_icon} {skill_name} v{result.skill_version}\n"
+        out += f"Pass rate: {int(result.pass_rate*100)}% ({result.eval_cases_total} cases, {trials} trials, {result.duration_s}s)\n\n"
+
+        for c in result.case_results:
+            icon = "✅" if c.overall_pass_rate >= 0.8 else "❌"
+            out += f"{icon} [{c.case_id}] overall={int(c.overall_pass_rate*100)}%"
+            out += f"  checks={int(c.checks_pass_rate*100)}%"
+            if c.llm_judge_score >= 0:
+                out += f"  judge={int(c.llm_judge_score*100)}%"
+            out += f"  ~{c.avg_tokens}tok {int(c.avg_latency_ms)}ms\n"
+            # Show failing checks
+            for ch in c.check_details:
+                if not ch.passed:
+                    out += f"     ✗ {ch.check_spec}: {ch.notes}\n"
+            if c.judge_notes and c.llm_judge_score < 0.8:
+                out += f"     judge: {c.judge_notes[:100]}\n"
+
+        if result.coverage_gap:
+            out += f"\nCoverage gaps: {', '.join(result.coverage_gap)}"
+
+        return SFCommandResponse(success=True, output=out, data={
+            "skill_name": skill_name, "pass_rate": result.pass_rate,
+        })
+    except Exception as exc:
+        logger.exception("Error running skill eval")
+        return SFCommandResponse(success=False, output="", error=str(exc))
+
+    """List projects."""
+    from ...projects.manager import get_project_store
+
+    try:
+        store = get_project_store()
+        projects = store.list_all()
+
+        if not projects:
+            return SFCommandResponse(
+                success=True, output="No projects found", data={"count": 0}
+            )
+
         # Format as table
         headers = ["ID", "Name", "Type", "Status"]
         rows = []
@@ -664,6 +809,8 @@ SF_COMMANDS = {
     "skills": {
         "sync": cmd_skills_sync,
         "search": cmd_skills_search,
+        "eval": cmd_skills_eval,
+        "coverage": cmd_skills_coverage,
     },
     "projects": {
         "list": cmd_projects_list,

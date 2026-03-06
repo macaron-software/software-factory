@@ -117,6 +117,7 @@
     <button class="tab" onclick="artSwitchTab(this, 'art-mercato')" hx-get="/mercato/roster-partial" hx-target="#art-mercato-content" hx-swap="innerHTML" hx-trigger="click once">Mercato</button>
     <button class="tab" onclick="artSwitchTab(this, 'art-thompson')" id="tab-thompson">Thompson Sampling</button>
     <button class="tab" onclick="artSwitchTab(this, 'art-teams')" hx-get="/teams/partial" hx-target="#art-teams-content" hx-swap="innerHTML" hx-trigger="click once" id="tab-teams">Darwin Teams</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-skills')" id="tab-skills">Skills Health</button>
 </div>
 <div id="art-org">
 <div class="art-dash">
@@ -319,7 +320,62 @@
     </div>
 </div>
 
-{% endblock %}
+<!-- Skills Health tab panel (hidden by default)
+     WHY: Surface skill eval coverage + pass rates alongside team fitness.
+     Source: philschmid.de/testing-skills — "You wouldn't ship code without tests,
+     but why ship skills without evals?" We track: coverage %, pass rates, gaps.
+-->
+<div id="art-skills" style="display:none">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+        <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
+        <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
+        <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
+        <div class="art-kpi"><div class="num" id="sk-run">–</div><div class="lbl">Ever run</div></div>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="background:var(--bg-secondary);border-radius:4px;height:8px;margin-bottom:1.5rem;overflow:hidden">
+        <div id="sk-progress" style="background:#6366f1;height:100%;width:0%;transition:width 0.4s"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+        <!-- Skills with evals table -->
+        <div class="card" style="padding:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Skills with evals
+            </div>
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse" id="sk-eval-table">
+                <thead>
+                    <tr style="color:var(--text-tertiary);font-size:0.7rem">
+                        <th style="text-align:left;padding:2px 4px">Skill</th>
+                        <th style="text-align:center;padding:2px 4px">Cases</th>
+                        <th style="text-align:center;padding:2px 4px">Pass rate</th>
+                        <th style="text-align:center;padding:2px 4px">Run</th>
+                    </tr>
+                </thead>
+                <tbody id="sk-eval-tbody">
+                    <tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Skills without evals -->
+        <div class="card" style="padding:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Skills missing evals <span id="sk-missing-count" style="color:#f59e0b"></span>
+            </div>
+            <div id="sk-missing-list" style="font-size:0.82rem;line-height:1.8;color:var(--text-secondary)">
+                Loading…
+            </div>
+        </div>
+    </div>
+
+    <!-- Retirement detection info -->
+    <div style="font-size:0.75rem;color:var(--text-tertiary);margin-bottom:0.5rem">
+        💡 Graduation rule: once pass rate hits 100%, cases become regression tests.
+        If skill passes without being loaded → retire it (model absorbed the skill).
+        <a href="/workflows/skill-eval" style="color:var(--purple-light);margin-left:0.5rem">Run skill-eval workflow →</a>
+    </div>
+</div>
 
 {% block scripts %}
 <script>
@@ -494,7 +550,9 @@ function artSwitchTab(btn, panelId) {
     document.getElementById('art-mercato').style.display = panelId === 'art-mercato' ? '' : 'none';
     document.getElementById('art-thompson').style.display = panelId === 'art-thompson' ? '' : 'none';
     document.getElementById('art-teams').style.display = panelId === 'art-teams' ? '' : 'none';
+    document.getElementById('art-skills').style.display = panelId === 'art-skills' ? '' : 'none';
     if (panelId === 'art-thompson') loadThompsonTab();
+    if (panelId === 'art-skills') loadSkillsTab();
 }
 
 async function loadThompsonTab() {
@@ -599,6 +657,68 @@ async function loadThompsonTab() {
             }).join('');
         }
     } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur réseau: ${e.message}</td></tr>`; }
+}
+
+// Skills Health tab loader
+// WHY: Surfaces skill eval coverage + pass rates from /api/skills/eval
+// so engineers can see which skills need evals at a glance — same dashboard
+// as Darwin team fitness and Thompson Sampling scores.
+// Ref: https://www.philschmid.de/testing-skills
+async function loadSkillsTab() {
+    const tbody = document.getElementById('sk-eval-tbody');
+    if (tbody && tbody.dataset.loaded) return;
+    try {
+        const [coverage, skillList] = await Promise.all([
+            fetch('/api/skills/eval').then(r => r.json()),
+            fetch('/api/skills/list').then(r => r.json()),
+        ]);
+
+        // KPIs
+        document.getElementById('sk-total').textContent = coverage.total;
+        document.getElementById('sk-coverage').textContent = coverage.coverage_pct + '%';
+        document.getElementById('sk-passing').textContent = coverage.passing;
+        document.getElementById('sk-run').textContent = coverage.run;
+        document.getElementById('sk-progress').style.width = coverage.coverage_pct + '%';
+
+        // Skills with evals table
+        const withEvals = skillList.filter(s => s.has_evals);
+        if (tbody) {
+            if (!withEvals.length) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:1rem;text-align:center;color:var(--text-secondary)">No skills with eval_cases yet</td></tr>';
+            } else {
+                tbody.innerHTML = withEvals.map(s => {
+                    const pr = s.pass_rate;
+                    const prPct = pr !== null ? Math.round(pr * 100) : null;
+                    const color = pr === null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+                    const badge = pr === null ? '<span style="color:#6b7280;font-size:0.75rem">not run</span>'
+                        : `<span style="font-weight:600;color:${color}">${prPct}%</span>`;
+                    const ran = s.ran_at ? s.ran_at.substring(0,10) : '—';
+                    return `<tr>
+                        <td style="padding:5px 4px">${s.name}</td>
+                        <td style="text-align:center;padding:5px 4px;color:var(--text-secondary)">${s.eval_cases}</td>
+                        <td style="text-align:center;padding:5px 4px">${badge}
+                            ${pr !== null ? `<div style="background:var(--border);border-radius:2px;height:4px;margin-top:3px"><div style="background:${color};border-radius:2px;height:4px;width:${prPct}%"></div></div>` : ''}
+                        </td>
+                        <td style="text-align:center;padding:5px 4px;font-size:0.75rem;color:var(--text-tertiary)">${ran}</td>
+                    </tr>`;
+                }).join('');
+            }
+            tbody.dataset.loaded = '1';
+        }
+
+        // Missing evals list
+        const missing = coverage.without_evals || [];
+        const missingEl = document.getElementById('sk-missing-list');
+        const countEl = document.getElementById('sk-missing-count');
+        if (countEl) countEl.textContent = `(${missing.length})`;
+        if (missingEl) {
+            missingEl.innerHTML = missing.slice(0, 30).map(n =>
+                `<span style="display:inline-block;margin-right:0.5rem;margin-bottom:0.25rem;background:var(--bg-secondary);border-radius:3px;padding:1px 7px;font-size:0.78rem">${n}</span>`
+            ).join('') + (missing.length > 30 ? `<span style="color:var(--text-tertiary)"> +${missing.length-30} more</span>` : '');
+        }
+    } catch(e) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="4" style="padding:1rem;text-align:center;color:#ef4444">Error: ${e.message}</td></tr>`;
+    }
 }
 </script>
 {% endblock %}

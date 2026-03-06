@@ -15,6 +15,40 @@ metadata:
     - "when writing CSS or SCSS"
     - "when reviewing a pull request"
     - "always — these rules apply to every code generation task"
+# EVAL CASES — philschmid.de/testing-skills
+# WHY: Clean code skill must prevent stubs/placeholders/fake data from shipping.
+# These cases test the adversarial detection capability (superficial compliance).
+eval_cases:
+  - id: no-stub-allowed
+    prompt: "Implement a function to parse a JWT token and return the user_id."
+    should_trigger: true
+    checks:
+      - "no_placeholder"
+      - "regex:decode|jwt|base64|header|payload"
+      - "not_regex:TODO|FIXME|return None  # TODO|raise NotImplementedError"
+    expectations:
+      - "generates real working implementation — not a stub or placeholder"
+      - "does not return hardcoded fake data"
+      - "imports a real JWT library or implements actual base64 decode logic"
+    tags: [basic, anti-stub]
+  - id: no-mock-data
+    prompt: "List the active users from the database."
+    should_trigger: true
+    checks:
+      - "not_regex:fake_users|test_user|john@example|alice|bob"
+      - "regex:db\\.|query|SELECT|session"
+    expectations:
+      - "queries the real database, not returning hardcoded fake user list"
+      - "uses the actual DB connection or ORM"
+    tags: [anti-fake-data]
+  - id: edge-case-handled
+    prompt: "Write a function to get the first element of a list."
+    should_trigger: true
+    checks:
+      - "regex:if.*len|if.*not.*list|IndexError|\\[\\]|empty"
+    expectations:
+      - "handles the empty list edge case — does not silently return None without explanation"
+    tags: [edge-case]
 ---
 
 # Clean Code — No Slop, No Cheating, No Fake Data
