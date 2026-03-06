@@ -17,13 +17,45 @@ Endpoints:
     DELETE /api/users/{id}/projects/{project_id}/role — remove project role (admin)
 """
 
+import collections
+import logging
+import time
+
 from fastapi import APIRouter, Depends, Request
 from starlette.responses import JSONResponse
 
 from ...auth import service
 from ...auth.middleware import require_auth, get_current_user
+from ...demo import is_demo_mode
+
+_log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# SBD-04: In-memory sliding-window rate limiter for auth endpoints.
+# WHY: /api/auth/login and /api/auth/demo have no external rate limiting and
+# are publicly reachable → brute-force / credential-stuffing vectors.
+# 5 attempts per 60 s per IP; exceeding returns 429 with Retry-After.
+# Ref: SecureByDesign v1.1.0 SBD-04 — brute-force protection on auth endpoints
+# (https://github.com/Yems221/securebydesign-llmskill/blob/main/SKILL.md)
+# ---------------------------------------------------------------------------
+_RATE_LIMIT_MAX = 5
+_RATE_LIMIT_WINDOW = 60  # seconds
+_login_attempts: dict[str, collections.deque] = {}
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if IP has exceeded the login rate limit."""
+    now = time.monotonic()
+    bucket = _login_attempts.setdefault(ip, collections.deque())
+    while bucket and now - bucket[0] > _RATE_LIMIT_WINDOW:
+        bucket.popleft()
+    if len(bucket) >= _RATE_LIMIT_MAX:
+        return True
+    bucket.append(now)
+    return False
+
 
 ACCESS_COOKIE_MAX_AGE = 15 * 60  # 15 minutes
 REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60  # 7 days
@@ -93,16 +125,35 @@ async def setup(request: Request):
     except service.AuthError as e:
         return JSONResponse({"error": str(e), "code": e.code}, status_code=400)
     except Exception as e:
-        return JSONResponse({"error": f"Setup failed: {str(e)}"}, status_code=500)
+        # SBD-13: log full error server-side, return generic message to client.
+        _log.error("setup: unexpected error: %s", e, exc_info=True)
+        return JSONResponse(
+            {"error": "Setup error. Check server logs."}, status_code=500
+        )
 
 
 @router.post("/api/auth/demo")
 async def demo_login(request: Request):
-    """Skip login — create or reuse demo admin and auto-login."""
-    import asyncio
-    import logging
+    """Skip login — create or reuse demo admin and auto-login.
 
-    _log = logging.getLogger(__name__)
+    WHY: Only enabled when PLATFORM_LLM_PROVIDER=demo. Leaving this endpoint
+    active on production would create a permanent admin backdoor with hardcoded
+    credentials. Ref: SecureByDesign v1.1.0 SBD-04.
+    """
+    # SBD-04: Restrict demo login to demo deployments only.
+    if not is_demo_mode():
+        return JSONResponse({"error": "Not found"}, status_code=404)
+
+    ip = request.client.host if request.client else ""
+    if _check_rate_limit(ip):
+        return JSONResponse(
+            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
+            status_code=429,
+            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
+        )
+
+    import asyncio
+
     demo_email = "admin@demo.local"
     demo_pass = "demo-admin-2026"
     demo_name = "Demo Admin"
@@ -151,13 +202,22 @@ async def demo_login(request: Request):
     except service.AuthError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
     except Exception as e:
-        _log.error("demo_login: login failed: %s", e)
-        return JSONResponse({"error": f"Demo login error: {e}"}, status_code=500)
+        # SBD-13: log internally, return generic message.
+        _log.error("demo_login: login failed: %s", e, exc_info=True)
+        return JSONResponse({"error": "Demo login error"}, status_code=500)
 
 
 @router.post("/api/auth/login")
 async def login(request: Request):
     """Authenticate user with email/password. Returns JWT cookies."""
+    ip = request.client.host if request.client else ""
+    if _check_rate_limit(ip):
+        return JSONResponse(
+            {"error": "Too many attempts. Try again later.", "code": "rate_limited"},
+            status_code=429,
+            headers={"Retry-After": str(_RATE_LIMIT_WINDOW)},
+        )
+
     try:
         body = await request.json()
     except Exception:
