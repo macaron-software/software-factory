@@ -375,7 +375,7 @@
 
     <!-- Thompson Sampling sub-panel -->
     <div id="ac-panel-thompson" style="display:none">
-        <div class="stats-grid" style="margin-bottom:1.5rem" id="ts-art-stats">
+        <div style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
             <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
             <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
             <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
