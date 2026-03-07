@@ -120,7 +120,7 @@ class DockerLocalTarget(DeployTarget):
         if not os.path.isdir(workspace):
             return DeployResult(ok=False, message=f"Workspace not found: {workspace}")
 
-        container_name = f"macaron-app-{mission_id[:12]}"
+        container_name = f"macaron-app-{mission_id[:12].rstrip('-_')}"
         subprocess.run(["docker", "rm", "-f", container_name], capture_output=True, timeout=10)
 
         try:
