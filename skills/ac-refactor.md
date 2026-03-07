@@ -67,10 +67,11 @@ eval_cases:
           return round(amount * rate, 2)
     should_trigger: true
     checks:
-      - "regex:score|refactoring_score|\\d+/100|0-100"
-      - "no_placeholder"
+      - "regex:score|refactoring_score|\\d+/100|0-100|\\d{1,3}\\s*/\\s*100"
+      - "regex:clean|minimal|simple|good|high|excellent|well.written|no.*issue|no.*smell|no.*problem|solid"
+      - "not_regex:should extract|needs refactoring|refactoring needed|smells.*found|violations.*found|issues.*found"
     expectations:
-      - "produces a refactoring_score or equivalent metric"
+      - "produces a refactoring_score or equivalent metric (e.g., 90/100)"
       - "gives high score for clean, minimal function"
       - "does not invent smells that don't exist"
     tags: [score, negative]

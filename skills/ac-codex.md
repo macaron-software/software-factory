@@ -45,16 +45,21 @@ eval_cases:
     tags: [anti-stub, jwt]
   - id: red-green-cycle
     prompt: |
-      The following test is failing: assert calculate_discount(100, 0.2) == 80.0
-      Fix it with strict TDD.
+      The following test is failing:
+      def test_calculate_discount():
+          assert calculate_discount(100, 0.2) == 80.0
+      Fix it with strict TDD: show RED phase (confirm failure), GREEN phase (write calculate_discount), REFACTOR phase.
+      Write the actual implementation of calculate_discount(price, discount) -> float.
     should_trigger: true
     checks:
       - "regex:RED|GREEN|REFACTOR|failing.*test|test.*fail|make.*pass"
-      - "regex:def calculate_discount|calculate_discount"
+      - "regex:def calculate_discount|calculate_discount\\(|def calculate_discount\\("
+      - "regex:return.*price|return.*100|return.*-|price.*discount|price.*\\*"
       - "no_placeholder"
     expectations:
-      - "explicitly identifies the RED phase (failing test)"
-      - "implements minimal code to reach GREEN"
+      - "explicitly identifies the RED phase (test is failing because function doesn't exist)"
+      - "implements calculate_discount(price, discount) -> float with actual formula"
+      - "shows GREEN phase: tests now pass"
       - "does not add extra features beyond what the test requires"
     tags: [red-green-refactor, minimal]
 ---

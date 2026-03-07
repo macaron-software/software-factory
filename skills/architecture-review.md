@@ -63,9 +63,12 @@ eval_cases:
     should_trigger: true
     checks:
       - "length_min:40"
+      - "regex:separation|clean|concern|well.struct|good|organized|minimal|single.*responsib|SRP"
+      - "not_regex:god.*class|too.*many.*responsib|tight.*coupl|should.*split|refactor.*needed"
     expectations:
-      - "recognizes clean separation of concerns"
+      - "recognizes clean separation of concerns (service/middleware/models)"
       - "does NOT invent architectural problems that don't exist"
+      - "acknowledges the module is well-structured"
     tags: [negative]
 ---
 

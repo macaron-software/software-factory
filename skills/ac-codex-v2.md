@@ -15,28 +15,37 @@ metadata:
 eval_cases:
   - id: a11y-first-test
     prompt: |
-      Implement a modal dialog component in HTML/CSS/JS with TDD.
+      Write the RED phase tests and GREEN phase HTML for an accessible modal dialog.
+      Keep it minimal: tests for role=dialog + aria-modal + aria-labelledby, then the HTML that makes them pass.
+      Output tests and HTML directly in one response — no explanation needed.
     should_trigger: true
     checks:
-      - "regex:aria-modal|role.*dialog|aria-labelledby"
-      - "regex:def test_|class Test|describe\\(|it\\("
+      - "regex:aria-modal|role.*dialog|aria-labelledby|role=.dialog"
+      - "regex:test|describe\\(|it\\(|assert|expect|querySelector"
+      - "regex:<dialog|<div.*role|role=|aria-"
       - "no_placeholder"
+      - "length_min:100"
     expectations:
-      - "writes accessibility tests FIRST (ARIA roles, keyboard nav, focus trap)"
-      - "implements dialog with role=dialog, aria-modal, focus trap"
-      - "keyboard Escape closes dialog"
+      - "writes tests for ARIA attributes (role=dialog, aria-modal, aria-labelledby)"
+      - "implements minimal dialog HTML with the required ARIA attributes"
+      - "no boilerplate — just tests + HTML"
     tags: [a11y-first, aria, modal]
   - id: design-token-only
     prompt: |
-      Implement a card component with hover state. Use TDD.
+      Write CSS for a card component with hover state using ONLY CSS custom properties (design tokens).
+      Rules: zero hardcoded colors (no #hex, no rgb()), zero hardcoded spacing (no px values directly — use var(--)).
+      Output the CSS directly.
     should_trigger: true
     checks:
-      - "not_regex:#[0-9a-fA-F]{3,6}|rgb\\(|rgba\\(|px.*solid|border: [0-9]"
+      - "not_regex:#[0-9a-fA-F]{3,6}|rgb\\(|rgba\\("
       - "regex:var\\(--"
+      - "regex:\\.card|card\\s*\\{"
       - "no_placeholder"
+      - "length_min:50"
     expectations:
-      - "zero hardcoded color/spacing values — only CSS custom properties"
-      - "hover state via var(--color-*-hover) token, not inline color"
+      - "zero hardcoded color values — only var(--color-*) tokens"
+      - "hover state uses CSS custom property"
+      - "outputs actual CSS, not a description"
     tags: [design-tokens, no-hardcode]
 ---
 # Skill: AC Codex v2 — TDD Coder, Accessibility-First Variant

@@ -24,7 +24,7 @@ eval_cases:
     should_trigger: true
     checks:
       - "regex:SBD-01|injection|f-string|dynamic.*column|whitelist|allowlist"
-      - "no_placeholder"
+      - "regex:FAIL|risk|vulnerab|danger|issue|problem|insecur"
       - "length_min:80"
     expectations:
       - "evaluates specifically against SBD-01 (injection control)"
