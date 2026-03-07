@@ -1557,6 +1557,30 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     yield ("tool", tc.function_name)
+                    # ── QA scope enforcement (streaming): only QA_REPORT_* and Dockerfile ──
+                    if tc.function_name in _CODE_WRITE_TOOLS:
+                        _role_l = (agent.role or "").lower()
+                        if "qa" in _role_l and "devops" not in _role_l:
+                            _write_path = str(tc.arguments.get("path", ""))
+                            _bn = _write_path.split("/")[-1]
+                            _qa_ok = (
+                                _bn.startswith("QA_REPORT")
+                                or _bn == "Dockerfile"
+                                or _bn.startswith("Dockerfile.")
+                            )
+                            if not _qa_ok:
+                                messages.append(LLMMessage(
+                                    role="tool",
+                                    content=(
+                                        f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
+                                        "Allowed: QA_REPORT_N.md, Dockerfile (Chromium only). "
+                                        "If docker_deploy fails → VETO. Do not fix source code."
+                                    ),
+                                    tool_call_id=tc.id,
+                                    name=tc.function_name,
+                                ))
+                                logger.warning("QA SCOPE VIOLATION agent=%s path=%s", agent.id, _bn)
+                                continue
                     # PRE_TOOL hook (may block)
                     _hook_ctx2 = HookContext(
                         hook_type=HookType.PRE_TOOL,
