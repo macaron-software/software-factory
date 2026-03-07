@@ -524,38 +524,6 @@ async def notification_status():
     )
 
 
-@router.post("/api/notifications/test")
-async def notification_test():
-    """Send a test notification to all configured channels."""
-    from ....services.notification_service import (
-        NotificationPayload,
-        get_notification_service,
-    )
-
-    svc = get_notification_service()
-    if not svc.is_configured:
-        return JSONResponse(
-            {"error": "No notification channels configured"}, status_code=400
-        )
-    payload = NotificationPayload(
-        event="test",
-        title="Test Notification",
-        message="This is a test notification from Software Factory.",
-        severity="info",
-    )
-    await svc.notify(payload)
-    return JSONResponse(
-        {
-            "ok": True,
-            "channels": {
-                "slack": svc.has_slack,
-                "email": svc.has_email,
-                "webhook": svc.has_webhook,
-            },
-        }
-    )
-
-
 @router.get("/api/reactions/stats")
 async def reactions_stats():
     """Get reaction engine statistics."""

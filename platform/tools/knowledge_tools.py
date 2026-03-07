@@ -22,6 +22,7 @@ import urllib.request
 from typing import TYPE_CHECKING
 
 from .registry import BaseTool
+from ._helpers import get_json as _get_json
 
 if TYPE_CHECKING:
     from ..models import AgentInstance
@@ -36,12 +37,6 @@ _OSV_ECOSYSTEM_MAP = {
     "maven": "Maven",
     "go": "Go",
 }
-
-
-def _get_json(url: str) -> dict:
-    req = urllib.request.Request(url, headers={"User-Agent": "sf-agent/1.0"})
-    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-        return json.loads(resp.read().decode())
 
 
 def _post_json(url: str, payload: dict) -> dict:

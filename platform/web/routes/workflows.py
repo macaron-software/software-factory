@@ -19,25 +19,6 @@ logger = logging.getLogger(__name__)
 # ── Workflows ────────────────────────────────────────────────────
 
 
-@router.get("/workflows", response_class=HTMLResponse)
-async def workflows_page(request: Request):
-    """Workflow templates listing."""
-    from ...workflows.store import get_workflow_store
-    from ...patterns.store import get_pattern_store
-
-    workflows = get_workflow_store().list_all()
-    patterns = {p.id: p for p in get_pattern_store().list_all()}
-    return _templates(request).TemplateResponse(
-        "workflows.html",
-        {
-            "request": request,
-            "page_title": "Workflows",
-            "workflows": workflows,
-            "patterns": patterns,
-        },
-    )
-
-
 @router.get("/workflows/new", response_class=HTMLResponse)
 async def workflow_new(request: Request):
     """New workflow form."""

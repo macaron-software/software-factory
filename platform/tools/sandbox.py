@@ -399,3 +399,48 @@ class SandboxExecutor:
 def get_sandbox(workspace: str = ".") -> SandboxExecutor:
     """Get a sandbox executor for the given workspace."""
     return SandboxExecutor(workspace)
+
+
+def run_in_project_docker(
+    project_id: str,
+    command: str,
+    cwd: Optional[str] = None,
+    timeout: int = SANDBOX_TIMEOUT,
+    env: Optional[dict] = None,
+    agent_id: Optional[str] = None,
+) -> SandboxResult:
+    """Run a command inside the Docker container of the given project.
+
+    Looks up the project workspace, detects the container image from its
+    Dockerfile, and delegates to SandboxExecutor._run_docker().
+    Falls back to direct execution if Docker is unavailable or the project
+    has no Dockerfile.
+
+    Usage:
+        result = run_in_project_docker("software-factory", "pytest tests/")
+        result = run_in_project_docker("ac-hello-html", "npm test", cwd=workspace)
+    """
+    workspace = cwd or ""
+    image = None
+
+    try:
+        from ..projects.manager import get_project_store
+
+        proj = get_project_store().get(project_id)
+        if proj and proj.path:
+            workspace = workspace or proj.path
+            # Auto-detect Docker image from project Dockerfile
+            dockerfile = os.path.join(proj.path, "Dockerfile")
+            if os.path.isfile(dockerfile):
+                image = _detect_image(command)  # command-based heuristic first
+                if not image:
+                    image = f"sf-{project_id}:latest"
+    except Exception as e:
+        logger.debug("run_in_project_docker: project lookup failed: %s", e)
+
+    executor = SandboxExecutor(workspace or ".")
+    if SANDBOX_ENABLED:
+        return executor._run_docker(
+            command, cwd or workspace, timeout, image, SANDBOX_NETWORK, env, agent_id
+        )
+    return executor._run_direct(command, cwd or workspace, timeout, env)

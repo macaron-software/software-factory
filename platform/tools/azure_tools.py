@@ -28,7 +28,8 @@ class AzureSearchTool(BaseTool):
             return "Azure not connected"
         try:
             result = await self._bridge.query(
-                prompt=query, model="gpt-5.1", max_tokens=2000,
+                prompt=query,
+                model="gpt-5.1",
             )
             return result
         except Exception as e:

@@ -4,19 +4,23 @@ Lint Tools — Bridge to ruff, eslint, golint with auto-detection.
 
 from __future__ import annotations
 
-import asyncio
 import os
 import shutil
 
 from .registry import BaseTool
+from ._helpers import run_proc as _run_base
 from ..models import AgentInstance
 
 TIMEOUT = 30
 
 EXT_LANG = {
-    ".py": "python", ".pyi": "python",
-    ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript",
-    ".ts": "typescript", ".tsx": "typescript",
+    ".py": "python",
+    ".pyi": "python",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".mjs": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
     ".go": "go",
     ".rs": "rust",
 }
@@ -29,15 +33,35 @@ _RUFF_MAX_COMPLEXITY = "10"
 LINT_CONFIG = {
     "python": {
         "bin": "ruff",
-        "check": lambda p: ["ruff", "check", "--select", _RUFF_SELECT,
-                            "--per-file-ignores", "__init__.py:F401",
-                            "--max-doc-length", "120", p],
-        "fix":  lambda p: ["ruff", "check", "--fix", "--select", _RUFF_SELECT, p],
+        "check": lambda p: [
+            "ruff",
+            "check",
+            "--select",
+            _RUFF_SELECT,
+            "--per-file-ignores",
+            "__init__.py:F401",
+            "--max-doc-length",
+            "120",
+            p,
+        ],
+        "fix": lambda p: ["ruff", "check", "--fix", "--select", _RUFF_SELECT, p],
     },
-    "javascript": {"bin": "eslint", "check": lambda p: ["eslint", p], "fix": lambda p: ["eslint", "--fix", p]},
-    "typescript": {"bin": "eslint", "check": lambda p: ["eslint", p], "fix": lambda p: ["eslint", "--fix", p]},
+    "javascript": {
+        "bin": "eslint",
+        "check": lambda p: ["eslint", p],
+        "fix": lambda p: ["eslint", "--fix", p],
+    },
+    "typescript": {
+        "bin": "eslint",
+        "check": lambda p: ["eslint", p],
+        "fix": lambda p: ["eslint", "--fix", p],
+    },
     "go": {"bin": "go", "check": lambda p: ["go", "vet", "./..."], "fix": None},
-    "rust": {"bin": "cargo", "check": lambda p: ["cargo", "clippy", "--", "-D", "warnings"], "fix": None},
+    "rust": {
+        "bin": "cargo",
+        "check": lambda p: ["cargo", "clippy", "--", "-D", "warnings"],
+        "fix": None,
+    },
 }
 
 
@@ -53,21 +77,7 @@ def _detect_language(path: str) -> str | None:
 
 
 async def _run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=TIMEOUT)
-        output = (stdout.decode(errors="replace") + stderr.decode(errors="replace")).strip()
-        return proc.returncode, output
-    except FileNotFoundError:
-        return -1, f"{cmd[0]}: command not found"
-    except asyncio.TimeoutError:
-        proc.kill()
-        return -2, f"Timeout ({TIMEOUT}s) exceeded running {cmd[0]}"
+    return await _run_base(cmd, cwd, timeout=TIMEOUT)
 
 
 class LintTool(BaseTool):
@@ -89,7 +99,9 @@ class LintTool(BaseTool):
             return f"Error: no linter configured for {lang}"
 
         if not shutil.which(cfg["bin"]):
-            return f"Error: {cfg['bin']} not installed. Install it to lint {lang} files."
+            return (
+                f"Error: {cfg['bin']} not installed. Install it to lint {lang} files."
+            )
 
         code, output = await _run(cfg["check"](path))
         if code == 0:
@@ -124,7 +136,9 @@ class LintFixTool(BaseTool):
             return f"Error: auto-fix not supported for {lang} ({cfg['bin']})"
 
         if not shutil.which(cfg["bin"]):
-            return f"Error: {cfg['bin']} not installed. Install it to lint {lang} files."
+            return (
+                f"Error: {cfg['bin']} not installed. Install it to lint {lang} files."
+            )
 
         code, output = await _run(cfg["fix"](path))
         if code == 0:
