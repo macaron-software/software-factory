@@ -35,8 +35,16 @@ def _find_free_port() -> int:
 
 def _generate_dockerfile(workspace: str) -> None:
     dockerfile = os.path.join(workspace, "Dockerfile")
+    _is_template = False
     if os.path.isfile(dockerfile):
-        return
+        try:
+            with open(dockerfile) as _f:
+                _head = _f.read(120)
+            _is_template = "⚠️ TEMPLATE DOCKERFILE" in _head or "# ⚠️ TEMPLATE" in _head
+        except Exception:
+            pass
+        if not _is_template:
+            return  # Custom Dockerfile — never override
 
     has_pkg = os.path.isfile(os.path.join(workspace, "package.json"))
     has_cargo = os.path.isfile(os.path.join(workspace, "Cargo.toml"))

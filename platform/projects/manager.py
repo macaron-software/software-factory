@@ -182,6 +182,28 @@ def _detect_git_url(path: str) -> str:
 
 
 _DOCKERFILE_TEMPLATE = """\
+# ⚠️ TEMPLATE DOCKERFILE — À REMPLACER SELON LA STACK DU PROJET
+# Lire INCEPTION.md pour connaître la stack, puis remplacer ce fichier entier.
+#
+# HTML statique / Nginx :
+#   FROM nginx:alpine
+#   COPY . /usr/share/nginx/html/
+#   EXPOSE 80
+#   CMD ["nginx", "-g", "daemon off;"]
+#
+# Vue.js / React SPA (multi-stage) :
+#   FROM node:18-alpine AS build
+#   WORKDIR /app
+#   COPY package*.json ./
+#   RUN npm ci
+#   COPY . .
+#   RUN npm run build
+#   FROM nginx:alpine
+#   COPY --from=build /app/dist /usr/share/nginx/html/
+#   EXPOSE 80
+#   CMD ["nginx", "-g", "daemon off;"]
+#
+# Python API (FastAPI/uvicorn) — garder ce template :
 FROM python:3.12-slim
 WORKDIR /app
 COPY . .
@@ -190,6 +212,7 @@ CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000
 """
 
 _DOCKER_COMPOSE_TEMPLATE = """\
+# ⚠️ Adapter le port interne (8000) selon la stack : nginx → 80, node → 3000, Python → 8000
 version: "3.9"
 services:
   app:
