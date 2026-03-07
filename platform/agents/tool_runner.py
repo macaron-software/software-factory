@@ -1887,6 +1887,44 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 
+def _resolve_file_path(path: str, project_path: str | None) -> str:
+    """Resolve a file path from agent context to a real filesystem path.
+
+    Rules (applied in order):
+    1. /workspace  or /workspace/  → project_path
+    2. /workspace/<rest>           → project_path/<rest>
+    3. empty or "."                → project_path
+    4. absolute path inside project_path → kept as-is (already correct)
+    5. absolute path outside project_path → kept as-is (other allowed roots, /tmp…)
+    6. relative path               → project_path/<path> (strips ws_id prefix if present)
+    """
+    if not project_path:
+        return path
+    if not path or path == ".":
+        return project_path
+    # /workspace alias
+    if path in ("/workspace", "/workspace/"):
+        return project_path
+    if path.startswith("/workspace/"):
+        return project_path + "/" + path[len("/workspace/"):]
+    if os.path.isabs(path):
+        # already under project_path — strip and rejoin to normalize
+        if path.startswith(project_path + "/"):
+            return os.path.join(project_path, path[len(project_path) + 1:])
+        if path == project_path:
+            return project_path
+        # external absolute path (another workspace, /tmp, /etc…) — don't touch
+        return path
+    # relative path
+    ws_id = os.path.basename(project_path)
+    if path.startswith(ws_id + "/"):
+        path = path[len(ws_id) + 1:]
+    elif path.startswith("." + project_path):
+        path = path[1:]
+        return path
+    return os.path.join(project_path, path)
+
+
 async def _execute_tool(
     tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None
 ) -> str:
@@ -1921,7 +1959,7 @@ async def _execute_tool(
                     args["cwd"] = ctx.project_path
                 else:
                     args["cwd"] = os.path.join(ctx.project_path, cwd_val)
-        # File tools: resolve relative paths to project root
+        # File tools: resolve relative/aliased paths to project root
         if name in (
             "code_read",
             "code_search",
@@ -1930,32 +1968,7 @@ async def _execute_tool(
             "list_files",
         ):
             path = args.get("path", "")
-            if not path or path == ".":
-                args["path"] = ctx.project_path
-            elif os.path.isabs(path) and ctx.project_path:
-                # Agent used absolute path — normalize to workspace-relative
-                # e.g. /app/data/workspaces/abc123/src/main.ts → src/main.ts
-                if path.startswith(ctx.project_path + "/"):
-                    path = path[len(ctx.project_path) + 1 :]
-                    args["path"] = os.path.join(ctx.project_path, path)
-                elif path.startswith(ctx.project_path):
-                    args["path"] = ctx.project_path
-                else:
-                    args["path"] = path  # truly external absolute path
-            elif not os.path.isabs(path):
-                # Strip workspace ID prefix if LLM included it (avoids path doubling)
-                if ctx.project_path:
-                    ws_id = os.path.basename(ctx.project_path)
-                    if path.startswith(ws_id + "/"):
-                        path = path[len(ws_id) + 1 :]
-                    # Strip project_path prefix if LLM used it as relative
-                    elif path.startswith("." + ctx.project_path):
-                        path = path[1:]  # remove leading dot, keep absolute
-                args["path"] = (
-                    os.path.join(ctx.project_path, path)
-                    if not os.path.isabs(path)
-                    else path
-                )
+            args["path"] = _resolve_file_path(path, ctx.project_path)
 
     # ── Permission enforcement ──
     try:
