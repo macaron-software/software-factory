@@ -1,6 +1,21 @@
 """Hook system — PreToolUse / PostToolUse / SessionStart / SessionEnd / PreCompact.
 
-Inspired by ECC (everything-claude-code), adapted for server-side agent executor.
+SOURCE: ECC (everything-claude-code) https://github.com/affaan-m/everything-claude-code
+WHY: ECC demonstrated that Claude Code CLI hooks enable powerful automation. We adapted
+     the concept server-side, hooking into executor.py's _execute_tool() call sites.
+
+     Key ECC concepts adopted:
+     - PRE_TOOL / POST_TOOL hooks around every tool execution (ECC: PreToolUse/PostToolUse)
+     - PRE_COMPACT hook before context summarization (ECC: PreCompact)
+     - SESSION_START / SESSION_END lifecycle hooks (ECC: SessionStart / Stop)
+     - HookResult.blocked — only PRE_TOOL hooks may block (ECC: exit code 2 = block)
+     - Priority-ordered execution — higher priority fires first
+
+     Key differences from ECC:
+     - No CLI JSON stdin/stdout — we use Python async handlers in-process
+     - No shell scripts — pure Python, no node.js dependency
+     - RBAC-gated registration (see hooks/rbac.py)
+     - Hook log persisted to DB (hook_log table) for observability
 
 Usage (built-in registration happens automatically at module import):
 

@@ -1,12 +1,23 @@
 """Built-in hook handlers for the SF platform.
 
+SOURCE: ECC (everything-claude-code) https://github.com/affaan-m/everything-claude-code
+WHY: ECC demonstrated that Claude Code CLI hooks (PreToolUse/PostToolUse/Stop) enable
+     powerful session-level automation: compact state saving, continuous learning via
+     instincts, quality gates, cost tracking. We adapted these concepts server-side,
+     wiring them into executor.py's _execute_tool() call sites instead of CLI JSON hooks.
+
 Six hooks registered automatically:
-1. pre_compact     — PRE_COMPACT : persists key decisions to memory before context shrinks
-2. session_start   — SESSION_START : loads recent agent memory/patterns
-3. session_end     — SESSION_END : saves session summary + tool-call digest
-4. quality_gate    — POST_TOOL (code_write/code_edit) : triggers fast lint asynchronously
-5. cost_tracker    — POST_TOOL : emits cost telemetry event
-6. pattern_extract — SESSION_END : extracts recurring patterns to global memory
+1. pre_compact      — PRE_COMPACT : saves key decisions to memory before context shrinks
+                      SOURCE: ECC pre-compact.js "Save state before context compaction"
+2. session_start    — SESSION_START : fires at agent session start
+3. session_end      — SESSION_END : saves session digest + triggers instinct observer
+                      SOURCE: ECC session-end.js + continuous-learning-v2 observe.sh
+4. pattern_extract  — SESSION_END : deprecated — replaced by instinct_observer below
+5. quality_gate     — POST_TOOL (code_write/code_edit) : triggers fast lint async
+                      SOURCE: ECC quality-gate.js post:quality-gate hook
+6. cost_tracker     — POST_TOOL : emits cost telemetry event
+7. instinct_observer— SESSION_END : runs instinct pattern analysis (ECC CL-v2 core)
+                      SOURCE: ECC continuous-learning-v2/SKILL.md + observe.sh
 """
 
 from __future__ import annotations
@@ -147,7 +158,11 @@ async def _cost_tracker(ctx: HookContext) -> HookResult:
 
 
 async def _pattern_extract(ctx: HookContext) -> HookResult:
-    """Extract top tools used in this session and store as a pattern hint."""
+    """Extract top tools used in this session and store as a pattern hint.
+
+    NOTE: This simple counter is superseded by _instinct_observer (ECC CL-v2 adaptation).
+    Kept as a lightweight fallback for sessions below the MIN_TOOL_CALLS threshold.
+    """
     if len(ctx.all_tool_calls) < 5:
         return HookResult()
     from collections import Counter
@@ -168,6 +183,41 @@ async def _pattern_extract(ctx: HookContext) -> HookResult:
     return HookResult()
 
 
+# ── 7. Instinct observer — ECC continuous-learning-v2 adaptation ─────────────
+
+
+async def _instinct_observer(ctx: HookContext) -> HookResult:
+    """Analyze session tool calls and extract instincts.
+
+    SOURCE: ECC continuous-learning-v2 SKILL.md
+      "Turns Claude Code sessions into reusable knowledge through atomic instincts —
+       small learned behaviors with confidence scoring."
+
+    WHY: Instead of manually curating skills, agents automatically learn from observed
+    patterns: tool sequences, dominant workflows, read-before-write habits, etc.
+    Instincts are stored with confidence 0.3-0.9 and can be evolved into skill YAMLs.
+    """
+    if not ctx.all_tool_calls:
+        return HookResult()
+    try:
+        import asyncio
+
+        from .instinct import observe_session
+
+        # Run analysis in background — don't block session end
+        asyncio.ensure_future(
+            observe_session(
+                ctx.all_tool_calls,
+                ctx.agent_id,
+                ctx.project_id,
+                ctx.session_id,
+            )
+        )
+    except Exception as exc:
+        logger.debug("instinct_observer hook: %s", exc)
+    return HookResult()
+
+
 # ── Registration ─────────────────────────────────────────────────────────────
 
 
@@ -177,6 +227,9 @@ def register_builtins(reg: HookRegistry) -> None:
     reg.register(HookType.SESSION_START, "session_start", _session_start, priority=0)
     reg.register(HookType.SESSION_END, "session_end", _session_end, priority=10)
     reg.register(HookType.SESSION_END, "pattern_extract", _pattern_extract, priority=5)
+    reg.register(
+        HookType.SESSION_END, "instinct_observer", _instinct_observer, priority=8
+    )
     reg.register(HookType.POST_TOOL, "quality_gate", _quality_gate, priority=20)
     reg.register(HookType.POST_TOOL, "cost_tracker", _cost_tracker, priority=5)
-    logger.debug("hook builtins registered (6 handlers)")
+    logger.debug("hook builtins registered (7 handlers)")

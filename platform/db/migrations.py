@@ -1046,7 +1046,7 @@ def _ensure_darwin_tables(conn) -> None:
             can_block INTEGER DEFAULT 0,
             required_role TEXT,
             config_json TEXT DEFAULT '{}',
-            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute("""
@@ -1060,9 +1060,95 @@ def _ensure_darwin_tables(conn) -> None:
             blocked INTEGER DEFAULT 0,
             message TEXT,
             duration_ms INTEGER,
-            ts TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            ts TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+
+    # Instinct system — ECC continuous-learning-v2 adapted for server-side
+    # SOURCE: https://github.com/affaan-m/everything-claude-code/tree/main/skills/continuous-learning-v2
+    # WHY: Atomic learned behaviors extracted from sessions, with confidence scoring and project scoping.
+    #      Allows agents to evolve skills from observed patterns rather than manual curation.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS instinct_observations (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            session_id TEXT,
+            project_id TEXT,
+            tool_name TEXT,
+            args_json TEXT DEFAULT '{}',
+            outcome TEXT,
+            ts TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS instincts (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT,
+            project_id TEXT,
+            trigger TEXT NOT NULL,
+            action TEXT NOT NULL,
+            confidence REAL DEFAULT 0.5,
+            domain TEXT DEFAULT 'general',
+            scope TEXT DEFAULT 'project',
+            evidence_json TEXT DEFAULT '[]',
+            source TEXT DEFAULT 'session-observation',
+            evolved_into TEXT,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
+    # ECC — external module integration entry
+    # SOURCE: https://github.com/affaan-m/everything-claude-code
+    # WHY: Allow admins to toggle ECC-inspired features on/off without code changes.
+    conn.execute("""
+        INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
+        VALUES (
+            'ecc-everything-claude',
+            'Everything Claude Code (ECC)',
+            'external',
+            'platform',
+            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+            'ECC-inspired features: instinct system (continuous learning from sessions), skill-stocktake auditor, hook profiles. Source: github.com/affaan-m/everything-claude-code',
+            1,
+            'connected',
+            '{"repo": "https://github.com/affaan-m/everything-claude-code", "features": ["instinct-observer", "skill-stocktake", "quality-gate", "pre-compact"], "hook_profile": "standard", "observer_enabled": true, "min_observations": 10}',
+            '["ac-architect", "platform"]'
+        )
+    """)
+
+    # Agent-specific hook assignments (seeded defaults)
+    # SOURCE: ECC hooks.json — maps agent roles to appropriate hook types
+    # WHY: security agents watch PRE_TOOL (can potentially block), QA runs quality-gate,
+    #      ac-architect + ac-codex run instinct observer to accumulate learning.
+    for _agent, _htype, _hname, _can_block, _role in [
+        # AC agents: instinct observer fires at SESSION_END
+        ("ac-architect", "session_end", "instinct_observer", 0, None),
+        ("ac-codex", "session_end", "instinct_observer", 0, None),
+        # QA agents: quality gate fires POST_TOOL
+        ("qa-security", "post_tool", "quality_gate", 0, "quality"),
+        ("ciso", "post_tool", "quality_gate", 0, "security"),
+        # Security agents: PRE_TOOL hook (non-blocking by default — security-critic decides)
+        ("security-critic", "pre_tool", "security_scan_noop", 0, "security"),
+        ("security-architect", "pre_tool", "security_scan_noop", 0, "security"),
+    ]:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO hook_registrations
+            (id, hook_type, handler_name, agent_id, priority, enabled, can_block, required_role, config_json)
+            VALUES (?,?,?,?,?,1,?,?,?)
+        """,
+            (
+                f"builtin-{_agent}-{_htype}",
+                _htype,
+                _hname,
+                _agent,
+                5,
+                _can_block,
+                _role,
+                "{}",
+            ),
+        )
 
     conn.commit()
 
