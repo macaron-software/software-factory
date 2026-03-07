@@ -418,6 +418,14 @@ for _qrole in ("qa", "devops", "architecture", "cdp"):
     if _qrole in ROLE_TOOL_MAP:
         ROLE_TOOL_MAP[_qrole].extend(_QUALITY_TOOLS)
 
+# Claude-compatible aliases — MiniMax/Claude models use these names from training data
+# Maps to: read_file→code_read, write_file→code_write, edit_file→code_edit, etc.
+_CLAUDE_ALIAS_TOOLS = ["read_file", "write_file", "read_many_files", "edit_file"]
+for _arole in ("dev", "reviewer", "qa", "security", "devops", "architecture"):
+    if _arole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_arole].extend(_CLAUDE_ALIAS_TOOLS)
+
+
 # Platform introspection tools — available to ALL agent roles
 _PLATFORM_TOOLS = [
     "platform_agents",
