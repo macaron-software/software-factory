@@ -39,19 +39,10 @@ def _find_free_port() -> int:
 
 
 def _generate_dockerfile(workspace: str) -> str:
-    """Generate a Dockerfile if one doesn't exist, based on project type.
-    Also auto-replaces the placeholder template when a better match is detected."""
+    """Generate a Dockerfile if one doesn't exist, based on project type."""
     dockerfile = os.path.join(workspace, "Dockerfile")
-    _is_template = False
     if os.path.isfile(dockerfile):
-        try:
-            with open(dockerfile) as _f:
-                _content = _f.read(100)
-            _is_template = "⚠️ TEMPLATE DOCKERFILE" in _content or "TEMPLATE" in _content
-        except Exception:
-            pass
-        if not _is_template:
-            return dockerfile  # Custom Dockerfile — never override
+        return dockerfile
 
     has_pkg = os.path.isfile(os.path.join(workspace, "package.json"))
     has_cargo = os.path.isfile(os.path.join(workspace, "Cargo.toml"))
