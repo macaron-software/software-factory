@@ -2109,6 +2109,7 @@ async def api_improvement_backfill(project_id: str):
     )
 
 
+@router.get("/api/improvement/project/{project_id}")
 async def api_improvement_project_state(project_id: str):
     """
     Return current AC project state including RL hint, convergence, skill eval pending.

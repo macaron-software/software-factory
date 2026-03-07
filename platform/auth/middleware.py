@@ -229,6 +229,7 @@ PUBLIC_PATHS = {
     "/api/set-lang",
     "/api/i18n",
     "/api/webhooks",
+    "/api/improvement/project",
     "/api/autoheal/heartbeat",
     "/api/cockpit",
     "/api/notifications/badge",
