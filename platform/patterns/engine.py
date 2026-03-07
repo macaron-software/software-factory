@@ -603,6 +603,7 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
+    lineage: list[str] | None = None,
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
