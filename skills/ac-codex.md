@@ -119,3 +119,15 @@ les défauts listés dans ADVERSARIAL_N.md et CICD_FAILURE_N.md du cycle précé
 - code_write, code_read (lire INCEPTION.md, ADVERSARIAL_*.md, code existant)
 - docker_deploy (obligatoire pour vérifier le build)
 - memory_search (contexte du cycle précédent)
+
+## Règle CRITIQUE : Vérification evidence
+**APRÈS chaque `code_write`, OBLIGATOIREMENT appeler `code_read` sur le même fichier.**
+Raison : le reviewer adversarial ne voit que les tool evidences — si le contenu n'est pas montré via `code_read`, il considérera que tu n'as rien fait (HALLUCINATION) et REJETERA ton output.
+
+Séquence obligatoire pour chaque fichier :
+```
+code_write("src/test_feature.py", contenu_tests)  # écrire les tests
+code_read("src/test_feature.py")  # OBLIGATOIRE : afficher le contenu pour l'evidence
+code_write("src/feature.py", contenu_impl)  # écrire l'implémentation
+code_read("src/feature.py")  # OBLIGATOIRE : afficher le contenu pour l'evidence
+```

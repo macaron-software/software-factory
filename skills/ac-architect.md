@@ -79,6 +79,16 @@ Fichier `INCEPTION.md` dans le workspace avec :
 
 ## Tools autorisés
 - code_write (écrire INCEPTION.md)
+- code_read (**OBLIGATOIRE** après chaque code_write — lire le fichier écrit pour afficher son contenu dans l'evidence)
 - memory_store (persist les refs)
-- code_read (si cycle > 1, lire le code existant)
 - web_fetch (pour lire http://localhost:8099/api/improvement/project/{project_id})
+
+## Règle CRITIQUE : Vérification evidence
+**APRÈS chaque `code_write`, OBLIGATOIREMENT appeler `code_read` sur le même fichier.**
+Raison : le reviewer adversarial ne voit que les tool evidences — si le contenu n'est pas montré via `code_read`, il ne peut pas vérifier ton travail et REJETERA ton output.
+
+Séquence obligatoire :
+```
+code_write("INCEPTION.md", contenu_complet)  # écrire
+code_read("INCEPTION.md")  # OBLIGATOIRE : afficher le contenu écrit
+```
