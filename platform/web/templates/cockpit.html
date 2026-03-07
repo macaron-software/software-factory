@@ -416,25 +416,25 @@
         <text x="672" y="288" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="700">Azure sf-node-1</text>
         <text x="672" y="300" text-anchor="middle" fill="#6b7280" font-size="7">52.143.158.19</text>
         <text x="672" y="311" text-anchor="middle" fill="#6b7280" font-size="7">systemd · full</text>
-        <text x="672" y="322" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">● master</text>
+        <text x="672" y="322" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">master</text>
 
         <rect x="748" y="272" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
         <text x="805" y="288" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="700">Azure sf-node-2</text>
         <text x="805" y="300" text-anchor="middle" fill="#6b7280" font-size="7">40.89.174.75</text>
         <text x="805" y="311" text-anchor="middle" fill="#6b7280" font-size="7">systemd · full</text>
-        <text x="805" y="322" text-anchor="middle" fill="#94a3b8" font-size="7">○ worker</text>
+        <text x="805" y="322" text-anchor="middle" fill="#94a3b8" font-size="7">worker</text>
 
         <rect x="615" y="340" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
         <text x="672" y="356" text-anchor="middle" fill="#6ee7b7" font-size="8" font-weight="700">OVH Demo</text>
         <text x="672" y="368" text-anchor="middle" fill="#6b7280" font-size="7">54.36.183.124</text>
         <text x="672" y="379" text-anchor="middle" fill="#6b7280" font-size="7">Docker blue-green</text>
-        <text x="672" y="390" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">● active</text>
+        <text x="672" y="390" text-anchor="middle" fill="#22c55e" font-size="7" font-weight="600">active</text>
 
         <rect x="748" y="340" width="115" height="55" rx="5" fill="rgba(30,30,46,.8)" stroke="#475569" stroke-width="1"/>
         <text x="805" y="356" text-anchor="middle" fill="#a5b4fc" font-size="8" font-weight="700">Local Dev</text>
         <text x="805" y="368" text-anchor="middle" fill="#6b7280" font-size="7">localhost:8099</text>
         <text x="805" y="379" text-anchor="middle" fill="#6b7280" font-size="7">Python · SQLite</text>
-        <text x="805" y="390" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="600">● dev</text>
+        <text x="805" y="390" text-anchor="middle" fill="#f59e0b" font-size="7" font-weight="600">dev</text>
 
         <rect x="615" y="408" width="248" height="30" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
         <text x="739" y="421" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Nginx · OTEL/Jaeger :16686</text>
@@ -1623,10 +1623,10 @@
     };
     const cls = map[status] || 'off';
     const labels = {
-      ok: ' OK', online: '● Online', running: '▶ Running', enabled: '● Actif',
-      scheduled: '⏱ Scheduled', cooldown: '⚠ Cooldown', open: ' CB Open',
+      ok: 'OK', online: 'Online', running: 'Running', enabled: 'Actif',
+      scheduled: 'Scheduled', cooldown: 'Cooldown', open: 'CB Open',
       offline: ' Offline', disabled: '— Désactivé', not_configured: '— N/A',
-      degraded: '⚠ Dégradé', idle: '○ Idle', error: ' Error',
+      degraded: 'Degrade', idle: 'Idle', error: 'Error',
     };
     return `<span class="ck-badge badge-${cls}">${labels[status] || status}</span>`;
   }
@@ -1738,7 +1738,7 @@
 
     document.getElementById('kpi-tma').textContent = tma.open ?? '—';
     document.getElementById('kpi-tma-sub').textContent =
-      tma.critical > 0 ? `⚠ ${tma.critical} critique(s)` : 'ouverts';
+      tma.critical > 0 ? `${tma.critical} critique(s)` : 'ouverts';
 
     document.getElementById('kpi-incidents').textContent = inc.open ?? '—';
     document.getElementById('kpi-incidents-sub').textContent =
