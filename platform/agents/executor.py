@@ -762,6 +762,37 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
+                    # Hard rejection: if active tools are narrowed (write-only nudge mode),
+                    # block read-tool calls to force the model to write instead
+                    _allowed_run_names = (
+                        {t.get("function", {}).get("name") for t in _active_tools}
+                        if _active_tools is not tools
+                        else None
+                    )
+                    _read_run_tools = {
+                        "code_read",
+                        "list_files",
+                        "code_search",
+                        "file_search",
+                    }
+                    if (
+                        _allowed_run_names is not None
+                        and tc.function_name not in _allowed_run_names
+                        and tc.function_name in _read_run_tools
+                    ):
+                        result = (
+                            f"Error: '{tc.function_name}' is not available. "
+                            "You have enough context. Call code_write NOW to create the files."
+                        )
+                        messages.append(
+                            LLMMessage(
+                                role="tool",
+                                content=result[:2000],
+                                tool_call_id=tc.id,
+                                name=tc.function_name,
+                            )
+                        )
+                        continue
                     # ── Workspace conflict guard: warn if another agent is writing this file ──
                     if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
                         import time as _time
@@ -1472,10 +1503,21 @@ class AgentExecutor:
                         and tc.function_name not in _allowed_tc_names
                         and tc.function_name in _read_tools
                     ):
-                        result = result + (
-                            "\n⚠️ Tu as assez de contexte. "
-                            "Appelle code_write MAINTENANT pour créer les fichiers."
+                        # Hard rejection: don't execute, return error + nudge
+                        result = (
+                            f"Error: '{tc.function_name}' is not available. "
+                            "You have enough context. Call code_write NOW to create the files."
                         )
+                        messages.append(
+                            LLMMessage(
+                                role="tool",
+                                content=result[:2000],
+                                tool_call_id=tc.id,
+                                name=tc.function_name,
+                            )
+                        )
+                        yield ("tool", f"BLOCKED:{tc.function_name}")
+                        continue
                     logger.warning(
                         "TOOL_EXEC agent=%s tool=%s args=%s result=%s",
                         agent.id,

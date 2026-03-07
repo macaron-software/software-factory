@@ -224,6 +224,11 @@ def _select_model_for_agent(
             return _db_cfg["provider"], _db_cfg.get("model", _default_model)
 
         # No DB override — use env defaults (all agents on the same provider)
+        # CODEX_PROVIDER override: use different provider for code-writing agents (e.g. azure-openai on OVH)
+        _codex_prov = os.environ.get("PLATFORM_LLM_CODEX_PROVIDER", "")
+        if _codex_prov and agent.id in ("ac-codex", "ac-architect"):
+            _codex_model = os.environ.get("PLATFORM_LLM_CODEX_MODEL", "gpt-5-mini")
+            return _codex_prov, _codex_model
         return _default_provider, _default_model
 
     azure_ai_key = os.environ.get("AZURE_AI_API_KEY", "")
