@@ -510,7 +510,9 @@ async def platform_watchdog_loop():
         SF_PROJECT_ID,
         QI_WORKFLOW_ID,
     )
-    # Resume any stuck AC cycles immediately at startup
+    # Wait for server startup hook to register interrupted sessions in _active_mission_tasks
+    # before we check — avoids double-resume race condition (startup hook + watchdog both fire).
+    await asyncio.sleep(15)
     n = await resume_stuck_ac_cycles()
     if n:
         logger.warning("watchdog: resumed %d stuck AC cycle(s) at startup", n)
