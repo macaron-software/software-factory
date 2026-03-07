@@ -1143,10 +1143,24 @@ This is BLOCKING: developers cannot start without your design tokens."""
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
                 # Re-run agent with rejection feedback
                 feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
+                # Show already-written files so agent doesn't hallucinate tool calls
+                written_files = [
+                    tc.get("args", {}).get("path", "?")
+                    for tc in cumulative_tool_calls
+                    if tc.get("tool") == "code_write"
+                ]
+                written_info = (
+                    f"\nFichiers déjà créés (via code_write): {', '.join(written_files)}\n"
+                    if written_files
+                    else ""
+                )
                 retry_task = (
                     f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ]\n"
-                    f"Problèmes:\n{feedback}\n\n"
-                    f"Corrige ces problèmes. Même tâche:\n{task}"
+                    f"Problèmes:\n{feedback}\n"
+                    f"{written_info}"
+                    f"OBLIGATION: utilise code_write pour CHAQUE fichier manquant ou à corriger.\n"
+                    f"Ne décris pas ce que tu fais — APPELLE les outils directement.\n\n"
+                    f"Même tâche:\n{task}"
                 )
                 if protocol_override:
                     retry_task += "\n\n" + protocol_override
