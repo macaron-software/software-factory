@@ -16,7 +16,12 @@ from typing import Optional
 
 from ..db.migrations import get_db
 from ..patterns.store import get_pattern_store
-from ..patterns.engine import run_pattern, _push_sse, WorkflowPaused, AdversarialEscalation
+from ..patterns.engine import (
+    run_pattern,
+    _push_sse,
+    WorkflowPaused,
+    AdversarialEscalation,
+)
 from ..sessions.store import get_session_store, MessageDef
 
 logger = logging.getLogger(__name__)
@@ -525,6 +530,7 @@ async def run_workflow(
     if project_id:
         try:
             from ..projects.manager import get_project_store as _gps
+
             _proj = _gps().get(project_id)
             if _proj and _proj.path:
                 _project_path = _proj.path
@@ -669,7 +675,14 @@ async def run_workflow(
 
         try:
             result = await asyncio.wait_for(
-                run_pattern(pattern, session_id, phase_task, project_id, project_path=_project_path, lineage=_lineage),
+                run_pattern(
+                    pattern,
+                    session_id,
+                    phase_task,
+                    project_id,
+                    project_path=_project_path,
+                    lineage=_lineage,
+                ),
                 timeout=phase_timeout,
             )
 
@@ -771,8 +784,8 @@ async def run_workflow(
                 f"sans passer le contrôle qualité :\n"
                 + "\n".join(f"- {i}" for i in ae.issues[:5])
                 + "\n\n"
-                f"**Action requise** : analyser les problèmes, corriger l'agent ou la tâche, "
-                f"et relancer le cycle."
+                "**Action requise** : analyser les problèmes, corriger l'agent ou la tâche, "
+                "et relancer le cycle."
             )
             await _rte_facilitate(
                 session_id,
@@ -865,7 +878,14 @@ async def run_workflow(
                     )
                     try:
                         result = await asyncio.wait_for(
-                            run_pattern(pattern, session_id, retry_task, project_id, project_path=_project_path, lineage=_lineage),
+                            run_pattern(
+                                pattern,
+                                session_id,
+                                retry_task,
+                                project_id,
+                                project_path=_project_path,
+                                lineage=_lineage,
+                            ),
                             timeout=phase_timeout,
                         )
                         run.phase_results.append(
@@ -942,6 +962,7 @@ async def run_workflow(
         "failed": "failed",
         "gated": "interrupted",
         "paused": "interrupted",
+        "escalated": "interrupted",
     }.get(run.status, "completed")
     try:
         store.update_status(session_id, session_status)
@@ -949,7 +970,7 @@ async def run_workflow(
         pass
 
     # RTE closes the workflow (skip closing message when paused — workflow isn't done)
-    if run.status == "paused":
+    if run.status in ("paused", "escalated"):
         return run
 
     status_emoji = {"completed": "[OK]", "failed": "[FAIL]", "gated": "[BLOCKED]"}.get(

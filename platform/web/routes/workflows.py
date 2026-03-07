@@ -476,7 +476,7 @@ async def _run_workflow_background(
             pass
         _active_mission_tasks.pop(session_id, None)
         # If an AC cycle was gated/failed, reset ac_project_state so watchdog doesn't retry infinitely
-        if project_id and _final_run_status in ("gated", "failed"):
+        if project_id and _final_run_status in ("gated", "failed", "escalated"):
             try:
                 from ...db.migrations import get_db as _gdb2
                 from datetime import datetime as _dt
