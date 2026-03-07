@@ -50,7 +50,8 @@ _PROVIDERS = {
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        "models": ["gpt-5-mini", "gpt-5", "gpt-5.2", "gpt-5.1-codex", "gpt-5.2-codex"],
+        # Deployed on opanai-flamme (swedencentral): gpt-5-mini/gpt-5/gpt-5.1/gpt-5.2/gpt-5.1-codex
+        "models": ["gpt-5-mini", "gpt-5", "gpt-5.1", "gpt-5.2", "gpt-5.1-codex"],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
@@ -58,16 +59,16 @@ _PROVIDERS = {
         "azure_deployment_map": {
             "gpt-5-mini": os.environ.get("AZURE_DEPLOY_GPT5_MINI", "gpt-5-mini"),
             "gpt-5": os.environ.get("AZURE_DEPLOY_GPT5", "gpt-5"),
-            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-52"),
+            "gpt-5.1": os.environ.get("AZURE_DEPLOY_GPT51", "gpt-5.1"),
+            "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-5.2"),
             "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.1-codex"),
-            "gpt-5.2-codex": os.environ.get("AZURE_DEPLOY_CODEX2", "gpt-5.2-codex"),
         },
         "max_tokens_param": {
             "gpt-5-mini": "max_completion_tokens",
             "gpt-5": "max_completion_tokens",
+            "gpt-5.1": "max_completion_tokens",
             "gpt-5.2": "max_completion_tokens",
-            "gpt-5.1-codex": "max_completion_tokens",
-            "gpt-5.2-codex": "max_completion_tokens",
+            # gpt-5.1-codex uses Responses API (max_output_tokens handled separately)
         },
     },
     "nvidia": {
@@ -451,10 +452,17 @@ class LLMClient:
         except (OSError, FileNotFoundError):
             return ""
 
+    @staticmethod
+    def _is_codex_model(model: str) -> bool:
+        return "codex" in model
+
     def _build_url(self, pcfg: dict, model: str) -> str:
         base = pcfg["base_url"].rstrip("/")
         if pcfg.get("azure_api_version") and base:
-            # Azure uses deployment-based URLs; map model name → deployment name
+            if self._is_codex_model(model):
+                # Codex models use Responses API (no deployment in URL, model in body)
+                return f"{base}/openai/responses?api-version=2025-03-01-preview"
+            # Standard Azure: deployment-based URL
             dep_map = pcfg.get("azure_deployment_map", {})
             deployment = dep_map.get(model, model)
             return f"{base}/openai/deployments/{deployment}/chat/completions?api-version={pcfg['azure_api_version']}"
@@ -755,6 +763,11 @@ class LLMClient:
         system_prompt: str,
         tools: list[dict] | None = None,
     ) -> LLMResponse:
+        # gpt-5.1-codex uses Responses API (completely different wire format)
+        if self._is_codex_model(model) and pcfg.get("azure_api_version"):
+            return await self._do_chat_responses(
+                pcfg, provider, model, messages, max_tokens, system_prompt, tools
+            )
         http = await self._get_http()
         url = self._build_url(pcfg, model)
         headers = self._build_headers(pcfg)
@@ -945,6 +958,145 @@ class LLMClient:
             tokens_out=usage.get("completion_tokens", 0),
             duration_ms=elapsed,
             finish_reason=choice.get("finish_reason", "stop"),
+            tool_calls=parsed_tool_calls,
+        )
+
+    async def _do_chat_responses(
+        self,
+        pcfg: dict,
+        provider: str,
+        model: str,
+        messages: list[LLMMessage],
+        max_tokens: int,
+        system_prompt: str,
+        tools: list[dict] | None = None,
+    ) -> LLMResponse:
+        """Handle Azure Responses API for codex models (gpt-5.1-codex etc.)."""
+        import random
+
+        http = await self._get_http()
+        url = self._build_url(pcfg, model)
+        headers = self._build_headers(pcfg)
+
+        # Build input array — Responses API uses mixed item types
+        input_msgs: list[dict] = []
+        if system_prompt:
+            input_msgs.append({"role": "system", "content": system_prompt})
+        for m in messages:
+            if isinstance(m, dict):
+                role = m.get("role", "user")
+                content = m.get("content", "") or ""
+                tool_call_id = m.get("tool_call_id")
+                tool_calls = m.get("tool_calls")
+            else:
+                role = m.role
+                content = m.content or ""
+                tool_call_id = m.tool_call_id
+                tool_calls = m.tool_calls
+
+            if role == "tool" and tool_call_id:
+                # Tool result → function_call_output item
+                input_msgs.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": tool_call_id,
+                        "output": content,
+                    }
+                )
+            elif role == "assistant" and tool_calls:
+                # Previous assistant tool calls → function_call items
+                for tc in tool_calls or []:
+                    if isinstance(tc, dict):
+                        fn = tc.get("function", {})
+                        input_msgs.append(
+                            {
+                                "type": "function_call",
+                                "call_id": tc.get("id", ""),
+                                "name": fn.get("name", ""),
+                                "arguments": fn.get("arguments", "{}"),
+                            }
+                        )
+            else:
+                input_msgs.append({"role": role, "content": content})
+
+        # Convert tools from chat/completions format → Responses API format
+        resp_tools = None
+        if tools:
+            resp_tools = []
+            for t in tools:
+                fn = t.get("function", t)  # handle both wrapped and flat
+                resp_tools.append(
+                    {
+                        "type": "function",
+                        "name": fn.get("name", ""),
+                        "description": fn.get("description", ""),
+                        "parameters": fn.get("parameters", {}),
+                    }
+                )
+
+        body: dict = {
+            "model": model,
+            "input": input_msgs,
+            "max_output_tokens": max(max_tokens, 8000),
+        }
+        if resp_tools:
+            body["tools"] = resp_tools
+
+        t0 = time.monotonic()
+        for attempt in range(3):
+            resp = await http.post(url, json=body, headers=headers)
+            if resp.status_code != 429:
+                break
+            retry_after = int(resp.headers.get("Retry-After", (2**attempt) * 10))
+            retry_after = max(retry_after, 10)
+            retry_after = min(retry_after + random.randint(0, 5), 90)
+            logger.warning(
+                "LLM %s/%s rate-limited (429), retry in %ds (attempt %d/3)",
+                provider,
+                model,
+                retry_after,
+                attempt + 1,
+            )
+            await asyncio.sleep(retry_after)
+
+        elapsed = int((time.monotonic() - t0) * 1000)
+
+        if resp.status_code != 200:
+            raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
+
+        data = resp.json()
+
+        # Parse Responses API output array
+        content = ""
+        parsed_tool_calls: list[LLMToolCall] = []
+        for item in data.get("output", []):
+            itype = item.get("type", "")
+            if itype == "message":
+                for c in item.get("content", []):
+                    if c.get("type") == "output_text":
+                        content += c.get("text", "")
+            elif itype == "function_call":
+                try:
+                    args = json.loads(item.get("arguments", "{}"))
+                except (json.JSONDecodeError, TypeError):
+                    args = {}
+                parsed_tool_calls.append(
+                    LLMToolCall(
+                        id=item.get("call_id", item.get("id", "")),
+                        function_name=item.get("name", ""),
+                        arguments=args,
+                    )
+                )
+
+        usage = data.get("usage", {})
+        return LLMResponse(
+            content=content,
+            model=data.get("model", model),
+            provider=provider,
+            tokens_in=usage.get("input_tokens", 0),
+            tokens_out=usage.get("output_tokens", 0),
+            duration_ms=elapsed,
+            finish_reason=data.get("status", "completed"),
             tool_calls=parsed_tool_calls,
         )
 

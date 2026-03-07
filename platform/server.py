@@ -411,13 +411,14 @@ async def lifespan(app: FastAPI):
 
         _sdb = _gdb_sync()
         # Only update agents that have a stale/wrong model or provider (not matching env)
+        # Exclude agents with custom model assignments (e.g. AC agents using gpt-5.2-codex)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model')",
+            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model') AND id NOT LIKE 'ac-%'",
             (_current_model, _current_provider),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model')",
+                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model') AND id NOT LIKE 'ac-%'",
                 (_current_model, _current_provider),
             )
             _sdb.commit()

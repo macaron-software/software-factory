@@ -31,7 +31,14 @@ logger = logging.getLogger(__name__)
 TOOL_PROVIDER = "azure-openai"
 TOOL_MODEL = "gpt-5-mini"
 # Providers that support native function calling (minimax M2.5 supports tools)
-TOOL_CAPABLE_PROVIDERS = {"azure-openai", "azure-ai", "openai", "local-mlx", "ollama", "minimax"}
+TOOL_CAPABLE_PROVIDERS = {
+    "azure-openai",
+    "azure-ai",
+    "openai",
+    "local-mlx",
+    "ollama",
+    "minimax",
+}
 
 # Backward-compat aliases (executor.py used underscore-prefixed names)
 _TOOL_PROVIDER = TOOL_PROVIDER
@@ -156,6 +163,7 @@ def _select_model_for_agent(
     """Select (provider, model) using routing config + Darwin LLM Thompson Sampling.
 
     Priority:
+    0. Agent's explicit model in DB (if different from env default — honours ac-% agents)
     1. Darwin LLM Thompson Sampling (if multiple models tested for this agent×context)
     2. DB routing config (Settings → LLM tab)
     3. Hardcoded role/tag defaults
@@ -168,6 +176,17 @@ def _select_model_for_agent(
     _default_model = os.environ.get(
         "PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
     )
+
+    # Priority 0: respect explicit agent model from DB.
+    # If agent.model is set AND differs from the env default, honour it directly
+    # so ac-% agents (gpt-5.2-codex) are never overridden by role/tag routing.
+    if (
+        agent.model
+        and agent.model not in ("", "demo-model")
+        and agent.model != _default_model
+    ):
+        ag_provider = agent.provider if agent.provider else _default_provider
+        return ag_provider, agent.model
 
     if not os.environ.get("AZURE_DEPLOY", ""):
         # Non-Azure deployment (local dev, OVH demo…).
