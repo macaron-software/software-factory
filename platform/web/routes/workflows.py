@@ -374,6 +374,7 @@ async def _run_workflow_background(
         pass
 
     _final_run_status = "failed"  # track for finally block — default "failed" so any crash resets ac_project_state
+    _run_exception: Exception | None = None  # captured for escalation reason extraction
     try:
         result = await run_workflow(
             wf, session_id, task, project_id, resume_from=resume_from
@@ -445,7 +446,11 @@ async def _run_workflow_background(
                             _chain_err,
                         )
     except Exception as e:
+        _run_exception = e
         logger.error("Workflow failed: %s", e)
+        # Detect adversarial escalation to track reason separately from generic failures
+        if type(e).__name__ in ("AdversarialEscalation", "AdversarialEscalationError"):
+            _final_run_status = "escalated"
         get_session_store().add_message(
             MessageDef(
                 session_id=session_id,
@@ -481,18 +486,22 @@ async def _run_workflow_background(
                 from ...db.migrations import get_db as _gdb2
                 from datetime import datetime as _dt
 
-                # Extract escalation reason from phase_results if available
+                # Extract escalation reason from exception or phase_results if available
                 _escalation_reason = None
                 try:
-                    _phase_results = (
-                        getattr(result, "phase_results", [])
-                        if "result" in dir()
-                        else []
-                    )
-                    for _pr in _phase_results:
-                        if _pr.get("escalated") and _pr.get("error"):
-                            _escalation_reason = str(_pr["error"])[:500]
-                            break
+                    # Primary: extract from the caught exception (AdversarialEscalation etc.)
+                    if _run_exception is not None:
+                        _escalation_reason = str(_run_exception)[:500]
+                    else:
+                        _phase_results = (
+                            getattr(result, "phase_results", [])
+                            if "result" in dir()
+                            else []
+                        )
+                        for _pr in _phase_results:
+                            if _pr.get("escalated") and _pr.get("error"):
+                                _escalation_reason = str(_pr["error"])[:500]
+                                break
                 except Exception:
                     pass
 
