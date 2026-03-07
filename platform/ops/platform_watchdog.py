@@ -86,16 +86,26 @@ def _is_already_triggered(db, source_run_id: str) -> bool:
         return False
 
 
-def _launch_quality_improvement(db, run_id: str, issues: list[str]) -> Optional[str]:
+def _launch_quality_improvement(
+    db, run_id: str, issues: list[str], skill_hints: Optional[list[str]] = None
+) -> Optional[str]:
     """Insert a quality-improvement epic_run on the software-factory project."""
     try:
         new_id = uuid.uuid4().hex[:8]
         issues_text = "\n".join(f"- {i}" for i in issues)
+        hints_text = ""
+        if skill_hints:
+            hints_text = (
+                "\n## Fichiers SF à corriger (hints)\n"
+                + "\n".join(f"- {h}" for h in skill_hints)
+                + "\n"
+            )
         brief = (
             f"# Platform Quality Issue Detected\n\n"
             f"Source run: {run_id}\n"
             f"Detected at: {datetime.now(timezone.utc).isoformat()}\n\n"
-            f"## Issues Found\n{issues_text}\n\n"
+            f"## Issues Found\n{issues_text}\n"
+            f"{hints_text}\n"
             f"## Task pour les agents AC (ac-architect + lead_dev)\n"
             f"Analyser et corriger les problèmes détectés dans la SF elle-même:\n"
             f"1. Lire les fichiers concernés: code_read('/app/platform/...') ou deploy/Dockerfile\n"
@@ -245,10 +255,123 @@ def scan_ac_issues() -> list[dict]:
     return issues_found
 
 
+# Mapping: escalation reason pattern → (skill file to fix, description)
+_ESCALATION_SKILL_MAP = [
+    (
+        [
+            "mentions of calls",
+            "No code_write evidence",
+            "no code_write",
+            "only read files",
+        ],
+        "/app/skills/ac-codex.md",
+        "ac-codex ne produit pas de code_write réel — écrit le texte '[code_write]' au lieu d'appeler l'outil. "
+        "Fix: renforcer dans ac-codex.md la règle 'SÉQUENCE OBLIGATOIRE code_write' et ajouter un exemple concret.",
+    ),
+    (
+        ["XXX marker", "placeholder", "XXX"],
+        "/app/skills/ac-codex.md",
+        "ac-codex produit des marqueurs XXX dans le code. "
+        "Fix: ajouter dans ac-codex.md règle 'INTERDIT: XXX, TODO, placeholder dans le code livré'.",
+    ),
+    (
+        ["TOO_SHORT", "26 chars", "25 chars"],
+        "/app/skills/ac-architect.md",
+        "ac-architect produit une réponse trop courte (< 80 chars) sans écrire INCEPTION.md. "
+        "Fix: renforcer dans ac-architect.md la séquence OBLIGATOIRE code_write.",
+    ),
+    (
+        ["No tests written", "test-first", "RED→GREEN→REFACTOR"],
+        "/app/skills/ac-codex.md",
+        "ac-codex ne suit pas TDD (pas de tests écrits). "
+        "Fix: renforcer dans ac-codex.md la séquence obligatoire tests AVANT implémentation.",
+    ),
+    (
+        ["HALLUCINATION", "Claims TDD sprint but no"],
+        "/app/skills/ac-codex.md",
+        "ac-codex hallucine des tool calls (dit avoir fait TDD sans preuves). "
+        "Fix: ajouter dans ac-codex.md 'PREUVE OBLIGATOIRE: code_read après chaque code_write pour afficher le contenu dans l'evidence'.",
+    ),
+]
+
+
+def scan_escalated_ac_runs() -> list[dict]:
+    """Scan recently escalated AC runs to detect recurring SF skill bugs.
+
+    Maps escalation reasons to specific skill files that need fixing and triggers
+    quality-improvement with targeted briefs. Only scans runs escalated in last 2h.
+    """
+    try:
+        from ..web.routes.pages import _ac_get_db, _ac_ensure_tables
+
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat()
+        try:
+            rows = conn.execute(
+                """SELECT project_id, current_run_id, current_cycle, last_escalation_reason
+                   FROM ac_project_state
+                   WHERE status='idle'
+                   AND last_escalation_at > ?
+                   AND last_escalation_reason IS NOT NULL""",
+                (cutoff,),
+            ).fetchall()
+        except Exception:
+            rows = []
+        finally:
+            conn.close()
+
+        issues_found = []
+        seen_skills: set = set()  # deduplicate by skill file per watchdog cycle
+
+        for row in rows:
+            project_id = row[0]
+            run_id = row[1]
+            cycle = row[2]
+            reason = row[3]
+
+            if not run_id or not reason:
+                continue
+
+            for patterns, skill_file, description in _ESCALATION_SKILL_MAP:
+                if any(p.lower() in reason.lower() for p in patterns):
+                    if skill_file in seen_skills:
+                        continue
+                    seen_skills.add(skill_file)
+                    issues_found.append(
+                        {
+                            "run_id": f"escalated-{run_id}",
+                            "project_id": project_id,
+                            "issues": [
+                                f"AC cycle {project_id} cycle {cycle} escaladé: {reason[:200]}",
+                                description,
+                            ],
+                            "skill_hints": [
+                                f"code_read('{skill_file}') puis corriger le skill",
+                                f"code_write('{skill_file}', contenu_corrigé)",
+                            ],
+                        }
+                    )
+                    break  # one issue per run
+
+        if issues_found:
+            logger.warning(
+                "platform_watchdog: scan_escalated_ac_runs found %d SF skill bug(s)",
+                len(issues_found),
+            )
+        return issues_found
+
+    except Exception as e:
+        logger.warning("platform_watchdog: scan_escalated_ac_runs failed: %s", e)
+        return []
+
+
 async def watchdog_cycle():
     """One watchdog cycle: scan → detect → trigger quality-improvement if needed."""
     db = _get_db()
-    false_positives = scan_false_completions() + scan_ac_issues()
+    false_positives = (
+        scan_false_completions() + scan_ac_issues() + scan_escalated_ac_runs()
+    )
 
     if not false_positives:
         return
@@ -260,6 +383,7 @@ async def watchdog_cycle():
     for fp in false_positives:
         run_id = fp["run_id"]
         issues = fp["issues"]
+        skill_hints = fp.get("skill_hints")
 
         if _is_already_triggered(db, run_id):
             logger.warning(
@@ -268,7 +392,9 @@ async def watchdog_cycle():
             )
             continue
 
-        new_run_id = _launch_quality_improvement(db, run_id, issues)
+        new_run_id = _launch_quality_improvement(
+            db, run_id, issues, skill_hints=skill_hints
+        )
         if new_run_id:
             logger.warning(
                 "platform_watchdog: → quality-improvement %s triggered for run %s",

@@ -481,12 +481,36 @@ async def _run_workflow_background(
                 from ...db.migrations import get_db as _gdb2
                 from datetime import datetime as _dt
 
+                # Extract escalation reason from phase_results if available
+                _escalation_reason = None
+                try:
+                    _phase_results = (
+                        getattr(result, "phase_results", [])
+                        if "result" in dir()
+                        else []
+                    )
+                    for _pr in _phase_results:
+                        if _pr.get("escalated") and _pr.get("error"):
+                            _escalation_reason = str(_pr["error"])[:500]
+                            break
+                except Exception:
+                    pass
+
                 _db2 = _gdb2()
-                _db2.execute(
-                    "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=?"
-                    " WHERE project_id=? AND status='running'",
-                    (_dt.utcnow().isoformat(), project_id),
-                )
+                _now = _dt.utcnow().isoformat()
+                if _escalation_reason:
+                    _db2.execute(
+                        "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=?,"
+                        " last_escalation_reason=?, last_escalation_at=?"
+                        " WHERE project_id=? AND status='running'",
+                        (_now, _escalation_reason, _now, project_id),
+                    )
+                else:
+                    _db2.execute(
+                        "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=?"
+                        " WHERE project_id=? AND status='running'",
+                        (_now, project_id),
+                    )
                 # Also mark session as completed so the watchdog doesn't resume it
                 _db2.execute(
                     "UPDATE sessions SET status='completed' WHERE id=? AND status IN ('interrupted','active','running')",
@@ -494,9 +518,10 @@ async def _run_workflow_background(
                 )
                 _db2.commit()
                 logger.warning(
-                    "AC cycle gated/failed — reset project %s to idle (run=%s)",
+                    "AC cycle gated/failed — reset project %s to idle (run=%s, reason=%s)",
                     project_id,
                     _final_run_status,
+                    (_escalation_reason or "")[:100],
                 )
             except Exception as _e:
                 logger.warning("Failed to reset AC project state: %s", _e)
