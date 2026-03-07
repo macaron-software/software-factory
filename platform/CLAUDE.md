@@ -91,7 +91,7 @@ ssh -i "$SSH_KEY" azureadmin@4.233.64.30 "cd /opt/macaron && docker compose --en
 FastAPI + Jinja2 + HTMX + SSE (no WS) · Zero build step · Zero emoji (SVG Feather only)
 PostgreSQL 16 WAL + FTS5 (~35 tables) — SQLite fallback for local dev
 Infisical REST API for secrets (INFISICAL_TOKEN) — .env fallback
-330 agents · 114 YAML skills · 10 patterns · 46 workflows · 1271 skills
+192 agents (DB) · 330 SAFe portfolio · 114 YAML defs · 10 patterns · 46 workflows · 1286 skills
 
 ---
 
