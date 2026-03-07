@@ -24,6 +24,7 @@ from .simplify import router as simplify_router
 from .teams import router as teams_router
 from .skill_eval import router as skill_eval_router
 from .hooks import router as hooks_router
+from .instincts import router as instincts_router
 
 router = APIRouter()
 
@@ -48,3 +49,4 @@ router.include_router(cockpit_router)
 router.include_router(screens_router)
 router.include_router(skill_eval_router)
 router.include_router(hooks_router)
+router.include_router(instincts_router)

@@ -126,6 +126,14 @@ class CodeWriteTool(BaseTool):
                 p.with_suffix(p.suffix + ".bak").write_text(p.read_text())
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content)
+            # REF: arXiv:2602.20021 — SBD-08: audit destructive file writes
+            try:
+                from ..security.audit import audit_log as _audit
+                _agent_id = getattr(agent, "id", "?")
+                _project_id = getattr(agent, "project_id", "") or ""
+                _audit("code_write", "file", path, f"{len(content)} chars", actor=_agent_id)
+            except Exception:
+                pass
             return f"Written {len(content)} chars to {path}"
         except Exception as e:
             return f"Error writing {path}: {e}"

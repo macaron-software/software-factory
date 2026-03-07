@@ -312,3 +312,43 @@ Amélioration Continue  web/routes/pages.py  projets pilotes bout-en-bout en cyc
 **AC king:** 8 projets pilotes (simple→enterprise+games+migration) · 20 cycles max · metrics agrégées
 **DB:** agent_scores · evolution_proposals · evolution_runs · rl_experience · ac_cycles · ac_project_state
 
+
+---
+
+## SECURITY — arXiv:2602.20021 Mitigations
+
+**Reference:** "Red-Teaming Autonomous LLM Agents in Live Labs" (arXiv:2602.20021, Feb 2026)
+Documented 11 vulnerability classes in multi-agent systems. Our mitigations:
+
+### Threat Model & Design Decisions
+
+| Threat (paper code) | Mitigation | File | Note |
+|---|---|---|---|
+| SBD-02 Info disclosure | Sensitive file blocklist on `code_read` + `code_write` | `tools/code_tools.py` | `.env`, `*.key`, `*.pem`, SSH keys, JWT in output |
+| SBD-03 Cross-session leakage | Same blocklist on reads | `tools/code_tools.py` | |
+| SBD-04 DoS / resource abuse | `RESOURCE_ABUSE` L0 pattern (busy-loops, fork bombs) | `agents/adversarial.py` | Score +7 |
+| SBD-05 Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` hard budget per agent run | `agents/executor.py` | Env override |
+| SBD-06 Identity spoofing | A2A `from_agent` validation + `IDENTITY_CLAIM` L0 | `a2a/bus.py` + `adversarial.py` | Log+flag (not hard reject yet) |
+| SBD-07 Cross-agent prop. | Memory write sanitization (`sanitize_agent_output`) | `memory/manager.py` | project + global |
+| SBD-08 Destructive actions | Sensitive file blocklist + audit trail on `code_write` | `tools/code_tools.py` + `security/audit.py` | |
+| SBD-09 Prompt injection | `PROMPT_INJECTION` L0 (+8) in output + tool results | `agents/adversarial.py` | |
+| SBD-10 Partial takeover | Memory write sanitization, max 8K value | `memory/manager.py` | |
+| SBD-11 Fake completion | Already: `FAKE_BUILD`/`MOCK`/`HALLUCINATION` L0 | `agents/adversarial.py` | Pre-existing |
+| SBD-01 Unauthorized compliance | A2A owner_id scoping (logged, not hard-blocked) | `a2a/bus.py` | |
+
+### Swiss Cheese Defense Model
+```
+L0 adversarial (deterministic, 0ms)  → code output quality + security patterns
+L1 adversarial (LLM semantic, ~5s)   → holistic review
+Tool guards (sync, before execution) → path/file blocklist, budget
+Memory sanitization (on write)       → strip injection from shared state
+A2A validation (on publish)          → identity check + scope logging
+Audit trail                          → `admin_audit_log` table for forensics
+```
+
+### What We Intentionally Don't Do (and why)
+- **No hard-block on A2A from_agent mismatch** — would break legitimate cross-session agent delegation (log+flag instead)
+- **No Landlock/Docker per agent** — too invasive for Phase 1; planned in scope hierarchy plan
+- **No full ACL on memory_project reads** — already scoped by `project_id` column in all queries
+- **No RBAC at runtime tool dispatch** — documented in scope hierarchy plan (separate initiative)
+- **No prompt injection hard-block in tool results** — log+score (avoid breaking RAG agents citing docs with injection text)

@@ -628,6 +628,7 @@ class AgentExecutor:
             # Tool-calling loop
             deep_search_used = False
             _force_tc_attempts = 0  # track how many times we've injected a forcing message
+            _run_tool_call_count = 0  # REF: arXiv:2602.20021 SBD-05 per-run tool budget
             for round_num in range(MAX_TOOL_ROUNDS):
                 llm_resp = await self._llm.chat(
                     messages=messages,
@@ -788,6 +789,13 @@ class AgentExecutor:
                             "agent": agent.id,
                             "ts": _time.time(),
                         }
+                    # REF: arXiv:2602.20021 SBD-05 — enforce per-run tool call budget
+                    _run_tool_call_count += 1
+                    if _run_tool_call_count > MAX_TOOL_CALLS_PER_RUN:
+                        raise BudgetExceededError(
+                            f"Tool call budget exceeded ({MAX_TOOL_CALLS_PER_RUN} calls/run). "
+                            "Increase MAX_TOOL_CALLS_PER_RUN env var if needed."
+                        )
                     result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     all_tool_calls.append(
                         {

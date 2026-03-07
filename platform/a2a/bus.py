@@ -85,6 +85,25 @@ class MessageBus:
         """Publish a message to the bus."""
         self._stats["published"] += 1
 
+        # REF: arXiv:2602.20021 — SBD-06: validate from_agent to detect identity spoofing.
+        # Log warning if sender is not a registered agent in this bus instance.
+        _sender = message.from_agent
+        _trusted_senders = {"user", "system", "platform", ""}
+        if (
+            _sender
+            and _sender not in _trusted_senders
+            and _sender not in self._agent_queues
+            and _sender not in self._handlers
+        ):
+            logger.warning(
+                "A2A IDENTITY_SPOOF: from_agent='%s' not registered in bus (session='%s'). "
+                "Message type=%s — relaying but flagging for audit.",
+                _sender[:40],
+                (message.session_id or "?")[:20],
+                message.message_type,
+            )
+            self._stats["spoofed"] = self._stats.get("spoofed", 0) + 1
+
         # Persist to DB asynchronously (non-blocking)
         if self.db:
             asyncio.get_event_loop().call_soon(self._persist_message, message)
