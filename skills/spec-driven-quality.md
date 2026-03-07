@@ -33,6 +33,7 @@
 # LICENSE: MIT — free to adapt with attribution
 
 name: spec-driven-quality
+version: "1.1.0"
 description: >
   Pre-code quality gates for SF agents based on spec-kit (GitHub, MIT).
   Activate when: starting a new mission, refining a backlog item, or reviewing
@@ -43,21 +44,46 @@ description: >
     4. analyze      — cross-artifact consistency (spec ↔ plan ↔ tasks)
 
 eval_cases:
-  - input: "Build a photo album feature — albums grouped by date, drag-and-drop reorder"
-    expect:
-      - Clarify step identifies: auth model? max albums? offline support? mobile?
-      - Checklist flags: "drag-and-drop" needs acceptance criteria (touch? keyboard?)
-      - Analyze step detects missing: error states, empty state, pagination
-  - input: "Add Slack notifications when agent mission completes"
-    expect:
-      - Clarify step asks: which events? opt-in or opt-out? per-user or per-project?
-      - Checklist flags: non-functional requirement missing (delivery guarantee, rate-limit)
-      - Analyze step detects: no rollback plan if Slack API is down
-  - input: "Migrate database from SQLite to Postgres"
-    expect:
-      - Constitution check: is Postgres allowed in this project's tech stack?
-      - Clarify step asks: zero-downtime requirement? data volume? rollback plan?
-      - Checklist flags: missing success criteria (latency baseline, data integrity check)
+  - id: clarify-ambiguous-feature
+    prompt: "Build a photo album feature — albums grouped by date, drag-and-drop reorder."
+    should_trigger: true
+    checks:
+      - "regex:clarif|question|ambig|missing|unclear|assumption"
+      - "regex:auth|mobile|offline|drag|touch|keyboard|max|limit|pagina"
+      - "length_min:80"
+      - "no_placeholder"
+    expectations:
+      - "runs Clarify step: identifies at least 2 ambiguities (auth model? touch support? pagination?)"
+      - "runs Checklist: drag-and-drop needs acceptance criteria (touch? keyboard nav?)"
+      - "does NOT jump straight to implementation"
+    tags: [clarify, checklist]
+
+  - id: clarify-integration-feature
+    prompt: "Add Slack notifications when an agent mission completes."
+    should_trigger: true
+    checks:
+      - "regex:clarif|question|which event|opt-in|opt-out|per-user|per-project|webhook|token"
+      - "regex:rate.?limit|delivery|retry|fail|down|unavailab"
+      - "length_min:80"
+      - "no_placeholder"
+    expectations:
+      - "asks clarifying questions before designing the feature (which events? opt-in/out? scope?)"
+      - "flags non-functional requirements: message delivery guarantees, rate limits"
+      - "identifies a missing failure scenario: what happens if Slack is unavailable?"
+    tags: [clarify, non-functional]
+
+  - id: clarify-migration
+    prompt: "Migrate the database from SQLite to Postgres."
+    should_trigger: true
+    checks:
+      - "regex:clarif|question|zero.?downtime|rollback|data.*volume|integrit"
+      - "regex:success.*criteri|latency|baseline|test|verif|validat"
+      - "length_min:80"
+      - "no_placeholder"
+    expectations:
+      - "Clarify step asks: zero-downtime requirement? data volume? rollback plan?"
+      - "Checklist flags missing success criteria (latency baseline, data integrity check)"
+    tags: [clarify, migration]
 ---
 
 # Spec-Driven Quality Skill

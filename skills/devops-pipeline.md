@@ -64,9 +64,12 @@ eval_cases:
     should_trigger: true
     checks:
       - "length_min:40"
+      - "regex:valid|correct|good|fine|basic|reasonable|sufficient|simple|clear|acceptable|no.*major|works|ok"
+      - "not_regex:security.*critical|vulnerability.*found|broken|dangerous|must.*fix|urgent"
     expectations:
       - "does not fabricate issues with a basic but valid test step"
       - "may note branch filtering could be more explicit"
+      - "acknowledges the pipeline step is functional"
     tags: [negative]
 ---
 

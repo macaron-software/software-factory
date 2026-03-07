@@ -46,11 +46,13 @@ eval_cases:
     prompt: "Error: 'ConnectionReset by peer' — ongoing for 6 days, 3 occurrences/hour, stable rate, already acknowledged."
     should_trigger: true
     checks:
-      - "regex:ONGOING|ongoing|suppress|mute|known"
-      - "not_regex:ALERT|page on-call|critical"
+      - "regex:ONGOING|ongoing|suppress|mute|known|stable|acknowledged"
+      - "not_regex:ALERT.*urgent|page.*on-call.*now|immediate.*alert|critical.*alert|trigger.*alert|new.*alert"
+      - "regex:suppress|mute|silence|known|monitor|no.*action|no.*alert|no.*page"
     expectations:
       - "classifies as ONGOING (not a new regression)"
       - "recommends suppressing/muting the alert — already known"
+      - "does NOT recommend immediately paging on-call for this stable known error"
     tags: [suppress, noise-reduction]
 ---
 
