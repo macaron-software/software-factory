@@ -943,6 +943,8 @@ class LLMClient:
             )
             return LLMResponse(
                 content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
+                model=model,
+                provider=provider,
                 tool_calls=[],
                 finish_reason="content_filter",
                 tokens_in=0,
@@ -1120,6 +1122,8 @@ class LLMClient:
             )
             return LLMResponse(
                 content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
+                model=model,
+                provider=provider,
                 tool_calls=[],
                 finish_reason="content_filter",
                 tokens_in=0,
