@@ -630,6 +630,36 @@ def _migrate_pg(conn):
     except Exception:
         pass
 
+    # Hook system (2026-03)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hook_registrations (
+            id TEXT PRIMARY KEY,
+            hook_type TEXT NOT NULL,
+            handler_name TEXT NOT NULL,
+            agent_id TEXT,
+            priority INTEGER DEFAULT 0,
+            enabled BOOLEAN DEFAULT TRUE,
+            can_block BOOLEAN DEFAULT FALSE,
+            required_role TEXT,
+            config_json TEXT DEFAULT '{}',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hook_log (
+            id TEXT PRIMARY KEY,
+            hook_type TEXT,
+            handler_name TEXT,
+            agent_id TEXT,
+            session_id TEXT,
+            tool_name TEXT,
+            blocked BOOLEAN DEFAULT FALSE,
+            message TEXT,
+            duration_ms INTEGER,
+            ts TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+
     conn.commit()
 
 
@@ -1003,6 +1033,36 @@ def _ensure_darwin_tables(conn) -> None:
     # agents.project_id FK (added 2026-03) — links ft-* project agents back to their project
     # Rationale: needed for project-scoped agent queries (ADR-0009 project isolation).
     conn.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS project_id TEXT")
+
+    # Hook system (2026-03) — pre/post tool hooks with RBAC
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hook_registrations (
+            id TEXT PRIMARY KEY,
+            hook_type TEXT NOT NULL,
+            handler_name TEXT NOT NULL,
+            agent_id TEXT,
+            priority INTEGER DEFAULT 0,
+            enabled INTEGER DEFAULT 1,
+            can_block INTEGER DEFAULT 0,
+            required_role TEXT,
+            config_json TEXT DEFAULT '{}',
+            created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hook_log (
+            id TEXT PRIMARY KEY,
+            hook_type TEXT,
+            handler_name TEXT,
+            agent_id TEXT,
+            session_id TEXT,
+            tool_name TEXT,
+            blocked INTEGER DEFAULT 0,
+            message TEXT,
+            duration_ms INTEGER,
+            ts TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+        )
+    """)
 
     conn.commit()
 
