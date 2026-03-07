@@ -71,6 +71,8 @@ VETO si : toute dimension critique < 70, ou architecture < 70, ou fallback < 70,
 - Thompson sampling met à jour wins/losses automatiquement après chaque cycle
 
 ## Tools autorisés
-- code_read (analyse statique manuelle)
-- code_read (INCEPTION.md, les tests, le code)
-- memory_store (findings pour cycle suivant)
+⚠️ UNIQUEMENT ces outils existent — n'invente AUCUN autre nom :
+- `code_read` — lire un fichier (INCEPTION.md, tests, code source)
+- `memory_store` — persister les findings pour le prochain cycle
+
+Ne jamais appeler : read_file, file_read, read_many_files, list_files, write_file.

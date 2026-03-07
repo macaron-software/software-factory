@@ -192,9 +192,125 @@ class CodeSearchTool(BaseTool):
             return f"Error: {e}"
 
 
+# ── Claude Code-compatible tool aliases ──────────────────────────────────────
+# Models trained on Claude data (MiniMax, Gemini, etc.) hallucinate these tool
+# names. Registering them as real tools makes those calls succeed instead of
+# producing "tool not found" errors.
+
+
+class ReadFileTool(BaseTool):
+    name = "read_file"
+    description = "Read the contents of a file (alias: code_read)"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return await CodeReadTool().execute(params, agent)
+
+
+class WriteFileTool(BaseTool):
+    name = "write_file"
+    description = "Write content to a file (alias: code_write)"
+    category = "code"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        # Claude Code uses (path, content) — same as code_write
+        return await CodeWriteTool().execute(params, agent)
+
+
+class ReadManyFilesTool(BaseTool):
+    name = "read_many_files"
+    description = "Read the contents of multiple files at once"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        paths = params.get("paths", [])
+        if isinstance(paths, str):
+            paths = [paths]
+        if not paths:
+            return "Error: paths list required"
+        reader = CodeReadTool()
+        results = []
+        for p in paths[:20]:  # cap at 20 files
+            content = await reader.execute({"path": p}, agent)
+            results.append(f"=== {p} ===\n{content}")
+        return "\n\n".join(results)
+
+
+class EditFileTool(BaseTool):
+    name = "edit_file"
+    description = "Replace a string in a file (alias: code_edit)"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return await CodeEditTool().execute(params, agent)
+
+
+class ListFilesTool(BaseTool):
+    name = "list_files"
+    description = "List files and directories at a path"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        path = params.get("path", ".")
+        if not os.path.exists(path):
+            return f"Error: path not found: {path}"
+        if os.path.isfile(path):
+            return path
+        try:
+            lines = []
+            for root, dirs, files in os.walk(path):
+                dirs.sort()
+                depth = root.replace(path, "").count(os.sep)
+                if depth > 3:
+                    dirs.clear()
+                    continue
+                indent = "  " * depth
+                lines.append(f"{indent}{os.path.basename(root)}/")
+                for f in sorted(files):
+                    lines.append(f"{indent}  {f}")
+            return "\n".join(lines[:200])
+        except Exception as e:
+            return f"Error listing {path}: {e}"
+
+
+class BashTool(BaseTool):
+    name = "bash"
+    description = "Execute a bash command and return its output"
+    category = "code"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        command = params.get("command", params.get("cmd", ""))
+        if not command:
+            return "Error: command required"
+        # Safety: block destructive commands
+        _blocked = ("rm -rf /", "mkfs", ":(){:|:&};:", "dd if=/dev/zero")
+        if any(b in command for b in _blocked):
+            return "Error: command blocked for safety"
+        try:
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=30
+            )
+            out = result.stdout + result.stderr
+            return out[:5000] or f"(exit {result.returncode})"
+        except subprocess.TimeoutExpired:
+            return "Error: command timed out after 30s"
+        except Exception as e:
+            return f"Error: {e}"
+
+
 def register_code_tools(registry):
     """Register all code tools."""
     registry.register(CodeReadTool())
     registry.register(CodeWriteTool())
     registry.register(CodeEditTool())
     registry.register(CodeSearchTool())
+    # Claude Code-compatible aliases — models trained on Claude data hallucinate
+    # these tool names; registering them as real tools makes those calls work.
+    registry.register(ReadFileTool())
+    registry.register(WriteFileTool())
+    registry.register(ReadManyFilesTool())
+    registry.register(EditFileTool())
+    registry.register(ListFilesTool())
+    registry.register(BashTool())

@@ -108,6 +108,9 @@ Phase 7 (ac-security) : VETO si secure_by_design < 60 (SecureByDesign 25 contrô
 ```
 
 ## Tools autorisés
-- code_read (analyse statique manuelle)
-- code_read (INCEPTION.md, les tests, le code)
-- memory_store (persist les findings pour le prochain cycle)
+⚠️ UNIQUEMENT ces outils existent — n'invente AUCUN autre nom :
+- `code_read` — lire un fichier (INCEPTION.md, tests, code source)
+- `memory_store` — persister les findings pour le prochain cycle
+
+Ne jamais appeler : read_file, file_read, read_many_files, list_files, write_file.
+Si un fichier n'est pas lisible via code_read, note "fichier absent" dans le rapport.
