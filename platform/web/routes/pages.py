@@ -893,21 +893,22 @@ def _ac_ensure_tables(conn) -> None:
     try:
         for stmt in stmts:
             conn.execute(stmt)
-        # Idempotent column additions
+        # Idempotent column additions (use IF NOT EXISTS for PostgreSQL)
+        _col = "IF NOT EXISTS " if is_pg else ""
         for alter in [
-            "ALTER TABLE ac_cycles ADD COLUMN adversarial_scores TEXT DEFAULT '{}'",
-            "ALTER TABLE ac_cycles ADD COLUMN traceability_score INTEGER DEFAULT 0",
-            "ALTER TABLE ac_cycles ADD COLUMN rl_reward REAL DEFAULT 0",
-            "ALTER TABLE ac_cycles ADD COLUMN veto_count INTEGER DEFAULT 0",
-            "ALTER TABLE ac_project_state ADD COLUMN next_cycle_hint TEXT",
-            "ALTER TABLE ac_project_state ADD COLUMN skill_eval_pending TEXT",
-            "ALTER TABLE ac_project_state ADD COLUMN convergence_status TEXT DEFAULT 'cold_start'",
-            "ALTER TABLE ac_project_state ADD COLUMN current_run_id TEXT",
-            "ALTER TABLE ac_project_state ADD COLUMN last_escalation_reason TEXT",
-            "ALTER TABLE ac_project_state ADD COLUMN last_escalation_at TEXT",
-            "ALTER TABLE ac_cycles ADD COLUMN rolled_back INTEGER DEFAULT 0",
-            "ALTER TABLE ac_cycles ADD COLUMN experiment_id TEXT",
-            "ALTER TABLE ac_cycles ADD COLUMN screenshot_path TEXT",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}adversarial_scores TEXT DEFAULT '{{}}'",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}traceability_score INTEGER DEFAULT 0",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}rl_reward REAL DEFAULT 0",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}veto_count INTEGER DEFAULT 0",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}next_cycle_hint TEXT",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}skill_eval_pending TEXT",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}convergence_status TEXT DEFAULT 'cold_start'",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}current_run_id TEXT",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}last_escalation_reason TEXT",
+            f"ALTER TABLE ac_project_state ADD COLUMN {_col}last_escalation_at TEXT",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}rolled_back INTEGER DEFAULT 0",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}experiment_id TEXT",
+            f"ALTER TABLE ac_cycles ADD COLUMN {_col}screenshot_path TEXT",
         ]:
             try:
                 conn.execute(alter)
