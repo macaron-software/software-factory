@@ -29,8 +29,13 @@ import logging
 import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+# Path where evolved skill YAMLs are written to disk
+# Resolved relative to this file: platform/hooks/ → platform/ → skills/definitions/
+_SKILLS_DIR = Path(__file__).parent.parent / "skills" / "definitions"
 
 # Minimum number of tool calls in a session before we bother analyzing
 _MIN_TOOL_CALLS = 6
@@ -249,6 +254,19 @@ async def observe_session(
                 p.trigger,
                 p.confidence,
             )
+
+    # After accumulating instincts, check if any project-scoped ones can be promoted
+    # SOURCE: ECC instinct promotion — fire asynchronously so it doesn't block the session
+    if count > 0:
+        try:
+            promoted = promote_global_instincts()
+            if promoted:
+                logger.info(
+                    "observe_session: promoted %d instincts to global scope", promoted
+                )
+        except Exception:
+            pass
+
     return count
 
 
@@ -345,13 +363,91 @@ behaviors:
         except Exception:
             pass
 
+        # Write YAML to disk so it can be loaded by the agent at runtime
+        # SOURCE: ECC /evolve — persists skills to skills/ directory
+        yaml_path: Path | None = None
+        try:
+            _SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+            yaml_path = _SKILLS_DIR / f"{skill_id}.yaml"
+            yaml_path.write_text(skill_yaml, encoding="utf-8")
+            logger.info("evolve_instincts: wrote %s", yaml_path)
+        except Exception as write_err:
+            logger.warning("evolve_instincts: could not write YAML: %s", write_err)
+
         return {
             "skill_id": skill_id,
             "domain": best_domain,
             "yaml": skill_yaml,
+            "yaml_path": str(yaml_path) if yaml_path else None,
             "instinct_count": len(cluster),
             "instinct_ids": [r["id"] for r in cluster],
         }
     except Exception as exc:
         logger.error("evolve_instincts error: %s", exc)
         return {"error": str(exc)}
+
+
+def promote_global_instincts(min_projects: int = 2, min_confidence: float = 0.7) -> int:
+    """Promote project-scoped instincts to global when seen in multiple projects.
+
+    SOURCE: ECC instinct promotion logic
+    WHY: If the same trigger→action pattern appears across 2+ distinct projects
+         with high confidence, it's a universal agent behavior worth globalising.
+
+    Returns: count of instincts promoted.
+    """
+    try:
+        from ..db.migrations import get_db
+
+        with get_db() as db:
+            # Find trigger→action pairs that appear in 2+ distinct projects
+            candidates = db.execute(
+                """SELECT trigger, action, domain, agent_id,
+                          COUNT(DISTINCT project_id) as project_count,
+                          AVG(confidence) as avg_conf
+                   FROM instincts
+                   WHERE scope = 'project' AND confidence >= ? AND project_id IS NOT NULL AND project_id != ''
+                   GROUP BY trigger, action, agent_id
+                   HAVING project_count >= ?""",
+                (min_confidence, min_projects),
+            ).fetchall()
+
+            if not candidates:
+                return 0
+
+            promoted = 0
+            for row in candidates:
+                # Upsert a global-scope instinct (one per agent + trigger)
+                global_id = f"global-{row['agent_id'] or 'any'}-{uuid.uuid4().hex[:8]}"
+                existing = db.execute(
+                    "SELECT id FROM instincts WHERE trigger=? AND agent_id=? AND scope='global'",
+                    (row["trigger"], row["agent_id"]),
+                ).fetchone()
+                if existing:
+                    db.execute(
+                        "UPDATE instincts SET confidence=MIN(0.9, confidence+0.05), "
+                        "updated_at=NOW() WHERE id=?",
+                        (existing["id"],),
+                    )
+                else:
+                    db.execute(
+                        """INSERT INTO instincts
+                           (id, agent_id, project_id, trigger, action, confidence, domain, scope, source)
+                           VALUES (?,?,NULL,?,?,?,?,'global','promotion')""",
+                        (
+                            global_id,
+                            row["agent_id"],
+                            row["trigger"],
+                            row["action"],
+                            min(0.9, float(row["avg_conf"]) + 0.05),
+                            row["domain"],
+                        ),
+                    )
+                    promoted += 1
+            db.commit()
+            if promoted:
+                logger.info("promote_global_instincts: promoted %d instincts", promoted)
+            return promoted
+    except Exception as exc:
+        logger.error("promote_global_instincts error: %s", exc)
+        return 0

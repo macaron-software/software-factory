@@ -4,7 +4,6 @@ Dependency Tools — Manifest parsing and security auditing.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import os
 import re
@@ -12,8 +11,7 @@ import shutil
 
 from .registry import BaseTool
 from ..models import AgentInstance
-
-TIMEOUT = 30
+from ._helpers import run_proc as _run
 
 MANIFEST_NAMES = {
     "requirements.txt": "python",
@@ -25,7 +23,16 @@ MANIFEST_NAMES = {
 
 AUDIT_CONFIG = {
     "python": {"bin": "pip-audit", "cmd": lambda p: ["pip-audit", "-r", p]},
-    "javascript": {"bin": "npm", "cmd": lambda p: ["npm", "audit", "--json", "--prefix", os.path.dirname(p) or "."]},
+    "javascript": {
+        "bin": "npm",
+        "cmd": lambda p: [
+            "npm",
+            "audit",
+            "--json",
+            "--prefix",
+            os.path.dirname(p) or ".",
+        ],
+    },
     "rust": {"bin": "cargo", "cmd": lambda _: ["cargo", "audit"]},
     "go": {"bin": "go", "cmd": lambda _: ["go", "vuln", "./..."]},
 }
@@ -70,14 +77,14 @@ def _parse_cargo_toml(text: str) -> list[str]:
     deps = []
     in_deps = False
     for line in text.splitlines():
-        if re.match(r'^\[.*dependencies.*\]', line):
+        if re.match(r"^\[.*dependencies.*\]", line):
             in_deps = True
             continue
         if line.startswith("["):
             in_deps = False
             continue
         if in_deps:
-            m = re.match(r'^(\w[\w-]*)\s*=\s*(.+)', line)
+            m = re.match(r"^(\w[\w-]*)\s*=\s*(.+)", line)
             if m:
                 deps.append(f"{m.group(1)} = {m.group(2).strip()}")
     return deps
@@ -107,23 +114,6 @@ PARSERS = {
     "Cargo.toml": _parse_cargo_toml,
     "go.mod": _parse_go_mod,
 }
-
-
-async def _run(cmd: list[str], cwd: str | None = None) -> tuple[int, str]:
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=cwd,
-        )
-        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=TIMEOUT)
-        return proc.returncode, (stdout.decode(errors="replace") + stderr.decode(errors="replace")).strip()
-    except FileNotFoundError:
-        return -1, f"{cmd[0]}: command not found"
-    except asyncio.TimeoutError:
-        proc.kill()
-        return -2, f"Timeout ({TIMEOUT}s) exceeded running {cmd[0]}"
 
 
 class DepCheckTool(BaseTool):
@@ -178,7 +168,9 @@ class DepAuditTool(BaseTool):
         if not shutil.which(cfg["bin"]):
             return f"Error: {cfg['bin']} not installed. Install it to audit {lang} dependencies."
 
-        code, output = await _run(cfg["cmd"](manifest_path), cwd=os.path.dirname(manifest_path) or None)
+        code, output = await _run(
+            cfg["cmd"](manifest_path), cwd=os.path.dirname(manifest_path) or None
+        )
         if code == 0:
             return "No known vulnerabilities found."
 

@@ -204,13 +204,14 @@ async def delete_instinct(instinct_id: str):
 
 @router.post("/api/instincts/evolve")
 async def evolve_instincts(request: Request):
-    """Cluster high-confidence instincts → generate skill YAML.
+    """Cluster high-confidence instincts → generate skill YAML + write to disk.
 
     SOURCE: ECC /evolve command (continuous-learning-v2)
     WHY: Instincts with confidence ≥ 0.6 sharing a domain are clustered into a
-         reusable skill YAML definition that can be loaded by agents at runtime.
+         reusable skill YAML definition written to platform/skills/definitions/.
 
-    Body: {agent_id, project_id?, min_confidence?}
+    Body: {agent_id?, project_id?, min_confidence?}
+    If agent_id is omitted, evolves all agents that have eligible instincts.
     """
     body = {}
     try:
@@ -218,19 +219,60 @@ async def evolve_instincts(request: Request):
     except Exception:
         pass
     agent_id = body.get("agent_id", "")
-    if not agent_id:
-        return JSONResponse({"error": "agent_id required"}, status_code=400)
 
     from ....hooks.instinct import evolve_instincts as _evolve
+    from ....db.migrations import get_db
 
-    result = _evolve(
-        agent_id=agent_id,
-        project_id=body.get("project_id", ""),
-        min_confidence=float(body.get("min_confidence", 0.6)),
+    if agent_id:
+        result = _evolve(
+            agent_id=agent_id,
+            project_id=body.get("project_id", ""),
+            min_confidence=float(body.get("min_confidence", 0.6)),
+        )
+        if "error" in result:
+            return JSONResponse(result, status_code=400)
+        return JSONResponse({"success": True, "clusters": [result]})
+
+    # No agent_id — evolve all agents with eligible instincts
+    min_conf = float(body.get("min_confidence", 0.6))
+    try:
+        with get_db() as db:
+            agents = db.execute(
+                "SELECT DISTINCT agent_id FROM instincts WHERE confidence >= ? AND evolved_into IS NULL AND agent_id IS NOT NULL",
+                (min_conf,),
+            ).fetchall()
+        results = []
+        for row in agents:
+            r = _evolve(agent_id=row["agent_id"], min_confidence=min_conf)
+            if "skill_id" in r:
+                results.append(r)
+        return JSONResponse({"success": True, "clusters": results})
+    except Exception as exc:
+        return JSONResponse({"success": False, "error": str(exc)}, status_code=500)
+
+
+@router.post("/api/instincts/promote")
+async def promote_instincts(request: Request):
+    """Promote project-scoped instincts to global when seen across 2+ projects.
+
+    SOURCE: ECC instinct promotion logic
+    WHY: Cross-project patterns are universal agent behaviors → global scope.
+
+    Body: {min_projects?: int, min_confidence?: float}
+    """
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+
+    from ....hooks.instinct import promote_global_instincts
+
+    count = promote_global_instincts(
+        min_projects=int(body.get("min_projects", 2)),
+        min_confidence=float(body.get("min_confidence", 0.7)),
     )
-    if "error" in result:
-        return JSONResponse(result, status_code=400)
-    return JSONResponse(result)
+    return JSONResponse({"success": True, "promoted": count})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
