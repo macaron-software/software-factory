@@ -1721,17 +1721,27 @@ class AgentExecutor:
                 elif (
                     round_num >= 2
                     and has_written
-                    and write_count < 2
+                    and write_count < 3
                     and tools is not None
                 ):
+                    _last_written = next(
+                        (t["args"].get("path", "") for t in reversed(all_tool_calls)
+                         if t["name"] in ("code_write", "code_edit")), ""
+                    )
                     messages.append(
                         LLMMessage(
-                            role="system",
-                            content="⚠️ 1 file written. Call code_write for remaining files.",
+                            role="user",
+                            content=(
+                                f"✅ {_last_written or 'file'} written ({write_count}/3). "
+                                "Write the NEXT required file NOW. "
+                                "TDD: if no test file yet → code_write(path=WORKSPACE/tests/test_*.py, content=...) "
+                                "otherwise write next source file or Dockerfile. "
+                                "Call code_write IMMEDIATELY."
+                            ),
                         )
                     )
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    if has_written:
+                    if has_written and write_count >= 2:
                         tools = None
                         written_paths = list(
                             {
