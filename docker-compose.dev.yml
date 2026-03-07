@@ -1,0 +1,130 @@
+# Platform Bubble — dev compose
+#
+# Architecture:
+#   platform bubble (Debian 13) talks to HOST Docker daemon via socket proxy.
+#   Agents exec into project containers (sf-{id}) via docker exec — no DinD.
+#
+# Services:
+#   socket-proxy  — tecnativa/docker-socket-proxy, whitelists exec/list/start/stop
+#   platform      — Platform bubble (Debian 13), FastAPI :8090
+#   postgres      — shared DB
+#   redis         — cache / task queue
+#
+# Networks:
+#   sf-internal   — platform + postgres + redis (no project containers here)
+#   sf-projects   — platform + project containers (isolated from DB)
+
+name: sf-bubble
+
+services:
+  # Docker socket proxy — restricts which Docker API endpoints are accessible.
+  # Platform talks to this proxy, not to /var/run/docker.sock directly.
+  # Ref: https://github.com/Tecnativa/docker-socket-proxy
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:0.3
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      # Allow: list + inspect containers, exec, start/stop, build, push
+      CONTAINERS: 1
+      EXEC: 1
+      IMAGES: 1
+      BUILD: 1
+      POST: 1
+      # Forbid: destructive ops — delete images/volumes/networks, swarm
+      DELETE: 0
+      VOLUMES: 0
+      NETWORKS: 0
+      SWARM: 0
+      SERVICES: 0
+      TASKS: 0
+      SECRETS: 0
+      PLUGINS: 0
+      SYSTEM: 0
+    networks:
+      - sf-internal
+    # socket-proxy must NOT be exposed outside the internal network
+
+  platform:
+    build:
+      context: .
+      dockerfile: Dockerfile.platform
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      # Docker socket via proxy (Platform Bubble pattern)
+      DOCKER_HOST: tcp://socket-proxy:2375
+      PROJECT_CONTAINER_NETWORK: sf-projects
+
+      # LLM
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
+      - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
+
+      # DB
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - REDIS_URL=redis://redis:6379/0
+
+      # Sandbox — use docker exec on persistent containers (not docker run --rm)
+      - SANDBOX_ENABLED=false
+      - SF_ROOT=/app
+    volumes:
+      # Workspace root — project volumes are named (sf-workspace-{id})
+      - platform-data:/app/data
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      socket-proxy:
+        condition: service_started
+    networks:
+      - sf-internal
+      - sf-projects
+    command: >
+      python3 -m uvicorn platform.server:app
+      --host 0.0.0.0 --port 8090 --ws none --log-level warning
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sf-internal
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sf-internal
+
+networks:
+  sf-internal:
+    driver: bridge
+    internal: true  # postgres + redis not accessible from outside
+  sf-projects:
+    name: sf-projects  # shared with project containers (created on demand)
+    driver: bridge
+
+volumes:
+  platform-data:
+  pg-data:

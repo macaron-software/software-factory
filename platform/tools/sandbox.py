@@ -409,19 +409,19 @@ def run_in_project_docker(
     env: Optional[dict] = None,
     agent_id: Optional[str] = None,
 ) -> SandboxResult:
-    """Run a command inside the Docker container of the given project.
+    """Run a command inside the persistent Docker container of the given project.
 
-    Looks up the project workspace, detects the container image from its
-    Dockerfile, and delegates to SandboxExecutor._run_docker().
-    Falls back to direct execution if Docker is unavailable or the project
-    has no Dockerfile.
+    Platform Bubble pattern: uses `docker exec` on a long-running project container
+    instead of `docker run --rm` (ephemeral). The container persists between calls
+    so build caches, node_modules, venvs etc. accumulate normally.
+
+    Falls back to direct subprocess if Docker is unavailable.
 
     Usage:
         result = run_in_project_docker("software-factory", "pytest tests/")
         result = run_in_project_docker("ac-hello-html", "npm test", cwd=workspace)
     """
     workspace = cwd or ""
-    image = None
 
     try:
         from ..projects.manager import get_project_store
@@ -429,18 +429,24 @@ def run_in_project_docker(
         proj = get_project_store().get(project_id)
         if proj and proj.path:
             workspace = workspace or proj.path
-            # Auto-detect Docker image from project Dockerfile
-            dockerfile = os.path.join(proj.path, "Dockerfile")
-            if os.path.isfile(dockerfile):
-                image = _detect_image(command)  # command-based heuristic first
-                if not image:
-                    image = f"sf-{project_id}:latest"
     except Exception as e:
         logger.debug("run_in_project_docker: project lookup failed: %s", e)
 
-    executor = SandboxExecutor(workspace or ".")
-    if SANDBOX_ENABLED:
-        return executor._run_docker(
-            command, cwd or workspace, timeout, image, SANDBOX_NETWORK, env, agent_id
+    try:
+        from ..projects.container import get_project_container
+
+        pc = get_project_container(project_id, path=workspace)
+        exec_cwd = cwd if cwd else "/workspace"
+        result = pc.exec(command, cwd=exec_cwd, env=env, timeout=timeout)
+        return SandboxResult(
+            stdout=result.stdout,
+            stderr=result.stderr,
+            exit_code=result.exit_code,
         )
+    except Exception as e:
+        logger.warning(
+            "run_in_project_docker: docker exec failed (%s) — falling back to direct", e
+        )
+
+    executor = SandboxExecutor(workspace or ".")
     return executor._run_direct(command, cwd or workspace, timeout, env)

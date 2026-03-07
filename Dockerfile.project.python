@@ -1,0 +1,26 @@
+# Project base image — Python 3.12 (for Python/FastAPI/ML projects)
+#
+# Used as the runtime container for Python projects.
+# Agents exec into this container via `docker exec sf-{project_id} cmd`.
+#
+# Build: docker build -f Dockerfile.project.python -t sf-project-python:3.12 .
+
+FROM python:3.12-slim-bookworm
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ripgrep build-essential \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Non-root agent user
+RUN groupadd -r agent && useradd -r -g agent -d /workspace agent \
+    && chown -R agent:agent /workspace
+
+USER agent
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/workspace
+
+CMD ["sleep", "infinity"]
