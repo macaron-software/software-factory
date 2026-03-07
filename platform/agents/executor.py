@@ -1036,6 +1036,41 @@ class AgentExecutor:
             else:
                 content = llm_resp.content or "(Max tool rounds reached)"
 
+            # Force synthesis if output is too short but tools were called
+            # Prevents adversarial REJECT due to TOO_SHORT when agent read files but didn't write
+            if content and len(content.strip()) < 80 and all_tool_calls:
+                try:
+                    messages.append(LLMMessage(role="assistant", content=content or ""))
+                    messages.append(
+                        LLMMessage(
+                            role="system",
+                            content=(
+                                "Ton résumé est trop court. Rédige maintenant un rapport COMPLET de 200 mots :\n"
+                                "- Quels fichiers as-tu créés, analysés ou mis à jour ?\n"
+                                "- Quel contenu précis contiennent-ils ?\n"
+                                "- Comment répondent-ils aux exigences du cycle ?\n"
+                                "Minimum 200 mots. Rapport factuel direct, pas d'excuse."
+                            ),
+                        )
+                    )
+                    _synth = await self._llm.chat(
+                        messages=messages,
+                        provider=use_provider,
+                        model=use_model,
+                        temperature=agent.temperature,
+                        max_tokens=2000,
+                        system_prompt="",
+                        tools=None,
+                    )
+                    if _synth.content and len(_synth.content.strip()) > len(
+                        content.strip()
+                    ):
+                        content = _synth.content
+                        total_tokens_in += _synth.tokens_in
+                        total_tokens_out += _synth.tokens_out
+                except Exception as _se:
+                    logger.debug("Synthesis expansion failed: %s", _se)
+
             elapsed = int((time.monotonic() - t0) * 1000)
             # Strip raw MiniMax tool-call tokens that leak into content
             content = _strip_raw_tokens(content)

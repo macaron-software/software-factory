@@ -22,11 +22,7 @@ phases:
     5. a11y checklist WCAG 2.1 AA : ARIA roles, contraste, navigation clavier, focus visible
     Sans ces 5 éléments, la phase est INCOMPLÈTE. Pas de code avant la fin de cette phase.
     Output structuré : INCEPTION.md avec toutes les specs + traceability matrix.
-  gate: always
-  config:
-    agents:
-    - ac-architect
-- id: ac-tdd-sprint
+  gate: all_approved
   pattern_id: loop
   name: TDD Sprint — Code + Tests
   description: >
@@ -42,12 +38,7 @@ phases:
     8. Appeler docker_deploy() pour vérifier le build — BLOQUANT si fail
     9. Corriger IMMÉDIATEMENT si CI échoue — pas de "ça marchera plus tard"
     Si adversarial feedback disponible (ADVERSARIAL_N.md), l'intégrer comme priorité absolue.
-  gate: no_veto
-  config:
-    agents:
-    - ac-codex
-    max_iterations: 3
-    dynamic_team: false
+  gate: all_approved
 - id: ac-adversarial-check
   pattern_id: sequential
   name: Vérification Adversariale 12 Dimensions
@@ -133,6 +124,7 @@ phases:
 config:
   max_cycles: 20
   auto_restart: true
+  default_scope: project
   projects:
   - ac-hello-html
   - ac-hello-vue

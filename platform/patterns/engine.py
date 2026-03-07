@@ -1061,7 +1061,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators and discussion patterns skip L1 (expensive LLM check)
     # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
-    MAX_ADVERSARIAL_RETRIES = 1  # 1 retry = 2 attempts total for execution patterns
+    MAX_ADVERSARIAL_RETRIES = 2  # 2 retries = 3 attempts total for execution patterns
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
     is_discussion = run.pattern.type in _discussion_patterns
@@ -1206,16 +1206,35 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     )
                     break
             else:
-                # No retries — pass with rejection warning (forward progress > perfection)
-                state.status = NodeStatus.COMPLETED
+                # Max retries exhausted — FAIL node if score is bad (no "forward progress" bypass)
+                # score 7-10 = real quality failure → node FAILED → cycle stops at gate
+                # score 5-6 = minor issues → pass with warning (acceptable degraded output)
+                if guard_result.score >= 7:
+                    state.status = NodeStatus.FAILED
+                    logger.warning(
+                        "ADVERSARIAL HARD-FAIL [%s] score=%d after %d attempts — node FAILED",
+                        agent.name,
+                        guard_result.score,
+                        MAX_ADVERSARIAL_RETRIES + 1,
+                    )
+                    content = (
+                        f"[ADVERSARIAL HARD-FAIL — {guard_result.level}] "
+                        f"Score: {guard_result.score}/10 après {MAX_ADVERSARIAL_RETRIES + 1} tentatives\n"
+                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                        + "\n\n"
+                        + content
+                    )
+                else:
+                    # Minor issues (score ≤ 6) — pass with warning only
+                    state.status = NodeStatus.COMPLETED
+                    content = (
+                        f"[ADVERSARIAL WARNING — {guard_result.level}] "
+                        f"Score: {guard_result.score}/10\n"
+                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                        + "\n\n"
+                        + content
+                    )
                 msg_type = "agent"
-                rejection = (
-                    f"[ADVERSARIAL WARNING — {guard_result.level}] "
-                    f"Score: {guard_result.score}/10\n"
-                    + "\n".join(f"- {i}" for i in guard_result.issues[:3])
-                    + "\n\n"
-                )
-                content = rejection + content
                 # Track rejection in agent scores + update quality_score
                 try:
                     db = get_db()
