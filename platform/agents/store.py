@@ -279,6 +279,7 @@ class AgentStore:
                 tagline="I see the big picture",
                 is_builtin=True,
                 tags=["orchestrator", "planning"],
+                skills=["brainstorming", "multi-agent-patterns"],
                 system_prompt="You are the Brain — strategic orchestrator of the Software Factory.\n"
                 "Your role: analyze codebases deeply, decompose into atomic tasks (FRACTAL),\n"
                 "prioritize by WSJF, and coordinate workers. Use CoVe (Chain-of-Verification)\n"
@@ -299,6 +300,7 @@ class AgentStore:
                 tagline="Test first, code second",
                 is_builtin=True,
                 tags=["coding", "tdd"],
+                skills=["tdd", "debugging-strategies", "api-design-principles"],
                 system_prompt="You are a TDD Worker. Write code following strict Red-Green-Refactor.\n"
                 "Each task is atomic and KISS. Write the test FIRST, then minimal code to pass.\n"
                 "Never skip tests. Never use .unwrap() in Rust. Handle all errors explicitly.",
@@ -318,6 +320,7 @@ class AgentStore:
                 tagline="Nothing escapes my review",
                 is_builtin=True,
                 tags=["review", "quality"],
+                skills=["code-review", "debugging-strategies", "clean-code"],
                 permissions={"can_veto": True, "veto_level": "absolute"},
                 system_prompt="You are the Code Critic. Review code for:\n"
                 "- SLOP (code that compiles but does nothing useful)\n"
@@ -362,6 +365,7 @@ class AgentStore:
                 tagline="Clean architecture, strong foundations",
                 is_builtin=True,
                 tags=["architecture", "design"],
+                skills=["architecture-review", "api-design-principles"],
                 permissions={"can_veto": True, "veto_level": "strong"},
                 system_prompt="You are the Architecture Critic. Review for:\n"
                 "- RBAC/Auth coverage on all endpoints\n"
@@ -401,6 +405,7 @@ class AgentStore:
                 tagline="Value over features",
                 is_builtin=True,
                 tags=["product", "business"],
+                skills=["brainstorming", "spec-driven-quality"],
             ),
             AgentDef(
                 id="tester",
@@ -1311,6 +1316,7 @@ class AgentStore:
                 hierarchy_rank=10,
                 is_builtin=True,
                 tags=["ac", "architecture", "specs", "traceability"],
+                skills=["brainstorming", "spec-driven-quality", "architecture-review"],
                 permissions={"can_veto": False, "scope": "project"},
                 system_prompt=(
                     "Rôle : définir les specs complètes d'un projet pilote AVANT tout code.\n"
@@ -1640,6 +1646,7 @@ class AgentStore:
                 hierarchy_rank=20,
                 is_builtin=True,
                 tags=["documentation", "architecture", "adr"],
+                skills=["architecture-decision-records"],
                 permissions={"can_veto": True, "veto_level": "strong"},
                 system_prompt="You are an ADR (Architecture Decision Record) specialist.\n"
                 "For every significant technical decision, create an ADR in docs/adr/ with:\n"
@@ -1986,8 +1993,12 @@ class AgentStore:
                 tagline="Every token counts",
                 is_builtin=True,
                 tags=["llm", "ops", "cost", "evaluation"],
+                skills=[
+                    "prompt-engineering",
+                    "multi-agent-patterns",
+                    "advanced-evaluation",
+                ],
                 system_prompt=(
-                    "You are the LLM Ops Engineer — responsible for the health and cost-efficiency of all LLM integrations.\n"
                     "Your scope: monitor per-agent token costs, detect latency regressions, manage provider fallback chains,\n"
                     "evaluate prompt quality, and recommend model upgrades/downgrades.\n"
                     "Tools: memory_search, code_read, analytics APIs.\n"
@@ -2010,8 +2021,8 @@ class AgentStore:
                 tagline="Words are the code of AI",
                 is_builtin=True,
                 tags=["prompt", "llm", "evaluation", "optimization"],
+                skills=["prompt-engineering", "llm-integration", "advanced-evaluation"],
                 system_prompt=(
-                    "You are the Prompt Engineer — you craft and refine the system prompts that define every agent's behavior.\n"
                     "Your tasks: audit existing agent prompts for clarity, completeness and safety; run A/B tests;\n"
                     "build a prompt library with versioning; score prompt quality (specificity, role clarity, output format).\n"
                     "Tools: memory_search, code_read, agent definitions.\n"
@@ -2084,8 +2095,8 @@ class AgentStore:
                 tagline="Calm in the storm",
                 is_builtin=True,
                 tags=["incident", "sre", "reliability", "postmortem"],
+                skills=["debugging-strategies", "incident-diagnosis"],
                 system_prompt=(
-                    "You are the Incident Commander — you lead the response to P0/P1 production incidents.\n"
                     "Your protocol: 1) Declare incident severity. 2) Assemble response team. 3) Establish timeline.\n"
                     "4) Coordinate diagnosis across SRE/DevOps/Security. 5) Communicate status to stakeholders.\n"
                     "6) Drive resolution. 7) Write post-mortem with 5-whys and action items.\n"
@@ -2160,8 +2171,8 @@ class AgentStore:
                 tagline="API first, always",
                 is_builtin=True,
                 tags=["api", "openapi", "design", "contracts"],
+                skills=["api-design-principles"],
                 system_prompt=(
-                    "You are the API Designer — you own the design of all public and internal APIs.\n"
                     "Your tasks: design OpenAPI 3.1 specs, review PRs for API contract violations,\n"
                     "enforce naming conventions, versioning strategy (URI vs header), pagination standards,\n"
                     "error response format, authentication schemes.\n"
@@ -2185,8 +2196,8 @@ class AgentStore:
                 tagline="Architecture is responsibility",
                 is_builtin=True,
                 tags=["architecture", "principal", "adr", "governance"],
+                skills=["architecture-decision-records", "architecture-review"],
                 system_prompt=(
-                    "You are the Principal Engineer — you are the highest technical authority across all ARTs.\n"
                     "Your scope: review Architecture Decision Records (ADRs), challenge technology choices,\n"
                     "identify cross-team dependencies, prevent duplication of solutions, set technical standards.\n"
                     "Tools: code_read, memory_search, all architecture tools.\n"
