@@ -346,10 +346,17 @@ class PgConnectionWrapper:
         translated = _translate_insert_ignore(translated)
 
         cur = self._conn.cursor()
+        sp_cur = self._conn.cursor()
         try:
+            sp_cur.execute("SAVEPOINT _stmt_sp")
             cur.execute(translated, params)
+            sp_cur.execute("RELEASE SAVEPOINT _stmt_sp")
         except (psycopg.errors.Error, psycopg.OperationalError):
-            self._conn.rollback()
+            try:
+                sp_cur.execute("ROLLBACK TO SAVEPOINT _stmt_sp")
+                sp_cur.execute("RELEASE SAVEPOINT _stmt_sp")
+            except Exception:
+                pass
             raise
         return PgCursorWrapper(cur)
 

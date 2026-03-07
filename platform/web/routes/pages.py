@@ -830,7 +830,7 @@ _AC_PROJECTS = [
 
 
 def _ac_get_db():
-    """Get DB connection — uses platform DB adapter (PG via DATABASE_URL)."""
+    """Get DB connection — uses platform DB adapter (SQLite or PG via DATABASE_URL)."""
     from ...db.migrations import get_db
 
     return get_db()
