@@ -143,10 +143,9 @@ RULES:
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
 
 WORKFLOW:
-1. EXPLORE FIRST: list_files(path=WORKSPACE) → code_read existing files → understand what exists
-2. READ SPECS: code_read(path=WORKSPACE+"/INCEPTION.md") → follow the stack defined there EXACTLY
-3. WRITE FILES: code_write per file using WORKSPACE-prefixed absolute paths (MINIMUM 3 code_write calls)
-4. BUILD: docker_deploy() or bash(command="cd WORKSPACE && npm install && npm run build")
+1. EXPLORE FIRST: list_files(path=WORKSPACE) → code_read(path=WORKSPACE+"/INCEPTION.md") to get the STACK
+2. WRITE FILES: code_write per file using WORKSPACE-prefixed absolute paths (MINIMUM 3 code_write calls)
+3. BUILD: docker_deploy() or bash(command="cd WORKSPACE && npm install && npm run build")
 
 TOOL: code_write(path=WORKSPACE+"/src/main.py", content="full source code here — 30+ lines")
       write_file(path=WORKSPACE+"/src/main.py", content="...") — also accepted
@@ -164,6 +163,13 @@ RULES:
 - Do NOT describe changes. DO them via code_write / write_file.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
 - After each code_write, IMMEDIATELY write the next required file — do NOT stop.
+
+DOCKERFILE TEMPLATES (choose based on INCEPTION.md stack — NEVER use wrong base image):
+- HTML/CSS/nginx → FROM nginx:alpine + COPY src/ /usr/share/nginx/html/ + EXPOSE 80
+- Vue.js/React/Node.js build → FROM node:20-alpine + RUN npm install + RUN npm run build + FROM nginx:alpine COPY --from=0 /app/dist/ /usr/share/nginx/html/
+- Python/FastAPI → FROM python:3.12-slim + COPY requirements.txt . + RUN pip install -r requirements.txt + COPY . . + CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+- Go → FROM golang:1.22-alpine AS build + RUN go build -o app + FROM alpine COPY --from=build /app/app . + CMD ["./app"]
+- Rust → FROM rust:1.78-slim AS build + RUN cargo build --release + FROM debian:bookworm-slim COPY --from=build ./target/release/app . + CMD ["./app"]
 
 UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
@@ -194,8 +200,9 @@ BUILD VERIFICATION (MANDATORY — run AFTER writing code):
 COMPLETION CHECKLIST:
 1. All source files written via code_write (WORKSPACE-prefixed absolute paths)
 2. Dependency manifest complete (requirements.txt / package.json / go.mod / Cargo.toml)
-3. Dockerfile exists and docker_deploy() succeeds
-4. No stubs, no placeholders, no TODO left in code"""
+3. Dockerfile exists with CORRECT base image (see DOCKERFILE TEMPLATES above)
+4. docker_deploy() succeeds
+5. No stubs, no placeholders, no TODO left in code"""
 
 # Validation protocol — telegraphic
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
