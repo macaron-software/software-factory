@@ -1,10 +1,17 @@
 id: ac-improvement-cycle
-name: AC — Cycle d'Amélioration Continue
+name: AC — Cycle d'Amélioration Continue (SF elle-même)
 description: >
-  Cycle complet pour un projet pilote : inception → TDD sprint → adversarial QA → CI/CD → deploy → scoring.
-  L'équipe AC vérifie que la chaîne de production logicielle fonctionne de bout en bout.
-  Chaque cycle produit un score, des défauts, et une correction automatique sur Git.
-  La boucle tourne 20 fois par projet pour mesurer la convergence qualité.
+  ⚠️ CE WORKFLOW AMÉLIORE LA SF ELLE-MÊME — PAS les projets pilotes.
+  Scope exclusif : skills/*.md, prompts agents, workflows/definitions/*.yaml, patterns.
+  INTERDIT : builder/déployer un projet pilote, toucher aux workspaces projets.
+
+  Les projets pilotes (ac-hello-html, ac-ecommerce, etc.) passent par la chaîne SAFe complète :
+  ideation-to-prod → epic-decompose → feature-sprint → cicd-pipeline
+  via les Feature Teams (ft-infra-lead, ft-e2e-api, Team CI/CD, Team Deploy, etc.)
+
+  Ce workflow analyse les outputs des projets pilotes pour détecter les bugs SF
+  (slop dans les skills, mauvais prompts, phases workflow incorrectes) et les corriger.
+  Déclenché par le watchdog quand pass_rate < seuil OU toutes les N itérations projets.
 icon: refresh-cw
 is_builtin: true
 phases:

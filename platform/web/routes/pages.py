@@ -1205,7 +1205,17 @@ def _ac_select_skill_variants(project_id: str) -> dict[str, str]:
 
 @router.post("/api/improvement/start/{project_id}")
 async def api_improvement_start(project_id: str):
-    """Launch an AC improvement cycle for a project via the platform workflow engine."""
+    """Launch an AC improvement cycle to improve the SF itself, using a pilot project workspace.
+
+    NOTE: This is NOT the SAFe project lifecycle for the pilot project itself.
+    For the full project lifecycle (ideation → epics → features → sprints → deploy),
+    use ideation-to-prod / epic-decompose / feature-sprint workflows via the SF teams
+    (Team CI/CD, Team Deploy, Feature Teams, etc.).
+
+    This endpoint triggers ac-improvement-cycle which analyses the pilot project workspace
+    to detect and fix SF issues (skills, prompts, workflow YAML).
+    Scope: skills/*.md, agents/store.py, workflows/definitions/*.yaml — NOT project source code.
+    """
     from fastapi.responses import JSONResponse
 
     # Validate project_id
