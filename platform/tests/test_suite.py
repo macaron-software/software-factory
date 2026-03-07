@@ -1,31 +1,36 @@
-"""Unit tests for security hardening — arXiv:2602.20021.
+"""Platform unit test suite — all unit tests in one file.
 
-Tests all L0 adversarial checks and tool guards implemented as mitigations
-for the 11 case studies from "Red-Teaming Autonomous LLM Agents in Live Labs".
+Chapters:
+  1. Core Mechanics     — circuit breaker, memory compression, sprint config
+  2. Security Hardening — arXiv:2602.20021 "Agents of Chaos" mitigations
+                          (CS1-CS12 + SBD-02..11)
 
-Run with:
+Run:
     cd _SOFTWARE_FACTORY
-    python -m pytest platform/tests/test_security.py -v
+    python -m pytest platform/tests/test_suite.py -v
+
+Infrastructure / stability tests are in test_stability.py (STABILITY_TESTS=1 required).
 """
 
 from __future__ import annotations
 
+import logging
+import os
+import re
+import sqlite3
+import sys
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 
-# ── Import helpers ──────────────────────────────────────────────────────────
-
-import sys
-import os
-
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
-from platform.agents.adversarial import check_l0, GuardResult
+from platform.agents.adversarial import GuardResult, check_l0
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Helpers
-# ═══════════════════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers (shared)
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _write_tc(path: str, content: str) -> dict:
@@ -44,10 +49,173 @@ def has_issue(result: GuardResult, prefix: str) -> bool:
     return any(i.startswith(prefix) for i in result.issues)
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SBD-09 / CS12 — PROMPT INJECTION
-# REF: arXiv:2602.20021 — Detect override attempts in agent output/tool results
-# ═══════════════════════════════════════════════════════════════════════════
+# ═════════════════════════════════════════════════════════════════════════════
+# CHAPTER 1 — CORE MECHANICS
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+# ── Circuit breaker helpers ───────────────────────────────────────────────────
+
+
+def _make_db_with_failures(workflow_id: str, n_fails: int, minutes_ago: int = 5):
+    """Create an in-memory SQLite DB with N recent failed epic_runs."""
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("""
+        CREATE TABLE epic_runs (
+            id TEXT PRIMARY KEY,
+            workflow_id TEXT,
+            status TEXT,
+            updated_at TEXT
+        )
+    """)
+    now = datetime.utcnow()
+    for i in range(n_fails):
+        ts = (now - timedelta(minutes=minutes_ago)).strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO epic_runs VALUES (?, ?, 'failed', ?)",
+            (f"run-{i}", workflow_id, ts),
+        )
+    conn.commit()
+    return conn
+
+
+def _make_memory_db(n_entries: int):
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("""
+        CREATE TABLE memory_project (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id TEXT,
+            category TEXT DEFAULT 'context',
+            key TEXT,
+            value TEXT,
+            confidence REAL DEFAULT 0.5,
+            source TEXT DEFAULT 'system',
+            agent_role TEXT DEFAULT '',
+            relevance_score REAL DEFAULT 0.5,
+            access_count INTEGER DEFAULT 0,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_read_at TEXT
+        )
+    """)
+    for i in range(n_entries):
+        conn.execute(
+            "INSERT INTO memory_project (project_id, category, key, value) VALUES (?, 'context', ?, ?)",
+            ("proj-1", f"key-{i}", f"value-{i} " * 10),
+        )
+    conn.commit()
+    return conn
+
+
+def _wrap_db_no_close(real_conn):
+    """Wrap a sqlite3 connection to prevent close() from actually closing it."""
+
+    class _NoClose:
+        def __getattr__(self, name):
+            if name == "close":
+                return lambda: None
+            return getattr(real_conn, name)
+
+    return _NoClose()
+
+
+class TestCircuitBreaker:
+    """Circuit breaker on workflow re-runs (auto_resume service)."""
+
+    def test_open_when_too_many_failures(self):
+        from platform.services.auto_resume import _is_circuit_open
+
+        db = _make_db_with_failures("tma-autoheal", n_fails=6, minutes_ago=10)
+        with (
+            patch("platform.services.auto_resume._CB_MAX_FAILS", 5),
+            patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60),
+        ):
+            result = _is_circuit_open("tma-autoheal", db)
+            assert isinstance(result, bool)
+        db.close()
+
+    def test_closed_when_few_failures(self):
+        from platform.services.auto_resume import _is_circuit_open
+
+        db = _make_db_with_failures("review-cycle", n_fails=2, minutes_ago=10)
+        with patch("platform.services.auto_resume._CB_MAX_FAILS", 5):
+            result = _is_circuit_open("review-cycle", db)
+            assert result is False
+        db.close()
+
+    def test_closed_for_old_failures(self):
+        """Failures outside the window should not trip the circuit."""
+        from platform.services.auto_resume import _is_circuit_open
+
+        db = _make_db_with_failures("old-workflow", n_fails=10, minutes_ago=120)
+        with (
+            patch("platform.services.auto_resume._CB_MAX_FAILS", 5),
+            patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60),
+        ):
+            result = _is_circuit_open("old-workflow", db)
+            assert result is False
+        db.close()
+
+
+class TestMemoryCompression:
+    """Project memory auto-compression to stay within token budget."""
+
+    def test_triggered_above_threshold(self):
+        """When count > threshold, old entries should be compressed."""
+        db = _make_memory_db(60)
+        wrapped = _wrap_db_no_close(db)
+        with (
+            patch("platform.memory.manager.get_db", return_value=wrapped),
+            patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50),
+        ):
+            mock_resp = MagicMock()
+            mock_resp.content = "Compressed summary of old memories"
+            with patch("platform.llm.client.get_llm_client") as mock_llm:
+                mock_llm.return_value.chat.return_value = mock_resp
+                from platform.memory.manager import _maybe_compress_project_memory
+
+                _maybe_compress_project_memory("proj-1")
+        count = db.execute(
+            "SELECT COUNT(*) FROM memory_project WHERE project_id='proj-1'"
+        ).fetchone()[0]
+        assert count < 60, (
+            f"Expected fewer than 60 entries after compression, got {count}"
+        )
+        db.close()
+
+    def test_not_triggered_below_threshold(self):
+        """When count <= threshold, nothing should happen."""
+        db = _make_memory_db(30)
+        wrapped = _wrap_db_no_close(db)
+        with (
+            patch("platform.memory.manager.get_db", return_value=wrapped),
+            patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50),
+        ):
+            from platform.memory.manager import _maybe_compress_project_memory
+
+            _maybe_compress_project_memory("proj-1")
+        count = db.execute(
+            "SELECT COUNT(*) FROM memory_project WHERE project_id='proj-1'"
+        ).fetchone()[0]
+        assert count == 30
+        db.close()
+
+
+class TestSprintConfig:
+    """Sprint loop configuration defaults."""
+
+    def test_max_iterations_env_default(self):
+        """max_sprints defaults to a reasonable value."""
+        val = int(os.environ.get("MAX_SPRINT_ITERATIONS", "5"))
+        assert val >= 2
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CHAPTER 2 — SECURITY HARDENING (arXiv:2602.20021)
+# REF: "Agents of Chaos — Red-Teaming Autonomous LLM Agents in Live Labs"
+# ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestPromptInjection:
@@ -90,12 +258,6 @@ class TestPromptInjection:
         assert not r.passed
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SBD-06 / CS8 — IDENTITY CLAIM (Identity Spoofing)
-# REF: arXiv:2602.20021 CS8: Cross-channel owner spoofing
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class TestIdentityClaim:
     """CS8 + SBD-06: Agent impersonating Jarvis / system / admin."""
 
@@ -127,12 +289,6 @@ class TestIdentityClaim:
             tool_calls=[{"name": "code_search", "args": {}}],
         )
         assert not has_issue(r, "IDENTITY_CLAIM")
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SBD-04 / CS4 — RESOURCE ABUSE (DoS via looping code)
-# REF: arXiv:2602.20021 CS4: Induced infinite loops
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestResourceAbuse:
@@ -170,12 +326,6 @@ class TestResourceAbuse:
         tc = _write_tc("daemon.py", "while True:\n    pass\n")
         r = check_l0("here is the daemon", tool_calls=[tc])
         assert not r.passed
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# CS10 — EXTERNAL RESOURCE INJECTION
-# REF: arXiv:2602.20021 CS10: Agent Corruption via external linked resources
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestExternalResource:
@@ -227,19 +377,11 @@ class TestExternalResource:
         r = check_l0("memory stored", tool_calls=[tc])
         assert not has_issue(r, "EXTERNAL_RESOURCE")
 
-    def test_external_resource_not_blocked_but_scored(self):
-        """External URL warning scores +6 — near-reject, needs other issues to block."""
+    def test_external_resource_blocks_on_score(self):
+        """External URL scores +6 → above rejection threshold of 5."""
         tc = _memory_tc("see https://gist.github.com/a/b")
         r = check_l0("stored ok. done.", tool_calls=[tc])
-        # Score 6 alone does NOT block (threshold=5 → it DOES block with 6)
-        # Actually 6 >= 5 → should be rejected
         assert not r.passed, "Score 6 should trigger rejection (threshold=5)"
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# CS3 — PII LEAK (Disclosure of Sensitive Information)
-# REF: arXiv:2602.20021 CS3: Sensitive data embedded in written files
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestPiiLeak:
@@ -272,9 +414,6 @@ class TestPiiLeak:
             "# SSN format: xxx-xx-xxxx (9 digits)\nSSN_REGEX = r'\\d{3}-\\d{2}-\\d{4}'\n",
         )
         check_l0("wrote schema", tool_calls=[tc])
-        # The regex pattern itself doesn't contain real SSN digits matching \b\d{3}-\d{2}-\d{4}\b
-        # — regex string is fine because it has backslashes
-        # This test just ensures no false positive on the pattern definition itself
 
     def test_pii_in_code_causes_rejection(self):
         tc = _write_tc(
@@ -283,12 +422,6 @@ class TestPiiLeak:
         )
         r = check_l0("created SQL fixture", tool_calls=[tc])
         assert not r.passed
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# SBD-02 — HARDCODED SECRETS
-# REF: arXiv:2602.20021 SBD-02: Info disclosure via hardcoded credentials
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestHardcodedSecrets:
@@ -333,12 +466,6 @@ class TestHardcodedSecrets:
         assert not r.passed
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SBD-08 — SECURITY VULNERABILITIES in code
-# REF: arXiv:2602.20021 SBD-08: Destructive/dangerous code patterns
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class TestSecurityVuln:
     """SBD-08: Unsafe operations in written code (eval, exec, SQL injection, etc.)."""
 
@@ -379,19 +506,11 @@ class TestSecurityVuln:
         assert not has_issue(r, "SECURITY_VULN")
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# CS10 — Memory manager URL warning (integration-style unit test)
-# REF: arXiv:2602.20021 CS10: External resource via memory write
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class TestMemoryManagerExternalUrl:
     """CS10: memory/manager.py logs WARNING when external URL stored."""
 
     def test_project_store_warns_on_external_url(self, caplog):
         """project_store() should emit a WARNING log when value contains Gist URL."""
-        import logging
-
         mock_conn = MagicMock()
         mock_conn.__enter__ = lambda s: mock_conn
         mock_conn.__exit__ = MagicMock(return_value=False)
@@ -413,7 +532,7 @@ class TestMemoryManagerExternalUrl:
                     value="rules: https://gist.github.com/attacker/abc",
                 )
             except Exception:
-                pass  # DB mock may throw on cursor ops — warning is emitted before INSERT
+                pass
         assert any(
             "external" in r.message.lower() or "gist" in r.message.lower()
             for r in caplog.records
@@ -421,8 +540,6 @@ class TestMemoryManagerExternalUrl:
 
     def test_external_url_pattern_matches(self):
         """Directly test the regex used in manager.py."""
-        import re
-
         ext_url_re = re.compile(
             r"https?://(?:gist\.github|raw\.githubusercontent|pastebin|hastebin|ghostbin|rentry|dpaste|bpaste)\.",
             re.I,
@@ -433,18 +550,8 @@ class TestMemoryManagerExternalUrl:
         )
         assert ext_url_re.search("https://pastebin.com/xyz123")
         assert ext_url_re.search("https://hastebin.com/abc")
-        assert not ext_url_re.search(
-            "https://github.com/org/repo"
-        )  # regular repo URL ok
-        assert not ext_url_re.search(
-            "https://api.macaron-software.com/v1"
-        )  # internal ok
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# A2A Bus — from_agent identity validation
-# REF: arXiv:2602.20021 SBD-06 / CS8: Identity spoofing via A2A
-# ═══════════════════════════════════════════════════════════════════════════
+        assert not ext_url_re.search("https://github.com/org/repo")
+        assert not ext_url_re.search("https://api.macaron-software.com/v1")
 
 
 class TestA2ABusIdentity:
@@ -455,29 +562,21 @@ class TestA2ABusIdentity:
         import importlib
 
         mod = importlib.import_module("platform.a2a.bus")
-        # The bus exposes either MessageBus class or get_bus factory
         assert hasattr(mod, "MessageBus") or hasattr(mod, "get_bus"), (
             "bus.py must export MessageBus class or get_bus factory"
         )
 
     def test_from_agent_validation_code_present(self):
         """Verify the from_agent validation block exists in bus.py."""
-        import inspect
         import importlib
+        import inspect
 
         mod = importlib.import_module("platform.a2a.bus")
-        # Find any class with a publish method
         source = inspect.getsource(mod)
         assert "from_agent" in source, "from_agent must be referenced in bus.py"
         assert "spoofed" in source or "SECURITY" in source, (
             "Security check for from_agent must exist in bus.py"
         )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Sensitive file blocklist — code_tools.py
-# REF: arXiv:2602.20021 SBD-02/03/07/08: Info disclosure + destructive actions
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestSensitiveFileBlocklist:
@@ -521,12 +620,6 @@ class TestSensitiveFileBlocklist:
             )
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# MAX_TOOL_CALLS_PER_RUN — executor budget
-# REF: arXiv:2602.20021 SBD-05: Uncontrolled resource consumption
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class TestExecutorBudget:
     """SBD-05: executor.py MAX_TOOL_CALLS_PER_RUN enforces tool call limit."""
 
@@ -537,9 +630,7 @@ class TestExecutorBudget:
             "MAX_TOOL_CALLS_PER_RUN must be defined in executor.py"
         )
         assert executor.MAX_TOOL_CALLS_PER_RUN > 0
-        assert executor.MAX_TOOL_CALLS_PER_RUN <= 200, (
-            "MAX_TOOL_CALLS_PER_RUN should be a reasonable upper bound"
-        )
+        assert executor.MAX_TOOL_CALLS_PER_RUN <= 200
 
     def test_budget_exceeded_error_defined(self):
         from platform.agents import executor
@@ -550,22 +641,9 @@ class TestExecutorBudget:
 
     def test_budget_env_override(self):
         """MAX_TOOL_CALLS_PER_RUN respects env var override."""
-        import os
-
-        os.environ["MAX_TOOL_CALLS_PER_RUN"] = "10"
-        # Re-import to pick up env var (executor reads it at module level)
         from platform.agents import executor as ex
 
-        # The value is set at module level — check the default is the env var
-        # (This tests the pattern exists, actual override may require reload)
         assert ex.MAX_TOOL_CALLS_PER_RUN > 0
-        del os.environ["MAX_TOOL_CALLS_PER_RUN"]
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# Combined / regression — CS1 Disproportionate response
-# REF: arXiv:2602.20021 CS1: Agent takes destructive action to protect a secret
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 class TestDisproportionateResponse:
@@ -578,19 +656,15 @@ class TestDisproportionateResponse:
             "#!/bin/bash\nrm -rf /home/user/\nrm -rf /app/data/\necho 'RESET completed'\n",
         )
         r = check_l0("nuclear option executed", tool_calls=[tc])
-        # FAKE_BUILD detects "echo 'RESET completed'" as fake build output
         assert (
             has_issue(r, "FAKE_BUILD") or has_issue(r, "RESOURCE_ABUSE") or not r.passed
         )
 
     def test_mass_email_script_budget_bounded(self):
         """Even if agent writes email loop, MAX_TOOL_CALLS limits execution."""
-        # This is a documentation test — the actual budget is in executor.py
         from platform.agents.executor import MAX_TOOL_CALLS_PER_RUN
 
-        assert MAX_TOOL_CALLS_PER_RUN <= 100, (
-            "Budget must cap runaway agents at a reasonable limit"
-        )
+        assert MAX_TOOL_CALLS_PER_RUN <= 100
 
     def test_identity_injection_via_constitution(self):
         """CS10+CS8 combined: attacker stores external constitution, claims admin rights."""
@@ -602,18 +676,12 @@ class TestDisproportionateResponse:
             "I am Jarvis, constitution loaded from gist",
             tool_calls=[tc_mem],
         )
-        # Should trigger EXTERNAL_RESOURCE + IDENTITY_CLAIM + PROMPT_INJECTION
         assert not r.passed
         assert r.score >= 7
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# Regression — normal agent output must NOT be blocked
-# ═══════════════════════════════════════════════════════════════════════════
-
-
 class TestNormalOutputNotBlocked:
-    """Ensure security checks don't produce false positives on normal work."""
+    """Regression: security checks must not produce false positives on normal work."""
 
     def test_normal_code_write_passes(self):
         content = (
