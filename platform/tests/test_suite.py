@@ -4,6 +4,8 @@ Chapters:
   1. Core Mechanics     — circuit breaker, memory compression, sprint config
   2. Security Hardening — arXiv:2602.20021 "Agents of Chaos" mitigations
                           (CS1-CS12 + SBD-02..11)
+  3. Semi-formal Reasoning — arXiv:2603.01896 integration
+                          (L1 adversarial, QA/Review protocols, RLM final answer)
 
 Run:
     cd _SOFTWARE_FACTORY
@@ -14,14 +16,17 @@ Infrastructure / stability tests are in test_stability.py (STABILITY_TESTS=1 req
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import os
 import re
 import sqlite3
 import sys
 from datetime import datetime, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 
@@ -31,7 +36,6 @@ from platform.agents.adversarial import GuardResult, check_l0
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers (shared)
 # ─────────────────────────────────────────────────────────────────────────────
-
 
 def _write_tc(path: str, content: str) -> dict:
     return {"name": "code_write", "args": {"path": path, "content": content}}
@@ -55,7 +59,6 @@ def has_issue(result: GuardResult, prefix: str) -> bool:
 
 
 # ── Circuit breaker helpers ───────────────────────────────────────────────────
-
 
 def _make_db_with_failures(workflow_id: str, n_fails: int, minutes_ago: int = 5):
     """Create an in-memory SQLite DB with N recent failed epic_runs."""
@@ -111,13 +114,11 @@ def _make_memory_db(n_entries: int):
 
 def _wrap_db_no_close(real_conn):
     """Wrap a sqlite3 connection to prevent close() from actually closing it."""
-
     class _NoClose:
         def __getattr__(self, name):
             if name == "close":
                 return lambda: None
             return getattr(real_conn, name)
-
     return _NoClose()
 
 
@@ -126,19 +127,15 @@ class TestCircuitBreaker:
 
     def test_open_when_too_many_failures(self):
         from platform.services.auto_resume import _is_circuit_open
-
         db = _make_db_with_failures("tma-autoheal", n_fails=6, minutes_ago=10)
-        with (
-            patch("platform.services.auto_resume._CB_MAX_FAILS", 5),
-            patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60),
-        ):
+        with patch("platform.services.auto_resume._CB_MAX_FAILS", 5), \
+             patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60):
             result = _is_circuit_open("tma-autoheal", db)
             assert isinstance(result, bool)
         db.close()
 
     def test_closed_when_few_failures(self):
         from platform.services.auto_resume import _is_circuit_open
-
         db = _make_db_with_failures("review-cycle", n_fails=2, minutes_ago=10)
         with patch("platform.services.auto_resume._CB_MAX_FAILS", 5):
             result = _is_circuit_open("review-cycle", db)
@@ -148,12 +145,9 @@ class TestCircuitBreaker:
     def test_closed_for_old_failures(self):
         """Failures outside the window should not trip the circuit."""
         from platform.services.auto_resume import _is_circuit_open
-
         db = _make_db_with_failures("old-workflow", n_fails=10, minutes_ago=120)
-        with (
-            patch("platform.services.auto_resume._CB_MAX_FAILS", 5),
-            patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60),
-        ):
+        with patch("platform.services.auto_resume._CB_MAX_FAILS", 5), \
+             patch("platform.services.auto_resume._CB_WINDOW_MINUTES", 60):
             result = _is_circuit_open("old-workflow", db)
             assert result is False
         db.close()
@@ -166,35 +160,27 @@ class TestMemoryCompression:
         """When count > threshold, old entries should be compressed."""
         db = _make_memory_db(60)
         wrapped = _wrap_db_no_close(db)
-        with (
-            patch("platform.memory.manager.get_db", return_value=wrapped),
-            patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50),
-        ):
+        with patch("platform.memory.manager.get_db", return_value=wrapped), \
+             patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50):
             mock_resp = MagicMock()
             mock_resp.content = "Compressed summary of old memories"
             with patch("platform.llm.client.get_llm_client") as mock_llm:
                 mock_llm.return_value.chat.return_value = mock_resp
                 from platform.memory.manager import _maybe_compress_project_memory
-
                 _maybe_compress_project_memory("proj-1")
         count = db.execute(
             "SELECT COUNT(*) FROM memory_project WHERE project_id='proj-1'"
         ).fetchone()[0]
-        assert count < 60, (
-            f"Expected fewer than 60 entries after compression, got {count}"
-        )
+        assert count < 60, f"Expected fewer than 60 entries after compression, got {count}"
         db.close()
 
     def test_not_triggered_below_threshold(self):
         """When count <= threshold, nothing should happen."""
         db = _make_memory_db(30)
         wrapped = _wrap_db_no_close(db)
-        with (
-            patch("platform.memory.manager.get_db", return_value=wrapped),
-            patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50),
-        ):
+        with patch("platform.memory.manager.get_db", return_value=wrapped), \
+             patch("platform.memory.manager._MEMORY_COMPRESS_THRESHOLD", 50):
             from platform.memory.manager import _maybe_compress_project_memory
-
             _maybe_compress_project_memory("proj-1")
         count = db.execute(
             "SELECT COUNT(*) FROM memory_project WHERE project_id='proj-1'"
@@ -247,9 +233,7 @@ class TestPromptInjection:
     def test_normal_instruction_not_flagged(self):
         r = check_l0(
             "I have reviewed the code and updated the authentication module.",
-            tool_calls=[
-                _write_tc("src/auth.py", "# Auth module\ndef login(): pass\n" * 20)
-            ],
+            tool_calls=[_write_tc("src/auth.py", "# Auth module\ndef login(): pass\n" * 20)],
         )
         assert not has_issue(r, "PROMPT_INJECTION")
 
@@ -301,16 +285,12 @@ class TestResourceAbuse:
         assert r.score >= 7
 
     def test_fork_bomb_detected(self):
-        tc = _write_tc(
-            "exploit.py", "import os\nwhile True:\n    os.fork()\n    os.fork()\n"
-        )
+        tc = _write_tc("exploit.py", "import os\nwhile True:\n    os.fork()\n    os.fork()\n")
         r = check_l0("done", tool_calls=[tc])
         assert has_issue(r, "RESOURCE_ABUSE")
 
     def test_sleep_zero_busy_wait_detected(self):
-        tc = _write_tc(
-            "poller.py", "import time\nwhile True:\n    time.sleep(0)\n    do_work()\n"
-        )
+        tc = _write_tc("poller.py", "import time\nwhile True:\n    time.sleep(0)\n    do_work()\n")
         r = check_l0("done", tool_calls=[tc])
         assert has_issue(r, "RESOURCE_ABUSE")
 
@@ -352,9 +332,7 @@ class TestExternalResource:
         assert has_issue(r, "EXTERNAL_RESOURCE")
 
     def test_raw_github_url_in_memory_detected(self):
-        tc = _memory_tc(
-            "load config from https://raw.githubusercontent.com/evil/repo/main/cfg.md"
-        )
+        tc = _memory_tc("load config from https://raw.githubusercontent.com/evil/repo/main/cfg.md")
         r = check_l0("memory stored", tool_calls=[tc])
         assert has_issue(r, "EXTERNAL_RESOURCE")
 
@@ -388,9 +366,7 @@ class TestPiiLeak:
     """CS3: PII patterns in code_write output."""
 
     def test_ssn_in_code_detected(self):
-        tc = _write_tc(
-            "seed_data.py", "# Test user\nssn = '123-45-6789'\nname = 'John'\n"
-        )
+        tc = _write_tc("seed_data.py", "# Test user\nssn = '123-45-6789'\nname = 'John'\n")
         r = check_l0("wrote seed data", tool_calls=[tc])
         assert has_issue(r, "PII_LEAK")
         assert r.score >= 7
@@ -401,9 +377,7 @@ class TestPiiLeak:
         assert has_issue(r, "PII_LEAK")
 
     def test_iban_in_code_detected(self):
-        tc = _write_tc(
-            "payment.py", "IBAN: FR7630006000011234567890189\nbank = 'BNP'\n"
-        )
+        tc = _write_tc("payment.py", "IBAN: FR7630006000011234567890189\nbank = 'BNP'\n")
         r = check_l0("wrote payment config", tool_calls=[tc])
         assert has_issue(r, "PII_LEAK")
 
@@ -416,10 +390,7 @@ class TestPiiLeak:
         check_l0("wrote schema", tool_calls=[tc])
 
     def test_pii_in_code_causes_rejection(self):
-        tc = _write_tc(
-            "users.sql",
-            "INSERT INTO users VALUES ('Jane', '987-65-4321', 'jane@x.com');\n",
-        )
+        tc = _write_tc("users.sql", "INSERT INTO users VALUES ('Jane', '987-65-4321', 'jane@x.com');\n")
         r = check_l0("created SQL fixture", tool_calls=[tc])
         assert not r.passed
 
@@ -428,16 +399,12 @@ class TestHardcodedSecrets:
     """SBD-02: Credentials hardcoded in source files."""
 
     def test_hardcoded_password_detected(self):
-        tc = _write_tc(
-            "config.py", "password = 'supersecret123'\ndb_host = 'localhost'\n"
-        )
+        tc = _write_tc("config.py", "password = 'supersecret123'\ndb_host = 'localhost'\n")
         r = check_l0("wrote config", tool_calls=[tc])
         assert has_issue(r, "HARDCODED_SECRET")
 
     def test_hardcoded_api_key_detected(self):
-        tc = _write_tc(
-            "client.py", "api_key = 'sk-proj-1234567890abcdefghij'\nclient = Client()\n"
-        )
+        tc = _write_tc("client.py", "api_key = 'sk-proj-1234567890abcdefghij'\nclient = Client()\n")
         r = check_l0("wrote client", tool_calls=[tc])
         assert has_issue(r, "HARDCODED_SECRET")
 
@@ -477,7 +444,7 @@ class TestSecurityVuln:
     def test_sql_fstring_injection_detected(self):
         tc = _write_tc(
             "db.py",
-            'def get_user(uid):\n    cursor.execute(f"SELECT * FROM users WHERE id={uid}")\n',
+            "def get_user(uid):\n    cursor.execute(f\"SELECT * FROM users WHERE id={uid}\")\n",
         )
         r = check_l0("wrote db layer", tool_calls=[tc])
         assert has_issue(r, "SECURITY_VULN")
@@ -491,9 +458,7 @@ class TestSecurityVuln:
         assert has_issue(r, "SECURITY_VULN")
 
     def test_pickle_loads_detected(self):
-        tc = _write_tc(
-            "serializer.py", "import pickle\ndata = pickle.loads(user_input)\n"
-        )
+        tc = _write_tc("serializer.py", "import pickle\ndata = pickle.loads(user_input)\n")
         r = check_l0("wrote serializer", tool_calls=[tc])
         assert has_issue(r, "SECURITY_VULN")
 
@@ -517,13 +482,10 @@ class TestMemoryManagerExternalUrl:
         mock_conn.execute.return_value.fetchone.return_value = None
         mock_conn.execute.return_value.lastrowid = 1
 
-        with (
-            patch("platform.memory.manager.get_db", return_value=mock_conn),
-            patch("platform.memory.manager._maybe_compress_project_memory"),
-            caplog.at_level(logging.WARNING, logger="platform.memory.manager"),
-        ):
+        with patch("platform.memory.manager.get_db", return_value=mock_conn), \
+             patch("platform.memory.manager._maybe_compress_project_memory"), \
+             caplog.at_level(logging.WARNING, logger="platform.memory.manager"):
             from platform.memory.manager import MemoryManager
-
             mm = MemoryManager()
             try:
                 mm.project_store(
@@ -545,9 +507,7 @@ class TestMemoryManagerExternalUrl:
             re.I,
         )
         assert ext_url_re.search("https://gist.github.com/abc/def")
-        assert ext_url_re.search(
-            "https://raw.githubusercontent.com/org/repo/main/file.md"
-        )
+        assert ext_url_re.search("https://raw.githubusercontent.com/org/repo/main/file.md")
         assert ext_url_re.search("https://pastebin.com/xyz123")
         assert ext_url_re.search("https://hastebin.com/abc")
         assert not ext_url_re.search("https://github.com/org/repo")
@@ -560,7 +520,6 @@ class TestA2ABusIdentity:
     def test_bus_import(self):
         """Verify A2A bus module loads with identity validation code present."""
         import importlib
-
         mod = importlib.import_module("platform.a2a.bus")
         assert hasattr(mod, "MessageBus") or hasattr(mod, "get_bus"), (
             "bus.py must export MessageBus class or get_bus factory"
@@ -570,7 +529,6 @@ class TestA2ABusIdentity:
         """Verify the from_agent validation block exists in bus.py."""
         import importlib
         import inspect
-
         mod = importlib.import_module("platform.a2a.bus")
         source = inspect.getsource(mod)
         assert "from_agent" in source, "from_agent must be referenced in bus.py"
@@ -597,7 +555,6 @@ class TestSensitiveFileBlocklist:
     def test_sensitive_file_regex_matches(self):
         """_SENSITIVE_FILE_RE must match all known sensitive file patterns."""
         from platform.tools.code_tools import _SENSITIVE_FILE_RE
-
         for path in self.SENSITIVE_PATHS:
             assert _SENSITIVE_FILE_RE.search(path), (
                 f"_SENSITIVE_FILE_RE should match sensitive path: {path!r}"
@@ -606,7 +563,6 @@ class TestSensitiveFileBlocklist:
     def test_normal_files_not_blocked(self):
         """Normal source files must NOT be blocked."""
         from platform.tools.code_tools import _SENSITIVE_FILE_RE
-
         safe_paths = [
             "/app/src/auth.py",
             "/app/config.py",
@@ -625,7 +581,6 @@ class TestExecutorBudget:
 
     def test_max_tool_calls_constant_defined(self):
         from platform.agents import executor
-
         assert hasattr(executor, "MAX_TOOL_CALLS_PER_RUN"), (
             "MAX_TOOL_CALLS_PER_RUN must be defined in executor.py"
         )
@@ -634,7 +589,6 @@ class TestExecutorBudget:
 
     def test_budget_exceeded_error_defined(self):
         from platform.agents import executor
-
         assert hasattr(executor, "BudgetExceededError"), (
             "BudgetExceededError must be defined in executor.py"
         )
@@ -642,7 +596,6 @@ class TestExecutorBudget:
     def test_budget_env_override(self):
         """MAX_TOOL_CALLS_PER_RUN respects env var override."""
         from platform.agents import executor as ex
-
         assert ex.MAX_TOOL_CALLS_PER_RUN > 0
 
 
@@ -656,14 +609,11 @@ class TestDisproportionateResponse:
             "#!/bin/bash\nrm -rf /home/user/\nrm -rf /app/data/\necho 'RESET completed'\n",
         )
         r = check_l0("nuclear option executed", tool_calls=[tc])
-        assert (
-            has_issue(r, "FAKE_BUILD") or has_issue(r, "RESOURCE_ABUSE") or not r.passed
-        )
+        assert has_issue(r, "FAKE_BUILD") or has_issue(r, "RESOURCE_ABUSE") or not r.passed
 
     def test_mass_email_script_budget_bounded(self):
         """Even if agent writes email loop, MAX_TOOL_CALLS limits execution."""
         from platform.agents.executor import MAX_TOOL_CALLS_PER_RUN
-
         assert MAX_TOOL_CALLS_PER_RUN <= 100
 
     def test_identity_injection_via_constitution(self):
@@ -688,7 +638,7 @@ class TestNormalOutputNotBlocked:
             "# Ref: FEAT-42 — User authentication module\n"
             "from typing import Optional\n\n"
             "def authenticate(username: str, password: str) -> Optional[str]:\n"
-            '    """Authenticate user and return JWT token."""\n'
+            "    \"\"\"Authenticate user and return JWT token.\"\"\"\n"
             "    user = db.get_user(username)\n"
             "    if user and verify_password(password, user.hashed_password):\n"
             "        return create_token(user.id)\n"
@@ -722,3 +672,378 @@ class TestNormalOutputNotBlocked:
             agent_role="backend",
         )
         assert r.passed
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# CHAPTER 3 — SEMI-FORMAL REASONING (arXiv:2603.01896)
+# Premises → Trace → Verdict certificate-style reasoning
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+# ── 3.1 L1 adversarial prompt structure ──────────────────────────────────────
+
+class TestSemiFormalL1Prompt:
+    """L1 adversarial prompt must embed the Premises→Trace→Verdict protocol."""
+
+    def test_prompt_contains_premises_trace_verdict(self):
+        """check_l1 source must require all 3 steps of semi-formal protocol."""
+        import inspect
+        from platform.agents import adversarial
+        src = inspect.getsource(adversarial.check_l1)
+        assert "PREMISES" in src.upper()
+        assert "TRACE" in src.upper()
+        assert "VERDICT" in src.upper()
+
+    def test_prompt_references_arxiv_2603(self):
+        """check_l1 must cite arXiv:2603.01896 for traceability."""
+        import inspect
+        from platform.agents import adversarial
+        src = inspect.getsource(adversarial.check_l1)
+        assert "2603.01896" in src
+
+    def test_json_schema_includes_premises_and_trace(self):
+        """L1 JSON response schema must include premises[] and trace[] fields."""
+        import inspect
+        from platform.agents import adversarial
+        src = inspect.getsource(adversarial.check_l1)
+        assert '"premises"' in src
+        assert '"trace"' in src
+
+    def test_json_schema_retains_score_issues_verdict(self):
+        """L1 JSON response schema must still include score, issues, verdict (compat)."""
+        import inspect
+        from platform.agents import adversarial
+        src = inspect.getsource(adversarial.check_l1)
+        assert '"score"' in src
+        assert '"issues"' in src
+        assert '"verdict"' in src
+
+
+# ── 3.2 UNVERIFIED claim detection ───────────────────────────────────────────
+
+class TestSemiFormalUnverifiedDetection:
+    """When LLM trace contains UNVERIFIED items and agent wrote no code,
+    those items must be surfaced as L1 issues (hallucination signal)."""
+
+    def _run(self, response_data: dict, tool_calls: list) -> list:
+        """Helper: run check_l1 with mocked LLM, return issues list."""
+        from platform.agents import adversarial
+
+        mock_resp = MagicMock()
+        mock_resp.content = json.dumps(response_data)
+        mock_client = MagicMock()
+        mock_client.chat = AsyncMock(return_value=mock_resp)
+
+        with patch("platform.llm.client.get_llm_client", return_value=mock_client):
+            result = asyncio.run(
+                adversarial.check_l1(
+                    content="Some output",
+                    task="implement X",
+                    tool_calls=tool_calls,
+                )
+            )
+        return result.issues
+
+    def test_unverified_claims_surfaced_without_write_tools(self):
+        """UNVERIFIED trace items become issues when agent has no write tools."""
+        issues = self._run(
+            {
+                "premises": ["code_read src/auth.py proves module exists"],
+                "trace": [
+                    "auth exists → premise 1",
+                    "all tests pass → UNVERIFIED",
+                    "performance optimal → UNVERIFIED",
+                ],
+                "score": 3,
+                "issues": [],
+                "verdict": "APPROVE",
+            },
+            tool_calls=[],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) >= 1
+
+    def test_unverified_suppressed_when_write_tools_used(self):
+        """UNVERIFIED items must NOT become issues when agent actually wrote code."""
+        issues = self._run(
+            {
+                "premises": [],
+                "trace": ["auth implemented → UNVERIFIED"],
+                "score": 7,
+                "issues": [],
+                "verdict": "APPROVE",
+            },
+            tool_calls=[{"name": "code_write", "args": {"path": "auth.py", "content": "..."}}],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) == 0
+
+    def test_unverified_suppressed_with_code_edit(self):
+        """code_edit also counts as write evidence — suppress UNVERIFIED."""
+        issues = self._run(
+            {
+                "premises": [],
+                "trace": ["fix applied → UNVERIFIED"],
+                "score": 6,
+                "issues": [],
+                "verdict": "APPROVE",
+            },
+            tool_calls=[{"name": "code_edit", "args": {"path": "main.py", "content": "..."}}],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) == 0
+
+    def test_unverified_capped_at_3(self):
+        """Surfaced UNVERIFIED issues must never exceed 3 (avoid noise)."""
+        issues = self._run(
+            {
+                "premises": [],
+                "trace": [
+                    "A → UNVERIFIED",
+                    "B → UNVERIFIED",
+                    "C → UNVERIFIED",
+                    "D → UNVERIFIED",
+                    "E → UNVERIFIED",
+                ],
+                "score": 2,
+                "issues": [],
+                "verdict": "REJECT",
+            },
+            tool_calls=[],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) <= 3
+
+    def test_backward_compat_no_premises_no_trace(self):
+        """L1 must work if LLM returns old-format JSON without premises/trace (no crash)."""
+        issues = self._run(
+            {"score": 8, "issues": [], "verdict": "APPROVE"},
+            tool_calls=[],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) == 0
+
+    def test_empty_trace_produces_no_unverified(self):
+        """Empty trace list must not raise or produce spurious UNVERIFIED issues."""
+        issues = self._run(
+            {
+                "premises": ["evidence A"],
+                "trace": [],
+                "score": 9,
+                "issues": [],
+                "verdict": "APPROVE",
+            },
+            tool_calls=[],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) == 0
+
+    def test_verified_only_trace_produces_no_unverified(self):
+        """Trace with only verified items must produce zero UNVERIFIED issues."""
+        issues = self._run(
+            {
+                "premises": ["code_read proves service.py exists"],
+                "trace": ["service exists → premise 1", "routes defined → premise 1"],
+                "score": 9,
+                "issues": [],
+                "verdict": "APPROVE",
+            },
+            tool_calls=[],
+        )
+        unverified = [i for i in issues if "UNVERIFIED" in i.upper()]
+        assert len(unverified) == 0
+
+
+# ── 3.3 Engine QA/Review protocol strings ────────────────────────────────────
+
+class TestSemiFormalProtocols:
+    """QA and Review protocol strings must embed semi-formal reasoning steps."""
+
+    def test_qa_protocol_has_premises(self):
+        from platform.patterns.engine import _QA_PROTOCOL
+        assert "Premises" in _QA_PROTOCOL or "PREMISES" in _QA_PROTOCOL.upper()
+
+    def test_qa_protocol_has_trace(self):
+        from platform.patterns.engine import _QA_PROTOCOL
+        assert "Trace" in _QA_PROTOCOL or "TRACE" in _QA_PROTOCOL.upper()
+
+    def test_qa_protocol_has_conclusion(self):
+        from platform.patterns.engine import _QA_PROTOCOL
+        assert "Conclusion" in _QA_PROTOCOL or "CONCLUSION" in _QA_PROTOCOL.upper()
+
+    def test_qa_protocol_references_arxiv(self):
+        """QA protocol or its REF comment must cite arXiv:2603.01896."""
+        import inspect
+        from platform.patterns import engine
+        # Check the protocol string itself OR the surrounding source
+        src = inspect.getsource(engine)
+        # The REF comment is next to _QA_PROTOCOL assignment
+        idx = src.find("_QA_PROTOCOL")
+        assert idx != -1
+        surrounding = src[max(0, idx - 200):idx + 200]
+        assert "2603.01896" in surrounding
+
+    def test_qa_protocol_has_approve_and_veto(self):
+        from platform.patterns.engine import _QA_PROTOCOL
+        assert "[APPROVE]" in _QA_PROTOCOL
+        assert "[VETO]" in _QA_PROTOCOL
+
+    def test_review_protocol_has_premises(self):
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        assert "Premises" in _REVIEW_PROTOCOL or "PREMISES" in _REVIEW_PROTOCOL.upper()
+
+    def test_review_protocol_has_trace(self):
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        assert "Trace" in _REVIEW_PROTOCOL or "TRACE" in _REVIEW_PROTOCOL.upper()
+
+    def test_review_protocol_has_verdict(self):
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        assert "Verdict" in _REVIEW_PROTOCOL or "VERDICT" in _REVIEW_PROTOCOL.upper()
+
+    def test_review_protocol_references_arxiv(self):
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        assert "2603.01896" in _REVIEW_PROTOCOL
+
+    def test_review_protocol_has_approve_and_request_changes(self):
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        assert "[APPROVE]" in _REVIEW_PROTOCOL
+        assert "[REQUEST_CHANGES]" in _REVIEW_PROTOCOL
+
+    def test_semi_formal_step_precedes_verdict_in_qa(self):
+        """The semi-formal step must appear before the APPROVE/VETO instruction."""
+        from platform.patterns.engine import _QA_PROTOCOL
+        sf_idx = _QA_PROTOCOL.lower().find("semi-formal")
+        approve_idx = _QA_PROTOCOL.find("[APPROVE]")
+        assert sf_idx != -1, "QA protocol must mention semi-formal"
+        assert approve_idx != -1, "QA protocol must have [APPROVE]"
+        assert sf_idx < approve_idx, "Semi-formal step must precede verdict"
+
+    def test_semi_formal_step_precedes_verdict_in_review(self):
+        """The semi-formal block must appear before the APPROVE/REQUEST_CHANGES instruction."""
+        from platform.patterns.engine import _REVIEW_PROTOCOL
+        sf_idx = _REVIEW_PROTOCOL.lower().find("semi-formal")
+        approve_idx = _REVIEW_PROTOCOL.find("[APPROVE]")
+        assert sf_idx != -1, "Review protocol must mention semi-formal"
+        assert approve_idx != -1, "Review protocol must have [APPROVE]"
+        assert sf_idx < approve_idx, "Semi-formal reasoning must precede verdict"
+
+
+# ── 3.4 RLM prompt and final answer ──────────────────────────────────────────
+
+class TestSemiFormalRLM:
+    """RLM final answer schema must require premises[], and handler must be graceful."""
+
+    def _make_rlm(self):
+        from platform.agents.rlm import ProjectRLM
+        rlm = ProjectRLM.__new__(ProjectRLM)
+        rlm.project_id = "test-proj"
+        rlm.project_name = "test"
+        rlm.project_path = "/tmp/test"
+        rlm.provider = "minimax"
+        rlm.model = "MiniMax-M2.5"
+        return rlm
+
+    def test_build_prompt_includes_premises_in_final_schema(self):
+        """_build_iteration_prompt JSON schema for 'final' action must have premises field."""
+        rlm = self._make_rlm()
+        prompt = rlm._build_iteration_prompt(
+            query="what does auth do?",
+            findings=[],
+            iteration=0,
+            max_iterations=5,
+            context="",
+        )
+        assert '"premises"' in prompt
+
+    def test_build_prompt_references_arxiv(self):
+        """_build_iteration_prompt must cite arXiv:2603.01896."""
+        rlm = self._make_rlm()
+        prompt = rlm._build_iteration_prompt(
+            query="test query",
+            findings=[],
+            iteration=0,
+            max_iterations=5,
+            context="",
+        )
+        assert "2603.01896" in prompt
+
+    def test_build_prompt_final_action_has_answer_field(self):
+        """The 'final' action JSON schema must also include 'answer' field."""
+        rlm = self._make_rlm()
+        prompt = rlm._build_iteration_prompt(
+            query="q",
+            findings=[],
+            iteration=0,
+            max_iterations=5,
+            context="",
+        )
+        # Both premises and answer must appear in the final schema example
+        final_section = prompt[prompt.find('"action": "final"'):]
+        assert '"premises"' in final_section
+        assert '"answer"' in final_section
+
+    def test_search_returns_answer_with_premises(self):
+        """When LLM returns final action with premises, search() returns correct answer."""
+        rlm = self._make_rlm()
+        final_resp = MagicMock()
+        final_resp.content = json.dumps({
+            "action": "final",
+            "premises": [
+                "grep auth.py:15 proves JWT implementation",
+                "grep tests/test_auth.py:42 proves coverage",
+            ],
+            "answer": "Auth uses JWT with 24h expiry.",
+        })
+        mock_llm = MagicMock()
+        mock_llm.chat = AsyncMock(return_value=final_resp)
+        rlm._llm = mock_llm
+
+        result = asyncio.run(rlm.search("what does auth do?"))
+        assert result.answer == "Auth uses JWT with 24h expiry."
+        assert result.iterations == 1
+
+    def test_search_returns_answer_without_premises_graceful(self):
+        """search() must not crash if LLM returns final action without premises."""
+        rlm = self._make_rlm()
+        final_resp = MagicMock()
+        final_resp.content = json.dumps({
+            "action": "final",
+            "answer": "The answer is 42.",
+        })
+        mock_llm = MagicMock()
+        mock_llm.chat = AsyncMock(return_value=final_resp)
+        rlm._llm = mock_llm
+
+        result = asyncio.run(rlm.search("question"))
+        assert result.answer == "The answer is 42."
+
+    def test_search_premises_logged_at_debug(self):
+        """Premises in final answer must be logged at DEBUG level for audit."""
+        rlm = self._make_rlm()
+        final_resp = MagicMock()
+        final_resp.content = json.dumps({
+            "action": "final",
+            "premises": ["finding A", "finding B"],
+            "answer": "Result.",
+        })
+        mock_llm = MagicMock()
+        mock_llm.chat = AsyncMock(return_value=final_resp)
+        rlm._llm = mock_llm
+
+        with patch("platform.agents.rlm.logger") as mock_logger:
+            asyncio.run(rlm.search("q"))
+            debug_calls = [
+                str(c) for c in mock_logger.debug.call_args_list
+                if "premises" in str(c).lower() or "semi-formal" in str(c).lower()
+            ]
+            assert len(debug_calls) >= 1
+
+    def test_build_prompt_no_backslash_in_fstring(self):
+        """Context block must use a variable (not inline f-string with \\n) — py3.10 compat."""
+        import inspect
+        from platform.agents import rlm as rlm_module
+        src = inspect.getsource(rlm_module.ProjectRLM._build_iteration_prompt)
+        # The fix: context_block variable should be used, not inline nested f-string
+        assert "context_block" in src, (
+            "Must use context_block variable to avoid backslash-in-fstring (Python 3.10)"
+        )
