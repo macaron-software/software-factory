@@ -486,7 +486,13 @@ def _classify_agent_role(agent) -> str:
         return "architecture"
     if any(
         k in combined
-        for k in ("reviewer", "code review", "code-reviewer", "code_reviewer")
+        for k in (
+            "reviewer",
+            "code review",
+            "code-reviewer",
+            "code_reviewer",
+            "adversarial",
+        )
     ):
         return "reviewer"
     if any(k in combined for k in ("ux", "ui", "design", "ergon")):
