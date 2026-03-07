@@ -81,6 +81,17 @@ _CODE_TAGS = {
     "devops",
 }
 
+# AC improvement-cycle agents — hardcoded routing (Azure only).
+# These have generic role names that don't match _REASONING/_CODE_ROLES above.
+_AC_AGENT_ROUTING: dict[str, tuple[str, str]] = {
+    "ac-architect":   ("azure-openai", "gpt-5.2"),
+    "ac-adversarial": ("azure-openai", "gpt-5.2"),
+    "ac-coach":       ("azure-openai", "gpt-5.2"),
+    "ac-codex":       ("azure-openai", "gpt-5.1-codex"),
+    "ac-qa-agent":    ("azure-openai", "gpt-5.1"),
+    "ac-cicd-agent":  ("azure-openai", "gpt-5.1"),
+}
+
 # Cache for routing config loaded from DB
 _routing_cache: dict | None = None
 _routing_cache_ts: float = 0.0
@@ -152,6 +163,10 @@ def _select_model_for_agent(
         # OVH demo or local dev — single model, no per-role dispatch
         model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
         return prov, model
+
+    # AC improvement-cycle agents — hardcoded overrides (before role/tag dispatch)
+    if agent.id in _AC_AGENT_ROUTING:
+        return _AC_AGENT_ROUTING[agent.id]
 
     # Azure prod — route by agent role/tags, overridable via Settings DB
     role = (agent.role or "").lower().replace("-", "_").replace(" ", "_")
