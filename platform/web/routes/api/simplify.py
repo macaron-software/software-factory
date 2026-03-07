@@ -73,7 +73,6 @@ async def _analyze_axis(diff: str, axis: str) -> list[dict]:
             messages=[LLMMessage(role="user", content=user_msg)],
             system_prompt=_SYSTEM,
             temperature=0.1,
-,
         )
         content = resp.content.strip()
         # Strip markdown fences if present

@@ -117,7 +117,7 @@ _PROVIDERS = {
     # Ref: https://github.com/sst/opencode — OPENCODE_BASE_URL + OPENCODE_API_KEY env vars.
     "opencode": {
         "name": "OpenCode (Go)",
-        "base_url": os.environ.get("OPENCODE_BASE_URL", "http://localhost:3000/v1"),
+        "base_url": os.environ.get("OPENCODE_BASE_URL", "https://opencode.ai/zen/go/v1"),
         "key_env": "OPENCODE_API_KEY",
         "models": [],  # fetched live from /v1/models; populated on first Settings load
         "default": os.environ.get("OPENCODE_DEFAULT_MODEL", ""),

@@ -62,7 +62,6 @@ Sois CONCRET, TECHNIQUE et ACTIONNABLE. Réponds UNIQUEMENT avec le JSON."""
             messages=[LLMMessage(role="user", content=prompt)],
             system_prompt="Coach Agile expert en rétrospectives SAFe. Analyse factuelle.",
             temperature=0.4,
-,
         )
         raw = resp.content.strip()
         if "```json" in raw:
@@ -1049,7 +1048,6 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
                 messages=[LLMMessage(role="user", content=archi_prompt)],
                 system_prompt="Architecte logiciel senior. Documentation technique concise et precise.",
                 temperature=0.3,
-,
             ),
             timeout=60,
         )
@@ -1104,7 +1102,6 @@ Reponds UNIQUEMENT avec le contenu Markdown du fichier."""
                 messages=[LLMMessage(role="user", content=readme_prompt)],
                 system_prompt="Technical writer. Documentation claire et actionnable.",
                 temperature=0.3,
-,
             ),
             timeout=60,
         )
@@ -2640,7 +2637,6 @@ async def _extract_features_from_phase(
                         ),
                     )
                 ],
-,
                 temperature=0.2,
             ),
             timeout=30,

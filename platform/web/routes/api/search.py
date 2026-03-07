@@ -296,7 +296,6 @@ Réponds UNIQUEMENT avec le JSON."""
             messages=[LLMMessage(role="user", content=retro_prompt)],
             system_prompt="Tu es un coach Agile expert en rétrospectives SAFe.",
             temperature=0.5,
-,
         )
         raw = resp.content.strip()
         if "```json" in raw:

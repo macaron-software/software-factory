@@ -139,7 +139,19 @@ def _builtin_providers() -> list[dict]:
     for pid, pcfg in _PROVIDERS.items():
         key_env = pcfg.get("key_env") or ""
         no_auth = pcfg.get("no_auth", False)
-        has_key = no_auth or bool(os.environ.get(key_env, "") if key_env else False)
+        api_key = os.environ.get(key_env, "") if key_env else ""
+        if not api_key and key_env:
+            # Also check ~/.config/factory/<name>.key (same logic as _get_api_key)
+            name = key_env.replace("_API_KEY", "").replace("_", "-").lower()
+            try:
+                api_key = (
+                    open(os.path.expanduser(f"~/.config/factory/{name}.key"))
+                    .read()
+                    .strip()
+                )
+            except OSError:
+                pass
+        has_key = no_auth or bool(api_key)
         result.append(
             {
                 "id": pid,
@@ -203,7 +215,8 @@ async def get_llm_routing():
             )
     routing = _load_routing()
     return JSONResponse(
-        {"ok": True, "providers": providers, "models": all_models, "routing": routing}
+        {"ok": True, "providers": providers, "models": all_models, "routing": routing},
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -224,6 +237,25 @@ async def save_llm_routing(payload: dict):
         except Exception:
             pass
         return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/llm/routing/reset")
+async def reset_llm_routing():
+    """Reset routing to current auto-detected defaults (primary provider)."""
+    try:
+        db = _get_db()
+        db.execute("DELETE FROM session_state WHERE key='llm_routing'")
+        db.commit()
+        db.close()
+        try:
+            from ....agents.executor import _invalidate_routing_cache
+
+            _invalidate_routing_cache()
+        except Exception:
+            pass
+        return JSONResponse({"ok": True, "routing": _DEFAULT_ROUTING})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
@@ -368,3 +400,118 @@ async def get_provider_models_live(provider_id: str):
         return JSONResponse({"ok": True, "provider_id": provider_id, "models": models})
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@router.post("/api/llm/local/ensure")
+async def ensure_local_server():
+    """Ensure the local LLM server (local-mlx) is running, starting it if needed.
+
+    Runs _ensure_mlx_server() in a thread (it blocks during startup wait).
+    Returns: {ok, status: 'running'|'started'|'failed'|'disabled', url, models}
+    """
+    import asyncio
+    import urllib.request
+
+    from ....llm.client import _env_flag
+
+    # Re-read from env in case it was changed at runtime
+    enabled = _env_flag("LOCAL_MLX_ENABLED")
+    if not enabled:
+        return JSONResponse(
+            {
+                "ok": True,
+                "status": "disabled",
+                "message": "LOCAL_MLX_ENABLED is not set",
+            }
+        )
+
+    mlx_url = os.environ.get("LOCAL_MLX_URL", "http://localhost:8080/v1")
+
+    def _check_up() -> bool:
+        try:
+            urllib.request.urlopen(f"{mlx_url}/models", timeout=5)
+            return True
+        except Exception:
+            return False
+
+    def _get_models() -> list:
+        import json as _json
+
+        try:
+            with urllib.request.urlopen(f"{mlx_url}/models", timeout=5) as r:
+                return [m["id"] for m in _json.loads(r.read()).get("data", [])]
+        except Exception:
+            return []
+
+    loop = asyncio.get_event_loop()
+
+    # Already up?
+    already_up = await loop.run_in_executor(None, _check_up)
+    if already_up:
+        models = await loop.run_in_executor(None, _get_models)
+        return JSONResponse(
+            {"ok": True, "status": "running", "url": mlx_url, "models": models}
+        )
+
+    # Start it
+    from ....llm.client import _ensure_mlx_server
+
+    await loop.run_in_executor(None, _ensure_mlx_server)
+
+    # Check again
+    now_up = await loop.run_in_executor(None, _check_up)
+    if now_up:
+        models = await loop.run_in_executor(None, _get_models)
+        return JSONResponse(
+            {"ok": True, "status": "started", "url": mlx_url, "models": models}
+        )
+
+    return JSONResponse(
+        {
+            "ok": False,
+            "status": "failed",
+            "url": mlx_url,
+            "message": f"Server did not respond on {mlx_url} after startup attempt",
+        },
+        status_code=503,
+    )
+
+
+@router.post("/api/llm/test")
+async def test_llm_model(payload: dict):
+    """Quick connectivity test for a provider/model pair.
+
+    Sends 'Reply: PONG' and checks the response contains 'PONG'.
+    Returns: {ok, provider, model, latency_ms, response}
+    """
+    import time as _time
+
+    provider = payload.get("provider", "")
+    model = payload.get("model", "")
+    if not provider:
+        return JSONResponse({"ok": False, "error": "provider required"}, status_code=400)
+
+    try:
+        from ....llm.client import LLMClient, LLMMessage
+
+        client = LLMClient()
+        t0 = _time.monotonic()
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content="Reply with exactly: PONG")],
+            provider=provider,
+            model=model or "",
+        )
+        latency_ms = int((_time.monotonic() - t0) * 1000)
+        content = (resp.content or "").strip()
+        ok = bool(content)
+        return JSONResponse({
+            "ok": ok,
+            "provider": provider,
+            "model": resp.model or model,
+            "latency_ms": latency_ms,
+            "response": content[:200],
+            "tokens_in": resp.tokens_in,
+            "tokens_out": resp.tokens_out,
+        })
+    except Exception as e:
+        return JSONResponse({"ok": False, "provider": provider, "model": model, "error": str(e)}, status_code=500)

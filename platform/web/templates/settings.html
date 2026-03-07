@@ -383,17 +383,17 @@
         <!-- Category filter tabs -->
         <div id="integ-cat-tabs" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.2rem">
             <button class="btn btn-sm integ-cat-btn active" data-cat="all" onclick="filterIntegCat('all',this)">All</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="devops" onclick="filterIntegCat('devops',this)">🎯 Dev/DevOps</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="communication" onclick="filterIntegCat('communication',this)">💬 Communication</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="monitoring" onclick="filterIntegCat('monitoring',this)">📈 Monitoring</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="security" onclick="filterIntegCat('security',this)">🛡️ Security</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="itsm" onclick="filterIntegCat('itsm',this)">🏢 ITSM/TMA</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="marketing" onclick="filterIntegCat('marketing',this)">📊 Marketing</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="infra" onclick="filterIntegCat('infra',this)">☁️ Cloud/Infra</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="testing" onclick="filterIntegCat('testing',this)">🧪 Testing</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">🎨 Design</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">📐 Architecture</button>
-            <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">🐙 GitHub OSS</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="devops" onclick="filterIntegCat('devops',this)">Dev/DevOps</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="communication" onclick="filterIntegCat('communication',this)">Communication</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="monitoring" onclick="filterIntegCat('monitoring',this)">Monitoring</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="security" onclick="filterIntegCat('security',this)">Security</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="itsm" onclick="filterIntegCat('itsm',this)">ITSM/TMA</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="marketing" onclick="filterIntegCat('marketing',this)">Marketing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="infra" onclick="filterIntegCat('infra',this)">Cloud/Infra</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="testing" onclick="filterIntegCat('testing',this)">Testing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">Design</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">Architecture</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">GitHub OSS</button>
             <button class="btn btn-sm integ-cat-btn" data-cat="platform" onclick="filterIntegCat('platform',this)">⚙️ Platform</button>
         </div>
 
@@ -405,9 +405,9 @@
                     <div class="integ-icon-emoji">
                         {% if integ.icon and integ.icon.startswith('http') %}
                         <img src="{{ integ.icon }}" style="width:28px;height:28px;object-fit:contain;border-radius:4px" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" alt="">
-                        <span style="display:none">🔌</span>
+                        
                         {% else %}
-                        {{ integ.icon or '🔌' }}
+                        {{ integ.icon or '' }}
                         {% endif %}
                     </div>
                     <div class="integ-info">
@@ -598,9 +598,9 @@
               body: JSON.stringify({channel, slack_url: document.getElementById('notif-slack-url')?.value, webhook_url: document.getElementById('notif-webhook-url')?.value})
             });
             const d = await r.json();
-            if(el) el.textContent = d.ok ? '✅ ' + (d.message||'Envoyé !') : '❌ ' + (d.error||'Erreur');
+            if(el) el.textContent = d.ok ? '' + (d.message||'Envoyé !') : 'Erreur: ' + (d.error||'Erreur');
           } catch(e) {
-            if(el) el.textContent = '❌ ' + e.message;
+            if(el) el.textContent = 'Erreur: ' + e.message;
           }
         }
 
@@ -627,9 +627,17 @@
                     <h3 style="margin:0">Routing</h3>
                     <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Assign LLM models per task category. Darwin Thompson Sampling will learn which model performs best for each team × category.</p>
                 </div>
-                <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
-                    <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
-                </button>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-ghost btn-sm" onclick="testLLMRouting()" id="routing-test-btn" title="Tester les modèles sélectionnés">
+                        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="resetLLMRouting()" id="routing-reset-btn" title="Reset to auto-detected defaults (primary provider)">
+                        <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
+                        <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
+                    </button>
+                </div>
             </div>
             <div style="overflow-x:auto">
             <table style="width:100%;border-collapse:collapse;font-size:0.83rem" id="routing-table">
@@ -656,7 +664,7 @@
                 <div class="llm-provider-card" id="imgprov-falai">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🌊 fal.ai — Flux</div>
+                            <div class="llm-prov-name">fal.ai — Flux</div>
                             <div class="llm-prov-models">flux-pro · flux-dev · flux-schnell</div>
                         </div>
                         <label class="integ-toggle">
@@ -676,7 +684,7 @@
                 <div class="llm-provider-card" id="imgprov-pixellab">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🎮 PixelLab</div>
+                            <div class="llm-prov-name">PixelLab</div>
                             <div class="llm-prov-models">sprites · tilesets · animations</div>
                         </div>
                         <label class="integ-toggle">
@@ -696,7 +704,7 @@
                 <div class="llm-provider-card" id="imgprov-gemini-image">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🍌 Gemini Image (Nano Banana)</div>
+                            <div class="llm-prov-name">Gemini Image (Nano Banana)</div>
                             <div class="llm-prov-models">gemini-2.5-flash · imagen-3</div>
                         </div>
                         <label class="integ-toggle">
@@ -716,7 +724,7 @@
                 <div class="llm-provider-card" id="imgprov-replicate">
                     <div class="llm-prov-header">
                         <div>
-                            <div class="llm-prov-name">🔁 Replicate</div>
+                            <div class="llm-prov-name">Replicate</div>
                             <div class="llm-prov-models">flux · sdxl · custom LoRA</div>
                         </div>
                         <label class="integ-toggle">
@@ -957,7 +965,11 @@ function showSettingsTab(id) {
     document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-'+id).classList.add('active');
-    event.target.closest('.settings-tab').classList.add('active');
+    try { event.target.closest('.settings-tab').classList.add('active'); } catch(_) {
+        document.querySelectorAll('.settings-tab').forEach(function(t){
+            if ((t.getAttribute('onclick')||'').includes("'"+id+"'")) t.classList.add('active');
+        });
+    }
     try { localStorage.setItem('settings_tab', id); } catch(e){}
     if (id === 'llm') loadLLMTab();
     if (id === 'orchestrator') { refreshLoad(); loadQualitySettings(); }
@@ -1403,6 +1415,11 @@ function renderProviders(providers) {
                 title="Fetch models from ${p.name} API"
                 style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-secondary);opacity:.7;font-size:0.9rem;line-height:1"
                 >↻</button>` : '';
+        const ensureBtn = p.id === 'local-mlx' ? `
+            <button onclick="ensureLocalServer()" id="ensure-local-btn"
+                title="Start / restart local MLX server"
+                style="font-size:0.7rem;padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;margin-left:4px"
+                >▶ Start</button>` : '';
         return `
         <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}" id="prov-card-${p.id}">
             <div class="llm-prov-header">
@@ -1410,7 +1427,7 @@ function renderProviders(providers) {
                     <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
                     <div>
                         <div class="llm-prov-name">${p.name}</div>
-                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}</div>
+                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}${ensureBtn}</div>
                     </div>
                 </div>
                 <div style="display:flex;align-items:center;gap:0.7rem">
@@ -1478,6 +1495,37 @@ async function refreshProviderModels(providerId) {
     }
 }
 
+// Ensure local-mlx server is running — calls _ensure_mlx_server() on the platform.
+// Shows status inline in the button. Takes up to LLM_TIMEOUT_MLX_WAIT seconds.
+async function ensureLocalServer() {
+    const btn = document.getElementById('ensure-local-btn');
+    if (!btn) return;
+    btn.textContent = '⏳ Starting…';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/local/ensure', {method: 'POST'});
+        const d = await r.json();
+        if (d.status === 'running' || d.status === 'started') {
+            btn.textContent = '' + (d.status === 'running' ? 'Running' : 'Started');
+            btn.style.color = 'var(--green, #22c55e)';
+            // Refresh models list
+            refreshProviderModels('local-mlx');
+        } else if (d.status === 'disabled') {
+            btn.textContent = '—';
+        } else {
+            btn.textContent = 'Erreur: Failed';
+            btn.style.color = 'var(--red, #ef4444)';
+            btn.title = d.message || 'Server did not start';
+        }
+    } catch(e) {
+        btn.textContent = 'Erreur: Error';
+        console.error('ensureLocalServer', e);
+    } finally {
+        btn.disabled = false;
+        setTimeout(() => { if(btn){ btn.textContent='▶ Start'; btn.style.color=''; } }, 5000);
+    }
+}
+
 async function toggleProvider(event, providerId) {
     event.preventDefault();
     const card = document.getElementById('prov-card-' + providerId);
@@ -1499,15 +1547,26 @@ async function toggleProvider(event, providerId) {
         badge.textContent = enabled ? 'active' : 'disabled';
         badge.className = 'badge ' + (enabled ? 'badge-green' : 'badge-yellow');
         badge.style.fontSize = '0.68rem';
+        // Update _llmModels enabled flag for this provider and refresh routing selects
+        _llmModels.forEach(m => { if (m.provider === providerId) m.enabled = enabled; });
+        const currentRouting = {};
+        document.querySelectorAll('[data-routing-key]').forEach(sel => {
+            const [p, mo] = sel.value.split('::');
+            currentRouting[sel.dataset.routingKey] = {provider: p, model: mo};
+        });
+        renderRoutingTable(currentRouting);
     } catch(e) { console.error(e); }
 }
 
 function _modelSelect(key, currentVal) {
-    const opts = _llmModels.map(m => {
+    const opts = _llmModels.filter(m => m.enabled).map(m => {
         const val = m.provider + '::' + m.model;
         const cur = currentVal ? (currentVal.provider + '::' + currentVal.model) : '';
-        const disabled = !m.enabled ? ' style="color:var(--text-secondary)"' : '';
-        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${m.label}</option>`;
+        // Short label: "ProviderName / model-basename" (strip HuggingFace org prefix)
+        const modelShort = m.model.includes('/') ? m.model.split('/').pop() : m.model;
+        const provShort = m.label.split(' / ')[0];
+        const displayLabel = provShort + ' / ' + modelShort;
+        return `<option value="${val}" ${val===cur?'selected':''}>${displayLabel}</option>`;
     }).join('');
     return `<select class="routing-select" data-routing-key="${key}">${opts}</select>`;
 }
@@ -1548,6 +1607,64 @@ async function saveLLMRouting() {
     } catch(e) {
         alert(e.message); btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
     }
+}
+
+async function resetLLMRouting() {
+    if (!confirm('Réinitialiser le routing aux valeurs par défaut (provider primaire auto-détecté) ?')) return;
+    const btn = document.getElementById('routing-reset-btn');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/routing/reset', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) {
+            renderRoutingTable(j.routing || {});
+            btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-check"/></svg> Reset';
+            setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset'; }, 2000);
+        }
+    } catch(e) { console.error(e); btn.disabled=false; }
+}
+
+async function testLLMRouting() {
+    const btn = document.getElementById('routing-test-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Testing…';
+    // Collect unique provider::model combos from routing selects
+    const seen = new Set();
+    const pairs = [];
+    document.querySelectorAll('[data-routing-key]').forEach(sel => {
+        if (sel.value && !seen.has(sel.value)) { seen.add(sel.value); pairs.push(sel.value); }
+    });
+    if (!pairs.length) { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester'; return; }
+    // Remove old results
+    document.querySelectorAll('.llm-test-result').forEach(el => el.remove());
+    const results = await Promise.all(pairs.map(async pv => {
+        const [provider, model] = pv.split('::');
+        try {
+            const r = await fetch('/api/llm/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({provider, model})});
+            return await r.json();
+        } catch(e) { return {ok:false, provider, model, error: e.message}; }
+    }));
+    // Show results below table
+    const tbl = document.getElementById('routing-table');
+    const div = document.createElement('div');
+    div.className = 'llm-test-result';
+    div.style.cssText = 'margin-top:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;font-size:.78rem';
+    results.forEach(res => {
+        const modelShort = (res.model||'').includes('/') ? (res.model||'').split('/').pop() : (res.model||'');
+        const label = `${res.provider} / ${modelShort}`;
+        const badge = document.createElement('span');
+        badge.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .6rem;border-radius:6px;' +
+            (res.ok ? 'background:rgba(34,197,94,.15);color:#4ade80' : 'background:rgba(239,68,68,.15);color:#f87171');
+        badge.title = res.ok ? `"${res.response}" (${res.latency_ms}ms, in:${res.tokens_in} out:${res.tokens_out})` : (res.error||'error');
+        badge.innerHTML = (res.ok
+            ? `<svg class="icon icon-sm"><use href="#icon-check"/></svg>`
+            : `<svg class="icon icon-sm"><use href="#icon-x"/></svg>`) +
+            `${label}` + (res.ok ? ` <small style="opacity:.7">${res.latency_ms}ms</small>` : '');
+        div.appendChild(badge);
+    });
+    tbl.parentNode.insertBefore(div, tbl.nextSibling);
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester';
 }
 
 async function loadLLMABTests() {
