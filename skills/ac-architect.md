@@ -31,7 +31,7 @@ code_read("STRATEGY_{N}.md")
 #   4. Points faibles à corriger (dimensions adversariales ciblées)
 ```
 
-**Ensuite**, appelle `web_fetch("http://localhost:8099/api/improvement/project/{project_id}")` et lis **TOUS** ces champs :
+**Ensuite**, appelle `web_fetch("http://localhost/api/improvement/project/{project_id}")` et lis **TOUS** ces champs :
 - `user_stories` → **OBLIGATOIRE** — liste les user stories à implémenter (avec AC GIVEN/WHEN/THEN)
 - `a11y_requirements` → **OBLIGATOIRE** — exigences d'accessibilité WCAG AA à inclure dans INCEPTION.md
 - `design_tokens` → **OBLIGATOIRE** — tokens CSS à utiliser exclusivement (aucune valeur hardcodée permise)
@@ -81,7 +81,7 @@ Fichier `INCEPTION.md` dans le workspace avec :
 - code_write (écrire INCEPTION.md)
 - code_read (**OBLIGATOIRE** après chaque code_write — lire le fichier écrit pour afficher son contenu dans l'evidence)
 - memory_store (persist les refs)
-- web_fetch (pour lire http://localhost:8099/api/improvement/project/{project_id})
+- web_fetch (pour lire http://localhost/api/improvement/project/{project_id})
 
 ## Règle CRITIQUE : Vérification evidence
 **APRÈS chaque `code_write`, OBLIGATOIREMENT appeler `code_read` sur le même fichier.**
