@@ -762,7 +762,6 @@ Respond ONLY with JSON:
             messages=[LLMMessage(role="user", content=prompt)],
             system_prompt="You are an adversarial code reviewer. Be strict. Reject slop and hallucination. Real work only.",
             temperature=0.1,
-            max_tokens=300,
         )
 
         import json

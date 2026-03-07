@@ -180,7 +180,7 @@ async def list_retrospectives(scope: str = "", limit: int = 20):
         else:
             rows = db.execute(
                 "SELECT * FROM retrospectives ORDER BY created_at DESC LIMIT ?",
-                (limit,),
+                (limit),
             ).fetchall()
         return JSONResponse(
             [
@@ -224,11 +224,11 @@ async def generate_retrospective(request: Request):
         if scope == "ideation" and scope_id:
             msgs = db.execute(
                 "SELECT agent_name, role, content FROM ideation_messages WHERE session_id=? ORDER BY created_at",
-                (scope_id,),
+                (scope_id),
             ).fetchall()
             findings = db.execute(
                 "SELECT type, text FROM ideation_findings WHERE session_id=?",
-                (scope_id,),
+                (scope_id),
             ).fetchall()
             context_parts.append(f"Ideation session {scope_id}:")
             for m in msgs:
@@ -244,7 +244,7 @@ async def generate_retrospective(request: Request):
             tool_rows = db.execute(
                 "SELECT tool_name, success, result FROM tool_calls WHERE session_id IN "
                 "(SELECT id FROM sessions WHERE id LIKE ?) ORDER BY created_at DESC LIMIT 50",
-                (f"%{scope_id}%",),
+                (f"%{scope_id}%"),
             ).fetchall()
             for t in tool_rows:
                 status = "OK" if t["success"] else "FAIL"
@@ -296,7 +296,7 @@ Réponds UNIQUEMENT avec le JSON."""
             messages=[LLMMessage(role="user", content=retro_prompt)],
             system_prompt="Tu es un coach Agile expert en rétrospectives SAFe.",
             temperature=0.5,
-            max_tokens=2048,
+,
         )
         raw = resp.content.strip()
         if "```json" in raw:
@@ -442,7 +442,7 @@ async def epic_features(epic_id: str):
         CASE status WHEN 'in_progress' THEN 0 WHEN 'backlog' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
         priority ASC, name ASC
     """,
-        (epic_id,),
+        (epic_id),
     ).fetchall()
     return JSONResponse([dict(r) for r in rows])
 
@@ -758,7 +758,7 @@ async def export_features_csv(request: Request):
     try:
         if epic_id:
             rows = db.execute(
-                "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
+                "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id)
             ).fetchall()
         else:
             rows = db.execute(
@@ -836,7 +836,7 @@ async def github_webhook(request: Request):
     if event == "ping":
         return JSONResponse({"ok": True, "event": "ping"})
 
-    from ....db.connection import get_db
+    from ....db.migrations import get_db
 
     db = get_db()
     now = datetime.utcnow().isoformat()
@@ -858,6 +858,35 @@ async def github_webhook(request: Request):
                 ),
             )
             db.commit()
+
+            # Auto-deploy on push to main (if GITHUB_WEBHOOK_AUTODEPLOY=1)
+            if (
+                branch == "main"
+                and os.environ.get("GITHUB_WEBHOOK_AUTODEPLOY", "0") == "1"
+            ):
+                import subprocess
+
+                deploy_script = os.environ.get(
+                    "DEPLOY_SCRIPT", "/home/sfadmin/deploy.sh"
+                )
+                logger.info("webhook: auto-deploy triggered for %s@%s", repo, branch)
+                subprocess.Popen(
+                    [
+                        "bash",
+                        "-c",
+                        f"sleep 3 && bash {deploy_script} --webhook 2>&1 >> /home/sfadmin/logs/deploy.log",
+                    ],
+                    start_new_session=True,  # detach — survives platform restart
+                )
+                return JSONResponse(
+                    {
+                        "ok": True,
+                        "event": "push",
+                        "mission_id": mid,
+                        "deploy": "triggered",
+                    }
+                )
+
             return JSONResponse({"ok": True, "event": "push", "mission_id": mid})
 
         if event == "pull_request":
@@ -894,7 +923,7 @@ async def github_webhook(request: Request):
                 mid = str(uuid.uuid4())[:8]
                 mtype = (
                     "bug"
-                    if any(l.get("name") == "bug" for l in issue.get("labels", []))
+                    if any(lbl.get("name") == "bug" for lbl in issue.get("labels", []))
                     else "feature"
                 )
                 db.execute(

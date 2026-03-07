@@ -1135,7 +1135,6 @@ class EpicOrchestrator:
                             retro_resp = await asyncio.wait_for(
                                 llm.chat(
                                     [LLMMessage(role="user", content=retro_prompt)],
-                                    max_tokens=300,
                                     temperature=0.4,
                                 ),
                                 timeout=30,
@@ -1512,7 +1511,6 @@ class EpicOrchestrator:
                                         content=f"Summarize this team discussion in 2-3 sentences. Focus on decisions made, key proposals, and conclusions. Be factual and specific. Answer in the same language as the discussion.\n\n{transcript[:4000]}",
                                     )
                                 ],
-                                max_tokens=200,
                                 temperature=0.3,
                             ),
                             timeout=45,
@@ -1916,7 +1914,6 @@ class EpicOrchestrator:
                                                 content=f"Résume cette discussion d'équipe en 2-3 phrases. Focus sur les décisions et conclusions. Même langue que la discussion.\n\n{transcript[:3000]}",
                                             )
                                         ],
-                                        max_tokens=200,
                                         temperature=0.3,
                                     ),
                                     timeout=45,

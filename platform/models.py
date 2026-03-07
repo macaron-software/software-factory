@@ -135,7 +135,7 @@ class AgentLLMConfig(BaseModel):
 
     model: str = "gpt-5.1"
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_tokens: int = 0
     fallback_model: Optional[str] = None
 
 

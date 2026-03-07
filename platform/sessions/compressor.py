@@ -97,7 +97,6 @@ async def _summarize_messages(messages: list[dict], project_name: str) -> Option
             provider="minimax",
             model="MiniMax-M2.5",
             temperature=0.2,
-            max_tokens=800,
         )
         return resp.content.strip() if resp.content else None
 

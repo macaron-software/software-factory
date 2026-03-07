@@ -133,7 +133,6 @@ class IntentRouter:
                 prompt=prompt,
                 model="gpt-5.1",
                 temperature=0.1,
-                max_tokens=50,
             )
 
             intent_name = response.strip().lower().replace(" ", "_")

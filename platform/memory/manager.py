@@ -99,7 +99,6 @@ def _maybe_compress_project_memory(project_id: str) -> None:
                             "(max 500 chars), conserve les faits clés:\n\n" + combined_text
                         ))
                     ],
-                    max_tokens=200,
                 )
                 summary = resp.content.strip() if resp and resp.content else combined_text[:500]
             except Exception:

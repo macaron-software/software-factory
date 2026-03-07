@@ -303,7 +303,6 @@ Rules:
         resp = await client.chat(
             messages=[LLMMessage(role="user", content=judge_prompt)],
             temperature=0.1,
-            max_tokens=1024,
         )
         raw = resp.content.strip()
         # Strip markdown fences if present
@@ -405,7 +404,6 @@ async def run_skill_eval(
                     messages=[LLMMessage(role="user", content=prompt)],
                     system_prompt=system,
                     temperature=0.3,
-                    max_tokens=2048,
                 )
                 latency_ms = (time.time() - t_start) * 1000
                 output = resp.content

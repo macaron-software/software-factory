@@ -1211,7 +1211,6 @@ class ProjectStore:
                 provider="azure-openai",
                 model="gpt-5-mini",
                 temperature=0.5,
-                max_tokens=8192,
                 icon="user",
                 color=_project_color(info.id),
                 avatar=pm_avatar,

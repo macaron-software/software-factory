@@ -203,7 +203,6 @@ class TeamGenerator:
             system_prompt=self._system_prompt,
             provider="azure",
             temperature=0.3,
-            max_tokens=4096,
         )
 
         raw = resp.content.strip()

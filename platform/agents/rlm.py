@@ -118,7 +118,6 @@ class ProjectRLM:
                 provider=self.provider or None,
                 model=self.model or None,
                 temperature=0.3,
-                max_tokens=1000,
                 system_prompt=f"You are the RLM for project '{self.project_name}'. Respond with ONLY valid JSON.",
             )
 

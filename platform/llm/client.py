@@ -136,7 +136,9 @@ _is_azure = bool(os.environ.get("AZURE_DEPLOY", ""))
 _local_mlx_enabled = bool(os.environ.get("LOCAL_MLX_ENABLED", ""))
 _ollama_enabled = bool(os.environ.get("OLLAMA_ENABLED", ""))
 _opencode_enabled = bool(
-    os.environ.get("OPENCODE_API_KEY", "") or os.environ.get("OPENCODE_ENABLED", "")
+    os.environ.get("OPENCODE_API_KEY", "")
+    or os.environ.get("OPENCODE_ENABLED", "")
+    or os.path.isfile(os.path.expanduser("~/.config/factory/opencode.key"))
 )
 _FALLBACK_CHAIN = [_primary] + [
     p
@@ -361,7 +363,7 @@ class LLMClient:
         provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 0,
         system_prompt: str = "",
         tools: list[dict] | None = None,
     ) -> LLMResponse:
@@ -688,16 +690,10 @@ class LLMClient:
         )
         if not _reasoning_model:
             body["temperature"] = temperature
-        # MiniMax uses <think> blocks — boost token limit
-        # GPT-5.x are reasoning models — need extra tokens
-        effective_max = max_tokens
-        if provider == "minimax":
-            effective_max = max(max_tokens, 16000)
-        elif _reasoning_model:
-            effective_max = max(max_tokens, 8000)
-        # Some models (gpt-5.2) use max_completion_tokens instead of max_tokens
-        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
-        body[mt_param] = effective_max
+        # Only set max_tokens if explicitly requested (0 = unlimited, let provider decide)
+        if max_tokens:
+            mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
+            body[mt_param] = max_tokens
 
         if tools:
             body["tools"] = tools
@@ -735,9 +731,9 @@ class LLMClient:
         choice = choices[0] if choices else {}
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
-        # Ollama/Qwen3: thinking models put response in reasoning field when content is empty
-        if not content and msg.get("reasoning"):
-            content = msg["reasoning"].strip()
+        # Ollama/Qwen3/GLM-5: thinking models put response in reasoning field when content is empty
+        if not content and (msg.get("reasoning") or msg.get("reasoning_content")):
+            content = (msg.get("reasoning") or msg.get("reasoning_content", "")).strip()
         # Strip <think> blocks from MiniMax / Qwen3
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
@@ -790,7 +786,7 @@ class LLMClient:
         provider: str = _primary,
         model: str = "",
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 0,
         system_prompt: str = "",
     ) -> AsyncIterator[LLMStreamChunk]:
         """Stream chat completion response with provider fallback."""
@@ -1026,26 +1022,11 @@ class LLMClient:
             else:
                 msgs.insert(0, {"role": "system", "content": sys_content})
 
-        effective_max = max_tokens
-        _reasoning_model_s = (
-            model.startswith("gpt-5-mini")
-            or model.startswith("gpt-5.1-codex")
-            or model.startswith("gpt-5.2-codex")
-            or model.startswith("gpt-5.2")
-            or model.startswith("gpt-5")
-        )
-        if provider == "minimax":
-            effective_max = max(max_tokens, 16000)
-        elif _reasoning_model_s:
-            effective_max = max(max_tokens, 8000)
-
-        mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
-        body = {
-            "model": model,
-            "messages": msgs,
-            mt_param: effective_max,
-            "stream": True,
-        }
+        body: dict = {"model": model, "messages": msgs, "stream": True}
+        # Only set max_tokens if explicitly requested (0 = unlimited, let provider decide)
+        if max_tokens:
+            mt_param = pcfg.get("max_tokens_param", {}).get(model, "max_tokens")
+            body[mt_param] = max_tokens
         # Reasoning models don't support temperature param
         if not _reasoning_model_s:
             body["temperature"] = temperature
