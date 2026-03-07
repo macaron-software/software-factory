@@ -848,7 +848,9 @@ class LLMClient:
         if tools:
             body["tools"] = tools
             if provider == "minimax":
-                # MiniMax M2.5 ignores "auto"; force "required" or a specific tool when available
+                # MiniMax M2.5 only supports single-tool forced mode or "auto".
+                # "required" is silently ignored. Executor narrows to 1 tool on nudge rounds,
+                # triggering forced-by-name mode which MiniMax respects.
                 if len(tools) == 1:
                     tool_name = tools[0].get("function", {}).get("name", "")
                     body["tool_choice"] = {
@@ -856,7 +858,7 @@ class LLMClient:
                         "function": {"name": tool_name},
                     }
                 else:
-                    body["tool_choice"] = "required"
+                    body["tool_choice"] = "auto"
             else:
                 body["tool_choice"] = "auto"
 

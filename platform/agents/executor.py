@@ -461,6 +461,30 @@ async def _extract_session_memory(
         logger.debug("Memory extraction failed (non-critical): %s", e)
 
 
+def _priority_tool_list(tools: list) -> list:
+    """Return single-item list with most important tool for forced calling.
+
+    Used on nudge rounds: shrinking to 1 tool triggers MiniMax's single-tool
+    forced mode (tool_choice by name) which is the only mode MiniMax respects.
+    Priority order matches AC agent roles (architect/codex → code_write,
+    qa-agent → docker_deploy, cicd → git_commit).
+    """
+    if not tools:
+        return tools
+    priority_names = (
+        "code_write",
+        "docker_deploy",
+        "git_commit",
+        "git_status",
+        "list_files",
+    )
+    for name in priority_names:
+        for t in tools:
+            if t.get("function", {}).get("name") == name:
+                return [t]
+    return [tools[0]]
+
+
 class AgentExecutor:
     """Executes agent logic: prompt → LLM → tool loop → response."""
 
@@ -608,6 +632,7 @@ class AgentExecutor:
 
             # Tool-calling loop
             deep_search_used = False
+            _active_tools = tools  # may be narrowed to 1 tool on nudge rounds
             for round_num in range(MAX_TOOL_ROUNDS):
                 llm_resp = await self._llm.chat(
                     messages=messages,
@@ -616,7 +641,7 @@ class AgentExecutor:
                     temperature=agent.temperature,
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
-                    tools=tools,
+                    tools=_active_tools,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
@@ -706,8 +731,13 @@ class AgentExecutor:
                                 ),
                             )
                         )
+                        # Narrow to priority tool so MiniMax uses single-tool forced mode
+                        _active_tools = _priority_tool_list(tools)
                         continue  # retry with nudge
                     break
+
+                # Tool was called → restore full tools for next round
+                _active_tools = tools
 
                 # Process tool calls
                 # Add assistant message with tool_calls to conversation
@@ -1178,6 +1208,7 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
+            _active_tools_2 = tools  # may be narrowed to 1 tool on nudge rounds
             for round_num in range(MAX_TOOL_ROUNDS):
                 is_last_possible = (round_num >= MAX_TOOL_ROUNDS - 1) or tools is None
 
@@ -1223,7 +1254,7 @@ class AgentExecutor:
                     temperature=agent.temperature,
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
-                    tools=tools,
+                    tools=_active_tools_2,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
@@ -1292,6 +1323,8 @@ class AgentExecutor:
                                 ),
                             )
                         )
+                        # Narrow to priority tool so MiniMax uses single-tool forced mode
+                        _active_tools_2 = _priority_tool_list(tools)
                         continue  # retry with nudge
 
                     # If work was done (files written) but output is too short,
@@ -1361,6 +1394,8 @@ class AgentExecutor:
                     break
 
                 # Process tool calls (same as run())
+                # Tool was called → restore full tools for next round
+                _active_tools_2 = tools
                 tc_msg_data = [
                     {
                         "id": tc.id,
