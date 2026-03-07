@@ -316,6 +316,133 @@ ROLE_TOOL_MAP["cto"] = delegation tools only (NO developer tools)
   POST-RESTART: must re-run /tmp/fix_agent5.sql (tools_json+system_prompt update)
 ```
 
+---
+
+## PATTERNS CATALOGUE — platform/patterns/impls/ + cross-cutting
+
+### 1. ORCHESTRATION PATTERNS (engine.py + impls/)
+```
+Pattern           File                  Mecanique
+solo              solo.py               1 agent, direct — entry point for all chat
+sequential        sequential.py         A→B→C, context rot mitigation (compress at 70%)
+parallel          parallel.py           dispatcher → N workers asyncio.gather → aggregator
+hierarchical      hierarchical.py       manager decomposes [SUBTASK N] → workers → QA loop → manager re-integrates
+loop              loop.py               writer ↔ reviewer, veto edge triggers retry, max_iterations (default 5)
+network/debate    network.py            N debaters in rounds → judge decides, max_rounds (default 5)
+router            router.py             router reads input → picks 1 specialist from N candidates
+aggregator        aggregator.py         N workers start independently (NO dispatcher) → 1 aggregator consolidates
+wave              wave.py               dependency graph → waves of parallel nodes, sequential across waves
+fractal_worktree  fractal_worktree.py   LLM classify gate (atomic/composite) → recurse, git worktree per leaf
+                                        Source: TinyAGI/fractals (MIT)
+fractal_qa        fractal_qa.py         recursive → atomic BDD/Gherkin scenarios (acceptance criteria)
+fractal_stories   fractal_stories.py    LLM-driven story decomposition for product planning
+fractal_tests     fractal_tests.py      AC → test cases (fractal variant)
+backprop_merge    backprop_merge.py     post-fractal: merge agent runs bottom-up after leaf completion
+                                        Source: TinyAGI/fractals roadmap "merge agent" concept
+human_in_the_loop human_in_the_loop.py checkpoints raise WorkflowPaused → resume via /api/sessions/{id}/resume
+adversarial-pair  (loop type)           writer + code-critic, veto→retry, swiss cheese L1
+adversarial-cascade (sequential type)  4 layers: code → code-critic → security-critic → arch-critic
+
+NodeStatus: PENDING | RUNNING | COMPLETED | VETOED | FAILED  (no DONE)
+Protocols: _DECOMPOSE_PROTOCOL, _EXEC_PROTOCOL, _QA_PROTOCOL, _REVIEW_PROTOCOL, _CICD_PROTOCOL
+```
+
+### 2. LEARNING PATTERNS (platform/hooks/ + platform/agents/)
+```
+InstinctObserver  hooks/instinct.py     SESSION_END → analyze tool call bigrams/dominant/rw-pairs
+                                        → upsert instincts(trigger, action, confidence 0.3-0.9)
+                                        → promote project→global when seen 2+ projects
+                                        Source: ECC continuous-learning-v2
+                                        github.com/affaan-m/everything-claude-code
+
+ConsolidateAgent  hooks/consolidate.py  timer 30min → load all instincts → deterministic convergence
+                                        (same trigger, 2+ agents = convergence) + LLM cross-reference
+                                        → instinct_insights (type: connection|insight|convergence)
+                                        Source: GoogleCloudPlatform/generative-ai always-on-memory-agent
+
+EvolutionScheduler agents/evolution.py  nightly 02:00 UTC → GA on agent_scores + mission outcomes
+                                        → evolves workflow genomes → top-3 proposals → human review
+                                        Leader election via Redis SET NX to avoid duplicate runs
+
+RLPolicy          agents/rl_policy.py   Q-learning offline batch on rl_experience table
+                                        called at phase start → recommend keep|switch_parallel|...
+                                        confidence 0.0-1.0, q_value
+
+evolve_instincts  hooks/instinct.py     cluster high-conf instincts (≥0.6) by domain
+                                        → skill YAML written to platform/skills/definitions/
+                                        Source: ECC /evolve command
+```
+
+### 3. QUALITY / SAFETY PATTERNS (platform/agents/)
+```
+AdversarialGuard  agents/adversarial.py  2-layer Swiss Cheese:
+                                         L0: deterministic regex (0ms) — SLOP/MOCK/FAKE_BUILD/HALLUCINATION/LIE
+                                         L1: semantic LLM check (different model than producer, ~5s)
+                                         Scores: <5=pass 5-6=soft-pass ≥7=reject
+                                         force-reject: HALLUCINATION/SLOP/STACK_MISMATCH/FAKE_BUILD
+
+Guardrails        agents/guardrails.py   critical action interception before tool exec:
+                                         DESTRUCTIVE_FS/GIT/INFRA → block (if settings enabled)
+                                         SENSITIVE_DATA → warn only
+                                         logs to admin_audit_log
+
+HookSystem        hooks/__init__.py      6 builtin hooks wired into executor._execute_tool():
+                                         pre_compact — save key decisions before context shrink (ECC)
+                                         session_start — fire at agent session start
+                                         session_end — save digest + trigger instinct_observer (ECC)
+                                         quality_gate — async lint after code_write/code_edit (ECC)
+                                         cost_tracker — emit cost telemetry event
+                                         instinct_observer — pattern extraction (ECC CL-v2 core)
+                                         RBAC: blocking PRE_TOOL → security/architecture scope only
+
+SkillStocktake    web/routes/api/instincts.py  GET /api/skills/stocktake
+                                         audit all skill YAMLs: actionability/scope/uniqueness
+                                         verdicts: Keep|Improve|Update|Retire|Merge
+                                         Source: ECC skill-stocktake SKILL.md
+```
+
+### 4. MEMORY PATTERNS (platform/memory/)
+```
+MemoryManager     memory/manager.py      project (per-project FTS5) + global (shared FTS5) + vector
+                                         short-term: per-agent sliding window 50 msgs (agents/memory.py)
+
+VectorMemory      memory/vectors.py      embeddings via OpenAI-compat endpoint + cosine sim Python/numpy
+                                         fallback: FTS5 keyword search
+
+MemoryCompactor   memory/compactor.py    nightly 03:00 UTC (after GA at 02:00):
+                                         prune stale (>7d pattern, >60d low-conf project)
+                                         compress oversized values, re-score global, deduplicate
+
+InboxWatcher      memory/inbox.py        poll ./inbox/ every 10s (INBOX_POLL_INTERVAL)
+                                         LLM extracts {summary, entities, topics, importance}
+                                         → memory_global(category='inbox'), processed/ after ingest
+                                         POST /api/memory/ingest for direct HTTP ingestion
+                                         Source: GoogleCloudPlatform/generative-ai always-on-memory-agent
+
+QueryAgent        web/routes/api/memory.py  GET /api/memory/query?q=
+                                         LLM reads memory_global + instincts + instinct_insights
+                                         → synthesized answer with [MEM-N]/[INST-N]/[INSIGHT-N] citations
+                                         Source: GoogleCloudPlatform/generative-ai always-on-memory-agent
+```
+
+### 5. OPS PATTERNS (platform/ops/)
+```
+AutoHeal          ops/auto_heal.py       scan platform_incidents every 60s → group by error_type
+                                         → create epic → launch TMA workflow → close on success
+
+ChaosEndurance    ops/chaos_endurance.py random chaos scenario every 2-6h
+                                         measure MTTR → log chaos_runs → platform resilience signal
+
+EnduranceWatchdog ops/endurance_watchdog.py every 60s:
+                                         phase stalls >15min → auto-retry
+                                         zombie missions (running but no asyncio task)
+                                         disk >90% → cleanup, LLM health, daily report
+
+A2A Bus           a2a/bus.py             pub/sub per-agent queues + DB persistence
+                                         Redis pub/sub optional (REDIS_URL) → cross-process SSE
+                                         PG NOTIFY/LISTEN for cross-node SSE fan-out (no Redis needed)
+```
+
 ## KNOWN ISSUES / GOTCHAS
 - `NodeStatus`: PENDING/RUNNING/COMPLETED/VETOED/FAILED — **NO `DONE`**
 - HTTP 400 tool message ordering `role 'tool' must follow 'tool_calls'` — non-fatal
