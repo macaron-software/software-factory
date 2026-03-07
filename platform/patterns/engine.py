@@ -143,19 +143,18 @@ RULES:
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
 
 WORKFLOW:
-1. EXPLORE FIRST: list_files + code_read existing files → understand what exists already
-2. deep_search(query="architecture, patterns, existing code") → discover project structure
-3. memory_search(query="conventions, decisions, design-system") → learn past decisions + design tokens
-4. THEN code_write per file → REAL build → git_commit
+1. EXPLORE FIRST: list_files(path=WORKSPACE) → code_read existing files → understand what exists
+2. READ SPECS: code_read(path=WORKSPACE+"/INCEPTION.md") → follow the stack defined there EXACTLY
+3. THEN code_write per file using WORKSPACE-prefixed absolute paths → docker_deploy to verify build
 
-TOOL: code_write(path="src/module.ts", content="full source code here")
+TOOL: code_write(path=WORKSPACE+"/src/main.py", content="full source code here — 30+ lines")
+      write_file(path=WORKSPACE+"/src/main.py", content="...") — also accepted
 
 RULES:
-- ALWAYS read existing code BEFORE writing. Do NOT recreate files that exist.
+- WORKSPACE is the absolute path provided in "## Workspace" below. ALL paths MUST start with it.
 - code_write EACH file. 30+ lines per file. No stubs. No placeholders. No fake scripts.
-- Use paths matching the project stack (src/ for web, app/ for mobile). Auto-resolved.
-- FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
-- Do NOT describe changes. DO them via code_write.
+- FOLLOW THE STACK IN INCEPTION.md. Do NOT switch language (Python stays Python, TS stays TS).
+- Do NOT describe changes. DO them via code_write / write_file.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
 
 UI/UX CONSTRAINTS (MANDATORY for frontend code):
@@ -171,31 +170,24 @@ UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - Loading/error/empty states for EVERY data-dependent component
 
 DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):
-- Go: code_write go.mod with module name + deps, then build(command="cd {project} && go mod tidy")
+- Go: code_write go.mod with module name + deps, then bash(command="cd WORKSPACE && go mod tidy")
 - Python: code_write requirements.txt with ALL imports (fastapi, uvicorn, pydantic, etc.)
-- Node.js/TS: code_write package.json with scripts + deps, then build(command="npm install")
+- Node.js/TS: code_write package.json with scripts + deps, then bash(command="cd WORKSPACE && npm install")
 - Rust: code_write Cargo.toml with [dependencies] section
 - Docker: code_write Dockerfile with correct base image + COPY + RUN install
 - NEVER leave deps empty. List EVERY import your code uses. Missing deps = build failure.
 
 BUILD VERIFICATION (MANDATORY — run AFTER writing code):
-- Web/Node.js: build(command="npm install && npm run build")
-- Python: build(command="python3 -m py_compile file.py")
-- Go: build(command="go vet ./...")
-- Rust: build(command="cargo check")
-- Android/Kotlin: android_build() — compiles via Gradle in real SDK container
-- Android tests: android_test() — runs real unit tests
-- Swift/iOS: build(command="swift build") — only for iOS/macOS projects
-- Docker: build(command="docker build -t test .")
-- If build fails, FIX the code and retry. Do NOT commit broken code.
-- Do NOT use generic build() for Android — use android_build() instead.
+- Web/Node.js: bash(command="cd WORKSPACE && npm install && npm run build")
+- Python: bash(command="cd WORKSPACE && python3 -m py_compile app/main.py")
+- Docker: docker_deploy() — use this if the project has a Dockerfile
+- If build fails, FIX the code and retry. Do NOT leave broken code.
 
-COMPLETION CHECKLIST (before git_commit):
-1. All source files written via code_write
-2. Dependency manifest exists and is complete (requirements.txt / package.json / go.mod / Cargo.toml)
-3. Dockerfile exists (if project uses Docker)
-4. Build command ran successfully
-5. git_commit with meaningful message"""
+COMPLETION CHECKLIST:
+1. All source files written via code_write (WORKSPACE-prefixed absolute paths)
+2. Dependency manifest complete (requirements.txt / package.json / go.mod / Cargo.toml)
+3. Dockerfile exists and docker_deploy() succeeds
+4. No stubs, no placeholders, no TODO left in code"""
 
 # Validation protocol — telegraphic
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
@@ -860,6 +852,48 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # Execute with streaming SSE
     executor = get_executor()
     result = None
+
+    # Inject WORKSPACE path explicitly for dev/codex agents so they know where to write
+    if ctx.project_path:
+        _ws_path = ctx.project_path
+        _role_l = (agent.role or "").lower()
+        _is_dev = any(
+            kw in _role_l
+            for kw in (
+                "dev",
+                "coder",
+                "fullstack",
+                "backend",
+                "frontend",
+                "tdd",
+                "implementer",
+                "worker",
+            )
+        )
+        if _is_dev:
+            import os as _os
+
+            try:
+                _files = []
+                for _root, _dirs, _fnames in _os.walk(_ws_path):
+                    _dirs[:] = [d for d in sorted(_dirs) if not d.startswith(".")]
+                    _depth = _root.replace(_ws_path, "").count(_os.sep)
+                    if _depth > 2:
+                        _dirs.clear()
+                        continue
+                    for _f in sorted(_fnames):
+                        _rel = _os.path.join(_root, _f).replace(_ws_path + "/", "")
+                        _files.append(_rel)
+                _listing = "\n".join(_files[:40]) or "(empty workspace)"
+            except Exception:
+                _listing = "(could not list files)"
+            full_task += (
+                f"\n\n## Workspace\n"
+                f"WORKSPACE={_ws_path}\n"
+                f"All code_write / write_file paths MUST start with: {_ws_path}/\n"
+                f'Example: code_write(path="{_ws_path}/src/main.py", content="...")\n\n'
+                f"Current files:\n{_listing}"
+            )
 
     await _sse(
         run,
