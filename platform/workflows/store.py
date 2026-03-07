@@ -520,6 +520,17 @@ async def run_workflow(
         project_id=project_id,
     )
 
+    # Resolve project_path from project store (needed by file tools for workspace aliasing)
+    _project_path = ""
+    if project_id:
+        try:
+            from ..projects.manager import get_project_store as _gps
+            _proj = _gps().get(project_id)
+            if _proj and _proj.path:
+                _project_path = _proj.path
+        except Exception:
+            pass
+
     store = get_session_store()
     pattern_store = get_pattern_store()
 
@@ -658,15 +669,8 @@ async def run_workflow(
 
         try:
             result = await asyncio.wait_for(
-                run_pattern(pattern, session_id, phase_task, project_id, lineage=_lineage),
+                run_pattern(pattern, session_id, phase_task, project_id, project_path=_project_path, lineage=_lineage),
                 timeout=phase_timeout,
-            )
-            run.phase_results.append(
-                {
-                    "phase": phase.name,
-                    "success": result.success,
-                    "error": result.error,
-                }
             )
 
             # RTE reacts to gate results
@@ -821,7 +825,7 @@ async def run_workflow(
                     )
                     try:
                         result = await asyncio.wait_for(
-                            run_pattern(pattern, session_id, retry_task, project_id, lineage=_lineage),
+                            run_pattern(pattern, session_id, retry_task, project_id, project_path=_project_path, lineage=_lineage),
                             timeout=phase_timeout,
                         )
                         run.phase_results.append(
