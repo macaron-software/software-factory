@@ -805,6 +805,29 @@ class AgentExecutor:
                             )
                         )
                         continue
+                    # ── QA scope enforcement: only allow writes to QA_REPORT_* and Dockerfile ──
+                    if tc.function_name in _CODE_WRITE_TOOLS:
+                        _role_l = (agent.role or "").lower()
+                        if "qa" in _role_l and "devops" not in _role_l:
+                            _write_path = str(tc.arguments.get("path", ""))
+                            _bn = _write_path.split("/")[-1]
+                            _qa_allowed = (
+                                _bn.startswith("QA_REPORT")
+                                or _bn == "Dockerfile"
+                                or _bn.startswith("Dockerfile.")
+                            )
+                            if not _qa_allowed:
+                                messages.append(LLMMessage(
+                                    role="tool",
+                                    content=(
+                                        f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
+                                        "Only allowed: QA_REPORT_N.md, Dockerfile (Chromium fix). "
+                                        "If docker_deploy fails for non-Chromium reasons → call veto_cycle."
+                                    ),
+                                    tool_call_id=tc.id,
+                                    name=tc.function_name,
+                                ))
+                                continue
                     # ── Workspace conflict guard: warn if another agent is writing this file ──
                     if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
                         import time as _time
