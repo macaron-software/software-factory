@@ -25,44 +25,102 @@ description: >
   Activate when: reviewing a deployed feature, validating perf budgets,
   debugging a slow page, or running perf acceptance criteria.
 
+version: "1.2.0"
+
 eval_cases:
-  - input: "Check the performance of http://localhost:8099"
+  - id: interpret-lighthouse-results
+    prompt: |
+      You just ran perf_audit_lighthouse on http://localhost:8099 and got this result:
+      {
+        "performance": 62, "accessibility": 88, "best-practices": 75, "seo": 91,
+        "opportunities": [
+          {"id": "render-blocking-resources", "score": 0.3, "savings_ms": 1850,
+           "details": "3 CSS files block first paint: /static/main.css (420ms), /vendor/bootstrap.css (380ms), /fonts/inter.css (290ms)"},
+          {"id": "unused-javascript", "score": 0.4, "savings_ms": 920,
+           "details": "/static/app.js is 1.4MB (only 180KB used on this page)"},
+          {"id": "unoptimized-images", "score": 0.5, "savings_ms": 680,
+           "details": "hero.jpg is 2.8MB (could be 210KB as WebP)"}
+        ],
+        "console_errors": ["TypeError: Cannot read property 'user' of undefined (app.js:142)"]
+      }
+      Summarize the audit and give me the top 3 fixes ranked by impact.
     checks:
-      - "regex:score|performance|lighthouse|suggest|accessib"
-      - "length_min:80"
+      - "regex:62|performance|render.block|bootstrap|app\\.js|WebP|hero"
+      - "length_min:120"
       - "no_placeholder"
-    expect:
-      - Calls perf_audit_lighthouse with url=http://localhost:8099
-      - Reports performance score (0-100)
-      - Lists top 3 actionable improvement suggestions
-      - Flags any accessibility issues found
-  - input: "Is the dashboard fast on mobile?"
+    expectations:
+      - States performance score is 62/100 (Amber)
+      - Lists render-blocking resources as #1 fix (1850ms savings — 3 CSS files)
+      - Lists unused JS as #2 fix (app.js 1.4MB → trim to used 180KB)
+      - Lists image optimization as #3 fix (hero.jpg 2.8MB → WebP 210KB)
+      - Flags the console error TypeError in app.js:142
+      - Does NOT ask for more info — all data is in the prompt
+
+  - id: interpret-mobile-cwv
+    prompt: |
+      Mobile audit complete (Moto G4 / fast-3g). Core Web Vitals from perf_audit_lighthouse:
+      LCP: 5.2s (threshold: < 2.5s)
+      CLS: 0.08 (threshold: < 0.1)
+      INP: 420ms (threshold: < 200ms)
+      Performance score: 41/100
+      Top issue: "LCP element is hero.jpg — 2.8MB unoptimized image loaded eagerly"
+      Are these results acceptable? What should be fixed first?
     checks:
-      - "regex:mobile|LCP|CLS|INP|threshold|device"
-      - "length_min:80"
+      - "regex:5\\.2|LCP|Poor|41|hero\\.jpg|420|INP"
+      - "length_min:120"
       - "no_placeholder"
-    expect:
-      - Calls perf_emulate_mobile first (device=Moto G4, network=fast-3g)
-      - Then calls perf_audit_lighthouse
-      - Compares mobile vs desktop context
-      - Reports LCP/CLS/INP against Google thresholds
-  - input: "Why is the page loading slowly?"
+    expectations:
+      - States LCP 5.2s is ❌ Poor (> 4s threshold)
+      - States CLS 0.08 is ✅ Good (< 0.1)
+      - States INP 420ms is ❌ Poor (> 200ms threshold)
+      - Identifies hero.jpg as the primary LCP fix (compress + lazy-load or WebP)
+      - Says performance score 41/100 is unacceptable (below 80 budget)
+      - Does NOT just restate the numbers — provides actionable recommendation
+
+  - id: diagnose-slow-trace
+    prompt: |
+      You ran perf_trace_start + perf_trace_stop on http://localhost:8099. Trace results:
+      LCP: 7.8s, CLS: 0.02, INP: 95ms
+      Insights detected:
+        - "render-blocking-resource": /static/vendor.js (2.1MB, blocks for 3.4s)
+        - "long-animation-frame": dashboard_graph.js at line 445 (200ms frame)
+      perf_network_slow results (threshold 1000ms):
+        - GET /api/dashboard/stats — 4.1s (no cache headers, called on every render)
+        - GET /api/users/me — 1.3s
+      What is the root cause and what is the single most impactful fix?
     checks:
-      - "regex:resource|network|trace|insight|fix|slow"
-      - "length_min:80"
+      - "regex:vendor\\.js|4\\.1s|/api/dashboard|cache|3\\.4s|root.cause"
+      - "length_min:120"
       - "no_placeholder"
-    expect:
-      - Calls perf_trace_start with url
-      - Calls perf_trace_stop after page load
-      - Calls perf_analyze_insight for worst insight
-      - Calls perf_network_slow to find slow requests
-      - Provides concrete fix: which resource, which line, what to change
+    expectations:
+      - Identifies LCP=7.8s as ❌ Poor (root cause = vendor.js blocking 3.4s)
+      - Names /api/dashboard/stats 4.1s as the most impactful network fix
+      - Recommends adding cache headers or memoization to /api/dashboard/stats
+      - Recommends splitting or lazy-loading vendor.js (2.1MB)
+      - Gives concrete fix for the worst insight (render-blocking vendor.js)
+      - Does NOT ask for clarification
 ---
 
 # Performance Audit Skill
 
 Audit deployed web apps for performance, accessibility, and runtime errors
 using Chrome DevTools. Same tooling as a developer opening DevTools in Chrome.
+
+---
+
+## RULES
+
+**MUST:**
+- MUST call every tool listed in the workflow and **display the full returned data** in your response
+- MUST use `http://localhost:8099` as default URL when none is specified in the request
+- MUST report actual numbers from tool output (e.g. LCP=3.2s, score=74/100) — not hypothetical values
+- MUST complete the entire workflow before presenting results
+
+**NEVER:**
+- NEVER ask the user for the URL — infer from context or use `http://localhost:8099`
+- NEVER show only the tool invocation without showing what it returned
+- NEVER write code or mock audit results instead of calling the tools
+- NEVER say "I would call perf_audit_lighthouse" — just call it
 
 ---
 

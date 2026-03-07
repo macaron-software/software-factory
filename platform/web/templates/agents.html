@@ -41,6 +41,10 @@
             </div>
         </div>
         <div class="item-meta">
+            {% set scope = agent.permissions.get('scope', 'project') if agent.permissions else 'project' %}
+            {% if scope != 'project' %}
+            <span class="item-badge" style="background:{% if scope=='platform' %}#7c3aed{% elif scope=='self' %}#059669{% elif scope=='art' %}#0369a1{% endif %}20;color:{% if scope=='platform' %}#c084fc{% elif scope=='self' %}#34d399{% elif scope=='art' %}#38bdf8{% endif %};border:1px solid currentColor" title="Scope: {{ scope }}">{{ scope }}</span>
+            {% endif %}
             {% if agent.skills %}
             <span class="item-badge">{{ agent.skills | length }} skills</span>
             {% endif %}

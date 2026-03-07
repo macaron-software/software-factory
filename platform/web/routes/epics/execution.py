@@ -149,11 +149,26 @@ async def launch_mission_workflow(request: Request, epic_id: str):
     except Exception:
         pass
 
+    # Register project in project store with workspace path so tools_enabled works
+    _proj_id = mission.project_id or epic_id
+    try:
+        from ....projects.manager import Project, get_project_store
+
+        _p_store = get_project_store()
+        _existing = _p_store.get(_proj_id)
+        if _existing:
+            _existing.path = str(workspace_root)
+            _p_store.update(_existing)
+        else:
+            _p_store.create(
+                Project(id=_proj_id, name=mission.name, path=str(workspace_root))
+            )
+    except Exception as _e:
+        logger.warning("Could not register project workspace for %s: %s", _proj_id, _e)
+
     async def _guarded_workflow():
         async with get_mission_semaphore():
-            await _run_workflow_background(
-                wf, session.id, task_desc, mission.project_id or ""
-            )
+            await _run_workflow_background(wf, session.id, task_desc, _proj_id)
 
     _wf_task = asyncio.create_task(_guarded_workflow())
     _active_mission_tasks[session.id] = _wf_task

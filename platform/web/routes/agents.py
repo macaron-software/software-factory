@@ -145,6 +145,7 @@ async def agent_save(request: Request, agent_id: str = ""):
 
     tags = [t.strip() for t in str(form.get("tags", "")).split(",") if t.strip()]
     permissions = {
+        "scope": str(form.get("scope", "project")),
         "can_veto": "can_veto" in form,
         "can_approve": "can_approve" in form,
         "can_delegate": "can_delegate" in form,
@@ -159,7 +160,7 @@ async def agent_save(request: Request, agent_id: str = ""):
     agent.provider = str(form.get("provider", "anthropic"))
     agent.model = str(form.get("model", ""))
     agent.temperature = float(form.get("temperature", 0.7))
-    agent.max_tokens = int(form.get("max_tokens", 4096))
+    agent.max_tokens = int(form.get("max_tokens", 0))
     agent.tags = tags
     agent.permissions = permissions
     agent.icon = str(form.get("icon", "bot"))

@@ -1,3 +1,80 @@
+---
+name: ac-refactor
+description: >
+  AC Refactor phase — detects technical debt and optimizes code after each successful
+  TDD sprint (phase 6, before security hardening). Analyzes 5 structural quality axes
+  and produces a refactoring_score (0-100) with a prioritized remediation plan.
+metadata:
+  category: development
+  triggers:
+    - "when running the refactoring phase after TDD sprint"
+    - "when detecting code smells or technical debt"
+    - "when producing a refactoring score"
+# EVAL CASES
+# WHY: Refactor skill must catch real smells (inline imports, duplicate code, god
+# classes) and produce an actionable score — not just generic style feedback.
+# Ref: philschmid.de/testing-skills
+eval_cases:
+  - id: inline-import-smell
+    prompt: |
+      Analyze this function for refactoring opportunities:
+      async def handle_request(data):
+          from .db.migrations import get_db
+          from .utils.helpers import format_response
+          db = get_db()
+          result = db.execute("SELECT * FROM items").fetchall()
+          return format_response(result)
+    should_trigger: true
+    checks:
+      - "regex:inline.*import|import.*inside|top.*level|module.*level|smell"
+      - "no_placeholder"
+      - "length_min:80"
+    expectations:
+      - "flags inline imports inside function body as a code smell"
+      - "recommends moving imports to module top level"
+      - "explains the maintenance and performance impact"
+    tags: [imports, code-smell]
+  - id: duplicate-logic
+    prompt: |
+      Analyze this for refactoring:
+      def create_project(name, db):
+          updated = []
+          for field in ("name", "status", "priority"):
+              if field in data:
+                  updated.append(f"{field} = ?")
+          db.execute(f"UPDATE projects SET {', '.join(updated)} WHERE id=?", ...)
+
+      def update_feature(name, db):
+          updated = []
+          for field in ("name", "status", "priority", "points"):
+              if field in data:
+                  updated.append(f"{field} = ?")
+          db.execute(f"UPDATE features SET {', '.join(updated)} WHERE id=?", ...)
+    should_trigger: true
+    checks:
+      - "regex:duplicate|DRY|extract|shared.*helper|common.*function|refactor"
+      - "no_placeholder"
+    expectations:
+      - "identifies the duplicated dynamic UPDATE builder pattern"
+      - "recommends extracting a shared helper function"
+    tags: [dry, duplication]
+  - id: score-output
+    prompt: |
+      Produce a refactoring analysis for this clean module:
+      def calculate_tax(amount: float, rate: float) -> float:
+          if amount < 0 or rate < 0:
+              raise ValueError("Negative values not allowed")
+          return round(amount * rate, 2)
+    should_trigger: true
+    checks:
+      - "regex:score|refactoring_score|\\d+/100|0-100"
+      - "no_placeholder"
+    expectations:
+      - "produces a refactoring_score or equivalent metric"
+      - "gives high score for clean, minimal function"
+      - "does not invent smells that don't exist"
+    tags: [score, negative]
+---
 # Skill: AC Refactor — Code Smell & Optimisation Phase
 
 ## Persona

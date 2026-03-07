@@ -52,7 +52,7 @@ class AgentDef:
     provider: str = DEFAULT_PROVIDER
     model: str = DEFAULT_MODEL
     temperature: float = 0.7
-    max_tokens: int = 4096
+    max_tokens: int = 0
     skills: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
     mcps: list[str] = field(default_factory=list)
@@ -2097,7 +2097,7 @@ class AgentStore:
                         provider=llm_cfg.get("provider", DEFAULT_PROVIDER),
                         model=llm_cfg.get("model", DEFAULT_MODEL),
                         temperature=llm_cfg.get("temperature", 0.7),
-                        max_tokens=llm_cfg.get("max_tokens", 4096),
+                        max_tokens=llm_cfg.get("max_tokens", 0),
                         skills=raw.get("skills", []),
                         tools=raw.get("tools", []),
                         mcps=raw.get("mcps", []),

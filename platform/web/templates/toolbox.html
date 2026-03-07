@@ -594,7 +594,7 @@ function showA2ATab() {
     document.getElementById('tab-content').innerHTML = `
         <div class="main-area" style="padding:2rem;max-width:960px">
             <h1 style="font-size:1.8rem;font-weight:700;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.6rem">
-                <span style="font-size:1.6rem">🤝</span> A2A — Agent2Agent Protocol
+                <span style="font-size:1.6rem"></span> A2A — Agent2Agent Protocol
             </h1>
             <p style="color:var(--text-secondary);margin-bottom:1.5rem;font-size:0.9rem">
                 Jarvis est exposé comme un agent A2A standard (Linux Foundation / A2A v1.0). 
@@ -604,7 +604,7 @@ function showA2ATab() {
             <!-- Agent Card -->
             <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1.5rem">
                 <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1rem">
-                    <div style="width:42px;height:42px;border-radius:10px;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:1.3rem">🧠</div>
+                    <div style="width:42px;height:42px;border-radius:10px;background:rgba(124,58,237,.15);display:flex;align-items:center;justify-content:center;font-size:1.3rem"></div>
                     <div>
                         <div style="font-weight:700;font-size:1rem">Jarvis — Software Factory CTO</div>
                         <div style="font-size:0.75rem;color:var(--text-secondary)">urn:agent:software-factory:jarvis · A2A v1.0</div>
@@ -635,7 +635,7 @@ function showA2ATab() {
 
             <!-- Try it -->
             <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1.5rem">
-                <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.8rem">🧪 Try it — Submit a task to Jarvis</div>
+                <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.8rem"> Try it — Submit a task to Jarvis</div>
                 <textarea id="a2a-message" placeholder="Ex: Crée un projet game-tetris-v3 HTML5 Canvas, lance l'epic et délègue au RTE." 
                     style="width:100%;box-sizing:border-box;padding:0.7rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:7px;color:var(--text-primary);font-size:0.85rem;resize:vertical;min-height:80px;font-family:inherit"></textarea>
                 <div style="display:flex;gap:0.8rem;margin-top:0.7rem;align-items:center">
@@ -682,7 +682,7 @@ async function _loadA2ACard() {
     try {
         const r = await fetch('/.well-known/agent.json');
         const d = await r.json();
-        document.getElementById('a2a-card-status').textContent = '✓ Live';
+        document.getElementById('a2a-card-status').textContent = ' Live';
         const caps = document.getElementById('a2a-capabilities');
         if (caps && d.capabilities) {
             caps.innerHTML = d.capabilities.map(c =>

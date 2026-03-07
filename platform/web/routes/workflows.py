@@ -494,6 +494,26 @@ async def _run_workflow_background(
         except Exception:
             pass
         _active_mission_tasks.pop(session_id, None)
+        # If an AC cycle was gated/failed, reset ac_project_state so watchdog doesn't retry infinitely
+        if project_id and _final_run_status in ("gated", "failed"):
+            try:
+                from ...db.migrations import get_db as _gdb2
+                from datetime import datetime as _dt
+
+                _db2 = _gdb2()
+                _db2.execute(
+                    "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=?"
+                    " WHERE project_id=? AND status='running'",
+                    (_dt.utcnow().isoformat(), project_id),
+                )
+                _db2.commit()
+                logger.warning(
+                    "AC cycle gated/failed — reset project %s to idle (run=%s)",
+                    project_id,
+                    _final_run_status,
+                )
+            except Exception as _e:
+                logger.warning("Failed to reset AC project state: %s", _e)
 
 
 # ── Workflow Resume ───────────────────────────────────────────────

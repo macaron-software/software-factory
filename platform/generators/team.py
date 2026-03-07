@@ -460,7 +460,7 @@ class TeamGenerator:
             provider=llm.get("provider", "azure"),
             model=llm.get("model", "gpt-5.1"),
             temperature=llm.get("temperature", 0.5),
-            max_tokens=llm.get("max_tokens", 4096),
+            max_tokens=llm.get("max_tokens", 0),
             skills=data.get("skills", []),
             tools=data.get("tools", []),
             mcps=data.get("mcps", []),

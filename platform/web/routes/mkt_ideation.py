@@ -509,17 +509,17 @@ async def mkt_session_detail(session_id: str):
     db = get_db()
     try:
         sess = db.execute(
-            "SELECT * FROM mkt_ideation_sessions WHERE id=?", (session_id)
+            "SELECT * FROM mkt_ideation_sessions WHERE id=?", (session_id,)
         ).fetchone()
         if not sess:
             return JSONResponse({"error": "Session not found"}, status_code=404)
         messages = db.execute(
             "SELECT * FROM mkt_ideation_messages WHERE session_id=? ORDER BY created_at ASC",
-            (session_id),
+            (session_id,),
         ).fetchall()
         findings = db.execute(
             "SELECT * FROM mkt_ideation_findings WHERE session_id=?",
-            (session_id),
+            (session_id,),
         ).fetchall()
         plan = None
         if sess["marketing_plan"]:

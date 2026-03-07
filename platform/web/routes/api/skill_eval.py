@@ -37,10 +37,15 @@ async def skill_eval_coverage() -> dict[str, Any]:
 
 @router.get("/api/skills/list", summary="List all skills with eval coverage")
 async def skill_list() -> list[dict[str, Any]]:
-    """List all skills with eval_cases count and last run status."""
+    """List all skills (agent skills + tech stack skills) with eval coverage."""
     try:
-        from ....tools.skill_eval_tools import list_skills_with_evals
-        return list_skills_with_evals()
+        from ....tools.skill_eval_tools import list_skills_with_evals, list_tech_skills
+        agent_skills = list_skills_with_evals()
+        # Mark agent skills with source
+        for s in agent_skills:
+            s.setdefault("source", "agent")
+        tech_skills = list_tech_skills()
+        return agent_skills + tech_skills
     except Exception as exc:
         logger.error("skill_list error: %s", exc, exc_info=True)
         return []

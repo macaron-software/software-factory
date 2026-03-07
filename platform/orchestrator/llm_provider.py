@@ -48,7 +48,7 @@ class LLMProvider:
         messages: list[dict],
         model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 0,
     ) -> str:
         """Send a chat completion request. Returns the assistant content."""
         model = model or self._cfg.model_deployment or "gpt-5.1"
@@ -74,7 +74,7 @@ class LLMProvider:
         messages: list[dict],
         model: str | None = None,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 0,
     ) -> AsyncIterator[str]:
         """Streaming chat completion — yields content chunks."""
         model = model or self._cfg.model_deployment or "gpt-5.1"

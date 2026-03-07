@@ -775,7 +775,7 @@ async def _stream_agent_response(
             provider=agent.provider or "minimax",
             model=agent.model or "",
             temperature=agent.temperature if agent.temperature else 0.7,
-            max_tokens=agent.max_tokens or 2000,
+            max_tokens=agent.max_tokens,
             system_prompt=system,
         ):
             if chunk.delta:
@@ -811,7 +811,7 @@ async def _stream_agent_response(
                 provider=agent.provider or "minimax",
                 model=agent.model or "",
                 temperature=agent.temperature if agent.temperature else 0.7,
-                max_tokens=agent.max_tokens or 2000,
+                max_tokens=agent.max_tokens,
                 system_prompt=system,
             )
             full_content = resp.content

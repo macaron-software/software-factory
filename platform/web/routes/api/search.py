@@ -180,7 +180,7 @@ async def list_retrospectives(scope: str = "", limit: int = 20):
         else:
             rows = db.execute(
                 "SELECT * FROM retrospectives ORDER BY created_at DESC LIMIT ?",
-                (limit),
+                (limit,),
             ).fetchall()
         return JSONResponse(
             [
@@ -224,11 +224,11 @@ async def generate_retrospective(request: Request):
         if scope == "ideation" and scope_id:
             msgs = db.execute(
                 "SELECT agent_name, role, content FROM ideation_messages WHERE session_id=? ORDER BY created_at",
-                (scope_id),
+                (scope_id,),
             ).fetchall()
             findings = db.execute(
                 "SELECT type, text FROM ideation_findings WHERE session_id=?",
-                (scope_id),
+                (scope_id,),
             ).fetchall()
             context_parts.append(f"Ideation session {scope_id}:")
             for m in msgs:
@@ -244,7 +244,7 @@ async def generate_retrospective(request: Request):
             tool_rows = db.execute(
                 "SELECT tool_name, success, result FROM tool_calls WHERE session_id IN "
                 "(SELECT id FROM sessions WHERE id LIKE ?) ORDER BY created_at DESC LIMIT 50",
-                (f"%{scope_id}%"),
+                (f"%{scope_id}%",),
             ).fetchall()
             for t in tool_rows:
                 status = "OK" if t["success"] else "FAIL"
@@ -441,7 +441,7 @@ async def epic_features(epic_id: str):
         CASE status WHEN 'in_progress' THEN 0 WHEN 'backlog' THEN 1 WHEN 'done' THEN 2 ELSE 3 END,
         priority ASC, name ASC
     """,
-        (epic_id),
+        (epic_id,),
     ).fetchall()
     return JSONResponse([dict(r) for r in rows])
 
@@ -757,7 +757,7 @@ async def export_features_csv(request: Request):
     try:
         if epic_id:
             rows = db.execute(
-                "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id)
+                "SELECT * FROM features WHERE epic_id=? ORDER BY priority", (epic_id,)
             ).fetchall()
         else:
             rows = db.execute(

@@ -74,7 +74,7 @@ class AzureBridge:
         prompt: str,
         model: str = None,
         temperature: float = 0.7,
-        max_tokens: int = 4096,
+        max_tokens: int = 0,
         system: str = None,
     ) -> str:
         """Query an LLM through Azure AI Foundry."""

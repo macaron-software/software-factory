@@ -171,18 +171,60 @@ test("admin creates item, user sees it", async ({ browser }) => {
 });
 ```
 
-### Screenshot on Failure
+### Screenshot at Every Journey Step (MANDATORY)
+
+**ALWAYS** take a `page.screenshot()` at the end of every `test.step()`.
+Screenshots document the full user journey with real data. They must be saved to `screenshots/` in the project workspace.
+
+**The steps to capture depend entirely on the project and its features.** Before writing tests, identify:
+1. What are the distinct features/screens of this app? (auth, dashboard, data views, forms, workflows…)
+2. What user journeys exist? (one journey per feature, one journey per user role if multi-user)
+3. What are the meaningful UI states within each journey? (initial state, form filled, after action, error state…)
+
+**Capture every meaningful UI state transition**, not a fixed list. Examples by project type:
+
+| Project type | Journey steps to capture |
+|---|---|
+| CRUD app | empty list → form filled → after create → detail → edit form → after update → after delete |
+| Auth app | login form → after login → profile → change password → logout → protected redirect |
+| Migration (PHP→new) | same pages as before migration, same data, same behavior — screenshot each route |
+| Dashboard/analytics | empty state → with data loaded → filtered view → exported result |
+| Real-time / WebSocket | before event → after event received → notification visible |
+| Multi-user | admin view → user view → shared state visible in both |
+| Wizard/multi-step form | each step → validation errors → summary → confirmation |
+
+Naming convention: `NN-[feature]-[state].png` (sequential, kebab-case).
 
 ```typescript
-// playwright.config.ts
-export default defineConfig({
-  use: {
-    screenshot: "only-on-failure",
-    trace: "retain-on-failure",
-    video: "retain-on-failure",
-  },
+import { test, expect } from "@playwright/test";
+import * as fs from "fs";
+
+test.beforeAll(() => fs.mkdirSync("screenshots", { recursive: true }));
+
+// Adapt steps to THIS project's actual features and user journeys
+test("[feature name] — full user journey", async ({ page }) => {
+  let step = 0;
+  const shot = (name: string) =>
+    page.screenshot({ path: `screenshots/${String(++step).padStart(2, "0")}-${name}.png`, fullPage: true });
+
+  await test.step("[Step name reflecting actual feature]", async () => {
+    // ... interact with the app using real data (not lorem ipsum, not empty strings)
+    await expect(/* relevant element */).toBeVisible();
+    await shot("[feature]-[state]"); // e.g. "auth-login-success" or "invoices-list-empty"
+  });
+
+  await test.step("[Next step]", async () => {
+    // ...
+    await shot("[feature]-[state]");
+  });
+
+  // One test.step() + one shot() per distinct UI state in this journey
 });
 ```
+
+Screenshots must use **real, meaningful data** (names, emails, amounts, dates) — not `"test"`, `"foo"`, or lorem ipsum. The screenshot must be readable and demonstrate the feature works end-to-end.
+
+### Screenshot on Failure (additionally)
 
 ### Accessibility Checks During E2E
 
@@ -198,23 +240,60 @@ test("page meets accessibility standards", async ({ page }) => {
 });
 ```
 
+## SF Platform — feature-e2e Phase Rules
+
+When running as `ft-e2e-ihm` in the `feature-e2e` phase:
+
+### STEP 1: Start the container BEFORE any test
+
+```python
+# ❌ WRONG — server not running, tests will produce failedTests=[] (false success)
+playwright_test(spec="tests/e2e/smoke.spec.ts", cwd=workspace)
+
+# ✅ CORRECT — start container, get URL, then test
+deploy_result = docker_deploy(cwd=workspace, mission_id=mission_id)
+# deploy_result must contain a URL like http://127.0.0.1:9100
+playwright_test(spec="tests/e2e/smoke.spec.ts", cwd=workspace, base_url="http://127.0.0.1:9100")
+```
+
+### Detecting false-positives (critical)
+
+A result `{"status": "failed", "failedTests": []}` means **ZERO tests ran** — the server wasn't reachable.  
+This is **NOT a success**. Treat it as VETO and report "server not running".
+
+```
+# Real pass looks like:
+{"status": "passed", "failedTests": [], "passedTests": ["test 1", "test 2"]}
+
+# False-positive to reject:
+{"status": "failed", "failedTests": []}   ← ZERO tests ran = FAIL
+```
+
+### Screenshot requirements
+
+Every user journey **must** produce screenshots saved to `workspace/screenshots/`.  
+Use `screenshot(url=<running_url>, cwd=workspace)` to capture states.  
+3 minimum: initial state, mid-interaction, final state (or game-over for games).
+
 ## Output Format
 
 ```
-## User Journey: [Journey Name]
-Step 1: [Action] → ✅ [Expected result]
-Step 2: [Action] → ✅ [Expected result]
-Step 3: [Action] → ❌ FAILED [Actual result]
-Screenshot: [path]
+## User Journey: [Feature Name] — [Project Name]
+Container: http://127.0.0.1:9100 ✅ running
+Step 01 — [feature]-[state]: ✅ [what was verified]  → screenshots/01-[feature]-[state].png
+Step 02 — [feature]-[state]: ✅ [what was verified]  → screenshots/02-[feature]-[state].png
+Step 03 — [feature]-[state]: ❌ FAILED [actual result]
 ```
 
 ## Anti-patterns
 
+- **NEVER** run Playwright tests without starting the container first (`docker_deploy`)
+- **NEVER** treat `{"status":"failed","failedTests":[]}` as success — it means zero tests ran
+- **NEVER** hardcode `localhost:8080` — always use the URL returned by `docker_deploy`
 - **NEVER** use `page.waitForTimeout()` — always wait for specific conditions
 - **NEVER** use CSS selectors when role/label/text locators work
 - **NEVER** write tests that depend on other tests' state
-- **NEVER** hardcode URLs — use relative paths and base URL config
 - **NEVER** ignore flaky tests — fix the root cause (usually missing waits)
 - **NEVER** test implementation details through the UI — test user-visible behavior
-- **NEVER** skip cleanup (created data should be cleaned up)
-- **NEVER** write mega-tests — keep each test focused on one journey
+- **NEVER** skip screenshots on journey steps — every UI state must be captured
+- **NEVER** use generic screenshot names — always use sequential numbered names

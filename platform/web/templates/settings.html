@@ -628,9 +628,6 @@
                     <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Assign LLM models per task category. Darwin Thompson Sampling will learn which model performs best for each team × category.</p>
                 </div>
                 <div style="display:flex;gap:.5rem">
-                    <button class="btn btn-ghost btn-sm" onclick="testLLMRouting()" id="routing-test-btn" title="Tester les modèles sélectionnés">
-                        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester
-                    </button>
                     <button class="btn btn-ghost btn-sm" onclick="resetLLMRouting()" id="routing-reset-btn" title="Reset to auto-detected defaults (primary provider)">
                         <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset
                     </button>
@@ -1547,26 +1544,19 @@ async function toggleProvider(event, providerId) {
         badge.textContent = enabled ? 'active' : 'disabled';
         badge.className = 'badge ' + (enabled ? 'badge-green' : 'badge-yellow');
         badge.style.fontSize = '0.68rem';
-        // Update _llmModels enabled flag for this provider and refresh routing selects
-        _llmModels.forEach(m => { if (m.provider === providerId) m.enabled = enabled; });
-        const currentRouting = {};
-        document.querySelectorAll('[data-routing-key]').forEach(sel => {
-            const [p, mo] = sel.value.split('::');
-            currentRouting[sel.dataset.routingKey] = {provider: p, model: mo};
-        });
-        renderRoutingTable(currentRouting);
     } catch(e) { console.error(e); }
 }
 
 function _modelSelect(key, currentVal) {
-    const opts = _llmModels.filter(m => m.enabled).map(m => {
+    const opts = _llmModels.map(m => {
         const val = m.provider + '::' + m.model;
         const cur = currentVal ? (currentVal.provider + '::' + currentVal.model) : '';
+        const disabled = !m.enabled ? ' style="color:var(--text-secondary)"' : '';
         // Short label: "ProviderName / model-basename" (strip HuggingFace org prefix)
         const modelShort = m.model.includes('/') ? m.model.split('/').pop() : m.model;
         const provShort = m.label.split(' / ')[0];
         const displayLabel = provShort + ' / ' + modelShort;
-        return `<option value="${val}" ${val===cur?'selected':''}>${displayLabel}</option>`;
+        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${displayLabel}</option>`;
     }).join('');
     return `<select class="routing-select" data-routing-key="${key}">${opts}</select>`;
 }
@@ -1622,49 +1612,6 @@ async function resetLLMRouting() {
             setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset'; }, 2000);
         }
     } catch(e) { console.error(e); btn.disabled=false; }
-}
-
-async function testLLMRouting() {
-    const btn = document.getElementById('routing-test-btn');
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Testing…';
-    // Collect unique provider::model combos from routing selects
-    const seen = new Set();
-    const pairs = [];
-    document.querySelectorAll('[data-routing-key]').forEach(sel => {
-        if (sel.value && !seen.has(sel.value)) { seen.add(sel.value); pairs.push(sel.value); }
-    });
-    if (!pairs.length) { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester'; return; }
-    // Remove old results
-    document.querySelectorAll('.llm-test-result').forEach(el => el.remove());
-    const results = await Promise.all(pairs.map(async pv => {
-        const [provider, model] = pv.split('::');
-        try {
-            const r = await fetch('/api/llm/test', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({provider, model})});
-            return await r.json();
-        } catch(e) { return {ok:false, provider, model, error: e.message}; }
-    }));
-    // Show results below table
-    const tbl = document.getElementById('routing-table');
-    const div = document.createElement('div');
-    div.className = 'llm-test-result';
-    div.style.cssText = 'margin-top:.75rem;display:flex;flex-wrap:wrap;gap:.5rem;font-size:.78rem';
-    results.forEach(res => {
-        const modelShort = (res.model||'').includes('/') ? (res.model||'').split('/').pop() : (res.model||'');
-        const label = `${res.provider} / ${modelShort}`;
-        const badge = document.createElement('span');
-        badge.style.cssText = 'display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .6rem;border-radius:6px;' +
-            (res.ok ? 'background:rgba(34,197,94,.15);color:#4ade80' : 'background:rgba(239,68,68,.15);color:#f87171');
-        badge.title = res.ok ? `"${res.response}" (${res.latency_ms}ms, in:${res.tokens_in} out:${res.tokens_out})` : (res.error||'error');
-        badge.innerHTML = (res.ok
-            ? `<svg class="icon icon-sm"><use href="#icon-check"/></svg>`
-            : `<svg class="icon icon-sm"><use href="#icon-x"/></svg>`) +
-            `${label}` + (res.ok ? ` <small style="opacity:.7">${res.latency_ms}ms</small>` : '');
-        div.appendChild(badge);
-    });
-    tbl.parentNode.insertBefore(div, tbl.nextSibling);
-    btn.disabled = false;
-    btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-zap"/></svg> Tester';
 }
 
 async function loadLLMABTests() {

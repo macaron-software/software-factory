@@ -116,7 +116,7 @@ class AgentConfig:
 
     max_concurrent_agents: int = 20
     default_temperature: float = 0.7
-    default_max_tokens: int = 4096
+    default_max_tokens: int = 0
     agent_timeout_sec: int = 300
     memory_window_size: int = 50
 

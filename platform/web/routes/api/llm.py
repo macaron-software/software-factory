@@ -139,19 +139,7 @@ def _builtin_providers() -> list[dict]:
     for pid, pcfg in _PROVIDERS.items():
         key_env = pcfg.get("key_env") or ""
         no_auth = pcfg.get("no_auth", False)
-        api_key = os.environ.get(key_env, "") if key_env else ""
-        if not api_key and key_env:
-            # Also check ~/.config/factory/<name>.key (same logic as _get_api_key)
-            name = key_env.replace("_API_KEY", "").replace("_", "-").lower()
-            try:
-                api_key = (
-                    open(os.path.expanduser(f"~/.config/factory/{name}.key"))
-                    .read()
-                    .strip()
-                )
-            except OSError:
-                pass
-        has_key = no_auth or bool(api_key)
+        has_key = no_auth or bool(os.environ.get(key_env, "") if key_env else False)
         result.append(
             {
                 "id": pid,
@@ -475,43 +463,3 @@ async def ensure_local_server():
         },
         status_code=503,
     )
-
-
-@router.post("/api/llm/test")
-async def test_llm_model(payload: dict):
-    """Quick connectivity test for a provider/model pair.
-
-    Sends 'Reply: PONG' and checks the response contains 'PONG'.
-    Returns: {ok, provider, model, latency_ms, response}
-    """
-    import time as _time
-
-    provider = payload.get("provider", "")
-    model = payload.get("model", "")
-    if not provider:
-        return JSONResponse({"ok": False, "error": "provider required"}, status_code=400)
-
-    try:
-        from ....llm.client import LLMClient, LLMMessage
-
-        client = LLMClient()
-        t0 = _time.monotonic()
-        resp = await client.chat(
-            messages=[LLMMessage(role="user", content="Reply with exactly: PONG")],
-            provider=provider,
-            model=model or "",
-        )
-        latency_ms = int((_time.monotonic() - t0) * 1000)
-        content = (resp.content or "").strip()
-        ok = bool(content)
-        return JSONResponse({
-            "ok": ok,
-            "provider": provider,
-            "model": resp.model or model,
-            "latency_ms": latency_ms,
-            "response": content[:200],
-            "tokens_in": resp.tokens_in,
-            "tokens_out": resp.tokens_out,
-        })
-    except Exception as e:
-        return JSONResponse({"ok": False, "provider": provider, "model": model, "error": str(e)}, status_code=500)

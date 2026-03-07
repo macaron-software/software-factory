@@ -58,7 +58,7 @@ class AgentRegistry:
         llm = AgentLLMConfig(
             model=llm_raw.get("model", "gpt-5.1"),
             temperature=llm_raw.get("temperature", 0.7),
-            max_tokens=llm_raw.get("max_tokens", 4096),
+            max_tokens=llm_raw.get("max_tokens", 0),
             fallback_model=llm_raw.get("fallback_model"),
         )
 

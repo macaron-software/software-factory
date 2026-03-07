@@ -607,6 +607,50 @@ _AC_PROJECTS = [
         "tier_label": "Simple",
         "tech": ["html", "css", "nginx"],
         "max_cycles": 20,
+        "description": "Page HTML statique servie par nginx. Affiche un message de bienvenue avec design soigné.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je vois un titre principal (h1) avec le message de bienvenue",
+            "US-02: En tant qu'utilisateur, la page se charge en < 1s et est accessible sans JS",
+            "US-03: En tant qu'utilisateur daltonien, je peux lire le contenu (contraste >= 4.5:1)",
+            "US-04: En tant qu'utilisateur au clavier, je peux naviguer sans souris (focus-visible)",
+            "US-05: En tant qu'utilisateur de lecteur d'écran, tous les éléments ont des labels ARIA",
+        ],
+        "a11y_requirements": [
+            "WCAG AA: contraste ratio >= 4.5:1 pour le texte normal, 3:1 pour le grand texte",
+            "focus-visible: outline visible sur tous les éléments interactifs",
+            "aria-label sur tous les éléments interactifs sans texte visible",
+            "lang='fr' sur la balise html",
+            "alt text sur toutes les images",
+            "Semantic HTML: h1>h2>h3, nav, main, footer",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-primary-hover": "#1e429f",
+            "--color-text": "#111928",
+            "--color-text-secondary": "#6b7280",
+            "--color-bg": "#ffffff",
+            "--color-bg-secondary": "#f9fafb",
+            "--color-border": "#e5e7eb",
+            "--color-focus-ring": "#3f83f8",
+            "--color-success": "#0e9f6e",
+            "--color-error": "#f05252",
+            "--spacing-xs": "0.25rem",
+            "--spacing-sm": "0.5rem",
+            "--spacing-md": "1rem",
+            "--spacing-lg": "1.5rem",
+            "--spacing-xl": "2rem",
+            "--font-size-sm": "0.875rem",
+            "--font-size-base": "1rem",
+            "--font-size-lg": "1.125rem",
+            "--font-size-xl": "1.25rem",
+            "--font-size-2xl": "1.5rem",
+            "--font-weight-normal": "400",
+            "--font-weight-medium": "500",
+            "--font-weight-bold": "700",
+            "--radius-sm": "0.25rem",
+            "--radius-md": "0.375rem",
+            "--radius-lg": "0.5rem",
+        },
     },
     {
         "id": "ac-hello-vue",
@@ -615,6 +659,26 @@ _AC_PROJECTS = [
         "tier_label": "Simple + Compile",
         "tech": ["vue", "vite", "node"],
         "max_cycles": 20,
+        "description": "Application Vue.js simple avec composant compteur interactif et routing basique.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je vois un compteur avec boutons +/- et valeur actuelle",
+            "US-02: En tant qu'utilisateur, le compteur se remet à zéro via un bouton Reset",
+            "US-03: En tant qu'utilisateur au clavier, tous les boutons sont accessibles (Tab, Enter, Space)",
+            "US-04: En tant qu'utilisateur de lecteur d'écran, le compteur annonce sa valeur (aria-live)",
+        ],
+        "a11y_requirements": [
+            "WCAG AA compliance",
+            "aria-live='polite' sur la valeur du compteur",
+            "Boutons avec aria-label explicite",
+            "focus-visible sur tous les éléments interactifs",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+            "--radius-md": "0.375rem",
+        },
     },
     {
         "id": "ac-fullstack-rs",
@@ -623,6 +687,25 @@ _AC_PROJECTS = [
         "tier_label": "Medium Fullstack",
         "tech": ["rust", "sveltekit", "postgres"],
         "max_cycles": 20,
+        "description": "API REST Rust (Axum) + frontend SvelteKit + PostgreSQL. CRUD complet, auth JWT.",
+        "user_stories": [
+            "US-01: En tant qu'utilisateur, je peux créer un compte et me connecter (JWT)",
+            "US-02: En tant qu'utilisateur authentifié, je peux créer/lire/modifier/supprimer des items",
+            "US-03: En tant qu'admin, je vois tous les items via une API paginée",
+            "US-04: En tant que développeur, l'API retourne des erreurs structurées (RFC 7807)",
+        ],
+        "a11y_requirements": [
+            "WCAG AA sur le frontend SvelteKit",
+            "Formulaires avec labels associés (htmlFor)",
+            "Messages d'erreur accessibles (role=alert)",
+            "Focus management après soumission de formulaire",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-docusign",
@@ -631,6 +714,24 @@ _AC_PROJECTS = [
         "tier_label": "Complex",
         "tech": ["react", "fastapi", "postgres"],
         "max_cycles": 20,
+        "description": "Clone simplifié DocuSign: upload PDF, signature électronique, workflow multi-signataires.",
+        "user_stories": [
+            "US-01: En tant qu'expéditeur, je peux uploader un PDF et désigner des signataires",
+            "US-02: En tant que signataire, je reçois un lien et peux signer le document",
+            "US-03: En tant qu'expéditeur, je vois l'état de signature en temps réel",
+            "US-04: En tant qu'auditeur, je peux télécharger le PDF signé avec piste d'audit",
+        ],
+        "a11y_requirements": [
+            "WCAG AA sur toute l'interface React",
+            "Drag-and-drop avec alternative clavier pour placement des champs de signature",
+            "Annonces ARIA pour les changements d'état de workflow",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
     },
     {
         "id": "ac-ecommerce",
@@ -639,6 +740,91 @@ _AC_PROJECTS = [
         "tier_label": "Enterprise",
         "tech": ["nextjs", "solaris", "stripe", "pg"],
         "max_cycles": 20,
+        "description": "E-commerce Next.js avec design system Solaris, Stripe, PostgreSQL. Catalogue, panier, checkout.",
+        "user_stories": [
+            "US-01: En tant que client, je peux parcourir le catalogue et filtrer par catégorie",
+            "US-02: En tant que client, je peux ajouter au panier et procéder au paiement (Stripe)",
+            "US-03: En tant que client, je reçois une confirmation email après achat",
+            "US-04: En tant qu'admin, je peux gérer le catalogue et voir les commandes",
+        ],
+        "a11y_requirements": [
+            "WCAG AA avec design system Solaris",
+            "Composants Solaris utilisés exclusivement (pas de CSS custom hors tokens)",
+            "Skip links pour navigation rapide",
+            "Panier accessible (live region pour le compteur)",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#ffffff",
+            "--color-text": "#111928",
+            "--spacing-md": "1rem",
+        },
+    },
+    {
+        "id": "ac-game-threejs",
+        "name": "Jeu Three.js",
+        "tier": "game-browser",
+        "tier_label": "Jeu Simple",
+        "tech": ["threejs", "js", "webgl"],
+        "max_cycles": 20,
+        "description": "Jeu browser 3D simple avec Three.js: contrôles clavier/souris, score, game over.",
+        "user_stories": [
+            "US-01: En tant que joueur, je peux déplacer mon personnage avec les flèches/WASD",
+            "US-02: En tant que joueur, je vois mon score en temps réel",
+            "US-03: En tant que joueur, je reçois un écran game over avec option restart",
+            "US-04: En tant que joueur mobile, les contrôles touch fonctionnent",
+        ],
+        "a11y_requirements": [
+            "Écran de titre accessible avec instructions clavier",
+            "Bouton Pause accessible (Escape ou bouton visible)",
+            "Score annoncé par aria-live au changement",
+        ],
+        "design_tokens": {
+            "--color-primary": "#1a56db",
+            "--color-bg": "#0f172a",
+            "--color-text": "#f8fafc",
+            "--spacing-md": "1rem",
+        },
+    },
+    {
+        "id": "ac-game-native",
+        "name": "Jeu Natif Compilé",
+        "tier": "game-compiled",
+        "tier_label": "Jeu Compilé",
+        "tech": ["rust", "sdl2", "opengl"],
+        "max_cycles": 20,
+        "description": "Jeu natif compilé en Rust avec SDL2/OpenGL: rendu 60fps, gestion collisions, score.",
+        "user_stories": [
+            "US-01: En tant que joueur, le jeu tourne à 60fps stables",
+            "US-02: En tant que joueur, les collisions sont détectées précisément",
+            "US-03: En tant que joueur, je peux quitter proprement (Escape ou fenêtre)",
+            "US-04: En tant que développeur, le binaire se compile sans warnings",
+        ],
+        "a11y_requirements": [
+            "Fenêtre avec titre descriptif",
+            "Gestion propre de la fermeture de fenêtre (signal SIGTERM)",
+        ],
+        "design_tokens": {},
+    },
+    {
+        "id": "ac-migration-php",
+        "name": "Migration PHP → FastAPI",
+        "tier": "migration",
+        "tier_label": "Migration",
+        "tech": ["php", "fastapi", "postgres"],
+        "max_cycles": 20,
+        "description": "Migration d'une API PHP legacy vers FastAPI Python. Parité fonctionnelle + tests de non-régression.",
+        "user_stories": [
+            "US-01: En tant que client API, tous les endpoints PHP sont disponibles en FastAPI avec la même interface",
+            "US-02: En tant que QA, les tests de non-régression couvrent 100% des endpoints",
+            "US-03: En tant qu'ops, la migration est documentée avec guide de rollback",
+            "US-04: En tant que développeur, le code FastAPI est < 500 LOC/fichier et typé",
+        ],
+        "a11y_requirements": [
+            "API: réponses d'erreur structurées RFC 7807",
+            "Documentation OpenAPI complète",
+        ],
+        "design_tokens": {},
     },
 ]
 
@@ -716,11 +902,16 @@ def _ac_ensure_tables(conn) -> None:
             "ALTER TABLE ac_project_state ADD COLUMN next_cycle_hint TEXT",
             "ALTER TABLE ac_project_state ADD COLUMN skill_eval_pending TEXT",
             "ALTER TABLE ac_project_state ADD COLUMN convergence_status TEXT DEFAULT 'cold_start'",
+            "ALTER TABLE ac_project_state ADD COLUMN current_run_id TEXT",
+            "ALTER TABLE ac_cycles ADD COLUMN rolled_back INTEGER DEFAULT 0",
+            "ALTER TABLE ac_cycles ADD COLUMN experiment_id TEXT",
+            "ALTER TABLE ac_cycles ADD COLUMN screenshot_path TEXT",
         ]:
             try:
                 conn.execute(alter)
             except Exception:
                 pass
+        conn.commit()
     except Exception:
         pass
 
@@ -808,12 +999,135 @@ async def workflows_improvement(request: Request):
 
 @router.get("/workflows/improvement/cycles/{project_id}", response_class=HTMLResponse)
 async def workflows_improvement_cycles(request: Request, project_id: str):
-    """HTMX fragment: cycle table for a given project."""
+    """HTMX fragment: cycle table for a given project.
+
+    Also auto-backfills cycle records for missions that completed but whose
+    CI/CD agent never called inject-cycle (agent failure / timeout).
+    """
     import json as _json
 
     def _load():
         conn = _ac_get_db()
         _ac_ensure_tables(conn)
+        # ── Auto-backfill: record cycles from missions that were never injected ──
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            all_missions = store.list_missions(project_id=project_id, limit=200)
+            # recorded = run_ids of cycles that already have real scores (skip them)
+            recorded = {
+                row[0]
+                for row in conn.execute(
+                    "SELECT platform_run_id FROM ac_cycles WHERE project_id=? AND total_score > 0",
+                    (project_id,),
+                ).fetchall()
+                if row[0]
+            }
+            for m in all_missions:
+                cfg = getattr(m, "config", {}) or {}
+                if cfg.get("project_id") != project_id:
+                    continue
+                if not cfg.get("ac"):
+                    continue
+                run_id = str(m.id)
+                if run_id in recorded:
+                    continue
+                cycle_num = cfg.get("cycle_num")
+                if not cycle_num:
+                    # parse from name "AC … — Cycle N"
+                    import re
+
+                    nm = getattr(m, "name", "") or ""
+                    mo = re.search(r"Cycle\s+(\d+)", nm)
+                    cycle_num = int(mo.group(1)) if mo else None
+                if not cycle_num:
+                    continue
+                status = getattr(m, "status", "unknown") or "unknown"
+                started = getattr(m, "created_at", None)
+                completed = getattr(m, "completed_at", None)
+                if hasattr(started, "isoformat"):
+                    started = started.isoformat()
+                if hasattr(completed, "isoformat"):
+                    completed = completed.isoformat()
+                # Try to extract phase scores + summary from sprints
+                phase_scores_dict = {}
+                fix_summary = f"Cycle {cycle_num} — {status}"
+                total_score = 0
+                defect_count = 0
+                try:
+                    sprints = store.list_sprints(run_id)
+                    if sprints:
+                        phase_scores_dict = {
+                            s.type: s.quality_score for s in sprints if s.quality_score
+                        }
+                        scored = [v for v in phase_scores_dict.values() if v]
+                        total_score = sum(scored) // len(scored) if scored else 0
+                        # Build a readable fix_summary: prefer deploy/qa retro_notes
+                        _SUMMARY_PRIORITY = ["deploy", "qa-sprint", "adversarial", "tdd-sprint", "inception"]
+                        sprint_by_type = {s.type: s for s in sprints}
+                        summary_text = ""
+                        for ptype in _SUMMARY_PRIORITY:
+                            s = sprint_by_type.get(ptype)
+                            if s and s.retro_notes and len(s.retro_notes) > 10:
+                                summary_text = s.retro_notes[:300].strip()
+                                break
+                        if summary_text:
+                            scores_compact = " ".join(
+                                f"{t[:3]}:{v}" for t, v in phase_scores_dict.items() if v
+                            )
+                            fix_summary = f"{summary_text} [{scores_compact}]"[:400]
+                        else:
+                            retros = [
+                                f"{s.type}:{s.quality_score}"
+                                for s in sprints
+                                if s.quality_score
+                            ]
+                            if retros:
+                                fix_summary = f"Cycle {cycle_num} — " + " · ".join(retros)
+                        # Estimate defect_count from adversarial retro_notes
+                        adv_sprint = sprint_by_type.get("adversarial")
+                        if adv_sprint and adv_sprint.retro_notes:
+                            import re as _re
+                            defect_count = len(_re.findall(
+                                r"\b(fail|bug|defect|error|issue|reject)\b",
+                                adv_sprint.retro_notes, _re.IGNORECASE
+                            ))
+                except Exception:
+                    pass
+                import json as _json2
+
+                # Stub record — backfilled from mission/sprint data
+                # Use DO UPDATE to enrich stubs that were inserted with no scores
+                conn.execute(
+                    "INSERT INTO ac_cycles (project_id, cycle_num, platform_run_id, status,"
+                    " phase_scores, total_score, defect_count, fix_summary, started_at, completed_at)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?)"
+                    " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
+                    " platform_run_id=COALESCE(NULLIF(excluded.platform_run_id,''), ac_cycles.platform_run_id),"
+                    " status=excluded.status,"
+                    " phase_scores=CASE WHEN ac_cycles.total_score <= 0 THEN excluded.phase_scores ELSE ac_cycles.phase_scores END,"
+                    " total_score=CASE WHEN ac_cycles.total_score <= 0 THEN excluded.total_score ELSE ac_cycles.total_score END,"
+                    " defect_count=CASE WHEN ac_cycles.defect_count = 0 THEN excluded.defect_count ELSE ac_cycles.defect_count END,"
+                    " fix_summary=CASE WHEN ac_cycles.total_score <= 0 OR ac_cycles.fix_summary LIKE 'Cycle % — %ompleted' OR ac_cycles.fix_summary LIKE 'Cycle % — unknown' THEN excluded.fix_summary ELSE ac_cycles.fix_summary END,"
+                    " completed_at=COALESCE(NULLIF(excluded.completed_at,''), ac_cycles.completed_at)",
+                    (
+                        project_id,
+                        cycle_num,
+                        run_id,
+                        status,
+                        _json2.dumps(phase_scores_dict),
+                        total_score,
+                        defect_count,
+                        fix_summary,
+                        started,
+                        completed,
+                    ),
+                )
+            conn.commit()
+        except Exception:
+            pass
+        # ── Load all cycles ──
         try:
             rows = conn.execute(
                 "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num",
@@ -836,8 +1150,43 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
 
     return _templates(request).TemplateResponse(
         "partials/workflows_improvement_cycles.html",
-        {"request": request, "cycles": cycles, "phases": _AC_PHASES},
+        {
+            "request": request,
+            "cycles": cycles,
+            "phases": _AC_PHASES,
+            "project_id": project_id,
+        },
     )
+
+
+# Thompson variant selection constants — skills with A/B variants
+_AC_SKILL_VARIANTS: dict[str, list[str]] = {
+    "ac-codex": ["v1", "v2"],
+    "ac-adversarial": ["v1", "v2"],
+}
+
+
+def _ac_select_skill_variants(project_id: str) -> dict[str, str]:
+    """Select the best skill variant via Thompson Sampling for each AC skill.
+
+    Returns a dict like {"ac-codex": "v2", "ac-adversarial": "v1"}.
+    Falls back to "v1" if the module is unavailable.
+    """
+    try:
+        from ...ac.skill_thompson import ac_skill_select_variant
+
+        # Look up tier for cross-project fallback
+        tier = next(
+            (p.get("tier") for p in _AC_PROJECTS if p["id"] == project_id), None
+        )
+        return {
+            skill: ac_skill_select_variant(
+                skill, variants, project_id=project_id, tier=tier
+            )
+            for skill, variants in _AC_SKILL_VARIANTS.items()
+        }
+    except Exception:
+        return {skill: "v1" for skill in _AC_SKILL_VARIANTS}
 
 
 @router.post("/api/improvement/start/{project_id}")
@@ -871,14 +1220,79 @@ async def api_improvement_start(project_id: str):
 
     # Build mission brief for the workflow
     proj = next(p for p in _AC_PROJECTS if p["id"] == project_id)
+
+    # Build enriched brief with user stories, a11y requirements, and design tokens
+    _stories = "\n".join(f"  - {s}" for s in proj.get("user_stories", []))
+    _a11y = "\n".join(f"  - {a}" for a in proj.get("a11y_requirements", []))
+    _tokens = "\n".join(f"  {k}: {v}" for k, v in proj.get("design_tokens", {}).items())
     brief = (
         f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
-        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n\n"
-        f"Cycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
+        f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n"
+        + (f"Description : {proj['description']}\n" if proj.get("description") else "")
+        + (f"\nUser Stories:\n{_stories}\n" if _stories else "")
+        + (
+            f"\nExigences Accessibilité (WCAG AA obligatoire):\n{_a11y}\n"
+            if _a11y
+            else ""
+        )
+        + (
+            f"\nDesign Tokens CSS (utiliser UNIQUEMENT ces valeurs, aucune valeur hardcodée):\n{_tokens}\n"
+            if _tokens
+            else ""
+        )
+        + f"\nCycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
         f"Objectif : score > 80/100, 0 défauts critiques, traçabilité 100%.\n"
         f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections.\n"
         f"Workflow : ac-improvement-cycle"
     )
+
+    # Ensure pilot project is registered in projects table with PILOTE domain + protected
+    def _ensure_pilot_project():
+        from ...projects.manager import get_project_store, Project
+        from ...config import DATA_DIR
+
+        ps = get_project_store()
+        existing = ps.get(project_id)
+        workspace = str(DATA_DIR / "workspaces" / project_id)
+        if not existing:
+            ps.create(
+                Project(
+                    id=project_id,
+                    name=proj["name"],
+                    description=proj.get("description", ""),
+                    factory_type="sf",
+                    domains=proj.get("tech", []),
+                    path=workspace,
+                    client_domain="PILOTE",
+                    is_protected=True,
+                )
+            )
+        elif not existing.is_protected or existing.client_domain != "PILOTE":
+            existing.client_domain = "PILOTE"
+            existing.is_protected = True
+            if not existing.path:
+                existing.path = workspace
+            ps.update(existing)
+
+    await asyncio.to_thread(_ensure_pilot_project)
+
+    # Stop any existing active sessions for this project before starting a new one
+    def _stop_existing_sessions():
+        from ...db.migrations import get_db
+
+        db = get_db()
+        try:
+            db.execute(
+                "UPDATE sessions SET status='interrupted' WHERE project_id=? AND status IN ('active','running')",
+                (project_id,),
+            )
+            db.commit()
+        except Exception:
+            pass
+        finally:
+            db.close()
+
+    await asyncio.to_thread(_stop_existing_sessions)
 
     try:
         from ...missions.store import get_mission_store
@@ -892,10 +1306,46 @@ async def api_improvement_start(project_id: str):
             type="improvement",
             workflow_id="ac-improvement-cycle",
             status="active",
-            config={"project_id": project_id, "cycle_num": cycle_num, "ac": True},
+            project_id=project_id,
+            config={
+                "project_id": project_id,
+                "cycle_num": cycle_num,
+                "ac": True,
+                "skill_variants": _ac_select_skill_variants(project_id),
+            },
         )
         created = await asyncio.to_thread(store.create_mission, mission_def)
         run_id = str(created.id)
+
+        # Create session + launch workflow
+        from ...sessions.store import get_session_store, SessionDef
+        from ...workflows.store import get_workflow_store
+        from .workflows import _run_workflow_background
+
+        wf_store = get_workflow_store()
+        wf = wf_store.get("ac-improvement-cycle")
+        sess_id = None
+        if wf:
+            sess = SessionDef(
+                name=f"AC {proj['name']} — Cycle {cycle_num}",
+                goal=brief,
+                project_id=project_id,
+                status="active",
+                config={
+                    "workflow_id": "ac-improvement-cycle",
+                    "mission_id": run_id,
+                    "ac": True,
+                    "cycle_num": cycle_num,
+                    "project_id": project_id,
+                    "skill_variants": _ac_select_skill_variants(project_id),
+                },
+            )
+            sess_store = get_session_store()
+            created_sess = await asyncio.to_thread(sess_store.create, sess)
+            sess_id = created_sess.id
+            asyncio.create_task(
+                _run_workflow_background(wf, sess_id, brief, project_id)
+            )
 
         # Update project state
         def _update_state():
@@ -916,17 +1366,268 @@ async def api_improvement_start(project_id: str):
                         time.strftime("%Y-%m-%dT%H:%M:%SZ"),
                     ),
                 )
+                conn.commit()
             except Exception:
                 pass
             conn.close()
 
         await asyncio.to_thread(_update_state)
         return JSONResponse(
-            {"run_id": run_id, "cycle_num": cycle_num, "project_id": project_id}
+            {
+                "run_id": run_id,
+                "session_id": sess_id,
+                "cycle_num": cycle_num,
+                "project_id": project_id,
+            }
         )
 
     except Exception as exc:
         return JSONResponse({"error": str(exc)}, status_code=500)
+
+
+@router.post("/api/improvement/stop/{project_id}")
+async def api_improvement_stop(project_id: str):
+    """Stop/abort a running AC cycle for a project."""
+    import time
+    from fastapi.responses import JSONResponse
+
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    cancelled_run_id = None
+
+    def _stop():
+        nonlocal cancelled_run_id
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            row = conn.execute(
+                "SELECT current_run_id, status FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if row:
+                cancelled_run_id = row["current_run_id"]
+                conn.execute(
+                    "UPDATE ac_project_state SET status='idle', current_run_id=NULL, updated_at=? WHERE project_id=?",
+                    (time.strftime("%Y-%m-%dT%H:%M:%SZ"), project_id),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        conn.close()
+
+    await asyncio.to_thread(_stop)
+
+    # Try to cancel the mission run if it exists
+    if cancelled_run_id:
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            await asyncio.to_thread(
+                store.update_mission_status, cancelled_run_id, "cancelled"
+            )
+        except Exception:
+            pass
+
+    return JSONResponse(
+        {"ok": True, "project_id": project_id, "cancelled_run": cancelled_run_id}
+    )
+
+
+@router.post("/api/improvement/rollback/{project_id}")
+async def api_improvement_rollback(project_id: str, request: Request):
+    """
+    AC Coach rollback: git revert last commit in workspace + delete current cycle from DB.
+    Called by ac-coach when score drops > 10pts.
+    """
+    import time
+    import subprocess
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    reason = body.get("reason", "score regression")
+    cycle_num = int(body.get("cycle_num", 0))
+
+    valid_ids = {p["id"] for p in _AC_PROJECTS}
+    if project_id not in valid_ids:
+        return JSONResponse(
+            {"error": f"Unknown project: {project_id}"}, status_code=404
+        )
+
+    def _rollback():
+        from ...config import DATA_DIR
+
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state = conn.execute(
+                "SELECT last_git_sha, current_cycle, current_run_id FROM ac_project_state WHERE project_id=?",
+                (project_id,),
+            ).fetchone()
+            if not state:
+                return {"error": "no state found"}
+
+            last_sha = state.get("last_git_sha", "")
+            _ = last_sha  # kept for potential future use (git reset --hard)
+            current_cycle = state.get("current_cycle", 0)
+            run_id = state.get("current_run_id", "")
+            rollback_cycle = cycle_num or current_cycle
+
+            # Find workspace for git revert
+            workspace_path = None
+            if run_id:
+                try:
+                    from ...agents.store import get_session_store
+
+                    for s in get_session_store().list():
+                        cfg = s.config if isinstance(s.config, dict) else {}
+                        if cfg.get("mission_id") == run_id or s.id == run_id:
+                            ws = DATA_DIR / "workspaces" / s.id
+                            if ws.exists():
+                                workspace_path = str(ws)
+                                break
+                except Exception:
+                    pass
+                if not workspace_path:
+                    ws = DATA_DIR / "workspaces" / run_id
+                    if ws.exists():
+                        workspace_path = str(ws)
+
+            git_reverted = False
+            git_output = ""
+            if workspace_path:
+                try:
+                    r = subprocess.run(
+                        ["git", "revert", "--no-commit", "HEAD"],
+                        cwd=workspace_path,
+                        capture_output=True,
+                        text=True,
+                        timeout=30,
+                    )
+                    if r.returncode == 0:
+                        subprocess.run(
+                            [
+                                "git",
+                                "commit",
+                                "-m",
+                                f"revert(ac-coach): rollback cycle {rollback_cycle} — {reason[:120]}",
+                            ],
+                            cwd=workspace_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=30,
+                        )
+                        git_reverted = True
+                        git_output = "git revert HEAD applied"
+                    else:
+                        git_output = r.stderr[:200]
+                except Exception as e:
+                    git_output = str(e)
+
+            now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+            # Mark cycle as rolled back (don't delete, keep for history)
+            conn.execute(
+                "UPDATE ac_cycles SET rolled_back=1 WHERE project_id=? AND cycle_num=?",
+                (project_id, rollback_cycle),
+            )
+            # Reset project state to previous cycle
+            prev_cycle = max(0, rollback_cycle - 1)
+            conn.execute(
+                "UPDATE ac_project_state SET status='idle', current_cycle=?, current_run_id=NULL, updated_at=? WHERE project_id=?",
+                (prev_cycle, now, project_id),
+            )
+            conn.commit()
+
+            # Close any active experiment as rolled_back
+            try:
+                from ...ac.experiments import get_active_experiment, close_experiment
+
+                exp = get_active_experiment(project_id)
+                if exp:
+                    close_experiment(
+                        exp["id"],
+                        None,
+                        None,
+                        "none",
+                        strategy_notes=reason,
+                        rolled_back=True,
+                    )
+            except Exception:
+                pass
+
+            return {
+                "ok": True,
+                "project_id": project_id,
+                "cycle_rolled_back": rollback_cycle,
+                "reset_to_cycle": prev_cycle,
+                "git_reverted": git_reverted,
+                "git_output": git_output,
+                "reason": reason,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+        finally:
+            conn.close()
+
+    result = await asyncio.to_thread(_rollback)
+    if "error" in result:
+        return JSONResponse(result, status_code=500)
+    return JSONResponse(result)
+
+
+@router.post("/api/improvement/experiment")
+async def api_improvement_experiment(request: Request):
+    """
+    Register an A/B experiment for the current cycle.
+    Called by ac-coach when it decides to test a new variant.
+    """
+    from fastapi.responses import JSONResponse
+    from .helpers import _parse_body
+
+    body = await _parse_body(request)
+    project_id = body.get("project_id")
+    cycle_num = int(body.get("cycle_num", 0))
+    experiment_key = body.get("experiment_key", "")
+    variant_a = body.get("variant_a", "v1")
+    variant_b = body.get("variant_b", "v2")
+    score_before = int(body.get("score_before", 0))
+    strategy_notes = body.get("strategy_notes", "")
+
+    if not project_id or not experiment_key:
+        return JSONResponse(
+            {"error": "project_id and experiment_key required"}, status_code=400
+        )
+
+    def _record():
+        from ...ac.experiments import record_experiment
+
+        exp_id = record_experiment(
+            project_id=project_id,
+            cycle_num=cycle_num,
+            experiment_key=experiment_key,
+            variant_a=variant_a,
+            variant_b=variant_b,
+            score_before=score_before,
+            strategy_notes=strategy_notes,
+        )
+        return exp_id
+
+    exp_id = await asyncio.to_thread(_record)
+    return JSONResponse(
+        {
+            "ok": True,
+            "experiment_id": exp_id,
+            "project_id": project_id,
+            "experiment_key": experiment_key,
+            "variant_a": variant_a,
+            "variant_b": variant_b,
+        }
+    )
 
 
 @router.post("/api/improvement/inject-cycle")
@@ -953,60 +1654,80 @@ async def api_improvement_inject_cycle(request: Request):
     fix_summary = body.get("fix_summary", "")
     adversarial_scores = body.get("adversarial_scores", {})
     traceability_score = int(body.get("traceability_score", 0))
+    screenshot_path = body.get("screenshot_path", "")  # relative path in workspace
+    platform_run_id = body.get("platform_run_id", f"ac-{project_id}-{cycle_num}")
     now = time.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def _write():
         conn = _ac_get_db()
         _ac_ensure_tables(conn)
         try:
+            phase_scores_json = (
+                _json.dumps(phase_scores)
+                if isinstance(phase_scores, dict)
+                else phase_scores
+            )
+            adv_scores_json = (
+                _json.dumps(adversarial_scores)
+                if isinstance(adversarial_scores, dict)
+                else adversarial_scores
+            )
             conn.execute(
                 "INSERT INTO ac_cycles (project_id, cycle_num, git_sha, status, phase_scores,"
                 " total_score, defect_count, fix_summary, adversarial_scores, traceability_score,"
-                " started_at, completed_at)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
+                " screenshot_path, started_at, completed_at)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)"
                 " ON CONFLICT(project_id, cycle_num) DO UPDATE SET"
                 " git_sha=excluded.git_sha, status=excluded.status, phase_scores=excluded.phase_scores,"
                 " total_score=excluded.total_score, defect_count=excluded.defect_count,"
                 " fix_summary=excluded.fix_summary, adversarial_scores=excluded.adversarial_scores,"
-                " traceability_score=excluded.traceability_score, completed_at=excluded.completed_at",
+                " traceability_score=excluded.traceability_score,"
+                " screenshot_path=COALESCE(NULLIF(excluded.screenshot_path,''), ac_cycles.screenshot_path),"
+                " completed_at=excluded.completed_at",
                 (
                     project_id,
                     cycle_num,
                     git_sha,
                     status,
-                    _json.dumps(phase_scores)
-                    if isinstance(phase_scores, dict)
-                    else phase_scores,
+                    phase_scores_json,
                     total_score,
                     defect_count,
                     fix_summary,
-                    _json.dumps(adversarial_scores)
-                    if isinstance(adversarial_scores, dict)
-                    else adversarial_scores,
+                    adv_scores_json,
                     traceability_score,
+                    screenshot_path,
                     now,
                     now,
                 ),
             )
-            # Update project state average score
+            # Compute average from existing cycles
+            avg_row = conn.execute(
+                "SELECT AVG(total_score) as avg FROM ac_cycles WHERE project_id=? AND total_score > 0",
+                (project_id,),
+            ).fetchone()
+            avg_score = float(avg_row["avg"] or 0) if avg_row else 0.0
+            ci_status = "green" if status == "completed" else "red"
+            new_status = "idle" if status == "completed" else status
+            # Two-step upsert: INSERT then UPDATE — avoids GREATEST/MAX cross-DB issues
             conn.execute(
                 "INSERT INTO ac_project_state (project_id, current_cycle, status, total_score_avg,"
                 " last_git_sha, ci_status, updated_at)"
                 " VALUES (?,?,?,?,?,?,?)"
-                " ON CONFLICT(project_id) DO UPDATE SET"
-                " current_cycle=MAX(current_cycle, excluded.current_cycle),"
-                " status=CASE WHEN excluded.status='completed' THEN 'idle' ELSE excluded.status END,"
-                " last_git_sha=excluded.last_git_sha, ci_status=excluded.ci_status,"
-                " total_score_avg=("
-                "   SELECT AVG(total_score) FROM ac_cycles WHERE project_id=? AND total_score > 0"
-                " ), updated_at=excluded.updated_at",
+                " ON CONFLICT(project_id) DO NOTHING",
+                (project_id, cycle_num, new_status, avg_score, git_sha, ci_status, now),
+            )
+            conn.execute(
+                "UPDATE ac_project_state SET"
+                " current_cycle=CASE WHEN current_cycle < ? THEN ? ELSE current_cycle END,"
+                " status=?, total_score_avg=?, last_git_sha=?, ci_status=?, updated_at=?"
+                " WHERE project_id=?",
                 (
-                    project_id,
                     cycle_num,
-                    status,
-                    total_score,
+                    cycle_num,
+                    new_status,
+                    avg_score,
                     git_sha,
-                    "green" if status == "completed" else "red",
+                    ci_status,
                     now,
                     project_id,
                 ),
@@ -1014,6 +1735,7 @@ async def api_improvement_inject_cycle(request: Request):
         except Exception as e:
             conn.close()
             raise e
+        conn.commit()
         conn.close()
 
     try:
@@ -1075,9 +1797,7 @@ async def api_improvement_inject_cycle(request: Request):
 
                     rl = get_rl_policy()
                     rl.record_experience(
-                        mission_id=body.get(
-                            "platform_run_id", f"ac-{project_id}-{cycle_num}"
-                        ),
+                        mission_id=platform_run_id,
                         state_dict=state,
                         action="keep",
                         reward=reward,
@@ -1132,7 +1852,54 @@ async def api_improvement_inject_cycle(request: Request):
                 except Exception as e:
                     log.debug("AC RL feedback error: %s", e)
 
-                # ── 2. Convergence detection ──────────────────────────────────
+                # ── 2. Thompson sampling feedback ─────────────────────────────
+                prev_score = prev_cycle["total_score"] if prev_cycle else None
+                if prev_score is not None:
+                    try:
+                        from ...ac.skill_thompson import ac_skill_record
+                        from ...db.migrations import get_db
+
+                        # Read skill_variants from the mission config (set at cycle start)
+                        def _load_variants():
+                            import json as _j
+
+                            conn_v = get_db()
+                            try:
+                                row = conn_v.execute(
+                                    "SELECT config_json FROM missions WHERE id=? LIMIT 1",
+                                    (platform_run_id,),
+                                ).fetchone()
+                                if row and row["config_json"]:
+                                    cfg = _j.loads(row["config_json"])
+                                    return cfg.get("skill_variants", {})
+                                return {}
+                            except Exception:
+                                return {}
+                            finally:
+                                conn_v.close()
+
+                        variants_used = await asyncio.to_thread(_load_variants)
+                        for skill_id, variant in variants_used.items():
+                            ac_skill_record(
+                                skill_id=skill_id,
+                                variant=variant,
+                                project_id=project_id,
+                                cycle_score=total_score,
+                                prev_cycle_score=prev_score,
+                                tier=tier,
+                            )
+                            log.info(
+                                "AC Thompson: recorded %s=%s score=%d prev=%d → %s",
+                                skill_id,
+                                variant,
+                                total_score,
+                                prev_score,
+                                "win" if total_score > prev_score else "loss",
+                            )
+                    except Exception as e:
+                        log.debug("AC Thompson record error: %s", e)
+
+                # ── 3. Convergence detection ──────────────────────────────────
                 def _load_scores():
                     conn4 = _ac_get_db()
                     try:
@@ -1215,7 +1982,106 @@ async def api_improvement_inject_cycle(request: Request):
         return JSONResponse({"error": str(exc)}, status_code=500)
 
 
-@router.get("/api/improvement/project/{project_id}")
+@router.get("/api/improvement/screenshot/{project_id}/{cycle_num}")
+async def api_improvement_screenshot(project_id: str, cycle_num: int):
+    """Serve the screenshot captured during a cycle's QA phase."""
+    from fastapi.responses import FileResponse, Response
+
+    def _find_screenshot():
+        from ...config import DATA_DIR
+
+        conn = _ac_get_db()
+        try:
+            row = conn.execute(
+                "SELECT screenshot_path, platform_run_id FROM ac_cycles"
+                " WHERE project_id=? AND cycle_num=?",
+                (project_id, cycle_num),
+            ).fetchone()
+        finally:
+            conn.close()
+        if not row:
+            return None
+        screenshot_path = (row.get("screenshot_path") or "").strip()
+        run_id = (row.get("platform_run_id") or "").strip()
+        # Find session_ids linked to this run
+        session_ids = []
+        if run_id:
+            try:
+                from ...agents.store import get_session_store
+
+                for s in get_session_store().list():
+                    cfg = s.config if isinstance(s.config, dict) else {}
+                    if cfg.get("mission_id") == run_id or s.id == run_id:
+                        session_ids.append(s.id)
+            except Exception:
+                pass
+        candidates = [DATA_DIR / "workspaces" / sid for sid in session_ids]
+        if run_id:
+            candidates.append(DATA_DIR / "workspaces" / run_id)
+        # Also check project-level workspace dir
+        candidates.append(DATA_DIR / "workspaces" / project_id)
+        # Try explicit path first
+        if screenshot_path:
+            for ws in candidates:
+                p = ws / screenshot_path
+                if p.exists():
+                    return str(p)
+            # Also try absolute path
+            from pathlib import Path as _Path
+            _abs = _Path(screenshot_path)
+            if _abs.is_absolute() and _abs.exists():
+                return str(_abs)
+        # Auto-discover screenshot
+        for ws in candidates:
+            if not ws.exists():
+                continue
+            # Check screenshots/ subdir first
+            ss_dir = ws / "screenshots"
+            if ss_dir.exists():
+                for pat in ("desktop*.png", "screen*.png", "*.png"):
+                    pngs = sorted(ss_dir.glob(pat))
+                    if pngs:
+                        return str(pngs[0])
+            # Also check workspace root for any PNG
+            root_pngs = sorted(ws.glob("*.png"))
+            if root_pngs:
+                return str(root_pngs[0])
+        return None
+
+    path = await asyncio.to_thread(_find_screenshot)
+    if path:
+        return FileResponse(path, media_type="image/png")
+    return Response(status_code=404)
+
+
+@router.post("/api/improvement/backfill/{project_id}")
+async def api_improvement_backfill(project_id: str):
+    """Force re-backfill of cycle records from mission/sprint data. Updates stubs."""
+    from fastapi.responses import JSONResponse
+
+    def _force_backfill():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        updated = 0
+        try:
+            # Delete all stub rows (total_score=0 with no git_sha = backfill-only stubs)
+            conn.execute(
+                "DELETE FROM ac_cycles WHERE project_id=? AND total_score = 0 AND (git_sha IS NULL OR git_sha = '')",
+                (project_id,),
+            )
+            conn.commit()
+            updated = conn.total_changes
+        except Exception:
+            pass
+        finally:
+            conn.close()
+        return updated
+
+    deleted = await asyncio.to_thread(_force_backfill)
+    return JSONResponse({"ok": True, "project_id": project_id, "stubs_cleared": deleted,
+                         "message": "Stub cycles cleared. Reload the page to re-backfill from missions."})
+
+
 async def api_improvement_project_state(project_id: str):
     """
     Return current AC project state including RL hint, convergence, skill eval pending.
@@ -1262,6 +2128,9 @@ async def api_improvement_project_state(project_id: str):
             except Exception:
                 pass
 
+    # Project metadata (user stories, a11y, design tokens)
+    proj_meta = next((p for p in _AC_PROJECTS if p["id"] == project_id), {})
+
     return JSONResponse(
         {
             "project_id": project_id,
@@ -1276,6 +2145,11 @@ async def api_improvement_project_state(project_id: str):
             "last_git_sha": state.get("last_git_sha"),
             "cycle_count": len(cycles),
             "recent_scores": scores[-5:],
+            # Project spec (read by ac-architect to generate INCEPTION.md)
+            "user_stories": proj_meta.get("user_stories", []),
+            "a11y_requirements": proj_meta.get("a11y_requirements", []),
+            "design_tokens": proj_meta.get("design_tokens", {}),
+            "description": proj_meta.get("description", ""),
         }
     )
 
@@ -1310,8 +2184,8 @@ async def api_improvement_scores(project_id: str):
         ac_convergence_check(scores) if len(scores) >= 3 else {"status": "cold_start"}
     )
 
-    # Thompson stats for AC skills
-    skill_stats = {}
+    # Thompson stats for AC skills — nested {skill: {variant: {wins, losses, avg_score}}}
+    skill_stats: dict = {}
     for skill in [
         "ac-architect",
         "ac-codex",
@@ -1319,9 +2193,16 @@ async def api_improvement_scores(project_id: str):
         "ac-qa-agent",
         "ac-cicd-agent",
     ]:
-        stats = await asyncio.to_thread(ac_skill_stats, skill, project_id)
-        if stats:
-            skill_stats[skill] = stats
+        stats_list = await asyncio.to_thread(ac_skill_stats, skill, project_id)
+        if stats_list:
+            skill_stats[skill] = {
+                row["variant"]: {
+                    "wins": row.get("wins", 0),
+                    "losses": row.get("losses", 0),
+                    "avg_score": row.get("avg_score", 0.0),
+                }
+                for row in stats_list
+            }
 
     return JSONResponse(
         {
@@ -1330,6 +2211,259 @@ async def api_improvement_scores(project_id: str):
             "convergence": conv,
             "avg_reward": round(sum(rewards) / len(rewards), 3) if rewards else 0.0,
             "skill_stats": skill_stats,
+        }
+    )
+
+
+@router.get("/api/improvement/live/{project_id}")
+async def api_improvement_live(project_id: str):
+    """Comprehensive live snapshot for the project detail modal.
+    Returns state, all cycles (phase breakdown, adversarial, fix_summary, tools, errors),
+    adversarial findings, and mission run status.
+    """
+    import json as _json
+    from fastapi.responses import JSONResponse
+
+    def _load():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            state_row = conn.execute(
+                "SELECT * FROM ac_project_state WHERE project_id=?", (project_id,)
+            ).fetchone()
+            cycles = conn.execute(
+                "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 20",
+                (project_id,),
+            ).fetchall()
+            adv_rows = conn.execute(
+                "SELECT cycle_num, dimension, score, verdict, findings, checked_at "
+                "FROM ac_adversarial WHERE project_id=? ORDER BY cycle_num DESC, score ASC LIMIT 50",
+                (project_id,),
+            ).fetchall()
+        except Exception:
+            state_row = None
+            cycles = []
+            adv_rows = []
+        finally:
+            conn.close()
+        return state_row, [dict(c) for c in cycles], [dict(r) for r in adv_rows]
+
+    state_row, cycles_raw, adv_rows = await asyncio.to_thread(_load)
+
+    # Parse cycles
+    cycles = []
+    all_scores = []
+    for c in cycles_raw:
+        row = dict(c)
+        try:
+            row["phase_scores_dict"] = _json.loads(row.get("phase_scores") or "{}")
+        except Exception:
+            row["phase_scores_dict"] = {}
+        try:
+            row["adv_dict"] = _json.loads(row.get("adversarial_scores") or "{}")
+        except Exception:
+            row["adv_dict"] = {}
+        all_scores.append(row.get("total_score", 0))
+        cycles.append(row)
+    all_scores.reverse()  # chronological
+
+    # Parse adversarial findings
+    adv_by_cycle: dict = {}
+    for r in adv_rows:
+        cn = r["cycle_num"]
+        if cn not in adv_by_cycle:
+            adv_by_cycle[cn] = []
+        try:
+            r["findings_list"] = _json.loads(r.get("findings") or "[]")
+        except Exception:
+            r["findings_list"] = []
+        adv_by_cycle[cn].append(r)
+
+    # State
+    state = dict(state_row) if state_row else {}
+    for field in ("next_cycle_hint", "skill_eval_pending"):
+        raw = state.get(field)
+        if raw and isinstance(raw, str):
+            try:
+                state[field] = _json.loads(raw)
+            except Exception:
+                pass
+
+    # Convergence
+    from ...ac.convergence import ac_convergence_check
+
+    conv = (
+        ac_convergence_check(all_scores)
+        if len(all_scores) >= 3
+        else {"status": "cold_start"}
+    )
+
+    # Mission run status + live activity (events + tool calls)
+    run_status = {}
+    live_events = []
+    tool_activity = []
+    agents_active = []
+    current_run_id = state.get("current_run_id")
+    if current_run_id:
+        try:
+            from ...missions.store import get_mission_store
+
+            store = get_mission_store()
+            run = await asyncio.to_thread(store.get_mission, current_run_id)
+            if run:
+                run_status = {
+                    "id": str(run.id),
+                    "name": run.name,
+                    "status": run.status,
+                    "current_phase": getattr(run, "current_phase", None),
+                    "started_at": str(getattr(run, "started_at", "") or ""),
+                    "updated_at": str(getattr(run, "updated_at", "") or ""),
+                }
+        except Exception:
+            pass
+
+        # Live events for this mission (last 30)
+        def _load_activity():
+            import json as _json
+            from ...db.migrations import get_db
+
+            db = get_db()
+            evts = []
+            tools = []
+            try:
+                rows = db.execute(
+                    "SELECT timestamp, event_type, actor, data FROM events "
+                    "WHERE mission_id=? ORDER BY timestamp DESC LIMIT 30",
+                    (current_run_id,),
+                ).fetchall()
+                for r in rows:
+                    try:
+                        d = _json.loads(r["data"] or "{}")
+                    except Exception:
+                        d = {}
+                    evts.append(
+                        {
+                            "ts": r["timestamp"],
+                            "type": r["event_type"],
+                            "actor": r["actor"],
+                            "summary": d.get("summary")
+                            or d.get("message")
+                            or d.get("content", "")[:120],
+                            "phase": d.get("phase", ""),
+                            "tool": d.get("tool_name", ""),
+                        }
+                    )
+            except Exception:
+                pass
+            # Tool calls linked to sessions of this mission
+            try:
+                tc_rows = db.execute(
+                    """SELECT tc.tool_name, tc.agent_id, tc.success, COUNT(*) as cnt
+                       FROM tool_calls tc
+                       WHERE tc.session_id IN (
+                           SELECT id FROM sessions WHERE config_json LIKE ?
+                       )
+                       GROUP BY tc.tool_name, tc.agent_id
+                       ORDER BY cnt DESC LIMIT 20""",
+                    (f"%{current_run_id}%",),
+                ).fetchall()
+                for r in tc_rows:
+                    tools.append(
+                        {
+                            "tool": r["tool_name"],
+                            "agent": r["agent_id"],
+                            "count": r["cnt"],
+                            "success": bool(r["success"]),
+                        }
+                    )
+            except Exception:
+                pass
+            db.close()
+            return evts, tools
+
+        live_events, tool_activity = await asyncio.to_thread(_load_activity)
+
+        # Aggregate active agents from events + tool_calls
+        seen = {}
+        for e in live_events:
+            a = e.get("actor", "")
+            if a and a != "system":
+                seen[a] = seen.get(a, 0) + 1
+        for t in tool_activity:
+            a = t.get("agent", "")
+            if a:
+                seen[a] = seen.get(a, 0) + t.get("count", 1)
+        agents_active = [
+            {"id": k, "activity": v}
+            for k, v in sorted(seen.items(), key=lambda x: -x[1])[:10]
+        ]
+
+    # Latest cycle full detail
+    latest = cycles[0] if cycles else {}
+
+    return JSONResponse(
+        {
+            "project_id": project_id,
+            "state": {
+                "current_cycle": state.get("current_cycle", 0),
+                "status": state.get("status", "idle"),
+                "ci_status": state.get("ci_status", "unknown"),
+                "last_git_sha": state.get("last_git_sha", ""),
+                "total_score_avg": round(state.get("total_score_avg") or 0, 1),
+                "next_cycle_hint": state.get("next_cycle_hint"),
+                "skill_eval_pending": state.get("skill_eval_pending"),
+                "updated_at": state.get("updated_at", ""),
+            },
+            "convergence": conv,
+            "run": run_status,
+            "latest_cycle": {
+                "cycle_num": latest.get("cycle_num", 0),
+                "status": latest.get("status", ""),
+                "total_score": latest.get("total_score", 0),
+                "defect_count": latest.get("defect_count", 0),
+                "veto_count": latest.get("veto_count", 0),
+                "traceability_score": latest.get("traceability_score", 0),
+                "ga_fitness": latest.get("ga_fitness", 0),
+                "rl_reward": latest.get("rl_reward", 0),
+                "fix_summary": latest.get("fix_summary", ""),
+                "git_sha": latest.get("git_sha", ""),
+                "phase_scores": latest.get("phase_scores_dict", {}),
+                "adversarial_scores": latest.get("adv_dict", {}),
+                "started_at": latest.get("started_at", ""),
+                "completed_at": latest.get("completed_at", ""),
+            },
+            "cycles": [
+                {
+                    "cycle_num": c.get("cycle_num"),
+                    "total_score": c.get("total_score", 0),
+                    "defect_count": c.get("defect_count", 0),
+                    "veto_count": c.get("veto_count", 0),
+                    "rl_reward": c.get("rl_reward", 0),
+                    "traceability_score": c.get("traceability_score", 0),
+                    "phase_scores": c.get("phase_scores_dict", {}),
+                    "fix_summary": c.get("fix_summary", ""),
+                    "status": c.get("status", ""),
+                    "started_at": c.get("started_at", ""),
+                    "completed_at": c.get("completed_at", ""),
+                }
+                for c in reversed(cycles)
+            ],
+            "adversarial": [
+                {
+                    "cycle_num": r["cycle_num"],
+                    "dimension": r["dimension"],
+                    "score": r["score"],
+                    "verdict": r["verdict"],
+                    "findings": r["findings_list"],
+                }
+                for r in adv_rows
+            ],
+            "phases": _AC_PHASES,
+            "all_scores": all_scores,
+            "live_events": live_events[:20],
+            "tool_activity": tool_activity,
+            "agents_active": agents_active,
+            "total_tool_calls": sum(t.get("count", 0) for t in tool_activity),
         }
     )
 
@@ -1381,6 +2515,166 @@ async def art_page(request: Request, tab: str = "agents"):
             "total_teams": len(all_teams),
             "total_members": total_members,
         },
+    )
+
+
+@router.get("/api/art/amelio/specbar/{subtab}")
+async def api_art_amelio_specbar(subtab: str):
+    """Return SAFe spec bar context for the given Amélioration Continue sub-tab.
+    Called live on each tab switch in art.html to populate Programme/Epic/Feature/etc.
+    """
+    from fastapi.responses import JSONResponse
+
+    def _build():
+        conn = _ac_get_db()
+        _ac_ensure_tables(conn)
+        try:
+            # All active AC projects
+            states = conn.execute(
+                "SELECT project_id, current_cycle, status, current_run_id, total_score_avg,"
+                " ci_status FROM ac_project_state ORDER BY updated_at DESC"
+            ).fetchall()
+            states = [dict(s) for s in states]
+            # Most recent cycle for the primary active project
+            active = next(
+                (s for s in states if s.get("status") not in ("idle", None)), None
+            ) or (states[0] if states else None)
+            latest_cycle = None
+            sprints = []
+            if active:
+                c = conn.execute(
+                    "SELECT * FROM ac_cycles WHERE project_id=? ORDER BY cycle_num DESC LIMIT 1",
+                    (active["project_id"],),
+                ).fetchone()
+                if c:
+                    latest_cycle = dict(c)
+            # Tasks from current mission via epics/sprints
+            if active and active.get("current_run_id"):
+                try:
+                    from ...missions.store import get_mission_store
+
+                    st = get_mission_store()
+                    sp_list = st.list_sprints(active["current_run_id"])
+                    sprints = [
+                        {
+                            "title": f"{s.type} — {s.name or s.type}",
+                            "status": s.status,
+                        }
+                        for s in sp_list
+                    ]
+                except Exception:
+                    pass
+        except Exception:
+            states, active, latest_cycle, sprints = [], None, None, []
+        finally:
+            conn.close()
+        return states, active, latest_cycle, sprints
+
+    states, active, latest_cycle, sprints = await asyncio.to_thread(_build)
+
+    # Build context per sub-tab
+    n_active = sum(1 for s in states if s.get("status") not in ("idle", None))
+    n_total = len(states)
+    programme = "Software Factory"
+    programme_sub = f"{n_active}/{n_total} projets actifs" if n_total else ""
+
+    if subtab == "cycles" or subtab == "ac-panel-cycles":
+        if active:
+            epic_name = f"AC {active['project_id']} — Cycle {active['current_cycle']}"
+            feature = {
+                "name": latest_cycle.get("status", "pending")
+                if latest_cycle
+                else active.get("ci_status", "unknown"),
+                "status": active.get("status", ""),
+            }
+            stories = sprints or (
+                [
+                    {
+                        "title": f"Cycle {active['current_cycle']} en cours",
+                        "status": "active",
+                    }
+                ]
+                if active.get("current_cycle")
+                else []
+            )
+            persona = "Marc Lefèvre (Platform Lead)"
+            rbac = ["admin", "developer"]
+        else:
+            epic_name = "Aucun cycle actif"
+            feature = None
+            stories = []
+            persona = "—"
+            rbac = []
+    elif subtab == "skills" or subtab == "ac-panel-skills":
+        epic_name = "Skills Improvement"
+        feature = {"name": "Eval coverage", "status": "ongoing"}
+        stories = [
+            {"title": "Skills avec evals ≥ 80%", "status": "active"},
+            {"title": "Skills manquants à créer", "status": "pending"},
+        ]
+        persona = "Sophia Renard (Knowledge Lead)"
+        rbac = ["admin", "developer", "viewer"]
+    elif subtab == "thompson" or subtab == "ac-panel-thompson":
+        epic_name = "Thompson Sampling — Skill Variants"
+        feature = {"name": "Beta distribution selection", "status": "running"}
+        stories = [
+            {"title": "Variant A/B skill selection", "status": "active"},
+            {"title": "Bayesian reward update", "status": "active"},
+        ]
+        persona = "Karim Benchekroun (ML Lead)"
+        rbac = ["admin", "developer"]
+    elif subtab == "darwin" or subtab == "ac-panel-darwin":
+        epic_name = "Darwin Teams — GA Evolution"
+        feature = {"name": "Fitness GA", "status": "running"}
+        stories = [
+            {"title": "Team fitness scoring", "status": "active"},
+            {"title": "Natural selection + crossover", "status": "active"},
+        ]
+        persona = "Thomas Dubois (ART Lead)"
+        rbac = ["admin", "project_manager"]
+    elif subtab == "evolution" or subtab == "ac-panel-evolution":
+        epic_name = "Evolution nocturne — GA + RL"
+        feature = {"name": "Orchestration évolutive", "status": "scheduled"}
+        stories = [
+            {"title": "GA orchestration nocturne", "status": "active"},
+            {"title": "RL reward propagation", "status": "active"},
+        ]
+        persona = "Orchestrateur Évolution"
+        rbac = ["admin"]
+    elif subtab == "rl" or subtab == "ac-panel-rl":
+        epic_name = "RL Reward — Politique d'apprentissage"
+        feature = {
+            "name": f"Score moy. {active['total_score_avg']:.0f}/100"
+            if active
+            else "RL policy",
+            "status": "active",
+        }
+        stories = [
+            {
+                "title": "Reward R = f(qualité, adversarial, traceability)",
+                "status": "active",
+            },
+        ]
+        persona = "Arnaud Delacroix (Cost Lead)"
+        rbac = ["admin", "developer"]
+    else:
+        epic_name = f"Amélioration Continue — {subtab}"
+        feature = None
+        stories = []
+        persona = "—"
+        rbac = ["admin"]
+
+    return JSONResponse(
+        {
+            "programme": programme,
+            "programme_sub": programme_sub,
+            "epic": {"name": epic_name},
+            "feature": feature,
+            "user_stories": stories,
+            "persona": persona,
+            "rbac_roles": rbac,
+            "slug": f"/art#amelio/{subtab}",
+        }
     )
 
 

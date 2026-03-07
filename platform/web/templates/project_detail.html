@@ -29,11 +29,11 @@
         <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Analyze
     </button>
     {% endif %}
-    <button onclick="document.getElementById('importGitModal').style.display='flex'" style="padding:4px 10px;background:#2d4a6d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px" title="Importer un dépôt GitHub">🔗 Import</button>
+    <button onclick="document.getElementById('importGitModal').style.display='flex'" style="padding:4px 10px;background:#2d4a6d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px" title="Importer un dépôt GitHub"> Import</button>
     <button onclick="openCmdPalette()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:11px" title="Palette de commandes (⌘K)">⌘K</button>
-    <button onclick="wsShowPanel('aichat')" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Assistant IA">🤖</button>
-    <button onclick="wsShowPanel('prs');wsPrLoad()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Pull Requests">🔃</button>
-    <button onclick="wsShowPanel('deploylogs');wsDeployLogsStart()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Deploy Logs">📋</button>
+    <button onclick="wsShowPanel('aichat')" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Assistant IA"></button>
+    <button onclick="wsShowPanel('prs');wsPrLoad()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Pull Requests"></button>
+    <button onclick="wsShowPanel('deploylogs');wsDeployLogsStart()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Deploy Logs"></button>
 </div>
 {% endblock %}
 
@@ -325,10 +325,17 @@
         <!-- Danger Zone -->
         <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(239,68,68,.2)">
             <h4 style="font-size:0.72rem;text-transform:uppercase;color:var(--red);opacity:.7;margin-bottom:0.5rem;letter-spacing:0.05em">Zone dangereuse</h4>
+            {% if project.is_protected %}
+            <button class="btn btn-sm" style="width:100%;opacity:.4;cursor:not-allowed" disabled title="Ce projet est protégé et ne peut pas être supprimé">
+                <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Projet protégé
+            </button>
+            {% else %}
             <button class="btn btn-sm btn-danger" style="width:100%" onclick="deleteProject('{{ project.id }}','{{ project.name|replace("'","&#39;") }}')">
                 <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 Supprimer ce projet
             </button>
+            {% endif %}
         </div>
     </aside>
 </div>
@@ -336,16 +343,16 @@
 <!-- ══ Explorer panel (floating sidebar) ══ -->
 <div id="panel-explorer" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:300px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;display:none;flex-direction:column">
   <div style="padding:8px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
-    <span style="font-size:13px;font-weight:600">📁 Explorateur</span>
+    <span style="font-size:13px;font-weight:600"> Explorateur</span>
     <span id="explorerPath" style="font-size:11px;color:#888;flex:1"></span>
     <button onclick="wsExplorerLoad('')" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px" title="Racine">⬆️</button>
-    <button onclick="document.getElementById('panel-explorer').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px">✕</button>
+    <button onclick="document.getElementById('panel-explorer').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
   </div>
   <div id="explorerList" style="padding:4px;font-size:12px;overflow-y:auto;flex:1"></div>
   <div id="filePreview" style="display:none;border-top:1px solid #333;flex-direction:column">
     <div style="padding:6px 12px;display:flex;align-items:center;justify-content:space-between;background:#1a1a1a">
       <span id="filePreviewName" style="font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
-      <button onclick="document.getElementById('filePreview').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;flex-shrink:0">✕</button>
+      <button onclick="document.getElementById('filePreview').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;flex-shrink:0"></button>
     </div>
     <pre id="filePreviewContent" style="margin:0;padding:8px;font-size:11px;line-height:1.5;overflow:auto;max-height:300px;background:#111;color:#ddd;white-space:pre-wrap;word-break:break-all"></pre>
   </div>
@@ -355,10 +362,10 @@
 <div id="panel-aichat" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
   <div style="display:flex;flex-direction:column;height:100%">
     <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:13px;font-weight:600">🤖 Assistant IA</span>
+      <span style="font-size:13px;font-weight:600"> Assistant IA</span>
       <div style="display:flex;gap:6px;align-items:center">
         <button onclick="wsAiClearChat()" style="background:none;border:none;color:#666;cursor:pointer;font-size:11px">Vider</button>
-        <button onclick="wsClosePanel('aichat')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px">✕</button>
+        <button onclick="wsClosePanel('aichat')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
       </div>
     </div>
     <div id="aiChatMessages" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:200px;max-height:calc(100vh - 300px)"></div>
@@ -380,10 +387,10 @@
 <!-- ══ PR Viewer panel ══ -->
 <div id="panel-prs" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
   <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
-    <span style="font-size:13px;font-weight:600">🔃 Pull Requests</span>
+    <span style="font-size:13px;font-weight:600"> Pull Requests</span>
     <span id="prRepo" style="font-size:11px;color:#888;flex:1"></span>
     <button onclick="wsPrLoad()" style="background:none;border:none;color:#888;cursor:pointer">↻</button>
-    <button onclick="wsClosePanel('prs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px">✕</button>
+    <button onclick="wsClosePanel('prs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
   </div>
   <div id="prList" style="padding:8px;font-size:12px;overflow-y:auto;flex:1"></div>
 </div>
@@ -391,22 +398,22 @@
 <!-- ══ Deploy Logs panel ══ -->
 <div id="panel-deploylogs" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
   <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
-    <span style="font-size:13px;font-weight:600">📋 Deploy Logs</span>
+    <span style="font-size:13px;font-weight:600"> Deploy Logs</span>
     <button onclick="wsDeployLogsStart()" style="padding:2px 8px;font-size:11px;background:#333;color:#aaa;border:none;border-radius:4px;cursor:pointer">↻ Stream</button>
     <button onclick="wsDeployLogsClear()" style="background:none;border:none;color:#666;cursor:pointer;font-size:11px">Vider</button>
-    <button onclick="wsClosePanel('deploylogs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;margin-left:auto">✕</button>
+    <button onclick="wsClosePanel('deploylogs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;margin-left:auto"></button>
   </div>
   <div id="deployLogsList" style="padding:6px;font-size:11px;font-family:monospace;overflow-y:auto;flex:1;background:#0d0d0d;color:#aaa;line-height:1.4"></div>
 </div>
 
 <!-- ══ Import GitHub modal ══ --> style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
   <div style="background:#1e1e1e;border:1px solid #444;border-radius:8px;padding:24px;width:480px;max-width:90vw">
-    <h3 style="margin:0 0 16px;font-size:15px;color:#eee">🔗 Importer un dépôt GitHub</h3>
+    <h3 style="margin:0 0 16px;font-size:15px;color:#eee"> Importer un dépôt GitHub</h3>
     <input id="importGitUrl" type="text" placeholder="https://github.com/user/repo"
            style="width:100%;box-sizing:border-box;background:#111;color:#eee;border:1px solid #444;border-radius:4px;padding:8px;font-size:13px;margin-bottom:12px">
     <div style="display:flex;gap:8px;justify-content:flex-end">
       <button onclick="document.getElementById('importGitModal').style.display='none'" style="padding:6px 14px;background:#333;color:#ccc;border:none;border-radius:4px;cursor:pointer">Annuler</button>
-      <button onclick="wsImportGit()" style="padding:6px 14px;background:#2d6a4f;color:#fff;border:none;border-radius:4px;cursor:pointer">🚀 Cloner</button>
+      <button onclick="wsImportGit()" style="padding:6px 14px;background:#2d6a4f;color:#fff;border:none;border-radius:4px;cursor:pointer"> Cloner</button>
     </div>
     <div id="importGitLog" style="display:none;margin-top:12px;background:#111;border-radius:4px;padding:8px;max-height:200px;overflow-y:auto;font-size:11px;font-family:monospace;color:#aaa"></div>
   </div>
@@ -657,7 +664,7 @@ async function wsExplorerLoad(path) {
         <div onclick="${item.type==='dir'?`wsExplorerLoad('${item.path.replace(/'/g,"\\'")}')` : `wsFilePreview('${item.path.replace(/'/g,"\\'")}')` }"
              style="padding:4px 8px;cursor:pointer;display:flex;align-items:center;gap:6px;border-radius:3px"
              onmouseover="this.style.background='#2a2a2a'" onmouseout="this.style.background=''">
-          <span>${item.type==='dir'?'📂':'📄'}</span>
+          <span>${item.type==='dir'?'':''}</span>
           <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</span>
           ${item.type==='file'?`<span style="color:#555;font-size:10px">${item.size>1024?Math.round(item.size/1024)+'k':item.size+'b'}</span>`:''}
         </div>`).join('');
@@ -713,9 +720,9 @@ async function wsImportGit() {
 
 // ── Feature 3: Command Palette ────────────────────────────────
 const CMD_ACTIONS = [
-    {icon:'📁', label:'Explorateur de fichiers', action: ()=>{ closeCmdPalette(); document.getElementById('panel-explorer').style.display='flex'; wsExplorerLoad(''); }},
-    {icon:'🔗', label:'Importer un dépôt GitHub', action: ()=>{ closeCmdPalette(); document.getElementById('importGitModal').style.display='flex'; }},
-    {icon:'📊', label:'Analytics & Coûts', action: ()=>window.open('/analytics','_blank')},
+    {icon:'', label:'Explorateur de fichiers', action: ()=>{ closeCmdPalette(); document.getElementById('panel-explorer').style.display='flex'; wsExplorerLoad(''); }},
+    {icon:'', label:'Importer un dépôt GitHub', action: ()=>{ closeCmdPalette(); document.getElementById('importGitModal').style.display='flex'; }},
+    {icon:'', label:'Analytics & Coûts', action: ()=>window.open('/analytics','_blank')},
     {icon:'⚙️', label:'Paramètres du projet', action: ()=>window.location.href=`/projects/${PROJECT_ID}/settings`},
 ];
 let _cmdSelected = 0;
@@ -826,13 +833,13 @@ async function wsAiSend() {
                         botEl.textContent = fullText;
                         msgs.scrollTop = msgs.scrollHeight;
                     } else if (e.type === 'error') {
-                        botEl.textContent = '❌ ' + e.text;
+                        botEl.textContent = ' ' + e.text;
                     }
                 } catch (ex) {}
             }
         }
     } catch (ex) {
-        document.getElementById(botId).textContent = '❌ Erreur: ' + ex.message;
+        document.getElementById(botId).textContent = ' Erreur: ' + ex.message;
     }
 }
 
@@ -857,7 +864,7 @@ async function wsPrLoad() {
               <div style="color:#666;font-size:10px">${pr.branch} → ${pr.base} · ${pr.author} · ${pr.created_at}</div>
             </a>`).join('');
     } catch (ex) {
-        list.innerHTML = `<span style="color:#e57373">❌ ${ex.message}</span>`;
+        list.innerHTML = `<span style="color:#e57373"> ${ex.message}</span>`;
     }
 }
 
@@ -893,7 +900,7 @@ async function wsDeployLogsStart() {
             }
         }
     } catch (ex) {
-        list.innerHTML += `<div style="color:#e57373">❌ ${ex.message}</div>`;
+        list.innerHTML += `<div style="color:#e57373"> ${ex.message}</div>`;
     }
 }
 </script>

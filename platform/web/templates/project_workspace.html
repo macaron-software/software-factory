@@ -290,7 +290,7 @@ html,body{height:100%;overflow:hidden}
                 <option value="HEAD~3">vs HEAD~3</option>
                 <option value="HEAD~10">vs HEAD~10</option>
               </select>
-              <button class="ws-btn ws-btn-sm" onclick="document.getElementById('wsDiffPanel').style.display='none'">✕</button>
+              <button class="ws-btn ws-btn-sm" onclick="document.getElementById('wsDiffPanel').style.display='none'"></button>
             </div>
             <div id="wsDiffContent" style="font-family:monospace;font-size:12px;overflow:auto;max-height:500px"></div>
           </div>
@@ -393,7 +393,7 @@ html,body{height:100%;overflow:hidden}
               <textarea id="wsLaunchBrief" rows="2" placeholder="Décrivez la tâche à réaliser…" style="width:100%;padding:.3rem .5rem;font-size:.75rem;font-family:inherit;background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;box-sizing:border-box"></textarea>
               <div style="display:flex;gap:.4rem">
                 <button class="ws-term-run" style="flex:1;font-size:.73rem;padding:.3rem" onclick="wsLaunchMission()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Lancer</button>
-                <button class="ws-secret-btn" style="font-size:.73rem;padding:.3rem .55rem" onclick="document.getElementById('wsLaunchMissionPanel').style.display='none'">✕</button>
+                <button class="ws-secret-btn" style="font-size:.73rem;padding:.3rem .55rem" onclick="document.getElementById('wsLaunchMissionPanel').style.display='none'"></button>
               </div>
               <div id="wsLaunchMissionStatus" style="font-size:.72rem;color:var(--text-secondary)"></div>
             </div>
@@ -1074,7 +1074,7 @@ function wsMonacoSave() {
   }).then(function(r){ return r.json(); })
     .then(function(d) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save'; }
-      wsSetStatus(d.ok ? 'Sauvegardé ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      wsSetStatus(d.ok ? 'Sauvegardé ' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
       setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2000);
     }).catch(function(){ if (btn) { btn.disabled = false; } wsSetStatus('Erreur save','running'); });
 }
@@ -1184,7 +1184,7 @@ function wsLaunchMission() {
     body: JSON.stringify({ workflow_id: wfId, brief: brief, project_id: _wsProjectId })
   }).then(function(r){ return r.json(); })
     .then(function(d) {
-      if (d.error) { if (status) status.textContent = '✗ ' + d.error; return; }
+      if (d.error) { if (status) status.textContent = ' ' + d.error; return; }
       if (status) status.textContent = 'Mission ' + (d.mission_id||'') + ' lancée !';
       document.getElementById('wsLaunchBrief').value = '';
       setTimeout(function(){
@@ -1193,7 +1193,7 @@ function wsLaunchMission() {
         if (status) status.textContent = '';
         wsLoadAgents();
       }, 3000);
-    }).catch(function(e){ if (status) status.textContent = '✗ Erreur: ' + e.message; });
+    }).catch(function(e){ if (status) status.textContent = ' Erreur: ' + e.message; });
 }
 
 function wsLoadAgents() {
@@ -1557,8 +1557,8 @@ function wsSecretsRender() {
       '<span class="ws-secret-key">' + wsEsc(v.key) + '</span>' +
       '<span class="ws-secret-val" data-idx="' + i + '">' + masked + '</span>' +
       '<input class="ws-secret-input" type="text" value="' + wsEsc(v.value) + '" data-idx="' + i + '" onchange="wsSecretsEdit(' + i + ',this.value)" style="display:none">' +
-      '<button class="ws-secret-btn" onclick="wsSecretsToggleEdit(' + i + ')" title="Modifier">✎</button>' +
-      '<button class="ws-secret-btn ws-secret-del" onclick="wsSecretsDelete(' + i + ')" title="Supprimer">✕</button>' +
+      '<button class="ws-secret-btn" onclick="wsSecretsToggleEdit(' + i + ')" title="Modifier"></button>' +
+      '<button class="ws-secret-btn ws-secret-del" onclick="wsSecretsDelete(' + i + ')" title="Supprimer"></button>' +
       '</div>';
   });
   list.innerHTML = html;
@@ -1619,7 +1619,7 @@ function wsSecretsSave() {
   }).then(function(r){ return r.json(); })
     .then(function(d) {
       if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Sauvegarder'; }
-      wsSetStatus(d.ok ? 'Secrets sauvegardés ✓' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
+      wsSetStatus(d.ok ? 'Secrets sauvegardés ' : 'Erreur: '+(d.error||''), d.ok ? 'ok' : 'running');
       setTimeout(function(){ wsSetStatus('Prêt','idle'); }, 2500);
     }).catch(function(){ if(btn){ btn.disabled=false; } wsSetStatus('Erreur save','running'); });
 }
@@ -2220,7 +2220,7 @@ function wsBranchOpen() {
   fetch('/api/projects/{{ project.id }}/workspace/branches').then(function(r){return r.json();}).then(function(data){
     dd.innerHTML = (data.branches||[]).map(function(b){
       return '<div onclick="wsBranchCheckout(\''+b+'\')" style="padding:.4rem .75rem;cursor:pointer;font-size:.72rem;'+(b===data.current?'color:#60a5fa;font-weight:700':'')+'" onmouseover="this.style.background=\'var(--bg-hover)\'" onmouseout="this.style.background=\'\'">'+
-        (b===data.current?'✓ ':'')+b+'</div>';
+        (b===data.current?' ':'')+b+'</div>';
     }).join('') || '<div style="padding:.5rem;color:var(--text-muted);font-size:.72rem">Aucune branche</div>';
   }).catch(function(){dd.innerHTML='<div style="padding:.5rem;color:#f87171;font-size:.72rem">Erreur</div>';});
 }

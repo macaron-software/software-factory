@@ -256,13 +256,28 @@ async def delete_project(project_id: str):
     """Delete a project and ALL associated missions, sessions, memory, agents."""
     from ....db.migrations import get_db
 
+    # Protected domains — projects in these domains cannot be deleted
+    _PROTECTED_DOMAINS = {"PILOTE", "LA POSTE", "SF"}
+
     conn = get_db()
     conn.execute("PRAGMA busy_timeout = 10000")  # 10s wait for lock
     project = conn.execute(
-        "SELECT id, name FROM projects WHERE id = ?", (project_id,)
+        "SELECT id, name, is_protected, client_domain FROM projects WHERE id = ?",
+        (project_id,),
     ).fetchone()
     if not project:
         return JSONResponse({"error": "Not found"}, status_code=404)
+    # Block deletion of protected projects
+    keys = project.keys() if hasattr(project, "keys") else []
+    _is_protected = bool(project["is_protected"]) if "is_protected" in keys else False
+    _client_domain = (project["client_domain"] or "") if "client_domain" in keys else ""
+    if _is_protected or _client_domain.upper() in _PROTECTED_DOMAINS:
+        return JSONResponse(
+            {
+                "error": f"Le projet '{project['name']}' est protégé et ne peut pas être supprimé."
+            },
+            status_code=403,
+        )
     try:
         conn.execute("BEGIN IMMEDIATE")
     except Exception:

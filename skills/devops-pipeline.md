@@ -14,6 +14,60 @@ metadata:
     - "when implementing health checks"
     - "when user asks about deployment or rollback strategies"
     - "when configuring monitoring or logging"
+# EVAL CASES
+# WHY: DevOps skill must catch production anti-patterns (latest tag, no health checks,
+# no rollback) while not over-flagging minimal but valid configs.
+# Ref: philschmid.de/testing-skills
+eval_cases:
+  - id: dockerfile-antipatterns
+    prompt: |
+      Review this Dockerfile:
+      FROM python:latest
+      COPY . /app
+      RUN pip install -r requirements.txt
+      CMD ["python", "app.py"]
+    should_trigger: true
+    checks:
+      - "regex:latest|pinned|specific.*version|SHA|reproducib"
+      - "regex:root|non-root|USER|privilege"
+      - "no_placeholder"
+      - "length_min:100"
+    expectations:
+      - "flags 'python:latest' — recommends pinned version (e.g. python:3.12-slim)"
+      - "flags running as root — recommends adding USER directive"
+      - "may suggest multi-stage build or .dockerignore"
+    tags: [docker, security, reproducibility]
+  - id: missing-health-check
+    prompt: |
+      Review this docker-compose service:
+      services:
+        api:
+          image: myapp:1.2.3
+          ports: ["8080:8080"]
+          environment:
+            DATABASE_URL: postgresql://db:5432/app
+      secrets are in env vars directly.
+    should_trigger: true
+    checks:
+      - "regex:healthcheck|health_check|depends_on|liveness|readiness"
+      - "regex:secret|env.*secret|vault|file.*secret|docker secret"
+    expectations:
+      - "flags missing healthcheck — service has no liveness check"
+      - "flags secrets passed as plain environment variables"
+    tags: [health-check, secrets]
+  - id: solid-pipeline
+    prompt: |
+      Review this CI pipeline step:
+      - name: Run tests
+        run: pytest tests/ --tb=short
+        if: github.event_name == 'push'
+    should_trigger: true
+    checks:
+      - "length_min:40"
+    expectations:
+      - "does not fabricate issues with a basic but valid test step"
+      - "may note branch filtering could be more explicit"
+    tags: [negative]
 ---
 
 # DevOps Pipeline
@@ -397,8 +451,47 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 2. [Improvement]
 ```
 
+## SF Platform — env-setup Phase Rules
+
+When running as `ft-infra-lead` in the `env-setup` phase of a feature-sprint:
+
+### MANDATORY: Use `docker_deploy`, not `build()`
+
+```
+# ❌ WRONG — only tests native compile, not Docker
+build(command="cargo build", cwd=workspace)
+build(command="npm install", cwd=workspace)
+
+# ✅ CORRECT — tests the full Docker build + run + health check
+docker_deploy(cwd=workspace, mission_id=mission_id)
+```
+
+### Dockerfile version rules (avoid silent failures)
+- Rust WASM projects: always use `rust:latest` (NOT `rust:1.77` — macroquad 0.4+ needs Rust 1.82+)
+- Rust native: `rust:latest` or `rust:1.83-slim`
+- Node: `node:20-slim` minimum
+- Python: `python:3.12-slim`
+- Never use `|| true` on critical build steps — it hides compilation errors
+
+### Success criteria for env-setup
+`docker_deploy` must return `[OK]` AND a valid URL before the phase is complete.
+If it returns `[FAIL]`, fix the Dockerfile/code errors and retry — **do not proceed to tdd-sprint**.
+
+### Output format for env-setup
+```
+## Environment Setup — [Project Name]
+Stack: [detected stack]
+Dockerfile: [path] — [key decisions, e.g. rust:latest for WASM]
+docker_deploy: ✅ OK — http://127.0.0.1:9100
+Health check: ✅ HTTP 200
+Ready for tdd-sprint: YES
+```
+
 ## Anti-patterns
 
+- **NEVER** use `build()` alone in env-setup — always `docker_deploy()`
+- **NEVER** use `|| true` on compilation steps in Dockerfile (hides errors)
+- **NEVER** pin old Rust/Node versions without checking compatibility with dependencies
 - **NEVER** deploy without health checks
 - **NEVER** run containers as root
 - **NEVER** store secrets in Docker images or Compose files

@@ -285,7 +285,7 @@ async def ideation_submit(request: Request):
                         pass
                 _db_m.execute(
                     "UPDATE ideation_sessions SET status='complete' WHERE id=?",
-                    (session_id),
+                    (session_id,),
                 )
                 _db_m.commit()
             except Exception as _e:
@@ -395,7 +395,7 @@ async def ideation_create_epic(request: Request):
         try:
             _sess_row = _db_epic.execute(
                 "SELECT prompt, title FROM ideation_sessions WHERE id=?",
-                (session_id_in),
+                (session_id_in,),
             ).fetchone()
             if _sess_row:
                 if not idea:
@@ -404,11 +404,11 @@ async def ideation_create_epic(request: Request):
                     # Use only the last PM synthesis + one message per other agent (avoid token overflow)
                     _pm_row = _db_epic.execute(
                         "SELECT content FROM ideation_messages WHERE session_id=? AND agent_id='product_manager' ORDER BY created_at DESC LIMIT 1",
-                        (session_id_in),
+                        (session_id_in,),
                     ).fetchone()
                     _other_rows = _db_epic.execute(
                         "SELECT agent_name, content FROM ideation_messages WHERE session_id=? AND agent_id!='product_manager' AND agent_id!='system' ORDER BY created_at DESC LIMIT 4",
-                        (session_id_in),
+                        (session_id_in,),
                     ).fetchall()
                     parts = []
                     if _pm_row and _pm_row["content"]:
@@ -780,7 +780,7 @@ async def ideation_create_epic(request: Request):
             try:
                 findings_rows = _db2.execute(
                     "SELECT type, text FROM ideation_findings WHERE session_id=?",
-                    (ideation_sid),
+                    (ideation_sid,),
                 ).fetchall()
                 for fr in findings_rows:
                     cat = (
@@ -889,7 +889,7 @@ async def ideation_sessions_list(request: Request):
         if user and user.role != "admin":
             rows = db.execute(
                 "SELECT * FROM ideation_sessions WHERE user_id=? ORDER BY created_at DESC LIMIT 50",
-                (user.id),
+                (user.id,),
             ).fetchall()
         else:
             rows = db.execute(
@@ -921,17 +921,17 @@ async def ideation_session_detail(session_id: str):
     db = get_db()
     try:
         sess = db.execute(
-            "SELECT * FROM ideation_sessions WHERE id=?", (session_id)
+            "SELECT * FROM ideation_sessions WHERE id=?", (session_id,)
         ).fetchone()
         if not sess:
             return JSONResponse({"error": "Session not found"}, status_code=404)
         messages = db.execute(
             "SELECT * FROM ideation_messages WHERE session_id=? ORDER BY created_at ASC",
-            (session_id),
+            (session_id,),
         ).fetchall()
         findings = db.execute(
             "SELECT * FROM ideation_findings WHERE session_id=?",
-            (session_id),
+            (session_id,),
         ).fetchall()
         return JSONResponse(
             {
@@ -976,11 +976,11 @@ async def ideation_history_page(request: Request):
         for r in rows:
             msg_count = db.execute(
                 "SELECT COUNT(*) as c FROM ideation_messages WHERE session_id=?",
-                (r["id"]),
+                (r["id"],),
             ).fetchone()["c"]
             finding_count = db.execute(
                 "SELECT COUNT(*) as c FROM ideation_findings WHERE session_id=?",
-                (r["id"]),
+                (r["id"],),
             ).fetchone()["c"]
             sessions.append(
                 {

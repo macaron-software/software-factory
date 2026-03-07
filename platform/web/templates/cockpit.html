@@ -1618,10 +1618,10 @@
     };
     const cls = map[status] || 'off';
     const labels = {
-      ok: '✓ OK', online: '● Online', running: '▶ Running', enabled: '● Actif',
-      scheduled: '⏱ Scheduled', cooldown: '⚠ Cooldown', open: '✗ CB Open',
-      offline: '✗ Offline', disabled: '— Désactivé', not_configured: '— N/A',
-      degraded: '⚠ Dégradé', idle: '○ Idle', error: '✗ Error',
+      ok: ' OK', online: '● Online', running: '▶ Running', enabled: '● Actif',
+      scheduled: '⏱ Scheduled', cooldown: '⚠ Cooldown', open: ' CB Open',
+      offline: ' Offline', disabled: '— Désactivé', not_configured: '— N/A',
+      degraded: '⚠ Dégradé', idle: '○ Idle', error: ' Error',
     };
     return `<span class="ck-badge badge-${cls}">${labels[status] || status}</span>`;
   }

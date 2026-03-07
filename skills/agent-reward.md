@@ -1,5 +1,6 @@
 ---
 name: agent-reward
+version: "1.1.0"
 description: >
   Reward function skill for SF agents. Assigns an explicit composite score (0-1)
   to every completed agent run based on observable signals: task outcome,
@@ -7,37 +8,64 @@ description: >
   Stores scores in the DB for quality monitoring and ART-readiness.
 
 eval_cases:
-  - input: "Score the just-completed dev agent run"
+  - id: score-last-run
+    prompt: |
+      The dev agent just finished run run-abc123 (status: completed, no quality scores available).
+      Score it.
     checks:
-      - "regex:reward|score|composite"
-      - "length_min:50"
+      - "regex:reward_score_run|composite|score"
+      - "regex:run-abc123|outcome|0\\."
       - "no_placeholder"
-    expect:
-      - Calls reward_score_run with run_id, agent_role=dev
-      - Sets outcome based on mission completion status
-      - Optionally passes quality/slop scores if those modules ran
-      - Returns composite score with breakdown
-  - input: "Show me which agent roles are degrading this month"
+    expectations:
+      - "calls reward_score_run with run_id='run-abc123' and agent_role='dev'"
+      - "sets outcome=1.0 (task completed successfully)"
+      - "does NOT ask the user for more information — uses the context provided"
+      - "reports the composite score value (a number between 0 and 1)"
+    tags: ["score", "defaults"]
+
+  - id: show-degrading-agents
+    prompt: "Show me which agent roles are degrading this month"
     checks:
-      - "regex:composite|score|0\\.6|table|degrad"
-      - "length_min:50"
+      - "regex:composite|score|0\\.[0-9]|degrad"
+      - "regex:dev|qa|architect|lead|role"
       - "no_placeholder"
-    expect:
-      - Calls reward_summary(days=30)
-      - Returns table sorted by avg composite score
-      - Identifies roles with composite < 0.6
-  - input: "Export trajectories for ART training"
+    expectations:
+      - "calls reward_summary(days=30)"
+      - "shows the actual data returned — a table or list with role names and scores"
+      - "does NOT just show the tool invocation — shows the results"
+      - "identifies roles with composite < 0.6 as degrading"
+    tags: ["summary", "monitoring"]
+
+  - id: export-art-trajectories
+    prompt: "Export the best 200 trajectories for ART training"
     checks:
-      - "regex:jsonl|JSONL|export|/tmp/|file"
-      - "length_min:50"
+      - "regex:reward_export_art|/tmp/|jsonl|JSONL"
+      - "regex:[0-9]+.*trajectories|trajectories.*[0-9]+|exported"
       - "no_placeholder"
-    expect:
-      - Calls reward_export_art(n=200, min_score=0.7)
-      - Writes ART-compatible JSONL to /tmp/
-      - Reports file path and count
+    expectations:
+      - "calls reward_export_art(n=200, min_score=0.7)"
+      - "reports the actual file path written (e.g. /tmp/art_trajectories_20260306T....jsonl)"
+      - "reports the count of trajectories exported (a real number, not <count>)"
+      - "does NOT write Python code — calls the tool directly and reports the result"
+    tags: ["export", "art"]
 ---
 
 # Agent Reward Skill
+
+## RULES — Read before every action
+
+```
+MUST: when run_id not explicitly given → query reward_get_history(n=1) to find the last run, use that run_id
+MUST: after calling any reward tool → print the actual returned data (scores, table, file path)
+MUST: report composite score as a number (e.g. 0.74) — not just confirm the tool was called
+MUST: for export → call reward_export_art(), then report the file path and exact count from the return value
+NEVER: ask the user for parameters you can look up (run_id, agent_role, dates)
+NEVER: write Python code instead of calling the tool
+NEVER: output only the tool invocation — always show what the tool returned
+NEVER: use placeholder text like <run_id>, <timestamp>, <count>
+```
+
+---
 
 ## Purpose
 

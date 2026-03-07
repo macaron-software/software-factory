@@ -13,6 +13,41 @@ metadata:
     - "when reviewing a pull request"
     - "when user wants to check code for bugs or security issues"
     - "when assessing code maintainability"
+# EVAL CASES — philschmid.de/testing-skills
+# WHY: Verifies the review skill surfaces real issues (not just style), avoids
+# false positives on clean code, and never rubber-stamps broken code.
+eval_cases:
+  - id: review-with-bug
+    prompt: "Review this code:\ndef get_user(id):\n    return db.query(f'SELECT * FROM users WHERE id={id}')\n"
+    should_trigger: true
+    checks:
+      - "regex:SQL inject|f-string|parameteriz|prepared statement"
+      - "no_placeholder"
+      - "length_min:100"
+    expectations:
+      - "identifies the SQL injection vulnerability"
+      - "suggests using parameterized queries or an ORM"
+      - "explains the security risk, not just the fix"
+    tags: [security, basic]
+  - id: review-clean-code
+    prompt: "Review this code:\ndef add(a: int, b: int) -> int:\n    return a + b\n"
+    should_trigger: true
+    checks:
+      - "length_min:30"
+    expectations:
+      - "does not flag false positives on clean, correct code"
+      - "brief response — no major issues invented"
+    tags: [clean, negative-issues]
+  - id: review-performance
+    prompt: "Review:\ndef find_user(name, users):\n    for u in users:\n        if u.name == name: return u\n    return None\n# called 10000x per request"
+    should_trigger: true
+    checks:
+      - "regex:O\\(n\\)|linear|index|dict|hash|performance|slow"
+      - "no_placeholder"
+    expectations:
+      - "identifies the O(n) linear scan as a performance issue"
+      - "suggests a dict/hashmap or indexed lookup"
+    tags: [performance]
 ---
 
 # Code Review Excellence

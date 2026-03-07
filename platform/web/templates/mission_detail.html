@@ -427,7 +427,7 @@ htmx.on('htmx:afterSwap', function(e) {
             const data = JSON.parse(e.target.textContent);
             if (data.artifacts) {
                 let html = '';
-                const typeIcon = {code: '📄', test: '🧪', story: '📋', decision: '📝', qa: '🔍'};
+                const typeIcon = {code: '', test: '', story: '', decision: '', qa: ''};
                 for (const [type, items] of Object.entries(data.artifacts)) {
                     html += `<div style="margin-bottom:0.5rem"><strong style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase">${typeIcon[type]||'•'} ${type}</strong>`;
                     for (const item of items.slice(0, 5)) {

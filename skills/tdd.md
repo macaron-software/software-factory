@@ -13,6 +13,66 @@ metadata:
     - "when user asks to fix a bug and wants a regression test"
     - "when user mentions red-green-refactor"
     - "when test coverage needs to increase"
+version: "1.2.0"
+# EVAL CASES — based on philschmid.de/testing-skills eval harness methodology
+# WHY: Skills shipped without evals = untested behavior. These cases verify
+# the skill correctly enforces Red-Green-Refactor and test-first discipline.
+# Ref: https://www.philschmid.de/testing-skills
+eval_cases:
+  - id: tdd-new-feature
+    prompt: |
+      TDD RED phase is done. Here is the failing test:
+
+      ```python
+      import pytest
+      from finance import compound_interest
+
+      def test_compound_interest_basic():
+          result = compound_interest(principal=1000, rate=0.05, years=3)
+          assert abs(result - 1157.625) < 0.01  # 1000 * (1.05)^3
+
+      def test_compound_interest_zero_years():
+          assert compound_interest(principal=500, rate=0.1, years=0) == 500.0
+      ```
+
+      This test FAILS because `compound_interest` doesn't exist yet.
+      Now show the GREEN phase (write the minimal implementation to pass both tests)
+      and then the REFACTOR phase (improve code while keeping tests green).
+      Do NOT rewrite the tests — just write the implementation.
+    should_trigger: true
+    checks:
+      - "regex:def compound_interest|def calculate_compound"
+      - 'regex:return.*principal|return.*rate|return.*\*\*|\(1.*rate\)'
+      - "regex:refactor|REFACTOR|clean|improve|docstring|type hint"
+      - "length_min:100"
+    expectations:
+      - "Shows GREEN phase: writes minimal compound_interest() with actual formula (principal * (1+rate)**years)"
+      - "Does NOT rewrite the tests — just implements the function"
+      - "Shows REFACTOR phase: adds type hints, docstring, or error handling"
+    tags: [basic, python]
+  - id: tdd-bug-regression
+    prompt: |
+      There's a bug: get_user(0) returns None instead of raising ValueError. Fix it with TDD.
+      Show: RED phase (failing test), GREEN phase (minimal fix), result.
+      Do NOT use pass or TODO anywhere — write the actual implementation.
+    should_trigger: true
+    checks:
+      - "regex:def test_.*user|class Test.*User|test_get_user"
+      - "regex:ValueError|raises"
+      - "regex:get_user"
+      - "regex:raise ValueError|pytest.raises"
+    expectations:
+      - "Writes a failing test reproducing the bug FIRST (test_get_user_raises_for_zero or similar)"
+      - "Test uses pytest.raises(ValueError) or assertRaises(ValueError)"
+      - "Implementation uses 'raise ValueError' for id=0 — actual code, not a stub"
+    tags: [bug, regression]
+  - id: tdd-no-trigger-doc
+    prompt: "Write documentation for a REST API endpoint that returns a list of users."
+    should_trigger: false
+    checks: []
+    expectations:
+      - "produces API documentation without forcing Red-Green-Refactor cycle"
+    tags: [negative]
 ---
 
 # TDD Mastery

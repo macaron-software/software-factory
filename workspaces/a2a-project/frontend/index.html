@@ -1,0 +1,75 @@
+# Why: Workflow: TMA Auto-Heal → Phase: Diagnostic
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A MessageBus Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>🚂 A2A MessageBus</h1>
+            <div class="status-indicator">
+                <span id="connection-status" class="status-dot"></span>
+                <span id="connection-text">Connecting...</span>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <section class="metrics-panel">
+                <h2>📊 Metrics</h2>
+                <div class="metric-cards">
+                    <div class="metric-card">
+                        <span class="metric-value" id="messages-sent">0</span>
+                        <span class="metric-label">Messages Sent</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value" id="messages-received">0</span>
+                        <span class="metric-label">Messages Received</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value" id="active-subscriptions">0</span>
+                        <span class="metric-label">Active Subscriptions</span>
+                    </div>
+                    <div class="metric-card">
+                        <span class="metric-value" id="error-count">0</span>
+                        <span class="metric-label">Errors</span>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="messages-panel">
+                <h2>📨 Messages</h2>
+                <div class="filter-bar">
+                    <input type="text" id="message-filter" placeholder="Filter messages...">
+                    <select id="message-type-filter">
+                        <option value="">All Types</option>
+                        <option value="task">Task</option>
+                        <option value="result">Result</option>
+                        <option value="event">Event</option>
+                    </select>
+                </div>
+                <div id="messages-list" class="messages-list"></div>
+            </section>
+            
+            <section class="subscriptions-panel">
+                <h2>📡 Subscriptions</h2>
+                <div class="subscription-form">
+                    <input type="text" id="channel-input" placeholder="Channel name">
+                    <button id="subscribe-btn" class="btn-primary">Subscribe</button>
+                </div>
+                <div id="subscriptions-list" class="subscriptions-list"></div>
+            </section>
+        </main>
+        
+        <aside class="logs-panel">
+            <h2>📋 Live Logs</h2>
+            <div id="logs-container" class="logs-container"></div>
+        </aside>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

@@ -257,7 +257,7 @@
         <div class="cto-attach-pill" id="cto-attach-pill">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
           <span id="cto-attach-name">fichier.pdf</span>
-          <span class="cto-attach-clear" onclick="ctoClearAttach()" title="Retirer">✕</span>
+          <span class="cto-attach-clear" onclick="ctoClearAttach()" title="Retirer"></span>
         </div>
         <span class="cto-attach-hint" id="cto-attach-hint"></span>
       </div>
@@ -494,13 +494,13 @@
     if(!msg && !_attachment) return;
     var fullMsg = msg;
     if(_attachment){
-      var header = '📎 **' + _attachment.name + '**' + (_attachment.truncated ? ' *(extrait)*' : '') + '\n\n';
+      var header = ' **' + _attachment.name + '**' + (_attachment.truncated ? ' *(extrait)*' : '') + '\n\n';
       fullMsg = (msg ? msg + '\n\n' : 'Analyse ce document :\n\n') + header + '```\n' + _attachment.text + '\n```';
     }
     inp.value = '';
     inp.style.height = 'auto';
     ctoClearAttach();
-    _ctoGuardrailCheck(fullMsg, msg || ('📎 ' + (_attachment ? _attachment.name : '')));
+    _ctoGuardrailCheck(fullMsg, msg || (' ' + (_attachment ? _attachment.name : '')));
   }
 
   /* ── Guardrail: confirm high-impact actions ── */
