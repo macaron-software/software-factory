@@ -163,7 +163,9 @@ def _env_flag(name: str) -> bool:
 
 _ollama_enabled = _env_flag("OLLAMA_ENABLED")
 _opencode_enabled = bool(
-    os.environ.get("OPENCODE_API_KEY", "") or _env_flag("OPENCODE_ENABLED")
+    os.environ.get("OPENCODE_API_KEY", "")
+    or _env_flag("OPENCODE_ENABLED")
+    or os.path.isfile(os.path.expanduser("~/.config/factory/opencode.key"))
 )
 # ── LLM timeout settings (override via env vars) ──────────────────────────────
 # LLM_TIMEOUT_HTTP     : httpx total timeout per request (seconds). Default: 600.
@@ -891,8 +893,13 @@ class LLMClient:
         msg = choice.get("message", {})
         content = msg.get("content", "") or ""
         # Ollama/Qwen3: thinking models put response in reasoning field when content is empty
-        if not content and msg.get("reasoning"):
-            content = msg["reasoning"].strip()
+        # GLM-5/kimi: use reasoning_content field
+        if not content:
+            for _rf in ("reasoning", "reasoning_content"):
+                _rtext = msg.get(_rf)
+                if _rtext:
+                    content = _rtext.strip()
+                    break
         # Strip <think> blocks from MiniMax / Qwen3
         if "<think>" in content and "</think>" in content:
             idx = content.index("</think>") + len("</think>")
