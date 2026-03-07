@@ -735,7 +735,12 @@ class LLMClient:
                         err_str[:200],
                     )
                     self._stats["errors"] += 1
-                    self._cb_record_failure(prov)
+                    # HTTP 4xx client errors shouldn't open the circuit breaker
+                    _is_client_err = any(
+                        f"HTTP {c}" in err_str for c in ("400", "401", "403", "404")
+                    )
+                    if not _is_client_err:
+                        self._cb_record_failure(prov)
                     await self._persist_usage(prov, use_model, 0, 0, error=True)
                     # Thompson Sampling: record failure
                     try:
@@ -833,6 +838,26 @@ class LLMClient:
                 d["tool_calls"] = tool_calls
                 d.pop("content", None)  # assistant tool_call msgs may have no content
             msgs.append(d)
+
+        # Strip orphaned tool result messages: if tool_call_id has no matching
+        # assistant tool_calls entry, the API will reject with HTTP 400.
+        # This can happen on session resume when history is partially restored.
+        _known_call_ids: set[str] = set()
+        for _m in msgs:
+            if _m.get("role") == "assistant":
+                for _tc in _m.get("tool_calls") or []:
+                    _cid = _tc.get("id") if isinstance(_tc, dict) else None
+                    if _cid:
+                        _known_call_ids.add(_cid)
+        msgs = [
+            _m
+            for _m in msgs
+            if not (
+                _m.get("role") == "tool"
+                and _m.get("tool_call_id")
+                and _m.get("tool_call_id") not in _known_call_ids
+            )
+        ]
 
         # local-mlx requires system message strictly at position 0 — merge all system msgs
         if provider == "local-mlx":
@@ -1307,7 +1332,12 @@ class LLMClient:
                         use_model,
                         err_str[:200],
                     )
-                    self._cb_record_failure(prov)
+                    # HTTP 4xx client errors shouldn't open the circuit breaker
+                    _is_client_err_s = any(
+                        f"HTTP {c}" in err_str for c in ("400", "401", "403", "404")
+                    )
+                    if not _is_client_err_s:
+                        self._cb_record_failure(prov)
                     if is_rate_limit:
                         is_quota_exhausted = "usage limit exceeded" in err_str.lower()
                         cd = 3600 if is_quota_exhausted else 30
@@ -1405,6 +1435,25 @@ class LLMClient:
                     msgs.insert(0, {"role": "user", "content": sys_content})
             else:
                 msgs.insert(0, {"role": "system", "content": sys_content})
+
+        # Strip orphaned tool result messages (no matching assistant tool_calls).
+        # This can happen on resume when conversation history is partially restored.
+        _stream_known_ids: set[str] = set()
+        for _m in msgs:
+            if _m.get("role") == "assistant":
+                for _tc in _m.get("tool_calls") or []:
+                    _cid = _tc.get("id") if isinstance(_tc, dict) else None
+                    if _cid:
+                        _stream_known_ids.add(_cid)
+        msgs = [
+            _m
+            for _m in msgs
+            if not (
+                _m.get("role") == "tool"
+                and _m.get("tool_call_id")
+                and _m.get("tool_call_id") not in _stream_known_ids
+            )
+        ]
 
         effective_max = max_tokens
         _reasoning_model_s = (
