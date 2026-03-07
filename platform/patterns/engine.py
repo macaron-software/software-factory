@@ -145,10 +145,17 @@ _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = F
 WORKFLOW:
 1. EXPLORE FIRST: list_files(path=WORKSPACE) → code_read existing files → understand what exists
 2. READ SPECS: code_read(path=WORKSPACE+"/INCEPTION.md") → follow the stack defined there EXACTLY
-3. THEN code_write per file using WORKSPACE-prefixed absolute paths → docker_deploy to verify build
+3. WRITE FILES: code_write per file using WORKSPACE-prefixed absolute paths (MINIMUM 3 code_write calls)
+4. BUILD: docker_deploy() or bash(command="cd WORKSPACE && npm install && npm run build")
 
 TOOL: code_write(path=WORKSPACE+"/src/main.py", content="full source code here — 30+ lines")
       write_file(path=WORKSPACE+"/src/main.py", content="...") — also accepted
+
+MINIMUM DELIVERABLES (MANDATORY — adversarial will fail you if missing):
+- At least 3 separate code_write calls (source file + test file + Dockerfile or config)
+- TDD projects: write TEST FILE first (WORKSPACE+"/tests/test_*.py" or "*.test.ts"), THEN source
+- TDD order: RED (write failing test) → GREEN (write source to pass) → REFACTOR
+- Token limit: write as much code as possible per call (full implementations, not stubs)
 
 RULES:
 - WORKSPACE is the absolute path provided in "## Workspace" below. ALL paths MUST start with it.
@@ -156,6 +163,7 @@ RULES:
 - FOLLOW THE STACK IN INCEPTION.md. Do NOT switch language (Python stays Python, TS stays TS).
 - Do NOT describe changes. DO them via code_write / write_file.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
+- After each code_write, IMMEDIATELY write the next required file — do NOT stop.
 
 UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
