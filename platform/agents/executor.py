@@ -1656,9 +1656,25 @@ class AgentExecutor:
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
                     if has_written:
                         tools = None
+                        written_paths = list(
+                            {
+                                tc_rec["args"].get("path", "?")
+                                for tc_rec in all_tool_calls
+                                if tc_rec["name"] in ("code_write", "code_edit")
+                                and tc_rec["args"].get("path")
+                            }
+                        )
+                        files_str = ", ".join(written_paths[:4]) or "les fichiers"
                         messages.append(
                             LLMMessage(
-                                role="system", content="Tools done. Summarize changes."
+                                role="system",
+                                content=(
+                                    f"✅ Fichiers créés/mis à jour : {files_str}.\n"
+                                    "MAINTENANT : décris en détail ce que tu as produit. "
+                                    "Liste chaque fichier, son contenu clé, sa structure, "
+                                    "et comment il répond aux exigences. Minimum 200 mots. "
+                                    "C'est ton rapport final au comité de validation."
+                                ),
                             )
                         )
                     # else: keep write-only tools — agent MUST write code
