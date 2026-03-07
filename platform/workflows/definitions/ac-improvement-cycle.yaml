@@ -12,16 +12,18 @@ phases:
   pattern_id: sequential
   name: Inception & User Stories
   description: >
-    L'architecte AC définit le projet : tech stack, persona, user stories avec AC GIVEN/WHEN/THEN,
-    tracabilité vers les exigences (REF), et critères de sortie mesurables.
-    OBLIGATIONS :
-    1. PERSONA : qui utilise ce projet (nom, rôle, besoin concret)
-    2. USER STORIES : "En tant que [persona], je veux [action] afin de [bénéfice]"
-    3. AC testables (GIVEN/WHEN/THEN) pour CHAQUE story, avec REF unique (AC-XXX-001)
-    4. DESIGN TOKENS si frontend (couleurs, typographie, spacing en CSS custom properties)
-    5. a11y checklist WCAG 2.1 AA : ARIA roles, contraste, navigation clavier, focus visible
-    Sans ces 5 éléments, la phase est INCOMPLÈTE. Pas de code avant la fin de cette phase.
-    Output structuré : INCEPTION.md avec toutes les specs + traceability matrix.
+    L'architecte AC gère le INCEPTION.md pour ce cycle.
+    ACTION IMMÉDIATE (séquence exacte) :
+    1. code_read("INCEPTION.md") — lire le fichier existant
+    2. Si INCEPTION.md contient déjà persona + user stories + AC GIVEN/WHEN/THEN + design tokens + a11y :
+       METTRE À JOUR uniquement la ligne "Cycle N/20" avec le numéro de cycle actuel,
+       puis code_write("INCEPTION.md", contenu_complet_mis_à_jour)
+    3. Si INCEPTION.md est absent ou incomplet :
+       CRÉER depuis zéro avec les 5 éléments obligatoires (persona, user stories, AC, design tokens, a11y),
+       puis code_write("INCEPTION.md", contenu_complet)
+    4. APRÈS code_write : obligatoirement code_read("INCEPTION.md") pour afficher le contenu dans l'evidence
+    RÈGLE ABSOLUE : code_write DOIT être appelé. Sans code_write, la phase est rejetée.
+    Sans code_read après code_write, la phase est rejetée (evidence invisible).
   gate: all_approved
   config:
     agents:
@@ -30,17 +32,17 @@ phases:
   pattern_id: loop
   name: TDD Sprint — Code + Tests
   description: >
-    Le codeur AC implémente en TDD strict : RED → GREEN → REFACTOR.
-    OBLIGATIONS :
-    1. Lire INCEPTION.md AVANT tout code
-    2. Écrire les tests AVANT le code (test first)
-    3. Aucun test.skip(), @ts-ignore, #[ignore]
-    4. Design tokens CSS appliqués (pas de valeurs hardcodées)
-    5. a11y : aria-label, role, tabindex, focus-visible sur chaque composant interactif
-    6. Zéro mock data, zéro hardcoded data (env vars obligatoires)
-    7. Chaque fichier créé doit avoir un commentaire // REF: AC-XXX-001 tracé vers l'AC de la story
-    8. Appeler docker_deploy() pour vérifier le build — BLOQUANT si fail
-    9. Corriger IMMÉDIATEMENT si CI échoue — pas de "ça marchera plus tard"
+    Le codeur AC produit le code source du projet.
+    SÉQUENCE EXACTE ET OBLIGATOIRE :
+    1. code_read("INCEPTION.md") — lire les ACs et la stack
+    2. Pour projet HTML/CSS : code_write("src/index.html", ...) + code_write("src/css/styles.css", ...)
+       Pour projet JS/TS : code_write("tests/test_feature.ts", ...) puis code_write("src/feature.ts", ...)
+       Pour projet Rust : code_write("tests/test_main.rs", ...) puis code_write("src/main.rs", ...)
+    3. APRÈS chaque code_write : code_read(même_fichier) — OBLIGATOIRE pour l'evidence
+    4. docker_deploy() — vérifier le build
+    RÈGLE ABSOLUE : Au moins 2 code_write DOIVENT être appelés. Zéro code_write = rejet immédiat.
+    REF : Chaque fichier doit contenir un commentaire // REF: AC-XXX-001
+    list_files est INTERDIT (perte de temps). TDD : tests d'abord pour JS/TS/Rust.
     Si adversarial feedback disponible (ADVERSARIAL_N.md), l'intégrer comme priorité absolue.
   gate: all_approved
   config:
@@ -92,18 +94,20 @@ phases:
     max_iterations: 2
 - id: ac-cicd
   pattern_id: sequential
-  name: CI/CD — Push + Attente GitHub Actions
+  name: CI/CD — Commit + Push + Enregistrement
   description: >
-    L'agent CI/CD :
-    1. Commit et push les corrections sur Git (message structuré avec refs)
-    2. Attend que GitHub Actions termine (poll toutes les 30s, max 10 min)
-    3. Si CI vert : proceed, enregistre le SHA
-    4. Si CI rouge : lit les logs, crée CICD_FAILURE_N.md, VETO → retour tdd-sprint
-    5. Enregistre le cycle complet en DB : scores, défauts, SHA, adversarial results
-    OBLIGATIONS :
-    - Message commit format : "fix(ac-XXX): [description] [refs: AC-XXX-001, AC-XXX-002]"
-    - Ne jamais skip les CI checks
-    - Enregistrer le résultat même en cas d'échec (pour le scoring)
+    SÉQUENCE EXACTE ET OBLIGATOIRE :
+    1. git_commit avec message format "fix(ac-{project}): {description} [refs: AC-XXX-001]"
+    2. git_push vers le remote configuré (remote local /app/data/git-remotes/{project}.git)
+       NOTE : il n'y a PAS de GitHub Actions — le push local suffit. Pas d'attente CI.
+    3. ac_inject_cycle avec tous les scores (project_id, cycle_num, git_sha, status="completed", total_score)
+    RÈGLE ABSOLUE :
+    - git_commit DOIT être appelé. Sans git_commit = rejet immédiat.
+    - ac_inject_cycle DOIT être appelé. Sans inject_cycle = rejet immédiat (cycle non enregistré).
+    - git_push peut échouer sans veto (remote local, pas de GitHub Actions).
+    - Récupérer le SHA du commit via git_commit output (7 premiers chars suffisent).
+    - Ne PAS attendre GitHub Actions (inexistant). Ne PAS poller.
+    Lire QA_REPORT_N.md si disponible pour les scores a11y/perf.
   gate: no_veto
   config:
     agents:

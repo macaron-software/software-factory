@@ -596,6 +596,28 @@ DATA_DIR/skills/ override: copier skill.md → /app/data/skills/ (OVH) ou /home/
 
 ## AC — AMÉLIORATION CONTINUE (platform/ac/)
 
+### ⚠️ DEUX NIVEAUX DISTINCTS — NE PAS CONFONDRE
+
+```
+NIVEAU 1 — PROJETS PILOTES (chaîne SAFe complète)
+  Les projets pilotes (ac-hello-html, ac-hello-vue, ac-ecommerce, ac-docusign, ac-fullstack-rs)
+  sont de vrais projets logiciels. Ils passent par la CHAÎNE COMPLÈTE SF :
+    RTE → PI Planning → Epics → Features → Stories → Sprints → Deploy
+  Workflows utilisés : ideation-to-prod, epic-decompose, feature-sprint, cicd-pipeline
+  Teams : Team CI/CD, Team Deploy, Team Tools & Integration, Feature Teams, etc.
+  → Ces projets font leur git, setup env, Docker build, tests QA, sécu, screenshots
+    via les équipes d'agents SF normales (ft-infra-lead, ft-e2e-api, ft-e2e-ihm, devops, ...)
+  → JAMAIS ac-improvement-cycle pour ça.
+
+NIVEAU 2 — AMÉLIORATION DE LA SF ELLE-MÊME (ac-improvement-cycle)
+  ac-improvement-cycle surveille et améliore la SF elle-même, EN PARALLÈLE des cycles projets.
+  Il analyse les outputs des projets pilotes pour détecter les bugs SF (skills, prompts, workflows).
+  Workflow : Inception→TDD Sprint→Adversarial→QA→CI/CD→Coach Review
+  → Scope EXCLUSIF : skills/*.md, agents/store.py, workflows/definitions/*.yaml, patterns
+  → Déclenché par le watchdog quand pass_rate < seuil OU toutes les N itérations projets
+  → JAMAIS pour builder/déployer un projet pilote
+```
+
 Boucle d'intelligence auto-améliorante : RL (reward shaping) + Thompson Sampling (skill selection) + GA (Darwin Teams).
 5 projets pilotes : hello-html, hello-vue, rust+svelte, docusign-clone, e-commerce+solaris.
 
