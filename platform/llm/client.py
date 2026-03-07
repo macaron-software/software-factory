@@ -50,8 +50,15 @@ _PROVIDERS = {
             "AZURE_OPENAI_ENDPOINT", "https://ascii-ui-openai.openai.azure.com"
         ).rstrip("/"),
         "key_env": "AZURE_OPENAI_API_KEY",
-        # Deployed on opanai-flamme (swedencentral): gpt-5-mini/gpt-5/gpt-5.1/gpt-5.2/gpt-5.1-codex
-        "models": ["gpt-5-mini", "gpt-5", "gpt-5.1", "gpt-5.2", "gpt-5.1-codex"],
+        # Deployed on opanai-flamme (swedencentral): gpt-5-mini/gpt-5/gpt-5.1/gpt-5.2/gpt-5.1-codex/gpt-4.1
+        "models": [
+            "gpt-5-mini",
+            "gpt-5",
+            "gpt-5.1",
+            "gpt-5.2",
+            "gpt-5.1-codex",
+            "gpt-4.1",
+        ],
         "default": "gpt-5-mini",
         "auth_header": "api-key",
         "auth_prefix": "",
@@ -62,12 +69,14 @@ _PROVIDERS = {
             "gpt-5.1": os.environ.get("AZURE_DEPLOY_GPT51", "gpt-5.1"),
             "gpt-5.2": os.environ.get("AZURE_DEPLOY_GPT52", "gpt-5.2"),
             "gpt-5.1-codex": os.environ.get("AZURE_DEPLOY_CODEX", "gpt-5.1-codex"),
+            "gpt-4.1": os.environ.get("AZURE_DEPLOY_GPT41", "gpt-4.1"),
         },
         "max_tokens_param": {
             "gpt-5-mini": "max_completion_tokens",
             "gpt-5": "max_completion_tokens",
             "gpt-5.1": "max_completion_tokens",
             "gpt-5.2": "max_completion_tokens",
+            "gpt-4.1": "max_completion_tokens",
             # gpt-5.1-codex uses Responses API (max_output_tokens handled separately)
         },
     },
