@@ -1781,6 +1781,18 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
 
     allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
+    # Inject INCEPTION.md content if available — prevents agents from skipping the read
+    if project_path:
+        try:
+            from pathlib import Path as _Path
+
+            _inception = _Path(project_path) / "INCEPTION.md"
+            if _inception.exists():
+                _ic = _inception.read_text(encoding="utf-8", errors="ignore")[:3000]
+                project_context += f"\n\n## INCEPTION.md (contexte projet — requis avant tout code)\n{_ic}"
+        except Exception:
+            pass
+
     # Enrich project_context with lessons and SI blueprint
     if lessons_prompt:
         project_context += "\n" + lessons_prompt
