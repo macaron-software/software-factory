@@ -498,9 +498,10 @@ async def _run_workflow_background(
                             if "result" in dir()
                             else []
                         )
+                        # Pick the first failed phase as the reason (escalated or error)
                         for _pr in _phase_results:
-                            if _pr.get("escalated") and _pr.get("error"):
-                                _escalation_reason = str(_pr["error"])[:500]
+                            if not _pr.get("success", True):
+                                _escalation_reason = str(_pr.get("error") or _pr)[:500]
                                 break
                 except Exception:
                     pass
