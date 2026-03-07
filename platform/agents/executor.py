@@ -30,6 +30,7 @@ from .tool_runner import (
 )
 from .tool_schemas import _filter_schemas, _get_tool_schemas
 from ..db.migrations import get_db
+from ..hooks import HookContext, HookType, registry as _hook_registry
 
 logger = logging.getLogger(__name__)
 
@@ -617,6 +618,17 @@ class AgentExecutor:
                 else None
             )
 
+            # Fire SESSION_START hooks
+            await _hook_registry.fire(
+                HookType.SESSION_START,
+                HookContext(
+                    hook_type=HookType.SESSION_START,
+                    agent_id=agent.id,
+                    session_id=ctx.session_id or "",
+                    project_id=ctx.project_id or "",
+                ),
+            )
+
             # Route provider: Darwin LLM Thompson Sampling + routing config
             # cheap_mode: if allowed_tools are all cheap (memory/read), use MiniMax
             from .routing import CHEAP_TOOLS as _CHEAP_TOOLS
@@ -811,12 +823,25 @@ class AgentExecutor:
                                     _existing,
                                     agent.id,
                                 )
-                        _file_write_locks[_lock_key] = ctx.session_id
-                        _file_write_lock_meta[_lock_key] = {
-                            "agent": agent.id,
-                            "ts": _time.time(),
-                        }
-                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # PRE_TOOL hook (may block)
+                    _hook_ctx = HookContext(
+                        hook_type=HookType.PRE_TOOL,
+                        agent_id=agent.id,
+                        session_id=ctx.session_id or "",
+                        project_id=ctx.project_id or "",
+                        tool_name=tc.function_name,
+                        tool_args=dict(tc.arguments),
+                    )
+                    _pre_res = await _hook_registry.fire_pre(HookType.PRE_TOOL, _hook_ctx)
+                    if _pre_res.blocked:
+                        result = f"[BLOCKED by hook: {_pre_res.message}]"
+                    else:
+                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # POST_TOOL hook
+                    _hook_ctx.hook_type = HookType.POST_TOOL
+                    _hook_ctx.tool_result = result[:200]
+                    _hook_ctx.all_tool_calls = all_tool_calls
+                    await _hook_registry.fire(HookType.POST_TOOL, _hook_ctx)
                     all_tool_calls.append(
                         {
                             "name": tc.function_name,
@@ -1034,6 +1059,18 @@ class AgentExecutor:
                 # Context summarization: when history grows large, summarize old messages
                 # instead of simply truncating (inspired by DeerFlow v2)
                 if len(messages) > 20:
+                    # PRE_COMPACT hook — let hooks save state before shrinkage
+                    await _hook_registry.fire(
+                        HookType.PRE_COMPACT,
+                        HookContext(
+                            hook_type=HookType.PRE_COMPACT,
+                            agent_id=agent.id,
+                            session_id=ctx.session_id or "",
+                            project_id=ctx.project_id or "",
+                            messages=messages,
+                            all_tool_calls=all_tool_calls,
+                        ),
+                    )
                     messages = await _summarize_context(
                         messages, self._llm, use_provider, use_model
                     )
@@ -1144,6 +1181,19 @@ class AgentExecutor:
                 )
             if ctx.epic_run_id:
                 self._stop_heartbeat(ctx.epic_run_id)
+            # SESSION_END hook (fire-and-forget)
+            asyncio.ensure_future(
+                _hook_registry.fire(
+                    HookType.SESSION_END,
+                    HookContext(
+                        hook_type=HookType.SESSION_END,
+                        agent_id=agent.id,
+                        session_id=ctx.session_id or "",
+                        project_id=ctx.project_id or "",
+                        all_tool_calls=all_tool_calls,
+                    ),
+                )
+            )
             return result
 
         except Exception as exc:
@@ -1484,7 +1534,24 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     yield ("tool", tc.function_name)
-                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # PRE_TOOL hook (may block)
+                    _hook_ctx2 = HookContext(
+                        hook_type=HookType.PRE_TOOL,
+                        agent_id=agent.id,
+                        session_id=ctx.session_id or "",
+                        project_id=ctx.project_id or "",
+                        tool_name=tc.function_name,
+                        tool_args=dict(tc.arguments),
+                    )
+                    _pre_res2 = await _hook_registry.fire_pre(HookType.PRE_TOOL, _hook_ctx2)
+                    if _pre_res2.blocked:
+                        result = f"[BLOCKED by hook: {_pre_res2.message}]"
+                    else:
+                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
+                    # POST_TOOL hook
+                    _hook_ctx2.hook_type = HookType.POST_TOOL
+                    _hook_ctx2.tool_result = result[:200]
+                    await _hook_registry.fire(HookType.POST_TOOL, _hook_ctx2)
                     # If schema was stripped to write-only but model still calls read tools,
                     # append a write reminder to the result (don't block, give context + nudge)
                     _allowed_tc_names = (
@@ -1702,12 +1769,15 @@ class AgentExecutor:
                     and tools is not None
                     and has_write_tools
                 ):
-                    # Strip read-only tools — force write
+                    # Strip read-only tools — force write (allow Claude aliases: read_file, write_file)
                     write_only_tools = [
                         t
                         for t in tools
                         if t.get("function", {}).get("name")
-                        in ("code_write", "code_edit", "fractal_code", "git_commit")
+                        in (
+                            "code_write", "code_edit", "fractal_code", "git_commit",
+                            "read_file", "write_file", "read_many_files", "edit_file",
+                        )
                     ]
                     if write_only_tools:
                         tools = write_only_tools
