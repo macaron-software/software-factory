@@ -352,6 +352,16 @@ async def lifespan(app: FastAPI):
         except Exception as _e:
             logger.warning("Memory seeding skipped: %s", _e)
 
+        # Seed AC pilot projects (idempotent — INSERT OR IGNORE)
+        from .web.routes.pages import seed_ac_projects as _seed_ac
+
+        try:
+            n_ac = await _loop.run_in_executor(None, _seed_ac)
+            if n_ac:
+                logger.info("Seeded %d AC pilot projects", n_ac)
+        except Exception as _e:
+            logger.warning("AC project seeding skipped: %s", _e)
+
     _asyncio.create_task(_bg_heal_and_seed())
 
     # Seed org tree (Portfolio → ART → Team)

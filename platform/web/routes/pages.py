@@ -836,6 +836,66 @@ def _ac_get_db():
     return get_db()
 
 
+def seed_ac_projects() -> int:
+    """Seed AC pilot projects into the projects table if they don't already exist.
+
+    Idempotent — uses INSERT OR IGNORE. Called at startup so a fresh SF instance
+    always has the AC pilot projects ready under domain 'Amélioration continue'.
+    Returns the number of projects newly inserted.
+    """
+    import json as _json
+    import os as _os
+
+    conn = _ac_get_db()
+    _ws_root = (
+        "/app/workspace"
+        if _os.path.isdir("/app")
+        else _os.path.join(_os.getcwd(), "workspace")
+    )
+    _ws_root = _os.environ.get("WORKSPACE_ROOT", _ws_root)
+    inserted = 0
+    for p in _AC_PROJECTS:
+        workspace = _os.path.join(_ws_root, p["id"])
+        _os.makedirs(workspace, exist_ok=True)
+        try:
+            cur = conn.execute(
+                """INSERT OR IGNORE INTO projects
+                   (id, name, path, description, factory_type, domains_json,
+                    vision, values_json, lead_agent_id, agents_json,
+                    active_pattern_id, status, git_url, current_phase,
+                    phases_json, owner_id, starred, container_url, client_domain)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    p["id"],
+                    p["name"],
+                    workspace,
+                    p.get("description", ""),
+                    "standalone",
+                    _json.dumps(["ac", "pilot"] + p.get("tech", [])),
+                    "",  # vision
+                    _json.dumps(["kaizen", "tdd", "quality"]),  # lean values
+                    "",  # lead_agent_id
+                    _json.dumps([]),
+                    "",  # active_pattern_id
+                    "active",
+                    "",  # git_url
+                    "inception",  # current_phase
+                    _json.dumps([]),
+                    "",  # owner_id
+                    False,
+                    "",  # container_url
+                    "Amélioration continue",
+                ),
+            )
+            if cur.rowcount:
+                inserted += 1
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
+    return inserted
+
+
 def _ac_ensure_tables(conn) -> None:
     """Create AC tables if they don't exist (idempotent)."""
     is_pg = False
