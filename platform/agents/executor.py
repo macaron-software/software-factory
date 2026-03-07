@@ -1343,6 +1343,7 @@ class AgentExecutor:
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False
             final_content = ""
+            write_count = 0  # track code_write calls so far (used in nudge condition)
             logger.warning(
                 "Agent %s: tools_enabled=%s, tools=%s, allowed=%s",
                 agent.id,
