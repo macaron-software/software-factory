@@ -102,23 +102,49 @@ les défauts listés dans ADVERSARIAL_N.md et CICD_FAILURE_N.md du cycle précé
 4. < 500 LOC par fichier (si plus, refactorer)
 5. Gestion d'erreur réelle (pas juste `console.error(e)` ou `print(e)`)
 
-## Workflow par cycle
-1. Lire `INCEPTION.md` pour les ACs et design tokens
-2. Si cycle > 1 : lire `ADVERSARIAL_{N-1}.md` et `CICD_FAILURE_{N-1}.md`
-3. Implémenter en TDD (tests first)
-4. Appeler `docker_deploy()` pour vérifier le build — OBLIGATOIRE
-5. Si `docker_deploy()` échoue :
-   - Lire les logs d'erreur
-   - Corriger le **Dockerfile du projet** (dans le workspace) ou le code source
-   - **JAMAIS** modifier `deploy/Dockerfile` ni aucun fichier de la plateforme SF
-   - Relancer `docker_deploy()` jusqu'à success
-6. Corriger si build échoue (BLOQUANT)
-7. Summary : liste des ACs implémentés avec leur REF
+## Séquence OBLIGATOIRE — dans cet ordre exact
+
+```
+# Étape 1 : lire les specs (1 seul appel)
+code_read("INCEPTION.md")
+
+# Étape 2 (cycle > 1 uniquement) : lire les défauts précédents
+code_read("ADVERSARIAL_{N-1}.md")
+
+# Étape 3 : ÉCRIRE LES TESTS (RED) — AVANT tout code de production
+code_write("tests/test_feature.py", """
+# contenu réel du fichier test ici
+""")
+code_read("tests/test_feature.py")  # obligatoire pour l'evidence
+
+# Étape 4 : ÉCRIRE L'IMPLÉMENTATION (GREEN)
+code_write("src/feature.py", """
+# contenu réel de l'implémentation ici
+""")
+code_read("src/feature.py")  # obligatoire pour l'evidence
+
+# Étape 5 : Vérifier le build
+docker_deploy()
+```
+
+**RÈGLES ABSOLUES :**
+- `list_files` = **INTERDIT** — perte de temps, tu connais la structure du projet via INCEPTION.md
+- Ton output doit contenir au minimum 2 appels `code_write` (tests + implémentation)
+- Si tu n'as écrit AUCUN fichier → la phase sera rejetée immédiatement (HALLUCINATION)
+- Ne JAMAIS écrire `[Appel outils: ...]` dans ton texte — appelle l'outil réellement
+- TDD strict : tests d'ABORD, implémentation ensuite, jamais l'inverse
+
+## Workflow si docker_deploy() échoue
+- Lire les logs d'erreur
+- Corriger le **Dockerfile du projet** (dans le workspace) ou le code source
+- **JAMAIS** modifier `deploy/Dockerfile` ni aucun fichier de la plateforme SF
+- Relancer `docker_deploy()` jusqu'à success
 
 ## Tools autorisés
-- code_write, code_read (lire INCEPTION.md, ADVERSARIAL_*.md, code existant)
-- docker_deploy (obligatoire pour vérifier le build)
-- memory_search (contexte du cycle précédent)
+- `code_write` — écrire les tests et l'implémentation (usage OBLIGATOIRE)
+- `code_read` — lire INCEPTION.md, les adversarial reports, et vérifier ce qu'on a écrit
+- `docker_deploy` — vérifier le build (obligatoire)
+- `memory_search` — contexte du cycle précédent
 
 ## Règle CRITIQUE : Vérification evidence
 **APRÈS chaque `code_write`, OBLIGATOIREMENT appeler `code_read` sur le même fichier.**

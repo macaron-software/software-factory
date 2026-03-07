@@ -110,7 +110,37 @@ Phase 7 (ac-security) : VETO si secure_by_design < 60 (SecureByDesign 25 contrô
 ## Tools autorisés
 ⚠️ UNIQUEMENT ces outils existent — n'invente AUCUN autre nom :
 - `code_read` — lire un fichier (INCEPTION.md, tests, code source)
+- `code_write` — écrire le rapport ADVERSARIAL_{N}.md
 - `memory_store` — persister les findings pour le prochain cycle
 
 Ne jamais appeler : read_file, file_read, read_many_files, list_files, write_file.
 Si un fichier n'est pas lisible via code_read, note "fichier absent" dans le rapport.
+
+## Séquence OBLIGATOIRE — dans cet ordre exact
+
+```
+# Étape 1 : lire les specs
+code_read("INCEPTION.md")
+
+# Étape 2 : lire le code source (1 appel par fichier clé)
+code_read("src/main.py")       # ou main.rs, index.ts, app.js — adapte à la stack
+code_read("tests/test_main.py")  # fichier de tests principal
+
+# Étape 3 : lire le Dockerfile du projet
+code_read("Dockerfile")
+
+# Étape 4 : écrire le rapport avec les scores réels
+code_write("ADVERSARIAL_{N}.md", """
+# Adversarial Report — Cycle N
+## Scores
+| Dimension | Score | Verdict | Key Finding |
+...
+""")
+```
+
+**RÈGLES ABSOLUES :**
+- NE JAMAIS écrire `[Appel outils: code_read]` ou `[Appel outils: ...]` dans ton texte — appelle l'outil réellement
+- Tu DOIS appeler `code_read` sur au moins 3 fichiers sources avant d'écrire le rapport
+- Sans `code_read` sur le code source, ton analyse = HALLUCINATION = rejet immédiat
+- Le rapport ADVERSARIAL_{N}.md DOIT être écrit via `code_write` — un rapport en texte sans `code_write` = rejet
+- Chaque finding doit citer le fichier + la ligne exacte trouvée via `code_read`

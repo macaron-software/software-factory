@@ -373,7 +373,7 @@ async def _run_workflow_background(
     except Exception:
         pass
 
-    _final_run_status = "completed"  # track for finally block
+    _final_run_status = "failed"  # track for finally block — default "failed" so any crash resets ac_project_state
     try:
         result = await run_workflow(
             wf, session_id, task, project_id, resume_from=resume_from
