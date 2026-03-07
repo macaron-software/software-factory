@@ -37,6 +37,9 @@ INSPIRATION:
   and adversarial collaboration pattern in GoodAI / Pentagi red-team workflows
   (https://github.com/vxcontrol/pentagi). Our RSSI team (security-hacking.yaml)
   is the offensive counterpart — agents actively attack the system they built.
+  L1 uses semi-formal reasoning (arXiv:2603.01896): Premises → Trace → Verdict.
+  Forces reviewer to ground claims in tool evidence before concluding — acts as
+  a certificate that prevents skipping cases or making unsupported claims.
 """
 
 from __future__ import annotations
@@ -133,10 +136,7 @@ _TEST_CHEAT_PATTERNS = [
     # Trivially-passing (useless) assertions
     (r"\bassert\s+True\s*(?:#|$)", "assert True — trivially passes, tests nothing"),
     (r"\bassert\s+1\s*(?:#|$)", "assert 1 — trivially passes, tests nothing"),
-    (
-        r"expect\([^)]+\)\.toBeTruthy\(\)\s*;?\s*$",
-        "toBeTruthy() — weak, tests nothing concrete",
-    ),
+    (r"expect\([^)]+\)\.toBeTruthy\(\)\s*;?\s*$", "toBeTruthy() — weak, tests nothing concrete"),
     # Empty test bodies — test exists but does nothing
     (
         r"def test_\w+\s*\([^)]*\)\s*:\s*\n\s+(?:pass|\.\.\.)$",
@@ -168,19 +168,13 @@ _CODE_SLOP_PATTERNS = [
     (r"//\s*@ts-nocheck\b", "@ts-nocheck — TypeScript disabled for entire file"),
     (r"/\*\s*eslint-disable\b", "eslint-disable block — lint rules suppressed"),
     # Python — type/error suppression
-    (
-        r"#\s*type:\s*ignore\b",
-        "# type: ignore — mypy error suppressed instead of fixed",
-    ),
+    (r"#\s*type:\s*ignore\b", "# type: ignore — mypy error suppressed instead of fixed"),
     (
         r"except\s+(?:Exception|BaseException)\s*:\s*\n\s+pass\s*$",
         "except Exception: pass — silently swallows all errors",
     ),
     # CSS — specificity hacks and unnecessary vendor prefixes
-    (
-        r"!\s*important\b",
-        "!important — lazy specificity override, fix the selector cascade",
-    ),
+    (r"!\s*important\b", "!important — lazy specificity override, fix the selector cascade"),
     (
         r"-webkit-(?:border-radius|box-shadow|transition|transform|animation)\s*:",
         "-webkit- vendor prefix not needed since 2017 (caniuse: >98%)",
@@ -221,31 +215,16 @@ _LIE_PATTERNS = [
 # Security vulnerability patterns — hardcoded secrets and unsafe code
 # SOURCE: OWASP Top 10 + internal security rules
 _HARDCODED_SECRET_PATTERNS = [
-    (
-        r"""(?:password|passwd|pwd)\s*=\s*['"][^'"]{4,}['"]""",
-        "Hardcoded password literal",
-    ),
+    (r"""(?:password|passwd|pwd)\s*=\s*['"][^'"]{4,}['"]""", "Hardcoded password literal"),
     (r"""(?:api_key|apikey|api-key)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded API key"),
-    (
-        r"""(?:secret|token|auth_token)\s*=\s*['"][^'"]{8,}['"]""",
-        "Hardcoded secret/token",
-    ),
-    (
-        r"""(?:private_key|privatekey)\s*=\s*['"][^'"]{8,}['"]""",
-        "Hardcoded private key",
-    ),
+    (r"""(?:secret|token|auth_token)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded secret/token"),
+    (r"""(?:private_key|privatekey)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded private key"),
     (r"""-----BEGIN (?:RSA |EC )?PRIVATE KEY-----""", "Private key embedded in code"),
-    (
-        r"""(?:access_key_id|aws_access)\s*=\s*['"][A-Z0-9]{16,}['"]""",
-        "Hardcoded AWS access key",
-    ),
+    (r"""(?:access_key_id|aws_access)\s*=\s*['"][A-Z0-9]{16,}['"]""", "Hardcoded AWS access key"),
     # REF: arXiv:2602.20021 — SBD-02: additional credential patterns (sec-adv-secrets)
     (r"""eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}""", "JWT token hardcoded"),
     (r"""sig=[A-Za-z0-9%+/]{20,}""", "Azure SAS signature token"),
-    (
-        r"""(?:AZURE_OPENAI|OPENAI)_API_KEY\s*=\s*['"][a-zA-Z0-9\-]{20,}['"]""",
-        "Azure/OpenAI API key",
-    ),
+    (r"""(?:AZURE_OPENAI|OPENAI)_API_KEY\s*=\s*['"][a-zA-Z0-9\-]{20,}['"]""", "Azure/OpenAI API key"),
     (r"""(?:sk|pk)-[A-Za-z0-9]{20,}""", "API secret key pattern (sk-/pk- prefix)"),
 ]
 
@@ -255,62 +234,33 @@ _SECURITY_VULN_PATTERNS = [
     (r"""\bexec\s*\(""", "exec() — arbitrary code execution risk"),
     (r"""\bpickle\.loads?\s*\(""", "pickle.loads() — deserialization RCE risk"),
     (r"""\bos\.system\s*\(""", "os.system() — shell injection risk, use subprocess"),
-    (
-        r"""cursor\.execute\s*\(f['"]""",
-        "SQL f-string injection — use parameterized queries",
-    ),
-    (
-        r"""cursor\.execute\s*\(['"].*?%\s*(?:str|repr|format)""",
-        "SQL string format — injection risk",
-    ),
-    (
-        r"""\bsubprocess\.(?:call|run|Popen)\s*\([^)]*shell\s*=\s*True""",
-        "subprocess shell=True — shell injection",
-    ),
-    (
-        r"""__import__\s*\(\s*(?:input|request)""",
-        "Dynamic import from user input — RCE risk",
-    ),
+    (r"""cursor\.execute\s*\(f['"]""", "SQL f-string injection — use parameterized queries"),
+    (r"""cursor\.execute\s*\(['"].*?%\s*(?:str|repr|format)""", "SQL string format — injection risk"),
+    (r"""\bsubprocess\.(?:call|run|Popen)\s*\([^)]*shell\s*=\s*True""", "subprocess shell=True — shell injection"),
+    (r"""__import__\s*\(\s*(?:input|request)""", "Dynamic import from user input — RCE risk"),
 ]
 
 # Architecture violation patterns — structural anti-patterns
 # SOURCE: clean architecture rules (see CLAUDE.md / SPECS.md)
 _ARCHITECTURE_VIOLATION_PATTERNS = [
-    (
-        r"""(?:import|from)\s+.*(?:sqlite3|sqlalchemy|psycopg|pymysql).*\n.*(?:render_template|jinja2|Jinja2)""",
-        "DB driver imported in template layer — violates clean architecture",
-        True,
-    ),
-    (
-        r"""cursor\.execute|conn\.execute|db\.execute""",
-        "Direct SQL in non-store file — use the store layer",
-        False,
-    ),
-    (
-        r"""requests\.(?:get|post|put|delete)\s*\((?!.*test)""",
-        "Raw HTTP call — use the LLM client or dedicated service layer",
-        False,
-    ),
+    (r"""(?:import|from)\s+.*(?:sqlite3|sqlalchemy|psycopg|pymysql).*\n.*(?:render_template|jinja2|Jinja2)""",
+     "DB driver imported in template layer — violates clean architecture", True),
+    (r"""cursor\.execute|conn\.execute|db\.execute""",
+     "Direct SQL in non-store file — use the store layer", False),
+    (r"""requests\.(?:get|post|put|delete)\s*\((?!.*test)""",
+     "Raw HTTP call — use the LLM client or dedicated service layer", False),
 ]
 
 # False fallback patterns — agents using stubs in production code
 _FALSE_FALLBACK_PATTERNS = [
-    (
-        r"""raise\s+NotImplementedError\s*(?:\([^)]*\))?\s*#?\s*(?:TODO|FIXME|later|implement)""",
-        "NotImplementedError with TODO — stub not replaced by real implementation",
-    ),
-    (
-        r"""#\s*TODO:\s*(?:implement|add|fix|handle|replace)\s+(?:this|later|me)""",
-        "TODO comment in production code — work not complete",
-    ),
-    (
-        r"""return\s+(?:None|False|0|\[\]|\{\}|\"\"\|'')\s*#\s*(?:TODO|FIXME|placeholder|stub)""",
-        "Stub return value — placeholder not replaced",
-    ),
-    (
-        r"""pass\s*#\s*(?:TODO|FIXME|implement|placeholder)""",
-        "pass with TODO — implementation missing",
-    ),
+    (r"""raise\s+NotImplementedError\s*(?:\([^)]*\))?\s*#?\s*(?:TODO|FIXME|later|implement)""",
+     "NotImplementedError with TODO — stub not replaced by real implementation"),
+    (r"""#\s*TODO:\s*(?:implement|add|fix|handle|replace)\s+(?:this|later|me)""",
+     "TODO comment in production code — work not complete"),
+    (r"""return\s+(?:None|False|0|\[\]|\{\}|\"\"\|'')\s*#\s*(?:TODO|FIXME|placeholder|stub)""",
+     "Stub return value — placeholder not replaced"),
+    (r"""pass\s*#\s*(?:TODO|FIXME|implement|placeholder)""",
+     "pass with TODO — implementation missing"),
 ]
 
 # REF: arXiv:2602.20021 — SBD-09: prompt injection patterns in agent output / tool results
@@ -319,49 +269,25 @@ _PROMPT_INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(?:previous|prior|above|all)\s+instructions?", re.I),
     re.compile(r"disregard\s+(?:your|the)\s+system\s+prompt", re.I),
     re.compile(r"you\s+are\s+now\s+(?:DAN|[A-Z]{2,10}|an?\s+AI\s+without)", re.I),
-    re.compile(
-        r"forget\s+(?:everything|all)\s+(?:you\s+(?:know|were\s+told)|above)", re.I
-    ),
+    re.compile(r"forget\s+(?:everything|all)\s+(?:you\s+(?:know|were\s+told)|above)", re.I),
     re.compile(r"new\s+(?:system\s+)?(?:prompt|instructions?)\s*:", re.I),
-    re.compile(
-        r"\[SYSTEM\]\s*\w*Agent", re.I
-    ),  # [SYSTEM] XxxAgent — inter-agent injection
+    re.compile(r"\[SYSTEM\]\s*\w*Agent", re.I),  # [SYSTEM] XxxAgent — inter-agent injection
 ]
 
 # REF: arXiv:2602.20021 — SBD-06: identity spoofing — agent claims to be another system
 _IDENTITY_CLAIM_PATTERNS = [
-    re.compile(
-        r"\bI\s+am\s+(?:Jarvis|the\s+(?:system|platform|admin|CTO|root)\b)", re.I
-    ),
-    re.compile(
-        r"\bI\s+have\s+(?:(?:special|elevated|admin|root|platform)\s+)+(?:permissions?|access|privileges?)",
-        re.I,
-    ),
+    re.compile(r"\bI\s+am\s+(?:Jarvis|the\s+(?:system|platform|admin|CTO|root)\b)", re.I),
+    re.compile(r"\bI\s+have\s+(?:(?:special|elevated|admin|root|platform)\s+)+(?:permissions?|access|privileges?)", re.I),
     re.compile(r"(?:acting|operating)\s+as\s+(?:Jarvis|system|admin|platform)", re.I),
-    re.compile(
-        r"my\s+security\s+restrictions?\s+(?:have\s+been\s+)?(?:removed|disabled|lifted|bypassed)",
-        re.I,
-    ),
+    re.compile(r"my\s+security\s+restrictions?\s+(?:have\s+been\s+)?(?:removed|disabled|lifted|bypassed)", re.I),
 ]
 
 # REF: arXiv:2602.20021 — SBD-04: resource abuse patterns in written code
 _RESOURCE_ABUSE_PATTERNS = [
-    (
-        r"""while\s+True\s*:\s*(?:pass|continue)\s*$""",
-        "Busy-wait infinite loop (DoS risk)",
-    ),
-    (
-        r"""while\s+1\s*:\s*(?:pass|continue)\s*$""",
-        "Busy-wait infinite loop (DoS risk)",
-    ),
-    (
-        r"""os\.fork\s*\(\s*\)""",
-        "os.fork() call — fork bomb risk",
-    ),  # flag any fork() in app code
-    (
-        r"""subprocess\.[A-Za-z]+\([^)]*\)\s*.*while""",
-        "subprocess in loop without bound (DoS)",
-    ),
+    (r"""while\s+True\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
+    (r"""while\s+1\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
+    (r"""os\.fork\s*\(\s*\)""", "os.fork() call — fork bomb risk"),  # flag any fork() in app code
+    (r"""subprocess\.[A-Za-z]+\([^)]*\)\s*.*while""", "subprocess in loop without bound (DoS)"),
     (r"""time\.sleep\s*\(\s*0\s*\)""", "sleep(0) busy-wait pattern"),
     (r"""rm\s+-(?:rf|fr)\s+/""", "rm -rf / — destructive filesystem wipe (CS1/CS7)"),
 ]
@@ -384,15 +310,9 @@ _EXTERNAL_RESOURCE_PATTERNS = [
 # PII patterns that should not appear in written code files or agent output.
 _PII_PATTERNS = [
     (r"\b\d{3}-\d{2}-\d{4}\b", "SSN (Social Security Number) pattern"),
-    (
-        r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b",
-        "Credit card number pattern",
-    ),
+    (r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b", "Credit card number pattern"),
     (r"\bIBAN\s*:?\s*[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b", "IBAN bank account number"),
-    (
-        r"\b(?:patient|medical|health)\s+(?:id|record|number)\s*:?\s*\S{4,}",
-        "Medical record reference",
-    ),
+    (r"\b(?:patient|medical|health)\s+(?:id|record|number)\s*:?\s*\S{4,}", "Medical record reference"),
 ]
 
 # Stack mismatch detection — backend code in wrong language
@@ -537,15 +457,7 @@ def check_l0(
         # Check test cheating patterns — only in test files
         is_test_file = any(
             kw in file_path.lower()
-            for kw in [
-                "test_",
-                "_test.",
-                "/test/",
-                "/tests/",
-                ".spec.",
-                ".test.",
-                "__tests__",
-            ]
+            for kw in ["test_", "_test.", "/test/", "/tests/", ".spec.", ".test.", "__tests__"]
         )
         if is_test_file:
             for pattern, desc in _TEST_CHEAT_PATTERNS:
@@ -723,14 +635,9 @@ def check_l0(
     for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
-        fp = str(
-            tc.get("args", {}).get("path", "")
-            or tc.get("args", {}).get("file_path", "")
-        )
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
-        if not fc or any(
-            x in fp.lower() for x in [".env.example", ".env.sample", ".md", "readme"]
-        ):
+        if not fc or any(x in fp.lower() for x in [".env.example", ".env.sample", ".md", "readme"]):
             continue
         for pattern, desc in _HARDCODED_SECRET_PATTERNS:
             if re.search(pattern, fc, re.IGNORECASE):
@@ -741,17 +648,11 @@ def check_l0(
     for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
-        fp = str(
-            tc.get("args", {}).get("path", "")
-            or tc.get("args", {}).get("file_path", "")
-        )
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
         if not fc:
             continue
-        is_test = any(
-            kw in fp.lower()
-            for kw in ["test_", "_test.", "/test/", "/tests/", ".spec."]
-        )
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", "/test/", "/tests/", ".spec."])
         for pattern, desc in _SECURITY_VULN_PATTERNS:
             if re.search(pattern, fc, re.IGNORECASE | re.MULTILINE):
                 if is_test and "eval" in pattern:
@@ -763,10 +664,7 @@ def check_l0(
     for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
-        fp = str(
-            tc.get("args", {}).get("path", "")
-            or tc.get("args", {}).get("file_path", "")
-        )
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
         if not fc:
             continue
@@ -784,33 +682,16 @@ def check_l0(
         r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC|Traceability|TODO-\d+|JIRA)[\s:\-]",
         re.IGNORECASE,
     )
-    _SKIP_TRACE_EXTS = {
-        ".md",
-        ".txt",
-        ".json",
-        ".yml",
-        ".yaml",
-        ".env",
-        ".toml",
-        ".cfg",
-        ".ini",
-        ".lock",
-    }
+    _SKIP_TRACE_EXTS = {".md", ".txt", ".json", ".yml", ".yaml", ".env", ".toml", ".cfg", ".ini", ".lock"}
     for tc in tool_calls:
         if tc.get("name") != "code_write":  # only NEW files, not edits
             continue
-        fp = str(
-            tc.get("args", {}).get("path", "")
-            or tc.get("args", {}).get("file_path", "")
-        )
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
         if not fc or not fp:
             continue
         ext = "." + fp.rsplit(".", 1)[-1].lower() if "." in fp else ""
-        is_config = any(
-            kw in fp.lower()
-            for kw in ["migration", "conftest", "settings", "__init__", "config."]
-        )
+        is_config = any(kw in fp.lower() for kw in ["migration", "conftest", "settings", "__init__", "config."])
         is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec."])
         if ext in _SKIP_TRACE_EXTS or is_config or is_test:
             continue
@@ -843,19 +724,15 @@ def check_l0(
     # PROMPT_INJECTION: SBD-09 — detect injection attempts in agent output / tool results
     for inj_pattern in _PROMPT_INJECTION_PATTERNS:
         if inj_pattern.search(content):
-            issues.append(
-                f"PROMPT_INJECTION: '{inj_pattern.pattern[:60]}' detected in output"
-            )
+            issues.append(f"PROMPT_INJECTION: '{inj_pattern.pattern[:60]}' detected in output")
             score += 8  # force reject — injection in output
             break
     # Also scan tool results (RAG / memory / code_read outputs)
-    for tc in tool_calls or []:
+    for tc in (tool_calls or []):
         result_text = str(tc.get("result", ""))
         for inj_pattern in _PROMPT_INJECTION_PATTERNS:
             if inj_pattern.search(result_text):
-                issues.append(
-                    f"PROMPT_INJECTION in tool result [{tc.get('name')}]: '{inj_pattern.pattern[:40]}'"
-                )
+                issues.append(f"PROMPT_INJECTION in tool result [{tc.get('name')}]: '{inj_pattern.pattern[:40]}'")
                 score += 6  # warn — poisoned data source
                 break
 
@@ -867,7 +744,7 @@ def check_l0(
             break
 
     # RESOURCE_ABUSE: SBD-04 — detect DoS patterns in written code
-    for tc in tool_calls or []:
+    for tc in (tool_calls or []):
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
         fc = str(tc.get("args", {}).get("content", ""))
@@ -883,12 +760,10 @@ def check_l0(
     # EXTERNAL_RESOURCE: CS10 — detect memory writes storing externally-editable URLs.
     # An agent coerced into storing a Gist/Pastebin URL in memory creates an indirect
     # injection channel that persists across sessions. REF: arXiv:2602.20021 CS10.
-    for tc in tool_calls or []:
+    for tc in (tool_calls or []):
         if tc.get("name") not in ("memory_store",):
             continue
-        val = str(
-            tc.get("args", {}).get("value", "") or tc.get("args", {}).get("content", "")
-        )
+        val = str(tc.get("args", {}).get("value", "") or tc.get("args", {}).get("content", ""))
         for url_re in _EXTERNAL_RESOURCE_PATTERNS:
             if url_re.search(val):
                 issues.append(
@@ -901,13 +776,10 @@ def check_l0(
     # PII_LEAK: CS3 — detect PII patterns in code_write output.
     # Agents should not embed real SSN/credit-card/IBAN/medical data in written files.
     # REF: arXiv:2602.20021 CS3: Disclosure of Sensitive Information.
-    for tc in tool_calls or []:
+    for tc in (tool_calls or []):
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
-        fp = str(
-            tc.get("args", {}).get("path", "")
-            or tc.get("args", {}).get("file_path", "")
-        )
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
         if not fc:
             continue
@@ -986,7 +858,9 @@ async def check_l1(
                 "Do NOT reject for 'incomplete' if agent addressed their own role contribution."
             )
 
-        prompt = f"""Evaluate this agent output for quality. Score 0-10 (0=excellent, 10=garbage).
+        prompt = f"""Evaluate this agent output for quality using SEMI-FORMAL REASONING.
+# REF: arXiv:2603.01896 — Semi-formal reasoning improves code analysis accuracy.
+# Requires explicit Premises → Trace → Verdict to prevent skipping cases.
 
 AGENT: {agent_name} ({agent_role})
 TASK: {task[:500]}
@@ -1004,6 +878,11 @@ IMPORTANT CONTEXT:
 - Only available tools: code_read, code_write, code_edit, list_files, deep_search. Do NOT penalize for not using tools that don't exist (build_tool, git_commit, deploy, etc).
 - If files already exist in the workspace, reading them IS valid work.{pattern_context}
 
+SEMI-FORMAL REASONING PROTOCOL (mandatory — you must complete all 3 steps):
+1. PREMISES: List each verifiable FACT from tool evidence (tool name → what it proves).
+2. TRACE: For each agent claim, map it to a premise or mark UNVERIFIED.
+3. VERDICT: Derive your conclusion ONLY from the above — no assumptions.
+
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
 2. HALLUCINATION: Claims actions not supported by tool evidence
@@ -1013,7 +892,7 @@ Check for:
 6. STACK_MISMATCH: Code written in wrong language for declared stack (e.g. TypeScript backend when task says Rust/axum)
 
 Respond ONLY with JSON:
-{{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
+{{"premises": ["tool X proves Y", ...], "trace": ["claim A → premise 1", "claim B → UNVERIFIED", ...], "score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
 
         client = get_llm_client()
         resp = await client.chat(
@@ -1034,6 +913,8 @@ Respond ONLY with JSON:
         l1_score = int(data.get("score", 0))
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
+        # REF: arXiv:2603.01896 — capture semi-formal reasoning trace for audit/debug
+        sf_trace = data.get("trace", [])
 
         # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS:
         # - agent used code_write/code_edit (wrote real code)
@@ -1049,6 +930,13 @@ Respond ONLY with JSON:
             tc.get("name", "") in ("code_write", "code_edit", "git_commit")
             for tc in tool_calls
         )
+        # REF: arXiv:2603.01896 — unverified claims in semi-formal trace = hallucination signal
+        # Only surface if agent produced no write evidence (otherwise text describes tool output)
+        if sf_trace and not used_write_tools:
+            unverified = [t for t in sf_trace if "UNVERIFIED" in t.upper()]
+            if unverified:
+                logger.debug("[L1 semi-formal] unverified claims (no write tools): %s", unverified)
+                l1_issues = l1_issues + [f"UNVERIFIED: {u}" for u in unverified[:3]]
         # In hierarchical patterns, leads/testers reference files from workers — not hallucination
         is_hierarchical_reviewer = pattern_type == "hierarchical" and any(
             r in (agent_role or "").lower()
@@ -1088,7 +976,6 @@ def record_guard_event(
     """Persist adversarial guard result to adversarial_events table (best-effort)."""
     try:
         from ..db.migrations import get_db
-
         # Extract dominant check type from first issue prefix
         check_type = "PASS"
         if guard_result.issues:
@@ -1129,7 +1016,6 @@ def record_code_traceability(
     """Extract traceability refs from a written file and store in code_traceability."""
     try:
         import re as _re
-
         # Parse ref tags from file header (first 2000 chars)
         header = content[:2000]
         ref_pattern = _re.compile(
@@ -1142,28 +1028,18 @@ def record_code_traceability(
         # Extract feature_id from ref if not provided
         if not feature_id and refs:
             for ref in refs:
-                if ref.lower().startswith("feat-") or ref.lower().startswith(
-                    "feature-"
-                ):
+                if ref.lower().startswith("feat-") or ref.lower().startswith("feature-"):
                     feature_id = ref
                     break
 
         from ..db.migrations import get_db
-
         db = get_db()
         try:
             db.execute(
                 """INSERT INTO code_traceability
                    (run_id, epic_id, feature_id, file_path, ref_tag, agent_name)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (
-                    run_id or "",
-                    epic_id or "",
-                    feature_id or "",
-                    file_path,
-                    ref_tag,
-                    agent_name or "",
-                ),
+                (run_id or "", epic_id or "", feature_id or "", file_path, ref_tag, agent_name or ""),
             )
             db.commit()
         finally:

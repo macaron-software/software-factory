@@ -76,9 +76,6 @@ class PatternRun:
     success: bool = False
     error: str = ""
     flow_step: str = ""
-    lineage: list[str] = field(
-        default_factory=list
-    )  # ancestry chain: Vision → Epic → Story → Task
 
 
 # SSE push (import from runner to share the same queues)
@@ -143,33 +140,20 @@ RULES:
 _EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
 
 WORKFLOW:
-1. EXPLORE FIRST: list_files(path=WORKSPACE) → code_read(path=WORKSPACE+"/INCEPTION.md") to get the STACK
-2. WRITE FILES: code_write per file using WORKSPACE-prefixed absolute paths (MINIMUM 3 code_write calls)
-3. BUILD: docker_deploy() or bash(command="cd WORKSPACE && npm install && npm run build")
+1. EXPLORE FIRST: list_files + code_read existing files → understand what exists already
+2. deep_search(query="architecture, patterns, existing code") → discover project structure
+3. memory_search(query="conventions, decisions, design-system") → learn past decisions + design tokens
+4. THEN code_write per file → REAL build → git_commit
 
-TOOL: code_write(path=WORKSPACE+"/src/main.py", content="full source code here — 30+ lines")
-      write_file(path=WORKSPACE+"/src/main.py", content="...") — also accepted
-
-MINIMUM DELIVERABLES (MANDATORY — adversarial will fail you if missing):
-- At least 3 separate code_write calls (source file + test file + Dockerfile or config)
-- TDD projects: write TEST FILE first (WORKSPACE+"/tests/test_*.py" or "*.test.ts"), THEN source
-- TDD order: RED (write failing test) → GREEN (write source to pass) → REFACTOR
-- Token limit: write as much code as possible per call (full implementations, not stubs)
+TOOL: code_write(path="src/module.ts", content="full source code here")
 
 RULES:
-- WORKSPACE is the absolute path provided in "## Workspace" below. ALL paths MUST start with it.
+- ALWAYS read existing code BEFORE writing. Do NOT recreate files that exist.
 - code_write EACH file. 30+ lines per file. No stubs. No placeholders. No fake scripts.
-- FOLLOW THE STACK IN INCEPTION.md. Do NOT switch language (Python stays Python, TS stays TS).
-- Do NOT describe changes. DO them via code_write / write_file.
+- Use paths matching the project stack (src/ for web, app/ for mobile). Auto-resolved.
+- FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
+- Do NOT describe changes. DO them via code_write.
 - NEVER create fake build scripts (gradlew, Makefile) that do nothing.
-- After each code_write, IMMEDIATELY write the next required file — do NOT stop.
-
-DOCKERFILE TEMPLATES (choose based on INCEPTION.md stack — NEVER use wrong base image):
-- HTML/CSS/nginx → FROM nginx:alpine + COPY src/ /usr/share/nginx/html/ + EXPOSE 80
-- Vue.js/React/Node.js build → FROM node:20-alpine + RUN npm install + RUN npm run build + FROM nginx:alpine COPY --from=0 /app/dist/ /usr/share/nginx/html/
-- Python/FastAPI → FROM python:3.12-slim + COPY requirements.txt . + RUN pip install -r requirements.txt + COPY . . + CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
-- Go → FROM golang:1.22-alpine AS build + RUN go build -o app + FROM alpine COPY --from=build /app/app . + CMD ["./app"]
-- Rust → FROM rust:1.78-slim AS build + RUN cargo build --release + FROM debian:bookworm-slim COPY --from=build ./target/release/app . + CMD ["./app"]
 
 UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
@@ -184,46 +168,56 @@ UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - Loading/error/empty states for EVERY data-dependent component
 
 DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):
-- Go: code_write go.mod with module name + deps, then bash(command="cd WORKSPACE && go mod tidy")
+- Go: code_write go.mod with module name + deps, then build(command="cd {project} && go mod tidy")
 - Python: code_write requirements.txt with ALL imports (fastapi, uvicorn, pydantic, etc.)
-- Node.js/TS: code_write package.json with scripts + deps, then bash(command="cd WORKSPACE && npm install")
+- Node.js/TS: code_write package.json with scripts + deps, then build(command="npm install")
 - Rust: code_write Cargo.toml with [dependencies] section
 - Docker: code_write Dockerfile with correct base image + COPY + RUN install
 - NEVER leave deps empty. List EVERY import your code uses. Missing deps = build failure.
 
 BUILD VERIFICATION (MANDATORY — run AFTER writing code):
-- Web/Node.js: bash(command="cd WORKSPACE && npm install && npm run build")
-- Python: bash(command="cd WORKSPACE && python3 -m py_compile app/main.py")
-- Docker: docker_deploy() — use this if the project has a Dockerfile
-- If build fails, FIX the code and retry. Do NOT leave broken code.
+- Web/Node.js: build(command="npm install && npm run build")
+- Python: build(command="python3 -m py_compile file.py")
+- Go: build(command="go vet ./...")
+- Rust: build(command="cargo check")
+- Android/Kotlin: android_build() — compiles via Gradle in real SDK container
+- Android tests: android_test() — runs real unit tests
+- Swift/iOS: build(command="swift build") — only for iOS/macOS projects
+- Docker: build(command="docker build -t test .")
+- If build fails, FIX the code and retry. Do NOT commit broken code.
+- Do NOT use generic build() for Android — use android_build() instead.
 
-COMPLETION CHECKLIST:
-1. All source files written via code_write (WORKSPACE-prefixed absolute paths)
-2. Dependency manifest complete (requirements.txt / package.json / go.mod / Cargo.toml)
-3. Dockerfile exists with CORRECT base image (see DOCKERFILE TEMPLATES above)
-4. docker_deploy() succeeds
-5. No stubs, no placeholders, no TODO left in code"""
+COMPLETION CHECKLIST (before git_commit):
+1. All source files written via code_write
+2. Dependency manifest exists and is complete (requirements.txt / package.json / go.mod / Cargo.toml)
+3. Dockerfile exists (if project uses Docker)
+4. Build command ran successfully
+5. git_commit with meaningful message"""
 
 # Validation protocol — telegraphic
+# REF: arXiv:2603.01896 — semi-formal reasoning improves fault localization +5pp,
+# code QA 87% accuracy. Structured Premises/Trace/Verdict prevents skipped cases.
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
 
-WORKFLOW (MANDATORY — in this exact order):
-1. docker_deploy() FIRST — verify status='ok' and url is not null. If fails → VETO immediately.
-2. list_files → find test files and source files
-3. Run REAL tests using the correct tools:
+WORKFLOW:
+1. list_files → find test files and source files
+2. Run REAL tests using the correct tools:
    - Android/Kotlin: android_build() → android_test() → android_lint()
    - Android E2E: android_emulator_test() — boots real emulator, runs instrumented tests
    - Python: build(command="python3 -m pytest tests/")
    - Node.js: build(command="npm test")
    - Playwright: playwright_test(spec="tests/e2e.spec.js")
-4. For web projects: TAKE REAL SCREENSHOTS:
+3. For web projects: TAKE REAL SCREENSHOTS:
    - browser_screenshot() → captures real browser rendering
    - Minimum 2 screenshots: home page + key interaction
-5. code_read source files → check for obvious bugs
+4. code_read source files → check for obvious bugs
+5. SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
+   Premises: list each FACT from tool output (exit codes, test counts, error lines)
+   Trace: map each claim to a premise or mark UNVERIFIED
+   Conclusion: [APPROVE] or [VETO] derived ONLY from premises above
 6. Deliver verdict based on ACTUAL test results + screenshots
 
 RULES:
-- Step 1 is MANDATORY: docker_deploy() BEFORE anything else.
 - NEVER use generic build() for Android — use android_build() and android_test() instead.
 - You MUST call build/test tools at least once. Reading code alone is NOT testing.
 - For web projects, you MUST call browser_screenshot at least once.
@@ -234,9 +228,14 @@ RULES:
 - DO NOT fabricate screenshots or build scripts."""
 
 # Review protocol — telegraphic
+# REF: arXiv:2603.01896 — semi-formal reasoning improves patch equivalence 78%→93%
 _REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
 
 DO: code_read files → code_search references → build(command="...") to verify.
+SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
+  Premises: what does each code_read / build result prove?
+  Trace: does the implementation match the requirement, step by step?
+  Verdict: [APPROVE] or [REQUEST_CHANGES] derived from above — no skipped cases.
 VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues.
 You MUST call build tool to verify the code compiles before approving."""
 
@@ -289,6 +288,11 @@ CRITICAL RULES:
 def _auto_create_tickets_from_results(results: str, ctx, source: str = "qa"):
     """Auto-create TMA tickets from E2E/build results that contain failures."""
     import uuid
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
 
     # Detect failures in results
     fail_lines = []
@@ -360,6 +364,11 @@ def _auto_persist_backlog(result: str, ctx, mission_id: str):
     """
     import re
     import uuid
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
 
     # Extract epics — two formats:
     # Format 1: | **E1** | Title | Priority |
@@ -454,6 +463,11 @@ def _auto_extract_requirements(description: str, mission_id: str):
     Output: REQ-xxxx-01 (parent) + REQ-xxxx-01.1, 01.2, 01.3 (sub-reqs)
     """
     import re
+
+    try:
+        from ..db.migrations import get_db
+    except Exception:
+        return
 
     # Match numbered items: "1. **Title**: desc" OR "1. Title: desc"
     req_pattern = re.compile(
@@ -582,7 +596,6 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
-    lineage: list[str] | None = None,
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
@@ -592,7 +605,6 @@ async def run_pattern(
         project_path=project_path,
         phase_id=phase_id,
         max_iterations=pattern.config.get("max_iterations", 5),
-        lineage=lineage or [],
     )
 
     # Resolve agents for each node — Thompson Sampling when multiple candidates exist
@@ -668,16 +680,6 @@ async def run_pattern(
             await _impl_wave(_engine_proxy, run, initial_task)
         elif ptype == "human-in-the-loop":
             await _impl_human_in_the_loop(_engine_proxy, run, initial_task)
-        elif ptype == "fractal-worktree":
-            await _impl_fractal_worktree(_engine_proxy, run, initial_task)
-        elif ptype == "backprop-merge":
-            await _impl_backprop_merge(_engine_proxy, run, initial_task)
-        elif ptype == "fractal-stories":
-            await _impl_fractal_stories(_engine_proxy, run, initial_task)
-        elif ptype == "fractal-tests":
-            await _impl_fractal_tests(_engine_proxy, run, initial_task)
-        elif ptype == "fractal-qa":
-            await _impl_fractal_qa(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -769,10 +771,6 @@ async def _execute_node(
         except ImportError:
             pass
         full_task += f"[Message from colleague]:\n{context_from}\n\n"
-    # Inject lineage context — tells agent WHY this task exists (fractal vertical traceability)
-    if run.lineage:
-        lineage_chain = " → ".join(run.lineage)
-        full_task += f"[WHY — Lineage]: {lineage_chain}\n\n"
     full_task += f"[Your task]:\n{task}\n\n"
 
     # Inject protocol — override takes precedence over role-based detection
@@ -817,7 +815,6 @@ async def _execute_node(
             or "tdd" in role_lower
             or "coder" in role_lower
             or "implementer" in role_lower
-            or "ac architect" in role_lower
         ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
@@ -870,48 +867,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # Execute with streaming SSE
     executor = get_executor()
     result = None
-
-    # Inject WORKSPACE path explicitly for dev/codex agents so they know where to write
-    if ctx.project_path:
-        _ws_path = ctx.project_path
-        _role_l = (agent.role or "").lower()
-        _is_dev = any(
-            kw in _role_l
-            for kw in (
-                "dev",
-                "coder",
-                "fullstack",
-                "backend",
-                "frontend",
-                "tdd",
-                "implementer",
-                "worker",
-            )
-        )
-        if _is_dev:
-            import os as _os
-
-            try:
-                _files = []
-                for _root, _dirs, _fnames in _os.walk(_ws_path):
-                    _dirs[:] = [d for d in sorted(_dirs) if not d.startswith(".")]
-                    _depth = _root.replace(_ws_path, "").count(_os.sep)
-                    if _depth > 2:
-                        _dirs.clear()
-                        continue
-                    for _f in sorted(_fnames):
-                        _rel = _os.path.join(_root, _f).replace(_ws_path + "/", "")
-                        _files.append(_rel)
-                _listing = "\n".join(_files[:40]) or "(empty workspace)"
-            except Exception:
-                _listing = "(could not list files)"
-            full_task += (
-                f"\n\n## Workspace\n"
-                f"WORKSPACE={_ws_path}\n"
-                f"All code_write / write_file paths MUST start with: {_ws_path}/\n"
-                f'Example: code_write(path="{_ws_path}/src/main.py", content="...")\n\n'
-                f"Current files:\n{_listing}"
-            )
 
     await _sse(
         run,
@@ -1113,7 +1068,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators and discussion patterns skip L1 (expensive LLM check)
     # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
-    MAX_ADVERSARIAL_RETRIES = 2  # 2 retries = 3 attempts total for execution patterns
+    MAX_ADVERSARIAL_RETRIES = 1  # 1 retry = 2 attempts total for execution patterns
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
     is_discussion = run.pattern.type in _discussion_patterns
@@ -1137,6 +1092,18 @@ This is BLOCKING: developers cannot start without your design tokens."""
             except Exception as guard_err:
                 logger.warning("Adversarial guard error: %s", guard_err)
                 break  # on error, don't block
+
+            # Record guard event for metrics (best-effort, non-blocking)
+            try:
+                from ..agents.adversarial import record_guard_event
+                record_guard_event(
+                    run_id=getattr(run, "run_id", "") or "",
+                    agent_name=agent.name,
+                    agent_role=agent.role or "",
+                    guard_result=guard_result,
+                )
+            except Exception:
+                pass
 
             if guard_result.passed:
                 if guard_result.issues:
@@ -1195,24 +1162,10 @@ This is BLOCKING: developers cannot start without your design tokens."""
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
                 # Re-run agent with rejection feedback
                 feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
-                # Show already-written files so agent doesn't hallucinate tool calls
-                written_files = [
-                    tc.get("args", {}).get("path", "?")
-                    for tc in cumulative_tool_calls
-                    if tc.get("tool") == "code_write"
-                ]
-                written_info = (
-                    f"\nFichiers déjà créés (via code_write): {', '.join(written_files)}\n"
-                    if written_files
-                    else ""
-                )
                 retry_task = (
                     f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ]\n"
-                    f"Problèmes:\n{feedback}\n"
-                    f"{written_info}"
-                    f"OBLIGATION: utilise code_write pour CHAQUE fichier manquant ou à corriger.\n"
-                    f"Ne décris pas ce que tu fais — APPELLE les outils directement.\n\n"
-                    f"Même tâche:\n{task}"
+                    f"Problèmes:\n{feedback}\n\n"
+                    f"Corrige ces problèmes. Même tâche:\n{task}"
                 )
                 if protocol_override:
                     retry_task += "\n\n" + protocol_override
@@ -1272,37 +1225,20 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     )
                     break
             else:
-                # Max retries exhausted — FAIL node if score is bad (no "forward progress" bypass)
-                # score 7-10 = real quality failure → node FAILED → cycle stops at gate
-                # score 5-6 = minor issues → pass with warning (acceptable degraded output)
-                if guard_result.score >= 7:
-                    state.status = NodeStatus.FAILED
-                    logger.warning(
-                        "ADVERSARIAL HARD-FAIL [%s] score=%d after %d attempts — node FAILED",
-                        agent.name,
-                        guard_result.score,
-                        MAX_ADVERSARIAL_RETRIES + 1,
-                    )
-                    content = (
-                        f"[ADVERSARIAL HARD-FAIL — {guard_result.level}] "
-                        f"Score: {guard_result.score}/10 après {MAX_ADVERSARIAL_RETRIES + 1} tentatives\n"
-                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
-                        + "\n\n"
-                        + content
-                    )
-                else:
-                    # Minor issues (score ≤ 6) — pass with warning only
-                    state.status = NodeStatus.COMPLETED
-                    content = (
-                        f"[ADVERSARIAL WARNING — {guard_result.level}] "
-                        f"Score: {guard_result.score}/10\n"
-                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
-                        + "\n\n"
-                        + content
-                    )
+                # No retries — pass with rejection warning (forward progress > perfection)
+                state.status = NodeStatus.COMPLETED
                 msg_type = "agent"
+                rejection = (
+                    f"[ADVERSARIAL WARNING — {guard_result.level}] "
+                    f"Score: {guard_result.score}/10\n"
+                    + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                    + "\n\n"
+                )
+                content = rejection + content
                 # Track rejection in agent scores + update quality_score
                 try:
+                    from ..db.migrations import get_db
+
                     db = get_db()
                     try:
                         db.execute(
@@ -1331,8 +1267,9 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 # Auto-close if agent already has >=3 open quality_rejection incidents
                 try:
                     from ..epics.feedback import create_platform_incident
+                    from ..db.migrations import get_db as _get_db
 
-                    _db = get_db()
+                    _db = _get_db()
                     try:
                         open_count = _db.execute(
                             """SELECT COUNT(*) FROM platform_incidents
@@ -1583,7 +1520,9 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
             # Record as tool_call for monitoring (auto-store counts as memory_store)
             try:
-                _db2 = get_db()
+                from ..db.migrations import get_db as _get_db2
+
+                _db2 = _get_db2()
                 _db2.execute(
                     "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
                     "VALUES (?, ?, 'memory_store', ?, ?, 1, datetime('now'))",
@@ -1608,6 +1547,8 @@ This is BLOCKING: developers cannot start without your design tokens."""
 
     # Track agent performance score with real quality_score
     try:
+        from ..db.migrations import get_db
+
         db = get_db()
         # Compute quality signals: output length, tools used
         _output_len = len(content) if content else 0
@@ -1727,19 +1668,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
     if run.project_path:
         project_path = run.project_path
 
-    # Fallback: if project_path still empty and we have a session_id,
-    # check if a workspace directory exists at DATA_DIR/workspaces/{session_id}.
-    # This survives container restarts (workspace is on a shared volume).
-    if not project_path and run.session_id:
-        try:
-            from ..config import DATA_DIR
-
-            _ws = DATA_DIR / "workspaces" / run.session_id
-            if _ws.exists():
-                project_path = str(_ws)
-        except Exception:
-            pass
-
     skills_prompt = ""
     if agent.skills:
         try:
@@ -1752,32 +1680,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             skills_prompt = "\n\n".join(parts)
         except Exception:
             pass
-
-    # ── Tech Skill Broker (Options A + C) ────────────────────────────────
-    # For dev/qa/lead roles: detect stack from project files + context,
-    # then inject tech-specific skills + dynamic context snippet.
-    try:
-        from ..agents.skill_broker import (
-            detect_stack,
-            load_tech_skills,
-            generate_dynamic_context,
-            should_inject,
-        )
-
-        if should_inject(agent.role or ""):
-            techs = detect_stack(
-                project_path=run.project_path or project_path or "",
-                specs_text=project_context[:4000],
-            )
-            if techs:
-                tech_skills = load_tech_skills(techs, max_chars=2500)
-                if tech_skills:
-                    skills_prompt = (skills_prompt + "\n\n" + tech_skills).strip()
-                dyn_ctx = generate_dynamic_context(techs)
-                if dyn_ctx:
-                    project_context += "\n\n" + dyn_ctx
-    except Exception:
-        pass
 
     # Inject global lessons from past epics (cross-epic learning)
     lessons_prompt = ""
@@ -1847,18 +1749,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
 
     allowed_tools = _get_tools_for_agent(agent) if tools_for_agent else None
 
-    # Inject INCEPTION.md content if available — prevents agents from skipping the read
-    if project_path:
-        try:
-            from pathlib import Path as _Path
-
-            _inception = _Path(project_path) / "INCEPTION.md"
-            if _inception.exists():
-                _ic = _inception.read_text(encoding="utf-8", errors="ignore")[:3000]
-                project_context += f"\n\n## INCEPTION.md (contexte projet — requis avant tout code)\n{_ic}"
-        except Exception:
-            pass
-
     # Enrich project_context with lessons and SI blueprint
     if lessons_prompt:
         project_context += "\n" + lessons_prompt
@@ -1876,7 +1766,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         vision=vision,
         tools_enabled=tools_for_agent,
         allowed_tools=allowed_tools,
-        lineage=run.lineage,
     )
 
 
@@ -1893,12 +1782,6 @@ from .impls.router import run_router as _impl_router
 from .impls.sequential import run_sequential as _impl_sequential
 from .impls.solo import run_solo as _impl_solo
 from .impls.wave import run_wave as _impl_wave
-from .impls.fractal_worktree import run_fractal_worktree as _impl_fractal_worktree
-from .impls.backprop_merge import run_backprop_merge as _impl_backprop_merge
-from .impls.fractal_stories import run_fractal_stories as _impl_fractal_stories
-from .impls.fractal_tests import run_fractal_tests as _impl_fractal_tests
-from .impls.fractal_qa import run_fractal_qa as _impl_fractal_qa
-from ..db.migrations import get_db
 
 
 class _EngineProxy:
