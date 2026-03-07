@@ -206,8 +206,12 @@ COMPLETION CHECKLIST (before git_commit):
 # code QA 87% accuracy. Structured Premises/Trace/Verdict prevents skipped cases.
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
 
+⚠️ STEP 0 — MANDATORY FIRST: docker_deploy(cwd=".", mission_id="{project_id}-qa")
+   Deploy the app BEFORE any test. Tests on un-deployed code = INVALID.
+   If docker_deploy fails: read the error, fix the Dockerfile via code_write, retry.
+
 WORKFLOW:
-1. list_files → find test files and source files
+1. docker_deploy(cwd=".", mission_id="{project_id}-qa") → get URL
 2. Run REAL tests using the correct tools:
    - Android/Kotlin: android_build() → android_test() → android_lint()
    - Android E2E: android_emulator_test() — boots real emulator, runs instrumented tests
@@ -215,7 +219,7 @@ WORKFLOW:
    - Node.js: build(command="npm test")
    - Playwright: playwright_test(spec="tests/e2e.spec.js")
 3. For web projects: TAKE REAL SCREENSHOTS:
-   - browser_screenshot() → captures real browser rendering
+   - browser_screenshot(url=<URL from docker_deploy>) → captures real browser rendering
    - Minimum 2 screenshots: home page + key interaction
 4. code_read source files → check for obvious bugs
 5. SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
@@ -226,6 +230,7 @@ WORKFLOW:
 
 RULES:
 - NEVER use generic build() for Android — use android_build() and android_test() instead.
+- You MUST call docker_deploy first for web projects. No deploy = INVALID QA.
 - You MUST call build/test tools at least once. Reading code alone is NOT testing.
 - For web projects, you MUST call browser_screenshot at least once.
 - Verify REAL compilation output — if build tool returns empty output, it's a fake wrapper.
