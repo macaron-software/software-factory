@@ -186,7 +186,11 @@ _LLM_TIMEOUT_CONNECT = float(os.environ.get("LLM_TIMEOUT_CONNECT", "30"))
 _LLM_TIMEOUT_MLX_WAIT = int(os.environ.get("LLM_TIMEOUT_MLX_WAIT", "120"))
 
 _fallback_env = os.environ.get("PLATFORM_LLM_FALLBACK", None)
-if _fallback_env is not None:
+if _is_azure:
+    # On Azure prod: ZERO fallback — fail fast, surface real LLM errors.
+    # A hidden fallback to opencode/kimi/minimax masks quota/routing bugs.
+    _FALLBACK_CHAIN = [_primary]
+elif _fallback_env is not None:
     # Explicit override: "" = no fallback, "p1,p2" = specific chain
     _FALLBACK_CHAIN = [_primary] + [
         p.strip()
@@ -200,11 +204,7 @@ else:
             (["local-mlx"] if _local_mlx_enabled else [])
             + (["ollama"] if _ollama_enabled else [])
             + (["opencode"] if _opencode_enabled else [])
-            + (
-                ["minimax", "azure-openai", "azure-ai"]
-                if not _is_azure
-                else ["azure-openai", "azure-ai"]
-            )
+            + ["minimax", "azure-openai", "azure-ai"]
         )
         if p != _primary
     ]
