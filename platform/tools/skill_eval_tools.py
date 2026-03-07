@@ -414,7 +414,6 @@ Rules:
         resp = await client.chat(
             messages=[LLMMessage(role="user", content=judge_prompt)],
             temperature=0.1,
-            max_tokens=1024,
         )
         parsed = _parse_judge_response(resp.content)
         if parsed is not None:
@@ -427,7 +426,6 @@ Rules:
         resp2 = await client.chat(
             messages=[LLMMessage(role="user", content=retry_prompt)],
             temperature=0.1,
-            max_tokens=1024,
         )
         parsed2 = _parse_judge_response(resp2.content)
         if parsed2 is not None:
@@ -569,7 +567,6 @@ async def run_skill_eval(
                     messages=msgs,
                     system_prompt=system,
                     temperature=0.3,
-                    max_tokens=2048,
                 )
                 # ── Real tool execution: execute tool calls against the platform registry ──
                 # Parse XML tool calls from content (MiniMax natural format)
@@ -626,7 +623,6 @@ async def run_skill_eval(
                             messages=msgs,
                             system_prompt=system,
                             temperature=0.3,
-                            max_tokens=2048,
                         )
                     except Exception as tex:
                         logger.warning(
