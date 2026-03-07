@@ -945,8 +945,8 @@ class LLMClient:
                 content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
                 tool_calls=[],
                 finish_reason="content_filter",
-                input_tokens=0,
-                output_tokens=0,
+                tokens_in=0,
+                tokens_out=0,
                 duration_ms=elapsed,
             )
 
@@ -1122,8 +1122,8 @@ class LLMClient:
                 content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
                 tool_calls=[],
                 finish_reason="content_filter",
-                input_tokens=0,
-                output_tokens=0,
+                tokens_in=0,
+                tokens_out=0,
                 duration_ms=elapsed,
             )
 

@@ -116,9 +116,15 @@ _ROUTING_CACHE_TTL = 60.0  # 1 min
 # These agents have generic role names (e.g. 'AC Architect') that don't match
 # _REASONING/_CODE_ROLES, so they'd silently fall to gpt-5-mini without this.
 _AC_AGENT_ROUTING: dict[str, tuple[str, str]] = {
-    "ac-architect": ("azure-openai", "gpt-5.2"),
-    "ac-adversarial": ("azure-openai", "gpt-5.2"),
-    "ac-coach": ("azure-openai", "gpt-5.2"),
+    "ac-architect": (
+        "azure-openai",
+        "gpt-5.1",
+    ),  # gpt-5.2 rate-limits constantly (S0 tier)
+    "ac-adversarial": (
+        "azure-openai",
+        "gpt-5.1-codex",
+    ),  # code review — separate quota from gpt-5.2
+    "ac-coach": ("azure-openai", "gpt-5-mini"),
     "ac-codex": ("azure-openai", "gpt-5.1-codex"),
     "ac-qa-agent": ("azure-openai", "gpt-5.1"),
     "ac-cicd-agent": ("azure-openai", "gpt-5.1"),
