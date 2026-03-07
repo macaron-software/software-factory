@@ -313,7 +313,7 @@
         <text x="520" y="142" text-anchor="middle" fill="#d8b4fe" font-size="8" font-weight="700">SERVICES</text>
         <text x="520" y="155" text-anchor="middle" fill="#6b7280" font-size="7">Notifications</text>
         <text x="520" y="166" text-anchor="middle" fill="#6b7280" font-size="7">Analytics</text>
-        <text x="520" y="177" text-anchor="middle" fill="#6b7280" font-size="7">Webhooks</text>
+        <text x="520" y="177" text-anchor="middle" fill="#10b981" font-size="7">Hooks · Instincts</text>
 
         <!-- ── Row 3: Core Engine ── -->
         <!-- Agent System -->
@@ -337,8 +337,8 @@
 
         <!-- Skill/Agent store -->
         <rect x="35" y="333" width="250" height="42" rx="4" fill="rgba(168,85,247,.08)" stroke="#7c3aed" stroke-width="1" stroke-dasharray="3,2"/>
-        <text x="160" y="349" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skill Library · Agent Store · YAML specs</text>
-        <text x="160" y="362" text-anchor="middle" fill="#10b981" font-size="7" font-weight="600">⬡ Eval Engine — Prompt Set · Check Registry · Pass Rate</text>
+        <text x="160" y="349" text-anchor="middle" fill="#a855f7" font-size="7.5" font-weight="600">Skill Library · Agent Store · 120 YAML (100% complets)</text>
+        <text x="160" y="362" text-anchor="middle" fill="#10b981" font-size="7" font-weight="600">⬡ Eval Engine — Prompt Set · Instinct Loop · Pass Rate</text>
 
         <!-- Pattern Engine -->
         <rect x="320" y="245" width="260" height="130" rx="8" fill="rgba(59,130,246,.07)" stroke="#2563eb" stroke-width="1.5"/>
@@ -444,7 +444,7 @@
         <text x="739" y="461" text-anchor="middle" fill="#10b981" font-size="7.5" font-weight="700">PostgreSQL Cluster</text>
         <text x="739" y="473" text-anchor="middle" fill="#6b7280" font-size="7">10.0.1.6:5432 · sfplatform DB</text>
         <text x="739" y="485" text-anchor="middle" fill="#6b7280" font-size="7">projects · agents · missions · epics</text>
-        <text x="739" y="497" text-anchor="middle" fill="#6b7280" font-size="7">patterns · skills · workflows · api_keys</text>
+        <text x="739" y="497" text-anchor="middle" fill="#10b981" font-size="7">hook_log · instincts · ac_cycles · skills</text>
 
         <!-- ── Arrows ── -->
         <!-- Browser → Platform -->
@@ -568,14 +568,14 @@
         <rect x="332" y="132" width="141" height="22" rx="4" fill="rgba(168,85,247,.12)" stroke="#7c3aed" stroke-width="1"/>
         <text x="402" y="147" text-anchor="middle" fill="#c4b5fd" font-size="7.5">Loop ReAct → LLM Call</text>
 
-        <rect x="332" y="160" width="141" height="20" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1"/>
-        <text x="402" y="174" text-anchor="middle" fill="#fca5a5" font-size="7">Safety Guardrails · A2A Veto</text>
+        <rect x="332" y="160" width="141" height="20" rx="4" fill="rgba(16,185,129,.1)" stroke="#10b981" stroke-width="1"/>
+        <text x="402" y="174" text-anchor="middle" fill="#6ee7b7" font-size="7">Hooks · Instinct callbacks (ECC)</text>
 
         <!-- ════════════════════════════════════════════════════════════
              ZONE C — TOOLS (right of agent)
         ════════════════════════════════════════════════════════════ -->
         <rect x="510" y="10" width="435" height="200" rx="8" fill="rgba(245,158,11,.06)" stroke="#d97706" stroke-width="1.5"/>
-        <text x="727" y="28" text-anchor="middle" fill="#f59e0b" font-size="8" font-weight="700" letter-spacing="2">TOOLS  ·  27 modules</text>
+        <text x="727" y="28" text-anchor="middle" fill="#f59e0b" font-size="8" font-weight="700" letter-spacing="2">TOOLS  ·  35 modules</text>
 
         <!-- Code tools -->
         <rect x="522" y="38" width="95" height="65" rx="5" fill="rgba(99,102,241,.12)" stroke="#6366f1" stroke-width="1"/>
@@ -691,7 +691,7 @@
              ZONE E — MÉTA-WORKFLOWS (middle-right)
         ════════════════════════════════════════════════════════════ -->
         <rect x="510" y="215" width="435" height="180" rx="8" fill="rgba(16,185,129,.06)" stroke="#059669" stroke-width="1.5"/>
-        <text x="727" y="233" text-anchor="middle" fill="#10b981" font-size="8" font-weight="700" letter-spacing="2">MÉTA-WORKFLOWS  ·  44 built-in</text>
+        <text x="727" y="233" text-anchor="middle" fill="#10b981" font-size="8" font-weight="700" letter-spacing="2">MÉTA-WORKFLOWS  ·  46 built-in</text>
 
         <!-- Orchestrator -->
         <rect x="522" y="242" width="130" height="80" rx="6" fill="rgba(168,85,247,.15)" stroke="#a855f7" stroke-width="1.5"/>
@@ -846,6 +846,10 @@
         <rect x="332" y="195" width="170" height="18" rx="4" fill="rgba(239,68,68,.1)" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2"/>
         <text x="417" y="207" text-anchor="middle" fill="#fca5a5" font-size="7">A2A Bus · VETO · ESCALATE · NEGOTIATE</text>
 
+        <!-- ── Hook System annotation ── -->
+        <rect x="332" y="215" width="170" height="18" rx="4" fill="rgba(16,185,129,.1)" stroke="#10b981" stroke-width="1" stroke-dasharray="3,2"/>
+        <text x="417" y="227" text-anchor="middle" fill="#6ee7b7" font-size="7">🪝 Hooks (ECC) — PRE/POST_TOOL · SESSION · COMPACT</text>
+
         <!-- ════════════════════════════════════════════════════════════
              ZONE G — EVAL SKILL ENGINE  (philschmid.de/testing-skills)
         ════════════════════════════════════════════════════════════ -->
@@ -892,10 +896,10 @@
         <text x="803" y="648" text-anchor="middle" fill="#6b7280" font-size="6.5">hardening-sprint déclenche l'eval harness</text>
         <text x="803" y="658" text-anchor="middle" fill="#6b7280" font-size="6.5">eval_agent → run_agent_cli(prompt, skill)</text>
         <text x="803" y="668" text-anchor="middle" fill="#6b7280" font-size="6.5">AC score ← pass_rate (Quality Gate)</text>
-        <text x="803" y="678" text-anchor="middle" fill="#6b7280" font-size="6.5">skill améliorée → re-injectée en Skill Library</text>
-        <text x="803" y="690" text-anchor="middle" fill="#86efac" font-size="6" font-style="italic">Skill Registry → Eval → fix loop → merge</text>
+        <text x="803" y="678" text-anchor="middle" fill="#6b7280" font-size="6.5">skill améliorée → Instinct Loop → YAML</text>
+        <text x="803" y="690" text-anchor="middle" fill="#86efac" font-size="6" font-style="italic">Instinct: session → pattern → skill évolue</text>
         <text x="803" y="700" text-anchor="middle" fill="#6b7280" font-size="6">seuils configurables dans Settings / Quality Gates</text>
-        <text x="803" y="711" text-anchor="middle" fill="#6b7280" font-size="6">source: agentskills.io · github/gemini-skills</text>
+        <text x="803" y="711" text-anchor="middle" fill="#6b7280" font-size="6">source: ECC · philschmid · affaan-m/claude-code</text>
 
         <!-- Connector: Skill Library (Zone A) → Eval Engine (Zone G) -->
         <path d="M 155 190 L 155 597" stroke="#10b981" stroke-width="1" stroke-dasharray="4,3" fill="none" marker-end="url(#a2g)"/>
@@ -989,12 +993,12 @@
         <text x="731" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Agent marketplace · registry</text>
         <circle cx="800" cy="95" r="4" fill="#3b82f6"/>
         <rect x="824" y="92" width="160" height="42" rx="4" fill="#1e293b" stroke="#7c3aed" stroke-width="1"/>
-        <text x="904" y="110" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">ralph-claude-code</text>
-        <text x="904" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Claude coding agent tool</text>
-        <circle cx="976" cy="95" r="4" fill="#3b82f6"/>
+        <text x="904" y="110" text-anchor="middle" fill="#c084fc" font-size="9" font-weight="bold">everything-claude-code</text>
+        <text x="904" y="122" text-anchor="middle" fill="#94a3b8" font-size="7.5">Hooks · Patterns · ECC module</text>
+        <circle cx="976" cy="95" r="4" fill="#10b981"/>
         <text x="654" y="150" fill="#64748b" font-size="8">→ Memory / context enrichment (Shannon)</text>
         <text x="654" y="163" fill="#64748b" font-size="8">→ Agentation skill marketplace</text>
-        <text x="654" y="176" fill="#64748b" font-size="8">→ Dev assistant tools (mflux · claude)</text>
+        <text x="654" y="176" fill="#64748b" font-size="8">→ Hook patterns (ECC) · mflux image gen</text>
 
         <!-- === CENTER BAND === -->
         <rect x="0" y="203" width="1000" height="118" fill="#1e293b"/>
@@ -1138,7 +1142,7 @@
         <text x="165" y="548" fill="#94a3b8" font-size="8">En cours d'intégration</text>
         <circle cx="290" cy="544" r="5" fill="#3b82f6"/>
         <text x="300" y="548" fill="#94a3b8" font-size="8">Planifié / à intégrer</text>
-        <text x="400" y="548" fill="#475569" font-size="7.5">Actifs : RTK · PostgreSQL · Docker · GitHub Actions · Infisical · Error Monitoring (built-in)</text>
+        <text x="400" y="548" fill="#475569" font-size="7.5">Actifs : RTK · PostgreSQL · Docker · GitHub Actions · Infisical · Error Monitoring · everything-claude-code (ECC)</text>
         <text x="400" y="562" fill="#475569" font-size="7.5">En cours : Redis · Scrapy  |  Planifiés : Trivy · D3.js · Shannon · mflux · Landlock · GSD · CompGallery · Agentation</text>
       </svg>
     </div>
@@ -1258,7 +1262,8 @@
         <rect x="15" y="185" width="970" height="22" rx="4" fill="#1e293b"/>
         <line x1="15" y1="185" x2="985" y2="185" stroke="#3b82f6" stroke-width="1.5"/>
         <line x1="15" y1="207" x2="985" y2="207" stroke="#3b82f6" stroke-width="1.5"/>
-        <text x="500" y="200" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">inject-cycle API → INTELLIGENCE FEEDBACK LOOP (async)</text>
+        <text x="400" y="200" text-anchor="middle" fill="#93c5fd" font-size="9" font-weight="bold">inject-cycle API → INTELLIGENCE FEEDBACK LOOP (async)</text>
+        <text x="800" y="200" text-anchor="middle" fill="#6ee7b7" font-size="8">🪝 Hooks (ECC) — SESSION_END → InstinctObserver</text>
 
         <!-- === BOTTOM ROW: 4 intelligence engines =========================== -->
 
@@ -1319,23 +1324,23 @@
 
         <!-- === DB + AC Project State band ===================================== -->
         <rect x="15" y="345" width="970" height="70" rx="6" fill="#1e2a3a" stroke="#334155" stroke-width="1"/>
-        <text x="500" y="362" text-anchor="middle" fill="#64748b" font-size="8.5" font-weight="bold">DATABASE — ac_cycles · ac_project_state · ac_skill_scores · rl_experiences</text>
+        <text x="500" y="362" text-anchor="middle" fill="#64748b" font-size="8.5" font-weight="bold">DATABASE — ac_cycles · ac_project_state · ac_skill_scores · rl_experiences · instinct_observations · instincts</text>
         <!-- Columns -->
-        <rect x="30" y="370" width="160" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
-        <text x="110" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_cycles : cycle_num, total_score</text>
-        <text x="110" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">rl_reward, phase_scores, adversarial_scores</text>
-        <rect x="210" y="370" width="160" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
-        <text x="290" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_project_state : current_cycle</text>
-        <text x="290" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">next_cycle_hint, skill_eval_pending</text>
-        <rect x="390" y="370" width="160" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
-        <text x="470" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_skill_scores : skill_id, variant</text>
-        <text x="470" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">wins, losses, avg_score (Thompson)</text>
-        <rect x="570" y="370" width="160" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
-        <text x="650" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">rl_experiences : state, action, R</text>
-        <text x="650" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">next_state (Q-learning training)</text>
-        <rect x="750" y="370" width="220" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
-        <text x="860" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">evolution proposals : genome, mutations</text>
-        <text x="860" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">fitness scores, prompt_tweaks (GA)</text>
+        <rect x="30" y="370" width="155" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
+        <text x="107" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_cycles : cycle_num, total_score</text>
+        <text x="107" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">rl_reward, phase_scores, adversarial_scores</text>
+        <rect x="198" y="370" width="155" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
+        <text x="275" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_project_state : current_cycle</text>
+        <text x="275" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">next_cycle_hint, skill_eval_pending</text>
+        <rect x="366" y="370" width="155" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
+        <text x="443" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">ac_skill_scores : skill_id, variant</text>
+        <text x="443" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">wins, losses, avg_score (Thompson)</text>
+        <rect x="534" y="370" width="155" height="32" rx="4" fill="#1e293b" stroke="#334155"/>
+        <text x="611" y="382" text-anchor="middle" fill="#94a3b8" font-size="7">rl_experiences : state, action, R</text>
+        <text x="611" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">next_state (Q-learning training)</text>
+        <rect x="702" y="370" width="265" height="32" rx="4" fill="rgba(16,185,129,.08)" stroke="#10b981" stroke-width="1"/>
+        <text x="834" y="382" text-anchor="middle" fill="#6ee7b7" font-size="7">instinct_observations · instincts (ECC)</text>
+        <text x="834" y="394" text-anchor="middle" fill="#64748b" font-size="6.5">trigger → action · confidence · evolved YAML skills</text>
 
         <!-- === 5 Pilot Projects band ========================================= -->
         <text x="500" y="438" text-anchor="middle" fill="#64748b" font-size="8" font-weight="bold">PROJETS PILOTES (20 cycles chacun)</text>
