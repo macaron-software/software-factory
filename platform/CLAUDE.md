@@ -169,7 +169,7 @@ flowchart TD
 **L0 deterministic (0ms):** SLOP · MOCK · FAKE_BUILD(+7) · HALLUCINATION · LIE · STACK_MISMATCH(+7) · TOO_SHORT · ECHO · REPETITION
 **L1 LLM semantic:** skipped for network/debate/aggregator/HITL
 **Scoring:** <5=pass · 5-6=soft-pass · ≥7=reject · HALLUCINATION/SLOP/STACK_MISMATCH/FAKE_BUILD → force reject
-`MAX_ADVERSARIAL_RETRIES=0` — rejection = warning only
+`MAX_ADVERSARIAL_RETRIES=1` (2 attempts total) — exhausted retries → **ESCALATE to higher team** (NodeStatus.FAILED), NEVER pass through rejected output
 
 ---
 

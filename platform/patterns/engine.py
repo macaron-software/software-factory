@@ -95,6 +95,23 @@ class WorkflowPaused(Exception):
         super().__init__("Workflow paused at checkpoint")
 
 
+class AdversarialEscalation(Exception):
+    """Raised when an agent exhausts adversarial retries without passing.
+
+    NEVER pass through rejected output. Propagates up to the workflow/AC runner,
+    which must escalate to a higher-level team or abort the current cycle phase.
+    """
+
+    def __init__(self, agent_name: str, score: int, issues: list[str]):
+        self.agent_name = agent_name
+        self.score = score
+        self.issues = issues
+        super().__init__(
+            f"Agent '{agent_name}' exhausted adversarial retries (score={score}/10): "
+            + "; ".join(issues[:3])
+        )
+
+
 async def _sse(run: PatternRun, event: dict):
     """Push SSE event with automatic phase_id injection."""
     if run.phase_id and "phase_id" not in event:
@@ -706,6 +723,8 @@ async def run_pattern(
     except Exception as e:
         if isinstance(e, WorkflowPaused):
             raise  # let it propagate to run_workflow
+        if isinstance(e, AdversarialEscalation):
+            raise  # let it propagate to AC runner for higher-team escalation
         run.finished = True
         run.error = str(e)
         has_vetoes = False
@@ -1238,16 +1257,35 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     )
                     break
             else:
-                # No retries — pass with rejection warning (forward progress > perfection)
-                state.status = NodeStatus.COMPLETED
-                msg_type = "agent"
-                rejection = (
-                    f"[ADVERSARIAL WARNING — {guard_result.level}] "
-                    f"Score: {guard_result.score}/10\n"
-                    + "\n".join(f"- {i}" for i in guard_result.issues[:3])
-                    + "\n\n"
+                # All retries exhausted — NEVER pass through: escalate to higher team
+                state.status = NodeStatus.FAILED
+                issues_str = "; ".join(guard_result.issues[:3])
+                logger.warning(
+                    "ADVERSARIAL ESCALATE [%s] score=%d — exhausted %d attempts: %s",
+                    agent.name,
+                    guard_result.score,
+                    MAX_ADVERSARIAL_RETRIES + 1,
+                    issues_str,
                 )
-                content = rejection + content
+                await _sse(
+                    run,
+                    {
+                        "type": "adversarial",
+                        "agent_id": agent.id,
+                        "agent_name": agent.name,
+                        "passed": False,
+                        "escalated": True,
+                        "score": guard_result.score,
+                        "level": guard_result.level,
+                        "issues": guard_result.issues[:5],
+                        "node_id": node_id,
+                    },
+                )
+                raise AdversarialEscalation(
+                    agent_name=agent.name,
+                    score=guard_result.score,
+                    issues=guard_result.issues,
+                )
                 # Track rejection in agent scores + update quality_score
                 try:
                     from ..db.migrations import get_db

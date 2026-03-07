@@ -16,7 +16,7 @@ from typing import Optional
 
 from ..db.migrations import get_db
 from ..patterns.store import get_pattern_store
-from ..patterns.engine import run_pattern, _push_sse, WorkflowPaused
+from ..patterns.engine import run_pattern, _push_sse, WorkflowPaused, AdversarialEscalation
 from ..sessions.store import get_session_store, MessageDef
 
 logger = logging.getLogger(__name__)
@@ -749,6 +749,44 @@ async def run_workflow(
             logger.info("Workflow paused at phase %s (%d)", phase.name, i)
             break
 
+        except AdversarialEscalation as ae:
+            # Agent exhausted retries — escalate to RTE/higher team, abort current phase
+            logger.warning(
+                "ADVERSARIAL ESCALATE phase=%s agent=%s score=%d — escalating to team lead",
+                phase.name,
+                ae.agent_name,
+                ae.score,
+            )
+            run.phase_results.append(
+                {
+                    "phase": phase.name,
+                    "success": False,
+                    "escalated": True,
+                    "error": str(ae),
+                }
+            )
+            escalation_msg = (
+                f"⚠️ **ESCALADE ADVERSARIALE** — Phase **{phase.name}**\n\n"
+                f"L'agent **{ae.agent_name}** a épuisé ses tentatives (score {ae.score}/10) "
+                f"sans passer le contrôle qualité :\n"
+                + "\n".join(f"- {i}" for i in ae.issues[:5])
+                + "\n\n"
+                f"**Action requise** : analyser les problèmes, corriger l'agent ou la tâche, "
+                f"et relancer le cycle."
+            )
+            await _rte_facilitate(
+                session_id,
+                escalation_msg,
+                to_agent=leader,
+                project_id=project_id,
+            )
+            _save_checkpoint(store, session_id, i)  # re-run this phase on next cycle
+            if not phase.skip_on_failure:
+                run.status = "escalated"
+                break
+            # skip_on_failure: log and continue
+            continue
+
         except asyncio.TimeoutError:
             logger.error(
                 "Workflow phase %s timed out after %ds",
@@ -791,6 +829,8 @@ async def run_workflow(
             continue
 
         except Exception as e:
+            if isinstance(e, AdversarialEscalation):
+                raise  # already handled above — should not reach here
             logger.error("Workflow phase %s failed: %s", phase.name, e)
             error_str = str(e)
             _last_summary = _capture_last_agent_summary(store, session_id, phase.name)
