@@ -19,6 +19,13 @@ except ImportError:
     psycopg = None  # type: ignore
 
 _PG_URL = os.environ.get("DATABASE_URL", "")
+if not _PG_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set. "
+        "The Software Factory requires PostgreSQL. "
+        "Set DATABASE_URL=postgresql://user:pass@host:5432/dbname "
+        "or run with docker-compose (includes postgres service)."
+    )
 _USE_PG = True
 
 # Connection pool for PostgreSQL (lazy initialized)

@@ -830,7 +830,7 @@ _AC_PROJECTS = [
 
 
 def _ac_get_db():
-    """Get DB connection — uses platform DB adapter (SQLite or PG via DATABASE_URL)."""
+    """Get DB connection — uses platform DB adapter (PG via DATABASE_URL)."""
     from ...db.migrations import get_db
 
     return get_db()
@@ -839,32 +839,34 @@ def _ac_get_db():
 def seed_ac_projects() -> int:
     """Seed AC pilot projects into the projects table if they don't already exist.
 
-    Idempotent — uses INSERT OR IGNORE. Called at startup so a fresh SF instance
-    always has the AC pilot projects ready under domain 'Amélioration continue'.
-    Returns the number of projects newly inserted.
+    Idempotent — uses INSERT ... ON CONFLICT DO NOTHING. Called at startup so a
+    fresh SF instance always has the AC pilot projects ready under domain
+    'Amélioration continue'. Returns the number of projects newly inserted.
     """
     import json as _json
     import os as _os
 
     conn = _ac_get_db()
-    _ws_root = (
-        "/app/workspace"
-        if _os.path.isdir("/app")
-        else _os.path.join(_os.getcwd(), "workspace")
+    _ws_root = _os.environ.get(
+        "WORKSPACE_ROOT",
+        "/app/workspace" if _os.path.isdir("/app") else _os.path.join(_os.getcwd(), "workspace"),
     )
-    _ws_root = _os.environ.get("WORKSPACE_ROOT", _ws_root)
     inserted = 0
     for p in _AC_PROJECTS:
         workspace = _os.path.join(_ws_root, p["id"])
-        _os.makedirs(workspace, exist_ok=True)
+        try:
+            _os.makedirs(workspace, exist_ok=True)
+        except Exception:
+            pass
         try:
             cur = conn.execute(
-                """INSERT OR IGNORE INTO projects
+                """INSERT INTO projects
                    (id, name, path, description, factory_type, domains_json,
                     vision, values_json, lead_agent_id, agents_json,
                     active_pattern_id, status, git_url, current_phase,
                     phases_json, owner_id, starred, container_url, client_domain)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT (id) DO NOTHING""",
                 (
                     p["id"],
                     p["name"],
@@ -872,18 +874,18 @@ def seed_ac_projects() -> int:
                     p.get("description", ""),
                     "standalone",
                     _json.dumps(["ac", "pilot"] + p.get("tech", [])),
-                    "",  # vision
-                    _json.dumps(["kaizen", "tdd", "quality"]),  # lean values
-                    "",  # lead_agent_id
+                    "",
+                    _json.dumps(["kaizen", "tdd", "quality"]),
+                    "",
                     _json.dumps([]),
-                    "",  # active_pattern_id
+                    "",
                     "active",
-                    "",  # git_url
-                    "inception",  # current_phase
+                    "",
+                    "inception",
                     _json.dumps([]),
-                    "",  # owner_id
+                    "",
                     False,
-                    "",  # container_url
+                    "",
                     "Amélioration continue",
                 ),
             )

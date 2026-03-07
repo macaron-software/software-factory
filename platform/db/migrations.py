@@ -1,7 +1,6 @@
 """
 Database migrations and initialization for the platform.
-Supports dual backend: SQLite (local) / PostgreSQL (production).
-Backend selected via DATABASE_URL env var.
+PostgreSQL-only — requires DATABASE_URL env var.
 """
 
 from pathlib import Path
@@ -14,7 +13,7 @@ SCHEMA_PG_PATH = Path(__file__).parent / "schema_pg.sql"
 
 _USE_PG = is_postgresql()
 
-# Increment this when adding new migration blocks (SQLite or PG).
+# Increment this when adding new migration blocks.
 _SCHEMA_VERSION = 2
 
 
@@ -401,7 +400,7 @@ def _migrate_pg(conn):
         pass  # already exists
 
     # ── GitHub OSS tool integrations ──
-    # Ensure columns exist first (SQLite path added them in _migrate)
+    # Ensure columns exist (added via ALTER TABLE IF NOT EXISTS)
     for col, typ in [
         ("category", "TEXT"),
         ("icon", "TEXT"),

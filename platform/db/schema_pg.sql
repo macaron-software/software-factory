@@ -37,7 +37,11 @@ CREATE TABLE IF NOT EXISTS projects (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     git_url TEXT DEFAULT '',
     container_url TEXT DEFAULT '',
-    starred BOOLEAN DEFAULT FALSE
+    starred BOOLEAN DEFAULT FALSE,
+    owner_id TEXT DEFAULT '',
+    client_domain TEXT DEFAULT '',
+    current_phase TEXT DEFAULT '',
+    phases_json TEXT DEFAULT '[]'
 );
 
 -- ============================================================================
