@@ -173,6 +173,13 @@ DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):
 - Node.js/TS: code_write package.json with scripts + deps, then build(command="npm install")
 - Rust: code_write Cargo.toml with [dependencies] section
 - Docker: code_write Dockerfile with correct base image + COPY + RUN install
+  - Vue/React/TS SPA: FROM node:18-alpine AS build → npm ci && npm run build → FROM nginx:alpine, COPY --from=build /app/dist /usr/share/nginx/html, EXPOSE 80
+  - Node.js API: FROM node:18-alpine, COPY package.json, RUN npm ci, COPY . ., EXPOSE 3000, CMD ["node","index.js"]
+  - Python/FastAPI: FROM python:3.11-slim, COPY requirements.txt, RUN pip install -r requirements.txt, COPY . ., EXPOSE 8000, CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8000"]
+  - Go: FROM golang:1.21-alpine AS build, go build -o /app, FROM alpine, COPY --from=build /app, EXPOSE 8080
+  - Rust: FROM rust:1.75 AS build, cargo build --release, FROM debian:slim, COPY --from=build, EXPOSE 8080
+  - NEVER mix stages unless you actually COPY --from the previous stage
+  - NEVER add a python backend stage to a frontend-only Vue/React project
 - NEVER leave deps empty. List EVERY import your code uses. Missing deps = build failure.
 
 BUILD VERIFICATION (MANDATORY — run AFTER writing code):
