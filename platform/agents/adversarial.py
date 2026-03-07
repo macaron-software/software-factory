@@ -41,6 +41,7 @@ INSPIRATION:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass
@@ -259,8 +260,36 @@ _SECURITY_VULN_PATTERNS = [
         "SQL f-string injection — use parameterized queries",
     ),
     (
+        r"""cursor\.execute\s*\(['"].*?%\s*(?:str|repr|format)""",
+        "SQL string format — injection risk",
+    ),
+    (
         r"""\bsubprocess\.(?:call|run|Popen)\s*\([^)]*shell\s*=\s*True""",
         "subprocess shell=True — shell injection",
+    ),
+    (
+        r"""__import__\s*\(\s*(?:input|request)""",
+        "Dynamic import from user input — RCE risk",
+    ),
+]
+
+# Architecture violation patterns — structural anti-patterns
+# SOURCE: clean architecture rules (see CLAUDE.md / SPECS.md)
+_ARCHITECTURE_VIOLATION_PATTERNS = [
+    (
+        r"""(?:import|from)\s+.*(?:sqlite3|sqlalchemy|psycopg|pymysql).*\n.*(?:render_template|jinja2|Jinja2)""",
+        "DB driver imported in template layer — violates clean architecture",
+        True,
+    ),
+    (
+        r"""cursor\.execute|conn\.execute|db\.execute""",
+        "Direct SQL in non-store file — use the store layer",
+        False,
+    ),
+    (
+        r"""requests\.(?:get|post|put|delete)\s*\((?!.*test)""",
+        "Raw HTTP call — use the LLM client or dedicated service layer",
+        False,
     ),
 ]
 
@@ -268,11 +297,15 @@ _SECURITY_VULN_PATTERNS = [
 _FALSE_FALLBACK_PATTERNS = [
     (
         r"""raise\s+NotImplementedError\s*(?:\([^)]*\))?\s*#?\s*(?:TODO|FIXME|later|implement)""",
-        "NotImplementedError with TODO — stub not replaced",
+        "NotImplementedError with TODO — stub not replaced by real implementation",
     ),
     (
         r"""#\s*TODO:\s*(?:implement|add|fix|handle|replace)\s+(?:this|later|me)""",
         "TODO comment in production code — work not complete",
+    ),
+    (
+        r"""return\s+(?:None|False|0|\[\]|\{\}|\"\"\|'')\s*#\s*(?:TODO|FIXME|placeholder|stub)""",
+        "Stub return value — placeholder not replaced",
     ),
     (
         r"""pass\s*#\s*(?:TODO|FIXME|implement|placeholder)""",
@@ -281,6 +314,7 @@ _FALSE_FALLBACK_PATTERNS = [
 ]
 
 # REF: arXiv:2602.20021 — SBD-09: prompt injection patterns in agent output / tool results
+# Detects attempts to override the next agent's system prompt via crafted content.
 _PROMPT_INJECTION_PATTERNS = [
     re.compile(r"ignore\s+(?:previous|prior|above|all)\s+instructions?", re.I),
     re.compile(r"disregard\s+(?:your|the)\s+system\s+prompt", re.I),
@@ -289,7 +323,9 @@ _PROMPT_INJECTION_PATTERNS = [
         r"forget\s+(?:everything|all)\s+(?:you\s+(?:know|were\s+told)|above)", re.I
     ),
     re.compile(r"new\s+(?:system\s+)?(?:prompt|instructions?)\s*:", re.I),
-    re.compile(r"\[SYSTEM\]\s*(?:To|For)\s+\w+Agent", re.I),
+    re.compile(
+        r"\[SYSTEM\]\s*\w*Agent", re.I
+    ),  # [SYSTEM] XxxAgent — inter-agent injection
 ]
 
 # REF: arXiv:2602.20021 — SBD-06: identity spoofing — agent claims to be another system
@@ -298,7 +334,7 @@ _IDENTITY_CLAIM_PATTERNS = [
         r"\bI\s+am\s+(?:Jarvis|the\s+(?:system|platform|admin|CTO|root)\b)", re.I
     ),
     re.compile(
-        r"\bI\s+have\s+(?:special|elevated|admin|root|platform)\s+(?:permissions?|access|privileges?)",
+        r"\bI\s+have\s+(?:(?:special|elevated|admin|root|platform)\s+)+(?:permissions?|access|privileges?)",
         re.I,
     ),
     re.compile(r"(?:acting|operating)\s+as\s+(?:Jarvis|system|admin|platform)", re.I),
@@ -318,8 +354,16 @@ _RESOURCE_ABUSE_PATTERNS = [
         r"""while\s+1\s*:\s*(?:pass|continue)\s*$""",
         "Busy-wait infinite loop (DoS risk)",
     ),
-    (r"""os\.fork\s*\(\s*\).*(?:while|loop|for)""", "fork() in loop (fork bomb risk)"),
+    (
+        r"""os\.fork\s*\(\s*\)""",
+        "os.fork() call — fork bomb risk",
+    ),  # flag any fork() in app code
+    (
+        r"""subprocess\.[A-Za-z]+\([^)]*\)\s*.*while""",
+        "subprocess in loop without bound (DoS)",
+    ),
     (r"""time\.sleep\s*\(\s*0\s*\)""", "sleep(0) busy-wait pattern"),
+    (r"""rm\s+-(?:rf|fr)\s+/""", "rm -rf / — destructive filesystem wipe (CS1/CS7)"),
 ]
 
 # REF: arXiv:2602.20021 — CS10: Agent Corruption via external linked resources.
@@ -673,24 +717,10 @@ def check_l0(
                 )
                 score += 6  # hard reject
 
-    # Check build tool failures — if any build/test tool returned [FAIL], force rejection
-    if tool_calls:
-        for tc in tool_calls:
-            if tc.get("name") not in ("build", "test", "lint"):
-                continue
-            result_str = str(tc.get("result", ""))
-            if "[FAIL]" in result_str or "command not found" in result_str.lower():
-                cmd = str(tc.get("args", {}).get("command", "?"))[:80]
-                issues.append(
-                    f"BUILD_FAILED: Tool '{tc.get('name')}' failed: {cmd!r} — "
-                    f"fix errors before approving"
-                )
-                score += 7  # hard reject — broken build cannot be approved
+    # ── NEW L0 CHECKS ────────────────────────────────────────────────────────
 
-    # ── REF: arXiv:2602.20021 — NEW SECURITY L0 CHECKS ─────────────────────
-
-    # HARDCODED_SECRET: credentials hardcoded in source files
-    for tc in tool_calls or []:
+    # HARDCODED_SECRET: credentials hardcoded in source files (not .env/.example)
+    for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
         fp = str(
@@ -705,10 +735,10 @@ def check_l0(
         for pattern, desc in _HARDCODED_SECRET_PATTERNS:
             if re.search(pattern, fc, re.IGNORECASE):
                 issues.append(f"HARDCODED_SECRET: {desc} in {fp}")
-                score += 8  # near-hard-reject
+                score += 8  # near-hard-reject: security risk
 
     # SECURITY_VULN: unsafe operations in non-test code
-    for tc in tool_calls or []:
+    for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
         fp = str(
@@ -725,12 +755,12 @@ def check_l0(
         for pattern, desc in _SECURITY_VULN_PATTERNS:
             if re.search(pattern, fc, re.IGNORECASE | re.MULTILINE):
                 if is_test and "eval" in pattern:
-                    continue
+                    continue  # eval in test fixtures is acceptable
                 issues.append(f"SECURITY_VULN: {desc} in {fp}")
                 score += 6
 
-    # FALSE_FALLBACK: stubs/placeholders in production code
-    for tc in tool_calls or []:
+    # FALSE_FALLBACK: stubs/placeholders left in production code
+    for tc in tool_calls:
         if tc.get("name") not in ("code_write", "code_edit"):
             continue
         fp = str(
@@ -746,7 +776,69 @@ def check_l0(
                 if re.search(pattern, fc, re.IGNORECASE | re.MULTILINE):
                     issues.append(f"FALSE_FALLBACK: {desc} in {fp}")
                     score += 4
-                    break
+                    break  # one per file
+
+    # MISSING_TRACEABILITY: code written without any reference comment
+    # Only for non-trivial source files (>30 lines), not config/migration/test files
+    _TRACE_PATTERN = re.compile(
+        r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC|Traceability|TODO-\d+|JIRA)[\s:\-]",
+        re.IGNORECASE,
+    )
+    _SKIP_TRACE_EXTS = {
+        ".md",
+        ".txt",
+        ".json",
+        ".yml",
+        ".yaml",
+        ".env",
+        ".toml",
+        ".cfg",
+        ".ini",
+        ".lock",
+    }
+    for tc in tool_calls:
+        if tc.get("name") != "code_write":  # only NEW files, not edits
+            continue
+        fp = str(
+            tc.get("args", {}).get("path", "")
+            or tc.get("args", {}).get("file_path", "")
+        )
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc or not fp:
+            continue
+        ext = "." + fp.rsplit(".", 1)[-1].lower() if "." in fp else ""
+        is_config = any(
+            kw in fp.lower()
+            for kw in ["migration", "conftest", "settings", "__init__", "config."]
+        )
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec."])
+        if ext in _SKIP_TRACE_EXTS or is_config or is_test:
+            continue
+        lines = fc.count("\n") + 1
+        if lines < 30:
+            continue  # small files exempt
+        if not _TRACE_PATTERN.search(fc[:1500]):  # check header only (first 1500 chars)
+            issues.append(
+                f"MISSING_TRACEABILITY: No # Ref/Feature/Story comment in {fp} "
+                f"({lines} lines) — add '# Ref: FEAT-xxx — <feature name>' at top"
+            )
+            score += 3  # warning: encourages but doesn't block
+
+    # Check build tool failures — if any build/test tool returned [FAIL], force rejection
+    if tool_calls:
+        for tc in tool_calls:
+            if tc.get("name") not in ("build", "test", "lint"):
+                continue
+            result_str = str(tc.get("result", ""))
+            if "[FAIL]" in result_str or "command not found" in result_str.lower():
+                cmd = str(tc.get("args", {}).get("command", "?"))[:80]
+                issues.append(
+                    f"BUILD_FAILED: Tool '{tc.get('name')}' failed: {cmd!r} — "
+                    f"fix errors before approving"
+                )
+                score += 7  # hard reject — broken build cannot be approved
+
+    # ── REF: arXiv:2602.20021 — NEW SECURITY L0 CHECKS ─────────────────────
 
     # PROMPT_INJECTION: SBD-09 — detect injection attempts in agent output / tool results
     for inj_pattern in _PROMPT_INJECTION_PATTERNS:
@@ -754,8 +846,9 @@ def check_l0(
             issues.append(
                 f"PROMPT_INJECTION: '{inj_pattern.pattern[:60]}' detected in output"
             )
-            score += 8  # force reject
+            score += 8  # force reject — injection in output
             break
+    # Also scan tool results (RAG / memory / code_read outputs)
     for tc in tool_calls or []:
         result_text = str(tc.get("result", ""))
         for inj_pattern in _PROMPT_INJECTION_PATTERNS:
@@ -763,14 +856,14 @@ def check_l0(
                 issues.append(
                     f"PROMPT_INJECTION in tool result [{tc.get('name')}]: '{inj_pattern.pattern[:40]}'"
                 )
-                score += 6
+                score += 6  # warn — poisoned data source
                 break
 
     # IDENTITY_CLAIM: SBD-06 — detect agent claiming to be another system
     for id_pattern in _IDENTITY_CLAIM_PATTERNS:
         if id_pattern.search(content):
             issues.append(f"IDENTITY_CLAIM: '{id_pattern.pattern[:60]}' detected")
-            score += 7
+            score += 7  # hard reject
             break
 
     # RESOURCE_ABUSE: SBD-04 — detect DoS patterns in written code
@@ -784,7 +877,7 @@ def check_l0(
             if re.search(pattern, fc, re.MULTILINE):
                 fp = str(tc.get("args", {}).get("path", "?"))
                 issues.append(f"RESOURCE_ABUSE: {desc} in {fp}")
-                score += 7
+                score += 7  # hard reject — DoS risk
                 break
 
     # EXTERNAL_RESOURCE: CS10 — detect memory writes storing externally-editable URLs.
@@ -984,6 +1077,99 @@ Respond ONLY with JSON:
         logger.warning(f"L1 adversarial check failed: {e}")
         # On failure, don't block — L0 is the safety net
         return GuardResult(passed=True, score=0, issues=[], level="L1-skipped")
+
+
+def record_guard_event(
+    run_id: str,
+    agent_name: str,
+    agent_role: str,
+    guard_result: "GuardResult",
+) -> None:
+    """Persist adversarial guard result to adversarial_events table (best-effort)."""
+    try:
+        from ..db.migrations import get_db
+
+        # Extract dominant check type from first issue prefix
+        check_type = "PASS"
+        if guard_result.issues:
+            first = guard_result.issues[0]
+            check_type = first.split(":")[0].strip() if ":" in first else first[:30]
+        db = get_db()
+        try:
+            db.execute(
+                """INSERT INTO adversarial_events
+                   (run_id, agent_name, agent_role, check_type, score, passed, issues_json, level)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id or "",
+                    agent_name or "",
+                    agent_role or "",
+                    check_type,
+                    guard_result.score,
+                    guard_result.passed,
+                    json.dumps(guard_result.issues[:10]),
+                    guard_result.level,
+                ),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug("record_guard_event failed: %s", e)
+
+
+def record_code_traceability(
+    run_id: str,
+    agent_name: str,
+    file_path: str,
+    content: str,
+    epic_id: str = "",
+    feature_id: str = "",
+) -> None:
+    """Extract traceability refs from a written file and store in code_traceability."""
+    try:
+        import re as _re
+
+        # Parse ref tags from file header (first 2000 chars)
+        header = content[:2000]
+        ref_pattern = _re.compile(
+            r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC)[\s:\-]+([A-Za-z0-9\-_\.]+)",
+            _re.IGNORECASE,
+        )
+        refs = ref_pattern.findall(header)
+        ref_tag = refs[0] if refs else ""
+
+        # Extract feature_id from ref if not provided
+        if not feature_id and refs:
+            for ref in refs:
+                if ref.lower().startswith("feat-") or ref.lower().startswith(
+                    "feature-"
+                ):
+                    feature_id = ref
+                    break
+
+        from ..db.migrations import get_db
+
+        db = get_db()
+        try:
+            db.execute(
+                """INSERT INTO code_traceability
+                   (run_id, epic_id, feature_id, file_path, ref_tag, agent_name)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    run_id or "",
+                    epic_id or "",
+                    feature_id or "",
+                    file_path,
+                    ref_tag,
+                    agent_name or "",
+                ),
+            )
+            db.commit()
+        finally:
+            db.close()
+    except Exception as e:
+        logger.debug("record_code_traceability failed: %s", e)
 
 
 async def run_guard(
