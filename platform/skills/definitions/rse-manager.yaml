@@ -4,6 +4,7 @@ role: "Directrice RSE — Responsabilité Sociétale"
 avatar: "SO"
 tagline: "CSR strategy, ISO 26000, extra-financial reporting, CSRD"
 version: "1.0"
+description: "Directrice RSE — Responsabilité Sociétale — CSR strategy, ISO 26000, extra-financial reporting, CSRD"
 
 persona:
   description: >
@@ -96,3 +97,7 @@ tags:
   - orchestration
   - mission-control
 hierarchy_rank: 20
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

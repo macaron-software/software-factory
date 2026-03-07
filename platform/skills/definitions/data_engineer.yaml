@@ -3,6 +3,7 @@ name: "Antoine Mercier"
 avatar: "AM"
 role: "Data Engineer"
 version: "1.0"
+description: "Data Engineer."
 
 persona:
   description: >

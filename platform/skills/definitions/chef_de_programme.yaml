@@ -3,6 +3,7 @@ name: "Alexandre Moreau"
 avatar: "AM"
 role: "Program Manager"
 version: "1.0"
+description: "Chef de Programme qui pilote le cycle de vie produit complet."
 
 persona:
   description: >

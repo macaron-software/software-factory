@@ -4,6 +4,7 @@ role: "CISO — Chief Information Security Officer"
 avatar: "RA"
 tagline: "Gouvernance SSI, ISO 27001, risk-based decisions, audit orchestration"
 version: "1.0"
+description: "CISO — Chief Information Security Officer — Gouvernance SSI, ISO 27001, risk-based decisions, audit orchestration"
 
 persona:
   description: >

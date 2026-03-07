@@ -3,6 +3,7 @@ name: "Camille Durand"
 avatar: "CD"
 role: "Business Analyst"
 version: "1.0"
+description: "Expert métier qui comprend les besoins utilisateurs et les traduit en exigences fonctionnelles."
 
 persona:
   description: >

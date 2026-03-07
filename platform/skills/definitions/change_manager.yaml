@@ -3,6 +3,7 @@ name: "Fatou Diop"
 avatar: "FD"
 role: "Change Manager"
 version: "1.0"
+description: "Change Manager."
 
 persona:
   description: >

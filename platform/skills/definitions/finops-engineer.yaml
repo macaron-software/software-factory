@@ -25,3 +25,7 @@ llm:
 tools:
   - memory_search
   - analytics
+triggers:
+  - when cloud costs exceed budget threshold
+  - when cost optimization opportunity is identified
+  - when FinOps maturity assessment is due

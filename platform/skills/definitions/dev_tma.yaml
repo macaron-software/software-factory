@@ -4,6 +4,7 @@ avatar: "MB"
 role: "TMA Developer"
 tagline: "Bugfixes, patches, impact analysis, tech debt"
 version: "1.0"
+description: "TMA Developer — Bugfixes, patches, impact analysis, tech debt"
 
 persona:
   description: >

@@ -4,6 +4,7 @@ role: "Security Researcher — Threat Intelligence"
 avatar: "LF"
 tagline: "CVE hunter, exploit chains, dark web intelligence, NVD/MITRE"
 version: "1.0"
+description: "Security Researcher — Threat Intelligence — CVE hunter, exploit chains, dark web intelligence, NVD/MITRE"
 
 persona:
   description: >

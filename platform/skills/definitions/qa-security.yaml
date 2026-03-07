@@ -4,6 +4,7 @@ role: "QA Security Engineer"
 avatar: "SH"
 tagline: "Security test automation, OWASP ZAP, SAST/DAST validation, regression"
 version: "1.0"
+description: "QA Security Engineer — Security test automation, OWASP ZAP, SAST/DAST validation, regression"
 
 persona:
   description: >

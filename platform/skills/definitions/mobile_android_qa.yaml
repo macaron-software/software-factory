@@ -2,6 +2,7 @@ id: mobile_android_qa
 name: "Théo Garnier"
 version: "1.0"
 role: "QA Android"
+description: "QA Android — JUnit · Compose Testing · Mockk"
 hierarchy_rank: 45
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=theo-android"
 tagline: "JUnit · Compose Testing · Mockk"
@@ -45,3 +46,7 @@ llm:
   max_tokens: 4096
 
 tags: [android, kotlin, qa, testing, mobile]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

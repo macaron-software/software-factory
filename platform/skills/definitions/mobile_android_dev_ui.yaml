@@ -2,6 +2,7 @@ id: mobile_android_dev_ui
 name: "Yasmine Khelifi"
 version: "1.0"
 role: "Dev Android UI"
+description: "Dev Android UI — Compose UI · Material 3 · Animations"
 hierarchy_rank: 40
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=yasmine-android"
 tagline: "Compose UI · Material 3 · Animations"
@@ -47,3 +48,7 @@ llm:
   max_tokens: 8192
 
 tags: [android, kotlin, compose, mobile, ui]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

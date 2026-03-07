@@ -3,6 +3,7 @@ name: "Lucas Martin"
 role: "Growth Hacker"
 avatar: "LM"
 version: "1.0"
+description: "Growth Hacker — Growth at all costs — sustainably"
 tagline: "Growth at all costs — sustainably"
 
 persona:
@@ -59,3 +60,7 @@ tags:
   - growth
   - acquisition
   - metrics
+triggers:
+  - when user acquisition funnel needs optimization
+  - when A/B test results need analyzing
+  - when growth experiments are planned

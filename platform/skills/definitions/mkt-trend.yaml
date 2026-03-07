@@ -3,6 +3,7 @@ name: "Hugo Renard"
 role: "Market & Trend Analyst"
 avatar: "HR"
 version: "1.0"
+description: "Market & Trend Analyst — Signals before they become noise"
 tagline: "Signals before they become noise"
 
 persona:
@@ -57,3 +58,7 @@ tags:
   - research
   - trends
   - analytics
+triggers:
+  - when business metrics need deep analysis
+  - when a new dashboard is requested
+  - when data quality issues are detected

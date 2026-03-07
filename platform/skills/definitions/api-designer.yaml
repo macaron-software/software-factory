@@ -29,3 +29,7 @@ llm:
 tools:
   - code_read
   - memory_search
+triggers:
+  - when UI implementation needs design review
+  - when design tokens need validating
+  - when component library audit is due

@@ -4,6 +4,7 @@ role: "SecOps Engineer — Security Operations"
 avatar: "AD"
 tagline: "WAF, container hardening, network policies, secure deployment"
 version: "1.0"
+description: "SecOps Engineer — Security Operations — WAF, container hardening, network policies, secure deployment"
 
 persona:
   description: >

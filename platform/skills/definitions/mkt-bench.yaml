@@ -3,6 +3,7 @@ name: "Emma Petit"
 role: "Competitive Intelligence"
 avatar: "EP"
 version: "1.0"
+description: "Competitive Intelligence — Know your competitors better than they know themselves"
 tagline: "Know your competitors better than they know themselves"
 
 persona:
@@ -56,3 +57,7 @@ tags:
   - marketing
   - competitive-intelligence
   - benchmarking
+triggers:
+  - when assigned to a new task
+  - when review or analysis is requested
+  - when escalation requires specialist input

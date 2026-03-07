@@ -4,6 +4,7 @@ role: "Lead Accessibilité — RGAA & WCAG"
 avatar: "NG"
 tagline: "RGAA 4.1, WCAG 2.2 AA, EAA directive, accessibility audit"
 version: "1.0"
+description: "Lead Accessibilité — RGAA & WCAG — RGAA 4.1, WCAG 2.2 AA, EAA directive, accessibility audit"
 
 persona:
   description: >
@@ -89,3 +90,7 @@ tags:
   - wcag
   - inclusion
 hierarchy_rank: 30
+triggers:
+  - when team velocity drops below threshold
+  - when code quality metrics degrade
+  - when technical alignment across teams is needed

@@ -4,6 +4,7 @@ role: "Project Manager"
 avatar: "SM"
 tagline: "Team coordinator, delivery guardian"
 version: "1.0"
+description: "Project Manager — Team coordinator, delivery guardian"
 
 persona:
   description: >

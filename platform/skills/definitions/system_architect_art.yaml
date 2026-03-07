@@ -3,6 +3,7 @@ name: "Frédéric Aubert"
 avatar: "FA"
 role: "System Architect (ART)"
 version: "1.0"
+description: "Architecte système au niveau ART."
 
 persona:
   description: >

@@ -30,3 +30,7 @@ llm:
 tools:
   - code_read
   - memory_search
+triggers:
+  - when cross-cutting technical decisions are needed
+  - when platform-wide standards need defining
+  - when senior technical review is requested

@@ -4,6 +4,7 @@ role: "Green IT Expert — Digital Sustainability"
 avatar: "TB"
 tagline: "Eco-design, digital sobriety, carbon footprint IT"
 version: "1.0"
+description: "Green IT Expert — Digital Sustainability — Eco-design, digital sobriety, carbon footprint IT"
 
 persona:
   description: >
@@ -85,3 +86,7 @@ tags:
   - eco-conception
   - rgesn
 hierarchy_rank: 30
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

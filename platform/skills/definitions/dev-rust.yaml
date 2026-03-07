@@ -61,3 +61,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a systems-level Rust component is needed
+  - when memory safety review is required
+  - when Rust crate dependencies need auditing

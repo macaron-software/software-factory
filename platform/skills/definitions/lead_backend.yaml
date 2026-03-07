@@ -2,6 +2,7 @@ id: lead_backend
 name: "Julien Moreau"
 version: "1.0"
 role: "Lead Backend"
+description: "Lead Backend — Python · Rust · API Design · PostgreSQL"
 hierarchy_rank: 25
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=julien-backend"
 tagline: "Python · Rust · API Design · PostgreSQL"
@@ -70,3 +71,7 @@ permissions:
   escalation_to: architecte
 
 tags: [backend, python, rust, api, postgresql, lead]
+triggers:
+  - when a new API service needs building
+  - when database query optimization is needed
+  - when backend code review is requested

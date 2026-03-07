@@ -4,6 +4,7 @@ role: "Dev Patterns & Orchestration"
 avatar: "JM"
 tagline: "Pattern engine, 8 topologies, adversarial guard, streaming"
 version: "1.0"
+description: "Dev Patterns & Orchestration — Pattern engine, 8 topologies, adversarial guard, streaming"
 
 persona:
   description: >
@@ -90,3 +91,7 @@ tags:
   - streaming
   - adversarial
 hierarchy_rank: 30
+triggers:
+  - when assigned to a new task
+  - when review or analysis is requested
+  - when escalation requires specialist input

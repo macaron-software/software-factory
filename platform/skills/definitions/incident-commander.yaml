@@ -29,3 +29,7 @@ llm:
 tools:
   - memory_search
   - code_read
+triggers:
+  - when P1/P2 incident is declared
+  - when incident response coordination is needed
+  - when post-incident review is scheduled

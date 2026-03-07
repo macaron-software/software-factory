@@ -31,3 +31,7 @@ llm:
 tools:
   - memory_search
   - analytics
+triggers:
+  - when a new product feature is prioritized
+  - when user feedback analysis is needed
+  - when product roadmap review is due

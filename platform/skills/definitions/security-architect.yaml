@@ -4,6 +4,7 @@ role: "Security Architect — Blue Team Strategist"
 avatar: "FM"
 tagline: "Zero Trust, defense-in-depth, threat modeling STRIDE/DREAD"
 version: "1.0"
+description: "Security Architect — Blue Team Strategist — Zero Trust, defense-in-depth, threat modeling STRIDE/DREAD"
 
 persona:
   description: >

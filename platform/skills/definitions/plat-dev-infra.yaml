@@ -4,6 +4,7 @@ role: "Dev Infra & Deploy"
 avatar: "AP"
 tagline: "SSE, SQLite, migrations, Docker, Azure VM, nginx"
 version: "1.0"
+description: "Dev Infra & Deploy — SSE, SQLite, migrations, Docker, Azure VM, nginx"
 
 persona:
   description: >
@@ -93,3 +94,7 @@ tags:
   - deploy
   - sse
 hierarchy_rank: 30
+triggers:
+  - when infrastructure provisioning is needed
+  - when capacity planning is required
+  - when infrastructure cost review is due

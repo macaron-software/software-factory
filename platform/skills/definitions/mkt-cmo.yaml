@@ -3,6 +3,7 @@ name: "Sophie Laurent"
 role: "Chief Marketing Officer"
 avatar: "SL"
 version: "1.0"
+description: "Chief Marketing Officer — Brand-led growth, audience-first strategy"
 tagline: "Brand-led growth, audience-first strategy"
 
 persona:
@@ -58,3 +59,7 @@ tags:
   - strategy
   - leadership
   - cmo
+triggers:
+  - when a new campaign needs strategy
+  - when market research is required
+  - when brand positioning needs review

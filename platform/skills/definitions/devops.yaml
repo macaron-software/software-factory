@@ -4,6 +4,7 @@ role: "DevOps / SRE"
 avatar: "KD"
 tagline: "CI/CD, Docker, canary deployment, monitoring"
 version: "1.0"
+description: "DevOps / SRE — CI/CD, Docker, canary deployment, monitoring"
 
 persona:
   description: >

@@ -4,6 +4,7 @@ avatar: "FG"
 role: "TMA Lead"
 tagline: "Application maintenance, bug triage, SLA, tech debt"
 version: "1.0"
+description: "TMA Lead — Application maintenance, bug triage, SLA, tech debt"
 
 persona:
   description: >

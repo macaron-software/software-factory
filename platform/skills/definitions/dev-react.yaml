@@ -62,3 +62,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a new React feature is requested
+  - when component state management needs refactoring
+  - when frontend tests are missing

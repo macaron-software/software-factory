@@ -36,3 +36,7 @@ tools:
 permissions:
   can_veto: false
   can_delegate: false
+triggers:
+  - when a new data pipeline is needed
+  - when ETL performance degrades
+  - when data lake schema changes are required

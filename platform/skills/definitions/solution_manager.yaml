@@ -3,6 +3,7 @@ name: "Marie-Claire Jobert"
 avatar: "MJ"
 role: "Solution Manager"
 version: "1.0"
+description: "Responsable solution."
 
 persona:
   description: >

@@ -3,6 +3,7 @@ name: "Léa Bernard"
 role: "Brand Strategist"
 avatar: "LB"
 version: "1.0"
+description: "Brand Strategist — Brand is the promise. Delivery is the proof."
 tagline: "Brand is the promise. Delivery is the proof."
 
 persona:
@@ -59,3 +60,7 @@ tags:
   - brand
   - positioning
   - messaging
+triggers:
+  - when assigned to a new task
+  - when review or analysis is requested
+  - when escalation requires specialist input

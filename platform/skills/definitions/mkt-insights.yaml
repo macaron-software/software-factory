@@ -3,6 +3,7 @@ name: "Marie Leclerc"
 role: "Customer Insights"
 avatar: "ML"
 version: "1.0"
+description: "Customer Insights — Customers don't buy products, they hire them for a job"
 tagline: "Customers don't buy products, they hire them for a job"
 
 persona:
@@ -60,3 +61,7 @@ tags:
   - customer-insights
   - personas
   - jtbd
+triggers:
+  - when assigned to a new task
+  - when review or analysis is requested
+  - when escalation requires specialist input

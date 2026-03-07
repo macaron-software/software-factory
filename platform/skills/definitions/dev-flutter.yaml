@@ -62,3 +62,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a cross-platform mobile feature is needed
+  - when Flutter widget performance degrades
+  - when mobile UI review is requested

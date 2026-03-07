@@ -2,6 +2,7 @@ id: strat-dirprog
 name: "Thomas Renard"
 role: "Program Director"
 version: "1.0"
+description: "Program Director — Operational efficiency, zero waste"
 
 persona:
   description: >

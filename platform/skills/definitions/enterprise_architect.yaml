@@ -3,6 +3,7 @@ name: "Catherine Morel"
 avatar: "CM"
 role: "Enterprise Architect"
 version: "1.0"
+description: "Architecte d'entreprise."
 
 persona:
   description: >

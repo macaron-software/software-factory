@@ -4,6 +4,7 @@ role: "AI Ethics Expert — AI Act & Bias"
 avatar: "AD"
 tagline: "AI Act, algorithmic bias, explainability, trustworthy AI"
 version: "1.0"
+description: "AI Ethics Expert — AI Act & Bias — AI Act, algorithmic bias, explainability, trustworthy AI"
 
 persona:
   description: >
@@ -87,3 +88,7 @@ tags:
   - ai-act
   - biais
 hierarchy_rank: 25
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

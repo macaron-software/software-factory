@@ -2,6 +2,7 @@ id: mobile_ios_qa
 name: "Jade Petit"
 version: "1.0"
 role: "QA iOS"
+description: "QA iOS — XCTest · XCUITest · Snapshot testing"
 hierarchy_rank: 45
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=jade-ios"
 tagline: "XCTest · XCUITest · Snapshot testing"
@@ -44,3 +45,7 @@ llm:
   max_tokens: 4096
 
 tags: [ios, swift, qa, testing, mobile]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

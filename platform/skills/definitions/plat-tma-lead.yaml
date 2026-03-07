@@ -4,6 +4,7 @@ role: "Platform TMA Lead"
 avatar: "SM"
 tagline: "Incident triage P0-P4, SLA, escalation, maintenance mgmt"
 version: "1.0"
+description: "Platform TMA Lead — Incident triage P0-P4, SLA, escalation, maintenance mgmt"
 
 persona:
   description: >
@@ -96,3 +97,7 @@ tags:
   - incident
   - sla
 hierarchy_rank: 20
+triggers:
+  - when a TMA sprint is planned
+  - when legacy code needs maintenance or patching
+  - when technical debt review is scheduled

@@ -62,3 +62,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a new Angular component is needed
+  - when frontend performance issues arise
+  - when TypeScript type coverage is insufficient

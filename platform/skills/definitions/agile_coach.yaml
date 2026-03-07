@@ -3,6 +3,7 @@ name: "Marc Lefèvre"
 avatar: "ML"
 role: "Agile Coach"
 version: "1.0"
+description: "Coach Agile SAFe."
 
 persona:
   description: >

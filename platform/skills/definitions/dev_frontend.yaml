@@ -4,6 +4,7 @@ role: "Frontend Developer"
 avatar: "LM"
 tagline: "Angular, TypeScript, codemods, component migration"
 version: "1.0"
+description: "Frontend Developer — Angular, TypeScript, codemods, component migration"
 
 persona:
   description: >

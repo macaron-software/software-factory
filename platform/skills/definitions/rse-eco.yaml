@@ -4,6 +4,7 @@ role: "Expert Éco-conception Logicielle"
 avatar: "RM"
 tagline: "Lean architecture, green tech debt, digital LCA"
 version: "1.0"
+description: "Expert Éco-conception Logicielle — Lean architecture, green tech debt, digital LCA"
 
 persona:
   description: >
@@ -84,3 +85,7 @@ tags:
   - sobriete
   - green-it
 hierarchy_rank: 30
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

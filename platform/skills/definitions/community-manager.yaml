@@ -25,3 +25,7 @@ llm:
 tools:
   - memory_search
   - git_tools
+triggers:
+  - when team health review is needed
+  - when performance evaluation is due
+  - when organizational change is planned

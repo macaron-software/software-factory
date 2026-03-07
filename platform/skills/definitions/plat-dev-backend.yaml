@@ -4,6 +4,7 @@ role: "Platform Backend Dev"
 avatar: "RG"
 tagline: "Routes, sessions, missions, DB — the server core"
 version: "1.0"
+description: "Platform Backend Dev — Routes, sessions, missions, DB — the server core"
 
 persona:
   description: >
@@ -84,3 +85,7 @@ tags:
   - sqlite
   - api
 hierarchy_rank: 30
+triggers:
+  - when a new API service needs building
+  - when database query optimization is needed
+  - when backend code review is requested

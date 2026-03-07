@@ -2,6 +2,7 @@ id: mobile_ios_dev_ui
 name: "Lucas Martin"
 version: "1.0"
 role: "Dev iOS UI"
+description: "Dev iOS UI — SwiftUI views · Navigation · Animations"
 hierarchy_rank: 40
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=lucas-ios"
 tagline: "SwiftUI views · Navigation · Animations"
@@ -45,3 +46,7 @@ llm:
   max_tokens: 8192
 
 tags: [ios, swift, swiftui, mobile, ui]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

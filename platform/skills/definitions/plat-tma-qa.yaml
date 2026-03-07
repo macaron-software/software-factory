@@ -4,6 +4,7 @@ role: "QA TMA Plateforme"
 avatar: "AF"
 tagline: "Regression tests, smoke tests, hotfix validation"
 version: "1.0"
+description: "QA TMA Plateforme — Regression tests, smoke tests, hotfix validation"
 
 persona:
   description: >
@@ -89,3 +90,7 @@ tags:
   - testing
   - non-regression
 hierarchy_rank: 30
+triggers:
+  - when a TMA sprint is planned
+  - when legacy code needs maintenance or patching
+  - when technical debt review is scheduled

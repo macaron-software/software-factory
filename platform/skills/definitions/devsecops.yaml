@@ -3,6 +3,7 @@ name: "Sami Khelifi"
 avatar: "SK"
 role: "DevSecOps Engineer"
 version: "1.0"
+description: "DevSecOps."
 
 persona:
   description: >

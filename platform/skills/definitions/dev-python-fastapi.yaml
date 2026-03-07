@@ -63,3 +63,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a new FastAPI service needs to be implemented
+  - when async database migrations are required
+  - when Python code review is requested

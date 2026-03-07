@@ -3,6 +3,7 @@ name: "Nicolas Blanc"
 avatar: "NB"
 role: "Performance Engineer"
 version: "1.0"
+description: "Ingénieur performance."
 
 persona:
   description: >

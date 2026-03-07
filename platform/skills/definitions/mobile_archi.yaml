@@ -2,6 +2,7 @@ id: mobile_archi
 name: "Alexandre Morel"
 version: "1.0"
 role: "Mobile Architect"
+description: "Mobile Architect — Cross-platform patterns · API contract · Clean arch"
 hierarchy_rank: 25
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=alex-archi-mobile"
 tagline: "Cross-platform patterns · API contract · Clean arch"
@@ -62,3 +63,7 @@ permissions:
   can_approve: true
 
 tags: [architecture, mobile, cross-platform]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

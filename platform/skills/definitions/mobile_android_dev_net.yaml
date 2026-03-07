@@ -2,6 +2,7 @@ id: mobile_android_dev_net
 name: "Romain Lefèvre"
 version: "1.0"
 role: "Dev Android Networking"
+description: "Dev Android Networking — OkHttp · Coroutines · Flow · Kotlinx.serialization"
 hierarchy_rank: 40
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=romain-android"
 tagline: "OkHttp · Coroutines · Flow · Kotlinx.serialization"
@@ -49,3 +50,7 @@ llm:
   max_tokens: 8192
 
 tags: [android, kotlin, networking, mobile]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

@@ -4,6 +4,7 @@ avatar: "AC"
 role: "Pipeline Engineer"
 tagline: "GitHub Actions, GitLab CI, pipelines, artifacts, environments"
 version: "1.0"
+description: "Pipeline Engineer — GitHub Actions, GitLab CI, pipelines, artifacts, environments"
 
 persona:
   description: >

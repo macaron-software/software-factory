@@ -61,3 +61,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a high-performance Go service is needed
+  - when concurrency issues appear in Go code
+  - when Go module dependencies need updating

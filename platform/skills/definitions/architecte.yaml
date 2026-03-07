@@ -3,6 +3,7 @@ name: "Pierre Duval"
 avatar: "PD"
 role: "Solution Architect"
 version: "1.0"
+description: "Architecte logiciel qui conçoit les systèmes à grande échelle."
 
 persona:
   description: >

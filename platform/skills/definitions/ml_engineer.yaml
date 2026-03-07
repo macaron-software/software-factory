@@ -3,6 +3,7 @@ name: "Aïcha Bah"
 avatar: "AB"
 role: "ML Engineer"
 version: "1.0"
+description: "ML Engineer."
 
 persona:
   description: >

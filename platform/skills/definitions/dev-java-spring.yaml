@@ -62,3 +62,7 @@ tools:
   - git_diff
   - git_commit
   - bash
+triggers:
+  - when a new Spring Boot service is required
+  - when JVM performance tuning is needed
+  - when Java code review is requested

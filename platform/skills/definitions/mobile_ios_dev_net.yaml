@@ -2,6 +2,7 @@ id: mobile_ios_dev_net
 name: "Emma Bernard"
 version: "1.0"
 role: "Dev iOS Networking"
+description: "Dev iOS Networking — URLSession · SSE · async/await · Codable"
 hierarchy_rank: 40
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=emma-ios"
 tagline: "URLSession · SSE · async/await · Codable"
@@ -48,3 +49,7 @@ llm:
   max_tokens: 8192
 
 tags: [ios, swift, networking, mobile]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

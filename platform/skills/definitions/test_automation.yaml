@@ -4,6 +4,7 @@ avatar: "YO"
 role: "Test Automation Engineer"
 tagline: "Playwright, Cypress, automated E2E tests, CI integration"
 version: "1.0"
+description: "Test Automation Engineer — Playwright, Cypress, automated E2E tests, CI integration"
 
 persona:
   description: >

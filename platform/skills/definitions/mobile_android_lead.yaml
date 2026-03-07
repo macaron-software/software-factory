@@ -2,6 +2,7 @@ id: mobile_android_lead
 name: "Karim Benali"
 version: "1.0"
 role: "Lead Android"
+description: "Lead Android — Compose · MVVM · Coroutines · Hilt"
 hierarchy_rank: 30
 avatar: "https://api.dicebear.com/9.x/personas/svg?seed=karim-android"
 tagline: "Compose · MVVM · Coroutines · Hilt"
@@ -62,3 +63,7 @@ permissions:
   escalation_to: rte
 
 tags: [android, kotlin, compose, mobile, lead]
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

@@ -3,6 +3,7 @@ name: "Marie Dubois (Solaris QA)"
 avatar: "MD"
 role: "Design System QA"
 version: "1.0"
+description: "Quality Assurance spécialisée design system Solaris."
 
 persona:
   description: >

@@ -4,6 +4,7 @@ role: "Security Frontend Developer"
 avatar: "CD"
 tagline: "XSS remediation, CSP hardening, CSRF tokens, secure DOM manipulation"
 version: "1.0"
+description: "Security Frontend Developer — XSS remediation, CSP hardening, CSRF tokens, secure DOM manipulation"
 
 persona:
   description: >

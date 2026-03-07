@@ -4,6 +4,7 @@ role: "DPO — Data Protection Officer"
 avatar: "ML"
 tagline: "GDPR, privacy by design, processing registry, PIA"
 version: "1.0"
+description: "DPO — Data Protection Officer — GDPR, privacy by design, processing registry, PIA"
 
 persona:
   description: >
@@ -85,3 +86,7 @@ tags:
   - compliance
   - legal
 hierarchy_rank: 25
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

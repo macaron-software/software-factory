@@ -3,6 +3,7 @@ name: "Thibault Renaud"
 avatar: "TR"
 role: "Site Reliability Engineer"
 version: "1.0"
+description: "SRE."
 
 persona:
   description: >

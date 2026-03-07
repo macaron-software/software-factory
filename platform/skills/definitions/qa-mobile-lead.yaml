@@ -25,3 +25,7 @@ llm:
 tools:
   - code_read
   - memory_search
+triggers:
+  - when a new mobile feature is needed
+  - when app performance degrades
+  - when mobile platform compatibility issues arise

@@ -4,6 +4,7 @@ role: "Platform Product Owner"
 avatar: "ND"
 tagline: "SAFe backlog, WSJF prioritization, platform features"
 version: "1.0"
+description: "Platform Product Owner — SAFe backlog, WSJF prioritization, platform features"
 
 persona:
   description: >
@@ -90,3 +91,7 @@ tags:
   - backlog
   - wsjf
 hierarchy_rank: 15
+triggers:
+  - when a new product feature is prioritized
+  - when user feedback analysis is needed
+  - when product roadmap review is due

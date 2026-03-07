@@ -3,6 +3,7 @@ name: "Bastien Clément"
 avatar: "BC"
 role: "Release Train Engineer (RTE)"
 version: "1.0"
+description: "Ingénieur du train de release."
 
 persona:
   description: >

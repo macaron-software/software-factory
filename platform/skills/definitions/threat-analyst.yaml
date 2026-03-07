@@ -4,6 +4,7 @@ role: "Threat Analyst — Risk Quantification"
 avatar: "MR"
 tagline: "STRIDE/DREAD scoring, CVSS v3.1, risk matrices, kill chain analysis"
 version: "1.0"
+description: "Threat Analyst — Risk Quantification — STRIDE/DREAD scoring, CVSS v3.1, risk matrices, kill chain analysis"
 
 persona:
   description: >

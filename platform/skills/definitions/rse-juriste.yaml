@@ -4,6 +4,7 @@ role: "Digital Law Expert"
 avatar: "EV"
 tagline: "Digital law, ToS, intellectual property, DSA/DMA"
 version: "1.0"
+description: "Digital Law Expert — Digital law, ToS, intellectual property, DSA/DMA"
 
 persona:
   description: >
@@ -83,3 +84,7 @@ tags:
   - dsa
   - ai-act
 hierarchy_rank: 25
+triggers:
+  - when sustainability assessment is required
+  - when CSR reporting is due
+  - when environmental impact needs evaluation

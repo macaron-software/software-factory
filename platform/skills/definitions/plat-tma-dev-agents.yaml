@@ -4,6 +4,7 @@ role: "Dev TMA Agents & LLM"
 avatar: "KD"
 tagline: "Fix LLM timeouts, tool bugs, streaming issues, agent loops"
 version: "1.0"
+description: "Dev TMA Agents & LLM — Fix LLM timeouts, tool bugs, streaming issues, agent loops"
 
 persona:
   description: >
@@ -89,3 +90,7 @@ tags:
   - streaming
   - async
 hierarchy_rank: 35
+triggers:
+  - when a TMA sprint is planned
+  - when legacy code needs maintenance or patching
+  - when technical debt review is scheduled

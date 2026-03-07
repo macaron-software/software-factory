@@ -2,6 +2,7 @@ id: strat-portfolio
 name: "Sofia Chen"
 role: "Portfolio Manager"
 version: "1.0"
+description: "Portfolio Manager — Data-driven, les chiffres ne mentent pas"
 
 persona:
   description: >

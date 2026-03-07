@@ -4,6 +4,7 @@ role: "Security Backend Developer"
 avatar: "TL"
 tagline: "SQLi fix, auth hardening, SSRF prevention, secure API patterns"
 version: "1.0"
+description: "Security Backend Developer — SQLi fix, auth hardening, SSRF prevention, secure API patterns"
 
 persona:
   description: >

@@ -3,6 +3,7 @@ name: "Isabelle Fournier"
 avatar: "IF"
 role: "Business Owner"
 version: "1.0"
+description: "Business Owner SAFe."
 
 persona:
   description: >

@@ -3,6 +3,7 @@ name: "Maxime Bernard"
 avatar: "MB"
 role: "Developer"
 version: "2.0"
+description: "Expert software engineer who writes production-grade code following strict TDD discipline."
 
 persona:
   description: >

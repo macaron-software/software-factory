@@ -4,6 +4,7 @@ role: "Fullstack Developer"
 avatar: "EC"
 tagline: "Angular + Java/Spring, module migration, tests"
 version: "1.0"
+description: "Fullstack Developer — Angular + Java/Spring, module migration, tests"
 
 persona:
   description: >

@@ -4,6 +4,7 @@ role: "Platform Frontend Dev"
 avatar: "ER"
 tagline: "Jinja2 templates, HTMX, CSS dark theme, client-side SSE"
 version: "1.0"
+description: "Platform Frontend Dev — Jinja2 templates, HTMX, CSS dark theme, client-side SSE"
 
 persona:
   description: >
@@ -85,3 +86,7 @@ tags:
   - css
   - sse
 hierarchy_rank: 30
+triggers:
+  - when a new UI feature needs implementation
+  - when frontend performance regression is detected
+  - when accessibility review is required

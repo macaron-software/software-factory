@@ -4,6 +4,7 @@ avatar: "VL"
 role: "Test Manager"
 tagline: "Test strategy, acceptance plans, functional coverage"
 version: "1.0"
+description: "Test Manager — Test strategy, acceptance plans, functional coverage"
 
 persona:
   description: >

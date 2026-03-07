@@ -3,6 +3,7 @@ name: "Valérie Caron"
 avatar: "VC"
 role: "Technical Writer"
 version: "1.0"
+description: "Rédacteur technique qui documente le système, les APIs, les guides utilisateur et les processus."
 
 persona:
   description: >

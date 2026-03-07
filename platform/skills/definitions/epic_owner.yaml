@@ -3,6 +3,7 @@ name: "Olivier Girard"
 avatar: "OG"
 role: "Epic Owner"
 version: "1.0"
+description: "Responsable d'épic."
 
 persona:
   description: >

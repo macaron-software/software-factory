@@ -3,6 +3,7 @@ name: "Hélène Gauthier"
 avatar: "HG"
 role: "Compliance Officer"
 version: "1.0"
+description: "Compliance Officer."
 
 persona:
   description: >

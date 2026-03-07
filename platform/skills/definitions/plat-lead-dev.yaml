@@ -4,6 +4,7 @@ role: "Lead Dev Plateforme"
 avatar: "ML"
 tagline: "Macaron tech architect — FastAPI, HTMX, SSE, patterns"
 version: "1.0"
+description: "Lead Dev Plateforme — Macaron tech architect — FastAPI, HTMX, SSE, patterns"
 
 persona:
   description: >
@@ -101,3 +102,7 @@ tags:
   - architecture
   - fastapi
 hierarchy_rank: 20
+triggers:
+  - when team velocity drops below threshold
+  - when code quality metrics degrade
+  - when technical alignment across teams is needed

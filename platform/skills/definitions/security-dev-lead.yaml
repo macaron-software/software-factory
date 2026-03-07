@@ -4,6 +4,7 @@ role: "Security Dev Lead — Remediation Team Lead"
 avatar: "IC"
 tagline: "Secure coding, TDD remediation, OWASP-aware patches, PR reviews"
 version: "1.0"
+description: "Security Dev Lead — Remediation Team Lead — Secure coding, TDD remediation, OWASP-aware patches, PR reviews"
 
 persona:
   description: >

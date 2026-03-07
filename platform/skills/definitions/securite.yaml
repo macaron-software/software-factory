@@ -4,6 +4,7 @@ role: "Security Engineer"
 avatar: "NB"
 tagline: "OWASP, security audit, vulnerability review"
 version: "1.0"
+description: "Security Engineer — OWASP, security audit, vulnerability review"
 
 persona:
   description: >

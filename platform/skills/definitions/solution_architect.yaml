@@ -3,6 +3,7 @@ name: "David Lemoine"
 avatar: "DL"
 role: "Solution Architect"
 version: "1.0"
+description: "Architecte solution."
 
 persona:
   description: >

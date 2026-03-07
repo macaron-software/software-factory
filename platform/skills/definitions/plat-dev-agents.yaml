@@ -4,6 +4,7 @@ role: "Dev Agents & A2A"
 avatar: "LM"
 tagline: "Executor, AgentLoop, MessageBus, agent tools — the brain"
 version: "1.0"
+description: "Dev Agents & A2A — Executor, AgentLoop, MessageBus, agent tools — the brain"
 
 persona:
   description: >
@@ -90,3 +91,7 @@ tags:
   - async
   - runtime
 hierarchy_rank: 30
+triggers:
+  - when assigned to a new task
+  - when review or analysis is requested
+  - when escalation requires specialist input

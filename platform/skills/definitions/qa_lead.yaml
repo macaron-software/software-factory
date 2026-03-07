@@ -4,6 +4,7 @@ role: "QA Lead"
 avatar: "CR"
 tagline: "Software quality, E2E tests, golden files ISO 100%"
 version: "1.0"
+description: "QA Lead — Software quality, E2E tests, golden files ISO 100%"
 
 persona:
   description: >
