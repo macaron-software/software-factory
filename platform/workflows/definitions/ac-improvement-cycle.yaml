@@ -23,6 +23,10 @@ phases:
     Sans ces 5 éléments, la phase est INCOMPLÈTE. Pas de code avant la fin de cette phase.
     Output structuré : INCEPTION.md avec toutes les specs + traceability matrix.
   gate: all_approved
+  config:
+    agents:
+    - ac-architect
+- id: ac-tdd-sprint
   pattern_id: loop
   name: TDD Sprint — Code + Tests
   description: >
@@ -39,6 +43,9 @@ phases:
     9. Corriger IMMÉDIATEMENT si CI échoue — pas de "ça marchera plus tard"
     Si adversarial feedback disponible (ADVERSARIAL_N.md), l'intégrer comme priorité absolue.
   gate: all_approved
+  config:
+    agents:
+    - ac-codex
 - id: ac-adversarial-check
   pattern_id: sequential
   name: Vérification Adversariale 12 Dimensions
