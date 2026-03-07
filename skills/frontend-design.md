@@ -207,10 +207,10 @@ h1 {
 ```html
 <section class="hero">
   <div class="hero-content">
-    <span class="hero-badge">✨ Now in Beta</span>
+    <span class="hero-badge">Now in Beta</span>
     <h1 class="hero-title">
       Build something<br />
-      <span class="gradient-text">extraordinary</span>
+      <span class="hero-title-accent">extraordinary</span>
     </h1>
     <p class="hero-subtitle">
       The developer platform that makes shipping delightful. Focus on what matters — we handle the
@@ -218,20 +218,37 @@ h1 {
     </p>
     <div class="hero-actions">
       <button class="btn btn-primary btn-lg">Get Started Free</button>
-      <button class="btn btn-ghost btn-lg">See Demo →</button>
+      <button class="btn btn-ghost btn-lg">
+        See Demo
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+          stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"/>
+          <polyline points="12 5 19 12 12 19"/></svg>
+      </button>
     </div>
   </div>
 </section>
 
 <style>
-  .gradient-text {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+  /* Accent text uses token color — no gradient backgrounds */
+  .hero-title-accent {
+    color: var(--color-primary);
   }
 </style>
 ```
+
+### Mandatory Design Constraints
+
+These rules are **non-negotiable** and override any aesthetic preference:
+
+| Rule | Requirement |
+|------|-------------|
+| **Tokens** | All colors, spacing, radii, shadows via CSS `var(--*)` — zero hardcoded values |
+| **No gradients** | Backgrounds must be flat solid token colors — `linear-gradient` / `radial-gradient` forbidden on backgrounds |
+| **No emojis** | Zero emoji or unicode symbols in UI — use [Feather SVG icons](https://feathericons.com) |
+| **Icons** | Feather SVG only — inline `<svg>` or `<Icon name="...">` component |
+| **Components** | Every repeated element must be a named component — no ad-hoc inline HTML blobs |
+| **No inline styles** | No `style=""` attribute — all styling through tokens and classes |
 
 ### Design Checklist
 
@@ -244,6 +261,10 @@ Before shipping any design:
 - [ ] Responsive from 375px to 1920px
 - [ ] Animations respect `prefers-reduced-motion`
 - [ ] Contrast ratios meet WCAG AA (4.5:1 body, 3:1 large)
+- [ ] Zero hardcoded hex colors or px values — all via CSS tokens
+- [ ] Zero emojis or unicode symbols — all icons are Feather SVGs
+- [ ] Zero gradient backgrounds — flat solid token colors only
+- [ ] Zero inline styles (`style=""` attribute)
 
 ## Output Format
 

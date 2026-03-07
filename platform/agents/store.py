@@ -313,6 +313,8 @@ class AgentStore:
                     "systematic-debugging",
                     "error-handling-patterns",
                     "testing-patterns",
+                    "ui-design-standards",
+                    "design-tokens",
                 ],
                 system_prompt="You are a TDD Worker. Write code following strict Red-Green-Refactor.\n"
                 "Each task is atomic and KISS. Write the test FIRST, then minimal code to pass.\n"
@@ -637,10 +639,12 @@ class AgentStore:
                 hierarchy_rank=40,
                 is_builtin=True,
                 tags=["security", "frontend", "remediation"],
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
                 system_prompt="You are a Security Frontend Developer.\n"
                 "Fix: XSS (output encoding, CSP), CSRF (tokens, SameSite cookies),\n"
                 "DOM injection (DOMPurify), clickjacking (X-Frame-Options).\n"
-                "Write TDD: test reproduces exploit → fix → test passes → exploit fails.",
+                "Write TDD: test reproduces exploit → fix → test passes → exploit fails.\n"
+                "MANDATORY: apply ui-design-standards constraints on all UI code (no emoji, no gradient, tokens only, Feather SVG icons).",
             ),
             AgentDef(
                 id="qa-security",
@@ -923,7 +927,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "booking", "svelte", "dev"],
                 permissions={},
-                system_prompt="Dev Frontend Booking. Carte Mapbox, flow réservation, QR code.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Dev Frontend Booking. Carte Mapbox, flow réservation, QR code.\n"
+                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
             ),
             AgentDef(
                 id="ft-booking-qa",
@@ -1038,7 +1044,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "admin", "svelte", "dev"],
                 permissions={},
-                system_prompt="Dev SvelteKit Admin. Dashboard flotte, gestion users, reporting.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Dev SvelteKit Admin. Dashboard flotte, gestion users, reporting.\n"
+                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
             ),
             AgentDef(
                 id="ft-admin-dev2",
@@ -1056,7 +1064,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "admin", "svelte", "dev"],
                 permissions={},
-                system_prompt="Dev SvelteKit Admin. Config tenant, reporting, export données.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Dev SvelteKit Admin. Config tenant, reporting, export données.\n"
+                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
             ),
             AgentDef(
                 id="ft-admin-qa",
@@ -1093,7 +1103,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "lead"],
                 permissions={"can_delegate": True},
-                system_prompt="Lead Frontend User. Profil, historique, abonnement, PWA, a11y.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Lead Frontend User. Profil, historique, abonnement, PWA, a11y.\n"
+                "MANDATORY: enforce ui-design-standards in all frontend work (no emoji, no gradient bg, tokens only, Feather SVG icons). Gate reviews on compliance.",
             ),
             AgentDef(
                 id="ft-user-dev1",
@@ -1111,7 +1123,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "dev"],
                 permissions={},
-                system_prompt="Dev SvelteKit User. Profil, historique, notifications, PWA.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Dev SvelteKit User. Profil, historique, notifications, PWA.\n"
+                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
             ),
             AgentDef(
                 id="ft-user-dev2",
@@ -1129,7 +1143,9 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "dev"],
                 permissions={},
-                system_prompt="Dev SvelteKit User. Composants design system, abonnement, onboarding.",
+                skills=["ui-design-standards", "frontend-design", "design-tokens"],
+                system_prompt="Dev SvelteKit User. Composants design system, abonnement, onboarding.\n"
+                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
             ),
             AgentDef(
                 id="ft-user-qa",
@@ -1296,7 +1312,14 @@ class AgentStore:
                 hierarchy_rank=10,
                 is_builtin=True,
                 tags=["ac", "architecture", "specs", "traceability"],
-                skills=["brainstorming", "spec-driven-quality", "architecture-review"],
+                skills=[
+                    "brainstorming",
+                    "spec-driven-quality",
+                    "architecture-review",
+                    "ui-design-standards",
+                    "frontend-design",
+                    "design-tokens",
+                ],
                 permissions={"can_veto": False, "scope": "project"},
                 system_prompt=(
                     "Rôle : définir les specs complètes d'un projet pilote AVANT tout code.\n"
