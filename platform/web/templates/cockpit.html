@@ -1569,7 +1569,337 @@
     </div>
   </div>
 
-  <!-- 9. Footer KPIs -->
+  <!-- 9. Patterns Catalogue graph -->
+  <div class="ck-card" style="padding:1rem 1.25rem">
+    <div class="ck-card-title" style="margin-bottom:1rem">
+      <svg class="icon icon-xs"><use href="#icon-git-branch"/></svg>
+      PATTERNS CATALOGUE
+    </div>
+    <svg id="sf-patterns-diagram" viewBox="0 0 1100 670" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:'Inter',system-ui,sans-serif">
+      <defs>
+        <marker id="pm-b" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#3b82f6"/></marker>
+        <marker id="pm-a" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#f59e0b"/></marker>
+        <marker id="pm-r" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#ef4444"/></marker>
+        <marker id="pm-p" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#a855f7"/></marker>
+        <marker id="pm-g" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#22c55e"/></marker>
+      </defs>
+
+      <!-- background -->
+      <rect width="1100" height="670" style="fill:var(--bg-primary)"/>
+
+      <!-- title bar -->
+      <rect width="1100" height="22" style="fill:var(--bg-secondary)"/>
+      <line x1="0" y1="22" x2="1100" y2="22" style="stroke:var(--border)" stroke-width="1"/>
+      <text x="550" y="15" text-anchor="middle" font-size="9" font-weight="700" letter-spacing="1" style="fill:var(--text-primary)">SF PATTERNS CATALOGUE  —  5 categories  33 patterns  platform/patterns/ + hooks/ + memory/ + agents/ + ops/</text>
+
+      <!-- ===== ORCHESTRATION (left, full height) ===== -->
+      <rect x="8" y="26" width="504" height="636" rx="5" style="fill:var(--bg-secondary)" stroke="#3b82f6" stroke-width="1.5"/>
+      <rect x="8" y="26" width="504" height="22" rx="5" fill="rgba(59,130,246,0.12)"/>
+      <line x1="8" y1="40" x2="512" y2="40" stroke="#1d4ed8" stroke-width="0.7"/>
+      <text x="260" y="40" text-anchor="middle" font-size="8" font-weight="700" letter-spacing="1" fill="#3b82f6">ORCHESTRATION  18 patterns  platform/patterns/impls/  engine.py</text>
+
+      <!-- node grid: cols x=16,180,344  w=156 h=28  row step=42 -->
+      <!-- row 0 y=52 -->
+      <rect x="16"  y="52" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="64" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">solo</text>
+      <text x="94"  y="75" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">1 agent · chat direct</text>
+      <rect x="180" y="52" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="64" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">sequential</text>
+      <text x="258" y="75" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">A-B-C · compress at 70%</text>
+      <rect x="344" y="52" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="422" y="64" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">parallel</text>
+      <text x="422" y="75" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">dispatcher  workers  aggregator</text>
+
+      <!-- row 1 y=94 -->
+      <rect x="16"  y="94" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="106" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">hierarchical</text>
+      <text x="94"  y="117" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">manager  workers  QA loop</text>
+      <rect x="180" y="94" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="106" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">loop</text>
+      <text x="258" y="117" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">writer / reviewer · veto edge</text>
+      <rect x="344" y="94" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="422" y="106" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">debate</text>
+      <text x="422" y="117" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">N debaters + judge · max_rounds</text>
+
+      <!-- row 2 y=136 -->
+      <rect x="16"  y="136" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="148" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">router</text>
+      <text x="94"  y="159" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">router  1 specialist from N</text>
+      <rect x="180" y="136" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="148" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">aggregator</text>
+      <text x="258" y="159" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">N workers (no dispatcher) / 1 agg</text>
+      <rect x="344" y="136" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="422" y="148" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">wave</text>
+      <text x="422" y="159" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">dep-graph  ordered parallel waves</text>
+
+      <!-- row 3 y=178 -->
+      <rect x="16"  y="178" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="190" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">fractal_worktree</text>
+      <text x="94"  y="201" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">LLM gate  recurse  git worktree</text>
+      <rect x="180" y="178" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="190" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">fractal_qa</text>
+      <text x="258" y="201" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">recursive  BDD/Gherkin ACs</text>
+      <rect x="344" y="178" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="422" y="190" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">fractal_stories</text>
+      <text x="422" y="201" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">LLM story decomposition</text>
+
+      <!-- row 4 y=220 -->
+      <rect x="16"  y="220" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="232" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">fractal_tests</text>
+      <text x="94"  y="243" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">AC  test cases (fractal)</text>
+      <rect x="180" y="220" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="232" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">backprop_merge</text>
+      <text x="258" y="243" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">fractal leaves  merge bottom-up</text>
+      <rect x="344" y="220" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="422" y="232" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">human_in_the_loop</text>
+      <text x="422" y="243" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">WorkflowPaused  resume API</text>
+
+      <!-- row 5 y=262 -->
+      <rect x="16"  y="262" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="94"  y="274" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">adversarial-pair</text>
+      <text x="94"  y="285" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">writer + critic · veto edge</text>
+      <rect x="180" y="262" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#3b82f6" stroke-width="0.7"/>
+      <text x="258" y="274" text-anchor="middle" font-size="8" font-weight="600" fill="#3b82f6">adversarial-cascade</text>
+      <text x="258" y="285" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">4 layers: code/critic/secu/arch</text>
+      <rect x="344" y="262" width="156" height="28" rx="3" style="fill:var(--bg-primary)" stroke="#1d4ed8" stroke-width="0.7" stroke-dasharray="4,2"/>
+      <text x="422" y="274" text-anchor="middle" font-size="8" font-weight="600" style="fill:var(--text-secondary)">sf-tdd</text>
+      <text x="422" y="285" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">brain/worker/critics x3/devops</text>
+
+      <!-- orch bottom: sources -->
+      <line x1="16" y1="302" x2="496" y2="302" style="stroke:var(--border)" stroke-width="0.7"/>
+      <text x="260" y="314" text-anchor="middle" font-size="7" font-weight="700" letter-spacing="1" style="fill:var(--text-secondary)">SOURCES</text>
+      <text x="260" y="326" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">TinyAGI/fractals (MIT): fractal_worktree · backprop_merge</text>
+      <text x="260" y="337" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">ECC affaan-m/everything-claude-code: hooks · instinct_observer · skill_stocktake</text>
+      <text x="260" y="348" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">Google AOMA GoogleCloudPlatform/generative-ai: ConsolidateAgent · InboxWatcher · QueryAgent</text>
+
+      <!-- orch bottom: key data flows -->
+      <line x1="16" y1="360" x2="496" y2="360" style="stroke:var(--border)" stroke-width="0.7"/>
+      <text x="260" y="372" text-anchor="middle" font-size="7" font-weight="700" letter-spacing="1" style="fill:var(--text-secondary)">KEY DATA FLOWS</text>
+
+      <text x="20" y="386" font-size="6.5" style="fill:var(--text-secondary)">Tool call</text>
+      <polygon points="75,382 82,385.5 75,389" fill="#ef4444"/>
+      <text x="87" y="386" font-size="6.5" fill="#ef4444" font-weight="600">HookSystem</text>
+      <polygon points="148,382 155,385.5 148,389" fill="#ef4444"/>
+      <text x="160" y="386" font-size="6.5" fill="#ef4444" font-weight="600">Guardrails</text>
+      <text x="208" y="386" font-size="6.5" style="fill:var(--text-secondary)">· block/audit</text>
+      <polygon points="270,382 277,385.5 270,389" fill="#ef4444"/>
+      <text x="282" y="386" font-size="6.5" fill="#ef4444" font-weight="600">AdversarialGuard</text>
+      <text x="382" y="386" font-size="6.5" style="fill:var(--text-secondary)">· score 0-10</text>
+
+      <text x="20" y="404" font-size="6.5" style="fill:var(--text-secondary)">Session end</text>
+      <polygon points="80,400 87,403.5 80,407" fill="#f59e0b"/>
+      <text x="92" y="404" font-size="6.5" fill="#f59e0b" font-weight="600">InstinctObserver</text>
+      <polygon points="178,400 185,403.5 178,407" fill="#f59e0b"/>
+      <text x="190" y="404" font-size="6.5" style="fill:var(--text-secondary)">instincts table</text>
+      <polygon points="262,400 269,403.5 262,407" fill="#f59e0b"/>
+      <text x="274" y="404" font-size="6.5" fill="#f59e0b" font-weight="600">ConsolidateAgent</text>
+      <polygon points="373,400 380,403.5 373,407" fill="#a855f7"/>
+      <text x="385" y="404" font-size="6.5" fill="#a855f7" font-weight="600">instinct_insights</text>
+
+      <text x="20" y="422" font-size="6.5" style="fill:var(--text-secondary)">inbox/ file</text>
+      <polygon points="72,418 79,421.5 72,425" fill="#a855f7"/>
+      <text x="84" y="422" font-size="6.5" fill="#a855f7" font-weight="600">InboxWatcher</text>
+      <polygon points="157,418 164,421.5 157,425" fill="#a855f7"/>
+      <text x="169" y="422" font-size="6.5" fill="#a855f7" font-weight="600">memory_global</text>
+      <polygon points="254,418 261,421.5 254,425" fill="#a855f7"/>
+      <text x="266" y="422" font-size="6.5" fill="#a855f7" font-weight="600">QueryAgent</text>
+      <text x="328" y="422" font-size="6.5" style="fill:var(--text-secondary)">· LLM synthesis + citations</text>
+
+      <text x="20" y="440" font-size="6.5" style="fill:var(--text-secondary)">platform_incident</text>
+      <polygon points="102,436 109,439.5 102,443" fill="#22c55e"/>
+      <text x="114" y="440" font-size="6.5" fill="#22c55e" font-weight="600">AutoHeal</text>
+      <polygon points="161,436 168,439.5 161,443" fill="#22c55e"/>
+      <text x="173" y="440" font-size="6.5" style="fill:var(--text-secondary)">epic</text>
+      <polygon points="193,436 200,439.5 193,443" fill="#22c55e"/>
+      <text x="205" y="440" font-size="6.5" style="fill:var(--text-secondary)">TMA workflow</text>
+      <polygon points="285,436 292,439.5 285,443" fill="#3b82f6"/>
+      <text x="297" y="440" font-size="6.5" style="fill:var(--text-secondary)">Orchestration pattern</text>
+
+      <text x="20" y="458" font-size="6.5" style="fill:var(--text-secondary)">rl_experience</text>
+      <polygon points="88,454 95,457.5 88,461" fill="#f59e0b"/>
+      <text x="100" y="458" font-size="6.5" fill="#f59e0b" font-weight="600">RLPolicy</text>
+      <polygon points="148,454 155,457.5 148,461" fill="#3b82f6"/>
+      <text x="160" y="458" font-size="6.5" style="fill:var(--text-secondary)">phase-start pattern recommendation</text>
+
+      <text x="20" y="476" font-size="6.5" style="fill:var(--text-secondary)">agent_scores + missions</text>
+      <polygon points="118,472 125,475.5 118,479" fill="#f59e0b"/>
+      <text x="130" y="476" font-size="6.5" fill="#f59e0b" font-weight="600">EvolutionScheduler</text>
+      <polygon points="225,472 232,475.5 225,479" fill="#3b82f6"/>
+      <text x="237" y="476" font-size="6.5" style="fill:var(--text-secondary)">workflow proposals  human review</text>
+
+      <!-- engine protocols -->
+      <line x1="16" y1="490" x2="496" y2="490" style="stroke:var(--border)" stroke-width="0.7"/>
+      <text x="260" y="502" text-anchor="middle" font-size="7" font-weight="700" letter-spacing="1" style="fill:var(--text-secondary)">ENGINE PROTOCOLS</text>
+      <text x="260" y="514" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">_DECOMPOSE · _EXEC · _QA · _REVIEW · _CICD · _CONTEXT_ROT</text>
+      <text x="260" y="525" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">NodeStatus: PENDING | RUNNING | COMPLETED | VETOED | FAILED</text>
+      <text x="260" y="536" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">max_iterations (loop) · max_rounds (debate) · parallel_threshold (wave)</text>
+
+      <!-- legend -->
+      <line x1="16" y1="548" x2="496" y2="548" style="stroke:var(--border)" stroke-width="0.7"/>
+      <text x="260" y="560" text-anchor="middle" font-size="7" font-weight="700" letter-spacing="1" style="fill:var(--text-secondary)">LEGEND</text>
+      <rect x="20"  y="565" width="10" height="10" rx="2" fill="none" stroke="#3b82f6" stroke-width="1.5"/><text x="34"  y="574" font-size="6.5" fill="#3b82f6">Orchestration</text>
+      <rect x="130" y="565" width="10" height="10" rx="2" fill="none" stroke="#f59e0b" stroke-width="1.5"/><text x="144" y="574" font-size="6.5" fill="#f59e0b">Learning</text>
+      <rect x="226" y="565" width="10" height="10" rx="2" fill="none" stroke="#ef4444" stroke-width="1.5"/><text x="240" y="574" font-size="6.5" fill="#ef4444">Quality/Safety</text>
+      <rect x="344" y="565" width="10" height="10" rx="2" fill="none" stroke="#a855f7" stroke-width="1.5"/><text x="358" y="574" font-size="6.5" fill="#a855f7">Memory</text>
+      <rect x="430" y="565" width="10" height="10" rx="2" fill="none" stroke="#22c55e" stroke-width="1.5"/><text x="444" y="574" font-size="6.5" fill="#22c55e">Ops</text>
+      <text x="260" y="589" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">dashed border = composite / alias pattern</text>
+      <line x1="20"  y1="596" x2="52"  y2="596" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#pm-b)"/>
+      <text x="57"  y="600" font-size="6" style="fill:var(--text-secondary)">control / delegation</text>
+      <line x1="174" y1="596" x2="206" y2="596" stroke="#a855f7" stroke-width="1.2" marker-end="url(#pm-p)"/>
+      <text x="211" y="600" font-size="6" style="fill:var(--text-secondary)">data / memory</text>
+      <line x1="332" y1="596" x2="364" y2="596" stroke="#22c55e" stroke-width="1.2" marker-end="url(#pm-g)"/>
+      <text x="369" y="600" font-size="6" style="fill:var(--text-secondary)">ops / monitoring</text>
+
+      <!-- ===== LEARNING PANEL (top-right-1) ===== -->
+      <rect x="520" y="26" width="278" height="306" rx="5" style="fill:var(--bg-secondary)" stroke="#f59e0b" stroke-width="1.5"/>
+      <rect x="520" y="26" width="278" height="22" rx="5" fill="rgba(245,158,11,0.12)"/>
+      <line x1="520" y1="40" x2="798" y2="40" stroke="#d97706" stroke-width="0.7"/>
+      <text x="659" y="40" text-anchor="middle" font-size="8" font-weight="700" letter-spacing="1" fill="#f59e0b">LEARNING  5 patterns  hooks/ + agents/</text>
+
+      <!-- x=528 w=262 h=44 step=50 -->
+      <rect x="528" y="50" width="262" height="44" rx="3" style="fill:var(--bg-primary)" stroke="#f59e0b" stroke-width="0.7"/>
+      <text x="659" y="64" text-anchor="middle" font-size="8" font-weight="600" fill="#f59e0b">InstinctObserver</text>
+      <text x="659" y="76" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">SESSION_END · bigrams + dominant + rw-pairs</text>
+      <text x="659" y="87" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">instincts table · ECC continuous-learning-v2</text>
+
+      <rect x="528" y="100" width="262" height="44" rx="3" style="fill:var(--bg-primary)" stroke="#f59e0b" stroke-width="0.7"/>
+      <text x="659" y="114" text-anchor="middle" font-size="8" font-weight="600" fill="#f59e0b">ConsolidateAgent</text>
+      <text x="659" y="126" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">timer 30min · SQL convergence + LLM cross-ref</text>
+      <text x="659" y="137" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">instinct_insights · Source: Google AOMA</text>
+
+      <rect x="528" y="150" width="262" height="44" rx="3" style="fill:var(--bg-primary)" stroke="#f59e0b" stroke-width="0.7"/>
+      <text x="659" y="164" text-anchor="middle" font-size="8" font-weight="600" fill="#f59e0b">EvolutionScheduler (GA)</text>
+      <text x="659" y="176" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">nightly 02:00 · genome evolution workflows</text>
+      <text x="659" y="187" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">top-3 proposals for human review · Redis leader election</text>
+
+      <rect x="528" y="200" width="262" height="44" rx="3" style="fill:var(--bg-primary)" stroke="#f59e0b" stroke-width="0.7"/>
+      <text x="659" y="214" text-anchor="middle" font-size="8" font-weight="600" fill="#f59e0b">RLPolicy (Q-learning)</text>
+      <text x="659" y="226" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">offline batch on rl_experience table</text>
+      <text x="659" y="237" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">phase-start: keep | switch_parallel | ... · confidence 0-1</text>
+
+      <rect x="528" y="250" width="262" height="44" rx="3" style="fill:var(--bg-primary)" stroke="#f59e0b" stroke-width="0.7"/>
+      <text x="659" y="264" text-anchor="middle" font-size="8" font-weight="600" fill="#f59e0b">evolve_instincts</text>
+      <text x="659" y="276" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">cluster instincts confidence >=0.6 by domain</text>
+      <text x="659" y="287" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">skill YAML files · Source: ECC /evolve command</text>
+
+      <text x="659" y="320" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">All wired in server.py startup tasks (factory mode only)</text>
+
+      <!-- ===== QUALITY / SAFETY PANEL (top-right-2) ===== -->
+      <rect x="806" y="26" width="286" height="306" rx="5" style="fill:var(--bg-secondary)" stroke="#ef4444" stroke-width="1.5"/>
+      <rect x="806" y="26" width="286" height="22" rx="5" fill="rgba(239,68,68,0.12)"/>
+      <line x1="806" y1="40" x2="1092" y2="40" stroke="#dc2626" stroke-width="0.7"/>
+      <text x="949" y="40" text-anchor="middle" font-size="8" font-weight="700" letter-spacing="1" fill="#ef4444">QUALITY / SAFETY  4 patterns  agents/ + hooks/</text>
+
+      <!-- x=814 w=270 -->
+      <rect x="814" y="50" width="270" height="56" rx="3" style="fill:var(--bg-primary)" stroke="#ef4444" stroke-width="0.7"/>
+      <text x="949" y="64" text-anchor="middle" font-size="8" font-weight="600" fill="#ef4444">AdversarialGuard</text>
+      <text x="949" y="76" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">L0: deterministic regex 0ms — SLOP/MOCK/FAKE_BUILD</text>
+      <text x="949" y="87" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">L1: semantic LLM 5s · score &lt;5=pass 5-6=soft &gt;=7=reject</text>
+      <text x="949" y="98" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">Swiss Cheese · inside _execute_node() before memory store</text>
+
+      <rect x="814" y="114" width="270" height="56" rx="3" style="fill:var(--bg-primary)" stroke="#ef4444" stroke-width="0.7"/>
+      <text x="949" y="128" text-anchor="middle" font-size="8" font-weight="600" fill="#ef4444">Guardrails</text>
+      <text x="949" y="140" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">critical action interception before tool exec</text>
+      <text x="949" y="151" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">DESTRUCTIVE_FS/GIT/INFRA  block · SENSITIVE  warn</text>
+      <text x="949" y="162" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">logs admin_audit_log · platform_settings toggles</text>
+
+      <rect x="814" y="178" width="270" height="66" rx="3" style="fill:var(--bg-primary)" stroke="#ef4444" stroke-width="0.7"/>
+      <text x="949" y="193" text-anchor="middle" font-size="8" font-weight="600" fill="#ef4444">HookSystem</text>
+      <text x="949" y="205" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">pre_compact · session_start · session_end</text>
+      <text x="949" y="216" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">quality_gate · cost_tracker · instinct_observer</text>
+      <text x="949" y="227" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">wired into executor._execute_tool() call sites</text>
+      <text x="949" y="238" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">Source: ECC · RBAC: blocking PRE_TOOL  security/arch scope</text>
+
+      <rect x="814" y="252" width="270" height="56" rx="3" style="fill:var(--bg-primary)" stroke="#ef4444" stroke-width="0.7"/>
+      <text x="949" y="266" text-anchor="middle" font-size="8" font-weight="600" fill="#ef4444">SkillStocktake</text>
+      <text x="949" y="278" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">audit skill YAMLs: actionability / scope / uniqueness</text>
+      <text x="949" y="289" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">verdicts: Keep | Improve | Update | Retire | Merge</text>
+      <text x="949" y="300" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">GET /api/skills/stocktake · Source: ECC SKILL.md</text>
+
+      <!-- ===== MEMORY PANEL (bottom-right-1) ===== -->
+      <rect x="520" y="340" width="278" height="322" rx="5" style="fill:var(--bg-secondary)" stroke="#a855f7" stroke-width="1.5"/>
+      <rect x="520" y="340" width="278" height="22" rx="5" fill="rgba(168,85,247,0.12)"/>
+      <line x1="520" y1="354" x2="798" y2="354" stroke="#7c3aed" stroke-width="0.7"/>
+      <text x="659" y="354" text-anchor="middle" font-size="8" font-weight="700" letter-spacing="1" fill="#a855f7">MEMORY  5 patterns  platform/memory/</text>
+
+      <!-- x=528 w=262 h=42 step=48 -->
+      <rect x="528" y="362" width="262" height="42" rx="3" style="fill:var(--bg-primary)" stroke="#a855f7" stroke-width="0.7"/>
+      <text x="659" y="376" text-anchor="middle" font-size="8" font-weight="600" fill="#a855f7">MemoryManager</text>
+      <text x="659" y="388" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">project FTS5 + global FTS5 + vector layers</text>
+      <text x="659" y="398" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">short-term: per-agent sliding window 50 msgs</text>
+
+      <rect x="528" y="410" width="262" height="42" rx="3" style="fill:var(--bg-primary)" stroke="#a855f7" stroke-width="0.7"/>
+      <text x="659" y="424" text-anchor="middle" font-size="8" font-weight="600" fill="#a855f7">VectorMemory</text>
+      <text x="659" y="436" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">embeddings (OpenAI-compat) + cosine sim</text>
+      <text x="659" y="446" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">fallback: FTS5 keyword search if no provider</text>
+
+      <rect x="528" y="458" width="262" height="42" rx="3" style="fill:var(--bg-primary)" stroke="#a855f7" stroke-width="0.7"/>
+      <text x="659" y="472" text-anchor="middle" font-size="8" font-weight="600" fill="#a855f7">MemoryCompactor</text>
+      <text x="659" y="484" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">nightly 03:00 · prune stale · compress oversized</text>
+      <text x="659" y="494" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">re-score global · dedup same-key entries</text>
+
+      <rect x="528" y="506" width="262" height="42" rx="3" style="fill:var(--bg-primary)" stroke="#a855f7" stroke-width="0.7"/>
+      <text x="659" y="520" text-anchor="middle" font-size="8" font-weight="600" fill="#a855f7">InboxWatcher</text>
+      <text x="659" y="532" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">poll ./inbox/ 10s · LLM extract  memory_global</text>
+      <text x="659" y="542" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">POST /api/memory/ingest · Source: Google AOMA</text>
+
+      <rect x="528" y="554" width="262" height="42" rx="3" style="fill:var(--bg-primary)" stroke="#a855f7" stroke-width="0.7"/>
+      <text x="659" y="568" text-anchor="middle" font-size="8" font-weight="600" fill="#a855f7">QueryAgent</text>
+      <text x="659" y="580" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">GET /api/memory/query?q= · LLM synthesis</text>
+      <text x="659" y="590" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">[MEM-N] / [INST-N] / [INSIGHT-N] citations · Google AOMA</text>
+
+      <text x="659" y="648" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">Tables: memory_project · memory_global · instincts · instinct_insights · vectors</text>
+
+      <!-- ===== OPS PANEL (bottom-right-2) ===== -->
+      <rect x="806" y="340" width="286" height="322" rx="5" style="fill:var(--bg-secondary)" stroke="#22c55e" stroke-width="1.5"/>
+      <rect x="806" y="340" width="286" height="22" rx="5" fill="rgba(34,197,94,0.12)"/>
+      <line x1="806" y1="354" x2="1092" y2="354" stroke="#16a34a" stroke-width="0.7"/>
+      <text x="949" y="354" text-anchor="middle" font-size="8" font-weight="700" letter-spacing="1" fill="#22c55e">OPS  4 patterns  platform/ops/</text>
+
+      <!-- x=814 w=270 h=60 step=66 -->
+      <rect x="814" y="362" width="270" height="60" rx="3" style="fill:var(--bg-primary)" stroke="#22c55e" stroke-width="0.7"/>
+      <text x="949" y="377" text-anchor="middle" font-size="8" font-weight="600" fill="#22c55e">AutoHeal</text>
+      <text x="949" y="389" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">scan platform_incidents every 60s · group by error_type</text>
+      <text x="949" y="400" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">epic  TMA workflow: diagnose / fix / verify / close</text>
+      <text x="949" y="411" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">ops/auto_heal.py</text>
+
+      <rect x="814" y="428" width="270" height="60" rx="3" style="fill:var(--bg-primary)" stroke="#22c55e" stroke-width="0.7"/>
+      <text x="949" y="443" text-anchor="middle" font-size="8" font-weight="600" fill="#22c55e">ChaosEndurance</text>
+      <text x="949" y="455" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">random chaos scenario every 2-6h</text>
+      <text x="949" y="466" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">execute · measure MTTR  chaos_runs table</text>
+      <text x="949" y="477" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">ops/chaos_endurance.py · standalone: --once</text>
+
+      <rect x="814" y="494" width="270" height="60" rx="3" style="fill:var(--bg-primary)" stroke="#22c55e" stroke-width="0.7"/>
+      <text x="949" y="509" text-anchor="middle" font-size="8" font-weight="600" fill="#22c55e">EnduranceWatchdog</text>
+      <text x="949" y="521" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">every 60s: stalls &gt;15min  retry · zombies · disk &gt;90%  cleanup</text>
+      <text x="949" y="532" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">LLM health probe · daily report generation</text>
+      <text x="949" y="543" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">ops/endurance_watchdog.py</text>
+
+      <rect x="814" y="560" width="270" height="60" rx="3" style="fill:var(--bg-primary)" stroke="#22c55e" stroke-width="0.7"/>
+      <text x="949" y="575" text-anchor="middle" font-size="8" font-weight="600" fill="#22c55e">A2A Bus</text>
+      <text x="949" y="587" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">pub/sub per-agent queues + DB persistence + SSE bridge</text>
+      <text x="949" y="598" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">Redis pub/sub optional · PG NOTIFY/LISTEN cross-node</text>
+      <text x="949" y="609" text-anchor="middle" font-size="6" style="fill:var(--text-secondary)">a2a/bus.py · Linux Foundation A2A v1.0 · ex-ACP BeeAI/IBM</text>
+
+      <text x="949" y="648" text-anchor="middle" font-size="6.5" style="fill:var(--text-secondary)">All started in server.py lifespan · circuit breaker + provider fallback in llm/router</text>
+
+      <!-- ===== CROSS-PANEL ARROWS ===== -->
+      <!-- Orch  Learning: session data feeds learning (short horizontal gap) -->
+      <line x1="512" y1="150" x2="520" y2="150" stroke="#f59e0b" stroke-width="1.4" marker-end="url(#pm-a)"/>
+      <line x1="512" y1="110" x2="520" y2="110" stroke="#ef4444" stroke-width="1.4" marker-end="url(#pm-r)"/>
+
+      <!-- Learning  Memory: instincts flow downward (crosses panel border) -->
+      <path d="M 659 320 L 659 348" stroke="#a855f7" stroke-width="1.4" fill="none" marker-end="url(#pm-p)"/>
+
+      <!-- Q/S  Memory: hook events feed memory (diagonal cross) -->
+      <path d="M 949 332 Q 880 336 798 430" stroke="#a855f7" stroke-width="1.1" fill="none" marker-end="url(#pm-p)" opacity="0.6"/>
+
+      <!-- Ops  Orch: auto-heal missions use orch patterns -->
+      <path d="M 806 462 Q 620 530 512 390" stroke="#22c55e" stroke-width="1.1" fill="none" marker-end="url(#pm-g)" opacity="0.55"/>
+    </svg>
+  </div>
+
+  <!-- 10. Footer KPIs -->
   <div class="kpi-bar" id="kpiBar">
     <div class="kpi-item">
       <span class="kpi-label">TMA Tickets</span>
