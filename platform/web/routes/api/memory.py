@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import html as html_mod
+import json
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 from ...schemas import MemoryStats
@@ -146,6 +147,217 @@ async def memory_health():
     from ....memory.compactor import get_memory_health
 
     return JSONResponse(get_memory_health())
+
+
+@router.post("/api/memory/ingest")
+async def memory_ingest(request: Request):
+    """Ingest raw text into platform memory (memory_global, category='inbox').
+
+    SOURCE: GoogleCloudPlatform/generative-ai always-on-memory-agent (IngestAgent)
+            https://github.com/GoogleCloudPlatform/generative-ai/tree/main/gemini/agents/always-on-memory-agent
+    WHY: Always-on-memory-agent's IngestAgent extracts summary+entities+topics+importance
+         from any text and stores it as structured memory. We expose the same flow via HTTP
+         so agents and the CLI can push artifacts without dropping files in inbox/.
+
+    Body: {"text": "...", "source"?: "...", "filename"?: "..."}
+    Returns: {id, summary, entities, topics, importance, stored}
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    text = body.get("text", "").strip()
+    if not text:
+        return JSONResponse({"error": "text is required"}, status_code=400)
+
+    from ....memory.inbox import ingest_text
+
+    result = await ingest_text(
+        content=text,
+        source=body.get("source", "api"),
+        filename=body.get("filename", "input.txt"),
+    )
+    return JSONResponse(result)
+
+
+@router.get("/api/memory/query")
+async def memory_query(q: str = "", limit_memory: int = 30, limit_instincts: int = 20):
+    """LLM-synthesized answer over all platform memory + instincts + insights.
+
+    SOURCE: GoogleCloudPlatform/generative-ai always-on-memory-agent (QueryAgent)
+            https://github.com/GoogleCloudPlatform/generative-ai/tree/main/gemini/agents/always-on-memory-agent
+    WHY: Their QueryAgent reads ALL memories + consolidation insights and synthesizes
+         a natural language answer with source citations. We had no such cross-layer
+         synthesis endpoint — only per-layer keyword search. This adds LLM reasoning
+         over the accumulated platform knowledge base.
+
+    Reads: memory_global + instincts (top by confidence) + instinct_insights
+    Returns: {answer, sources: [{type, id, excerpt}]}
+    """
+    if not q:
+        return JSONResponse({"error": "q parameter is required"}, status_code=400)
+
+    # 1. Load memory_global
+    memories: list[dict] = []
+    try:
+        from ....memory.manager import get_memory_manager
+
+        mm = get_memory_manager()
+        memories = mm.global_search(q, limit=limit_memory) or mm.global_get(
+            limit=limit_memory
+        )
+    except Exception as e:
+        logger.warning("memory_query: global_get error: %s", e)
+
+    # 2. Load instincts
+    instincts: list[dict] = []
+    try:
+        from ....db.migrations import get_db
+
+        with get_db() as db:
+            rows = db.execute(
+                """SELECT id, agent_id, trigger, action, domain, confidence
+                   FROM instincts ORDER BY confidence DESC LIMIT ?""",
+                (limit_instincts,),
+            ).fetchall()
+            instincts = [
+                {
+                    "id": r[0],
+                    "agent_id": r[1],
+                    "trigger": r[2],
+                    "action": r[3],
+                    "domain": r[4],
+                    "confidence": r[5],
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.warning("memory_query: instincts error: %s", e)
+
+    # 3. Load instinct_insights
+    insights: list[dict] = []
+    try:
+        with get_db() as db:
+            rows = db.execute(
+                """SELECT id, type, summary, domains, confidence
+                   FROM instinct_insights ORDER BY confidence DESC LIMIT 20"""
+            ).fetchall()
+            insights = [
+                {
+                    "id": r[0],
+                    "type": r[1],
+                    "summary": r[2],
+                    "domains": r[3],
+                    "confidence": r[4],
+                }
+                for r in rows
+            ]
+    except Exception as e:
+        logger.warning("memory_query: insights error: %s", e)
+
+    if not memories and not instincts and not insights:
+        return JSONResponse({"answer": "No platform memory found yet.", "sources": []})
+
+    # 4. Build context for LLM
+    sections = []
+
+    if memories:
+        mem_lines = []
+        for i, m in enumerate(memories[:20]):
+            val = m.get("value", "") or m.get("content", "")
+            try:
+                parsed = json.loads(val) if val.startswith("{") else {}
+                val = parsed.get("summary", val)
+            except Exception:
+                pass
+            mem_lines.append(f"[MEM-{i}] {m.get('key', '?')}: {str(val)[:200]}")
+        sections.append("PLATFORM MEMORY:\n" + "\n".join(mem_lines))
+
+    if instincts:
+        inst_lines = [
+            f"[INST-{i}] agent={v['agent_id']} domain={v['domain']} "
+            f"conf={v['confidence']:.1f}: {v['trigger']} → {v['action'][:80]}"
+            for i, v in enumerate(instincts[:15])
+        ]
+        sections.append(
+            "AGENT INSTINCTS (learned behaviors):\n" + "\n".join(inst_lines)
+        )
+
+    if insights:
+        ins_lines = [
+            f"[INSIGHT-{i}] [{v['type']}] conf={v['confidence']:.1f}: {v['summary']}"
+            for i, v in enumerate(insights[:10])
+        ]
+        sections.append("CROSS-AGENT INSIGHTS:\n" + "\n".join(ins_lines))
+
+    context = "\n\n".join(sections)
+    prompt = f"""You are a platform knowledge assistant. Answer the question using ONLY the provided context.
+Cite your sources using [MEM-N], [INST-N], or [INSIGHT-N] references.
+
+{context}
+
+QUESTION: {q}
+
+Answer concisely with citations. If the context doesn't contain relevant info, say so."""
+
+    # 5. LLM synthesis
+    answer = "Unable to synthesize answer."
+    sources = []
+    try:
+        from ....llm.client import LLMClient, LLMMessage
+
+        client = LLMClient()
+        resp = await client.chat(
+            messages=[LLMMessage(role="user", content=prompt)],
+            temperature=0.3,
+            max_tokens=1024,
+        )
+        answer = resp.content.strip()
+
+        # Build sources list from cited references in answer
+        import re
+
+        cited_mems = {int(m) for m in re.findall(r"\[MEM-(\d+)\]", answer)}
+        cited_inst = {int(m) for m in re.findall(r"\[INST-(\d+)\]", answer)}
+        cited_ins = {int(m) for m in re.findall(r"\[INSIGHT-(\d+)\]", answer)}
+
+        for i in sorted(cited_mems):
+            if i < len(memories):
+                m = memories[i]
+                sources.append(
+                    {
+                        "type": "memory",
+                        "id": m.get("key", ""),
+                        "excerpt": str(m.get("value", ""))[:150],
+                    }
+                )
+        for i in sorted(cited_inst):
+            if i < len(instincts):
+                v = instincts[i]
+                sources.append(
+                    {
+                        "type": "instinct",
+                        "id": v["id"][:8],
+                        "excerpt": f"{v['trigger']} → {v['action'][:80]}",
+                    }
+                )
+        for i in sorted(cited_ins):
+            if i < len(insights):
+                v = insights[i]
+                sources.append(
+                    {
+                        "type": "insight",
+                        "id": v["id"][:8],
+                        "excerpt": v["summary"][:150],
+                    }
+                )
+
+    except Exception as e:
+        logger.error("memory_query: LLM call failed: %s", e)
+        answer = f"LLM synthesis failed: {e}"
+
+    return JSONResponse({"answer": answer, "sources": sources})
 
 
 @router.post("/api/memory/compact")

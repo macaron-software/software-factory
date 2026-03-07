@@ -606,6 +606,32 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Failed to start evolution scheduler: %s", e)
 
+    # Cross-instinct consolidation timer + inbox watcher
+    # SOURCE: GoogleCloudPlatform/generative-ai always-on-memory-agent
+    #   https://github.com/GoogleCloudPlatform/generative-ai/tree/main/gemini/agents/always-on-memory-agent
+    # WHY: ConsolidateAgent (every 30min) finds cross-agent instinct connections.
+    #      IngestAgent watches ./inbox/ for artifacts → structured memory_global.
+    if _mode != "ui":
+        try:
+            from .hooks.consolidate import start_consolidation_timer as _consol
+
+            _asyncio.create_task(_consol())
+            logger.info(
+                "Instinct consolidation timer started (interval=%ds)",
+                int(os.environ.get("CONSOLIDATION_INTERVAL", 1800)),
+            )
+        except Exception as e:
+            logger.warning("Failed to start consolidation timer: %s", e)
+        try:
+            from .memory.inbox import start_inbox_watcher as _inbox
+
+            _asyncio.create_task(_inbox())
+            logger.info(
+                "Inbox watcher started (dir=%s)", os.environ.get("INBOX_DIR", "./inbox")
+            )
+        except Exception as e:
+            logger.warning("Failed to start inbox watcher: %s", e)
+
     # Redis pub/sub: connect bus and start cross-process listener
     _redis_url = os.environ.get("REDIS_URL")
     if _redis_url:

@@ -1081,6 +1081,25 @@ def _ensure_darwin_tables(conn) -> None:
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS instinct_insights (
+            id TEXT PRIMARY KEY,
+            type TEXT NOT NULL,
+            instinct_ids TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            domains TEXT NOT NULL,
+            confidence REAL DEFAULT 0.5,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_insights_type ON instinct_insights(type)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_insights_conf ON instinct_insights(confidence DESC)"
+    )
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS instincts (
             id TEXT PRIMARY KEY,
             agent_id TEXT,
