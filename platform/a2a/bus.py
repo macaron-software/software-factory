@@ -423,6 +423,14 @@ class MessageBus:
                         logger.debug("Redis message parse error: %s", exc)
             except asyncio.CancelledError:
                 return
+            except RuntimeError as exc:
+                # Python 3.12+: aclose() called on a running async generator (shutdown race)
+                if "aclose" in str(exc) or "asynchronous generator" in str(exc):
+                    return
+                logger.warning(
+                    "Redis listener RuntimeError (%s) — reconnecting in 5s", exc
+                )
+                await asyncio.sleep(5)
             except Exception as exc:
                 logger.warning("Redis listener error (%s) — reconnecting in 5s", exc)
                 await asyncio.sleep(5)

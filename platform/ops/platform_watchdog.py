@@ -285,9 +285,7 @@ async def resume_stuck_ac_cycles() -> int:
     """
     resumed = 0
     try:
-        from ..web.routes.pages import _ac_get_db, _ac_ensure_tables, _AC_PROJECTS
-
-        valid_ids = {p["id"] for p in _AC_PROJECTS}
+        from ..web.routes.pages import _ac_get_db, _ac_ensure_tables
 
         def _find_stuck():
             conn = _ac_get_db()
@@ -297,13 +295,18 @@ async def resume_stuck_ac_cycles() -> int:
                     "SELECT project_id, current_run_id, current_cycle, status "
                     "FROM ac_project_state WHERE status='running' AND current_run_id IS NOT NULL"
                 ).fetchall()
+                # valid_ids = all project_ids that exist in ac_project_state (DB-driven)
+                valid = {
+                    r["project_id"] if hasattr(r, "__getitem__") else r[0] for r in rows
+                }
             except Exception:
                 rows = []
+                valid = set()
             finally:
                 conn.close()
-            return rows
+            return rows, valid
 
-        stuck = await asyncio.to_thread(_find_stuck)
+        stuck, valid_ids = await asyncio.to_thread(_find_stuck)
 
         for row in stuck:
             project_id = row["project_id"] if hasattr(row, "__getitem__") else row[0]
@@ -312,9 +315,11 @@ async def resume_stuck_ac_cycles() -> int:
             if project_id not in valid_ids:
                 continue
 
-            # Check if an asyncio task is already running for this run
+            # Check if an asyncio task is already running for this session
             from ..web.routes.epics.execution import _active_mission_tasks
 
+            # _active_mission_tasks is keyed by session_id; run_id is the mission/epic id.
+            # Check both to avoid duplicate tasks.
             if run_id in _active_mission_tasks:
                 continue  # already running
 
