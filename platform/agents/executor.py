@@ -1066,7 +1066,29 @@ class AgentExecutor:
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
             # Retry once with backoff for transient LLM errors
+            # Skip retry if all providers are in long cooldown (quota exhaustion)
             if is_llm_error and not getattr(ctx, "_retried", False):
+                min_cooldown = min(
+                    (
+                        max(0, cd - time.monotonic())
+                        for cd in self._llm._provider_cooldown.values()
+                    ),
+                    default=0,
+                )
+                if min_cooldown > 300:
+                    # All providers in quota cooldown — no point retrying soon
+                    elapsed = int((time.monotonic() - t0) * 1000)
+                    logger.warning(
+                        "Agent %s skipping retry — providers in cooldown for %ds",
+                        agent.id,
+                        int(min_cooldown),
+                    )
+                    return ExecutionResult(
+                        content=f"Error: {exc}",
+                        agent_id=agent.id,
+                        duration_ms=elapsed,
+                        error=str(exc),
+                    )
                 ctx._retried = True  # type: ignore[attr-defined]
                 wait = 30 + (time.monotonic() % 30)  # 30-60s jittered backoff
                 logger.warning(
@@ -1634,7 +1656,32 @@ class AgentExecutor:
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
             # Retry once with backoff for transient LLM errors
+            # Skip retry if all providers are in long cooldown (quota exhaustion)
             if is_llm_error and not getattr(ctx, "_stream_retried", False):
+                min_cooldown = min(
+                    (
+                        max(0, cd - time.monotonic())
+                        for cd in self._llm._provider_cooldown.values()
+                    ),
+                    default=0,
+                )
+                if min_cooldown > 300:
+                    elapsed = int((time.monotonic() - t0) * 1000)
+                    logger.warning(
+                        "Agent %s streaming: skipping retry — providers in cooldown for %ds",
+                        agent.id,
+                        int(min_cooldown),
+                    )
+                    yield (
+                        "result",
+                        ExecutionResult(
+                            content=f"Error: {exc}",
+                            agent_id=agent.id,
+                            duration_ms=elapsed,
+                            error=str(exc),
+                        ),
+                    )
+                    return
                 ctx._stream_retried = True  # type: ignore[attr-defined]
                 wait = 30 + (time.monotonic() % 30)
                 logger.warning(

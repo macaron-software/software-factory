@@ -682,8 +682,13 @@ class LLMClient:
                         or "ConnectError" in err_str
                         or "RemoteProtocolError" in err_str
                     )
-                    if attempt < max_attempts - 1 and (
-                        is_transient or (is_rate_limit and not _is_azure)
+                    is_quota_exhausted = (
+                        is_rate_limit and "usage limit exceeded" in err_str.lower()
+                    )
+                    if (
+                        attempt < max_attempts - 1
+                        and not is_quota_exhausted
+                        and (is_transient or (is_rate_limit and not _is_azure))
                     ):
                         import random
 
@@ -721,9 +726,9 @@ class LLMClient:
                     except Exception:
                         pass
                     if is_rate_limit:
-                        # "usage limit exceeded" → 60s cooldown; generic 429 → 30s
+                        # quota exhausted → long cooldown (4h windows); generic 429 → 30s
                         is_quota_exhausted = "usage limit exceeded" in err_str.lower()
-                        cd = 60 if is_quota_exhausted else 30
+                        cd = 3600 if is_quota_exhausted else 30
                         self._provider_cooldown[prov] = time.monotonic() + cd
                         logger.warning(
                             "LLM %s → cooldown %ds (%s), falling back to next provider",
@@ -731,6 +736,8 @@ class LLMClient:
                             cd,
                             "quota exhausted" if is_quota_exhausted else "rate limited",
                         )
+                        if is_quota_exhausted:
+                            break  # skip remaining retries — quota won't recover in seconds
                 continue
 
         raise RuntimeError(f"All LLM providers failed for {provider}/{model}")
@@ -1073,8 +1080,13 @@ class LLMClient:
                         or "RemoteProtocolError" in err_str
                         or "ServerDisconnected" in err_str
                     )
-                    if attempt < max_attempts - 1 and (
-                        (is_rate_limit and not _is_azure) or is_transient
+                    is_quota_exhausted_stream = (
+                        is_rate_limit and "usage limit exceeded" in err_str.lower()
+                    )
+                    if (
+                        attempt < max_attempts - 1
+                        and not is_quota_exhausted_stream
+                        and ((is_rate_limit and not _is_azure) or is_transient)
                     ):
                         import random
 
@@ -1099,7 +1111,7 @@ class LLMClient:
                     self._cb_record_failure(prov)
                     if is_rate_limit:
                         is_quota_exhausted = "usage limit exceeded" in err_str.lower()
-                        cd = 60 if is_quota_exhausted else 30
+                        cd = 3600 if is_quota_exhausted else 30
                         self._provider_cooldown[prov] = time.monotonic() + cd
                         logger.warning(
                             "LLM %s stream → cooldown %ds (%s)",
