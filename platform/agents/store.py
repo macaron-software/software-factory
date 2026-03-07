@@ -1456,7 +1456,10 @@ class AgentStore:
                     "  → C'est la RESPONSABILITÉ de cet agent — ne pas signaler à la SF\n"
                     "VETO si : a11y Lighthouse < 95, axe-core critical violation, W3C error, E2E failing, screenshots manquants.\n"
                     "Output : QA_REPORT_{N}.md avec tous les scores, screenshots référencés, findings.\n"
-                    "Jamais de 'ça devrait marcher' — seulement des résultats mesurés."
+                    "Jamais de 'ça devrait marcher' — seulement des résultats mesurés.\n"
+                    "INTERDIT ABSOLU : ne JAMAIS écrire package.json, docker-compose.yml, src/*, ou tout fichier de code source.\n"
+                    "code_write est UNIQUEMENT autorisé pour QA_REPORT_{N}.md et le Dockerfile du projet (correction Chromium uniquement).\n"
+                    "Si docker_deploy échoue et que ce n'est PAS un problème Chromium → VETO immédiat, ne pas corriger le code."
                 ),
             ),
             AgentDef(
