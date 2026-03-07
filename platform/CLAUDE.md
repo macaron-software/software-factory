@@ -66,6 +66,42 @@ Health probes      /api/health      DB+Redis checks, returns checks:{db, redis}
                    nginx: max_fails=2 fail_timeout=10s + proxy_next_upstream http_503
 ```
 
+## DOCKER BUBBLE (platform/projects/container.py · sandbox.py · docker-compose.dev.yml)
+```
+Pattern: platform bubble (Debian 13) → docker.sock (via proxy) → docker exec sf-{id} cmd
+NO DinD. Platform parle au daemon HOST. Agents exec dans le container PROJET persistant.
+
+Container projet:  sf-{project_id}          (long-running, sleep infinity)
+Volume projet:     sf-workspace-{project_id} (persiste entre appels — node_modules, venv, cargo)
+Image:             sf-{id}:latest si Dockerfile, sinon auto-detect (node/python/rust/go/java)
+Landlock:          dans le container projet (Debian bookworm/trixie) — double isolation
+
+Flux agent:
+  ensure_running() → docker exec sf-{id} sh -c cmd → ContainerResult(stdout/stderr/exit_code)
+  Fallback: direct subprocess si docker exec échoue
+
+Cycle de vie complet (ProjectContainer):
+  DEV:    pc.ensure_running() + pc.exec("pytest tests/")
+  BUILD:  pc.build() → image sf-{id}:latest
+  PUSH:   pc.push(registry="registry.example.com")
+  DEPLOY: image → docker run VPS / kubectl
+
+run_in_project_docker() dans sandbox.py utilise ProjectContainer.exec() (était docker run --rm)
+
+Socket proxy (docker-compose.dev.yml):
+  tecnativa/docker-socket-proxy → whitelist: CONTAINERS+EXEC+IMAGES+BUILD+POST
+  Interdit: DELETE·VOLUMES·NETWORKS·SWARM·SECRETS
+  Réseau sf-internal (platform+DB) / sf-projects (platform+containers projet)
+
+Dockerfiles:
+  Dockerfile.platform      → python:3.13-slim, docker-cli only, rtk, Node 22
+  Dockerfile.project.node  → node:lts-bookworm-slim, user agent, sleep infinity
+  Dockerfile.project.python → python:3.12-slim-bookworm, idem
+  Dockerfile.project.rust  → rust:1-slim-bookworm, idem
+
+Commit: 4bed041c3 (feat(bubble))
+```
+
 ## DEPLOY (Azure VM 4.233.64.30 — Docker)
 ```bash
 SSH_KEY="$HOME/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"
