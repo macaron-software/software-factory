@@ -487,6 +487,11 @@ async def _run_workflow_background(
                     " WHERE project_id=? AND status='running'",
                     (_dt.utcnow().isoformat(), project_id),
                 )
+                # Also mark session as completed so the watchdog doesn't resume it
+                _db2.execute(
+                    "UPDATE sessions SET status='completed' WHERE id=? AND status IN ('interrupted','active','running')",
+                    (session_id,),
+                )
                 _db2.commit()
                 logger.warning(
                     "AC cycle gated/failed — reset project %s to idle (run=%s)",
