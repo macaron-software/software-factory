@@ -808,6 +808,7 @@ async def _execute_node(
             or "tdd" in role_lower
             or "coder" in role_lower
             or "implementer" in role_lower
+            or "ac architect" in role_lower
         ):
             full_task += _EXEC_PROTOCOL
             full_task += "\n\n" + _PR_PROTOCOL
