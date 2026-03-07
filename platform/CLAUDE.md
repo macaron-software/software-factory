@@ -439,34 +439,52 @@ Métrique "Score par cycle" : barre orange = 1 seul cycle → normal (cold_start
 ## SECURITY — arXiv:2602.20021 Mitigations
 
 **Reference:** "Red-Teaming Autonomous LLM Agents in Live Labs" (arXiv:2602.20021, Feb 2026)
-Documented 11 vulnerability classes in multi-agent systems. Our mitigations:
+11 case studies of red-teaming autonomous LLM agents. Full coverage (11/11 CS addressed):
 
-### Threat Model & Design Decisions
+### Case Study → Mitigation Map
 
-| Threat | Mitigation | File |
-|---|---|---|
-| SBD-02/03 Info disclosure | Sensitive file blocklist on code_read/write (.env, *.key, *.pem, SSH) | `tools/code_tools.py` |
-| SBD-04 DoS / resource abuse | `RESOURCE_ABUSE` L0 (+7), busy-loops/fork-bombs | `agents/adversarial.py` |
-| SBD-05 Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` hard budget per agent run | `agents/executor.py` |
-| SBD-06 Identity spoofing | A2A from_agent validation + `IDENTITY_CLAIM` L0 (+7) | `a2a/bus.py`, `adversarial.py` |
-| SBD-07/10 Cross-agent propagation | Memory write sanitization (`sanitize_agent_output`) | `memory/manager.py` |
-| SBD-08 Destructive actions | Sensitive file blocklist + audit trail on code_write | `tools/code_tools.py`, `security/audit.py` |
-| SBD-09 Prompt injection | `PROMPT_INJECTION` L0 (+8) in output + tool results | `agents/adversarial.py` |
-| SBD-11 Partial takeover | Memory sanitization + 8K value cap | `memory/manager.py` |
-| SBD-11 Fake completion | `FAKE_BUILD`/`MOCK`/`HALLUCINATION` L0 (pre-existing) | `agents/adversarial.py` |
-| SBD-01 Unauthorized compliance | A2A scope delegation check (log-only) | `a2a/bus.py` |
+| CS | Threat | Mitigation | File |
+|---|---|---|---|
+| CS1 Disproportionate response | Destructive self-action via social engineering | `RESOURCE_ABUSE` L0 + `MAX_TOOL_CALLS` | `adversarial.py`, `executor.py` |
+| CS2 Non-owner compliance (SBD-01) | Agents comply with non-owner instructions | A2A `_check_delegation_scope()` + owner_id | `a2a/bus.py` |
+| CS3 PII disclosure | Sensitive data embedded in output/code | `PII_LEAK` L0 (+7) + sensitive file blocklist | `adversarial.py`, `code_tools.py` |
+| CS4 Resource looping (SBD-04) | Induced infinite loops consuming resources | `RESOURCE_ABUSE` L0 (+7) — busy-loops, fork bombs | `adversarial.py` |
+| CS5 DoS storage (SBD-05) | Mass storage creation without bound | `MAX_TOOL_CALLS_PER_RUN=50` hard budget | `executor.py` |
+| CS6 Provider values | LLM provider biases silently alter behavior | **Intentionally not mitigated** — inherent to LLM | N/A |
+| CS7 Agent harm (SBD-08) | Destructive file ops under manipulation | Sensitive file blocklist + audit trail | `code_tools.py`, `security/audit.py` |
+| CS8 Identity spoofing (SBD-06) | Cross-channel display-name spoofing | A2A `from_agent` validation + `IDENTITY_CLAIM` L0 | `a2a/bus.py`, `adversarial.py` |
+| CS9 Cross-agent capability transfer | Unsafe skill propagation between agents | Memory sanitization limits poisoned knowledge | `memory/manager.py` |
+| CS10 Agent corruption via external resource | Gist/Pastebin URL in memory → remote injection | `EXTERNAL_RESOURCE` L0 (+6) + WARNING log on write | `adversarial.py`, `memory/manager.py` |
+| CS11 Libelous broadcast | Mass email/post after impersonation | `IDENTITY_CLAIM` L0 + `MAX_TOOL_CALLS` (no outbound tools) | `adversarial.py`, `executor.py` |
+
+### SBD Code → Implementation
+
+| SBD | Description | Mitigation | Score |
+|---|---|---|---|
+| SBD-02/03 | Info disclosure | `_SENSITIVE_FILE_RE` blocklist on read/write | block |
+| SBD-04 | DoS / resource abuse | `RESOURCE_ABUSE` L0 | +7 |
+| SBD-05 | Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` | hard stop |
+| SBD-06 | Identity spoofing | `from_agent` + `IDENTITY_CLAIM` L0 | +7 |
+| SBD-07/10 | Cross-agent propagation | `sanitize_agent_output` on all memory writes | strip |
+| SBD-08 | Destructive actions | Blocklist + `audit_log` | block+log |
+| SBD-09 | Prompt injection | `PROMPT_INJECTION` L0 in output + tool results | +8/+6 |
+| SBD-11 | Fake completion | `FAKE_BUILD`/`MOCK`/`HALLUCINATION` (pre-existing) | +4/+7 |
+| SBD-01 | Unauthorized compliance | A2A `_check_delegation_scope()` (log-only) | log |
 
 ### Swiss Cheese Defense Model
 ```
-L0 adversarial (deterministic, 0ms)  → code quality + HARDCODED_SECRET + PROMPT_INJECTION + IDENTITY_CLAIM + RESOURCE_ABUSE
+L0 adversarial (deterministic, 0ms)  → PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE
+                                        EXTERNAL_RESOURCE · PII_LEAK · HARDCODED_SECRET
 L1 adversarial (LLM semantic, ~5s)   → holistic review
-Tool guards (sync, before execution) → sensitive file blocklist, tool budget
-Memory sanitization (on write)       → strip injection from shared state
-A2A validation (on publish)          → from_agent identity check + scope logging
-Audit trail                          → admin_audit_log table on destructive actions
+Tool guards (sync, before execution) → path/file blocklist, tool budget
+Memory sanitization (on write)       → sanitize_agent_output + URL warning (CS10)
+A2A validation (on publish)          → from_agent identity + scope logging
+Audit trail                          → admin_audit_log on destructive actions
 ```
 
 ### Intentional Non-Mitigations
-- **A2A hard-block** on unknown `from_agent` — log-only (would break cross-session delegation patterns)
-- **Landlock/Docker per agent** — Phase 3+ initiative (scope hierarchy plan)
-- **RBAC at runtime tool dispatch** — separate initiative (scope hierarchy plan)
+- **CS6 — Provider values**: LLM provider biases/refusals are intrinsic to the model, not observable at platform level. No mitigation possible; monitor via L1 adversarial reviews.
+- **No hard-block on A2A from_agent mismatch** — would break legitimate cross-session delegation (log+flag instead)
+- **No Landlock/Docker per agent** — Phase 3+ (scope hierarchy plan)
+- **No RBAC at runtime tool dispatch** — separate initiative (scope hierarchy plan)
+- **No PII scrubbing on output text** — only code_write scanned; full NLP PII detection is Phase 3+

@@ -322,6 +322,35 @@ _RESOURCE_ABUSE_PATTERNS = [
     (r"""time\.sleep\s*\(\s*0\s*\)""", "sleep(0) busy-wait pattern"),
 ]
 
+# REF: arXiv:2602.20021 — CS10: Agent Corruption via external linked resources.
+# An agent convinced to store a URL to an externally-editable resource (Gist, Pastebin)
+# in persistent memory creates an indirect injection channel: the external content is
+# fetched in future sessions and may contain attacker-modified instructions.
+_EXTERNAL_RESOURCE_PATTERNS = [
+    re.compile(r"https?://gist\.github(?:usercontent)?\.com/", re.I),
+    re.compile(r"https?://pastebin\.com/", re.I),
+    re.compile(r"https?://raw\.githubusercontent\.com/", re.I),
+    re.compile(r"https?://hastebin\.com/", re.I),
+    re.compile(r"https?://ghostbin\.(?:com|co)/", re.I),
+    re.compile(r"https?://paste\.[a-z]{2,6}/", re.I),
+    re.compile(r"https?://(?:dpaste|bpaste|rentry)\.(?:com|org|co)/", re.I),
+]
+
+# REF: arXiv:2602.20021 — CS3: Disclosure of Sensitive Information.
+# PII patterns that should not appear in written code files or agent output.
+_PII_PATTERNS = [
+    (r"\b\d{3}-\d{2}-\d{4}\b", "SSN (Social Security Number) pattern"),
+    (
+        r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b",
+        "Credit card number pattern",
+    ),
+    (r"\bIBAN\s*:?\s*[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b", "IBAN bank account number"),
+    (
+        r"\b(?:patient|medical|health)\s+(?:id|record|number)\s*:?\s*\S{4,}",
+        "Medical record reference",
+    ),
+]
+
 # Stack mismatch detection — backend code in wrong language
 # Maps declared stack keywords to expected/forbidden file extensions
 _STACK_RULES = {
@@ -756,6 +785,43 @@ def check_l0(
                 fp = str(tc.get("args", {}).get("path", "?"))
                 issues.append(f"RESOURCE_ABUSE: {desc} in {fp}")
                 score += 7
+                break
+
+    # EXTERNAL_RESOURCE: CS10 — detect memory writes storing externally-editable URLs.
+    # An agent coerced into storing a Gist/Pastebin URL in memory creates an indirect
+    # injection channel that persists across sessions. REF: arXiv:2602.20021 CS10.
+    for tc in tool_calls or []:
+        if tc.get("name") not in ("memory_store",):
+            continue
+        val = str(
+            tc.get("args", {}).get("value", "") or tc.get("args", {}).get("content", "")
+        )
+        for url_re in _EXTERNAL_RESOURCE_PATTERNS:
+            if url_re.search(val):
+                issues.append(
+                    "EXTERNAL_RESOURCE: memory_store contains externally-editable URL — "
+                    "indirect injection channel risk (arXiv:2602.20021 CS10)"
+                )
+                score += 6  # near-reject — flag for human review
+                break
+
+    # PII_LEAK: CS3 — detect PII patterns in code_write output.
+    # Agents should not embed real SSN/credit-card/IBAN/medical data in written files.
+    # REF: arXiv:2602.20021 CS3: Disclosure of Sensitive Information.
+    for tc in tool_calls or []:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(
+            tc.get("args", {}).get("path", "")
+            or tc.get("args", {}).get("file_path", "")
+        )
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc:
+            continue
+        for pattern, desc in _PII_PATTERNS:
+            if re.search(pattern, fc, re.IGNORECASE):
+                issues.append(f"PII_LEAK: {desc} found in {fp}")
+                score += 7  # hard reject — PII in code is a data protection violation
                 break
 
     threshold = 5  # reject if score >= threshold
