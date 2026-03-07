@@ -708,7 +708,7 @@ _AC_PROJECTS = [
         },
     },
     {
-        "id": "ac-docusign",
+        "id": "ac-docsign-clone",
         "name": "DocuSign Clone",
         "tier": "complex",
         "tier_label": "Complex",
@@ -734,8 +734,8 @@ _AC_PROJECTS = [
         },
     },
     {
-        "id": "ac-ecommerce",
-        "name": "E-Commerce + Solaris",
+        "id": "ac-ecommerce-solaris",
+        "name": "E-commerce + Solaris DS",
         "tier": "enterprise",
         "tier_label": "Enterprise",
         "tech": ["nextjs", "solaris", "stripe", "pg"],
@@ -1064,7 +1064,13 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                         scored = [v for v in phase_scores_dict.values() if v]
                         total_score = sum(scored) // len(scored) if scored else 0
                         # Build a readable fix_summary: prefer deploy/qa retro_notes
-                        _SUMMARY_PRIORITY = ["deploy", "qa-sprint", "adversarial", "tdd-sprint", "inception"]
+                        _SUMMARY_PRIORITY = [
+                            "deploy",
+                            "qa-sprint",
+                            "adversarial",
+                            "tdd-sprint",
+                            "inception",
+                        ]
                         sprint_by_type = {s.type: s for s in sprints}
                         summary_text = ""
                         for ptype in _SUMMARY_PRIORITY:
@@ -1074,7 +1080,9 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                                 break
                         if summary_text:
                             scores_compact = " ".join(
-                                f"{t[:3]}:{v}" for t, v in phase_scores_dict.items() if v
+                                f"{t[:3]}:{v}"
+                                for t, v in phase_scores_dict.items()
+                                if v
                             )
                             fix_summary = f"{summary_text} [{scores_compact}]"[:400]
                         else:
@@ -1084,15 +1092,21 @@ async def workflows_improvement_cycles(request: Request, project_id: str):
                                 if s.quality_score
                             ]
                             if retros:
-                                fix_summary = f"Cycle {cycle_num} — " + " · ".join(retros)
+                                fix_summary = f"Cycle {cycle_num} — " + " · ".join(
+                                    retros
+                                )
                         # Estimate defect_count from adversarial retro_notes
                         adv_sprint = sprint_by_type.get("adversarial")
                         if adv_sprint and adv_sprint.retro_notes:
                             import re as _re
-                            defect_count = len(_re.findall(
-                                r"\b(fail|bug|defect|error|issue|reject)\b",
-                                adv_sprint.retro_notes, _re.IGNORECASE
-                            ))
+
+                            defect_count = len(
+                                _re.findall(
+                                    r"\b(fail|bug|defect|error|issue|reject)\b",
+                                    adv_sprint.retro_notes,
+                                    _re.IGNORECASE,
+                                )
+                            )
                 except Exception:
                     pass
                 import json as _json2
@@ -1226,6 +1240,7 @@ async def api_improvement_start(project_id: str):
     _a11y = "\n".join(f"  - {a}" for a in proj.get("a11y_requirements", []))
     _tokens = "\n".join(f"  {k}: {v}" for k, v in proj.get("design_tokens", {}).items())
     from ...config import DATA_DIR as _DATA_DIR
+
     _workspace = str(_DATA_DIR / "workspaces" / project_id)
     brief = (
         f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
@@ -2033,6 +2048,7 @@ async def api_improvement_screenshot(project_id: str, cycle_num: int):
                     return str(p)
             # Also try absolute path
             from pathlib import Path as _Path
+
             _abs = _Path(screenshot_path)
             if _abs.is_absolute() and _abs.exists():
                 return str(_abs)
@@ -2083,8 +2099,14 @@ async def api_improvement_backfill(project_id: str):
         return updated
 
     deleted = await asyncio.to_thread(_force_backfill)
-    return JSONResponse({"ok": True, "project_id": project_id, "stubs_cleared": deleted,
-                         "message": "Stub cycles cleared. Reload the page to re-backfill from missions."})
+    return JSONResponse(
+        {
+            "ok": True,
+            "project_id": project_id,
+            "stubs_cleared": deleted,
+            "message": "Stub cycles cleared. Reload the page to re-backfill from missions.",
+        }
+    )
 
 
 async def api_improvement_project_state(project_id: str):
