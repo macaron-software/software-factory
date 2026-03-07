@@ -112,6 +112,18 @@ _routing_cache: dict | None = None
 _routing_cache_ts: float = 0.0
 _ROUTING_CACHE_TTL = 60.0  # 1 min
 
+# AC improvement-cycle agents — hardcoded routing (Azure only).
+# These agents have generic role names (e.g. 'AC Architect') that don't match
+# _REASONING/_CODE_ROLES, so they'd silently fall to gpt-5-mini without this.
+_AC_AGENT_ROUTING: dict[str, tuple[str, str]] = {
+    "ac-architect": ("azure-openai", "gpt-5.2"),
+    "ac-adversarial": ("azure-openai", "gpt-5.2"),
+    "ac-coach": ("azure-openai", "gpt-5.2"),
+    "ac-codex": ("azure-openai", "gpt-5.1-codex"),
+    "ac-qa-agent": ("azure-openai", "gpt-5.1"),
+    "ac-cicd-agent": ("azure-openai", "gpt-5.1"),
+}
+
 # Regex to strip raw MiniMax/internal tool-call tokens from LLM output
 _RAW_TOKEN_RE = re.compile(
     r"<\|(?:tool_calls_section_begin|tool_calls_section_end|tool_call_begin|tool_call_end|"
@@ -176,6 +188,11 @@ def _select_model_for_agent(
     _default_model = os.environ.get(
         "PLATFORM_LLM_MODEL", "mlx-community/Qwen3.5-35B-A3B-4bit"
     )
+
+    # Priority -1: AC improvement-cycle agents — hardcoded routing on Azure.
+    # Must come before Priority 0 (agent.model check) so DB resets can't override.
+    if os.environ.get("AZURE_DEPLOY") and agent.id in _AC_AGENT_ROUTING:
+        return _AC_AGENT_ROUTING[agent.id]
 
     # Priority 0: respect explicit agent model from DB.
     # If agent.model is set AND differs from the env default, honour it directly
