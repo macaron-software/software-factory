@@ -41,12 +41,12 @@
 
 Software Factory est une **plateforme multi-agents autonome** qui orchestre l'intégralité du cycle de développement logiciel — de l'idéation au déploiement — en utilisant des agents IA spécialisés travaillant ensemble.
 
-Imaginez une **usine logicielle virtuelle** où 191 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
+Imaginez une **usine logicielle virtuelle** où 192 agents IA collaborent à travers des workflows structurés, suivant la méthodologie SAFe, les pratiques TDD et des portes de qualité automatisées.
 
 ### Points clés
 
-- **191 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
-- **36 workflows intégrés** — cérémonies SAFe, quality gates, maintenance nocturne, sécurité, gestion des connaissances
+- **192 agents spécialisés** — architectes, développeurs, testeurs, SRE, analystes sécurité, product owners
+- **46 workflows intégrés** — cérémonies SAFe, quality gates, maintenance nocturne, sécurité, gestion des connaissances
 - **8 groupes d'idéation** — CTO Jarvis, Business, Projet, Knowledge, Architecture, Sécurité, Data & IA, PI Planning
 - **Cluster multi-nœuds** — topologie master/slave sur PostgreSQL partagé ; load balancing nginx `least_conn` ; badges heartbeat live dans la topbar avec popover diagnostics au clic
 - **Marketplace d'agents** — découvrir et lancer des agents depuis `/marketplace` ; filtrer par ART, rôle ou compétences
@@ -181,7 +181,7 @@ Imaginez une **usine logicielle virtuelle** où 191 agents IA collaborent à tra
 </tr>
 <tr>
 <td width="50%">
-<strong>Workflows — 36 Pipelines Intégrés (/workflows)</strong><br>
+<strong>Workflows — 46 Pipelines Intégrés (/workflows)</strong><br>
 <img src="docs/screenshots/fr/workflows.png" alt="Workflows" width="100%">
 </td>
 <td width="50%">
@@ -294,7 +294,7 @@ Pour chaque groupe : décrivez votre besoin → les agents diffusent leur analys
 
 ### Voie C : Explorer le Marketplace d'Agents
 
-Allez sur `/marketplace` pour découvrir les 191 agents. Filtrez par ART, rôle ou compétences. Cliquez sur un agent pour voir son profil complet — outils, compétences, sessions récentes — et lancer une session directe.
+Allez sur `/marketplace` pour découvrir les 192 agents. Filtrez par ART, rôle ou compétences. Cliquez sur un agent pour voir son profil complet — outils, compétences, sessions récentes — et lancer une session directe.
 
 ### Voie D : Créer un Projet Manuellement
 
@@ -322,7 +322,7 @@ Allez sur `/marketplace` pour découvrir les 191 agents. Filtrez par ART, rôle 
 
 ## Fonctionnalités
 
-### 191 Agents IA Spécialisés
+### 192 Agents IA Spécialisés
 
 Les agents sont organisés en équipes reflétant de vraies organisations logicielles :
 
@@ -490,9 +490,10 @@ Place de marché à tokens pour la composition d'équipes :
 
 Porte de qualité double couche bloquant le code fake/placeholder :
 
-- **L0 Déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations, erreurs de stack
-- **L1 Sémantique LLM** — revue qualité par LLM séparé sur les sorties d'exécution
+- **L0 Déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations, stack mismatches ; **12 mitigations CS** : injection prompt, usurpation identité, PII, traversée chemin, SSRF, budget outils, sanitisation mémoire, validation A2A, audit trail (arXiv:2602.20021 — 50 tests sécurité)
+- **L1 Semi-formel** — revue LLM avec Prémisses (preuves outils) → Trace (carte affirmation↔preuve) → Verdict, certificat de raisonnement ; remontée des affirmations NON VÉRIFIÉES quand aucun outil d'écriture utilisé (arXiv:2603.01896)
 - **Rejet forcé** — hallucinations et erreurs de stack toujours bloquées
+- **86 tests unitaires** — suite couvrant L0/L1 adversarial, raisonnement semi-formel et 12 mitigations sécurité
 
 ### Auto-Documentation & Wiki
 
@@ -528,7 +529,7 @@ Intégrations d'outils configurables disponibles pour tous les agents :
 
 ### Marketplace d'Agents
 
-Découvrez, filtrez et lancez n'importe lequel des 191 agents depuis un catalogue unique à `/marketplace` :
+Découvrez, filtrez et lancez n'importe lequel des 192 agents depuis un catalogue unique à `/marketplace` :
 
 - **Filtrer par ART, rôle ou compétences** — trouvez rapidement l'agent adapté à chaque tâche
 - **Profils agents** — vue détaillée : prompt système, outils, compétences, sessions récentes
@@ -653,7 +654,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Santé plateforme
 sf projects list                       # Tous les projets
 sf missions list                       # Missions avec scores WSJF
-sf agents list                         # 191 agents
+sf agents list                         # 192 agents
 sf features list <epic_id>             # Features d'un epic
 sf stories list --feature <id>         # User stories
 
@@ -719,7 +720,7 @@ python3 -m platform.mcp_platform.server
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Moteur       │   │ Moteur   │   │   Couche     │
           │  Agents      │   │ Workflow │   │   Missions   │
-          │ 191 agents   │   │ 36 defs  │   │ Cycle SAFe   │
+          │ 192 agents   │   │ 46 defs  │   │ Cycle SAFe   │
           │ executeur    │   │ 10 ptrns │   │ Portfolio    │
           │ boucle+retry │   │ phases   │   │ Epic/Feature │
           └──────┬───────┘   │ retry    │   │ Story/Sprint │
@@ -944,9 +945,10 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 - **Contexte projet auto-chargé** — CLAUDE.md, SPECS.md, VISION.md injectés dans chaque prompt agent
 
 ### Garde Qualité Adversariale
-- **L0 déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations
-- **L1 sémantique** — revue qualité LLM sur les sorties d'exécution
+- **L0 Déterministe** — détection instantanée de slop, mocks, fake builds, hallucinations ; **12 mitigations CS** : injection prompt, usurpation identité, PII, traversée chemin, SSRF, budget outils, sanitisation mémoire, validation A2A, audit trail (arXiv:2602.20021 — 50 tests sécurité)
+- **L1 Semi-formel** — revue LLM avec Prémisses (preuves outils) → Trace (carte affirmation↔preuve) → Verdict, certificat de raisonnement ; remontée des affirmations NON VÉRIFIÉES quand aucun outil d'écriture utilisé (arXiv:2603.01896)
 - **Rejet forcé** — hallucinations et erreurs de stack toujours bloquées
+- **86 tests unitaires** — suite couvrant L0/L1 adversarial, raisonnement semi-formel et 12 mitigations sécurité
 
 ### Mercato Agents
 - **Place de marché à tokens** avec listings, transferts, prêts et draft d'agents libres
@@ -1083,7 +1085,7 @@ Chaque projet reçoit automatiquement 4 missions opérationnelles :
 ## Nouveautés v3.0.0 (2026)
 
 ### Marketplace d'Agents
-- **191 agents catalogués** — recherche plein-texte, filtre par ART/rôle/compétences à `/marketplace`
+- **192 agents catalogués** — recherche plein-texte, filtre par ART/rôle/compétences à `/marketplace`
 - **Profils agents** — vue détaillée avec outils, compétences et historique des sessions récentes
 - **Lancement en un clic** — démarrez une session directe avec n'importe quel agent depuis son profil
 

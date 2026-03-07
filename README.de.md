@@ -41,12 +41,12 @@
 
 Software Factory ist eine **autonome Multi-Agenten-Plattform**, die den gesamten Software-Entwicklungszyklus orchestriert — von der Ideenfindung bis zur Bereitstellung — mithilfe spezialisierter KI-Agenten, die zusammenarbeiten.
 
-Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 191 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
+Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 192 KI-Agenten ueber strukturierte Workflows zusammenarbeiten, der SAFe-Methodik folgen, TDD-Praktiken anwenden und automatisierte Qualitaets-Gates nutzen.
 
 ### Hauptmerkmale
 
-- **191 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
-- **36 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
+- **192 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **46 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
 - **Wissensmanagement** — 4 dedizierte Agenten, ART-Knowledge-Team, naechlicher `knowledge-maintenance`-Workflow
 - **Memory Intelligence** — Relevanzbewertung, Zugriffsverfolgung, automatisches Bereinigen veralteter Eintraege
 - **LLM-Kostenverfolgung** — Kosten pro Mission im Timeline-Tab-Header angezeigt
@@ -146,7 +146,7 @@ Stellen Sie sich eine **virtuelle Softwarefabrik** vor, in der 191 KI-Agenten ue
 </tr>
 <tr>
 <td width="50%">
-<strong>Workflows — 36 integrierte Pipelines (/workflows)</strong><br>
+<strong>Workflows — 46 integrierte Pipelines (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="Workflows" width="100%">
 </td>
 <td width="50%">
@@ -282,7 +282,7 @@ Alle vier werden mit dem Projekt erstellt. TMA, Sicherheit und Selbstheilung sta
 
 ## Funktionen
 
-### 191 spezialisierte KI-Agenten
+### 192 spezialisierte KI-Agenten
 
 Agenten sind in Teams organisiert, die echte Software-Organisationen widerspiegeln:
 
@@ -546,8 +546,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 191 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -991,7 +991,7 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 ## Neuheiten in v3.0.0 (2026)
 
 ### Agent-Marktplatz
-- **191 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
+- **192 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
 - **Agentenprofile** — Detailansicht mit Werkzeugen, Skills und jüngster Sitzungshistorie
 - **Ein-Klick-Start** — direkte Sitzung mit jedem Agenten von seiner Profilseite starten
 

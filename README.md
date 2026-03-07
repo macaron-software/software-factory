@@ -41,12 +41,12 @@
 
 Software Factory is an **autonomous multi-agent platform** that orchestrates the entire software development lifecycle — from ideation to deployment — using specialized AI agents working together.
 
-Think of it as a **virtual software factory** where 191 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
+Think of it as a **virtual software factory** where 192 AI agents collaborate through structured workflows, following SAFe methodology, TDD practices, and automated quality gates.
 
 ### Key Highlights
 
-- **191 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
-- **36 built-in workflows** — SAFe ceremonies, quality gates, nightly maintenance, security, knowledge management
+- **192 specialized agents** — architects, developers, testers, SREs, security analysts, product owners
+- **46 built-in workflows** — SAFe ceremonies, quality gates, nightly maintenance, security, knowledge management
 - **8 home ideation groups** — CTO Jarvis, Business, Project, Knowledge, Architecture, Security, Data & AI, PI Planning
 - **Multi-node cluster** — master/slave topology with shared PostgreSQL; nginx `least_conn` load balancing; live topbar heartbeat badges with click-to-popover diagnostics
 - **Agent Marketplace** — discover and launch agents from `/marketplace`; filter by ART, role, or skills
@@ -181,7 +181,7 @@ Think of it as a **virtual software factory** where 191 AI agents collaborate th
 </tr>
 <tr>
 <td width="50%">
-<strong>Workflows — 36 Built-in Pipelines (/workflows)</strong><br>
+<strong>Workflows — 46 Built-in Pipelines (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="Workflows" width="100%">
 </td>
 <td width="50%">
@@ -293,7 +293,7 @@ For each group: describe your need → agents stream their analysis → export a
 
 ### Path C: Explore the Agent Marketplace
 
-Go to `/marketplace` to discover all 191 agents. Filter by ART, role, or skills. Click any agent to view their full profile — tools, skills, recent sessions — and launch a direct session.
+Go to `/marketplace` to discover all 192 agents. Filter by ART, role, or skills. Click any agent to view their full profile — tools, skills, recent sessions — and launch a direct session.
 
 ### Path D: Create a Project Manually
 
@@ -334,7 +334,7 @@ All four are created with the project. TMA, Security, and Self-Healing start as 
 
 ## Features
 
-### 191 Specialized AI Agents
+### 192 Specialized AI Agents
 
 Agents are organized in teams mirroring real software organizations:
 
@@ -492,10 +492,11 @@ Token-based agent marketplace for team composition:
 
 Two-layer quality gate that blocks fake/placeholder code from passing:
 
-- **L0 Deterministic** — instant detection of slop (lorem ipsum, TBD), mocks (NotImplementedError, TODO), fake builds, hallucinations, stack mismatches
-- **L1 LLM Semantic** — separate LLM reviews output quality for execution patterns
+- **L0 Deterministic** — instant detection of slop, mocks, fake builds, hallucinations, stack mismatches; **12 CS security mitigations**: prompt injection, identity claims, PII, path traversal, SSRF, tool budget enforcement, memory sanitization, A2A validation, audit trail (arXiv:2602.20021 — 50 security tests)
+- **L1 Semi-formal** — LLM reviewer emits Premises (tool evidence) → Trace (claim↔evidence map) → Verdict, acting as a proof certificate; UNVERIFIED claim surfacing when no write tools used (arXiv:2603.01896)
 - **Scoring** — score < 5 passes, 5-6 soft-pass with warning, 7+ rejected
 - **Force reject** — hallucination, slop, stack mismatch, fake builds always rejected regardless of score
+- **86 unit tests** — full suite covering L0/L1 adversarial, semi-formal reasoning, and all 12 security mitigations
 
 ### Auto-Documentation & Wiki
 
@@ -533,7 +534,7 @@ Configurable tool integrations available to all agents:
 
 ### Agent Marketplace
 
-Discover, filter, and launch any of the 191 agents from a single catalog at `/marketplace`:
+Discover, filter, and launch any of the 192 agents from a single catalog at `/marketplace`:
 
 - **Filter by ART, role, or skills** — quickly find the right agent for any task
 - **Agent profiles** — full detail view: system prompt, tools, skills, recent sessions
@@ -993,9 +994,10 @@ Every project automatically gets 4 operational missions:
 - **Auto-loaded project context** — CLAUDE.md, SPECS.md, VISION.md injected into every agent prompt
 
 ### Adversarial Quality Guard
-- **L0 deterministic** — instant detection of slop, mocks, fake builds, hallucinations
-- **L1 semantic** — LLM-based quality review for execution outputs
+- **L0 Deterministic** — instant detection of slop, mocks, fake builds, hallucinations; **12 CS security mitigations**: prompt injection, identity claims, PII, path traversal, SSRF, tool budget enforcement, memory sanitization, A2A validation, audit trail (arXiv:2602.20021 — 50 security tests)
+- **L1 Semi-formal** — LLM reviewer emits Premises (tool evidence) → Trace (claim↔evidence map) → Verdict, acting as a proof certificate; UNVERIFIED claim surfacing when no write tools used (arXiv:2603.01896)
 - **Force reject** — hallucination and stack mismatch always blocked
+- **86 unit tests** — full suite covering L0/L1 adversarial, semi-formal reasoning, and all 12 security mitigations
 
 ### Agent Mercato
 - **Token-based marketplace** with agent listings, transfers, loans, and free agent draft
@@ -1217,7 +1219,7 @@ Before applying any GA proposal or RL recommendation live, the platform can run 
 ## What's New in v3.0.0 (2026)
 
 ### Agent Marketplace
-- **191 agents catalogued** — full-text search, filter by ART/role/skills at `/marketplace`
+- **192 agents catalogued** — full-text search, filter by ART/role/skills at `/marketplace`
 - **Agent profiles** — detailed view with tools, skills, and recent session history
 - **One-click launch** — start a direct session with any agent from their profile page
 

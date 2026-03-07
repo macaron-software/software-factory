@@ -16,11 +16,11 @@ Elle s'inscrit dans le cadre de la demarche **UDD IA Native** et suit la methodo
 
 ### Chiffres cles v3.0.0
 
-- 191 agents IA specialises
+- 192 agents IA specialises
 - 33 equipes agents
 - 10 ARTs (Agile Release Trains)
 - 8 groupes d'ideation sur la page d'accueil
-- 36 workflows de ceremonie
+- 46 workflows de ceremonie
 
 ---
 
@@ -73,7 +73,7 @@ L'onglet **CTO Jarvis** est le **point d'entree recommande** pour tout nouveau p
 
 ### Marche d'Agents (`/marketplace`)
 
-Catalogue de tous les 191 agents avec recherche plein texte et filtres par ART, role et competences. Chaque agent dispose d'un profil detail avec ses outils, ses competences et son historique de sessions recent.
+Catalogue de tous les 192 agents avec recherche plein texte et filtres par ART, role et competences. Chaque agent dispose d'un profil detail avec ses outils, ses competences et son historique de sessions recent.
 
 ### Tableau de Bord LLM (`/metrics`)
 
@@ -122,7 +122,7 @@ Espaces de noms isoles avec donnees, agents et memoire separes. Permet d'onboard
 </tr>
 <tr>
 <td width="50%">
-<strong>Marche d'Agents — Catalogue 191 agents</strong><br>
+<strong>Marche d'Agents — Catalogue 192 agents</strong><br>
 <img src="docs/screenshots/fr/marketplace.png" alt="Marche d'Agents" width="100%">
 </td>
 <td width="50%">
@@ -203,6 +203,16 @@ platform/
 ├── web/           <- Routes FastAPI + templates Jinja2
 └── db/            <- Migrations PostgreSQL (40+ index)
 ```
+
+## Securite Renforcee et Raisonnement (v3.1.0)
+
+### Garde Adversariale L0/L1
+
+Double couche de protection bloquant le code fake et les contenus malveillants :
+
+- **L0 Deterministe (0ms)** : detection slop/mocks/fake builds/hallucinations + 12 mitigations CS : injection prompt, usurpation identite, PII, traversee chemin, SSRF, budget outils, sanitisation memoire, validation A2A, audit trail (arXiv:2602.20021 — 50 tests securite)
+- **L1 Semi-formel** : le reveur LLM emet Premisses (preuves outils) → Trace (carte affirmation↔preuve) → Verdict, certificat de raisonnement verifie ; remontee des affirmations non verifiees (arXiv:2603.01896)
+- **86 tests unitaires** : suite complete couvrant securite et raisonnement
 
 ---
 

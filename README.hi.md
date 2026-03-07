@@ -41,12 +41,12 @@
 
 Software Factory एक **स्वायत्त बहु-एजेंट प्लेटफॉर्म** है जो संपूर्ण सॉफ्टवेयर विकास चक्र का संचालन करती है — विचार से लेकर तैनाती तक — विशेष AI एजेंटों के माध्यम से जो मिलकर काम करते हैं।
 
-एक **आभासी सॉफ्टवेयर फैक्टरी** की कल्पना करें जहाँ 191 AI एजेंट संरचित वर्कफ़्लो के माध्यम से सहयोग करते हैं, SAFe पद्धति का पालन करते हैं, TDD प्रथाओं को लागू करते हैं और स्वचालित गुणवत्ता गेट का उपयोग करते हैं।
+एक **आभासी सॉफ्टवेयर फैक्टरी** की कल्पना करें जहाँ 192 AI एजेंट संरचित वर्कफ़्लो के माध्यम से सहयोग करते हैं, SAFe पद्धति का पालन करते हैं, TDD प्रथाओं को लागू करते हैं और स्वचालित गुणवत्ता गेट का उपयोग करते हैं।
 
 ### मुख्य विशेषताएं
 
-- **191 विशेष एजेंट** — आर्किटेक्ट, डेवलपर, टेस्टर, SRE, सुरक्षा विश्लेषक, Product Owner
-- **36 अंतर्निहित वर्कफ़्लो** — SAFe समारोह, गुणवत्ता गेट, रात्रि रखरखाव, सुरक्षा, ज्ञान प्रबंधन
+- **192 विशेष एजेंट** — आर्किटेक्ट, डेवलपर, टेस्टर, SRE, सुरक्षा विश्लेषक, Product Owner
+- **46 अंतर्निहित वर्कफ़्लो** — SAFe समारोह, गुणवत्ता गेट, रात्रि रखरखाव, सुरक्षा, ज्ञान प्रबंधन
 - **ज्ञान प्रबंधन** — 4 समर्पित एजेंट, ART-Knowledge-Team, रात्रि `knowledge-maintenance` वर्कफ़्लो
 - **Memory Intelligence** — प्रासंगिकता स्कोरिंग, पहुँच ट्रैकिंग, पुरानी प्रविष्टियों की स्वचालित सफाई
 - **LLM लागत ट्रैकिंग** — प्रति मिशन लागत Timeline Tab हेडर में प्रदर्शित
@@ -146,7 +146,7 @@ Software Factory एक **स्वायत्त बहु-एजेंट प
 </tr>
 <tr>
 <td width="50%">
-<strong>वर्कफ्लो — 36 बिल्ट-इन पाइपलाइन (/workflows)</strong><br>
+<strong>वर्कफ्लो — 46 बिल्ट-इन पाइपलाइन (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="वर्कफ्लो" width="100%">
 </td>
 <td width="50%">
@@ -282,7 +282,7 @@ NVIDIA_API_KEY=nvapi-your-key-here
 
 ## विशेषताएं
 
-### 191 विशेष AI एजेंट
+### 192 विशेष AI एजेंट
 
 एजेंट वास्तविक सॉफ्टवेयर संगठनों को दर्शाने वाली टीमों में व्यवस्थित हैं:
 
@@ -546,8 +546,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 191 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -991,7 +991,7 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
 ## v3.0.0 में नया (2026)
 
 ### Agent Marketplace
-- **191 Agents catalogued** — `/marketplace` पर Full-text Search, ART/Role/Skills द्वारा Filter
+- **192 Agents catalogued** — `/marketplace` पर Full-text Search, ART/Role/Skills द्वारा Filter
 - **Agent Profiles** — Tools, Skills और recent Session History के साथ Detail View
 - **One-Click Start** — Agent की Profile Page से direct Session शुरू करें
 

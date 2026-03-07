@@ -41,12 +41,12 @@
 
 Software Factory, birlikte calisan uzmanlasmis yapay zeka ajanlari kullanarak yazilim gelistirme dongusunun tamamini — fikirden yayilima kadar — orkestre eden **otonom cok-ajanli bir platformdur**.
 
-191 yapay zeka ajaninin yapilandirilmis is akislari araciligiyla isbirligi yaptigi, SAFe metodolojisini takip ettigi, TDD uygulamalarini benimsedigi ve otomatik kalite kapilari kullandigi bir **sanal yazilim fabrikasi** hayal edin.
+192 yapay zeka ajaninin yapilandirilmis is akislari araciligiyla isbirligi yaptigi, SAFe metodolojisini takip ettigi, TDD uygulamalarini benimsedigi ve otomatik kalite kapilari kullandigi bir **sanal yazilim fabrikasi** hayal edin.
 
 ### Temel Ozellikler
 
-- **191 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
-- **36 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
+- **192 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **46 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
 - **Wissensmanagement** — 4 dedizierte Agenten, ART-Knowledge-Team, naechlicher `knowledge-maintenance`-Workflow
 - **Memory Intelligence** — Relevanzbewertung, Zugriffsverfolgung, automatisches Bereinigen veralteter Eintraege
 - **LLM-Kostenverfolgung** — Kosten pro Mission im Timeline-Tab-Header angezeigt
@@ -146,7 +146,7 @@ Software Factory, birlikte calisan uzmanlasmis yapay zeka ajanlari kullanarak ya
 </tr>
 <tr>
 <td width="50%">
-<strong>İş Akışları — 36 Yerleşik Pipeline (/workflows)</strong><br>
+<strong>İş Akışları — 46 Yerleşik Pipeline (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="İş Akışları" width="100%">
 </td>
 <td width="50%">
@@ -282,7 +282,7 @@ Alle vier werden mit dem Projekt erstellt. TMA, Sicherheit und Selbstheilung sta
 
 ## Funktionen
 
-### 191 spezialisierte KI-Agenten
+### 192 spezialisierte KI-Agenten
 
 Agenten sind in Teams organisiert, die echte Software-Organisationen widerspiegeln:
 
@@ -546,8 +546,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 191 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -991,7 +991,7 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 ## Neuheiten in v3.0.0 (2026)
 
 ### Agent-Marktplatz
-- **191 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
+- **192 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
 - **Agentenprofile** — Detailansicht mit Werkzeugen, Skills und jüngster Sitzungshistorie
 - **Ein-Klick-Start** — direkte Sitzung mit jedem Agenten von seiner Profilseite starten
 

@@ -41,12 +41,12 @@
 
 Software Factory é uma **plataforma autônoma multi-agente** que orquestra todo o ciclo de vida de desenvolvimento de software — da ideação ao deploy — usando agentes de IA especializados trabalhando juntos.
 
-Pense nela como uma **fábrica de software virtual** onde 191 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
+Pense nela como uma **fábrica de software virtual** onde 192 agentes de IA colaboram por meio de fluxos de trabalho estruturados, seguindo a metodologia SAFe, práticas de TDD e quality gates automatizados.
 
 ### Destaques Principais
 
-- **191 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
-- **36 workflows integrados** — cerimônias SAFe, quality gates, manutenção noturna, segurança, gestão do conhecimento
+- **192 agentes especializados** — arquitetos, desenvolvedores, testadores, SREs, analistas de segurança, product owners
+- **46 workflows integrados** — cerimônias SAFe, quality gates, manutenção noturna, segurança, gestão do conhecimento
 - **Gestão do Conhecimento** — 4 agentes dedicados, equipe ART Knowledge, workflow noturno `knowledge-maintenance`
 - **Inteligência de Memória** — pontuação de relevância, rastreamento de acessos, remoção automática de entradas obsoletas
 - **Rastreamento de Custo LLM** — custo por missão no cabeçalho da aba de timeline
@@ -146,7 +146,7 @@ Pense nela como uma **fábrica de software virtual** onde 191 agentes de IA cola
 </tr>
 <tr>
 <td width="50%">
-<strong>Fluxos de Trabalho — 36 Pipelines Integradas (/workflows)</strong><br>
+<strong>Fluxos de Trabalho — 46 Pipelines Integradas (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="Fluxos de Trabalho" width="100%">
 </td>
 <td width="50%">
@@ -282,7 +282,7 @@ Todas as quatro são criadas com o projeto. TMA, Segurança e Self-Healing come�
 
 ## Funcionalidades
 
-### 191 Agentes de IA Especializados
+### 192 Agentes de IA Especializados
 
 Os agentes são organizados em equipes que espelham organizações de software reais:
 
@@ -481,7 +481,7 @@ ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
 sf status                              # Platform health
 sf projects list                       # All projects
 sf missions list                       # Missions with WSJF scores
-sf agents list                         # 191 agents
+sf agents list                         # 192 agents
 sf features list <epic_id>             # Epic features
 sf stories list --feature <id>         # User stories
 
@@ -546,8 +546,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 191 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -991,7 +991,7 @@ Cada projeto recebe automaticamente 4 missões operacionais:
 ## Novidades na v3.0.0 (2026)
 
 ### Mercado de Agentes
-- **191 agentes catalogados** — pesquisa de texto completo, filtro por ART/função/habilidades em `/marketplace`
+- **192 agentes catalogados** — pesquisa de texto completo, filtro por ART/função/habilidades em `/marketplace`
 - **Perfis de agentes** — visualização detalhada com ferramentas, habilidades e histórico de sessões recentes
 - **Início com um clique** — inicie uma sessão direta com qualquer agente a partir da sua página de perfil
 

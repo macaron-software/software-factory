@@ -41,12 +41,12 @@
 
 Software Factory är en **autonom flaragents-plattform** som orkestrerar hela mjukvaruutvecklingscykeln — från idé till driftsättning — med hjälp av specialiserade AI-agenter som arbetar tillsammans.
 
-Föreställ dig en **virtuell mjukvarifabrik** där 191 AI-agenter samarbetar genom strukturerade arbetsflöden, följer SAFe-metodiken, tillämpar TDD-praxis och använder automatiserade kvalitetsportar.
+Föreställ dig en **virtuell mjukvarifabrik** där 192 AI-agenter samarbetar genom strukturerade arbetsflöden, följer SAFe-metodiken, tillämpar TDD-praxis och använder automatiserade kvalitetsportar.
 
 ### Nyckelfunktioner
 
-- **191 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
-- **36 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
+- **192 spezialisierte Agenten** — Architekten, Entwickler, Tester, SRE, Sicherheitsanalysten, Product Owner
+- **46 integrierte Workflows** — SAFe-Zeremonien, Qualitaets-Gates, naechliche Wartung, Sicherheit, Wissensmanagement
 - **Wissensmanagement** — 4 dedizierte Agenten, ART-Knowledge-Team, naechlicher `knowledge-maintenance`-Workflow
 - **Memory Intelligence** — Relevanzbewertung, Zugriffsverfolgung, automatisches Bereinigen veralteter Eintraege
 - **LLM-Kostenverfolgung** — Kosten pro Mission im Timeline-Tab-Header angezeigt
@@ -146,7 +146,7 @@ Föreställ dig en **virtuell mjukvarifabrik** där 191 AI-agenter samarbetar ge
 </tr>
 <tr>
 <td width="50%">
-<strong>Arbetsflöden — 36 Inbyggda Pipelines (/workflows)</strong><br>
+<strong>Arbetsflöden — 46 Inbyggda Pipelines (/workflows)</strong><br>
 <img src="docs/screenshots/en/workflows.png" alt="Arbetsflöden" width="100%">
 </td>
 <td width="50%">
@@ -282,7 +282,7 @@ Alle vier werden mit dem Projekt erstellt. TMA, Sicherheit und Selbstheilung sta
 
 ## Funktionen
 
-### 191 spezialisierte KI-Agenten
+### 192 spezialisierte KI-Agenten
 
 Agenten sind in Teams organisiert, die echte Software-Organisationen widerspiegeln:
 
@@ -546,8 +546,8 @@ python3 -m platform.mcp_platform.server
                        │          │            │
           ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
           │ Agent Engine │   │ Workflow │   │   Mission    │
-          │ 191 agents   │   │  Engine  │   │    Layer     │
-          │ executor     │   │ 36 defs  │   │ SAFe cycle   │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
           │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
           └──────┬───────┘   │ phases   │   │ Epic/Feature │
                  │           │ retry    │   │ Story/Sprint │
@@ -991,7 +991,7 @@ Jedes Projekt erhaelt automatisch 4 operative Missionen:
 ## Neuheiten in v3.0.0 (2026)
 
 ### Agent-Marktplatz
-- **191 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
+- **192 Agenten katalogisiert** — Volltext-Suche, Filter nach ART/Rolle/Skills unter `/marketplace`
 - **Agentenprofile** — Detailansicht mit Werkzeugen, Skills und jüngster Sitzungshistorie
 - **Ein-Klick-Start** — direkte Sitzung mit jedem Agenten von seiner Profilseite starten
 
