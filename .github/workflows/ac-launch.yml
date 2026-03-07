@@ -133,9 +133,11 @@ jobs:
             echo "AC cycles scores:"
             psql "$DB_URL" -t -c "SELECT project_id, cycle_num, total_score, status, defect_count, veto_count, LEFT(phase_scores::text,200) FROM ac_cycles ORDER BY created_at DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no ac_cycles table or empty)"
             echo "Message count per AC session:"
-            psql "$DB_URL" -t -c "SELECT s.id, LEFT(s.name,30), s.status, COUNT(m.id) as msgs FROM sessions s LEFT JOIN messages m ON m.session_id=s.id WHERE s.config_json LIKE '%ac-improvement-cycle%' AND s.created_at >= NOW() - INTERVAL '3 hours' GROUP BY s.id, s.name, s.status ORDER BY s.created_at DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || true
+            psql "$DB_URL" -t -c "SELECT s.id, LEFT(s.name,30), s.status, COUNT(m.id) as msgs, MAX(m.timestamp) as last_msg FROM sessions s LEFT JOIN messages m ON m.session_id=s.id WHERE s.config_json LIKE '%ac-improvement-cycle%' AND s.created_at >= NOW() - INTERVAL '24 hours' GROUP BY s.id, s.name, s.status ORDER BY s.created_at DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || true
             echo "Latest messages (active AC hello-html session):"
-            psql "$DB_URL" -t -c "SELECT m.from_agent, LEFT(m.content,150), m.message_type FROM messages m WHERE m.session_id=(SELECT id FROM sessions WHERE status='active' AND config_json::text LIKE '%ac-hello-html%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) ORDER BY m.timestamp DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no active session messages)"
+            psql "$DB_URL" -t -c "SELECT m.from_agent, LEFT(m.content,150), m.message_type FROM messages m WHERE m.session_id=(SELECT id FROM sessions WHERE status='active' AND config_json::text LIKE '%ac-hello-html%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) ORDER BY m.timestamp DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || echo "  (no active hello-html session)"
+            echo "Latest messages (active AC fullstack-rs session):"
+            psql "$DB_URL" -t -c "SELECT m.from_agent, LEFT(m.content,150), m.message_type FROM messages m WHERE m.session_id=(SELECT id FROM sessions WHERE status='active' AND config_json::text LIKE '%ac-fullstack-rs%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) ORDER BY m.timestamp DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || echo "  (no active fullstack-rs session)"
             echo "Workspace paths:"
             psql "$DB_URL" -t -c "SELECT id, path, is_protected, client_domain FROM projects WHERE id IN ('ac-hello-html','ac-fullstack-rs','software-factory');" 2>/dev/null | grep -v "^$" || true
           fi
