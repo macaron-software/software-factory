@@ -85,6 +85,31 @@ class MessageBus:
         """Publish a message to the bus."""
         self._stats["published"] += 1
 
+        # REF: arXiv:2602.20021 — SBD-06: validate from_agent to detect identity spoofing.
+        _sender = message.from_agent
+        _trusted_senders = {"user", "system", "platform", ""}
+        if (
+            _sender
+            and _sender not in _trusted_senders
+            and _sender not in self._agent_queues
+            and _sender not in self._handlers
+        ):
+            logger.warning(
+                "A2A IDENTITY_SPOOF: from_agent='%s' not registered in bus (session='%s'). "
+                "Message type=%s — relaying but flagging for audit.",
+                _sender[:40],
+                (message.session_id or "?")[:20],
+                message.message_type,
+            )
+            self._stats["spoofed"] = self._stats.get("spoofed", 0) + 1
+
+        # Scope delegation guard: log warning if project-scoped agent delegates to platform
+        if message.message_type and str(message.message_type) in (
+            "delegate",
+            "MessageType.DELEGATE",
+        ):
+            self._check_delegation_scope(message)
+
         # Persist to DB asynchronously (non-blocking)
         if self.db:
             asyncio.get_event_loop().call_soon(self._persist_message, message)
@@ -99,6 +124,37 @@ class MessageBus:
 
         # Notify SSE listeners (for web UI)
         await self._notify_sse(message)
+
+    def _check_delegation_scope(self, message: A2AMessage) -> None:
+        """Warn when a non-platform agent tries to delegate to a platform agent.
+
+        Scope hierarchy:  platform → art → project → self
+        project/art agents may only delegate to agents at the same or lower scope.
+        Enforcement is advisory (log-only) at the bus level; hard enforcement
+        is in PermissionGuard.check_scope().
+        """
+        try:
+            from ..agents.store import get_agent_store
+
+            store = get_agent_store()
+            sender = store.get(message.from_agent) if message.from_agent else None
+            receiver = store.get(message.to_agent) if message.to_agent else None
+            if not sender or not receiver:
+                return
+            sender_scope = (sender.permissions or {}).get("scope", "project")
+            receiver_scope = (receiver.permissions or {}).get("scope", "project")
+            _rank = {"platform": 0, "art": 1, "project": 2, "self": 3}
+            if _rank.get(sender_scope, 2) > _rank.get(receiver_scope, 2):
+                logger.warning(
+                    "A2A scope mismatch: %s (scope=%s) delegating to %s (scope=%s) — "
+                    "lower-scope agents should escalate via Jarvis",
+                    message.from_agent,
+                    sender_scope,
+                    message.to_agent,
+                    receiver_scope,
+                )
+        except Exception:
+            pass  # non-blocking — never break message delivery
 
     async def _deliver(self, agent_id: str, message: A2AMessage):
         """Deliver a message to a specific agent."""

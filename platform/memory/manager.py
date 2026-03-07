@@ -129,6 +129,15 @@ class MemoryManager:
         confidence: float = 0.5,
         agent_role: str = "",
     ) -> int:
+        # REF: arXiv:2602.20021 — SBD-10/SBD-11: sanitize memory writes to prevent
+        # cross-agent propagation of injection payloads and partial system takeover.
+        try:
+            from ..security.sanitize import sanitize_agent_output as _san
+
+            key = _san(key, f"memory_project:{project_id}")[:200]
+            value = _san(value, f"memory_project:{project_id}")[:8192]
+        except Exception:
+            pass
         now = datetime.now(timezone.utc).isoformat()
         relevance = _compute_relevance(confidence, now, 0)
         conn = get_db()
@@ -263,6 +272,15 @@ class MemoryManager:
         project_id: str = "",
         confidence: float = 0.5,
     ) -> int:
+        # REF: arXiv:2602.20021 — SBD-10/SBD-11: sanitize global memory writes.
+        # memory_global is world-readable → a poisoned entry propagates to ALL agents.
+        try:
+            from ..security.sanitize import sanitize_agent_output as _san
+
+            key = _san(key, "memory_global")[:200]
+            value = _san(value, "memory_global")[:8192]
+        except Exception:
+            pass
         now = datetime.now(timezone.utc).isoformat()
         conn = get_db()
         existing = conn.execute(

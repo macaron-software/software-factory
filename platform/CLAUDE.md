@@ -302,6 +302,9 @@ AC/evo    scope=self · R+W skills/templates/workflows · NO data/platform.db
 
 ## KNOWN ISSUES / GOTCHAS
 - `NodeStatus`: PENDING/RUNNING/COMPLETED/VETOED/FAILED — **NO `DONE`**
+- Landlock LSM sandbox: binary at `tools/sandbox/dist/landlock-runner-linux-x86_64`
+  Enable on OVH: `cp tools/sandbox/dist/landlock-runner-linux-x86_64 tools/sandbox/landlock-runner && chmod +x tools/sandbox/landlock-runner`
+  Then set `LANDLOCK_ENABLED=true` in env or `security.landlock_enabled: true` in config
 - HTTP 400 tool message ordering `role 'tool' must follow 'tool_calls'` — non-fatal
 - `_mission_semaphore` configurable now (settings → Orchestrator) — was hardcoded 1
 - Container path: `/app/macaron_platform/` (NOT `/app/platform/`)
@@ -430,3 +433,40 @@ Graph équipe: _AC_AGENTS_GRAPH → coach/architect/codex/adversarial/qa/cicd (P
 Métrique "Score par cycle" : barre orange = 1 seul cycle → normal (cold_start)
 ```
 
+
+---
+
+## SECURITY — arXiv:2602.20021 Mitigations
+
+**Reference:** "Red-Teaming Autonomous LLM Agents in Live Labs" (arXiv:2602.20021, Feb 2026)
+Documented 11 vulnerability classes in multi-agent systems. Our mitigations:
+
+### Threat Model & Design Decisions
+
+| Threat | Mitigation | File |
+|---|---|---|
+| SBD-02/03 Info disclosure | Sensitive file blocklist on code_read/write (.env, *.key, *.pem, SSH) | `tools/code_tools.py` |
+| SBD-04 DoS / resource abuse | `RESOURCE_ABUSE` L0 (+7), busy-loops/fork-bombs | `agents/adversarial.py` |
+| SBD-05 Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` hard budget per agent run | `agents/executor.py` |
+| SBD-06 Identity spoofing | A2A from_agent validation + `IDENTITY_CLAIM` L0 (+7) | `a2a/bus.py`, `adversarial.py` |
+| SBD-07/10 Cross-agent propagation | Memory write sanitization (`sanitize_agent_output`) | `memory/manager.py` |
+| SBD-08 Destructive actions | Sensitive file blocklist + audit trail on code_write | `tools/code_tools.py`, `security/audit.py` |
+| SBD-09 Prompt injection | `PROMPT_INJECTION` L0 (+8) in output + tool results | `agents/adversarial.py` |
+| SBD-11 Partial takeover | Memory sanitization + 8K value cap | `memory/manager.py` |
+| SBD-11 Fake completion | `FAKE_BUILD`/`MOCK`/`HALLUCINATION` L0 (pre-existing) | `agents/adversarial.py` |
+| SBD-01 Unauthorized compliance | A2A scope delegation check (log-only) | `a2a/bus.py` |
+
+### Swiss Cheese Defense Model
+```
+L0 adversarial (deterministic, 0ms)  → code quality + HARDCODED_SECRET + PROMPT_INJECTION + IDENTITY_CLAIM + RESOURCE_ABUSE
+L1 adversarial (LLM semantic, ~5s)   → holistic review
+Tool guards (sync, before execution) → sensitive file blocklist, tool budget
+Memory sanitization (on write)       → strip injection from shared state
+A2A validation (on publish)          → from_agent identity check + scope logging
+Audit trail                          → admin_audit_log table on destructive actions
+```
+
+### Intentional Non-Mitigations
+- **A2A hard-block** on unknown `from_agent` — log-only (would break cross-session delegation patterns)
+- **Landlock/Docker per agent** — Phase 3+ initiative (scope hierarchy plan)
+- **RBAC at runtime tool dispatch** — separate initiative (scope hierarchy plan)

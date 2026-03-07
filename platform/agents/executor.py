@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from collections.abc import AsyncIterator
@@ -36,6 +37,9 @@ logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
 MAX_TOOL_ROUNDS = 8
+
+# REF: arXiv:2602.20021 — SBD-05: per-run tool call budget to prevent resource exhaustion
+MAX_TOOL_CALLS_PER_RUN = int(os.getenv("MAX_TOOL_CALLS_PER_RUN", "50"))
 
 # Tools that produce code changes and should trigger auto-verification
 _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
@@ -644,6 +648,7 @@ class AgentExecutor:
 
             # Tool-calling loop
             deep_search_used = False
+            _run_tool_call_count = 0  # REF: arXiv:2602.20021 SBD-05 per-run tool budget
             _active_tools = tools  # may be narrowed to 1 tool on nudge rounds
             for round_num in range(MAX_TOOL_ROUNDS):
                 llm_resp = await self._llm.chat(
@@ -817,16 +822,18 @@ class AgentExecutor:
                                 or _bn.startswith("Dockerfile.")
                             )
                             if not _qa_allowed:
-                                messages.append(LLMMessage(
-                                    role="tool",
-                                    content=(
-                                        f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
-                                        "Only allowed: QA_REPORT_N.md, Dockerfile (Chromium fix). "
-                                        "If docker_deploy fails for non-Chromium reasons → call veto_cycle."
-                                    ),
-                                    tool_call_id=tc.id,
-                                    name=tc.function_name,
-                                ))
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=(
+                                            f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
+                                            "Only allowed: QA_REPORT_N.md, Dockerfile (Chromium fix). "
+                                            "If docker_deploy fails for non-Chromium reasons → call veto_cycle."
+                                        ),
+                                        tool_call_id=tc.id,
+                                        name=tc.function_name,
+                                    )
+                                )
                                 continue
                     # ── Workspace conflict guard: warn if another agent is writing this file ──
                     if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
@@ -855,10 +862,19 @@ class AgentExecutor:
                         tool_name=tc.function_name,
                         tool_args=dict(tc.arguments),
                     )
-                    _pre_res = await _hook_registry.fire_pre(HookType.PRE_TOOL, _hook_ctx)
+                    _pre_res = await _hook_registry.fire_pre(
+                        HookType.PRE_TOOL, _hook_ctx
+                    )
                     if _pre_res.blocked:
                         result = f"[BLOCKED by hook: {_pre_res.message}]"
                     else:
+                        # REF: arXiv:2602.20021 SBD-05 — enforce per-run tool call budget
+                        _run_tool_call_count += 1
+                        if _run_tool_call_count > MAX_TOOL_CALLS_PER_RUN:
+                            raise BudgetExceededError(
+                                f"Tool call budget exceeded ({MAX_TOOL_CALLS_PER_RUN} calls/run). "
+                                "Increase MAX_TOOL_CALLS_PER_RUN env var if needed."
+                            )
                         result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     # POST_TOOL hook
                     _hook_ctx.hook_type = HookType.POST_TOOL
@@ -1569,17 +1585,21 @@ class AgentExecutor:
                                 or _bn.startswith("Dockerfile.")
                             )
                             if not _qa_ok:
-                                messages.append(LLMMessage(
-                                    role="tool",
-                                    content=(
-                                        f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
-                                        "Allowed: QA_REPORT_N.md, Dockerfile (Chromium only). "
-                                        "If docker_deploy fails → VETO. Do not fix source code."
-                                    ),
-                                    tool_call_id=tc.id,
-                                    name=tc.function_name,
-                                ))
-                                logger.warning("QA SCOPE VIOLATION agent=%s path=%s", agent.id, _bn)
+                                messages.append(
+                                    LLMMessage(
+                                        role="tool",
+                                        content=(
+                                            f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
+                                            "Allowed: QA_REPORT_N.md, Dockerfile (Chromium only). "
+                                            "If docker_deploy fails → VETO. Do not fix source code."
+                                        ),
+                                        tool_call_id=tc.id,
+                                        name=tc.function_name,
+                                    )
+                                )
+                                logger.warning(
+                                    "QA SCOPE VIOLATION agent=%s path=%s", agent.id, _bn
+                                )
                                 continue
                     # PRE_TOOL hook (may block)
                     _hook_ctx2 = HookContext(
@@ -1590,7 +1610,9 @@ class AgentExecutor:
                         tool_name=tc.function_name,
                         tool_args=dict(tc.arguments),
                     )
-                    _pre_res2 = await _hook_registry.fire_pre(HookType.PRE_TOOL, _hook_ctx2)
+                    _pre_res2 = await _hook_registry.fire_pre(
+                        HookType.PRE_TOOL, _hook_ctx2
+                    )
                     if _pre_res2.blocked:
                         result = f"[BLOCKED by hook: {_pre_res2.message}]"
                     else:
@@ -1822,8 +1844,14 @@ class AgentExecutor:
                         for t in tools
                         if t.get("function", {}).get("name")
                         in (
-                            "code_write", "code_edit", "fractal_code", "git_commit",
-                            "read_file", "write_file", "read_many_files", "edit_file",
+                            "code_write",
+                            "code_edit",
+                            "fractal_code",
+                            "git_commit",
+                            "read_file",
+                            "write_file",
+                            "read_many_files",
+                            "edit_file",
                         )
                     ]
                     if write_only_tools:
@@ -1842,8 +1870,12 @@ class AgentExecutor:
                     and tools is not None
                 ):
                     _last_written = next(
-                        (t["args"].get("path", "") for t in reversed(all_tool_calls)
-                         if t["name"] in ("code_write", "code_edit")), ""
+                        (
+                            t["args"].get("path", "")
+                            for t in reversed(all_tool_calls)
+                            if t["name"] in ("code_write", "code_edit")
+                        ),
+                        "",
                     )
                     messages.append(
                         LLMMessage(

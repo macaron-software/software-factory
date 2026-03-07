@@ -6,6 +6,7 @@ Code Tools - File read/write/search operations for agents.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -30,6 +31,14 @@ _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
     Path("/tmp"),  # scratch
 )
 
+# REF: arXiv:2602.20021 — SBD-02/SBD-08: block reads/writes of sensitive credential files
+# regardless of path location (defense-in-depth against info disclosure + destructive actions).
+_SENSITIVE_FILE_RE = re.compile(
+    r"(?:/|^)(?:\.env$|\.ssh/|id_rsa$|id_ecdsa$|id_ed25519$|\.aws/credentials|"
+    r"\.gnupg/|secrets?\.(json|ya?ml)$|.*\.(pem|key|pfx|p12|p8|crt)$)",
+    re.IGNORECASE,
+)
+
 
 def _is_path_allowed(resolved_path: str) -> bool:
     """Return True if resolved_path is under one of the allowed write roots."""
@@ -51,6 +60,14 @@ class CodeReadTool(BaseTool):
             return f"Error: File not found: {path}"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # REF: arXiv:2602.20021 — SBD-02/SBD-03: block reads of sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_cr
+
+            _log_cr.getLogger(__name__).warning(
+                "code_read BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: reading '{path}' is not allowed (sensitive credential file)"
         # If path is a directory, fallback to listing its contents
         if os.path.isdir(path):
             try:
@@ -97,6 +114,14 @@ class CodeWriteTool(BaseTool):
             return f"Error: content too short ({len(stripped)} chars) — write real code"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # REF: arXiv:2602.20021 — SBD-08: block writes to sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_cw2
+
+            _log_cw2.getLogger(__name__).warning(
+                "code_write BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: writing to '{path}' is not allowed (sensitive file path)"
         # Workspace restriction: reject writes outside allowed directories
         if not _is_path_allowed(path):
             import logging as _log_cw
@@ -116,6 +141,19 @@ class CodeWriteTool(BaseTool):
                 p.with_suffix(p.suffix + ".bak").write_text(p.read_text())
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(content)
+            # REF: arXiv:2602.20021 — SBD-08: audit destructive file writes
+            try:
+                from ..security.audit import audit_log as _audit
+
+                _audit(
+                    "code_write",
+                    "file",
+                    path,
+                    f"{len(content)} chars",
+                    actor=getattr(agent, "id", "?"),
+                )
+            except Exception:
+                pass
             return f"Written {len(content)} chars to {path}"
         except Exception as e:
             return f"Error writing {path}: {e}"
@@ -134,6 +172,14 @@ class CodeEditTool(BaseTool):
             return "Error: path and old_str required"
         # Resolve symlinks to prevent path traversal
         path = os.path.realpath(path)
+        # REF: arXiv:2602.20021 — SBD-08: block edits to sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_ce2
+
+            _log_ce2.getLogger(__name__).warning(
+                "code_edit BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: editing '{path}' is not allowed (sensitive file path)"
         # Workspace restriction
         if not _is_path_allowed(path):
             import logging as _log_ce
