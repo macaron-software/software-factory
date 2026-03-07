@@ -310,6 +310,10 @@
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             Self Healing
         </button>
+        <button class="ac-stab" id="ac-stab-instincts" onclick="acSwitchTab(this,'ac-panel-instincts')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Instincts
+        </button>
     </div>
 
     <!-- Cycles AC sub-panel -->
@@ -508,6 +512,71 @@
                 Chargement…
             </div>
         </div>
+    </div>
+
+    <!-- Instincts panel — ECC continuous-learning-v2 adaptation -->
+    <div id="ac-panel-instincts" style="display:none">
+        <!-- KPI bar -->
+        <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap" id="instinct-kpis">
+            <div class="art-kpi"><div class="num" id="ik-total">–</div><div class="lbl">Instincts</div></div>
+            <div class="art-kpi"><div class="num" id="ik-conf">–</div><div class="lbl">Conf. moy.</div></div>
+            <div class="art-kpi"><div class="num" id="ik-high">–</div><div class="lbl">≥0.7 établis</div></div>
+            <div class="art-kpi"><div class="num" id="ik-evolved">–</div><div class="lbl">Évolués → skill</div></div>
+        </div>
+        <!-- Filters -->
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center">
+            <select id="if-agent" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les agents</option>
+            </select>
+            <select id="if-domain" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les domaines</option>
+                <option value="code">code</option>
+                <option value="git">git</option>
+                <option value="security">security</option>
+                <option value="testing">testing</option>
+                <option value="architecture">architecture</option>
+                <option value="general">general</option>
+            </select>
+            <select id="if-scope" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les scopes</option>
+                <option value="project">project</option>
+                <option value="global">global</option>
+            </select>
+            <button onclick="evolveInstincts()" style="margin-left:auto;font-size:0.75rem;padding:0.25rem 0.75rem;background:var(--purple,#7c3aed);color:#fff;border:none;border-radius:4px;cursor:pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Evolve → Skills
+            </button>
+        </div>
+        <!-- Instincts table -->
+        <div style="overflow-x:auto;margin-bottom:1.25rem">
+            <table style="width:100%;font-size:0.78rem;border-collapse:collapse" id="instinct-table">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border,#333);color:var(--text-muted)">
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Trigger</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Action</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Conf.</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Domaine</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Agent</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Scope</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Source</th>
+                    </tr>
+                </thead>
+                <tbody id="instinct-tbody">
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Skill Stocktake -->
+        <div style="border-top:1px solid var(--border,#333);padding-top:0.85rem">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span style="font-size:0.78rem;font-weight:600;color:var(--text-secondary)">Skill Stocktake</span>
+                <button onclick="loadStocktake()" style="font-size:0.72rem;padding:0.15rem 0.55rem;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border,#333);border-radius:3px;cursor:pointer;margin-left:auto">Audit</button>
+            </div>
+            <div id="instinct-stocktake" style="font-size:0.78rem;color:var(--text-secondary);padding:0.5rem 0">Cliquez Audit pour analyser les skills YAML.</div>
+        </div>
+        <!-- Evolve result -->
+        <div id="instinct-evolve-result" style="display:none;margin-top:0.75rem;padding:0.6rem 0.75rem;background:var(--bg-tertiary);border:1px solid var(--border,#333);border-radius:6px;font-size:0.78rem"></div>
     </div>
 
 </div>
@@ -853,7 +922,7 @@ function artSwitchTab(btn, panelId) {
 function acSwitchTab(btn, subId) {
     document.querySelectorAll('.ac-stab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
-    ['ac-panel-cycles','ac-panel-skills','ac-panel-thompson','ac-panel-darwin','ac-panel-evolution','ac-panel-rl','ac-panel-heal'].forEach(id => {
+    ['ac-panel-cycles','ac-panel-skills','ac-panel-thompson','ac-panel-darwin','ac-panel-evolution','ac-panel-rl','ac-panel-heal','ac-panel-instincts'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.style.display = id === subId ? '' : 'none';
     });
@@ -889,6 +958,7 @@ function acSwitchTab(btn, subId) {
             loadSelfHealTab();
         }
     }
+    if (subId === 'ac-panel-instincts') loadInstinctsTab();
 }
 
 async function loadThompsonTab() {
@@ -1685,6 +1755,145 @@ async function skLaunchCycle() {
     }
     btn.disabled = false;
     btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Lancer skill-eval';
+}
+
+// ── Instincts panel ───────────────────────────────────────────────────────────
+// SOURCE: ECC continuous-learning-v2 — display instincts extracted from sessions
+const _CONF_COLOR = c => c >= 0.7 ? '#22c55e' : c >= 0.5 ? '#f59e0b' : '#6b7280';
+const _CONF_LABEL = c => c >= 0.9 ? 'near-certain' : c >= 0.7 ? 'established' : c >= 0.5 ? 'developing' : 'tentative';
+
+async function loadInstinctsTab() {
+    const tbody = document.getElementById('instinct-tbody');
+    const agentSel = document.getElementById('if-agent');
+    const domainVal = document.getElementById('if-domain').value;
+    const scopeVal = document.getElementById('if-scope').value;
+    const agentVal = agentSel.value;
+
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:var(--text-secondary)">Chargement…</td></tr>';
+    try {
+        const params = new URLSearchParams();
+        if (agentVal) params.set('agent_id', agentVal);
+        if (domainVal) params.set('domain', domainVal);
+        if (scopeVal) params.set('scope', scopeVal);
+        params.set('limit', '100');
+        const [iData, sData] = await Promise.all([
+            fetch('/api/instincts?' + params).then(r => r.json()),
+            fetch('/api/instincts/stats').then(r => r.json()),
+        ]);
+
+        // KPIs
+        if (sData.success) {
+            const s = sData.stats;
+            document.getElementById('ik-total').textContent = s.total ?? '–';
+            document.getElementById('ik-conf').textContent = s.avg_confidence != null ? s.avg_confidence.toFixed(2) : '–';
+            document.getElementById('ik-high').textContent = s.high_confidence ?? '–';
+            document.getElementById('ik-evolved').textContent = s.evolved ?? '–';
+        }
+
+        // Populate agent filter (deduplicate)
+        if (!agentSel.dataset.populated && iData.success) {
+            const agents = [...new Set(iData.instincts.map(i => i.agent_id).filter(Boolean))].sort();
+            agents.forEach(a => {
+                const o = document.createElement('option'); o.value = a; o.textContent = a;
+                agentSel.appendChild(o);
+            });
+            agentSel.value = agentVal;
+            agentSel.dataset.populated = '1';
+        }
+
+        // Table rows
+        if (!iData.success || !iData.instincts.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Aucun instinct enregistré — les agents accumuleront des patterns au fil des sessions.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = iData.instincts.map(inst => {
+            const conf = inst.confidence ?? 0;
+            const pct = Math.round(conf * 100);
+            const col = _CONF_COLOR(conf);
+            const lbl = _CONF_LABEL(conf);
+            const evidCount = (() => { try { return JSON.parse(inst.evidence_json || '[]').length; } catch { return 0; } })();
+            return `<tr style="border-bottom:1px solid var(--border,#2a2a2a)">
+                <td style="padding:0.35rem 0.5rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(inst.trigger)}">${esc(inst.trigger)}</td>
+                <td style="padding:0.35rem 0.5rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)" title="${esc(inst.action)}">${esc(inst.action)}</td>
+                <td style="padding:0.35rem 0.5rem;white-space:nowrap">
+                    <div style="display:flex;align-items:center;gap:0.4rem">
+                        <div style="width:40px;height:5px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                            <div style="width:${pct}%;height:100%;background:${col};border-radius:3px"></div>
+                        </div>
+                        <span style="color:${col};font-size:0.72rem">${pct}%</span>
+                        <span style="color:var(--text-muted);font-size:0.68rem">${lbl}</span>
+                    </div>
+                </td>
+                <td style="padding:0.35rem 0.5rem"><span style="background:rgba(99,102,241,0.1);color:#818cf8;border-radius:3px;padding:1px 5px;font-size:0.7rem">${esc(inst.domain||'–')}</span></td>
+                <td style="padding:0.35rem 0.5rem;color:var(--text-secondary);font-size:0.74rem">${esc(inst.agent_id||'–')}</td>
+                <td style="padding:0.35rem 0.5rem;font-size:0.72rem">${inst.scope === 'global' ? '<span style="color:#22c55e">global</span>' : '<span style="color:var(--text-muted)">project</span>'}</td>
+                <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--text-muted)">${esc(inst.source||'–')} ${evidCount ? `· ${evidCount} obs` : ''}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;color:#ef4444">Erreur: ${e.message}</td></tr>`;
+    }
+}
+
+async function evolveInstincts() {
+    const btn = event.currentTarget;
+    const res = document.getElementById('instinct-evolve-result');
+    btn.disabled = true; btn.textContent = 'Evolution…';
+    res.style.display = 'none';
+    try {
+        const agentVal = document.getElementById('if-agent').value;
+        const body = agentVal ? {agent_id: agentVal} : {};
+        const d = await fetch('/api/instincts/evolve', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+        res.style.display = '';
+        if (d.success) {
+            const clusters = d.clusters || [];
+            res.innerHTML = `<div style="color:#22c55e;margin-bottom:0.4rem;font-weight:600">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><polyline points="20 6 9 17 4 12"/></svg>
+                ${clusters.length} cluster(s) générés
+            </div>${clusters.map(c => `<div style="margin-top:0.35rem;padding:0.3rem 0.5rem;background:var(--bg-secondary);border-radius:4px">
+                <span style="color:var(--text-primary);font-weight:600">${esc(c.skill_name||c.domain)}</span>
+                <span style="color:var(--text-muted);font-size:0.72rem;margin-left:0.4rem">${c.instinct_count} instincts · conf. ${(c.avg_confidence||0).toFixed(2)}</span>
+            </div>`).join('')}`;
+            loadInstinctsTab();
+        } else {
+            res.innerHTML = `<span style="color:#ef4444">Erreur: ${esc(d.error||d.detail||'inconnue')}</span>`;
+        }
+    } catch(e) {
+        res.style.display = ''; res.innerHTML = `<span style="color:#ef4444">Erreur réseau: ${e.message}</span>`;
+    }
+    btn.disabled = false; btn.textContent = 'Evolve → Skills';
+}
+
+async function loadStocktake() {
+    const cont = document.getElementById('instinct-stocktake');
+    cont.innerHTML = '<span style="color:var(--text-secondary)">Audit en cours…</span>';
+    try {
+        const d = await fetch('/api/skills/stocktake').then(r => r.json());
+        if (!d.success) { cont.innerHTML = `<span style="color:#ef4444">Erreur: ${d.error}</span>`; return; }
+        const skills = d.skills || [];
+        const summary = d.summary || {};
+        const verdictColor = v => ({'Keep':'#22c55e','Improve':'#f59e0b','Retire':'#ef4444','Update':'#6366f1','Merge':'#a78bfa'})[v] || '#6b7280';
+        cont.innerHTML = `<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem">
+            ${['Keep','Improve','Update','Retire','Merge'].map(v => `<span style="font-size:0.72rem;padding:2px 7px;border-radius:3px;background:${verdictColor(v)}22;color:${verdictColor(v)}">${v}: ${summary[v.toLowerCase()]??0}</span>`).join('')}
+        </div>
+        <div style="overflow-x:auto"><table style="width:100%;font-size:0.75rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-muted);border-bottom:1px solid var(--border,#333)">
+                <th style="text-align:left;padding:0.25rem 0.4rem">Skill</th>
+                <th style="text-align:left;padding:0.25rem 0.4rem">Verdict</th>
+                <th style="text-align:left;padding:0.25rem 0.4rem">Issues</th>
+                <th style="text-align:right;padding:0.25rem 0.4rem">Lignes</th>
+            </tr></thead>
+            <tbody>${skills.map(s => `<tr style="border-bottom:1px solid var(--border,#2a2a2a)">
+                <td style="padding:0.25rem 0.4rem;font-weight:500">${esc(s.name)}</td>
+                <td style="padding:0.25rem 0.4rem"><span style="color:${verdictColor(s.verdict)};font-weight:600">${s.verdict}</span></td>
+                <td style="padding:0.25rem 0.4rem;color:var(--text-muted)">${(s.issues||[]).join(', ')||'–'}</td>
+                <td style="padding:0.25rem 0.4rem;text-align:right;color:var(--text-secondary)">${s.line_count}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+    } catch(e) {
+        cont.innerHTML = `<span style="color:#ef4444">Erreur: ${e.message}</span>`;
+    }
 }
 </script>
 {% endblock %}
