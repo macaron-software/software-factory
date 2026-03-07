@@ -238,11 +238,7 @@ def _select_model_for_agent(
         if category_heavy == "production_heavy"
         else "gpt-5.1"  # tasks_heavy
     )
-    l_model_default = (
-        "gpt-5.1"
-        if category_light in ("reasoning_light", "production_light")
-        else "gpt-5-mini"  # tasks_light
-    )
+    l_model_default = "gpt-5-mini"  # all light tasks → mini
     if azure_ai_key:
         h_provider = heavy_cfg.get("provider", "azure-openai")
         h_model = heavy_cfg.get("model", h_model_default)
