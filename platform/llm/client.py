@@ -908,6 +908,23 @@ class LLMClient:
 
         elapsed = int((time.monotonic() - t0) * 1000)
 
+        if resp.status_code == 400 and "content management policy" in resp.text.lower():
+            # Azure content filter blocked the prompt — not a transient error, don't
+            # count in circuit breaker, return a neutral synthetic completion instead.
+            logger.warning(
+                "LLM %s/%s HTTP 400 content policy — returning synthetic neutral response",
+                provider,
+                model,
+            )
+            return LLMResponse(
+                content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
+                tool_calls=[],
+                finish_reason="content_filter",
+                input_tokens=0,
+                output_tokens=0,
+                duration_ms=elapsed,
+            )
+
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
 
@@ -1070,12 +1087,24 @@ class LLMClient:
 
         elapsed = int((time.monotonic() - t0) * 1000)
 
+        if resp.status_code == 400 and "content management policy" in resp.text.lower():
+            logger.warning(
+                "LLM %s/%s HTTP 400 content policy (Responses API) — returning synthetic neutral response",
+                provider,
+                model,
+            )
+            return LLMResponse(
+                content="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
+                tool_calls=[],
+                finish_reason="content_filter",
+                input_tokens=0,
+                output_tokens=0,
+                duration_ms=elapsed,
+            )
+
         if resp.status_code != 200:
             raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:200]}")
-
         data = resp.json()
-
-        # Parse Responses API output array
         content = ""
         parsed_tool_calls: list[LLMToolCall] = []
         for item in data.get("output", []):
@@ -1416,6 +1445,23 @@ class LLMClient:
             ) as resp:
                 if resp.status_code != 200:
                     text = await resp.aread()
+                    if (
+                        resp.status_code == 400
+                        and b"content management policy" in text.lower()
+                    ):
+                        logger.warning(
+                            "LLM stream %s/%s HTTP 400 content policy — yielding synthetic neutral response",
+                            provider,
+                            model,
+                        )
+                        yield LLMStreamChunk(
+                            delta="[CONTENT_POLICY_BLOCKED] Azure content management policy prevented this analysis. Treating as neutral/pass.",
+                            done=True,
+                            model=model,
+                            tokens_in=0,
+                            tokens_out=0,
+                        )
+                        return
                     raise RuntimeError(f"HTTP {resp.status_code}: {text[:200]}")
                 logger.warning("LLM stream %s/%s connected", provider, model)
                 _stream_usage: dict = {}
