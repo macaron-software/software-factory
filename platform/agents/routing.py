@@ -226,20 +226,28 @@ def _select_model_for_agent(
 
     candidates: list[tuple[str, str]] = []
     # Model tiers (all on azure-openai endpoint):
-    #   reasoning/leadership → gpt-5
-    #   code/tests           → gpt-5.1-codex
-    #   small talk/default   → gpt-5-mini
+    #   reasoning/leadership complex → gpt-5.2
+    #   code/tests complex           → gpt-5.1-codex (Responses API)
+    #   reasoning/code simple        → gpt-5.1
+    #   tasks/default                → gpt-5-mini
     codex_model = os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
-    h_model_reasoning = "gpt-5.2"
-    h_model_code = codex_model
+    h_model_default = (
+        "gpt-5.2"
+        if category_heavy == "reasoning_heavy"
+        else codex_model
+        if category_heavy == "production_heavy"
+        else "gpt-5.1"  # tasks_heavy
+    )
+    l_model_default = (
+        "gpt-5.1"
+        if category_light in ("reasoning_light", "production_light")
+        else "gpt-5-mini"  # tasks_light
+    )
     if azure_ai_key:
         h_provider = heavy_cfg.get("provider", "azure-openai")
-        h_model = heavy_cfg.get(
-            "model",
-            h_model_reasoning if category_heavy == "reasoning_heavy" else h_model_code,
-        )
+        h_model = heavy_cfg.get("model", h_model_default)
         l_provider = light_cfg.get("provider", "azure-openai")
-        l_model = light_cfg.get("model", "gpt-5-mini")
+        l_model = light_cfg.get("model", l_model_default)
         candidates = [(h_model, h_provider), (l_model, l_provider)]
     else:
         candidates = [("gpt-5-mini", "azure-openai")]
@@ -268,7 +276,7 @@ def _select_model_for_agent(
         return "azure-openai", "gpt-5.2"
     if role in _CODE_ROLES or tags & _CODE_TAGS:
         return "azure-openai", os.environ.get("AZURE_CODEX_MODEL", "gpt-5.1-codex")
-    return "azure-openai", "gpt-5-mini"
+    return "azure-openai", "gpt-5.1"  # tasks: default to gpt-5.1
 
 
 def _route_provider(
