@@ -31,7 +31,7 @@ _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
 # REF: arXiv:2602.20021 — SBD-02/SBD-08: block reads/writes of sensitive credential files
 # regardless of path location (defense-in-depth against info disclosure + destructive actions).
 _SENSITIVE_FILE_RE = re.compile(
-    r"(?:/|^)(?:\.env$|\.ssh/|id_rsa$|id_ecdsa$|id_ed25519$|\.aws/credentials|"
+    r"(?:/|^)(?:\.env(?:\.(?!example|sample|template|test)[^/]*)?$|\.ssh/|id_rsa$|id_ecdsa$|id_ed25519$|\.aws/credentials|"
     r"\.gnupg/|secrets?\.(json|ya?ml)$|.*\.(pem|key|pfx|p12|p8|crt)$)",
     re.IGNORECASE,
 )

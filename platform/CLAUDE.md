@@ -318,37 +318,80 @@ Amélioration Continue  web/routes/pages.py  projets pilotes bout-en-bout en cyc
 ## SECURITY — arXiv:2602.20021 Mitigations
 
 **Reference:** "Red-Teaming Autonomous LLM Agents in Live Labs" (arXiv:2602.20021, Feb 2026)
-Documented 11 vulnerability classes in multi-agent systems. Our mitigations:
+11 case studies of red-teaming autonomous LLM agents. Full coverage (11/11 CS addressed):
 
-### Threat Model & Design Decisions
+### Case Study → Mitigation Map
 
-| Threat (paper code) | Mitigation | File | Note |
+| CS | Threat | Mitigation | File |
 |---|---|---|---|
-| SBD-02 Info disclosure | Sensitive file blocklist on `code_read` + `code_write` | `tools/code_tools.py` | `.env`, `*.key`, `*.pem`, SSH keys, JWT in output |
-| SBD-03 Cross-session leakage | Same blocklist on reads | `tools/code_tools.py` | |
-| SBD-04 DoS / resource abuse | `RESOURCE_ABUSE` L0 pattern (busy-loops, fork bombs) | `agents/adversarial.py` | Score +7 |
-| SBD-05 Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` hard budget per agent run | `agents/executor.py` | Env override |
-| SBD-06 Identity spoofing | A2A `from_agent` validation + `IDENTITY_CLAIM` L0 | `a2a/bus.py` + `adversarial.py` | Log+flag (not hard reject yet) |
-| SBD-07 Cross-agent prop. | Memory write sanitization (`sanitize_agent_output`) | `memory/manager.py` | project + global |
-| SBD-08 Destructive actions | Sensitive file blocklist + audit trail on `code_write` | `tools/code_tools.py` + `security/audit.py` | |
-| SBD-09 Prompt injection | `PROMPT_INJECTION` L0 (+8) in output + tool results | `agents/adversarial.py` | |
-| SBD-10 Partial takeover | Memory write sanitization, max 8K value | `memory/manager.py` | |
-| SBD-11 Fake completion | Already: `FAKE_BUILD`/`MOCK`/`HALLUCINATION` L0 | `agents/adversarial.py` | Pre-existing |
-| SBD-01 Unauthorized compliance | A2A owner_id scoping (logged, not hard-blocked) | `a2a/bus.py` | |
+| CS1 Disproportionate response | Destructive self-action via social engineering | `RESOURCE_ABUSE` L0 + `MAX_TOOL_CALLS` | `adversarial.py`, `executor.py` |
+| CS2 Non-owner compliance (SBD-01) | Agents comply with non-owner instructions | A2A `_check_delegation_scope()` + owner_id | `a2a/bus.py` |
+| CS3 PII disclosure | Sensitive data embedded in output/code | `PII_LEAK` L0 (+7) + sensitive file blocklist | `adversarial.py`, `code_tools.py` |
+| CS4 Resource looping (SBD-04) | Induced infinite loops consuming resources | `RESOURCE_ABUSE` L0 (+7) — busy-loops, fork bombs | `adversarial.py` |
+| CS5 DoS storage (SBD-05) | Mass storage creation without bound | `MAX_TOOL_CALLS_PER_RUN=50` hard budget | `executor.py` |
+| CS6 Provider values | LLM provider biases silently alter behavior | **Intentionally not mitigated** — inherent to LLM | N/A |
+| CS7 Agent harm (SBD-08) | Destructive file ops under manipulation | Sensitive file blocklist + audit trail | `code_tools.py`, `security/audit.py` |
+| CS8 Identity spoofing (SBD-06) | Cross-channel display-name spoofing | A2A `from_agent` validation + `IDENTITY_CLAIM` L0 | `a2a/bus.py`, `adversarial.py` |
+| CS9 Cross-agent capability transfer | Unsafe skill propagation between agents | Memory sanitization limits poisoned knowledge | `memory/manager.py` |
+| CS10 Agent corruption via external resource | Gist/Pastebin URL in memory → remote injection | `EXTERNAL_RESOURCE` L0 (+6) + WARNING log on write | `adversarial.py`, `memory/manager.py` |
+| CS11 Libelous broadcast | Mass email/post after impersonation | `IDENTITY_CLAIM` L0 + `MAX_TOOL_CALLS` (no outbound tools) | `adversarial.py`, `executor.py` |
+
+### SBD Code → Implementation
+
+| SBD | Description | Mitigation | Score |
+|---|---|---|---|
+| SBD-02/03 | Info disclosure | `_SENSITIVE_FILE_RE` blocklist on read/write | block |
+| SBD-04 | DoS / resource abuse | `RESOURCE_ABUSE` L0 | +7 |
+| SBD-05 | Resource consumption | `MAX_TOOL_CALLS_PER_RUN=50` | hard stop |
+| SBD-06 | Identity spoofing | `from_agent` + `IDENTITY_CLAIM` L0 | +7 |
+| SBD-07/10 | Cross-agent propagation | `sanitize_agent_output` on all memory writes | strip |
+| SBD-08 | Destructive actions | Blocklist + `audit_log` | block+log |
+| SBD-09 | Prompt injection | `PROMPT_INJECTION` L0 in output + tool results | +8/+6 |
+| SBD-11 | Fake completion | `FAKE_BUILD`/`MOCK`/`HALLUCINATION` (pre-existing) | +4/+7 |
+| SBD-01 | Unauthorized compliance | A2A `_check_delegation_scope()` (log-only) | log |
 
 ### Swiss Cheese Defense Model
 ```
-L0 adversarial (deterministic, 0ms)  → code output quality + security patterns
-L1 adversarial (LLM semantic, ~5s)   → holistic review
-Tool guards (sync, before execution) → path/file blocklist, budget
-Memory sanitization (on write)       → strip injection from shared state
-A2A validation (on publish)          → identity check + scope logging
-Audit trail                          → `admin_audit_log` table for forensics
+L0 adversarial (deterministic, 0ms)  → PROMPT_INJECTION · IDENTITY_CLAIM · RESOURCE_ABUSE
+                                        EXTERNAL_RESOURCE · PII_LEAK · HARDCODED_SECRET
+L1 adversarial (LLM semantic, ~5s)   → semi-formal review (arXiv:2603.01896)
+Tool guards (sync, before execution) → path/file blocklist, tool budget
+Memory sanitization (on write)       → sanitize_agent_output + URL warning (CS10)
+A2A validation (on publish)          → from_agent identity + scope logging
+Audit trail                          → admin_audit_log on destructive actions
 ```
 
-### What We Intentionally Don't Do (and why)
-- **No hard-block on A2A from_agent mismatch** — would break legitimate cross-session agent delegation (log+flag instead)
-- **No Landlock/Docker per agent** — too invasive for Phase 1; planned in scope hierarchy plan
-- **No full ACL on memory_project reads** — already scoped by `project_id` column in all queries
-- **No RBAC at runtime tool dispatch** — documented in scope hierarchy plan (separate initiative)
-- **No prompt injection hard-block in tool results** — log+score (avoid breaking RAG agents citing docs with injection text)
+### Intentional Non-Mitigations
+- **CS6 — Provider values**: LLM provider biases/refusals are intrinsic to the model, not observable at platform level. No mitigation possible; monitor via L1 adversarial reviews.
+- **No hard-block on A2A from_agent mismatch** — would break legitimate cross-session delegation (log+flag instead)
+- **No Landlock/Docker per agent** — Phase 3+ (scope hierarchy plan)
+- **No RBAC at runtime tool dispatch** — separate initiative (scope hierarchy plan)
+- **No PII scrubbing on output text** — only code_write scanned; full NLP PII detection is Phase 3+
+
+---
+
+## AGENTIC CODE REASONING — arXiv:2603.01896
+
+**Reference:** "Semi-formal Reasoning for Agentic Code Analysis" (arXiv:2603.01896, Mar 2026)
+Patch equivalence 78%→93% · fault localization +5pp · code QA 87%. Certificate-style reasoning.
+
+### What: Semi-formal Reasoning
+Forces agent to structure output: **Premises** (tool evidence) → **Trace** (claim↔evidence map) → **Verdict**.
+Unlike chain-of-thought: cannot skip cases, cannot make unsupported claims — acts as a proof certificate.
+
+### Where applied
+
+| Component | File | How |
+|---|---|---|
+| L1 adversarial reviewer | `agents/adversarial.py` | Prompt requires `premises[]` + `trace[]` before score/verdict. UNVERIFIED trace items → surfaced as hallucination signal. |
+| QA protocol | `patterns/engine.py` | `_QA_PROTOCOL` step 5: Premises/Trace/Conclusion before [APPROVE]/[VETO] |
+| Review protocol | `patterns/engine.py` | `_REVIEW_PROTOCOL`: semi-formal before APPROVE/REQUEST_CHANGES |
+| RLM final answer | `agents/rlm.py` | `final` action requires `premises[]` field; every claim must cite a finding |
+
+### Why these four and not others
+- **L1 reviewer** = direct match for "patch equivalence verification" (paper's primary task, +15pp).
+- **QA/review protocols** = fault localization + code QA tasks from paper (+5pp, 87% accuracy).
+- **RLM** = execution-free code reasoning — paper shows 93% accuracy without running code.
+- **NOT in executor tool-call loop** — semi-formal overhead (~300 tokens) too costly per tool call; reserved for synthesis steps.
+- **NOT in L0 checks** — L0 is deterministic regex, no LLM involved.
+- **Backward-compatible** — `premises`/`trace` fields optional in JSON; older LLMs return just score/verdict (no breakage).

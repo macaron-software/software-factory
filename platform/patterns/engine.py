@@ -195,6 +195,8 @@ COMPLETION CHECKLIST (before git_commit):
 5. git_commit with meaningful message"""
 
 # Validation protocol — telegraphic
+# REF: arXiv:2603.01896 — semi-formal reasoning improves fault localization +5pp,
+# code QA 87% accuracy. Structured Premises/Trace/Verdict prevents skipped cases.
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
 
 WORKFLOW:
@@ -209,7 +211,11 @@ WORKFLOW:
    - browser_screenshot() → captures real browser rendering
    - Minimum 2 screenshots: home page + key interaction
 4. code_read source files → check for obvious bugs
-5. Deliver verdict based on ACTUAL test results + screenshots
+5. SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
+   Premises: list each FACT from tool output (exit codes, test counts, error lines)
+   Trace: map each claim to a premise or mark UNVERIFIED
+   Conclusion: [APPROVE] or [VETO] derived ONLY from premises above
+6. Deliver verdict based on ACTUAL test results + screenshots
 
 RULES:
 - NEVER use generic build() for Android — use android_build() and android_test() instead.
@@ -222,9 +228,14 @@ RULES:
 - DO NOT fabricate screenshots or build scripts."""
 
 # Review protocol — telegraphic
+# REF: arXiv:2603.01896 — semi-formal reasoning improves patch equivalence 78%→93%
 _REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
 
 DO: code_read files → code_search references → build(command="...") to verify.
+SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
+  Premises: what does each code_read / build result prove?
+  Trace: does the implementation match the requirement, step by step?
+  Verdict: [APPROVE] or [REQUEST_CHANGES] derived from above — no skipped cases.
 VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues.
 You MUST call build tool to verify the code compiles before approving."""
 

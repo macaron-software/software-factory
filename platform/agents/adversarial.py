@@ -37,6 +37,9 @@ INSPIRATION:
   and adversarial collaboration pattern in GoodAI / Pentagi red-team workflows
   (https://github.com/vxcontrol/pentagi). Our RSSI team (security-hacking.yaml)
   is the offensive counterpart — agents actively attack the system they built.
+  L1 uses semi-formal reasoning (arXiv:2603.01896): Premises → Trace → Verdict.
+  Forces reviewer to ground claims in tool evidence before concluding — acts as
+  a certificate that prevents skipping cases or making unsupported claims.
 """
 
 from __future__ import annotations
@@ -268,13 +271,13 @@ _PROMPT_INJECTION_PATTERNS = [
     re.compile(r"you\s+are\s+now\s+(?:DAN|[A-Z]{2,10}|an?\s+AI\s+without)", re.I),
     re.compile(r"forget\s+(?:everything|all)\s+(?:you\s+(?:know|were\s+told)|above)", re.I),
     re.compile(r"new\s+(?:system\s+)?(?:prompt|instructions?)\s*:", re.I),
-    re.compile(r"\[SYSTEM\]\s*(?:To|For)\s+\w+Agent", re.I),
+    re.compile(r"\[SYSTEM\]\s*\w*Agent", re.I),  # [SYSTEM] XxxAgent — inter-agent injection
 ]
 
 # REF: arXiv:2602.20021 — SBD-06: identity spoofing — agent claims to be another system
 _IDENTITY_CLAIM_PATTERNS = [
     re.compile(r"\bI\s+am\s+(?:Jarvis|the\s+(?:system|platform|admin|CTO|root)\b)", re.I),
-    re.compile(r"\bI\s+have\s+(?:special|elevated|admin|root|platform)\s+(?:permissions?|access|privileges?)", re.I),
+    re.compile(r"\bI\s+have\s+(?:(?:special|elevated|admin|root|platform)\s+)+(?:permissions?|access|privileges?)", re.I),
     re.compile(r"(?:acting|operating)\s+as\s+(?:Jarvis|system|admin|platform)", re.I),
     re.compile(r"my\s+security\s+restrictions?\s+(?:have\s+been\s+)?(?:removed|disabled|lifted|bypassed)", re.I),
 ]
@@ -283,9 +286,33 @@ _IDENTITY_CLAIM_PATTERNS = [
 _RESOURCE_ABUSE_PATTERNS = [
     (r"""while\s+True\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
     (r"""while\s+1\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
-    (r"""os\.fork\s*\(\s*\).*(?:while|loop|for)""", "fork() in loop (fork bomb risk)"),
+    (r"""os\.fork\s*\(\s*\)""", "os.fork() call — fork bomb risk"),  # flag any fork() in app code
     (r"""subprocess\.[A-Za-z]+\([^)]*\)\s*.*while""", "subprocess in loop without bound (DoS)"),
     (r"""time\.sleep\s*\(\s*0\s*\)""", "sleep(0) busy-wait pattern"),
+    (r"""rm\s+-(?:rf|fr)\s+/""", "rm -rf / — destructive filesystem wipe (CS1/CS7)"),
+]
+
+# REF: arXiv:2602.20021 — CS10: Agent Corruption via external linked resources.
+# An agent convinced to store a URL to an externally-editable resource (Gist, Pastebin)
+# in persistent memory creates an indirect injection channel: the external content is
+# fetched in future sessions and may contain attacker-modified instructions.
+_EXTERNAL_RESOURCE_PATTERNS = [
+    re.compile(r"https?://gist\.github(?:usercontent)?\.com/", re.I),
+    re.compile(r"https?://pastebin\.com/", re.I),
+    re.compile(r"https?://raw\.githubusercontent\.com/", re.I),
+    re.compile(r"https?://hastebin\.com/", re.I),
+    re.compile(r"https?://ghostbin\.(?:com|co)/", re.I),
+    re.compile(r"https?://paste\.[a-z]{2,6}/", re.I),
+    re.compile(r"https?://(?:dpaste|bpaste|rentry)\.(?:com|org|co)/", re.I),
+]
+
+# REF: arXiv:2602.20021 — CS3: Disclosure of Sensitive Information.
+# PII patterns that should not appear in written code files or agent output.
+_PII_PATTERNS = [
+    (r"\b\d{3}-\d{2}-\d{4}\b", "SSN (Social Security Number) pattern"),
+    (r"\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13})\b", "Credit card number pattern"),
+    (r"\bIBAN\s*:?\s*[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}\b", "IBAN bank account number"),
+    (r"\b(?:patient|medical|health)\s+(?:id|record|number)\s*:?\s*\S{4,}", "Medical record reference"),
 ]
 
 # Stack mismatch detection — backend code in wrong language
@@ -730,6 +757,38 @@ def check_l0(
                 score += 7  # hard reject — DoS risk
                 break
 
+    # EXTERNAL_RESOURCE: CS10 — detect memory writes storing externally-editable URLs.
+    # An agent coerced into storing a Gist/Pastebin URL in memory creates an indirect
+    # injection channel that persists across sessions. REF: arXiv:2602.20021 CS10.
+    for tc in (tool_calls or []):
+        if tc.get("name") not in ("memory_store",):
+            continue
+        val = str(tc.get("args", {}).get("value", "") or tc.get("args", {}).get("content", ""))
+        for url_re in _EXTERNAL_RESOURCE_PATTERNS:
+            if url_re.search(val):
+                issues.append(
+                    "EXTERNAL_RESOURCE: memory_store contains externally-editable URL — "
+                    "indirect injection channel risk (arXiv:2602.20021 CS10)"
+                )
+                score += 6  # near-reject — flag for human review
+                break
+
+    # PII_LEAK: CS3 — detect PII patterns in code_write output.
+    # Agents should not embed real SSN/credit-card/IBAN/medical data in written files.
+    # REF: arXiv:2602.20021 CS3: Disclosure of Sensitive Information.
+    for tc in (tool_calls or []):
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc:
+            continue
+        for pattern, desc in _PII_PATTERNS:
+            if re.search(pattern, fc, re.IGNORECASE):
+                issues.append(f"PII_LEAK: {desc} found in {fp}")
+                score += 7  # hard reject — PII in code is a data protection violation
+                break
+
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)
@@ -799,7 +858,9 @@ async def check_l1(
                 "Do NOT reject for 'incomplete' if agent addressed their own role contribution."
             )
 
-        prompt = f"""Evaluate this agent output for quality. Score 0-10 (0=excellent, 10=garbage).
+        prompt = f"""Evaluate this agent output for quality using SEMI-FORMAL REASONING.
+# REF: arXiv:2603.01896 — Semi-formal reasoning improves code analysis accuracy.
+# Requires explicit Premises → Trace → Verdict to prevent skipping cases.
 
 AGENT: {agent_name} ({agent_role})
 TASK: {task[:500]}
@@ -817,6 +878,11 @@ IMPORTANT CONTEXT:
 - Only available tools: code_read, code_write, code_edit, list_files, deep_search. Do NOT penalize for not using tools that don't exist (build_tool, git_commit, deploy, etc).
 - If files already exist in the workspace, reading them IS valid work.{pattern_context}
 
+SEMI-FORMAL REASONING PROTOCOL (mandatory — you must complete all 3 steps):
+1. PREMISES: List each verifiable FACT from tool evidence (tool name → what it proves).
+2. TRACE: For each agent claim, map it to a premise or mark UNVERIFIED.
+3. VERDICT: Derive your conclusion ONLY from the above — no assumptions.
+
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
 2. HALLUCINATION: Claims actions not supported by tool evidence
@@ -826,7 +892,7 @@ Check for:
 6. STACK_MISMATCH: Code written in wrong language for declared stack (e.g. TypeScript backend when task says Rust/axum)
 
 Respond ONLY with JSON:
-{{"score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
+{{"premises": ["tool X proves Y", ...], "trace": ["claim A → premise 1", "claim B → UNVERIFIED", ...], "score": <0-10>, "issues": ["issue1", "issue2"], "verdict": "APPROVE" or "REJECT"}}"""
 
         client = get_llm_client()
         resp = await client.chat(
@@ -847,6 +913,8 @@ Respond ONLY with JSON:
         l1_score = int(data.get("score", 0))
         l1_issues = data.get("issues", [])
         verdict = data.get("verdict", "APPROVE")
+        # REF: arXiv:2603.01896 — capture semi-formal reasoning trace for audit/debug
+        sf_trace = data.get("trace", [])
 
         # HALLUCINATION/SLOP/STACK_MISMATCH in issues = reject UNLESS:
         # - agent used code_write/code_edit (wrote real code)
@@ -862,6 +930,13 @@ Respond ONLY with JSON:
             tc.get("name", "") in ("code_write", "code_edit", "git_commit")
             for tc in tool_calls
         )
+        # REF: arXiv:2603.01896 — unverified claims in semi-formal trace = hallucination signal
+        # Only surface if agent produced no write evidence (otherwise text describes tool output)
+        if sf_trace and not used_write_tools:
+            unverified = [t for t in sf_trace if "UNVERIFIED" in t.upper()]
+            if unverified:
+                logger.debug("[L1 semi-formal] unverified claims (no write tools): %s", unverified)
+                l1_issues = l1_issues + [f"UNVERIFIED: {u}" for u in unverified[:3]]
         # In hierarchical patterns, leads/testers reference files from workers — not hallucination
         is_hierarchical_reviewer = pattern_type == "hierarchical" and any(
             r in (agent_role or "").lower()

@@ -47,4 +47,4 @@ include = ["core*", "mcp_lrm*", "cli*", "analyzers*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["platform/tests"]

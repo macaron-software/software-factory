@@ -199,6 +199,18 @@ class MemoryManager:
             value = _san(value, f"memory_project:{project_id}")[:8192]
         except Exception:
             pass
+        # REF: arXiv:2602.20021 — CS10: warn when storing externally-editable URLs.
+        import re as _re
+        _EXT_URL_RE = _re.compile(
+            r"https?://(?:gist\.github|raw\.githubusercontent|pastebin|hastebin|ghostbin|rentry|dpaste|bpaste)\.",
+            _re.I,
+        )
+        if _EXT_URL_RE.search(value):
+            logger.warning(
+                "SECURITY[CS10] project_store key=%r contains external URL — "
+                "indirect injection channel risk (arXiv:2602.20021 CS10). "
+                "project=%s", key, project_id
+            )
         now = datetime.now(timezone.utc).isoformat()
         relevance = _compute_relevance(confidence, now, 0)
         conn = get_db()
@@ -343,6 +355,17 @@ class MemoryManager:
             value = _san(value, "memory_global")[:8192]
         except Exception:
             pass
+        # REF: arXiv:2602.20021 — CS10: warn when storing externally-editable URLs in global memory.
+        import re as _re
+        _EXT_URL_RE = _re.compile(
+            r"https?://(?:gist\.github|raw\.githubusercontent|pastebin|hastebin|ghostbin|rentry|dpaste|bpaste)\.",
+            _re.I,
+        )
+        if _EXT_URL_RE.search(value):
+            logger.warning(
+                "SECURITY[CS10] global_store key=%r contains external URL — "
+                "indirect injection channel risk (arXiv:2602.20021 CS10)", key
+            )
         now = datetime.now(timezone.utc).isoformat()
         conn = get_db()
         existing = conn.execute(

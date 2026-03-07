@@ -138,6 +138,10 @@ class ProjectRLM:
                     f"[RLM:{self.project_name}] FINAL_ANSWER at iteration {i + 1}",
                     flush=True,
                 )
+                # REF: arXiv:2603.01896 — log premises for traceability
+                premises = decision.get("premises", [])
+                if premises:
+                    logger.debug("[RLM semi-formal] %d premises: %s", len(premises), premises[:3])
                 return RLMResult(
                     answer=decision.get("answer", ""),
                     findings=findings,
@@ -383,25 +387,28 @@ class ProjectRLM:
         elif findings:
             urgency = f"\nYou have {len(findings)} findings. If you can answer the query, emit FINAL_ANSWER now.\n"
 
+        context_block = f"PROJECT CONTEXT:\n{context[:2000]}" if context else ""
         return f'''Project: "{self.project_name}" at {self.project_path}
 Iteration {iteration + 1}/{max_iterations}.
 {urgency}
 USER QUERY: {query}
 
-{f"PROJECT CONTEXT:\n{context[:2000]}" if context else ""}
+{context_block}
 
 FINDINGS SO FAR:
 {findings_text}
 
 Generate 1-3 exploration queries OR emit FINAL_ANSWER.
+# REF: arXiv:2603.01896 — semi-formal reasoning: when emitting final answer, ground
+# each claim in a specific finding (file:line or grep match). No unsupported claims.
 
 Sub-agent tools: "grep" (pattern + glob), "read" (files list), "structure" (path), "auto".
 
 JSON response ONLY:
 {{"action": "explore", "queries": [{{"query": "...", "tool": "grep|read|structure|auto", "pattern": "...", "glob": "...", "files": [...], "reason": "..."}}]}}
 
-OR:
-{{"action": "final", "answer": "Comprehensive answer with file paths, code excerpts, concrete facts."}}
+OR (semi-formal final answer):
+{{"action": "final", "premises": ["finding X proves Y", ...], "answer": "Comprehensive answer — every claim cites a premise (file:line or grep match)."}}
 '''
 
     def _parse_response(self, response: str) -> dict:

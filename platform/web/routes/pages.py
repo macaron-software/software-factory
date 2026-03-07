@@ -1225,9 +1225,13 @@ async def api_improvement_start(project_id: str):
     _stories = "\n".join(f"  - {s}" for s in proj.get("user_stories", []))
     _a11y = "\n".join(f"  - {a}" for a in proj.get("a11y_requirements", []))
     _tokens = "\n".join(f"  {k}: {v}" for k, v in proj.get("design_tokens", {}).items())
+    from ...config import DATA_DIR as _DATA_DIR
+    _workspace = str(_DATA_DIR / "workspaces" / project_id)
     brief = (
         f"AC Amélioration Continue — {proj['name']} — Cycle {cycle_num}/20\n\n"
         f"Projet : {proj['id']}\nStack : {', '.join(proj['tech'])}\nTier : {proj['tier_label']}\n"
+        f"## Workspace\n{_workspace}\n"
+        f"TOUS les chemins de fichiers DOIVENT commencer par : {_workspace}/\n"
         + (f"Description : {proj['description']}\n" if proj.get("description") else "")
         + (f"\nUser Stories:\n{_stories}\n" if _stories else "")
         + (
@@ -1242,7 +1246,8 @@ async def api_improvement_start(project_id: str):
         )
         + f"\nCycle {cycle_num}/20 : inception → TDD sprint → adversarial → QA → CI/CD → enregistrement.\n"
         f"Objectif : score > 80/100, 0 défauts critiques, traçabilité 100%.\n"
-        f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections.\n"
+        f"INCEPTION (phase 0) : OBLIGATOIRE — appeler code_write pour créer/mettre à jour {_workspace}/INCEPTION.md avec le cycle {cycle_num}, user stories complètes, stack, et critères d'acceptance GIVEN/WHEN/THEN.\n"
+        f"Si cycle > 1 : lire ADVERSARIAL_{{N-1}}.md et CICD_FAILURE_{{N-1}}.md pour les corrections à intégrer dans INCEPTION.md.\n"
         f"Workflow : ac-improvement-cycle"
     )
 
