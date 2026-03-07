@@ -393,6 +393,7 @@ async def mkt_generate_plan(request: Request):
             messages=[LLMMessage(role="user", content=full_prompt)],
             system_prompt=_MKT_PLAN_SYSTEM,
             temperature=0.5,
+            max_tokens=8000,
         )
         raw = resp.content.strip()
         if "```json" in raw:

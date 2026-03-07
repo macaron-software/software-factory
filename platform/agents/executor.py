@@ -35,6 +35,11 @@ logger = logging.getLogger(__name__)
 # Max tool-calling rounds to prevent infinite loops
 MAX_TOOL_ROUNDS = 8
 
+# REF: arXiv:2602.20021 — SBD-05: per-run tool call budget to prevent resource exhaustion
+MAX_TOOL_CALLS_PER_RUN = int(os.getenv("MAX_TOOL_CALLS_PER_RUN", "50"))
+# Per-run counter: keyed by (session_id, run_uuid) populated at exec start
+_run_tool_counts: dict[str, int] = {}
+
 # Tools that produce code changes and should trigger auto-verification
 _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
 # Max automatic repair rounds after a failed verification (lint/build)
@@ -108,6 +113,8 @@ class ExecutionContext:
     capability_grade: str = "executor"
     # Max tool-calling rounds (0 = use global MAX_TOOL_ROUNDS)
     max_rounds: int = 0
+    # Vertical traceability chain (mission → phase → task)
+    lineage: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -619,6 +626,7 @@ class AgentExecutor:
 
             # Tool-calling loop
             deep_search_used = False
+            _force_tc_attempts = 0  # track how many times we've injected a forcing message
             for round_num in range(MAX_TOOL_ROUNDS):
                 llm_resp = await self._llm.chat(
                     messages=messages,
@@ -686,8 +694,37 @@ class AgentExecutor:
                             tool_calls=xml_tcs,
                         )
 
-                # No tool calls → final response
+                # No tool calls → force retry or final response
                 if not llm_resp.tool_calls:
+                    _has_write_tools = any(
+                        t.get("function", {}).get("name")
+                        in ("code_write", "code_edit", "fractal_code")
+                        for t in (tools or [])
+                    )
+                    if (
+                        tools is not None
+                        and _has_write_tools
+                        and round_num < MAX_TOOL_ROUNDS - 1
+                        and _force_tc_attempts < 2
+                    ):
+                        _force_tc_attempts += 1
+                        # Strip read-only tools so only write tools remain
+                        tools = [
+                            t for t in tools
+                            if t.get("function", {}).get("name")
+                            in ("code_write", "code_edit", "fractal_code", "git_commit")
+                        ] or tools
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content=(
+                                    "⚡ STOP. Tu dois appeler code_write MAINTENANT.\n"
+                                    'Exemple: code_write(path="src/index.ts", content="// full code\\n...")\n'
+                                    "Pas de texte. Appelle l'outil directement."
+                                ),
+                            )
+                        )
+                        continue
                     content = llm_resp.content
                     break
 
@@ -714,6 +751,19 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
+                    # When forcing write-only mode, reject calls to stripped tools
+                    if _force_tc_attempts > 0 and tools is not None:
+                        _allowed_names = {t.get("function", {}).get("name") for t in tools}
+                        if tc.function_name not in _allowed_names:
+                            messages.append(
+                                LLMMessage(
+                                    role="tool",
+                                    content=f"Error: '{tc.function_name}' not available. Call code_write.",
+                                    tool_call_id=tc.id,
+                                    name=tc.function_name,
+                                )
+                            )
+                            continue
                     # ── Workspace conflict guard: warn if another agent is writing this file ──
                     if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
                         import time as _time
@@ -1118,6 +1168,7 @@ class AgentExecutor:
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False
             final_content = ""
+            _force_tc_attempts = 0  # track how many times we've injected a forcing message
             logger.warning(
                 "Agent %s: tools_enabled=%s, tools=%s, allowed=%s",
                 agent.id,
@@ -1223,8 +1274,37 @@ class AgentExecutor:
                             tool_calls=xml_tcs,
                         )
 
-                # No tool calls → stream remaining content in chunks
+                # No tool calls → force retry or stream remaining content
                 if not llm_resp.tool_calls:
+                    _has_write_tools = any(
+                        t.get("function", {}).get("name")
+                        in ("code_write", "code_edit", "fractal_code")
+                        for t in (tools or [])
+                    )
+                    if (
+                        tools is not None
+                        and _has_write_tools
+                        and not is_last_possible
+                        and _force_tc_attempts < 2
+                    ):
+                        _force_tc_attempts += 1
+                        # Strip read-only tools so only write tools remain
+                        tools = [
+                            t for t in tools
+                            if t.get("function", {}).get("name")
+                            in ("code_write", "code_edit", "fractal_code", "git_commit")
+                        ] or tools
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content=(
+                                    "⚡ STOP. Tu dois appeler code_write MAINTENANT.\n"
+                                    'Exemple: code_write(path="src/index.ts", content="// full code\\n...")\n'
+                                    "Pas de texte. Appelle l'outil directement."
+                                ),
+                            )
+                        )
+                        continue
                     final_content = llm_resp.content or ""
                     # Strip <think> blocks before chunking (tags would split across chunks)
                     import re as _re_exec
@@ -1276,6 +1356,20 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
+                    # When forcing write-only mode, reject calls to stripped tools
+                    if _force_tc_attempts > 0 and tools is not None:
+                        _allowed_names = {t.get("function", {}).get("name") for t in tools}
+                        if tc.function_name not in _allowed_names:
+                            messages.append(
+                                LLMMessage(
+                                    role="tool",
+                                    content=f"Error: '{tc.function_name}' not available. Call code_write.",
+                                    tool_call_id=tc.id,
+                                    name=tc.function_name,
+                                )
+                            )
+                            yield ("tool", f"REJECTED:{tc.function_name}")
+                            continue
                     yield ("tool", tc.function_name)
                     result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     logger.warning(

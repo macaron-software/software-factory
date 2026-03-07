@@ -461,6 +461,7 @@ async def ideation_create_epic(request: Request):
             messages=[LLMMessage(role="user", content=prompt)],
             system_prompt=_PO_EPIC_SYSTEM,
             temperature=0.5,
+            max_tokens=4096,
         )
         raw = resp.content.strip()
         if "```json" in raw:

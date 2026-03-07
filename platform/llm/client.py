@@ -659,7 +659,7 @@ class LLMClient:
             if d["role"] == "system" and provider == "minimax" and msgs:
                 d["role"] = "user"
                 d["content"] = f"[System instruction]: {d['content']}"
-            if name:
+            if name and provider != "minimax":  # MiniMax: name must be consistent (error 2013)
                 d["name"] = name
             if tool_call_id:
                 d["tool_call_id"] = tool_call_id
@@ -970,7 +970,7 @@ class LLMClient:
         sys_content = system_prompt or ""
         for m in messages:
             d = {"role": m.role, "content": m.content or ""}
-            if m.name:
+            if m.name and provider != "minimax":  # MiniMax: name must be consistent (error 2013)
                 d["name"] = m.name
             if provider == "minimax":
                 # MiniMax rejects system role in streaming

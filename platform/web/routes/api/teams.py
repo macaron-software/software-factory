@@ -144,7 +144,7 @@ async def import_team(request: Request):
             provider=a.get("provider", ""),
             model=a.get("model", ""),
             temperature=float(a.get("temperature", 0.7)),
-            max_tokens=int(a.get("max_tokens", 0)),
+            max_tokens=int(a.get("max_tokens", 4096)),
             skills=a.get("skills", []),
             tools=a.get("tools", []),
             mcps=a.get("mcps", []),

@@ -218,6 +218,11 @@ _HARDCODED_SECRET_PATTERNS = [
     (r"""(?:private_key|privatekey)\s*=\s*['"][^'"]{8,}['"]""", "Hardcoded private key"),
     (r"""-----BEGIN (?:RSA |EC )?PRIVATE KEY-----""", "Private key embedded in code"),
     (r"""(?:access_key_id|aws_access)\s*=\s*['"][A-Z0-9]{16,}['"]""", "Hardcoded AWS access key"),
+    # REF: arXiv:2602.20021 — SBD-02: additional credential patterns (sec-adv-secrets)
+    (r"""eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{10,}""", "JWT token hardcoded"),
+    (r"""sig=[A-Za-z0-9%+/]{20,}""", "Azure SAS signature token"),
+    (r"""(?:AZURE_OPENAI|OPENAI)_API_KEY\s*=\s*['"][a-zA-Z0-9\-]{20,}['"]""", "Azure/OpenAI API key"),
+    (r"""(?:sk|pk)-[A-Za-z0-9]{20,}""", "API secret key pattern (sk-/pk- prefix)"),
 ]
 
 # Security vulnerability patterns — unsafe operations
@@ -253,6 +258,34 @@ _FALSE_FALLBACK_PATTERNS = [
      "Stub return value — placeholder not replaced"),
     (r"""pass\s*#\s*(?:TODO|FIXME|implement|placeholder)""",
      "pass with TODO — implementation missing"),
+]
+
+# REF: arXiv:2602.20021 — SBD-09: prompt injection patterns in agent output / tool results
+# Detects attempts to override the next agent's system prompt via crafted content.
+_PROMPT_INJECTION_PATTERNS = [
+    re.compile(r"ignore\s+(?:previous|prior|above|all)\s+instructions?", re.I),
+    re.compile(r"disregard\s+(?:your|the)\s+system\s+prompt", re.I),
+    re.compile(r"you\s+are\s+now\s+(?:DAN|[A-Z]{2,10}|an?\s+AI\s+without)", re.I),
+    re.compile(r"forget\s+(?:everything|all)\s+(?:you\s+(?:know|were\s+told)|above)", re.I),
+    re.compile(r"new\s+(?:system\s+)?(?:prompt|instructions?)\s*:", re.I),
+    re.compile(r"\[SYSTEM\]\s*(?:To|For)\s+\w+Agent", re.I),
+]
+
+# REF: arXiv:2602.20021 — SBD-06: identity spoofing — agent claims to be another system
+_IDENTITY_CLAIM_PATTERNS = [
+    re.compile(r"\bI\s+am\s+(?:Jarvis|the\s+(?:system|platform|admin|CTO|root)\b)", re.I),
+    re.compile(r"\bI\s+have\s+(?:special|elevated|admin|root|platform)\s+(?:permissions?|access|privileges?)", re.I),
+    re.compile(r"(?:acting|operating)\s+as\s+(?:Jarvis|system|admin|platform)", re.I),
+    re.compile(r"my\s+security\s+restrictions?\s+(?:have\s+been\s+)?(?:removed|disabled|lifted|bypassed)", re.I),
+]
+
+# REF: arXiv:2602.20021 — SBD-04: resource abuse patterns in written code
+_RESOURCE_ABUSE_PATTERNS = [
+    (r"""while\s+True\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
+    (r"""while\s+1\s*:\s*(?:pass|continue)\s*$""", "Busy-wait infinite loop (DoS risk)"),
+    (r"""os\.fork\s*\(\s*\).*(?:while|loop|for)""", "fork() in loop (fork bomb risk)"),
+    (r"""subprocess\.[A-Za-z]+\([^)]*\)\s*.*while""", "subprocess in loop without bound (DoS)"),
+    (r"""time\.sleep\s*\(\s*0\s*\)""", "sleep(0) busy-wait pattern"),
 ]
 
 # Stack mismatch detection — backend code in wrong language
@@ -658,6 +691,44 @@ def check_l0(
                     f"fix errors before approving"
                 )
                 score += 7  # hard reject — broken build cannot be approved
+
+    # ── REF: arXiv:2602.20021 — NEW SECURITY L0 CHECKS ─────────────────────
+
+    # PROMPT_INJECTION: SBD-09 — detect injection attempts in agent output / tool results
+    for inj_pattern in _PROMPT_INJECTION_PATTERNS:
+        if inj_pattern.search(content):
+            issues.append(f"PROMPT_INJECTION: '{inj_pattern.pattern[:60]}' detected in output")
+            score += 8  # force reject — injection in output
+            break
+    # Also scan tool results (RAG / memory / code_read outputs)
+    for tc in (tool_calls or []):
+        result_text = str(tc.get("result", ""))
+        for inj_pattern in _PROMPT_INJECTION_PATTERNS:
+            if inj_pattern.search(result_text):
+                issues.append(f"PROMPT_INJECTION in tool result [{tc.get('name')}]: '{inj_pattern.pattern[:40]}'")
+                score += 6  # warn — poisoned data source
+                break
+
+    # IDENTITY_CLAIM: SBD-06 — detect agent claiming to be another system
+    for id_pattern in _IDENTITY_CLAIM_PATTERNS:
+        if id_pattern.search(content):
+            issues.append(f"IDENTITY_CLAIM: '{id_pattern.pattern[:60]}' detected")
+            score += 7  # hard reject
+            break
+
+    # RESOURCE_ABUSE: SBD-04 — detect DoS patterns in written code
+    for tc in (tool_calls or []):
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fc = str(tc.get("args", {}).get("content", ""))
+        if not fc:
+            continue
+        for pattern, desc in _RESOURCE_ABUSE_PATTERNS:
+            if re.search(pattern, fc, re.MULTILINE):
+                fp = str(tc.get("args", {}).get("path", "?"))
+                issues.append(f"RESOURCE_ABUSE: {desc} in {fp}")
+                score += 7  # hard reject — DoS risk
+                break
 
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports

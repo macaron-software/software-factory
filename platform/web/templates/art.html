@@ -1271,12 +1271,14 @@ async function skShowDetail(skillName) {
                                 ${!c.should_trigger ? '<span style="color:#f59e0b">negative test</span>' : ''}
                             </div>
                             ${(c.check_details||c.checks_details) ? `<div style="margin-top:0.35rem;display:flex;flex-wrap:wrap;gap:0.3rem">
-                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}">${ch.passed?'':''} ${ch.check_spec?.substring(0,30)||ch.spec?.substring(0,30)||''}</span>`).join('')}
+                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}" title="${ch.notes||''}">${ch.passed?'✓':'✗'} ${ch.check_spec?.substring(0,35)||ch.spec?.substring(0,35)||''}</span>`).join('')}
                             </div>` : ''}
+                            ${c.judge_notes ? `<div style="margin-top:0.4rem;padding:0.35rem 0.6rem;background:rgba(99,102,241,0.07);border-left:2px solid #6366f1;border-radius:3px;font-size:0.72rem;color:var(--text-secondary);line-height:1.5"><span style="color:#818cf8;font-weight:600">Judge: </span>${c.judge_notes}</div>` : ''}
                         </div>
                     </div>
                 </div>`;
             }).join('')}
+            ${d.coverage_gap?.length ? `<div style="margin-top:0.75rem;padding:0.4rem 0.75rem;background:rgba(245,158,11,0.07);border-left:3px solid #f59e0b;border-radius:4px;font-size:0.72rem;display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center"><span style="color:#f59e0b;font-weight:600;margin-right:0.25rem">Coverage gaps:</span>${d.coverage_gap.map(g=>`<span style="background:rgba(245,158,11,0.12);color:#fbbf24;border-radius:3px;padding:1px 6px">${g}</span>`).join('')}</div>` : ''}
         </div>`;
     } catch(e) {
         panel.innerHTML = `<div style="padding:1rem;color:#ef4444">Error: ${e.message}</div>`;

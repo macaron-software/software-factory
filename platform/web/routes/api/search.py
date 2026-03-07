@@ -296,6 +296,7 @@ Réponds UNIQUEMENT avec le JSON."""
             messages=[LLMMessage(role="user", content=retro_prompt)],
             system_prompt="Tu es un coach Agile expert en rétrospectives SAFe.",
             temperature=0.5,
+            max_tokens=2048,
         )
         raw = resp.content.strip()
         if "```json" in raw:
@@ -514,38 +515,6 @@ async def notification_status():
     return JSONResponse(
         {
             "configured": svc.is_configured,
-            "channels": {
-                "slack": svc.has_slack,
-                "email": svc.has_email,
-                "webhook": svc.has_webhook,
-            },
-        }
-    )
-
-
-@router.post("/api/notifications/test")
-async def notification_test():
-    """Send a test notification to all configured channels."""
-    from ....services.notification_service import (
-        NotificationPayload,
-        get_notification_service,
-    )
-
-    svc = get_notification_service()
-    if not svc.is_configured:
-        return JSONResponse(
-            {"error": "No notification channels configured"}, status_code=400
-        )
-    payload = NotificationPayload(
-        event="test",
-        title="Test Notification",
-        message="This is a test notification from Software Factory.",
-        severity="info",
-    )
-    await svc.notify(payload)
-    return JSONResponse(
-        {
-            "ok": True,
             "channels": {
                 "slack": svc.has_slack,
                 "email": svc.has_email,

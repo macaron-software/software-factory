@@ -299,6 +299,7 @@ async def test_ai_provider(provider_id: str):
                 json={
                     "model": model,
                     "messages": [{"role": "user", "content": "test"}],
+                    "max_tokens": 5,
                 },
             )
 

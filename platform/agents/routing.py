@@ -160,6 +160,11 @@ def _select_model_for_agent(
     )
 
     if not os.environ.get("AZURE_DEPLOY", ""):
+        # Per-agent override for code-writing agents (e.g. use azure-openai on OVH)
+        codex_prov = os.environ.get("PLATFORM_LLM_CODEX_PROVIDER", "")
+        if codex_prov and agent.id in ("ac-codex", "ac-architect"):
+            codex_model = os.environ.get("PLATFORM_LLM_CODEX_MODEL", "gpt-5-mini")
+            return codex_prov, codex_model
         # OVH demo or local dev — single model, no per-role dispatch
         model = os.environ.get("PLATFORM_LLM_MODEL", "MiniMax-M2.5")
         return prov, model
