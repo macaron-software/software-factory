@@ -1,0 +1,34 @@
+team_id: saas-fullstack
+technology: generic
+phase_type: development
+description: SaaS fullstack team — hierarchical with lead dev coordinating
+
+pattern:
+  type: hierarchical
+  agents:
+    - id: architecte
+    - id: dev
+    - id: code-reviewer
+
+task: |
+  Design and implement a REST API for a task management system.
+  Requirements:
+  - POST /tasks — create a task (title, description, priority)
+  - GET /tasks — list all tasks with pagination
+  - PUT /tasks/{id} — update task status
+  - DELETE /tasks/{id} — soft delete
+
+  Architect defines the API contract, Dev implements, Code Reviewer reviews.
+
+checks:
+  - has_keyword:POST
+  - has_keyword:GET
+  - has_keyword:pagination
+  - has_keyword:delete
+  - length_min:500
+
+expectations:
+  - "Architect produces a clear API contract with request/response schemas"
+  - "Developer implements endpoints following the architect's design"
+  - "Code reviewer identifies issues and suggests improvements"
+  - "Soft delete is implemented (not hard delete)"

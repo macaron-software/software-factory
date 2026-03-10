@@ -1,0 +1,20 @@
+team_id: team-popinz
+technology: react
+phase_type: development
+description: Team team-popinz — end-to-end collaboration bench
+pattern:
+  type: hierarchical
+  agents:
+  - id: brain
+  - id: dev-react
+  - id: dev
+task: 'Build a real-time event discovery feature: geolocation-based search within radius, event filtering (date, category,
+  price), map integration with clustering, and social sharing with deep links.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

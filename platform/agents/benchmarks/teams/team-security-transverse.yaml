@@ -1,0 +1,20 @@
+team_id: team-security-transverse
+technology: generic
+phase_type: development
+description: Team team-security-transverse — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: ciso
+  - id: secops-engineer
+  - id: security-architect
+task: 'Perform a security audit on this API authentication flow: JWT tokens stored in localStorage, no refresh token rotation,
+  CORS set to ''*'', no rate limiting on /login endpoint. Provide findings and remediation plan.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

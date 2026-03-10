@@ -1,0 +1,76 @@
+{
+  "pattern": "focus-visible",
+  "wcag": "2.4.7 Focus Visible (Level AA)",
+  "description": "Focus indicator must be visible when element receives keyboard focus",
+  "implementation": {
+    "html": {
+      "interactive_elements": ["<a>", "<button>", "<input>", "<select>", "<textarea>"],
+      "custom_focus": "Elements with tabindex='0' or role='button/link/etc.'"
+    },
+    "css": {
+      "selector": ":focus-visible",
+      "why_not_focus": ":focus triggers on mouse click too, :focus-visible only on keyboard",
+      "typical_styles": [
+        "outline: 2px solid var(--color-focus)",
+        "outline-offset: 2px",
+        "border-radius: inherit (if rounded element)"
+      ]
+    }
+  },
+  "figma_patterns": {
+    "focus_state_variant": {
+      "detection": "Variant with State=Focus or name containing 'focus'",
+      "typical_structure": {
+        "focus_ring_element": {
+          "type": "FRAME",
+          "name": "Focus state",
+          "strokes": [{ "color": "blue", "type": "SOLID" }],
+          "strokeWeight": 2,
+          "strokeAlign": "OUTSIDE",
+          "position": "absolute, extends beyond parent"
+        }
+      }
+    },
+    "css_generation": {
+      "static_showcase": ".component--focus { /* shows focus ring always */ }",
+      "dynamic_focus": ".component:focus-visible { /* shows focus ring on keyboard focus */ }",
+      "both_needed": true
+    }
+  },
+  "critical_rules": [
+    {
+      "rule": "Parent must NOT have overflow:hidden if focus ring extends outside",
+      "reason": "OUTSIDE strokes are positioned with negative offsets",
+      "fix": "Check clipsContent: false and omit overflow:hidden"
+    },
+    {
+      "rule": "Focus ring element needs proper z-index",
+      "reason": "Focus ring should appear above sibling content",
+      "css": "z-index: 1"
+    },
+    {
+      "rule": "Current/disabled elements should NOT show focus ring",
+      "examples": [
+        "aria-current='page' (breadcrumb current page)",
+        "[disabled] or aria-disabled='true'"
+      ]
+    }
+  ],
+  "color_contrast": {
+    "wcag": "1.4.11 Non-text Contrast (Level AA)",
+    "requirement": "3:1 contrast ratio for focus indicator against background",
+    "typical_color": "#006BD4 (blue) works on white/light backgrounds"
+  },
+  "examples": {
+    "breadcrumb": {
+      "default": "<a href='#'>Level X</a> <!-- focusable -->",
+      "current": "<span aria-current='page'>Current</span> <!-- NOT focusable -->",
+      "focus_css": "a.breadcrumb:focus-visible { outline: 2px solid var(--color-focus); }"
+    },
+    "button": {
+      "normal": "<button>Click</button> <!-- focusable -->",
+      "disabled": "<button disabled>Disabled</button> <!-- NOT focusable -->",
+      "focus_css": "button:focus-visible:not([disabled]) { outline: 2px solid var(--color-focus); }"
+    }
+  }
+}

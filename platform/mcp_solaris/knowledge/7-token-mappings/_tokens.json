@@ -1,0 +1,199 @@
+{
+  "_meta": {
+    "description": "Token mappings for Figma values to CSS variables",
+    "version": "1.0.0",
+    "updated": "2026-01-07",
+    "source": "Extracted from Solaris foundations"
+  },
+
+  "colors": {
+    "_description": "Figma RGBA to CSS color variables",
+    "brand": {
+      "#003DA5": "var(--color-brand-primary)",
+      "#FFD100": "var(--color-brand-secondary)",
+      "#D91414": "var(--color-critical)",
+      "#00875A": "var(--color-success)",
+      "#FF8B00": "var(--color-warning)"
+    },
+    "neutral": {
+      "#FFFFFF": "var(--color-white)",
+      "#000000": "var(--color-black)",
+      "#F5F5F5": "var(--color-neutral-50)",
+      "#E5E5E5": "var(--color-neutral-100)",
+      "#CCCCCC": "var(--color-neutral-200)",
+      "#999999": "var(--color-neutral-400)",
+      "#666666": "var(--color-neutral-600)",
+      "#333333": "var(--color-neutral-800)",
+      "#1A1A1A": "var(--color-neutral-900)"
+    },
+    "semantic": {
+      "background": {
+        "#FFFFFF": "var(--color-background-default)",
+        "#F5F5F5": "var(--color-background-neutral)",
+        "#003DA5": "var(--color-background-brand)"
+      },
+      "text": {
+        "#1A1A1A": "var(--color-text-primary)",
+        "#666666": "var(--color-text-secondary)",
+        "#999999": "var(--color-text-tertiary)",
+        "#FFFFFF": "var(--color-text-inverse)"
+      },
+      "border": {
+        "#E5E5E5": "var(--color-border-default)",
+        "#CCCCCC": "var(--color-border-strong)",
+        "#003DA5": "var(--color-border-focus)"
+      }
+    },
+    "tolerance": {
+      "_note": "Allow small variations in alpha/rounding",
+      "alpha_threshold": 0.01,
+      "rgb_threshold": 2
+    }
+  },
+
+  "spacing": {
+    "_description": "Pixel values to spacing tokens",
+    "0": "var(--spacing-0)",
+    "2": "var(--spacing-2)",
+    "4": "var(--spacing-4)",
+    "6": "var(--spacing-6)",
+    "8": "var(--spacing-8)",
+    "10": "var(--spacing-10)",
+    "12": "var(--spacing-12)",
+    "14": "var(--spacing-14)",
+    "16": "var(--spacing-16)",
+    "20": "var(--spacing-20)",
+    "24": "var(--spacing-24)",
+    "28": "var(--spacing-28)",
+    "32": "var(--spacing-32)",
+    "40": "var(--spacing-40)",
+    "48": "var(--spacing-48)",
+    "56": "var(--spacing-56)",
+    "64": "var(--spacing-64)",
+    "80": "var(--spacing-80)",
+    "96": "var(--spacing-96)",
+    "120": "var(--spacing-120)",
+    "160": "var(--spacing-160)"
+  },
+
+  "sizing": {
+    "_description": "Dimension values to sizing tokens",
+    "16": "var(--sizing-16)",
+    "20": "var(--sizing-20)",
+    "24": "var(--sizing-24)",
+    "28": "var(--sizing-28)",
+    "32": "var(--sizing-32)",
+    "36": "var(--sizing-36)",
+    "40": "var(--sizing-40)",
+    "44": "var(--sizing-44)",
+    "48": "var(--sizing-48)",
+    "56": "var(--sizing-56)",
+    "64": "var(--sizing-64)",
+    "72": "var(--sizing-72)",
+    "80": "var(--sizing-80)",
+    "96": "var(--sizing-96)",
+    "120": "var(--sizing-120)",
+    "160": "var(--sizing-160)"
+  },
+
+  "radius": {
+    "_description": "Corner radius to radius tokens",
+    "0": "var(--radius-none)",
+    "2": "var(--radius-2)",
+    "4": "var(--radius-4)",
+    "6": "var(--radius-6)",
+    "8": "var(--radius-8)",
+    "12": "var(--radius-12)",
+    "16": "var(--radius-16)",
+    "24": "var(--radius-24)",
+    "32": "var(--radius-32)",
+    "9999": "var(--radius-full)",
+    "50%": "var(--radius-circle)"
+  },
+
+  "typography": {
+    "font-family": {
+      "Montserrat": "var(--font-family-heading)",
+      "Roboto": "var(--font-family-body)",
+      "Roboto Mono": "var(--font-family-mono)"
+    },
+    "font-size": {
+      "10": "var(--font-size-xs)",
+      "12": "var(--font-size-sm)",
+      "14": "var(--font-size-md)",
+      "16": "var(--font-size-lg)",
+      "18": "var(--font-size-xl)",
+      "20": "var(--font-size-2xl)",
+      "24": "var(--font-size-3xl)",
+      "28": "var(--font-size-4xl)",
+      "32": "var(--font-size-5xl)",
+      "40": "var(--font-size-6xl)",
+      "48": "var(--font-size-7xl)"
+    },
+    "font-weight": {
+      "300": "var(--font-weight-light)",
+      "400": "var(--font-weight-regular)",
+      "500": "var(--font-weight-medium)",
+      "600": "var(--font-weight-semibold)",
+      "700": "var(--font-weight-bold)"
+    },
+    "line-height": {
+      "1": "var(--line-height-none)",
+      "1.2": "var(--line-height-tight)",
+      "1.4": "var(--line-height-snug)",
+      "1.5": "var(--line-height-normal)",
+      "1.6": "var(--line-height-relaxed)",
+      "2": "var(--line-height-loose)"
+    }
+  },
+
+  "elevation": {
+    "_description": "Shadow effects to elevation tokens",
+    "none": "var(--elevation-none)",
+    "xs": "var(--elevation-xs)",
+    "sm": "var(--elevation-sm)",
+    "md": "var(--elevation-md)",
+    "lg": "var(--elevation-lg)",
+    "xl": "var(--elevation-xl)",
+    "mapping": {
+      "0 1px 2px rgba(0,0,0,0.1)": "var(--elevation-xs)",
+      "0 2px 4px rgba(0,0,0,0.1)": "var(--elevation-sm)",
+      "0 4px 8px rgba(0,0,0,0.1)": "var(--elevation-md)",
+      "0 8px 16px rgba(0,0,0,0.1)": "var(--elevation-lg)",
+      "0 16px 32px rgba(0,0,0,0.15)": "var(--elevation-xl)"
+    }
+  },
+
+  "z-index": {
+    "_description": "Z-index layering system",
+    "base": "var(--z-index-base)",
+    "dropdown": "var(--z-index-dropdown)",
+    "sticky": "var(--z-index-sticky)",
+    "fixed": "var(--z-index-fixed)",
+    "modal-backdrop": "var(--z-index-modal-backdrop)",
+    "modal": "var(--z-index-modal)",
+    "popover": "var(--z-index-popover)",
+    "tooltip": "var(--z-index-tooltip)"
+  },
+
+  "transitions": {
+    "_description": "Transition duration and easing",
+    "duration": {
+      "75": "var(--duration-75)",
+      "100": "var(--duration-100)",
+      "150": "var(--duration-150)",
+      "200": "var(--duration-200)",
+      "300": "var(--duration-300)",
+      "500": "var(--duration-500)",
+      "700": "var(--duration-700)",
+      "1000": "var(--duration-1000)"
+    },
+    "easing": {
+      "linear": "var(--easing-linear)",
+      "ease": "var(--easing-ease)",
+      "ease-in": "var(--easing-ease-in)",
+      "ease-out": "var(--easing-ease-out)",
+      "ease-in-out": "var(--easing-ease-in-out)"
+    }
+  }
+}

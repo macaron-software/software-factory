@@ -1,0 +1,53 @@
+"""Memory Tools — search, store, retrieve and prune in project memory.
+
+WHY: memory_retrieve and memory_prune expose explicit LTM/STM control to agents,
+inspired by AgeMem (arXiv:2601.01885) — unified tool-based memory management.
+"""
+from __future__ import annotations
+
+from ..models import AgentInstance
+from .registry import BaseTool
+
+
+class MemorySearchTool(BaseTool):
+    name = "memory_search"
+    description = "Search project memory for stored knowledge"
+    category = "memory"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        # Actual execution is handled directly in executor (needs ctx)
+        return "Error: memory_search must be called via executor"
+
+
+class MemoryStoreTool(BaseTool):
+    name = "memory_store"
+    description = "Store a fact in project memory"
+    category = "memory"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return "Error: memory_store must be called via executor"
+
+
+class MemoryRetrieveTool(BaseTool):
+    name = "memory_retrieve"
+    description = "Retrieve a specific memory entry by exact key"
+    category = "memory"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return "Error: memory_retrieve must be called via executor"
+
+
+class MemoryPruneTool(BaseTool):
+    name = "memory_prune"
+    description = "Delete memory entries that are no longer relevant"
+    category = "memory"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return "Error: memory_prune must be called via executor"
+
+
+def register_memory_tools(registry):
+    registry.register(MemorySearchTool())
+    registry.register(MemoryStoreTool())
+    registry.register(MemoryRetrieveTool())
+    registry.register(MemoryPruneTool())

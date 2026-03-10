@@ -1,0 +1,20 @@
+team_id: team-rse-ethique
+technology: ethics
+phase_type: development
+description: Team team-rse-ethique — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: rse-ethique-ia
+  - id: rse-audit-social
+  - id: rse-manager
+task: 'Evaluate an AI-powered hiring tool for ethical risks: training data bias, protected characteristics, explainability
+  of decisions, human oversight mechanisms, and EU AI Act compliance (high-risk classification).'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

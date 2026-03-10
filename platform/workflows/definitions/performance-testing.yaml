@@ -1,0 +1,107 @@
+id: performance-testing
+name: Performance Testing & Optimization
+description: Load testing with k6, bottleneck analysis, bundle optimization, SLO validation.
+icon: ⚡
+is_builtin: true
+phases:
+- id: perf-plan
+  pattern_id: sequential
+  name: Performance Plan
+  description: Define SLOs, identify critical paths, create test scenarios (smoke/load/stress/soak)
+  gate: SLOs defined, test scenarios documented
+  config:
+    agents:
+    - perf-tester
+    - architecte
+- id: load-tests
+  pattern_id: sequential
+  name: Load Test Execution
+  description: 'Write and run k6 scripts: progressive load 10→100→500→1000 VUs'
+  gate: All load test scenarios executed
+  config:
+    agents:
+    - perf-tester
+- id: bottleneck-analysis
+  pattern_id: parallel
+  name: Bottleneck Analysis
+  description: 'Analyze results: slow queries (N+1), memory leaks, bundle size, Core Web Vitals'
+  gate: Bottlenecks identified and prioritized
+  config:
+    agents:
+    - perf-tester
+    - lead_dev
+    - performance_engineer
+- id: perf-fix
+  pattern_id: loop
+  name: Performance Fixes
+  description: 'Implement optimizations: query tuning, caching, lazy loading, code splitting'
+  gate: All SLOs met after optimization
+  config:
+    agents:
+    - lead_dev
+    - perf-tester
+    max_iterations: 5
+- id: perf-report
+  pattern_id: sequential
+  name: Performance Report
+  description: 'Generate final report: before/after metrics, recommendations, performance budget'
+  gate: Performance report published
+  config:
+    agents:
+    - perf-tester
+    - doc-writer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: perf-tester
+      x: 100
+      y: 150
+      label: Plan
+      phase: perf-plan
+    - id: n2
+      agent_id: perf-tester
+      x: 300
+      y: 150
+      label: Load Tests
+      phase: load-tests
+    - id: n3
+      agent_id: lead_dev
+      x: 500
+      y: 100
+      label: Analysis
+      phase: bottleneck-analysis
+    - id: n4
+      agent_id: lead_dev
+      x: 500
+      y: 200
+      label: Fix Loop
+      phase: perf-fix
+    - id: n5
+      agent_id: doc-writer
+      x: 700
+      y: 150
+      label: Report
+      phase: perf-report
+    edges:
+    - from: n1
+      to: n2
+      label: scenarios ready
+      color: '#f97316'
+    - from: n2
+      to: n3
+      label: results
+      color: '#f97316'
+    - from: n3
+      to: n4
+      label: bottlenecks
+      color: '#ef4444'
+    - from: n4
+      to: n2
+      label: re-test
+      color: '#d29922'
+      style: dashed
+    - from: n4
+      to: n5
+      label: SLOs met
+      color: '#3fb950'

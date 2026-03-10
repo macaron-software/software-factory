@@ -1,0 +1,81 @@
+agent_id: architecte
+technology: generic
+phase_type: inception
+description: Solution Architect — system design, trade-offs, scalability, ADRs
+
+eval_cases:
+  - id: design-notification-system
+    input: |
+      Design a notification system for a SaaS platform with 500K users:
+      - Channels: email, SMS, push notification, in-app
+      - User preferences: per-channel opt-in/out, quiet hours, frequency caps
+      - Priority levels: critical (immediate), high (within 5min), normal (batched hourly)
+      - Delivery guarantees: at-least-once for critical, best-effort for normal
+      - Scale: 10M notifications/day peak
+
+      Produce an Architecture Decision Record (ADR) with:
+      - Context, decision, consequences
+      - Component diagram (text-based)
+      - Technology choices with trade-offs
+    checks:
+      - has_keyword:queue
+      - has_keyword:retry
+      - has_keyword:idempoten
+      - has_keyword:trade-off
+      - length_min:500
+    expectations:
+      - "Uses message queue (Kafka, RabbitMQ, SQS) for async delivery"
+      - "Separates notification creation from delivery (producer/consumer pattern)"
+      - "Addresses idempotency (dedup by notification ID)"
+      - "Handles user preferences and quiet hours in routing layer"
+      - "Discusses trade-offs of at-least-once vs exactly-once delivery"
+
+  - id: migrate-monolith-to-microservices
+    input: |
+      A monolithic e-commerce app (Django, PostgreSQL, 200K LOC) needs to be
+      split into microservices. Current modules:
+      - User management (auth, profiles, addresses)
+      - Product catalog (categories, search, inventory)
+      - Order processing (cart, checkout, payment)
+      - Shipping (tracking, carrier integration)
+      - Analytics (dashboards, reports)
+
+      Propose a migration strategy:
+      - Which services to extract first and why
+      - Data ownership and inter-service communication
+      - Migration pattern (strangler fig, parallel run, etc.)
+      - Risk mitigation
+    checks:
+      - has_keyword:strangler
+      - has_keyword:API gateway
+      - has_keyword:event
+      - has_keyword:bounded context
+      - length_min:500
+    expectations:
+      - "Identifies bounded contexts aligned with business domains"
+      - "Recommends strangler fig pattern for incremental migration"
+      - "Proposes API gateway for routing during transition"
+      - "Addresses data migration strategy (shared DB → per-service DB)"
+      - "Identifies risks: distributed transactions, data consistency, latency"
+
+  - id: adr-database-per-service
+    input: |
+      Write an ADR (Architecture Decision Record) for the following decision:
+      Should each microservice have its own database, or share a single database?
+
+      Context: 8 microservices, team of 15 developers, current shared PostgreSQL.
+      Constraints: budget-conscious startup, need to move fast.
+
+      Use the standard ADR format: Title, Status, Context, Decision, Consequences.
+    checks:
+      - has_keyword:Status
+      - has_keyword:Context
+      - has_keyword:Decision
+      - has_keyword:Consequences
+      - length_min:400
+    expectations:
+      - "Recommends database-per-service (or justified shared-DB with clear reasoning)"
+      - "Lists pros: independent deployment, schema freedom, fault isolation"
+      - "Lists cons: distributed transactions, data consistency, operational overhead"
+      - "Addresses the startup constraint (pragmatic phased approach)"
+      - "Follows standard ADR format with clear sections"

@@ -1,0 +1,236 @@
+id: dsi-platform-tma
+name: DSI Plateforme — TMA Maintenance
+description: Pipeline réactif de maintenance applicative pour la plateforme Macaron. Détection d'incidents (auto + manuel)
+  → Triage P0-P4 → Diagnostic root cause parallèle → Fix TDD itératif → Non-régression complète → Deploy hotfix.
+icon: tool
+is_builtin: true
+phases:
+- id: detection
+  pattern_id: parallel
+  name: Détection Incidents
+  description: Le TMA Lead analyse les incidents remontés (auto-détection 500, SSE drops, LLM failures + signalements manuels).
+    Le SRE vérifie les métriques serveur. Le QA Lead vérifie les tests automatisés.
+  gate: always
+  config:
+    agents:
+    - plat-tma-lead
+    - sre
+    - qa_lead
+- id: triage
+  pattern_id: router
+  name: Triage & Priorisation P0-P4
+  description: Le TMA Lead classifie chaque incident par sévérité (P0=platform down, P1=feature broken, P2=minor, P3=cosmetic,
+    P4=tech debt) et par domaine (backend/frontend/agents/patterns/infra). L'Architecte évalue l'impact systémique. La Sécurité
+    vérifie les aspects sécu.
+  gate: always
+  config:
+    agents:
+    - plat-tma-lead
+    - architecte
+    - securite
+- id: diagnostic
+  pattern_id: parallel
+  name: Diagnostic Root Cause
+  description: '4 devs TMA analysent en parallèle selon leur domaine : Backend (routes, DB), Frontend (templates, CSS, HTMX),
+    Agents (executor, LLM, bus), DBA (requêtes, migrations). Chacun identifie la root cause dans son périmètre.'
+  gate: always
+  config:
+    agents:
+    - plat-tma-dev-back
+    - plat-tma-dev-front
+    - plat-tma-dev-agents
+    - dba
+- id: fix-tdd
+  pattern_id: loop
+  name: Fix TDD Itératif
+  description: Les devs TMA écrivent le test de non-régression (RED), puis le correctif (GREEN). La QA TMA valide. Si échec,
+    on reboucle. Max 3 itérations avant escalation.
+  gate: no_veto
+  config:
+    agents:
+    - plat-tma-dev-back
+    - plat-tma-dev-front
+    - plat-tma-dev-agents
+    - plat-tma-qa
+    max_iterations: 3
+- id: non-regression
+  pattern_id: parallel
+  name: Non-Régression Complète
+  description: La QA TMA lance les tests fonctionnels. Le Test Automation vérifie les E2E. La Sécurité fait un scan OWASP.
+    Le Performance Engineer vérifie les benchmarks. TOUS doivent approuver.
+  gate: all_approved
+  config:
+    agents:
+    - plat-tma-qa
+    - test_automation
+    - securite
+    - performance_engineer
+- id: deploy-hotfix
+  pattern_id: sequential
+  name: Deploy Hotfix
+  description: Le DevOps déploie le hotfix en staging. Le SRE vérifie la santé. Le TMA Lead confirme la résolution de l'incident.
+    Le QA Lead donne le GO prod.
+  gate: all_approved
+  config:
+    agents:
+    - devops
+    - sre
+    - plat-tma-lead
+    - qa_lead
+config:
+  project_ref: software-factory
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: plat-tma-lead
+      x: 400
+      y: 20
+      label: TMA Lead
+    - id: n2
+      agent_id: sre
+      x: 600
+      y: 20
+      label: SRE
+    - id: n3
+      agent_id: architecte
+      x: 250
+      y: 120
+      label: Architecte
+    - id: n4
+      agent_id: securite
+      x: 550
+      y: 120
+      label: Sécurité
+    - id: n5
+      agent_id: plat-tma-dev-back
+      x: 150
+      y: 240
+      label: TMA Backend
+    - id: n6
+      agent_id: plat-tma-dev-front
+      x: 350
+      y: 240
+      label: TMA Frontend
+    - id: n7
+      agent_id: plat-tma-dev-agents
+      x: 550
+      y: 240
+      label: TMA Agents
+    - id: n8
+      agent_id: dba
+      x: 750
+      y: 240
+      label: DBA
+    - id: n9
+      agent_id: plat-tma-qa
+      x: 300
+      y: 360
+      label: QA TMA
+    - id: n10
+      agent_id: test_automation
+      x: 500
+      y: 360
+      label: Test Auto
+    - id: n11
+      agent_id: performance_engineer
+      x: 700
+      y: 360
+      label: Perf Eng.
+    - id: n12
+      agent_id: qa_lead
+      x: 200
+      y: 20
+      label: QA Lead
+    - id: n13
+      agent_id: devops
+      x: 400
+      y: 460
+      label: DevOps
+    edges:
+    - from: n1
+      to: n3
+      label: triage
+      color: '#ef4444'
+    - from: n1
+      to: n4
+      label: sécu?
+      color: '#ef4444'
+    - from: n1
+      to: n5
+      label: fix back
+      color: '#f59e0b'
+    - from: n1
+      to: n6
+      label: fix front
+      color: '#f59e0b'
+    - from: n1
+      to: n7
+      label: fix agents
+      color: '#f59e0b'
+    - from: n3
+      to: n1
+      label: impact
+      color: '#3b82f6'
+    - from: n5
+      to: n9
+      label: test
+      color: '#10b981'
+    - from: n6
+      to: n9
+      label: test
+      color: '#10b981'
+    - from: n7
+      to: n9
+      label: test
+      color: '#10b981'
+    - from: n8
+      to: n5
+      label: data
+      color: '#3b82f6'
+    - from: n9
+      to: n1
+      label: validé
+      color: '#10b981'
+    - from: n9
+      to: n10
+      label: E2E
+      color: '#8b5cf6'
+    - from: n10
+      to: n13
+      label: GO
+      color: '#10b981'
+    - from: n11
+      to: n13
+      label: perf OK
+      color: '#10b981'
+    - from: n12
+      to: n1
+      label: incidents
+      color: '#ef4444'
+    - from: n2
+      to: n1
+      label: métriques
+      color: '#3b82f6'
+    - from: n13
+      to: n1
+      label: déployé
+      color: '#10b981'
+  agents_permissions:
+    plat-tma-lead:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+      can_approve: true
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    plat-tma-qa:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: STRONG
+    architecte:
+      can_veto: true
+      veto_level: STRONG

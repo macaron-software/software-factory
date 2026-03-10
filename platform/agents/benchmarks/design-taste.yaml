@@ -1,0 +1,223 @@
+agent_id: solaris_ui_developer
+technology: frontend_design
+phase_type: design
+description: Design taste evaluation — visual quality, tokens, spacing, typography, hierarchy
+
+# Iteration loop: agent refines until target or max attempts
+max_iterations: 3
+target_score: 0.90
+
+taste_judge_prompt: |
+  You are an elite design critic evaluating UI component code for VISUAL EXCELLENCE.
+  You have seen the best designs on the web (Linear, Vercel, Stripe, Raycast, Arc).
+  Your job is to score the output on these dimensions:
+
+  1. TYPOGRAPHY (weight: 1.5x)
+     - Font hierarchy: distinct sizes for h1/h2/body/caption (not all the same)
+     - Font pairing: max 2-3 families with clear roles (display/body/mono)
+     - Line height: 1.4-1.6 for body, tighter for headings
+     - Letter spacing: negative for large headings, normal for body
+     - No orphan text, widows handled
+
+  2. SPACING & RHYTHM (weight: 1.5x)
+     - 4px or 8px grid strictly applied (no random px values)
+     - Consistent padding/margin scale (e.g., 4/8/12/16/24/32/48)
+     - Vertical rhythm: related items closer, sections separated
+     - Breathing room: content is not cramped
+
+  3. COLOR & CONTRAST (weight: 1.2x)
+     - Limited palette: 1 accent color, neutrals, semantic (success/error/warning)
+     - WCAG AA contrast on all text (4.5:1 body, 3:1 large)
+     - Opacity-based borders and dividers (not hardcoded grays)
+     - Dark/light theme support if applicable
+     - No competing accent colors
+
+  4. SHADOWS & DEPTH (weight: 1.0x)
+     - Multi-layer shadows on elevated elements (not single box-shadow)
+     - Subtle: shadow opacity 0.04-0.12, not harsh black
+     - Consistent elevation system (card < modal < tooltip)
+     - Ring/outline for focus states, not just shadow
+
+  5. COMPONENT STRUCTURE (weight: 1.0x)
+     - Semantic HTML (button, nav, main, section — not all divs)
+     - Design tokens used (CSS custom properties, not hardcoded values)
+     - States: default/hover/active/focus/disabled defined
+     - Responsive: works across breakpoints
+
+  6. VISUAL HIERARCHY (weight: 1.3x)
+     - Clear primary action (one CTA stands out)
+     - Information hierarchy: most important content is most prominent
+     - Alignment: elements are aligned on a grid, not randomly placed
+     - Negative space used intentionally
+
+  7. MICRO-INTERACTIONS (weight: 0.8x)
+     - Transitions: 150-300ms ease-out on hover/state changes
+     - Transform: subtle scale (1.02-1.05) on interactive hover
+     - No jarring instant changes
+     - Loading states, skeleton screens if applicable
+
+  Score 0-10 per dimension:
+    10 = Would be at home on Linear/Stripe/Vercel
+    8  = Professional, polished, intentional choices
+    6  = Correct but generic, "Bootstrap default" feel
+    4  = Mediocre, some visual issues
+    2  = Poor, looks like a prototype
+    0  = Broken or no visual design at all
+
+eval_cases:
+  - id: pricing-card-component
+    input: |
+      Create a pricing card component in HTML + CSS (no framework).
+      Requirements:
+      - 3 tiers: Starter ($9/mo), Pro ($29/mo), Enterprise (custom)
+      - Pro tier is visually highlighted as "Most Popular"
+      - Each tier lists 4-6 features with check/cross icons
+      - CTA button per tier
+      - Dark theme (dark background, light text)
+      - Must look like it belongs on a premium SaaS website (think Linear, Vercel)
+
+      Output the complete HTML + CSS. No placeholders. Production quality.
+    checks:
+      - "has_keyword:box-shadow"
+      - "has_keyword:border-radius"
+      - "has_keyword:transition"
+      - "has_keyword:font-weight"
+      - "has_keyword:var(--"
+      - "has_keyword:hover"
+      - "has_keyword:Most Popular"
+      - "length_min:1500"
+    expectations:
+      - "Uses CSS custom properties (design tokens) for colors, spacing, and typography"
+      - "Pro tier is visually distinct (different background, border, or scale)"
+      - "Typography has clear hierarchy: plan name > price > features > CTA"
+      - "Spacing follows a consistent scale (4px/8px grid)"
+      - "Multi-layer or subtle shadows (not a single harsh box-shadow)"
+      - "Hover states on buttons with smooth transitions (150-300ms)"
+      - "Dark theme with proper contrast ratios (not pure white on pure black)"
+      - "Icons are consistent (SVG or Unicode, not mixed)"
+
+  - id: dashboard-sidebar-nav
+    input: |
+      Create a sidebar navigation component in HTML + CSS.
+      Requirements:
+      - Fixed sidebar, 260px wide, full height
+      - Logo/brand area at top
+      - Navigation sections: Main (Dashboard, Analytics, Projects), Settings (Team, Billing, Integrations)
+      - Each nav item has an icon (use SVG placeholders or Unicode) + label
+      - Active state, hover state
+      - Collapse/expand indicator for sections
+      - User avatar + name at bottom
+      - Dark theme, subtle borders
+
+      Output complete HTML + CSS. This should look like a modern SaaS app sidebar (Linear, Notion, Figma style).
+    checks:
+      - "has_keyword:<nav"
+      - "has_keyword:box-shadow"
+      - "has_keyword:transition"
+      - "has_keyword:var(--"
+      - "has_keyword:active"
+      - "has_keyword:hover"
+      - "length_min:1500"
+    expectations:
+      - "Uses semantic HTML (nav, ul/li, button — not all divs)"
+      - "Active nav item has visual indicator (left border, background, or both)"
+      - "Hover states are subtle (background opacity change, not jarring color swap)"
+      - "Typography: section headers are smaller/muted, nav items are medium weight"
+      - "Spacing: consistent gaps between items, sections visually separated"
+      - "Icons and text are vertically aligned"
+      - "User area at bottom is visually distinct from nav items"
+      - "CSS custom properties for theming (can switch light/dark)"
+
+  - id: notification-toast-system
+    input: |
+      Create a toast notification system in HTML + CSS + vanilla JS.
+      Requirements:
+      - 4 variants: success (green), error (red), warning (amber), info (blue)
+      - Toast appears top-right, stacks vertically
+      - Auto-dismiss after 5s with progress bar
+      - Manual dismiss with X button
+      - Slide-in animation from right
+      - Icon + title + message per toast
+      - Maximum 3 visible toasts, queue the rest
+
+      Output complete HTML + CSS + JS. Should feel smooth and polished.
+    checks:
+      - "has_keyword:@keyframes"
+      - "has_keyword:transition"
+      - "has_keyword:border-radius"
+      - "has_keyword:position: fixed"
+      - "has_keyword:setTimeout"
+      - "has_keyword:transform"
+      - "length_min:2000"
+    expectations:
+      - "Animations use transform (translateX) not left/right for performance"
+      - "Progress bar countdown is visible and smooth (CSS animation or JS)"
+      - "Color palette per variant is cohesive (not just background swap — icon, border, accent match)"
+      - "Exit animation exists (slide out or fade) — not instant disappear"
+      - "Stacking: new toasts push existing ones down with smooth transition"
+      - "Z-index is high enough (1000+) to overlay content"
+      - "Typography: title is bold/semibold, message is regular, smaller"
+      - "Shadows on toast elements for depth"
+
+  - id: data-table-with-interactions
+    input: |
+      Create a data table component in HTML + CSS.
+      Requirements:
+      - Table with 6 columns: Checkbox, Name, Status (badge), Role, Email, Actions (dropdown)
+      - 5 sample rows of realistic data
+      - Status badges: Active (green), Pending (yellow), Inactive (gray)
+      - Sortable column headers (show sort icon)
+      - Row hover highlight
+      - Checkbox for row selection (header checkbox selects all)
+      - Sticky header on scroll
+      - Dark theme
+
+      Output complete HTML + CSS. Should look like a modern admin panel table (Vercel dashboard, Linear).
+    checks:
+      - "has_keyword:<table"
+      - "has_keyword:sticky"
+      - "has_keyword:hover"
+      - "has_keyword:checkbox"
+      - "has_keyword:border-radius"
+      - "has_keyword:var(--"
+      - "length_min:2000"
+    expectations:
+      - "Table uses proper semantic elements (thead, tbody, th, td)"
+      - "Status badges have subtle background + matching text color (not harsh solid colors)"
+      - "Row hover is subtle background change (opacity-based, not bright color)"
+      - "Sticky header has border-bottom or shadow to separate from scrolling content"
+      - "Consistent cell padding (12-16px horizontal, 8-12px vertical)"
+      - "Actions column doesn't break layout"
+      - "Checkbox column is narrow and aligned"
+      - "Typography: header cells slightly smaller/uppercase/muted vs data cells"
+
+  - id: hero-section-landing
+    input: |
+      Create a hero section for a developer tool landing page in HTML + CSS.
+      Requirements:
+      - Full viewport height hero
+      - Headline (large, bold), subheadline (medium, muted), 2 CTA buttons (primary + secondary)
+      - Subtle animated gradient background (not static)
+      - Code snippet preview floating on the right (or below on mobile)
+      - Trusted by logos row (5 company logos as gray SVG placeholders)
+      - Responsive: stacks on mobile
+      - Dark theme
+
+      Output complete HTML + CSS. This should look like Vercel, Railway, or Supabase hero sections.
+    checks:
+      - "has_keyword:@keyframes"
+      - "has_keyword:gradient"
+      - "has_keyword:100vh"
+      - "has_keyword:@media"
+      - "has_keyword:var(--"
+      - "has_keyword:font-weight"
+      - "length_min:2000"
+    expectations:
+      - "Animated gradient is subtle (slow movement, 8-15s duration, muted colors)"
+      - "Headline has tight letter-spacing and heavy font-weight (700-900)"
+      - "CTA buttons: primary is filled/accent, secondary is outline/ghost — clearly different"
+      - "Code preview has monospace font, syntax-like styling, subtle border/shadow"
+      - "Logo row: logos are desaturated/gray, small, with consistent height"
+      - "Responsive breakpoint stacks content vertically on mobile"
+      - "Vertical spacing: generous whitespace between headline/sub/CTAs/logos"
+      - "Overall: feels premium, not a Bootstrap template"

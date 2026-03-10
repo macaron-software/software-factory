@@ -1,0 +1,20 @@
+team_id: team-devops-platform
+technology: devops
+phase_type: development
+description: Team team-devops-platform — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: devops
+  - id: pipeline_engineer
+  - id: sre
+task: 'Build a complete CI/CD pipeline: lint + test + build + deploy to staging + E2E tests + canary deploy to prod + automated
+  rollback on error rate > 1%. Include monitoring dashboards.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

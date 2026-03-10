@@ -1,0 +1,76 @@
+{
+  "property": "clipsContent",
+  "figma_type": "boolean",
+  "description": "Determines whether content that extends beyond the frame bounds is clipped (hidden) or visible",
+  "css_mapping": {
+    "true": "overflow: hidden",
+    "false": "overflow: visible (or omit - default)"
+  },
+  "critical_rules": [
+    {
+      "rule": "NEVER add overflow:hidden when clipsContent is false",
+      "reason": "Figma explicitly says content should NOT be clipped",
+      "impact": [
+        "Focus rings (position: absolute with negative offsets) get clipped",
+        "Text with descenders (g, j, p, q, y) gets truncated",
+        "Tooltips/popovers positioned outside parent get hidden"
+      ]
+    },
+    {
+      "rule": "Only add overflow:hidden when clipsContent is explicitly true",
+      "reason": "Respects designer intent from Figma",
+      "common_use_cases": [
+        "Image containers with overflow cropping",
+        "Carousel slides that hide off-screen items",
+        "Fixed-size text boxes with ellipsis truncation"
+      ]
+    }
+  ],
+  "anti_patterns": [
+    {
+      "pattern": "Adding overflow:hidden to enforce max-height",
+      "problem": "Masks dimension calculation issues instead of fixing root cause",
+      "symptoms": [
+        "Text appears truncated/clipped",
+        "Focus rings invisible",
+        "Content disappears on hover/focus states"
+      ],
+      "fix": "Find the actual cause of dimension mismatch (fonts, line-height, box-sizing)"
+    }
+  ],
+  "examples": {
+    "focus_ring": {
+      "figma": {
+        "parent": { "clipsContent": false, "width": 45, "height": 21 },
+        "focus_state": { 
+          "type": "FRAME",
+          "strokeWeight": 2,
+          "strokeAlign": "OUTSIDE",
+          "position": "absolute",
+          "extends_beyond_parent": true
+        }
+      },
+      "correct_css": {
+        "parent": "/* NO overflow:hidden */",
+        "focus_state": "position: absolute; left: -2px; top: -2px; right: -2px; bottom: -2px; outline: 2px solid var(--color-focus);"
+      },
+      "incorrect_css": {
+        "parent": "overflow: hidden; /* WRONG - clips focus ring */",
+        "focus_state": "/* Focus ring invisible because parent clips it */"
+      }
+    },
+    "text_with_descenders": {
+      "figma": {
+        "text": { "characters": "Label badge", "fontSize": 14, "lineHeightPx": 14 },
+        "parent": { "clipsContent": false }
+      },
+      "note": "The 'g' in 'badge' has a descender that extends ~2px below baseline",
+      "correct_css": "line-height: 14px; /* Let descenders render naturally */",
+      "incorrect_css": "line-height: 14px; overflow: hidden; /* WRONG - clips 'g' descender */"
+    }
+  },
+  "validation": {
+    "check": "If clipsContent !== true, CSS must NOT have overflow: hidden",
+    "exception": "textAutoResize === 'NONE' (fixed text box with intentional truncation)"
+  }
+}

@@ -1,0 +1,22 @@
+agent_id: tech_writer
+technology: generic
+phase_type: documentation
+description: Technical Writer — technical documentation, knowledge management
+eval_cases:
+- id: api-documentation
+  input: 'Write API documentation for this endpoint:
+
+    POST /api/v1/invoices
+
+    Creates a new invoice. Requires authentication. Body: {customer_id, items: [{description, quantity, unit_price}], due_date,
+    currency}. Returns created invoice with calculated totals and tax.'
+  checks:
+  - has_keyword:POST
+  - has_keyword:authentication
+  - has_keyword:example
+  - length_min:300
+  expectations:
+  - Includes request/response examples
+  - Documents all parameters with types
+  - Lists error codes and descriptions
+  - Mentions authentication requirements

@@ -1,0 +1,41 @@
+{
+  "property": "lineHeightPx",
+  "figma_type": "number",
+  "description": "The line height in pixels for text nodes",
+  "css_mapping": "line-height: {lineHeightPx}px",
+  "critical_rules": [
+    {
+      "rule": "Always set explicit line-height for TEXT nodes",
+      "reason": "Browser default line-height (~1.2) differs from Figma's explicit value",
+      "impact": "Text height mismatch of 2-4px per line"
+    },
+    {
+      "rule": "Tight line-heights (100% of font-size) may clip descenders",
+      "reason": "Characters like g, j, p, q, y have descenders extending below baseline",
+      "example": {
+        "figma": { "fontSize": 14, "lineHeightPx": 14 },
+        "note": "14px line-height with 14px font = 100%, very tight",
+        "behavior": "Descenders may extend 1-2px below the line-height box"
+      }
+    },
+    {
+      "rule": "DO NOT use overflow:hidden to 'fix' text height",
+      "reason": "This clips descenders instead of fixing the root cause",
+      "correct_approach": "Accept that browser may need 1-2px more for descenders, or use 120%+ line-height"
+    }
+  ],
+  "typography_best_practices": {
+    "minimum_line_height": "120% of font-size for body text",
+    "tight_line_height": "100% (lineHeightPx === fontSize) - only for single-line labels without descenders",
+    "comfortable_line_height": "140-160% for multi-line text"
+  },
+  "font_metrics": {
+    "ascender": "Part of letter above x-height (d, h, l, etc.)",
+    "descender": "Part of letter below baseline (g, j, p, q, y)",
+    "typical_descender_depth": "~20% of font-size (14px font ≈ 3px descender)"
+  },
+  "validation": {
+    "check": "If lineHeightPx === fontSize (100%), warn about potential descender clipping",
+    "acceptable_variance": "1-2px for text with descenders"
+  }
+}

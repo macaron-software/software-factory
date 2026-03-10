@@ -1,0 +1,28 @@
+agent_id: ft-booking-dev-back
+technology: rust
+phase_type: development
+description: Dev Rust Booking — code generation, TDD, clean code
+eval_cases:
+- id: implement-function
+  input: 'Implement a function parse_csv(text: str) -> list[dict] in Rust that parses CSV text (with headers) into a list
+    of dictionaries. Use TDD: write failing tests first, then implement.'
+  checks:
+  - has_keyword:def test_
+  - has_keyword:def parse_csv
+  - has_keyword:assert
+  - length_min:300
+  expectations:
+  - Writes at least 2 test cases before implementation
+  - Handles edge cases (empty input, missing fields)
+  - Implementation is clean and minimal
+- id: debug-fix
+  input: "This function has a bug — it returns wrong results for negative numbers in Rust:\n\ndef absolute_values(numbers):\n\
+    \    return [n if n > 0 else n for n in numbers]\n\nFind the bug, write a test that exposes it, then fix it."
+  checks:
+  - has_keyword:test
+  - has_keyword:-
+  - length_min:150
+  expectations:
+  - Identifies the bug (missing negation for negative numbers)
+  - Writes a failing test first
+  - Fixes with -n or abs(n)

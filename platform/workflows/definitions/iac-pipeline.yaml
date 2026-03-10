@@ -1,0 +1,105 @@
+id: iac-pipeline
+name: Infrastructure as Code Pipeline
+description: 'IaC lifecycle: module creation, environment parity, drift detection, PR-based changes.'
+icon: 🏗️
+is_builtin: true
+phases:
+- id: iac-design
+  pattern_id: network
+  name: Infrastructure Design
+  description: Define infrastructure components, network topology, security groups, storage tiers
+  gate: Infrastructure architecture documented and approved
+  config:
+    agents:
+    - iac-engineer
+    - architecte
+    - securite
+- id: iac-modules
+  pattern_id: sequential
+  name: IaC Module Development
+  description: 'Write Terraform/Pulumi modules: networking, compute, storage, monitoring, secrets'
+  gate: All modules written with variables, outputs, and documentation
+  config:
+    agents:
+    - iac-engineer
+    - devops
+- id: env-parity
+  pattern_id: parallel
+  name: Environment Parity
+  description: Create identical environments (dev/staging/prod) with only variable differences
+  gate: All environments deployable from same modules
+  config:
+    agents:
+    - iac-engineer
+- id: drift-detect
+  pattern_id: sequential
+  name: Drift Detection
+  description: 'Implement automated drift detection: terraform plan in CI, alert on unexpected changes'
+  gate: Drift detection automated with alerting
+  config:
+    agents:
+    - iac-engineer
+    - monitoring-ops
+- id: iac-review
+  pattern_id: adversarial-pair
+  name: IaC Security Review
+  description: 'Security review of IaC: no hardcoded secrets, least privilege IAM, encryption at rest/transit'
+  gate: Security review passed, no critical findings
+  config:
+    agents:
+    - securite
+    - iac-engineer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: iac-engineer
+      x: 100
+      y: 150
+      label: Design
+      phase: iac-design
+    - id: n2
+      agent_id: iac-engineer
+      x: 300
+      y: 150
+      label: Modules
+      phase: iac-modules
+    - id: n3
+      agent_id: iac-engineer
+      x: 500
+      y: 100
+      label: Env Parity
+      phase: env-parity
+    - id: n4
+      agent_id: monitoring-ops
+      x: 500
+      y: 200
+      label: Drift Detect
+      phase: drift-detect
+    - id: n5
+      agent_id: securite
+      x: 700
+      y: 150
+      label: Security
+      phase: iac-review
+    edges:
+    - from: n1
+      to: n2
+      label: architecture
+      color: '#0ea5e9'
+    - from: n2
+      to: n3
+      label: modules ready
+      color: '#0ea5e9'
+    - from: n2
+      to: n4
+      label: modules ready
+      color: '#0ea5e9'
+    - from: n3
+      to: n5
+      label: envs ok
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: drift ok
+      color: '#3fb950'

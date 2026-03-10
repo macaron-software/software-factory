@@ -1,0 +1,21 @@
+team_id: team-factory
+technology: python
+phase_type: development
+description: Team team-factory — end-to-end collaboration bench
+pattern:
+  type: hierarchical
+  agents:
+  - id: brain
+  - id: dev
+  - id: code-reviewer
+  - id: architecte
+task: Design and implement a REST API endpoint for user registration with validation, password hashing, and email confirmation.
+  Use TDD approach.
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

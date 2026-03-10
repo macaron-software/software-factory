@@ -1,0 +1,37 @@
+team_id: portfolio-strategy
+technology: generic
+phase_type: strategy
+description: Portfolio strategy team — brain orchestrates strategic planning
+
+pattern:
+  type: sequential
+  agents:
+    - id: brain
+    - id: architecte
+
+task: |
+  Create a technology portfolio review for Q2:
+  Current portfolio:
+  - Project Alpha: React SPA, 2 devs, 65% complete, on budget
+  - Project Beta: Python ML pipeline, 3 devs, 30% complete, 15% over budget
+  - Project Gamma: Mobile app (Flutter), 1 dev, 80% complete, on time
+  - Project Delta: Legacy PHP migration to Node.js, 4 devs, 10% complete, blocked
+
+  Produce:
+  1. Portfolio health assessment (Red/Amber/Green for each)
+  2. Resource reallocation recommendations
+  3. Risk matrix with impact/probability
+  4. Strategic recommendations for next quarter
+
+checks:
+  - has_keyword:Alpha
+  - has_keyword:Beta
+  - has_keyword:risk
+  - has_keyword:recommendation
+  - length_min:500
+
+expectations:
+  - "Provides RAG status for each project with justification"
+  - "Recommends resource reallocation based on priority and risk"
+  - "Risk matrix covers both technical and business risks"
+  - "Strategic recommendations are actionable with clear next steps"

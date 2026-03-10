@@ -1,0 +1,36 @@
+team_id: safe-art
+technology: generic
+phase_type: planning
+description: SAFe ART team — RTE orchestrates planning with hierarchical pattern
+
+pattern:
+  type: hierarchical
+  agents:
+    - id: rte
+    - id: product-manager-art
+    - id: system-architect-art
+
+task: |
+  Run a PI Planning session for a new feature: "User Authentication System".
+  1. RTE: Set the PI objectives and coordinate the planning
+  2. Product Manager: Define the feature backlog with priorities
+  3. System Architect: Define the technical architecture and dependencies
+
+  Produce a structured PI planning output with:
+  - PI Objectives (3-5 measurable objectives)
+  - Feature backlog (prioritized list)
+  - Architecture decisions
+  - Risk assessment
+
+checks:
+  - has_keyword:objective
+  - has_keyword:backlog
+  - has_keyword:architecture
+  - has_keyword:risk
+  - length_min:500
+
+expectations:
+  - "RTE provides clear PI objectives with measurable outcomes"
+  - "Product Manager creates a prioritized feature backlog"
+  - "System Architect defines technical architecture with component dependencies"
+  - "Output includes risk assessment with mitigation strategies"

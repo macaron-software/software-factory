@@ -1,0 +1,20 @@
+team_id: team-platform-tma
+technology: python
+phase_type: development
+description: Team team-platform-tma — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: plat-tma-lead
+  - id: plat-tma-dev-back
+  - id: plat-tma-qa
+task: 'Diagnose and fix a performance regression: the /api/missions endpoint went from 50ms to 800ms after the last deploy.
+  Investigate, identify root cause, fix, and write a regression test.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

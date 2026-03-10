@@ -1,0 +1,20 @@
+team_id: team-knowledge-core
+technology: knowledge
+phase_type: development
+description: Team team-knowledge-core — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: knowledge-manager
+  - id: knowledge-curator
+  - id: knowledge-seeder
+task: 'Design a knowledge management system for a 200-person engineering org: capture decisions (ADRs), runbooks, onboarding
+  paths, and tribal knowledge. Define taxonomy, contribution workflow, and freshness tracking.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

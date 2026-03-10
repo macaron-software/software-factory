@@ -1,0 +1,66 @@
+id: tech-java-spring
+name: "Java / Spring Boot"
+stack: java-spring
+description: "Spring Boot 3+ production patterns — REST, JPA, testing, security"
+
+content: |
+  ## Build & Test
+  ./mvnw test                          # Maven
+  ./gradlew test                       # Gradle
+  ./mvnw spring-boot:run               # dev run
+  ./mvnw package -DskipTests           # build JAR
+
+  ## Application Structure
+  src/main/java/com/example/
+  ├── Application.java          @SpringBootApplication
+  ├── controller/               @RestController — HTTP layer only
+  ├── service/                  @Service — business logic
+  ├── repository/               @Repository — extends JpaRepository<E, ID>
+  ├── entity/                   @Entity + @Table
+  ├── dto/                      Request/Response records
+  └── config/                   @Configuration beans
+
+  ## Controller
+  @RestController
+  @RequestMapping("/api/items")
+  @RequiredArgsConstructor
+  public class ItemController {
+      private final ItemService itemService;
+      @GetMapping("/{id}")
+      public ResponseEntity<ItemDto> getById(@PathVariable Long id) {
+          return ResponseEntity.ok(itemService.findById(id));
+      }
+      @PostMapping
+      public ResponseEntity<ItemDto> create(@Valid @RequestBody CreateItemRequest req) {
+          return ResponseEntity.status(201).body(itemService.create(req));
+      }
+  }
+
+  ## JPA / Repository
+  public interface ItemRepository extends JpaRepository<Item, Long> {
+      List<Item> findByStatusAndCreatedAtAfter(String status, LocalDateTime since);
+      @Query("SELECT i FROM Item i WHERE i.price > :min")
+      Page<Item> findExpensive(@Param("min") BigDecimal min, Pageable pageable);
+  }
+  - Use `Optional<T>` return type: `findById(id).orElseThrow(() -> new ResourceNotFoundException(...))`
+  - Transactions: `@Transactional` on service methods (not controller)
+  - N+1: use `@EntityGraph` or JOIN FETCH in @Query
+
+  ## Lombok
+  @Data @Builder @NoArgsConstructor @AllArgsConstructor
+  - Records for DTOs (Java 16+): `public record ItemDto(Long id, String name) {}`
+
+  ## Testing
+  @SpringBootTest(webEnvironment = RANDOM_PORT)  // integration
+  @WebMvcTest(ItemController.class)              // slice — controller only
+  @DataJpaTest                                   // slice — JPA only
+
+  @Test
+  void should_return_item_when_found() {
+      when(service.findById(1L)).thenReturn(itemDto);
+      mockMvc.perform(get("/api/items/1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.name").value("Test"));
+  }
+  - Mockito: `@MockBean` in Spring test, `@Mock` + `@InjectMocks` for unit
+  - Testcontainers for real DB in integration tests

@@ -1,0 +1,2464 @@
+"""Mission orchestrator — core mission execution logic.
+
+Extracted from web/routes/epics.py to keep route handlers thin.
+
+═══════════════════════════════════════════════════════════════════════════════
+DECISIONS ET CORRECTIFS (historique, ordre chronologique)
+═══════════════════════════════════════════════════════════════════════════════
+
+[Fix #2] quality_score jamais assigné (2026-02)
+  Symptôme : toutes les phases retournaient Q=None même quand les agents avaient
+  produit du code et des tests.
+  Cause    : _compute_quality_score() n'était pas appelé en fin de phase.
+  Fix      : appel systématique après chaque phase, score stocké en DB.
+
+[Fix #3] done_with_issues accepté comme succès silencieux (2026-02)
+  Symptôme : une phase marquée "done_with_issues" passait à la suivante sans alerte.
+  Décision : done_with_issues = échec pour les phases critiques (tdd-sprint, env-setup).
+  Fix      : critical_phase = True → reloop si done_with_issues.
+
+[Fix #4] adversarial review sans contexte code (2026-02)
+  Symptôme : l'agent adversarial critiquait du "code imaginaire" car il n'avait pas
+  accès aux fichiers du workspace.
+  Fix      : injection des fichiers workspace dans le prompt adversarial.
+
+[Fix #5] feature-deploy = simulation LLM (2026-02)
+  Symptôme : la phase feature-deploy ne lançait pas de vrai build — l'agent décrivait
+  juste ce qu'il "ferait" sans exécuter cargo build / npm test.
+  Fix      : prompts explicites avec commandes build/test réelles à exécuter via tool.
+
+[Fix #6a] Sprint N+1 lancé même si cargo test PASSE (2026-02)
+  Symptôme : after a sprint success (cargo test OK), the orchestrator launched sprint 2.
+  Cause    : le break sur phase_success=True était absent.
+  Fix      : break immédiat dès que phase_success=True. Commit commentaire ~1288.
+
+[Fix #6b] Stack confusion — agents écrivent TypeScript dans un projet Rust (2026-02)
+  Symptôme : sur OVH M01 (Rust), ft-auth-dev2 créait src/index.ts (TypeScript).
+  Cause    : le stack fingerprint (lecture Cargo.toml/package.json) n'était injecté
+  que pour le sprint N+1, pas pour le sprint 1.
+  Fix      : injection du fingerprint dès le sprint 1 via phase_task. Voir ~872.
+
+[Fix #7] Infra escalation — cargo/docker-compose not found (2026-02, commit 491b0bf91)
+  Symptôme : le sprint échouait silencieusement avec "cargo: not found" (exit 127).
+  L'agent relançait le sprint N+1 identique → boucle infinie.
+  Décision architecturale : les agents DEV ne peuvent pas installer des outils.
+  C'est le rôle de ft-infra-lead (équipe infra). Flux :
+    sprint fail + _detect_tool_not_found() → run ft-infra-lead solo-phase →
+    ft-infra-lead met à jour docker-compose.project.yml + écrit BUILD_INSTRUCTIONS.md →
+    prev_context injecté avec les bonnes commandes → sprint retry.
+  Règle : toujours "docker compose" (v2, intégré Docker CLI), jamais "docker-compose"
+  (v1, binaire séparé, absent des containers SF).
+
+[Fix #8] Briefs longs → escaping SSH cassé (2026-03)
+  Symptôme : les briefs v9 (~1500 chars) contenaient ', ", \n, # etc.
+  Les tentatives d'échappement shell (.replace('"', '\\"') etc.) étaient fragiles.
+  Fix : base64.b64encode(brief) → string safe [A-Za-z0-9+/=] → passée en SSH →
+  base64.b64decode() dans le container Python → string originale intacte.
+
+[Fix #9] Evidence gate trop laxiste — faux positifs HTML5 games (2026-03)
+  Symptôme : TypeScript jamais compilé, dist/ absent, game broken → run marqué completed score=83.
+  Cause 1  : criterion npm-test utilisait "npm test 2>&1 || true" → toujours exit 0.
+  Cause 2  : aucun criterion vérifiant dist/ ou fichiers JS compilés.
+  Cause 3  : exhaustion des sprints → phase_success=True même sur phase critique.
+  Fix 1    : suppression du "|| true" dans npm-test command.
+  Fix 2    : ajout criterion "build-produces-js" : npm run build + vérif dist/ ou JS.
+  Fix 3    : _CRITICAL_EVIDENCE_PHASES → phase_success=False si evidence gate exhaust.
+
+═══════════════════════════════════════════════════════════════════════════════
+PRINCIPES D'ORCHESTRATION (décisions structurelles)
+═══════════════════════════════════════════════════════════════════════════════
+
+[P1] Métaworkflow NON linéaire
+  Les missions ne suivent pas un pipeline fixe "dev → test → deploy".
+  Si un outil manque (cargo, mvn, node) → escalade INFRA avant de continuer DEV.
+  L'équipe infra est une équipe comme les autres, appelable mid-sprint.
+
+[P2] Stack fingerprint = source de vérité
+  L'orchestrateur lit Cargo.toml / package.json / go.mod / pom.xml / pyproject.toml
+  pour détecter le vrai stack du projet. Ce fingerprint est injecté dans CHAQUE
+  sprint (pas juste le N+1) pour éviter la confusion cross-stack des agents.
+
+[P3] Version lock dans les briefs
+  Chaque brief spécifie les versions exactes (ex: "TypeScript: 5.4.5", "Axum: 0.7").
+  Sans ça, les agents choisissent les dernières versions → incompatibilités,
+  breaking changes, comportements non testés par la SF.
+
+[P4] Quality score = signal composite (pas juste "passe/échoue")
+  Q = combinaison de : nb messages agents, durée phase, succès build/tests,
+  réponse adversarial. Permet de détecter les phases "complétées trop vite"
+  (agents qui feignent le succès sans vraiment travailler).
+
+═══════════════════════════════════════════════════════════════════════════════
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import time
+import traceback
+from datetime import datetime
+
+# Phases where evidence gate failure at max_sprints = hard failure (not "continue with issues")
+_CRITICAL_EVIDENCE_PHASES = {"tdd-sprint", "feature-e2e", "qa-sprint", "game-tdd"}
+
+logger = logging.getLogger(__name__)
+
+
+def _compute_quality_score(
+    session_id: str, agent_ids: list[str], phase_start_ts: float, db
+) -> float:
+    """Compute a composite quality_score from observable phase signals.
+
+    Formula (each capped at 1.0):
+      - 0.35 × tool_success_rate  (successful tool calls / total)
+      - 0.30 × commit_signal      (1.0 if ≥1 commit, 0.5 if any code_write, 0.0 otherwise)
+      - 0.25 × message_density    (log-scaled messages count: 1.0 at 20 messages)
+      - 0.10 × duration_signal    (1.0 if phase took 30–600s, less otherwise)
+    """
+    try:
+        from datetime import datetime as _dt
+
+        phase_start_iso = _dt.utcfromtimestamp(phase_start_ts).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+
+        # Tool call success rate in this session during this phase
+        tc_row = db.execute(
+            "SELECT COUNT(*) as total, SUM(CASE WHEN success=1 THEN 1 ELSE 0 END) as ok "
+            "FROM tool_calls WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        total_tc = int(tc_row[0] or 0)
+        ok_tc = int(tc_row[1] or 0)
+        tool_success_rate = (ok_tc / total_tc) if total_tc > 0 else 0.5
+
+        # Commit signal: did agents commit code?
+        commit_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name='git_commit' AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        code_write_row = db.execute(
+            "SELECT COUNT(*) FROM tool_calls WHERE session_id=? AND tool_name IN ('code_write','code_edit','code_create') AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        commits = int(commit_row[0] or 0)
+        code_writes = int(code_write_row[0] or 0)
+        commit_signal = (
+            1.0
+            if commits >= 1
+            else (0.6 if code_writes >= 2 else (0.3 if code_writes >= 1 else 0.0))
+        )
+
+        # Message density: how many agent messages were exchanged
+        msg_row = db.execute(
+            "SELECT COUNT(*) FROM messages WHERE session_id=? AND timestamp >= ?",
+            (session_id, phase_start_iso),
+        ).fetchone()
+        msg_count = int(msg_row[0] or 0)
+        import math as _math
+
+        message_density = min(
+            1.0, _math.log(msg_count + 1) / _math.log(21)
+        )  # 1.0 at 20 messages
+
+        # Duration signal (healthy phase is 30s–600s)
+        duration = time.monotonic() - phase_start_ts
+        if 30 <= duration <= 600:
+            duration_signal = 1.0
+        elif duration < 30:
+            duration_signal = max(0.0, duration / 30)
+        else:
+            duration_signal = max(0.0, 1.0 - (duration - 600) / 1200)
+
+        score = (
+            0.35 * tool_success_rate
+            + 0.30 * commit_signal
+            + 0.25 * message_density
+            + 0.10 * duration_signal
+        )
+        return round(min(1.0, max(0.0, score)), 4)
+    except Exception:
+        return 0.0
+
+
+def _extract_stack_fingerprint(workspace: str) -> str:
+    """Read manifest files and return a stack+version fingerprint for sprint context.
+
+    Examples:
+      "Rust (cargo) | edition=2021 | axum=0.7, tokio=1, serde=1"
+      "Node.js/TypeScript | node>=18 | angular=17, rxjs=7, typescript=5"
+      "Python | python=^3.12 | fastapi=0.110, pydantic=2"
+
+    Injected into sprint N+1 so agents never switch stack or upgrade versions.
+    """
+    import os
+    import re
+    import json
+
+    parts: list[str] = []
+
+    # ── Rust ──────────────────────────────────────────────────────────────────
+    cargo_path = os.path.join(workspace, "Cargo.toml")
+    if os.path.exists(cargo_path):
+        try:
+            text = open(cargo_path).read()
+            edition = re.search(r'edition\s*=\s*"(\d+)"', text)
+            deps: dict[str, str] = {}
+            in_deps = False
+            for line in text.splitlines():
+                if re.match(r"^\[(.*dependencies.*)\]", line):
+                    in_deps = True
+                    continue
+                if line.startswith("[") and "dependencies" not in line:
+                    in_deps = False
+                if in_deps:
+                    m = re.match(r'^([\w-]+)\s*=\s*["\{]?([0-9][^\s,"}\n]*)', line)
+                    if m:
+                        deps[m.group(1)] = m.group(2).rstrip('",}')
+            parts.append("Rust (cargo)")
+            if edition:
+                parts.append(f"edition={edition.group(1)}")
+            if deps:
+                parts.append(", ".join(f"{k}={v}" for k, v in list(deps.items())[:8]))
+        except Exception:
+            parts.append("Rust (cargo)")
+
+    # ── Node.js / TypeScript ──────────────────────────────────────────────────
+    pkg_path = os.path.join(workspace, "package.json")
+    if os.path.exists(pkg_path) and not parts:
+        try:
+            pkg = json.load(open(pkg_path))
+            node_ver = pkg.get("engines", {}).get("node", "")
+            all_deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+            key_pkgs = [
+                "angular",
+                "@angular/core",
+                "react",
+                "vue",
+                "next",
+                "express",
+                "fastify",
+                "typescript",
+                "rxjs",
+                "vite",
+                "webpack",
+                "nestjs",
+            ]
+            selected = {}
+            for raw_k, v in all_deps.items():
+                short = raw_k.lstrip("@").split("/")[-1]
+                if any(
+                    raw_k == kp or short == kp.lstrip("@").split("/")[-1]
+                    for kp in key_pkgs
+                ):
+                    selected[short] = v.lstrip("^~")
+            parts.append("Node.js/TypeScript (npm)")
+            if node_ver:
+                parts.append(f"node={node_ver}")
+            if selected:
+                parts.append(
+                    ", ".join(f"{k}={v}" for k, v in list(selected.items())[:6])
+                )
+        except Exception:
+            parts.append("Node.js/TypeScript (npm)")
+
+    # ── Python ────────────────────────────────────────────────────────────────
+    py_path = os.path.join(workspace, "pyproject.toml")
+    req_path = os.path.join(workspace, "requirements.txt")
+    if os.path.exists(py_path) and not parts:
+        try:
+            import tomllib
+
+            data = tomllib.load(open(py_path, "rb"))
+            py_ver = data.get("project", {}).get("requires-python", "") or data.get(
+                "tool", {}
+            ).get("poetry", {}).get("dependencies", {}).get("python", "")
+            raw_deps = data.get("project", {}).get("dependencies", []) or list(
+                data.get("tool", {}).get("poetry", {}).get("dependencies", {}).items()
+            )
+            dep_strs = []
+            for d in raw_deps[:6]:
+                if isinstance(d, str):
+                    dep_strs.append(d.split(">=")[0].split("==")[0].split("[")[0])
+                elif isinstance(d, tuple):
+                    dep_strs.append(f"{d[0]}={str(d[1]).lstrip('^~>=').split(',')[0]}")
+            parts.append("Python")
+            if py_ver:
+                parts.append(f"python={py_ver}")
+            if dep_strs:
+                parts.append(", ".join(dep_strs))
+        except Exception:
+            parts.append("Python")
+    elif os.path.exists(req_path) and not parts:
+        try:
+            reqs = [
+                line.strip()
+                for line in open(req_path)
+                if line.strip() and not line.startswith("#")
+            ]
+            parts.append("Python (pip)")
+            if reqs:
+                parts.append(", ".join(reqs[:5]))
+        except Exception:
+            parts.append("Python (pip)")
+
+    # ── Go ────────────────────────────────────────────────────────────────────
+    go_path = os.path.join(workspace, "go.mod")
+    if os.path.exists(go_path) and not parts:
+        try:
+            text = open(go_path).read()
+            go_ver = re.search(r"^go\s+(\S+)", text, re.MULTILINE)
+            mod_name = re.search(r"^module\s+(\S+)", text, re.MULTILINE)
+            parts.append("Go")
+            if go_ver:
+                parts.append(f"go={go_ver.group(1)}")
+            if mod_name:
+                parts.append(f"module={mod_name.group(1)}")
+        except Exception:
+            parts.append("Go")
+
+    return " | ".join(parts) if parts else ""
+
+
+def _extract_build_summary(result) -> str:
+    """Extract a short build/test summary from a pattern result for sprint context injection."""
+    try:
+        summaries = []
+        for node in result.nodes.values():
+            output = (node.output or "") + (
+                (node.result.content if node.result else "") or ""
+            )
+            # Look for build tool output lines
+            for line in output.splitlines():
+                if any(
+                    k in line
+                    for k in (
+                        "test result:",
+                        "BUILD SUCCESS",
+                        "BUILD FAILED",
+                        "error[E",
+                        "warning[",
+                        "cargo test",
+                        "passed",
+                        "failed",
+                    )
+                ):
+                    summaries.append(line.strip()[:120])
+                    if len(summaries) >= 4:
+                        break
+            if len(summaries) >= 4:
+                break
+        return " | ".join(summaries) if summaries else "no build output captured"
+    except Exception:
+        return "unknown"
+
+
+def _detect_tool_not_found(result) -> list[str]:
+    """Scan agent outputs for 'tool: not found' / 'exit 127' errors.
+
+    Returns list of missing tool names (e.g. ['cargo', 'docker-compose']).
+    These signal that the dev team needs infra help before retrying.
+    """
+    missing: list[str] = []
+    try:
+        for node in result.nodes.values():
+            output = (node.output or "") + (
+                (node.result.content if node.result else "") or ""
+            )
+            for line in output.splitlines():
+                # Pattern: "cargo: not found", "npm: not found", "go: not found"
+                if ": not found" in line or "exit 127" in line:
+                    # Extract tool name
+                    tool = line.split(":")[0].strip().split()[-1].strip()
+                    if tool and tool not in missing:
+                        missing.append(tool)
+                # Also catch "command not found: cargo"
+                if "command not found:" in line.lower():
+                    parts = line.lower().split("command not found:")
+                    if len(parts) > 1:
+                        tool = parts[1].strip().split()[0]
+                        if tool and tool not in missing:
+                            missing.append(tool)
+    except Exception:
+        pass
+    return missing
+
+
+class EpicOrchestrator:
+    """Drives mission execution: CDP orchestrates phases sequentially.
+
+    Uses the REAL pattern engine (run_pattern) for each phase — agents
+    think with LLM, stream their responses, and interact per pattern type.
+    """
+
+    def __init__(
+        self,
+        mission,
+        workflow,
+        run_store,
+        agent_store,
+        session_id: str,
+        orch_id: str,
+        orch_name: str,
+        orch_role: str,
+        orch_avatar: str,
+        push_sse,
+    ):
+        self.mission = mission
+        self.wf = workflow
+        self.run_store = run_store
+        self.agent_store = agent_store
+        self.session_id = session_id
+        self.orch_id = orch_id
+        self.orch_name = orch_name
+        self.orch_role = orch_role
+        self.orch_avatar = orch_avatar
+        self._push_sse = push_sse
+
+    # ── helpers re-used by the phase loop ──
+
+    async def _check_deploy_http(
+        self, workspace: str, session_id: str, mission_id: str, phase_id: str
+    ) -> bool:
+        """PR4 — Deploy gate: try to find the deployed port and HTTP-check it.
+
+        Reads docker-compose.project.yml or package.json scripts for port hints.
+        Retries 3× with 5s delay. Returns True if HTTP responds, False otherwise.
+        Non-blocking on errors (returns True to avoid blocking non-web projects).
+        """
+        import asyncio
+        import os
+        import re
+        import urllib.request
+
+        port: int | None = None
+        # Try to find port from docker-compose
+        dc_path = (
+            os.path.join(workspace, "docker-compose.project.yml") if workspace else ""
+        )
+        if workspace and os.path.isfile(dc_path):
+            try:
+                content = open(dc_path).read()
+                m = re.search(r'"(\d{4,5}):(?:\d{4,5})"', content) or re.search(
+                    r"'(\d{4,5}):\d+'", content
+                )
+                if m:
+                    port = int(m.group(1))
+            except Exception:
+                pass
+        # Try package.json scripts for port hint
+        if not port and workspace:
+            pkg = os.path.join(workspace, "package.json")
+            if os.path.isfile(pkg):
+                try:
+                    import json as _json
+
+                    data = _json.load(open(pkg))
+                    scripts = data.get("scripts", {})
+                    for v in scripts.values():
+                        m = re.search(
+                            r"-p\s+(\d{4,5})|--port\s+(\d{4,5})|:(\d{4,5})", str(v)
+                        )
+                        if m:
+                            port = int(next(g for g in m.groups() if g))
+                            break
+                except Exception:
+                    pass
+        if not port:
+            # No port found — skip gate for non-HTTP projects (static files, libs, etc.)
+            logger.info(
+                "Deploy gate: no port found in %s — skipping HTTP check", workspace
+            )
+            return True
+
+        url = f"http://localhost:{port}"
+        for attempt in range(3):
+            try:
+                req = urllib.request.urlopen(url, timeout=5)
+                if req.status < 500:
+                    await self._sse_orch_msg(
+                        f"✅ Deploy gate OK — {url} répond HTTP {req.status}", phase_id
+                    )
+                    return True
+            except Exception as _e:
+                logger.debug("Deploy gate attempt %d/%d: %s", attempt + 1, 3, _e)
+            if attempt < 2:
+                await asyncio.sleep(5)
+
+        await self._sse_orch_msg(
+            f"⚠️ Deploy gate: {url} ne répond pas après 3 tentatives — vérifier que le service est démarré",
+            phase_id,
+        )
+        return False
+
+    async def _sse_orch_msg(self, content: str, phase_id: str = ""):
+        await self._push_sse(
+            self.session_id,
+            {
+                "type": "message",
+                "from_agent": self.orch_id,
+                "from_name": self.orch_name,
+                "from_role": self.orch_role,
+                "from_avatar": self.orch_avatar,
+                "content": content,
+                "phase_id": phase_id,
+                "msg_type": "text",
+            },
+        )
+
+    # ── main entry point ──
+
+    async def run_phases(self):
+        """Execute phases sequentially using the real pattern engine.
+
+        Error reloop: when QA or deploy fails, re-run dev→CI/CD→QA with
+        error feedback injected (max 2 reloops to avoid infinite loops).
+        """
+        from ..models import EpicStatus, PhaseStatus
+        from ..patterns.engine import NodeStatus, run_pattern
+        from ..patterns.store import PatternDef
+
+        # Late imports to avoid circular deps
+        from ..web.routes.epics.internal import (
+            _auto_retrospective,
+            _build_phase_prompt,
+            _detect_project_platform,
+            _extract_features_from_phase,
+            _run_post_phase_hooks,
+        )
+
+        mission = self.mission
+        wf = self.wf
+        run_store = self.run_store
+        agent_store = self.agent_store
+        session_id = self.session_id
+
+        logger.warning(
+            "ORCH START mission=%s phases=%d session=%s",
+            mission.id,
+            len(mission.phases),
+            session_id,
+        )
+
+        # Emit event: mission started
+        try:
+            from ..events.store import MISSION_STARTED, get_event_store
+
+            get_event_store().emit(
+                MISSION_STARTED,
+                {
+                    "workflow": wf.id,
+                    "phases": len(mission.phases),
+                    "session_id": session_id,
+                },
+                entity_type="mission",
+                entity_id=mission.id,
+                actor=self.orch_id,
+                project_id=getattr(mission, "project_id", ""),
+                mission_id=mission.id,
+            )
+        except Exception:
+            pass
+
+        # Stop any existing agent loops for this session to avoid conflicts
+        try:
+            from ..agents.loop import get_loop_manager
+
+            mgr = get_loop_manager()
+            await mgr.stop_session(session_id)
+            logger.warning(
+                "ORCH stopped existing agent loops for session %s", session_id
+            )
+        except Exception as e:
+            logger.warning("ORCH stop loops: %s", e)
+
+        workspace = mission.workspace_path or ""
+        phases_done = 0
+        phases_failed = 0
+        phase_summaries = []
+        reloop_count = 0
+        MAX_RELOOPS = 2
+        reloop_errors = []
+
+        # Evidence gate: acceptance criteria for dev phases
+        from ..services.evidence import (
+            format_evidence_report,
+            get_criteria_for_workflow,
+            run_evidence_checks,
+        )
+
+        wf_config = (
+            wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
+        )
+        acceptance_criteria = get_criteria_for_workflow(
+            wf.id, wf_config, workspace=workspace, epic_id=mission.id
+        )
+        if acceptance_criteria:
+            logger.warning(
+                "ORCH evidence gate: %d criteria for %s",
+                len(acceptance_criteria),
+                wf.id,
+            )
+
+        i = 0
+        while i < len(mission.phases):
+            phase = mission.phases[i]
+            wf_phase = wf.phases[i] if i < len(wf.phases) else None
+            if not wf_phase:
+                i += 1
+                continue
+
+            if phase.status in (
+                PhaseStatus.DONE,
+                PhaseStatus.DONE_WITH_ISSUES,
+                PhaseStatus.SKIPPED,
+            ):
+                if phase.summary:
+                    phase_summaries.append(f"## {wf_phase.name}\n{phase.summary}")
+                i += 1
+                continue
+
+            cfg = wf_phase.config or {}
+            aids = cfg.get("agent_ids", cfg.get("agents", []))
+            pattern_type = wf_phase.pattern_id
+
+            # Dynamic team resolution: pick agents from graph nodes or defaults
+            if not aids and cfg.get("dynamic_team"):
+                wf_graph = (
+                    (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                )
+                graph_nodes = wf_graph.get("nodes", [])
+                phase_agents = []
+                for gn in graph_nodes:
+                    if gn.get("phase") == wf_phase.id and gn.get("agent_id"):
+                        aid = gn["agent_id"]
+                        if aid not in phase_agents and agent_store.get(aid):
+                            phase_agents.append(aid)
+                if phase_agents:
+                    aids = phase_agents
+                    logger.warning(
+                        "ORCH team for %s: %s (from graph)", wf_phase.id, aids
+                    )
+                else:
+                    # Fallback: assign generic dev agents
+                    fallback = ["lead_dev", "lead_backend", "lead_frontend"]
+                    aids = [a for a in fallback if agent_store.get(a)][:3] or [
+                        "lead_dev"
+                    ]
+                    logger.warning("ORCH team for %s: %s (fallback)", wf_phase.id, aids)
+
+            # Dynamic lead/reviewer resolution
+            if not aids and cfg.get("dynamic_lead"):
+                wf_graph = (
+                    (self.wf.config or {}).get("graph", {}) if self.wf.config else {}
+                )
+                for gn in wf_graph.get("nodes", []):
+                    if gn.get("phase") == wf_phase.id and gn.get("agent_id"):
+                        aid = gn["agent_id"]
+                        if aid not in aids and agent_store.get(aid):
+                            aids.append(aid)
+                if not aids:
+                    aids = ["system-architect-art"]
+                logger.warning("ORCH lead for %s: %s", wf_phase.id, aids)
+
+            if not aids and cfg.get("dynamic_reviewers"):
+                aids = ["system-architect-art"]
+                logger.warning("ORCH reviewers for %s: %s", wf_phase.id, aids)
+
+            if not aids and cfg.get("dynamic_deployer"):
+                aids = ["ft-infra-lead"]
+                if not agent_store.get("ft-infra-lead"):
+                    aids = ["devops"]
+                logger.warning("ORCH deployer for %s: %s", wf_phase.id, aids)
+
+            # Build CDP context: workspace state + previous phase summaries
+            cdp_context = ""
+            if mission.workspace_path:
+                try:
+                    import subprocess
+
+                    ws = mission.workspace_path
+                    file_count = subprocess.run(
+                        ["find", ws, "-type", "f", "-not", "-path", "*/.git/*"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    n_files = (
+                        len(file_count.stdout.strip().split("\n"))
+                        if file_count.stdout.strip()
+                        else 0
+                    )
+                    git_log = subprocess.run(
+                        ["git", "log", "--oneline", "-5"],
+                        cwd=ws,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    cdp_context = f"Workspace: {n_files} fichiers"
+                    if git_log.stdout.strip():
+                        cdp_context += (
+                            f" | Git: {git_log.stdout.strip().split(chr(10))[0]}"
+                        )
+                except Exception:
+                    pass
+
+            prev_context = ""
+            if phase_summaries:
+                prev_context = "\n".join(
+                    s
+                    if isinstance(s, str)
+                    else f"- Phase {s.get('name', '?')}: {s.get('summary', '')}"
+                    for s in phase_summaries[-5:]
+                )
+
+            # CDP announces the phase
+            detected_platform = _detect_project_platform(workspace) if workspace else ""
+            platform_display = {
+                "macos-native": "🖥️ macOS native (Swift/SwiftUI)",
+                "ios-native": "📱 iOS native (Swift/SwiftUI)",
+                "android-native": "🤖 Android native (Kotlin)",
+                "web-docker": "🌐 Web (Docker)",
+                "web-node": "🌐 Web (Node.js)",
+                "web-static": "🌐 Web statique",
+            }.get(detected_platform, "")
+            cdp_announce = f"Lancement phase {i + 1}/{len(mission.phases)} : **{wf_phase.name}** (pattern: {pattern_type})"
+            if platform_display:
+                cdp_announce += f"\nPlateforme détectée : {platform_display}"
+            if cdp_context:
+                cdp_announce += f"\n{cdp_context}"
+            await self._sse_orch_msg(cdp_announce, phase.phase_id)
+            await asyncio.sleep(0.5)
+
+            # Snapshot message count before phase starts
+            from ..sessions.store import get_session_store as _get_ss
+
+            _ss_pre = _get_ss()
+            _pre_phase_msg_count = len(_ss_pre.get_messages(session_id, limit=1000))
+            _phase_start_time = time.monotonic()
+
+            # Update phase status
+            phase.status = PhaseStatus.RUNNING
+            phase.started_at = datetime.utcnow()
+            phase.agent_count = len(aids)
+            mission.current_phase = phase.phase_id
+            run_store.update(mission)
+            logger.warning(
+                "ORCH phase=%s status=RUNNING agents=%s pattern=%s",
+                phase.phase_id,
+                aids,
+                pattern_type,
+            )
+
+            # Emit event: phase started
+            try:
+                from ..events.store import PHASE_STARTED, get_event_store
+
+                get_event_store().emit(
+                    PHASE_STARTED,
+                    {
+                        "phase_name": wf_phase.name,
+                        "pattern": pattern_type,
+                        "agents": aids,
+                    },
+                    entity_type="phase",
+                    entity_id=phase.phase_id,
+                    actor=self.orch_id,
+                    project_id=getattr(mission, "project_id", ""),
+                    mission_id=mission.id,
+                )
+            except Exception:
+                pass
+
+            await self._push_sse(
+                session_id,
+                {
+                    "type": "phase_started",
+                    "mission_id": mission.id,
+                    "phase_id": phase.phase_id,
+                    "phase_name": wf_phase.name,
+                    "pattern": pattern_type,
+                    "agents": aids,
+                },
+            )
+
+            # RL Policy hook: recommend pattern adaptation before phase starts
+            try:
+                from ..agents.rl_policy import get_rl_policy
+
+                _rl = get_rl_policy()
+                _rej_rate = 0.0
+                _qual = 0.0
+                try:
+                    from ..db.migrations import get_db as _rldb
+
+                    _db = _rldb()
+                    _row = _db.execute(
+                        "SELECT rejected, iterations, quality_score FROM agent_scores"
+                        " WHERE epic_id=? ORDER BY iterations DESC LIMIT 1",
+                        (mission.id,),
+                    ).fetchone()
+                    _db.close()
+                    if _row and _row["iterations"] > 0:
+                        _rej_rate = _row["rejected"] / max(1, _row["iterations"])
+                        _qual = _row["quality_score"] or 0.0
+                except Exception:
+                    pass
+                _rl_rec = _rl.recommend(
+                    mission_id=mission.id,
+                    phase_id=phase.phase_id,
+                    state_dict={
+                        "workflow_id": mission.workflow_id or "",
+                        "phase_idx": i,
+                        "phase_count": len(self.wf.phases)
+                        if hasattr(self, "wf") and self.wf
+                        else len(mission.phases),
+                        "rejection_pct": _rej_rate,
+                        "quality_score": _qual,
+                    },
+                )
+                if _rl_rec and _rl_rec.get("fired") and _rl_rec.get("action") != "keep":
+                    _new_pattern = {
+                        "switch_parallel": "parallel",
+                        "switch_sequential": "sequential",
+                        "switch_hierarchical": "hierarchical",
+                        "switch_debate": "debate",
+                    }.get(_rl_rec["action"])
+                    if _new_pattern and _new_pattern != pattern_type:
+                        logger.warning(
+                            "RL hook: phase=%s pattern %s→%s (conf=%.2f)",
+                            phase.phase_id,
+                            pattern_type,
+                            _new_pattern,
+                            _rl_rec.get("confidence", 0),
+                        )
+                        pattern_type = _new_pattern
+            except Exception as _rl_err:
+                logger.debug(f"RL hook skipped: {_rl_err}")
+
+            # Build PatternDef for this phase
+            agent_nodes = [{"id": aid, "agent_id": aid} for aid in aids]
+
+            leader = cfg.get("leader", "")
+            if not leader and aids:
+                ranked = sorted(
+                    aids,
+                    key=lambda a: agent_store.get(a).hierarchy_rank
+                    if agent_store.get(a)
+                    else 50,
+                )
+                leader = ranked[0]
+
+            edges = self._build_edges(pattern_type, aids, leader)
+
+            # Merge YAML phase config with defaults (YAML overrides hardcoded defaults)
+            _default_config = {"max_rounds": 4, "max_iterations": 5}
+            _yaml_config = wf_phase.config or {}
+            _merged_cfg = {
+                **_default_config,
+                **{k: v for k, v in _yaml_config.items() if k not in ("agents",)},
+            }
+            phase_pattern = PatternDef(
+                id=f"mission-{mission.id}-phase-{phase.phase_id}",
+                name=wf_phase.name,
+                type=pattern_type,
+                agents=agent_nodes,
+                edges=edges,
+                config=_merged_cfg,
+            )
+
+            phase_task = _build_phase_prompt(
+                wf_phase.name,
+                pattern_type,
+                mission.brief,
+                i,
+                len(mission.phases),
+                prev_context,
+                workspace_path=workspace,
+            )
+            phase_task += f"\nMISSION_ID: {mission.id}"
+            # Inject target branch if set
+            _target_branch = (mission.context or {}).get("target_branch", "")
+            if _target_branch:
+                phase_task += (
+                    f"\nTARGET_BRANCH: {_target_branch} — "
+                    "All code changes MUST be committed to this branch. "
+                    "Use git_create_branch to checkout this branch before any commit."
+                )
+
+            # Sprint loop
+            phase_key_check = (
+                wf_phase.name.lower()
+                .replace(" ", "-")
+                .replace("é", "e")
+                .replace("è", "e")
+            )
+            is_dev_phase = (
+                "sprint" in phase_key_check
+                or "dev" in phase_key_check
+                or "features" in phase_key_check
+                or "test" in phase_key_check
+            )
+            _is_retryable = (
+                is_dev_phase
+                or "cicd" in phase_key_check
+                or "qa" in phase_key_check
+                or "architecture" in phase_key_check
+                or "setup" in phase_key_check
+            )
+            # Evidence gate only for TDD sprints (not E2E/QA which can't run tests)
+            is_evidence_gated = (
+                "sprint" in phase_key_check and "e2e" not in phase_key_check
+            )
+            max_sprints = (
+                wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2)
+                if is_dev_phase
+                else 1
+            )
+            if is_dev_phase:
+                logger.warning(
+                    "ORCH phase=%s max_sprints=%d (from config=%s)",
+                    phase.phase_id,
+                    max_sprints,
+                    wf_phase.config.get("max_iterations"),
+                )
+
+            phase_success = False
+            phase_error = ""
+            current_sprint_id = None
+
+            for sprint_num in range(1, max_sprints + 1):
+                sprint_label = (
+                    f"Sprint {sprint_num}/{max_sprints}" if max_sprints > 1 else ""
+                )
+
+                # SAFe: Auto-create Sprint record for dev phases
+                if is_dev_phase:
+                    try:
+                        from ..epics.store import SprintDef, get_epic_store
+
+                        _ms = get_epic_store()
+                        sprint = SprintDef(
+                            mission_id=mission.id,
+                            number=sprint_num,
+                            name=f"Sprint {sprint_num}"
+                            + (f" — {wf_phase.name}" if sprint_num == 1 else ""),
+                            goal=phase_task[:200]
+                            if sprint_num == 1
+                            else f"Iteration {sprint_num} — correction et amélioration",
+                            status="active",
+                            started_at=datetime.utcnow().isoformat(),
+                        )
+                        sprint = _ms.create_sprint(sprint)
+                        current_sprint_id = sprint.id
+                        logger.warning(
+                            "ORCH Sprint created: %s (num=%d, mission=%s)",
+                            sprint.id,
+                            sprint_num,
+                            mission.id,
+                        )
+                    except Exception as e:
+                        logger.warning("Sprint creation failed: %s", e)
+
+                _phase_technology = "generic"
+                _phase_type_key = "development"
+                if max_sprints > 1:
+                    await self._sse_orch_msg(
+                        f"Lancement {sprint_label} pour «{wf_phase.name}»",
+                        phase.phase_id,
+                    )
+                    await asyncio.sleep(0.5)
+                    phase_task = _build_phase_prompt(
+                        wf_phase.name,
+                        pattern_type,
+                        mission.brief,
+                        i,
+                        len(mission.phases),
+                        prev_context,
+                        workspace_path=workspace,
+                    )
+                    phase_task += (
+                        f"\n\n--- {sprint_label} ---\n"
+                        f"C'est le sprint {sprint_num} sur {max_sprints} prévus.\n"
+                    )
+                    if sprint_num == 1:
+                        phase_task += "Focus: mise en place structure projet, première feature MVP.\n"
+                    elif sprint_num < max_sprints:
+                        phase_task += "Focus: itérez sur les features suivantes du backlog, utilisez le code existant.\n"
+                    else:
+                        phase_task += "Focus: sprint final — finalisez, nettoyez, préparez le handoff CI/CD.\n"
+
+                    # Inject backlog from earlier phases
+                    if mission.id:
+                        try:
+                            from ..memory.manager import get_memory_manager
+
+                            mem = get_memory_manager()
+                            backlog_items = mem.project_get(
+                                mission.id, category="product"
+                            )
+                            arch_items = mem.project_get(
+                                mission.id, category="architecture"
+                            )
+                            if backlog_items or arch_items:
+                                phase_task += "\n\n--- Backlog et architecture (phases précédentes) ---\n"
+                                for item in (backlog_items or [])[:5]:
+                                    phase_task += f"- [Backlog] {item.get('key', '')}: {item.get('value', '')[:200]}\n"
+                                for item in (arch_items or [])[:5]:
+                                    phase_task += f"- [Archi] {item.get('key', '')}: {item.get('value', '')[:200]}\n"
+                        except Exception:
+                            pass
+
+                    # SAFe B1: Feature Pull
+                    if is_dev_phase:
+                        try:
+                            from ..epics.product import get_product_backlog
+
+                            pb = get_product_backlog()
+                            features = pb.list_features(epic_id=mission.id)
+                            if features:
+                                phase_task += (
+                                    "\n\n--- Features Backlog (WSJF priorité) ---\n"
+                                )
+                                for fi, feat in enumerate(features[:8]):
+                                    status_icon = {
+                                        "backlog": "⏳",
+                                        "ready": "📋",
+                                        "in_progress": "🔄",
+                                        "done": "✅",
+                                    }.get(feat.status, "?")
+                                    phase_task += f"{fi + 1}. {status_icon} [{feat.story_points}SP] {feat.name}: {feat.description[:100]}\n"
+                                    if feat.status == "backlog" and sprint_num == 1:
+                                        pb.update_feature_status(feat.id, "in_progress")
+                        except Exception:
+                            pass
+
+                    # SAFe D1: Learning Loop
+                    if is_dev_phase and sprint_num > 1:
+                        try:
+                            from ..memory.manager import get_memory_manager
+
+                            mem = get_memory_manager()
+                            learnings = mem.global_search("retrospective sprint")
+                            if learnings:
+                                phase_task += (
+                                    "\n\n--- Learnings des sprints précédents ---\n"
+                                )
+                                for lr in learnings[:3]:
+                                    phase_task += f"- {lr.get('value', '')[:200]}\n"
+                        except Exception:
+                            pass
+
+                    # Stack fingerprint injection — EVERY sprint (not just N+1)
+                    # Dev agents must know the stack from sprint 1 to avoid cross-stack confusion
+                    from ..patterns.team_selector import (
+                        normalize_technology,
+                        infer_context as _infer_ctx,
+                    )
+
+                    _phase_technology = "generic"
+                    if is_dev_phase and workspace:
+                        _fp = _extract_stack_fingerprint(workspace)
+                        if _fp:
+                            phase_task += (
+                                f"\n\n⚠️ STACK DÉTECTÉE: {_fp}\n"
+                                f"RÈGLES ABSOLUES:\n"
+                                f"1. Ne créer AUCUN fichier d'une autre stack\n"
+                                f"2. Si un outil est absent (cargo/npm/python/go), "
+                                f"utiliser: `docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                f"3. NE PAS utiliser `docker-compose` (v1) — utiliser `docker compose` (v2, avec espace)\n"
+                                f"4. Lire BUILD_INSTRUCTIONS.md s'il existe dans le workspace"
+                            )
+                            _phase_technology = normalize_technology(_fp)
+
+                    # Phase type from workflow/phase name (frontend, backend, devops, etc.)
+                    _inferred_tech, _inferred_phase = _infer_ctx(
+                        workflow_id=getattr(mission, "workflow_id", "") or "",
+                        title=wf_phase.name or "",
+                    )
+                    if _inferred_tech != "generic" and _phase_technology == "generic":
+                        _phase_technology = _inferred_tech
+                    _phase_type_key = (
+                        _inferred_phase
+                        if _inferred_phase != "generic"
+                        else "development"
+                    )
+
+                try:
+                    # Phase timeout: 10 minutes max per phase execution
+                    PHASE_TIMEOUT = 600
+                    MAX_LLM_RETRIES = 2
+                    LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
+                    result = None  # init before retry loop
+
+                    # Build lineage for traceability
+                    _epic_lineage = [f"Epic: {mission.workflow_name or mission.id}"]
+                    if wf_phase.name:
+                        _epic_lineage.append(f"Phase: {wf_phase.name}")
+                    if mission.brief and len(mission.brief) < 120:
+                        _epic_lineage.append(f"Goal: {mission.brief[:120]}")
+
+                    for llm_attempt in range(1, MAX_LLM_RETRIES + 1):
+                        try:
+                            result = await asyncio.wait_for(
+                                run_pattern(
+                                    phase_pattern,
+                                    session_id,
+                                    phase_task,
+                                    project_id=mission.project_id or mission.id,
+                                    project_path=mission.workspace_path,
+                                    phase_id=phase.phase_id,
+                                    lineage=_epic_lineage,
+                                    technology=_phase_technology,
+                                    phase_type=_phase_type_key,
+                                ),
+                                timeout=PHASE_TIMEOUT,
+                            )
+                            phase_success = result.success
+                            if not phase_success:
+                                failed_nodes = [
+                                    n
+                                    for n in result.nodes.values()
+                                    if n.status
+                                    not in (NodeStatus.COMPLETED, NodeStatus.PENDING)
+                                ]
+                                if result.error:
+                                    phase_error = result.error
+                                elif failed_nodes:
+                                    errors = []
+                                    for fn in failed_nodes:
+                                        err = (
+                                            (fn.result.error if fn.result else "")
+                                            or fn.output
+                                            or ""
+                                        )
+                                        errors.append(f"{fn.agent_id}: {err[:100]}")
+                                    phase_error = "; ".join(errors)
+                                else:
+                                    phase_error = "Pattern returned success=False"
+                                # Retry on rate limit errors
+                                is_rate_limit = any(
+                                    kw in phase_error.lower()
+                                    for kw in (
+                                        "rate limit",
+                                        "429",
+                                        "all llm providers failed",
+                                        "throttl",
+                                    )
+                                )
+                                if is_rate_limit and llm_attempt < MAX_LLM_RETRIES:
+                                    logger.warning(
+                                        "Phase %s rate-limited (attempt %d/%d), waiting %ds...",
+                                        phase.phase_id,
+                                        llm_attempt,
+                                        MAX_LLM_RETRIES,
+                                        LLM_RETRY_DELAY,
+                                    )
+                                    await self._sse_orch_msg(
+                                        f"⏳ Rate limit — pause {LLM_RETRY_DELAY}s avant retry ({llm_attempt}/{MAX_LLM_RETRIES})…",
+                                        phase.phase_id,
+                                    )
+                                    await asyncio.sleep(LLM_RETRY_DELAY)
+                                    continue
+                            break  # Success or non-retryable error
+                        except asyncio.TimeoutError:
+                            if llm_attempt < MAX_LLM_RETRIES:
+                                logger.warning(
+                                    "Phase %s timed out (attempt %d/%d), retrying...",
+                                    phase.phase_id,
+                                    llm_attempt,
+                                    MAX_LLM_RETRIES,
+                                )
+                                await asyncio.sleep(LLM_RETRY_DELAY)
+                                continue
+                            logger.error(
+                                "Phase %s timed out after %ds (all retries exhausted)",
+                                phase.phase_id,
+                                PHASE_TIMEOUT,
+                            )
+                            phase_error = f"Phase timed out after {PHASE_TIMEOUT}s"
+                            break
+                except Exception as exc:
+                    logger.error(
+                        "Phase %s pattern crashed: %s\n%s",
+                        phase.phase_id,
+                        exc,
+                        traceback.format_exc(),
+                    )
+                    phase_error = str(exc)
+
+                # ── ESCALATE: auto-switch workflow if architect requested it ──
+                # Detect [ESCALATE: workflow-id] in any node output of this phase.
+                # Triggers when feature-design determines brief is too complex for
+                # feature-sprint and should be handled by epic-decompose instead.
+                if phase_success and wf_phase and wf_phase.id == "feature-design":
+                    escalate_target = None
+                    import re as _re
+
+                    for _node in result.nodes.values():
+                        _txt = (_node.output or "") + (
+                            (_node.result.content if _node.result else "") or ""
+                        )
+                        _m = _re.search(
+                            r"\[ESCALATE:\s*([\w\-]+)\]", _txt, _re.IGNORECASE
+                        )
+                        if _m:
+                            escalate_target = _m.group(1).strip()
+                            break
+                    if escalate_target:
+                        from ..workflows.store import get_workflow_store as _get_wf
+
+                        _new_wf = _get_wf().get(escalate_target)
+                        if _new_wf:
+                            logger.warning(
+                                "ESCALATE: mission %s → switching workflow %s → %s",
+                                mission.id,
+                                mission.workflow_id,
+                                escalate_target,
+                            )
+                            await self._sse_orch_msg(
+                                f"🔀 **Escalade automatique** — brief trop complexe pour "
+                                f"`feature-sprint`, relance en `{escalate_target}`…",
+                                phase.phase_id,
+                            )
+                            # Rebuild mission phases from new workflow
+                            from ..models import PhaseRun, PhaseStatus
+
+                            mission.workflow_id = escalate_target
+                            mission.phases = [
+                                PhaseRun(
+                                    phase_id=wp.id,
+                                    phase_name=wp.name,
+                                    status=PhaseStatus.PENDING,
+                                )
+                                for wp in _new_wf.phases
+                            ]
+                            run_store.update(mission)
+                            self.wf = _new_wf
+                            # Restart phase loop from index 0
+                            i = 0
+                            continue
+
+                # SAFe B2: Sprint Review + Retro Auto
+                if is_dev_phase and current_sprint_id:
+                    try:
+                        from ..epics.store import get_epic_store
+
+                        _ms = get_epic_store()
+                        sprint_status = "completed" if phase_success else "failed"
+                        _ms.update_sprint_status(current_sprint_id, sprint_status)
+                        try:
+                            from ..llm.client import LLMMessage, get_llm_client
+
+                            llm = get_llm_client()
+                            retro_prompt = (
+                                f"Sprint {sprint_num} {'réussi' if phase_success else 'échoué'}. "
+                                f"Erreur: {phase_error[:300] if phase_error else 'none'}. "
+                                f"Génère une rétrospective en 3 points: "
+                                f"1) Ce qui a bien marché 2) Ce qui n'a pas marché 3) Action d'amélioration. "
+                                f"2-3 phrases max par point."
+                            )
+                            retro_resp = await asyncio.wait_for(
+                                llm.chat(
+                                    [LLMMessage(role="user", content=retro_prompt)],
+                                    max_tokens=300,
+                                    temperature=0.4,
+                                ),
+                                timeout=30,
+                            )
+                            retro_text = (retro_resp.content or "").strip()
+                            if retro_text:
+                                _ms.update_sprint_retro(current_sprint_id, retro_text)
+                                from ..memory.manager import get_memory_manager
+
+                                mem = get_memory_manager()
+                                mem.global_store(
+                                    key=f"retro-sprint-{mission.id}-{sprint_num}",
+                                    value=retro_text[:500],
+                                    category="retrospective",
+                                )
+                                logger.info(
+                                    "SAFe Retro stored for sprint %d (mission %s)",
+                                    sprint_num,
+                                    mission.id,
+                                )
+                        except Exception as e:
+                            logger.warning("Retro generation failed: %s", e)
+                        # SAFe B3: Velocity tracking
+                        if phase_success:
+                            try:
+                                import subprocess as _sp
+
+                                ws = getattr(mission, "workspace_path", "")
+                                if ws:
+                                    res = _sp.run(
+                                        ["git", "diff", "--stat", "HEAD~1"],
+                                        cwd=ws,
+                                        capture_output=True,
+                                        text=True,
+                                        timeout=10,
+                                    )
+                                    files_changed = (
+                                        res.stdout.count("|")
+                                        if res.returncode == 0
+                                        else 0
+                                    )
+                                    velocity = max(1, files_changed)
+                                    _ms.update_sprint_velocity(
+                                        current_sprint_id, velocity, planned_sp=velocity
+                                    )
+                            except Exception:
+                                pass
+                    except Exception as e:
+                        logger.warning("Sprint update failed: %s", e)
+
+                # Inject stack fingerprint + sprint outcome into next-sprint context.
+                # Done on BOTH success and failure so sprint N+1 agents never lose their bearings.
+                if workspace:
+                    _fingerprint = _extract_stack_fingerprint(workspace)
+                    if _fingerprint:
+                        prev_context += (
+                            f"\n\n⚠️ STACK & VERSIONS VERROUILLÉES: {_fingerprint}\n"
+                            f"RÈGLES ABSOLUES pour le sprint suivant:\n"
+                            f"1. Ne créer AUCUN fichier d'une autre stack (ex: pas de package.json si Rust)\n"
+                            f"2. Ne PAS changer les versions de dépendances déjà définies\n"
+                            f"3. Lire les manifests (Cargo.toml/package.json/etc.) avant d'écrire du code"
+                        )
+
+                if not phase_success:
+                    if sprint_num < max_sprints:
+                        # ── Infra escalation: tool not found → run ft-infra-lead before retry ──
+                        missing_tools = _detect_tool_not_found(result) if result else []
+                        if missing_tools and is_dev_phase:
+                            tools_str = ", ".join(missing_tools)
+                            logger.warning(
+                                "Sprint %s: tool not found [%s] — escalating to ft-infra-lead",
+                                sprint_num,
+                                tools_str,
+                            )
+                            await self._sse_orch_msg(
+                                f"⚠️ Outils manquants [{tools_str}] — escalade vers infra avant relance…",
+                                phase.phase_id,
+                            )
+                            # Build infra-fix prompt
+                            _infra_prompt = (
+                                f"URGENCE INFRA: Le sprint dev a échoué car ces outils sont absents du container SF: [{tools_str}].\n"
+                                f"RÈGLES:\n"
+                                f"1. Ne PAS installer ces outils directement dans le container SF — ce n'est pas ton rôle.\n"
+                                f"2. Créer/mettre à jour docker-compose.project.yml dans le workspace pour que les devs puissent lancer les tests VIA DOCKER.\n"
+                                f"3. Utiliser `docker compose` (v2, avec espace) — PAS `docker-compose` (v1, déprécié, absent).\n"
+                                f"4. Format correct: `docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                f"5. Tester que docker compose run fonctionne: build(command='docker compose -f docker-compose.project.yml run --rm app <tool> --version')\n"
+                                f"6. Écrire dans le workspace un fichier BUILD_INSTRUCTIONS.md expliquant exactement quelle commande utiliser.\n"
+                                f"\nWorkspace: {workspace}\nBrief original: {(mission.brief or '')[:300]}"
+                            )
+                            try:
+                                from ..patterns.store import PatternDef
+
+                                _infra_pattern = PatternDef(
+                                    pattern_id="solo",
+                                    name="Infra Fix",
+                                    config={"agent_id": "ft-infra-lead"},
+                                )
+                                _infra_result = await asyncio.wait_for(
+                                    run_pattern(
+                                        _infra_pattern,
+                                        session_id,
+                                        _infra_prompt,
+                                        project_id=mission.project_id or mission.id,
+                                        project_path=mission.workspace_path,
+                                        phase_id=f"{phase.phase_id}-infra-fix",
+                                        lineage=_epic_lineage + ["Task: Infra Fix"],
+                                    ),
+                                    timeout=300,
+                                )
+                                prev_context += (
+                                    f"\n\n🔧 INFRA FIX (sprint {sprint_num}): ft-infra-lead a corrigé l'environnement.\n"
+                                    f"Outils absents: [{tools_str}] → utiliser MAINTENANT: "
+                                    f"`docker compose -f docker-compose.project.yml run --rm app <commande>`\n"
+                                    f"Ne PAS appeler cargo/npm/python/go directement — toujours via docker compose run."
+                                )
+                                logger.warning(
+                                    "Infra fix completed for sprint %s (tools: %s)",
+                                    sprint_num,
+                                    tools_str,
+                                )
+                            except Exception as _infra_err:
+                                logger.warning("Infra fix failed: %s", _infra_err)
+                                prev_context += (
+                                    f"\n\n⚠️ INFRA: outils [{tools_str}] absents du container SF."
+                                    f" Utiliser: `docker compose -f docker-compose.project.yml run --rm app <commande>`"
+                                )
+
+                        retry_label = (
+                            f"Itération {sprint_num}/{max_sprints}"
+                            if not is_dev_phase
+                            else sprint_label
+                        )
+                        remediation_msg = f"{retry_label} terminé avec des problèmes. Relance avec feedback correctif…"
+                        await self._sse_orch_msg(remediation_msg, phase.phase_id)
+                        await asyncio.sleep(0.8)
+                        prev_context += (
+                            f"\n- REJET itération {sprint_num}: {phase_error[:500]}"
+                        )
+                        phase_error = ""
+                        continue
+                    # Max sprints exhausted — continue pipeline with issues (don't block)
+                    await self._sse_orch_msg(
+                        f"Max iterations atteint ({max_sprints}) — poursuite avec avertissement.",
+                        phase.phase_id,
+                    )
+                    logger.warning(
+                        "Phase %s max sprints exhausted — continuing with issues",
+                        phase.phase_id,
+                    )
+                    phase_success = True
+                    phase_error = (
+                        f"Max sprints exhausted ({max_sprints}): {phase_error[:200]}"
+                    )
+                    break
+
+                # ── Evidence Gate: check acceptance criteria after dev sprints ──
+                if is_evidence_gated and acceptance_criteria and workspace:
+                    # Reset criteria for fresh check
+                    for c in acceptance_criteria:
+                        c.passed = False
+                        c.detail = ""
+                    all_passed, results = run_evidence_checks(
+                        workspace, acceptance_criteria
+                    )
+                    evidence_report = format_evidence_report(results)
+                    passed_count = sum(1 for c in results if c.passed)
+                    total_count = len(results)
+
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "evidence_gate",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "sprint_num": sprint_num,
+                            "passed": passed_count,
+                            "total": total_count,
+                            "all_passed": all_passed,
+                            "details": [
+                                {
+                                    "id": c.id,
+                                    "desc": c.description,
+                                    "passed": c.passed,
+                                    "detail": c.detail,
+                                }
+                                for c in results
+                            ],
+                        },
+                    )
+
+                    if all_passed:
+                        await self._sse_orch_msg(
+                            f"Evidence Gate PASSED ({passed_count}/{total_count}) — tous les critères d'acceptation remplis.",
+                            phase.phase_id,
+                        )
+                        logger.info(
+                            "Evidence gate PASSED for %s sprint %d (%d/%d)",
+                            phase.phase_id,
+                            sprint_num,
+                            passed_count,
+                            total_count,
+                        )
+                        break  # All criteria met, exit sprint loop
+                    if sprint_num < max_sprints:
+                        await self._sse_orch_msg(
+                            f"Evidence Gate FAILED ({passed_count}/{total_count}) — critères manquants, relance sprint…",
+                            phase.phase_id,
+                        )
+                        logger.warning(
+                            "Evidence gate FAILED for %s sprint %d (%d/%d), looping",
+                            phase.phase_id,
+                            sprint_num,
+                            passed_count,
+                            total_count,
+                        )
+                        # Inject evidence feedback + build summary into next sprint prompt
+                        build_summary = _extract_build_summary(result)
+                        prev_context += f"\n\n✅ Sprint {sprint_num} build: {build_summary}\n{evidence_report}"
+                        continue  # Loop to next sprint
+                    await self._sse_orch_msg(
+                        f"Evidence Gate FAILED ({passed_count}/{total_count}) — max sprints atteint, poursuite avec avertissement.\n{evidence_report}",
+                        phase.phase_id,
+                    )
+                    logger.warning(
+                        "Evidence gate FAILED for %s, max sprints exhausted — continuing with issues",
+                        phase.phase_id,
+                    )
+                    if phase.phase_id in _CRITICAL_EVIDENCE_PHASES:
+                        phase_success = False  # Hard failure for critical phases
+                        phase_error = f"Evidence gate FAILED ({passed_count}/{total_count}) — phase critique, livraison bloquée"
+                    else:
+                        phase_success = True  # Continue pipeline despite evidence gap
+                        phase_error = (
+                            f"Evidence gate: {passed_count}/{total_count} criteria met"
+                        )
+                    break
+
+                # Sprint succeeded but evidence gate was not applicable (no criteria).
+                # Break immediately — do NOT run sprint N+1 just because max_sprints > 1.
+                if phase_success:
+                    break
+
+                if max_sprints > 1 and sprint_num < max_sprints:
+                    await self._sse_orch_msg(
+                        f"{sprint_label} terminé. Passage au sprint suivant…",
+                        phase.phase_id,
+                    )
+                    await asyncio.sleep(0.8)
+
+            # Human-in-the-loop checkpoint
+            if pattern_type == "human-in-the-loop":
+                from ..config import get_config as _get_cfg
+
+                if _get_cfg().orchestrator.yolo_mode:
+                    # YOLO mode: auto-GO, no wait
+                    phase.status = PhaseStatus.DONE
+                    run_store.update(mission)
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "checkpoint",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "question": f"Validation requise pour «{wf_phase.name}»",
+                            "options": ["GO", "NOGO", "PIVOT"],
+                            "auto_decision": "GO",
+                            "yolo": True,
+                        },
+                    )
+                else:
+                    phase.status = PhaseStatus.WAITING_VALIDATION
+                    run_store.update(mission)
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "checkpoint",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                            "question": f"Validation requise pour «{wf_phase.name}»",
+                            "options": ["GO", "NOGO", "PIVOT"],
+                        },
+                    )
+                    # Persist in-app notification so the bell shows GO/NOGO buttons
+                    try:
+                        from .notifications import emit_notification
+
+                        _proj_id = getattr(mission, "project_id", "") or ""
+                        emit_notification(
+                            f"⏸ GO/NOGO — {getattr(mission, 'name', mission.id)} — {wf_phase.name}",
+                            type="checkpoint",
+                            message="L'équipe attend votre décision pour continuer.",
+                            url=f"/missions/{mission.id}/control",
+                            severity="warning",
+                            source=phase.phase_id,
+                            ref_id=mission.id,
+                        )
+                    except Exception:
+                        pass
+                    for _ in range(600):
+                        await asyncio.sleep(1)
+                        m = run_store.get(mission.id)
+                        if m:
+                            for p in m.phases:
+                                if (
+                                    p.phase_id == phase.phase_id
+                                    and p.status != PhaseStatus.WAITING_VALIDATION
+                                ):
+                                    phase.status = p.status
+                                    break
+                            if phase.status != PhaseStatus.WAITING_VALIDATION:
+                                break
+                    if phase.status == PhaseStatus.WAITING_VALIDATION:
+                        phase.status = PhaseStatus.DONE
+                if phase.status == PhaseStatus.FAILED:
+                    run_store.update(mission)
+                    await self._push_sse(
+                        session_id,
+                        {
+                            "type": "phase_failed",
+                            "mission_id": mission.id,
+                            "phase_id": phase.phase_id,
+                        },
+                    )
+                    await self._sse_orch_msg(
+                        "Epic arrêtée — décision NOGO.", phase.phase_id
+                    )
+                    mission.status = EpicStatus.FAILED
+                    run_store.update(mission)
+                    return
+            else:
+                phase.status = PhaseStatus.DONE if phase_success else PhaseStatus.FAILED
+                if (
+                    not phase_success
+                    and phase_error
+                    and ("Evidence gate" in phase_error or "Max sprints" in phase_error)
+                    or phase_success
+                    and phase_error
+                ):
+                    phase.status = PhaseStatus.DONE_WITH_ISSUES
+
+            phase_actually_done = phase.status in (
+                PhaseStatus.DONE,
+                PhaseStatus.DONE_WITH_ISSUES,
+            )
+            # For critical gate phases (env-setup, tdd-sprint), done_with_issues is
+            # treated as a soft-failure: log prominently and trigger the reloop mechanism
+            _critical_phase = any(
+                k in (phase.phase_id or "").lower()
+                for k in ("env-setup", "tdd-sprint", "dev-sprint")
+            )
+            if phase.status == PhaseStatus.DONE_WITH_ISSUES and _critical_phase:
+                logger.warning(
+                    "ORCH phase=%s DONE_WITH_ISSUES on critical phase — will reloop if possible",
+                    phase.phase_id,
+                )
+                # Keep phase_success=False to trigger reloop logic below
+                phase_success = False
+                if not phase_error:
+                    phase_error = f"Phase {phase.phase_id} completed with issues — quality gate not met"
+            else:
+                phase_success = phase_actually_done
+            logger.warning(
+                "ORCH phase=%s status=%s", phase.phase_id, phase.status.value
+            )
+
+            # Emit event: phase completed/failed
+            try:
+                from ..events.store import (
+                    PHASE_COMPLETED,
+                    PHASE_FAILED,
+                    get_event_store,
+                )
+
+                evt = PHASE_COMPLETED if phase_success else PHASE_FAILED
+                get_event_store().emit(
+                    evt,
+                    {"phase_name": wf_phase.name, "status": phase.status.value},
+                    entity_type="phase",
+                    entity_id=phase.phase_id,
+                    actor=self.orch_id,
+                    project_id=getattr(mission, "project_id", ""),
+                    mission_id=mission.id,
+                )
+            except Exception:
+                pass
+
+            phase.completed_at = datetime.utcnow()
+            if phase_success:
+                try:
+                    from ..llm.client import LLMMessage, get_llm_client
+                    from ..sessions.store import get_session_store
+
+                    ss = get_session_store()
+                    phase_msgs = ss.get_messages(session_id, limit=1000)
+                    convo = []
+                    for m in phase_msgs[_pre_phase_msg_count:]:
+                        txt = (getattr(m, "content", "") or "").strip()
+                        if not txt or len(txt) < 20:
+                            continue
+                        agent = getattr(m, "from_agent", "") or ""
+                        if agent in ("system", "user", "chef_de_programme"):
+                            continue
+                        name = getattr(m, "from_name", "") or agent
+                        convo.append(f"{name}: {txt[:500]}")
+                    if convo:
+                        transcript = "\n\n".join(convo[-15:])
+                        llm = get_llm_client()
+                        resp = await asyncio.wait_for(
+                            llm.chat(
+                                [
+                                    LLMMessage(
+                                        role="user",
+                                        content=f"Summarize this team discussion in 2-3 sentences. Focus on decisions made, key proposals, and conclusions. Be factual and specific. Answer in the same language as the discussion.\n\n{transcript[:4000]}",
+                                    )
+                                ],
+                                max_tokens=200,
+                                temperature=0.3,
+                            ),
+                            timeout=45,
+                        )
+                        phase.summary = (resp.content or "").strip()[:500]
+                    if not getattr(phase, "summary", None):
+                        phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
+                except Exception:
+                    phase.summary = f"{len(aids)} agents, pattern: {pattern_type}"
+                phases_done += 1
+
+                # RL: record experience (phase succeeded → positive reward)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=max(
+                            -1.0, min(1.0, (_qual if "_qual" in dir() else 0.5) * 2 - 1)
+                        ),
+                    )
+                except Exception:
+                    pass
+
+                # Record real execution outcome for GA empirical fitness + chemistry
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _rej_val = _rej_rate if "_rej_rate" in dir() else 0.0
+                    _db = None
+                    try:
+                        _db = _get_db()
+                        # Composite quality score from real phase signals
+                        _qual_val = _compute_quality_score(
+                            session_id, aids or [], _phase_start_time, _db
+                        )
+                        phase.quality_score = int(
+                            _qual_val * 100
+                        )  # expose on phase object
+                        _db.execute(
+                            """INSERT INTO phase_outcomes
+                               (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                                team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (
+                                mission.id,
+                                mission.workflow_id or "",
+                                phase.phase_id,
+                                pattern_type,
+                                _json.dumps(aids),
+                                _json.dumps(aids),
+                                len(aids),
+                                1,
+                                _qual_val,
+                                int(_rej_val * max(1, len(aids))),
+                                round(_duration, 1),
+                                round(_duration, 1),
+                                _complexity,
+                            ),
+                        )
+                        if len(aids) >= 2:
+                            from itertools import combinations as _combos
+
+                            for _ag_a, _ag_b in _combos(sorted(aids), 2):
+                                _db.execute(
+                                    """INSERT INTO agent_pair_scores
+                                       (agent_a, agent_b, co_appearances, joint_successes, joint_quality_sum, last_seen)
+                                       VALUES (?,?,1,1,?,datetime('now'))
+                                       ON CONFLICT(agent_a, agent_b) DO UPDATE SET
+                                           co_appearances = co_appearances + 1,
+                                           joint_successes = joint_successes + 1,
+                                           joint_quality_sum = joint_quality_sum + excluded.joint_quality_sum,
+                                           last_seen = excluded.last_seen""",
+                                    (_ag_a, _ag_b, _qual_val),
+                                )
+                        _db.commit()
+                    finally:
+                        if _db:
+                            _db.close()
+                except Exception:
+                    pass
+
+                summary_text = f"[{wf_phase.name}] terminée"
+                if mission.workspace_path:
+                    try:
+                        import subprocess as _sp
+
+                        diff_stat = _sp.run(
+                            ["git", "diff", "--stat", "HEAD~1"],
+                            cwd=mission.workspace_path,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if diff_stat.stdout.strip():
+                            summary_text += f" | Fichiers: {diff_stat.stdout.strip().split(chr(10))[-1]}"
+                    except Exception:
+                        pass
+                try:
+                    from ..memory.manager import get_memory_manager
+
+                    mem = get_memory_manager()
+                    if mission.project_id:
+                        mem.project_store(
+                            mission.project_id,
+                            key=f"phase:{wf_phase.name}",
+                            value=summary_text[:500],
+                            category="phase-summary",
+                            source="mission-control",
+                        )
+                except Exception:
+                    pass
+                phase_summaries.append(f"## {wf_phase.name}\n{summary_text[:200]}")
+            else:
+                phase.summary = f"Phase échouée — {phase_error[:200]}"
+                phases_failed += 1
+                # RL: record negative experience (phase failed)
+                try:
+                    from ..agents.rl_policy import get_rl_policy as _get_rl
+
+                    _get_rl().record_experience(
+                        mission_id=mission.id,
+                        state_dict={
+                            "workflow_id": mission.workflow_id or "",
+                            "phase_idx": i,
+                            "phase_count": len(self.wf.phases)
+                            if hasattr(self, "wf") and self.wf
+                            else len(mission.phases),
+                            "rejection_pct": _rej_rate if "_rej_rate" in dir() else 0.0,
+                            "quality_score": _qual if "_qual" in dir() else 0.0,
+                        },
+                        action=pattern_type,
+                        reward=max(
+                            -1.0, min(0.0, (_qual if "_qual" in dir() else 0.0) * 2 - 1)
+                        ),
+                    )
+                except Exception:
+                    pass
+                # Record failed phase outcome (success=0)
+                try:
+                    from ..db.migrations import get_db as _get_db
+                    from ..agents.evolution import _workflow_complexity as _wf_cx
+                    import json as _json
+
+                    _duration = time.monotonic() - _phase_start_time
+                    _complexity = _wf_cx(self.wf if hasattr(self, "wf") else None)
+                    _db = None
+                    try:
+                        _db = _get_db()
+                        # Composite quality score from real phase signals (even on failure)
+                        _qual_fail = _compute_quality_score(
+                            session_id, aids or [], _phase_start_time, _db
+                        )
+                        phase.quality_score = int(
+                            _qual_fail * 100
+                        )  # expose on phase object
+                        _db.execute(
+                            """INSERT INTO phase_outcomes
+                               (mission_id, workflow_id, phase_id, pattern_id, agent_ids_json, agent_ids,
+                                team_size, success, quality_score, rejection_count, duration_secs, duration_s, complexity_tier)
+                               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (
+                                mission.id,
+                                mission.workflow_id or "",
+                                phase.phase_id,
+                                pattern_type,
+                                _json.dumps(aids),
+                                _json.dumps(aids),
+                                len(aids),
+                                0,
+                                _qual_fail,
+                                int(
+                                    (_rej_rate if "_rej_rate" in dir() else 1.0)
+                                    * max(1, len(aids))
+                                ),
+                                round(time.monotonic() - _phase_start_time, 1),
+                                round(time.monotonic() - _phase_start_time, 1),
+                                _complexity,
+                            ),
+                        )
+                        _db.commit()
+                    finally:
+                        if _db:
+                            _db.close()
+                except Exception:
+                    pass
+            run_store.update(mission)
+
+            # Extract features from phase output into PO backlog
+            if phase_success:
+                asyncio.ensure_future(
+                    _extract_features_from_phase(
+                        mission.id,
+                        session_id,
+                        phase.phase_id,
+                        wf_phase.name,
+                        phase.summary or "",
+                        _pre_phase_msg_count,
+                    )
+                )
+                _fdb = None
+                try:
+                    from ..db.migrations import get_db as _gdb_feat
+
+                    _fdb = _gdb_feat()
+                    if phase.phase_id in ("dev-sprint",):
+                        _fdb.execute(
+                            "UPDATE features SET status='in_progress' WHERE epic_id=? AND status='backlog'",
+                            (mission.id,),
+                        )
+                        _fdb.commit()
+                    elif phase.phase_id in (
+                        "qa-campaign",
+                        "qa-execution",
+                        "deploy-prod",
+                        "feature-deploy",
+                    ):
+                        _fdb.execute(
+                            "UPDATE features SET status='done' WHERE epic_id=? AND status='in_progress'",
+                            (mission.id,),
+                        )
+                        _fdb.commit()
+                    rows = _fdb.execute(
+                        "SELECT name, status, priority, story_points FROM features WHERE epic_id=?",
+                        (mission.id,),
+                    ).fetchall()
+                    if rows:
+                        _bl = [
+                            {"name": r[0], "priority": r[2], "story_points": r[3]}
+                            for r in rows
+                            if r[1] == "backlog"
+                        ]
+                        _sp = [
+                            {"name": r[0], "priority": r[2], "story_points": r[3]}
+                            for r in rows
+                            if r[1] == "in_progress"
+                        ]
+                        _dn = [{"name": r[0]} for r in rows if r[1] == "done"]
+                        await self._push_sse(
+                            session_id,
+                            {
+                                "type": "kanban_refresh",
+                                "mission_id": mission.id,
+                                "backlog": _bl,
+                                "sprint": _sp,
+                                "done": _dn,
+                            },
+                        )
+                except Exception:
+                    pass
+                finally:
+                    if _fdb:
+                        _fdb.close()
+
+            await self._push_sse(
+                session_id,
+                {
+                    "type": "phase_completed",
+                    "mission_id": mission.id,
+                    "phase_id": phase.phase_id,
+                    "success": phase_success,
+                },
+            )
+
+            # Feedback loop: activate TMA after deploy phase
+            if phase_success and phase.phase_id in (
+                "deploy-prod",
+                "deploy",
+                "deploy-feature",
+                "feature-deploy",
+                "tma-handoff",
+            ):
+                # PR4 — Deploy gate: HTTP check to confirm service is actually up
+                if phase.phase_id in (
+                    "deploy-prod",
+                    "deploy",
+                    "deploy-feature",
+                    "feature-deploy",
+                ):
+                    _deploy_ok = await self._check_deploy_http(
+                        workspace, session_id, mission.id, phase.phase_id
+                    )
+                    if not _deploy_ok:
+                        phase_success = False
+                        phase_error = "Deploy gate FAILED: service did not respond on HTTP after deploy"
+                        await self._sse_orch_msg(
+                            "⛔ Deploy gate FAILED — le service ne répond pas sur HTTP. Phase marquée échouée.",
+                            phase.phase_id,
+                        )
+
+                try:
+                    from ..epics.feedback import on_deploy_completed
+
+                    if mission.project_id:
+                        on_deploy_completed(mission.project_id, mission.id)
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_deploy_completed failed: %s", _fb_err)
+
+            # Feedback: create TMA incident on deploy failure
+            if not phase_success and phase.phase_id in (
+                "deploy-prod",
+                "deploy",
+                "deploy-feature",
+                "feature-deploy",
+            ):
+                try:
+                    from ..epics.feedback import on_deploy_failed
+
+                    if mission.project_id:
+                        on_deploy_failed(
+                            mission.project_id,
+                            mission.id,
+                            phase_error or "Deploy phase failed",
+                        )
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_deploy_failed failed: %s", _fb_err)
+
+            # Create platform_incident for ANY failed phase (DORA tracking)
+            if not phase_success and phase_error:
+                try:
+                    from ..epics.feedback import on_phase_failed
+
+                    on_phase_failed(
+                        mission_id=mission.id,
+                        phase_name=wf_phase.name,
+                        phase_error=phase_error,
+                        project_id=mission.project_id or "",
+                    )
+                except Exception as _fb_err:
+                    logger.warning("Feedback on_phase_failed failed: %s", _fb_err)
+
+            # Feedback loop: track TMA fix for recurring incident detection
+            if phase_success and phase.phase_id in ("fix", "tma-fix", "validate"):
+                _mission_type = getattr(mission, "type", None)
+                _mission_config = getattr(mission, "config", None) or {}
+                _mission_name = getattr(mission, "name", mission.workflow_name)
+                if mission.project_id and (
+                    _mission_type in ("bug", "program")
+                    or "tma" in mission.workflow_id.lower()
+                ):
+                    try:
+                        from ..epics.feedback import on_tma_incident_fixed
+
+                        incident_key = _mission_config.get(
+                            "incident_key", _mission_name
+                        )
+                        on_tma_incident_fixed(mission.project_id, incident_key)
+                    except Exception as _fb_err:
+                        logger.warning(
+                            "Feedback on_tma_incident_fixed failed: %s", _fb_err
+                        )
+
+            # CDP announces result
+            if i < len(mission.phases) - 1:
+                if phase_success:
+                    cdp_msg = (
+                        f"Phase «{wf_phase.name}» réussie. Passage à la phase suivante…"
+                    )
+                    await self._sse_orch_msg(cdp_msg, phase.phase_id)
+                    await asyncio.sleep(0.8)
+                else:
+                    phase_gate = getattr(wf_phase, "gate", "always") or "always"
+                    phase_key = phase.phase_id.lower() if phase.phase_id else ""
+                    is_execution_phase = any(
+                        k in phase_key
+                        for k in ("sprint", "dev", "cicd", "ci-cd", "pipeline")
+                    )
+                    is_hitl_gate = phase_gate == "all_approved" and pattern_type in (
+                        "human-in-the-loop",
+                    )
+                    is_blocking = (
+                        phase_gate in ("all_approved", "no_veto") or is_execution_phase
+                    )
+                    short_err = phase_error[:200] if phase_error else "erreur inconnue"
+                    if is_hitl_gate:
+                        cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Epic arrêtée — corrigez puis relancez via le bouton Réinitialiser."
+                    elif is_blocking:
+                        cdp_msg = f"Phase «{wf_phase.name}» échouée ({short_err}). Phase bloquante — correction nécessaire avant de continuer."
+                    else:
+                        cdp_msg = f"Phase «{wf_phase.name}» terminée avec des problèmes ({short_err}). Passage à la phase suivante malgré tout…"
+                        phase.status = PhaseStatus.DONE_WITH_ISSUES
+                        phases_done += 1
+                        phases_failed -= 1
+                        try:
+                            from ..sessions.store import get_session_store
+
+                            ss = get_session_store()
+                            phase_msgs = ss.get_messages(session_id, limit=1000)
+                            convo = []
+                            for pm in phase_msgs[_pre_phase_msg_count:]:
+                                txt = (getattr(pm, "content", "") or "").strip()
+                                if not txt or len(txt) < 20:
+                                    continue
+                                agent = getattr(pm, "from_agent", "") or ""
+                                if agent in ("system", "user", "chef_de_programme"):
+                                    continue
+                                name = getattr(pm, "from_name", "") or agent
+                                convo.append(f"{name}: {txt[:300]}")
+                            if convo:
+                                from ..llm.client import LLMMessage, get_llm_client
+
+                                llm = get_llm_client()
+                                transcript = "\n\n".join(convo[-10:])
+                                resp = await asyncio.wait_for(
+                                    llm.chat(
+                                        [
+                                            LLMMessage(
+                                                role="user",
+                                                content=f"Résume cette discussion d'équipe en 2-3 phrases. Focus sur les décisions et conclusions. Même langue que la discussion.\n\n{transcript[:3000]}",
+                                            )
+                                        ],
+                                        max_tokens=200,
+                                        temperature=0.3,
+                                    ),
+                                    timeout=45,
+                                )
+                                new_summary = (resp.content or "").strip()[:500]
+                                if new_summary and len(new_summary) > 20:
+                                    phase.summary = new_summary
+                                else:
+                                    phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
+                            else:
+                                phase.summary = (
+                                    f"{len(aids)} agents, pattern: {pattern_type}"
+                                )
+                        except Exception:
+                            phase.summary = f"{len(aids)} agents ont travaillé ({pattern_type}) — terminée avec avertissements"
+                    await self._sse_orch_msg(cdp_msg, phase.phase_id)
+                    if is_hitl_gate:
+                        mission.status = EpicStatus.FAILED
+                        run_store.update(mission)
+                        await self._push_sse(
+                            session_id,
+                            {
+                                "type": "mission_failed",
+                                "mission_id": mission.id,
+                                "phase_id": phase.phase_id,
+                                "error": short_err,
+                            },
+                        )
+                        return
+                    await asyncio.sleep(0.8)
+
+            # Post-phase hooks (non-blocking, generous timeout for docker+screenshots)
+            if phase_success:
+                hook_result = {"build_ok": True, "test_ok": True, "deploy_ok": True}
+
+                async def _safe_hooks():
+                    nonlocal hook_result
+                    try:
+                        hook_result = (
+                            await asyncio.wait_for(
+                                _run_post_phase_hooks(
+                                    phase.phase_id,
+                                    wf_phase.name,
+                                    mission,
+                                    session_id,
+                                    self._push_sse,
+                                ),
+                                timeout=600,
+                            )
+                            or hook_result
+                        )
+                    except Exception as hook_err:
+                        logger.warning(
+                            "Post-phase hooks timeout/error for %s: %s",
+                            phase.phase_id,
+                            hook_err,
+                        )
+
+                await _safe_hooks()  # AWAIT — don't fire-and-forget
+
+                # Create incidents for build/test/deploy failures in hooks
+                if (
+                    not hook_result.get("build_ok", True)
+                    or not hook_result.get("test_ok", True)
+                    or not hook_result.get("deploy_ok", True)
+                ):
+                    from ..epics.feedback import create_platform_incident
+
+                    failures = []
+                    if not hook_result.get("build_ok"):
+                        failures.append("build")
+                    if not hook_result.get("test_ok"):
+                        failures.append("tests")
+                    if not hook_result.get("deploy_ok"):
+                        failures.append("deploy")
+                    create_platform_incident(
+                        title=f"Pipeline {', '.join(failures)} failed — {wf_phase.name}",
+                        severity="P3",
+                        source="pipeline_hooks",
+                        error_type=f"{'_'.join(failures)}_failure",
+                        error_detail=f"Phase: {wf_phase.name}, Mission: {mission.id}",
+                        mission_id=mission.id,
+                    )
+
+            # Error Reloop
+            if not phase_success and reloop_count < MAX_RELOOPS:
+                phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
+                is_reloopable = any(
+                    k in phase_key_rl
+                    for k in (
+                        "qa",
+                        "deploy",
+                        "tma",
+                        "sprint",
+                        "dev",
+                        "cicd",
+                        "ci-cd",
+                        "pipeline",
+                        "adversarial",
+                        "review",
+                        "e2e",
+                        "test",
+                    )
+                )
+                if is_reloopable:
+                    reloop_count += 1
+                    reloop_errors.append(
+                        f"[Reloop {reloop_count}] Phase «{wf_phase.name}» failed: {phase_error[:300]}"
+                    )
+                    dev_idx = None
+                    for j, wp_j in enumerate(wf.phases):
+                        pk_j = (
+                            wp_j.name.lower()
+                            .replace(" ", "-")
+                            .replace("é", "e")
+                            .replace("è", "e")
+                        )
+                        if "sprint" in pk_j or "dev" in pk_j:
+                            dev_idx = j
+                            break
+                    if dev_idx is not None and dev_idx <= i:
+                        reloop_msg = (
+                            f"Reloop {reloop_count}/{MAX_RELOOPS} — Phase «{wf_phase.name}» échouée. "
+                            f"Error: {phase_error[:200]}. "
+                            f"Back to development sprint for correction…"
+                        )
+                        await self._sse_orch_msg(reloop_msg, phase.phase_id)
+                        await asyncio.sleep(1)
+                        reset_pids = []
+                        for k in range(dev_idx, len(mission.phases)):
+                            mission.phases[k].status = PhaseStatus.PENDING
+                            mission.phases[k].summary = None
+                            mission.phases[k].started_at = None
+                            mission.phases[k].completed_at = None
+                            reset_pids.append(mission.phases[k].phase_id)
+                        run_store.update(mission)
+                        await self._push_sse(
+                            session_id,
+                            {
+                                "type": "reloop",
+                                "mission_id": mission.id,
+                                "reloop_count": reloop_count,
+                                "max_reloops": MAX_RELOOPS,
+                                "failed_phase": phase.phase_id,
+                                "target_phase": mission.phases[dev_idx].phase_id,
+                                "reset_phases": reset_pids,
+                                "error": phase_error[:200],
+                            },
+                        )
+                        error_feedback = "\n".join(reloop_errors)
+                        prev_context += f"\n\n--- RELOOP FEEDBACK (erreurs à corriger) ---\n{error_feedback}\n"
+                        i = dev_idx
+                        continue
+
+            i += 1
+
+        # Mission complete
+        phases_done = sum(1 for p in mission.phases if p.status == PhaseStatus.DONE)
+        phases_with_issues = sum(
+            1 for p in mission.phases if p.status == PhaseStatus.DONE_WITH_ISSUES
+        )
+        phases_failed = sum(1 for p in mission.phases if p.status == PhaseStatus.FAILED)
+        total = phases_done + phases_with_issues + phases_failed
+        if phases_failed == 0 and phases_with_issues == 0:
+            mission.status = EpicStatus.COMPLETED
+            reloop_info = (
+                f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})"
+                if reloop_count > 0
+                else ""
+            )
+            final_msg = f"Epic terminée avec succès — {phases_done}/{total} phases réussies{reloop_info}."
+        else:
+            # COMPLETED si au moins une phase terminée (même avec avertissements)
+            # FAILED seulement si toutes les phases ont échoué sans produire de résultat
+            mission.status = (
+                EpicStatus.COMPLETED
+                if (phases_done > 0 or phases_with_issues > 0)
+                else EpicStatus.FAILED
+            )
+            reloop_info = (
+                f" ({reloop_count} reloop{'s' if reloop_count > 1 else ''})"
+                if reloop_count > 0
+                else ""
+            )
+            issues_info = (
+                f", {phases_with_issues} avec avertissements"
+                if phases_with_issues > 0
+                else ""
+            )
+            final_msg = f"Epic terminée — {phases_done} réussies{issues_info}, {phases_failed} échouées sur {total} phases{reloop_info}."
+        run_store.update(mission)
+        await self._sse_orch_msg(final_msg)
+
+        # Emit event: mission completed/failed
+        try:
+            from ..events.store import (
+                MISSION_COMPLETED,
+                MISSION_FAILED,
+                get_event_store,
+            )
+
+            evt_type = (
+                MISSION_COMPLETED
+                if mission.status == EpicStatus.COMPLETED
+                else MISSION_FAILED
+            )
+            get_event_store().emit(
+                evt_type,
+                {
+                    "phases_done": phases_done,
+                    "phases_failed": phases_failed,
+                    "phases_with_issues": phases_with_issues,
+                    "reloop_count": reloop_count,
+                },
+                entity_type="mission",
+                entity_id=mission.id,
+                actor=self.orch_id,
+                project_id=getattr(mission, "project_id", ""),
+                mission_id=mission.id,
+            )
+        except Exception:
+            pass
+
+        try:
+            await _auto_retrospective(
+                mission, session_id, phase_summaries, self._push_sse
+            )
+        except Exception as retro_err:
+            logger.warning(f"Auto-retrospective failed: {retro_err}")
+
+        # Promote recurring project decisions to global memory
+        if mission.status == EpicStatus.COMPLETED:
+            try:
+                _promote_mission_to_global(mission)
+            except Exception as promo_err:
+                logger.warning(f"Global memory promotion failed: {promo_err}")
+
+    def _build_edges(self, pattern_type: str, aids: list, leader: str) -> list:
+        """Build edges for the pattern graph."""
+        edges = []
+        others = [a for a in aids if a != leader] if leader else aids
+
+        if pattern_type == "network":
+            if leader:
+                for o in others:
+                    edges.append({"from": leader, "to": o, "type": "delegate"})
+            for idx_a, a in enumerate(others):
+                for b in others[idx_a + 1 :]:
+                    edges.append({"from": a, "to": b, "type": "bidirectional"})
+            if leader:
+                for o in others:
+                    edges.append({"from": o, "to": leader, "type": "report"})
+
+        elif pattern_type == "sequential":
+            for idx_a in range(len(aids) - 1):
+                edges.append(
+                    {"from": aids[idx_a], "to": aids[idx_a + 1], "type": "sequential"}
+                )
+            if len(aids) > 2:
+                edges.append({"from": aids[-1], "to": aids[0], "type": "feedback"})
+
+        elif pattern_type == "hierarchical" and leader:
+            for sub in others:
+                edges.append({"from": leader, "to": sub, "type": "delegate"})
+            workers = [
+                a
+                for a in others
+                if (
+                    self.agent_store.get(a) or type("", (), {"hierarchy_rank": 50})
+                ).hierarchy_rank
+                >= 40
+            ]
+            for idx_a, a in enumerate(workers):
+                for b in workers[idx_a + 1 :]:
+                    edges.append({"from": a, "to": b, "type": "bidirectional"})
+            for sub in others:
+                edges.append({"from": sub, "to": leader, "type": "report"})
+
+        elif pattern_type == "aggregator" and aids:
+            aggregator_id = leader or (aids[-1] if len(aids) > 1 else aids[0])
+            contributors = [a for a in aids if a != aggregator_id]
+            for a in contributors:
+                edges.append({"from": a, "to": aggregator_id, "type": "report"})
+            for idx_a, a in enumerate(contributors):
+                for b in contributors[idx_a + 1 :]:
+                    edges.append({"from": a, "to": b, "type": "bidirectional"})
+
+        elif pattern_type == "router" and aids:
+            router_id = leader or aids[0]
+            specialists = [a for a in aids if a != router_id]
+            for a in specialists:
+                edges.append({"from": router_id, "to": a, "type": "route"})
+                edges.append({"from": a, "to": router_id, "type": "report"})
+
+        elif pattern_type == "human-in-the-loop" and aids:
+            for o in others:
+                edges.append({"from": o, "to": leader, "type": "report"})
+            for idx_a, a in enumerate(others):
+                for b in others[idx_a + 1 :]:
+                    edges.append({"from": a, "to": b, "type": "bidirectional"})
+
+        elif pattern_type == "loop" and len(aids) >= 2:
+            edges.append({"from": aids[0], "to": aids[1], "type": "sequential"})
+            edges.append({"from": aids[1], "to": aids[0], "type": "feedback"})
+
+        elif pattern_type == "parallel" and aids:
+            dispatcher = leader or aids[0]
+            workers = [a for a in aids if a != dispatcher]
+            for w in workers:
+                edges.append({"from": dispatcher, "to": w, "type": "delegate"})
+                edges.append({"from": w, "to": dispatcher, "type": "report"})
+
+        return edges
+
+
+def _promote_mission_to_global(mission) -> None:
+    """Promote high-confidence project decisions to global memory after a successful mission.
+
+    Selects entries with category in (architecture, stack, convention, decision)
+    and confidence >= 0.7, then upserts them in memory_global so they benefit
+    future projects on the same platform.
+    """
+    from ..memory.manager import get_memory_manager
+
+    project_id = getattr(mission, "project_id", "") or mission.id
+    mem = get_memory_manager()
+    # Pull high-confidence facts from this project
+    entries = mem.project_get(project_id, limit=100)
+    promotable_categories = {
+        "architecture",
+        "stack",
+        "convention",
+        "decision",
+        "pattern",
+    }
+    promoted = 0
+    for entry in entries:
+        cat = (entry.get("category") or "").lower()
+        conf = float(entry.get("confidence") or 0)
+        if cat in promotable_categories and conf >= 0.7:
+            key = entry.get("key", "")
+            value = entry.get("value", "")
+            if key and value:
+                mem.global_store(
+                    key=key,
+                    value=value[:500],
+                    category=cat,
+                    project_id=project_id,
+                    confidence=conf,
+                )
+                promoted += 1
+    if promoted:
+        logger.info(
+            "Promoted %d entries to global memory from project %s", promoted, project_id
+        )

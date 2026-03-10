@@ -18,17 +18,6 @@ from .helpers import (
     _templates,
 )
 
-# Prevent asyncio task GC — store references until tasks complete
-_bg_tasks: set[asyncio.Task] = set()
-
-
-def _keep_task(t: asyncio.Task) -> asyncio.Task:
-    """Store task reference to prevent GC, auto-discard on completion."""
-    _bg_tasks.add(t)
-    t.add_done_callback(_bg_tasks.discard)
-    return t
-
-
 log = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -1359,11 +1348,8 @@ async def api_improvement_start(project_id: str):
 
     # Pause auto-resume during AC cycle — give 100% LLM budget to AC
     import os as _os_ac
-
     _os_ac.environ["PLATFORM_AUTO_RESUME_ENABLED"] = "0"
-    logger.warning(
-        "AC cycle: auto-resume PAUSED for project %s cycle %d", project_id, cycle_num
-    )
+    logger.warning("AC cycle: auto-resume PAUSED for project %s cycle %d", project_id, cycle_num)
 
     # Ingest previous cycle artifacts into project memory BEFORE workspace reset
     # so agents can recall previous findings, failures, and corrections next cycle.
@@ -1508,12 +1494,8 @@ async def api_improvement_start(project_id: str):
             )
             created_builder = await asyncio.to_thread(sess_store.create, builder_sess)
             builder_sess_id = created_builder.id
-            _keep_task(
-                asyncio.create_task(
-                    _run_workflow_background(
-                        builder_wf, builder_sess_id, brief, project_id
-                    )
-                )
+            asyncio.create_task(
+                _run_workflow_background(builder_wf, builder_sess_id, brief, project_id)
             )
 
         # ── Session [SUPERVISE] — ac-supervision-cycle with AC supervisors (read-only) ──
@@ -1546,11 +1528,9 @@ async def api_improvement_start(project_id: str):
             supervisor_sess_id = created_supervisor.id
             # Small delay so builder starts first, supervisors observe
             await asyncio.sleep(1)
-            _keep_task(
-                asyncio.create_task(
-                    _run_workflow_background(
-                        supervisor_wf, supervisor_sess_id, brief, project_id
-                    )
+            asyncio.create_task(
+                _run_workflow_background(
+                    supervisor_wf, supervisor_sess_id, brief, project_id
                 )
             )
 
@@ -2979,14 +2959,12 @@ async def launch_strategic_committee(request: Request):
     # Auto-start workflow — agents debate autonomously
     from .workflows import _run_workflow_background
 
-    _keep_task(
-        asyncio.create_task(
-            _run_workflow_background(
-                wf,
-                session.id,
-                "Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO sur les projets en cours",
-                "",
-            )
+    asyncio.create_task(
+        _run_workflow_background(
+            wf,
+            session.id,
+            "Revue stratégique du portfolio — arbitrages, priorités, GO/NOGO sur les projets en cours",
+            "",
         )
     )
 

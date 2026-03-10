@@ -1,0 +1,81 @@
+id: test-data-pipeline
+name: Test Data & Fixtures Pipeline
+description: 'Generate reproducible test data: factories, seeds, fixtures for all environments.'
+icon: 🧪
+is_builtin: true
+phases:
+- id: model-analysis
+  pattern_id: sequential
+  name: Domain Model Analysis
+  description: Analyze all domain models, relationships, constraints, and validation rules
+  gate: All models inventoried with relationships mapped
+  config:
+    agents:
+    - fixture-gen
+    - architecte
+- id: factory-gen
+  pattern_id: sequential
+  name: Factory Generation
+  description: Create factory functions/classes for each model with realistic data (Faker)
+  gate: Factory for every model, referential integrity maintained
+  config:
+    agents:
+    - fixture-gen
+- id: seed-scripts
+  pattern_id: sequential
+  name: Seed Scripts
+  description: Create SQL/script seeds for dev, staging, and test environments
+  gate: Seed scripts run without errors in all environments
+  config:
+    agents:
+    - fixture-gen
+    - devops
+- id: edge-cases
+  pattern_id: sequential
+  name: Edge Case Datasets
+  description: 'Create pathological datasets: empty, max-length, unicode, concurrent access'
+  gate: Edge case datasets covering all boundary conditions
+  config:
+    agents:
+    - fixture-gen
+    - testeur
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: fixture-gen
+      x: 100
+      y: 150
+      label: Models
+      phase: model-analysis
+    - id: n2
+      agent_id: fixture-gen
+      x: 300
+      y: 150
+      label: Factories
+      phase: factory-gen
+    - id: n3
+      agent_id: fixture-gen
+      x: 500
+      y: 100
+      label: Seeds
+      phase: seed-scripts
+    - id: n4
+      agent_id: testeur
+      x: 500
+      y: 200
+      label: Edge Cases
+      phase: edge-cases
+    edges:
+    - from: n1
+      to: n2
+      label: models
+      color: '#a855f7'
+    - from: n2
+      to: n3
+      label: factories
+      color: '#a855f7'
+    - from: n2
+      to: n4
+      label: factories
+      color: '#a855f7'

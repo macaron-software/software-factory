@@ -1,0 +1,57 @@
+agent_id: brain
+technology: generic
+phase_type: inception
+description: Strategic Orchestrator — decomposition quality, planning depth, actionability
+
+eval_cases:
+  - id: decompose-feature-user-profile
+    input: |
+      Decompose this feature into implementation tasks:
+      "As a user, I want to update my profile (name, avatar, bio) so that my information stays current."
+      Produce a numbered plan with tasks, acceptance criteria, and technical notes.
+    checks:
+      - has_keyword:test
+      - has_keyword:validation
+      - has_keyword:error
+      - length_min:400
+    expectations:
+      - "Breaks the feature into at least 4 distinct tasks (form UI, API endpoint, file upload for avatar, DB update)"
+      - "Each task has clear acceptance criteria"
+      - "Mentions validation (file size, format, field length)"
+      - "Mentions error cases (upload failure, invalid format, network error)"
+
+  - id: arch-decision-database
+    input: |
+      We need to choose a database for a multi-tenant SaaS application with:
+      - 10k tenants, 500 users/tenant
+      - Complex relational data (users, subscriptions, invoices)
+      - Need for full-text search
+      - Budget: startup
+
+      Analyze the options and recommend one with justification.
+    checks:
+      - has_keyword:postgresql
+      - has_keyword:index
+      - length_min:300
+    expectations:
+      - "Considers at least 2 database options (PostgreSQL, MySQL, MongoDB, etc.)"
+      - "Recommends PostgreSQL (or equivalent) with solid justification"
+      - "Mentions multi-tenancy strategy (row-level isolation vs schema-per-tenant)"
+      - "Addresses full-text search (pg_trgm, elasticsearch as extension, etc.)"
+
+  - id: sprint-planning
+    input: |
+      Plan a 2-week sprint for a team of 3 developers to build an e-commerce cart feature:
+      - Add/remove items
+      - Quantity management
+      - Price calculation with discounts
+      - Persist cart (logged-in users: DB, anonymous: localStorage)
+    checks:
+      - has_keyword:story
+      - has_keyword:day
+      - length_min:400
+    expectations:
+      - "Produces a day-by-day or story-by-story sprint plan"
+      - "Assigns stories to developers or gives capacity estimates"
+      - "Identifies risks or dependencies (auth, payment integration)"
+      - "Includes testing tasks (unit tests, integration, QA)"

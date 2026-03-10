@@ -1,0 +1,20 @@
+team_id: team-design
+technology: frontend
+phase_type: development
+description: Team team-design — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: ux_designer
+  - id: accessibility_expert
+  - id: solaris_ux_designer
+task: Design a checkout flow for a mobile-first e-commerce app. Create wireframe descriptions, ensure WCAG 2.1 AA compliance,
+  define interaction patterns for payment form, and provide design token specifications.
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -1,0 +1,532 @@
+"""
+PostgreSQL adapter.
+
+Handles:
+    - ? → %s placeholder translation
+    - Row dict-like access for both backends
+    - Connection pooling for PostgreSQL
+    - PRAGMA skip for PostgreSQL
+"""
+
+import os
+import re
+from typing import Any, Sequence
+
+try:
+    import psycopg
+    import psycopg.errors
+except ImportError:
+    psycopg = None  # type: ignore
+
+_PG_URL = os.environ.get("DATABASE_URL", "")
+# _USE_PG: True ONLY when DATABASE_URL is set and psycopg is available.
+# Hardcoding True caused silent PG pool failures on local dev (SQLite).
+_USE_PG = bool(_PG_URL) and psycopg is not None
+
+# Connection pool for PostgreSQL (lazy initialized)
+_pg_pool = None
+_pg_pool_lock = None
+
+
+def _get_pg_pool():
+    """Get or create the PostgreSQL connection pool (lazy, thread-safe)."""
+    global _pg_pool, _pg_pool_lock
+    import threading
+
+    if _pg_pool_lock is None:
+        _pg_pool_lock = threading.Lock()
+    if _pg_pool is None:
+        with _pg_pool_lock:
+            if _pg_pool is None:
+                from psycopg_pool import ConnectionPool
+
+                conninfo = _PG_URL
+                if "connect_timeout" not in conninfo:
+                    sep = "&" if "?" in conninfo else "?"
+                    conninfo += f"{sep}connect_timeout=10"
+                _pool_max = int(os.environ.get("PG_POOL_MAX_SIZE", "10"))
+                _pg_pool = ConnectionPool(
+                    conninfo=conninfo,
+                    min_size=2,
+                    max_size=_pool_max,
+                    max_idle=120,  # 2 min — recycle idle connections faster
+                    timeout=15,  # fail fast instead of waiting 30s
+                    open=True,
+                )
+    return _pg_pool
+
+
+def _get_pg_connection():
+    """Get a psycopg connection from the pool."""
+    return _get_pg_pool().getconn()
+
+
+# ── Placeholder translation ─────────────────────────────────────────────────
+
+# SQLite uses ? for params, PostgreSQL uses %s
+# Also handle named :name → %(name)s (not used in our codebase but safe)
+_Q_RE = re.compile(r"\?")
+
+
+_DATETIME_RE = re.compile(
+    r"datetime\('now',\s*'([+-]\d+)\s+(second|minute|hour|day|month|year)s?'\)",
+    re.IGNORECASE,
+)
+
+
+def _translate_datetime(sql: str) -> str:
+    """Convert SQLite datetime('now', '-N unit') → PostgreSQL NOW() - INTERVAL 'N unit'."""
+
+    def _replace(m: re.Match) -> str:
+        offset = m.group(1)  # e.g. "-10" or "+7"
+        unit = m.group(2).lower()  # e.g. "minute", "day"
+        # Use abs value with sign for INTERVAL direction
+        n = int(offset)
+        if n < 0:
+            return f"(NOW() - INTERVAL '{-n} {unit}s')"
+        return f"(NOW() + INTERVAL '{n} {unit}s')"
+
+    return _DATETIME_RE.sub(_replace, sql)
+
+
+def _translate_sql(sql: str) -> str:
+    """Convert SQLite ? placeholders to PostgreSQL %s.
+
+    Also escapes any literal % (e.g. in LIKE patterns) to %% so psycopg3
+    doesn't interpret them as parameter placeholders.
+    """
+    sql = _translate_datetime(sql)
+    # Escape existing % before adding %s placeholders
+    sql = sql.replace("%", "%%")
+    return _Q_RE.sub("%s", sql)
+
+
+# ── INSERT OR REPLACE / INSERT OR IGNORE translation ────────────────────────
+
+_INSERT_OR_REPLACE_RE = re.compile(
+    r"INSERT\s+OR\s+REPLACE\s+INTO\s+(\w+)\s*\(([^)]+)\)",
+    re.IGNORECASE,
+)
+
+_INSERT_OR_IGNORE_RE = re.compile(
+    r"INSERT\s+OR\s+IGNORE\s+INTO",
+    re.IGNORECASE,
+)
+
+
+def _translate_upsert(sql: str) -> str:
+    """Convert INSERT OR REPLACE INTO t (cols) VALUES (...)
+    to INSERT INTO t (cols) VALUES (...) ON CONFLICT (pk) DO UPDATE SET ..."""
+    m = _INSERT_OR_REPLACE_RE.search(sql)
+    if not m:
+        return sql
+
+    table = m.group(1).lower()
+    cols_str = m.group(2)
+    cols = [c.strip() for c in cols_str.split(",")]
+
+    # Tables with composite primary keys (conflict targets for ON CONFLICT clause)
+    _COMPOSITE_PKS = {
+        "org_team_members": ["team_id", "agent_id"],
+        "confluence_pages": ["mission_id", "tab"],
+        "feature_deps": ["feature_id", "depends_on"],
+        "team_fitness_history": [
+            "agent_id",
+            "pattern_id",
+            "technology",
+            "phase_type",
+            "snapshot_date",
+        ],
+        "user_project_roles": ["user_id", "project_id"],
+    }
+
+    pk_cols = _COMPOSITE_PKS.get(table, [cols[0]])
+
+    # Build SET clause for all non-PK columns
+    updates = [f"{c} = EXCLUDED.{c}" for c in cols if c not in pk_cols]
+
+    # Replace "INSERT OR REPLACE INTO" with "INSERT INTO"
+    new_sql = re.sub(
+        r"INSERT\s+OR\s+REPLACE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE
+    )
+
+    pk_str = ", ".join(pk_cols)
+    if updates:
+        new_sql += f" ON CONFLICT ({pk_str}) DO UPDATE SET " + ", ".join(updates)
+    else:
+        new_sql += f" ON CONFLICT ({pk_str}) DO NOTHING"
+
+    return new_sql
+
+
+def _translate_insert_ignore(sql: str) -> str:
+    """Convert INSERT OR IGNORE INTO to INSERT INTO ... ON CONFLICT DO NOTHING."""
+    if not _INSERT_OR_IGNORE_RE.search(sql):
+        return sql
+    new_sql = re.sub(
+        r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT INTO", sql, flags=re.IGNORECASE
+    )
+    # Add ON CONFLICT DO NOTHING at end (before any trailing semicolon)
+    new_sql = new_sql.rstrip().rstrip(";")
+    new_sql += " ON CONFLICT DO NOTHING"
+    return new_sql
+
+
+# ── Row wrapper ──────────────────────────────────────────────────────────────
+
+
+class DictRow:
+    """Dict-like row compatible with sqlite3.Row access patterns.
+
+    Uses a tuple for positional/iteration access (handles duplicate column names)
+    and a dict for named key access.
+    """
+
+    __slots__ = ("_keys", "_vals", "_data")
+
+    def __init__(self, keys: Sequence[str], values: Sequence[Any]):
+        self._keys = tuple(keys)
+        self._vals = tuple(values)
+        # Dict for named access — last value wins on duplicate keys (matches sqlite3.Row)
+        self._data = dict(zip(self._keys, self._vals))
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            return self._vals[key]
+        return self._data[key]
+
+    def __contains__(self, key):
+        return key in self._data
+
+    def __iter__(self):
+        # Iterate values positionally so tuple-unpacking works even with duplicate col names
+        return iter(self._vals)
+
+    def __len__(self):
+        return len(self._vals)
+
+    def keys(self):
+        return self._keys
+
+    def get(self, key, default=None):
+        return self._data.get(key, default)
+
+    def __repr__(self):
+        return f"DictRow({dict(zip(self._keys, self._vals))})"
+
+
+# ── Cursor wrapper ───────────────────────────────────────────────────────────
+
+
+class PgCursorWrapper:
+    """Wraps psycopg cursor to return DictRow objects like sqlite3.Row."""
+
+    def __init__(self, cursor):
+        self._cur = cursor
+        self._description = None
+
+    @property
+    def lastrowid(self):
+        return getattr(self._cur, "lastrowid", None)
+
+    @property
+    def rowcount(self):
+        return self._cur.rowcount
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    def _wrap_row(self, row):
+        if row is None:
+            return None
+        cols = [d[0] for d in self._cur.description]
+        return DictRow(cols, row)
+
+    def fetchone(self):
+        row = self._cur.fetchone()
+        return self._wrap_row(row)
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        if not rows or not self._cur.description:
+            return rows
+        cols = [d[0] for d in self._cur.description]
+        return [DictRow(cols, r) for r in rows]
+
+    def fetchmany(self, size=None):
+        rows = self._cur.fetchmany(size) if size else self._cur.fetchmany()
+        if not rows or not self._cur.description:
+            return rows
+        cols = [d[0] for d in self._cur.description]
+        return [DictRow(cols, r) for r in rows]
+
+    def close(self):
+        self._cur.close()
+
+    def __iter__(self):
+        cols = None
+        for row in self._cur:
+            if cols is None:
+                cols = [d[0] for d in self._cur.description]
+            yield DictRow(cols, row)
+
+
+# ── Connection wrapper ───────────────────────────────────────────────────────
+
+
+class PgConnectionWrapper:
+    """Wraps psycopg connection to match sqlite3.Connection API.
+
+    Key translations:
+    - execute("...?...", params) → execute("...%s...", params)
+    - Skips PRAGMA commands
+    - executescript → splits and executes statements
+    - Returns PgCursorWrapper for dict-like row access
+    """
+
+    def __init__(self, conn):
+        self._conn = conn
+
+    def execute(self, sql: str, params: tuple = ()) -> PgCursorWrapper:
+        # Translate PRAGMA table_info(table) → information_schema query
+        stripped = sql.strip()
+        stripped_up = stripped.upper()
+        if stripped_up.startswith("PRAGMA TABLE_INFO(") or stripped_up.startswith(
+            "PRAGMA TABLE_INFO ("
+        ):
+            # Extract table name from PRAGMA table_info(tablename)
+            import re as _re
+
+            m = _re.search(r"TABLE_INFO\s*\(\s*(\w+)\s*\)", stripped, _re.IGNORECASE)
+            if m:
+                table = m.group(1).lower()
+                pg_sql = (
+                    "SELECT ordinal_position AS cid, column_name AS name, "
+                    "data_type AS type, "
+                    "CASE WHEN is_nullable='NO' THEN 1 ELSE 0 END AS notnull, "
+                    "column_default AS dflt_value, "
+                    "CASE WHEN column_name IN ("
+                    "  SELECT kcu.column_name FROM information_schema.key_column_usage kcu"
+                    "  JOIN information_schema.table_constraints tc ON tc.constraint_name=kcu.constraint_name"
+                    "  WHERE tc.constraint_type='PRIMARY KEY' AND tc.table_name=%s"
+                    ") THEN 1 ELSE 0 END AS pk "
+                    "FROM information_schema.columns "
+                    "WHERE table_schema='public' AND table_name=%s "
+                    "ORDER BY ordinal_position"
+                )
+                cur = self._conn.cursor()
+                try:
+                    cur.execute(pg_sql, (table, table))
+                except (psycopg.errors.Error, psycopg.OperationalError):
+                    self._conn.rollback()
+                    return PgCursorWrapper(_NullCursor())
+                return PgCursorWrapper(cur)
+            return PgCursorWrapper(_NullCursor())
+
+        # Skip other SQLite PRAGMAs
+        if stripped_up.startswith("PRAGMA"):
+            return PgCursorWrapper(_NullCursor())
+
+        # Skip SQLite FTS5 virtual tables and FTS triggers
+        if "USING FTS5" in sql.upper():
+            return PgCursorWrapper(_NullCursor())
+        if "CREATE TRIGGER" in sql.upper() and "_fts" in sql.lower():
+            return PgCursorWrapper(_NullCursor())
+
+        translated = _translate_sql(sql)
+
+        # AUTOINCREMENT → just remove keyword
+        translated = translated.replace("AUTOINCREMENT", "")
+
+        # datetime('now') → CURRENT_TIMESTAMP
+        translated = translated.replace("datetime('now')", "CURRENT_TIMESTAMP")
+
+        # INSERT OR REPLACE → INSERT ... ON CONFLICT DO UPDATE
+        translated = _translate_upsert(translated)
+
+        # INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
+        translated = _translate_insert_ignore(translated)
+
+        cur = self._conn.cursor()
+        try:
+            cur.execute(translated, params)
+        except (psycopg.errors.Error, psycopg.OperationalError):
+            self._conn.rollback()
+            raise
+        return PgCursorWrapper(cur)
+
+    def executemany(self, sql: str, params_seq) -> PgCursorWrapper:
+        translated = _translate_sql(sql)
+        cur = self._conn.cursor()
+        for params in params_seq:
+            cur.execute(translated, params)
+        return PgCursorWrapper(cur)
+
+    def executescript(self, sql: str):
+        """Execute multiple SQL statements (for schema init).
+
+        psycopg3 does not support multi-statement execute — we split on ';'
+        and execute each statement individually, skipping empty ones.
+        Errors on individual statements are logged but don't abort the rest
+        (needed for idempotent schema init where some objects may already exist).
+        """
+        import logging as _log
+
+        _logger = _log.getLogger(__name__)
+
+        # Filter out SQLite-specific statements
+        lines = []
+        skip = False
+        for line in sql.split("\n"):
+            up = line.strip().upper()
+            if "USING FTS5" in up or (
+                "CREATE TRIGGER" in up and "_fts" in line.lower()
+            ):
+                skip = True
+            if skip:
+                if ";" in line:
+                    skip = False
+                continue
+            if up.startswith("PRAGMA"):
+                continue
+            lines.append(line)
+
+        cleaned = "\n".join(lines)
+        cleaned = cleaned.replace("AUTOINCREMENT", "")
+        cleaned = cleaned.replace("datetime('now')", "CURRENT_TIMESTAMP")
+
+        last_cur = None
+        for stmt in cleaned.split(";"):
+            stmt = stmt.strip()
+            if not stmt:
+                continue
+            # Strip leading comment lines to check if there's actual SQL
+            import re as _re
+
+            sql_body = _re.sub(
+                r"^\s*--[^\n]*\n?", "", stmt, flags=_re.MULTILINE
+            ).strip()
+            if not sql_body:
+                continue
+            stmt = sql_body  # execute only the SQL, not the comments
+            cur = self._conn.cursor()
+            try:
+                cur.execute("SAVEPOINT _exec_sp")
+                cur.execute(stmt)
+                cur.execute("RELEASE SAVEPOINT _exec_sp")
+                last_cur = cur
+            except psycopg.errors.Error as exc:
+                # "Already exists" errors are expected during idempotent schema init — ignore silently.
+                # Any other error is unexpected and should be visible in logs.
+                is_harmless = isinstance(
+                    exc,
+                    (
+                        psycopg.errors.DuplicateTable,
+                        psycopg.errors.DuplicateColumn,
+                        psycopg.errors.DuplicateObject,
+                        psycopg.errors.UniqueViolation,
+                    ),
+                )
+                if is_harmless:
+                    _logger.debug("executescript: skipping statement error: %s", exc)
+                else:
+                    _logger.warning(
+                        "executescript: unexpected error on stmt [%.80s]: %s",
+                        stmt,
+                        exc,
+                    )
+                try:
+                    cur.execute("ROLLBACK TO SAVEPOINT _exec_sp")
+                    cur.execute("RELEASE SAVEPOINT _exec_sp")
+                except Exception:
+                    pass
+        return PgCursorWrapper(last_cur or self._conn.cursor())
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        """Return connection to pool instead of closing."""
+        if self._conn is None:
+            return
+        try:
+            # Rollback any open transaction before returning to pool
+            # (avoids psycopg_pool "rolling back returned connection" warnings)
+            if self._conn.info.transaction_status != 0:  # 0 = IDLE
+                self._conn.rollback()
+            pool = _get_pg_pool()
+            pool.putconn(self._conn)
+        except (psycopg.OperationalError, OSError):
+            self._conn.close()
+        finally:
+            self._conn = None  # prevent double-return
+
+    def __del__(self):
+        """Safety net: return connection to pool on GC if close() was never called."""
+        if self._conn is not None:
+            try:
+                self.close()
+            except Exception:
+                pass
+
+    @property
+    def row_factory(self):
+        return None
+
+    @row_factory.setter
+    def row_factory(self, value):
+        pass  # No-op for PG — we use DictRow wrapper
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+class _NullCursor:
+    """No-op cursor for skipped statements (PRAGMAs, FTS5)."""
+
+    description = None
+    lastrowid = None
+    rowcount = 0
+
+    def fetchone(self):
+        return None
+
+    def fetchall(self):
+        return []
+
+    def fetchmany(self, size=None):
+        return []
+
+    def close(self):
+        pass
+
+    def __iter__(self):
+        return iter([])
+
+
+# ── Public API ───────────────────────────────────────────────────────────────
+
+
+def is_postgresql() -> bool:
+    """Check if using PostgreSQL backend (True only when DATABASE_URL is set + psycopg available)."""
+    return _USE_PG
+
+
+def get_connection() -> Any:
+    """Get a PostgreSQL database connection."""
+    conn = _get_pg_connection()
+    conn.autocommit = False
+    return PgConnectionWrapper(conn)
+
+
+def return_connection(conn):
+    """Close a connection (for both backends)."""
+    if conn:
+        conn.close()

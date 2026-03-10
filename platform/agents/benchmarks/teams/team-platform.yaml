@@ -1,0 +1,20 @@
+team_id: team-platform
+technology: python
+phase_type: development
+description: Team team-platform — end-to-end collaboration bench
+pattern:
+  type: hierarchical
+  agents:
+  - id: plat-cto
+  - id: plat-dev-backend
+  - id: plat-lead-dev
+task: Implement a new webhook notification system for the platform. Design the schema, implement the API, and add retry logic
+  for failed deliveries.
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -1,0 +1,122 @@
+id: mobile-ios-epic
+name: Epic iOS App (SwiftUI)
+description: 'Full Epic workflow for native iOS app: Architecture → Networking → Features → Tests → Integration.'
+icon: smartphone
+is_builtin: true
+phases:
+- id: ios-archi
+  pattern_id: aggregator
+  name: Architecture & UX
+  description: Mobile architect + UX define app structure, navigation, API contract
+  gate: always
+  config:
+    agents:
+    - mobile_archi
+    - mobile_ux
+    - mobile_ios_lead
+- id: ios-network
+  pattern_id: hierarchical
+  name: Networking Layer
+  description: 'Lead iOS delegates: APIClient, SSEClient, DTOs, AuthManager to network dev'
+  gate: always
+  config:
+    agents:
+    - mobile_ios_lead
+    - mobile_ios_dev_net
+    - mobile_ios_qa
+- id: ios-features
+  pattern_id: hierarchical
+  name: Features Sprint
+  description: 'Lead delegates UI screens to dev: Dashboard, Missions, Agents, Chat, Ideation'
+  gate: always
+  config:
+    agents:
+    - mobile_ios_lead
+    - mobile_ios_dev_ui
+    - mobile_ios_dev_net
+- id: ios-tests
+  pattern_id: loop
+  name: Testing & QA
+  description: QA writes XCTest + Swift Testing, validates coverage > 80%, accessibility audit
+  gate: always
+  config:
+    agents:
+    - mobile_ios_qa
+    - mobile_ios_lead
+    max_iterations: 3
+- id: ios-integration
+  pattern_id: sequential
+  name: Integration & Polish
+  description: 'Final integration: navigation flows, dark mode, error states, app shell'
+  gate: always
+  config:
+    agents:
+    - mobile_ios_lead
+    - mobile_ios_dev_ui
+    - mobile_ios_qa
+config:
+  type: epic
+  stack: swift-swiftui
+  graph:
+    nodes:
+    - id: n1
+      agent_id: mobile_archi
+      x: 300
+      y: 20
+      label: Archi
+      phase: ios-archi
+    - id: n2
+      agent_id: mobile_ux
+      x: 500
+      y: 20
+      label: UX
+      phase: ios-archi
+    - id: n3
+      agent_id: mobile_ios_lead
+      x: 400
+      y: 130
+      label: Lead iOS
+      phase: ios-network
+    - id: n4
+      agent_id: mobile_ios_dev_net
+      x: 250
+      y: 240
+      label: Dev Network
+      phase: ios-network
+    - id: n5
+      agent_id: mobile_ios_dev_ui
+      x: 550
+      y: 240
+      label: Dev UI
+      phase: ios-features
+    - id: n6
+      agent_id: mobile_ios_qa
+      x: 400
+      y: 350
+      label: QA iOS
+      phase: ios-tests
+    edges:
+    - from: n1
+      to: n3
+      label: architecture
+      color: '#58a6ff'
+    - from: n2
+      to: n3
+      label: ux specs
+      color: '#ec4899'
+    - from: n3
+      to: n4
+      label: networking
+      color: '#3fb950'
+    - from: n3
+      to: n5
+      label: features
+      color: '#3fb950'
+    - from: n4
+      to: n6
+      label: test
+      color: '#d29922'
+    - from: n5
+      to: n6
+      label: test
+      color: '#d29922'

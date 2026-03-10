@@ -1,0 +1,28 @@
+agent_id: fixture-gen
+technology: generic
+phase_type: testing
+description: Test Data Engineer — test strategy, quality assurance
+eval_cases:
+- id: test-strategy
+  input: 'Design a test strategy for an e-commerce checkout flow: cart → address → payment → confirmation. Cover unit, integration,
+    E2E, and edge cases. List specific test scenarios.'
+  checks:
+  - has_keyword:test
+  - has_keyword:payment
+  - has_keyword:edge
+  - length_min:400
+  expectations:
+  - Covers all 3 test levels (unit, integration, E2E)
+  - Lists specific test scenarios for each step
+  - Includes edge cases (expired card, network failure, empty cart)
+- id: bug-report-analysis
+  input: 'Users report: ''Sometimes after login, I see another user\''s dashboard for 2-3 seconds before it refreshes to mine.''
+    Analyze this bug: what could cause it? What tests would prevent it? How critical is it?'
+  checks:
+  - has_keyword:cache
+  - has_keyword:security
+  - length_min:200
+  expectations:
+  - Identifies caching as likely root cause
+  - Rates severity as critical (data leak)
+  - Suggests specific tests to prevent recurrence

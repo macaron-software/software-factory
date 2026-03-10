@@ -1,0 +1,47 @@
+id: tech-react
+name: "React"
+stack: react
+description: "React/Vite production patterns — hooks, state, testing, performance"
+
+content: |
+  ## Build & Test
+  npm run dev         # dev server (Vite)
+  npm run build       # prod build
+  npm test -- --run   # vitest (non-watch)
+  npm run lint        # eslint
+
+  ## Component Rules
+  - Functional components only — no class components
+  - `const MyComponent: React.FC<Props> = ({ prop }) => {...}` or typed arrow
+  - Extract sub-components when JSX > 50 lines
+  - Always add `key` on list items — stable IDs, never array index
+  - `React.memo()` only after profiling shows re-render issue
+
+  ## Hooks
+  - `useState<T>(initial)` — local UI state only
+  - `useReducer` — when state transitions are complex (>2 setState calls together)
+  - `useEffect(() => { ... return cleanup; }, [deps])` — always return cleanup
+  - `useCallback` / `useMemo` — only for expensive computations or stable refs passed as props
+  - `useRef` — DOM refs + mutable values that don't trigger re-render
+  - Custom hooks: prefix `use`, return named values
+
+  ## State Management
+  - Zustand (recommended): `const useStore = create<State>(set => ({ ... }))`
+  - React Query / TanStack Query: server state, caching, invalidation
+  - Context: theme/auth only — not for frequently changing state
+  - Never mutate state directly: `setState(prev => [...prev, newItem])`
+
+  ## Forms
+  - React Hook Form: `const { register, handleSubmit, formState } = useForm<T>()`
+  - Zod validation: `zodResolver(schema)` passed to useForm
+  - Controlled only when needed — uncontrolled with refs is faster
+
+  ## Testing (Vitest + RTL)
+  import { render, screen, fireEvent } from '@testing-library/react'
+  test('shows label', () => {
+    render(<MyButton label="Save" />)
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
+  })
+  - Query priority: getByRole > getByLabelText > getByText > getByTestId
+  - `userEvent.click()` over `fireEvent.click()` for realistic events
+  - Mock fetch: `vi.mock` or `msw` (Mock Service Worker)

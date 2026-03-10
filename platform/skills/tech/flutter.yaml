@@ -1,0 +1,68 @@
+id: tech-flutter
+name: "Flutter / Dart"
+stack: flutter
+description: "Flutter production patterns — widgets, state, testing, build"
+
+content: |
+  ## Build & Test
+  flutter test                          # unit + widget tests
+  flutter test --update-goldens         # update golden images
+  flutter run                           # dev (connected device/emulator)
+  flutter build apk --release           # Android release
+  flutter build ios --release           # iOS release
+  flutter analyze                       # Dart analyzer (treat as errors)
+
+  ## Widget Patterns
+  - Prefer `const` constructors everywhere — `const Text('hello')`
+  - StatelessWidget for pure UI. StatefulWidget only when local state needed.
+  - Extract sub-widgets aggressively (avoid mega-build methods)
+  - `Key` on list items: `ValueKey(item.id)` (never index)
+
+  ## State Management (Riverpod — recommended)
+  // Provider definition
+  final counterProvider = StateNotifierProvider<CounterNotifier, int>((ref) {
+    return CounterNotifier();
+  });
+  class CounterNotifier extends StateNotifier<int> {
+    CounterNotifier() : super(0);
+    void increment() => state++;
+  }
+  // Consume
+  class MyWidget extends ConsumerWidget {
+    @override
+    Widget build(BuildContext context, WidgetRef ref) {
+      final count = ref.watch(counterProvider);
+      return Text('$count');
+    }
+  }
+  - FutureProvider for async data. `ref.invalidate()` to refresh.
+  - AsyncNotifier for complex async state with loading/error handling.
+
+  ## Navigation (go_router)
+  final router = GoRouter(routes: [
+    GoRoute(path: '/', builder: (ctx, state) => HomePage()),
+    GoRoute(path: '/item/:id', builder: (ctx, state) => ItemPage(id: state.pathParameters['id']!)),
+  ]);
+  - `context.push('/item/42')` / `context.go('/home')`
+
+  ## Async
+  - `FutureBuilder<T>` for one-shot async, `StreamBuilder<T>` for streams
+  - Always handle `connectionState.waiting` (loading) + `hasError` cases
+  - `await` in `initState`: use `SchedulerBinding.instance.addPostFrameCallback`
+
+  ## Testing
+  // Widget test
+  testWidgets('shows title', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: MyWidget()));
+    expect(find.text('Hello'), findsOneWidget);
+    await tester.tap(find.byType(ElevatedButton));
+    await tester.pump();
+  });
+  // Unit test
+  test('counter increments', () {
+    final notifier = CounterNotifier();
+    notifier.increment();
+    expect(notifier.state, 1);
+  });
+  // Golden test
+  await expectLater(find.byType(MyWidget), matchesGoldenFile('my_widget.png'));

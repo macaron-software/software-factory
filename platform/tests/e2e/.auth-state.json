@@ -1,0 +1,45 @@
+{
+  "cookies": [
+    {
+      "name": "refresh_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJzaWQiOiI3OTNmMmYxY2M5ZDE0YTg0IiwidHlwZSI6InJlZnJlc2giLCJleHAiOjE3NzI5MTQxMDksImlhdCI6MTc3MjMwOTMwOX0.muqqwIx4HVjUf5bWdKPgzYFzqLtj-WyxPKGKZZJIdH4",
+      "domain": "127.0.0.1",
+      "path": "/api/auth",
+      "expires": 1772914109.659,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "access_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiOWJhOTBkMGZiZjMiLCJlbWFpbCI6ImFkbWluQGRlbW8ubG9jYWwiLCJyb2xlIjoiYWRtaW4iLCJuYW1lIjoiRGVtbyBBZG1pbiIsInR5cGUiOiJhY2Nlc3MiLCJleHAiOjE3NzIzMTAyMDksImlhdCI6MTc3MjMwOTMwOX0.NrcjKC3okXOQGx_emFfLd3nDIneSm8Ir1pe8qcIXgp8",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1772310209.659,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "sf_lang",
+      "value": "en",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1803845309.659,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "onboarding_done",
+      "value": "1",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

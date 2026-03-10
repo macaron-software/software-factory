@@ -1,0 +1,48 @@
+{
+  "property": "strokeAlign",
+  "figma_type": "enum",
+  "values": ["INSIDE", "CENTER", "OUTSIDE"],
+  "description": "Determines where the stroke is positioned relative to the element bounds",
+  "css_mapping": {
+    "INSIDE": {
+      "css": "box-shadow: inset 0 0 0 {strokeWeight}px {color}",
+      "alt": "border with box-sizing: border-box",
+      "impact_on_dimensions": "None - stroke is inside the absoluteBoundingBox"
+    },
+    "CENTER": {
+      "css": "border: {strokeWeight}px solid {color}",
+      "note": "Half the stroke is inside, half outside",
+      "impact_on_dimensions": "Adds strokeWeight/2 to each side visually"
+    },
+    "OUTSIDE": {
+      "css": "outline: {strokeWeight}px solid {color}; outline-offset: 0",
+      "alt": "box-shadow: 0 0 0 {strokeWeight}px {color}",
+      "impact_on_dimensions": "None - absoluteBoundingBox does NOT include OUTSIDE strokes"
+    }
+  },
+  "critical_rules": [
+    {
+      "rule": "OUTSIDE strokes must use outline or box-shadow, NOT border",
+      "reason": "border adds to element dimensions, outline/box-shadow don't",
+      "example": {
+        "figma": { "width": 45, "strokeWeight": 2, "strokeAlign": "OUTSIDE" },
+        "correct": "width: 45px; outline: 2px solid blue; /* Total visual: 49px, box: 45px */",
+        "incorrect": "width: 45px; border: 2px solid blue; /* Total box: 49px - WRONG! */"
+      }
+    },
+    {
+      "rule": "Focus rings typically use strokeAlign: OUTSIDE",
+      "reason": "Focus indicator shouldn't change element dimensions or layout",
+      "wcag": "Focus must be visible but not disrupt layout (WCAG 2.4.7)"
+    }
+  ],
+  "common_use_cases": {
+    "INSIDE": ["Input field borders", "Card borders", "Button borders in normal state"],
+    "CENTER": ["Rarely used - causes dimension complexity"],
+    "OUTSIDE": ["Focus rings", "Selection indicators", "Hover outlines"]
+  },
+  "dimension_calculation": {
+    "absoluteBoundingBox": "Does NOT include OUTSIDE strokes",
+    "visual_size": "absoluteBoundingBox + (strokeAlign === 'OUTSIDE' ? strokeWeight * 2 : 0)"
+  }
+}

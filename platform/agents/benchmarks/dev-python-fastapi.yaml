@@ -1,0 +1,59 @@
+agent_id: dev_backend
+technology: python_fastapi
+phase_type: development
+description: Python FastAPI backend — async endpoints, Pydantic models, SQLAlchemy, testing
+
+eval_cases:
+  - id: crud-endpoint-with-validation
+    input: |
+      Implement a FastAPI CRUD endpoint for a Product resource:
+      - GET /products (list with pagination: skip, limit query params)
+      - GET /products/{id} (404 if not found)
+      - POST /products (create with validation)
+      - PUT /products/{id} (update, 404 if not found)
+      - DELETE /products/{id} (204 no content)
+
+      Product fields: id (int, auto), name (str, required, 3-100 chars),
+      price (float, > 0), category (enum: electronics, clothing, food),
+      in_stock (bool, default True).
+
+      Use Pydantic BaseModel for request/response schemas.
+      Use SQLAlchemy async with AsyncSession for DB access.
+      Write pytest tests with httpx AsyncClient.
+    checks:
+      - has_keyword:@app.get
+      - has_keyword:BaseModel
+      - has_keyword:AsyncSession
+      - has_keyword:def test_
+      - has_keyword:HTTPException
+      - length_min:500
+    expectations:
+      - "Defines Pydantic schemas (ProductCreate, ProductResponse) with field validation"
+      - "All 5 endpoints are implemented with proper HTTP status codes"
+      - "Uses dependency injection for DB session (Depends(get_db))"
+      - "Tests cover create, read, list, update, delete, and 404 cases"
+      - "Validates price > 0 and name length constraints"
+
+  - id: auth-middleware-jwt
+    input: |
+      Implement JWT authentication for a FastAPI app:
+      - POST /auth/login (accepts username/password, returns access + refresh tokens)
+      - POST /auth/refresh (accepts refresh token, returns new access token)
+      - A dependency get_current_user() that extracts and validates the JWT
+      - Tokens expire: access=15min, refresh=7days
+      - Use python-jose for JWT encoding/decoding
+      - Hash passwords with passlib[bcrypt]
+
+      Write the auth module and tests.
+    checks:
+      - has_keyword:jwt
+      - has_keyword:bcrypt
+      - has_keyword:refresh
+      - has_keyword:Depends
+      - length_min:400
+    expectations:
+      - "Implements login endpoint that verifies password and returns JWT pair"
+      - "Implements refresh endpoint that validates refresh token"
+      - "get_current_user dependency decodes JWT and raises 401 on invalid/expired"
+      - "Passwords are hashed with bcrypt (never stored in plain text)"
+      - "Token expiry is properly set (access=15min, refresh=7days)"

@@ -1,0 +1,103 @@
+id: chaos-scheduled
+name: Scheduled Chaos Engineering
+description: 'Periodic resilience testing: inject failures, verify auto-recovery, validate SLOs under stress.'
+icon: 🐒
+is_builtin: true
+phases:
+- id: chaos-plan
+  pattern_id: sequential
+  name: Chaos Plan
+  description: 'Select failure scenarios: network partition, disk full, process kill, latency injection'
+  gate: Chaos scenarios selected with blast radius defined
+  config:
+    agents:
+    - sre
+    - architecte
+- id: steady-state
+  pattern_id: sequential
+  name: Steady State Baseline
+  description: 'Capture baseline metrics before chaos: latency, error rate, throughput'
+  gate: Baseline metrics captured and SLOs verified
+  config:
+    agents:
+    - monitoring-ops
+    - sre
+- id: chaos-inject
+  pattern_id: sequential
+  name: Fault Injection
+  description: Inject planned failures, observe system behavior, monitor auto-recovery
+  gate: Fault injected, system behavior observed
+  config:
+    agents:
+    - sre
+- id: chaos-observe
+  pattern_id: parallel
+  name: Impact Observation
+  description: 'Monitor recovery: did autoheal trigger? Did SLOs hold? Any cascading failures?'
+  gate: Recovery behavior documented
+  config:
+    agents:
+    - monitoring-ops
+    - sre
+    - perf-tester
+- id: chaos-report
+  pattern_id: sequential
+  name: Resilience Report
+  description: Document findings, update runbooks, create hardening tickets for failures
+  gate: Resilience report published, action items created
+  config:
+    agents:
+    - sre
+    - doc-writer
+config:
+  schedule: bi-weekly
+  blast_radius: staging
+  graph:
+    nodes:
+    - id: n1
+      agent_id: sre
+      x: 100
+      y: 150
+      label: Plan
+      phase: chaos-plan
+    - id: n2
+      agent_id: monitoring-ops
+      x: 250
+      y: 150
+      label: Baseline
+      phase: steady-state
+    - id: n3
+      agent_id: sre
+      x: 400
+      y: 150
+      label: Inject
+      phase: chaos-inject
+    - id: n4
+      agent_id: monitoring-ops
+      x: 550
+      y: 150
+      label: Observe
+      phase: chaos-observe
+    - id: n5
+      agent_id: doc-writer
+      x: 700
+      y: 150
+      label: Report
+      phase: chaos-report
+    edges:
+    - from: n1
+      to: n2
+      label: scenarios
+      color: '#ef4444'
+    - from: n2
+      to: n3
+      label: baseline ok
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: fault active
+      color: '#ef4444'
+    - from: n4
+      to: n5
+      label: observed
+      color: '#d29922'

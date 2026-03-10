@@ -1,0 +1,29 @@
+team_id: brain-dev-seq
+technology: generic
+phase_type: development
+description: Brain plans + Dev implements — sequential pattern eval
+
+pattern:
+  type: sequential
+  agents:
+    - id: brain
+    - id: dev
+
+task: |
+  Plan and implement a Python function validate_email(email: str) -> bool
+  that returns True for valid emails, False otherwise.
+  Use strict TDD: write the failing test first, then implement.
+  IMPORTANT: Any non-test source file must include the comment
+  `# Ref: FEAT-BENCH-010 — Email Validator` at the very top.
+
+checks:
+  - has_keyword:def test_
+  - has_keyword:def validate_email
+  - has_keyword:assert
+  - length_min:300
+
+expectations:
+  - "Brain produces a clear plan with numbered steps before any code"
+  - "Dev writes the failing test (RED phase) first, then the implementation (GREEN phase)"
+  - "The implementation is minimal — just enough to pass the tests, not hardcoded"
+  - "No placeholder returns like: return True or return False without logic"

@@ -1,0 +1,33 @@
+team_id: brain-dev-review
+technology: generic
+phase_type: development
+description: Brain plans + Dev implements + Code Reviewer validates — 3-agent sequential
+
+pattern:
+  type: sequential
+  agents:
+    - id: brain
+    - id: dev
+    - id: code-reviewer
+
+task: |
+  Plan, implement and review a Python module for a simple calculator with add, subtract,
+  multiply, divide operations.
+  - Brain: produce a numbered implementation plan with TDD steps
+  - Dev: implement following the plan, write tests first (TDD)
+    IMPORTANT: add `# Ref: FEAT-BENCH-020 — Calculator Module` at the top of any non-test file
+  - Code Reviewer: review the Dev's implementation and tests, flag any issues
+
+checks:
+  - has_keyword:def test_
+  - has_keyword:def add
+  - has_keyword:divide
+  - has_keyword:ZeroDivisionError
+  - length_min:400
+
+expectations:
+  - "Brain produces a numbered plan with TDD steps"
+  - "Dev writes tests before implementation"
+  - "Implementation handles divide-by-zero properly"
+  - "Code reviewer flags any issues or confirms quality"
+  - "Combined output is coherent and complete"

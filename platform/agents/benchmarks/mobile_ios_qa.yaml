@@ -1,0 +1,18 @@
+agent_id: mobile_ios_qa
+technology: ios/swift
+phase_type: development
+description: QA iOS — mobile development for iOS/Swift
+eval_cases:
+- id: implement-screen
+  input: 'Implement a login screen for iOS/Swift with: email/password fields, ''Remember me'' toggle, ''Forgot password''
+    link, form validation (email format, password min 8 chars), and loading state during API call. Use modern architecture
+    patterns.'
+  checks:
+  - has_keyword:email
+  - has_keyword:password
+  - has_keyword:validation
+  - length_min:300
+  expectations:
+  - Implements form validation with user-friendly messages
+  - Handles loading/error states
+  - Uses appropriate architecture pattern (MVVM, MVI, etc.)

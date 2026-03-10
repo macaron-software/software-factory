@@ -1,0 +1,32 @@
+agent_id: threat-analyst
+technology: generic
+phase_type: security
+description: Threat Analyst — Risk Quantification — security analysis, threat assessment
+eval_cases:
+- id: code-security-review
+  input: "Review this code for security vulnerabilities:\n\n```python\n@app.post('/login')\ndef login(username: str, password:\
+    \ str, db=Depends(get_db)):\n    query = f\"SELECT * FROM users WHERE username='{username}' AND password='{password}'\"\
+    \n    user = db.execute(query).fetchone()\n    if user:\n        return {'token': base64.b64encode(f'{user.id}:{time.time()}'.encode()).decode()}\n\
+    \    return {'error': 'Invalid credentials'}\n```"
+  checks:
+  - has_keyword:injection
+  - has_keyword:hash
+  - length_min:300
+  expectations:
+  - Identifies SQL injection vulnerability
+  - Points out plain-text password storage
+  - Identifies weak token generation (base64 is not JWT)
+  - Provides remediation code or recommendations
+- id: threat-model
+  input: Create a threat model for a REST API that handles medical records. The API is accessed by doctors (web app), patients
+    (mobile app), and admin staff (internal tool). Data includes diagnoses, prescriptions, and lab results.
+  checks:
+  - has_keyword:authentication
+  - has_keyword:encryption
+  - has_keyword:access
+  - length_min:400
+  expectations:
+  - Identifies STRIDE or similar threat categories
+  - Addresses data-at-rest and data-in-transit encryption
+  - Covers role-based access control
+  - Mentions compliance (HIPAA, GDPR)

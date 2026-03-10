@@ -1,0 +1,147 @@
+id: data-migration
+name: Data Migration Pipeline
+description: 'Generic data migration: schema mapping, ETL, validation, zero-downtime with rollback.'
+icon: 🔄
+is_builtin: true
+phases:
+- id: migration-plan
+  pattern_id: network
+  name: Migration Planning
+  description: Inventory source/target schemas, define transformation rules, estimate volume, plan timeline
+  gate: Migration plan approved with go/no-go criteria
+  config:
+    agents:
+    - data-migrator
+    - architecte
+    - backup-ops
+- id: pre-migration-backup
+  pattern_id: sequential
+  name: Pre-Migration Backup
+  description: Full backup of source and target databases, verify restore capability
+  gate: Backup verified with successful test restore
+  config:
+    agents:
+    - backup-ops
+    - data-migrator
+- id: etl-dev
+  pattern_id: sequential
+  name: ETL Development
+  description: 'Write migration scripts: extract → transform → load, with reversible up/down migrations'
+  gate: Migration scripts written and unit-tested
+  config:
+    agents:
+    - data-migrator
+    - lead_dev
+- id: staging-run
+  pattern_id: sequential
+  name: Staging Migration Run
+  description: 'Execute migration on staging: measure duration, validate row counts, checksums, referential integrity'
+  gate: Staging migration successful, metrics within targets
+  config:
+    agents:
+    - data-migrator
+    - testeur
+- id: migration-go-nogo
+  pattern_id: human-in-the-loop
+  name: Production GO/NO-GO
+  description: 'Human checkpoint: review staging results, confirm production migration window'
+  gate: checkpoint
+  config:
+    agents:
+    - data-migrator
+- id: prod-migration
+  pattern_id: sequential
+  name: Production Migration
+  description: Execute production migration with zero-downtime (expand-contract/dual-write), validate post-migration
+  gate: Production data migrated and validated
+  config:
+    agents:
+    - data-migrator
+    - sre
+    - monitoring-ops
+- id: post-validation
+  pattern_id: adversarial-pair
+  name: Post-Migration Validation
+  description: 'Full data validation: row counts, checksums, business rule verification, performance check'
+  gate: All validation checks passed, rollback window closed
+  config:
+    agents:
+    - data-migrator
+    - testeur
+config:
+  critical: true
+  requires_backup: true
+  graph:
+    nodes:
+    - id: n1
+      agent_id: data-migrator
+      x: 50
+      y: 150
+      label: Plan
+      phase: migration-plan
+    - id: n2
+      agent_id: backup-ops
+      x: 180
+      y: 150
+      label: Backup
+      phase: pre-migration-backup
+    - id: n3
+      agent_id: data-migrator
+      x: 310
+      y: 150
+      label: ETL Dev
+      phase: etl-dev
+    - id: n4
+      agent_id: data-migrator
+      x: 440
+      y: 150
+      label: Staging
+      phase: staging-run
+    - id: n5
+      agent_id: data-migrator
+      x: 540
+      y: 150
+      label: GO/NOGO
+      phase: migration-go-nogo
+    - id: n6
+      agent_id: sre
+      x: 640
+      y: 150
+      label: Prod Run
+      phase: prod-migration
+    - id: n7
+      agent_id: testeur
+      x: 770
+      y: 150
+      label: Validate
+      phase: post-validation
+    edges:
+    - from: n1
+      to: n2
+      label: plan ok
+      color: '#d946ef'
+    - from: n2
+      to: n3
+      label: backup ok
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: scripts ready
+      color: '#d946ef'
+    - from: n4
+      to: n5
+      label: staging ok
+      color: '#3fb950'
+    - from: n5
+      to: n6
+      label: approved
+      color: '#3fb950'
+    - from: n6
+      to: n7
+      label: migrated
+      color: '#d946ef'
+    - from: n6
+      to: n2
+      label: rollback
+      color: '#ef4444'
+      style: dashed

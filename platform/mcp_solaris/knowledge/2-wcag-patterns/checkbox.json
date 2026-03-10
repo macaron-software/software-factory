@@ -1,0 +1,96 @@
+{
+  "_meta": {
+    "pattern": "checkbox",
+    "wcag_source": "https://www.w3.org/WAI/ARIA/apg/patterns/checkbox/",
+    "version": "1.0.0",
+    "updated": "2026-01-06"
+  },
+
+  "applies_to": ["checkbox", "check", "case-a-cocher"],
+
+  "variants": {
+    "dual_state": { "values": ["checked", "unchecked"] },
+    "tri_state": { "values": ["checked", "unchecked", "mixed"], "aria-checked": ["true", "false", "mixed"] }
+  },
+
+  "structure": {
+    "checkbox": {
+      "element": "input",
+      "attributes": { "type": "checkbox" },
+      "aria": {
+        "aria-checked": { "type": "tristate", "when": "custom" }
+      }
+    },
+    "custom_checkbox": {
+      "element": "div",
+      "aria": {
+        "role": "checkbox",
+        "aria-checked": { "type": "tristate" },
+        "tabindex": "0"
+      },
+      "when": "custom_styled"
+    },
+    "label": {
+      "element": "label",
+      "attributes": { "for": "checkbox_id" },
+      "required": true
+    },
+    "icon_check": {
+      "element": "svg",
+      "aria": { "aria-hidden": "true" },
+      "class_pattern": "__check"
+    },
+    "icon_mixed": {
+      "element": "svg",
+      "aria": { "aria-hidden": "true" },
+      "class_pattern": "__mixed",
+      "when": "tri_state"
+    }
+  },
+
+  "states": {
+    "unchecked": {
+      "aria-checked": "false",
+      "checked": false,
+      "data_attr": "data-state=unchecked"
+    },
+    "checked": {
+      "aria-checked": "true",
+      "checked": true,
+      "data_attr": "data-state=checked"
+    },
+    "mixed": {
+      "aria-checked": "mixed",
+      "indeterminate": true,
+      "data_attr": "data-state=mixed"
+    },
+    "disabled": {
+      "aria-disabled": "true",
+      "disabled": true,
+      "data_attr": "data-state=disabled"
+    },
+    "invalid": {
+      "aria-invalid": "true",
+      "data_attr": "data-state=invalid"
+    }
+  },
+
+  "keyboard": {
+    "Space": { "action": "toggle" }
+  },
+
+  "group": {
+    "element": "fieldset",
+    "legend": { "element": "legend", "required": true },
+    "aria": { "role": "group", "aria-labelledby": "legend_id" }
+  },
+
+  "css_selectors": {
+    "checked": ":checked, [aria-checked='true']",
+    "unchecked": ":not(:checked), [aria-checked='false']",
+    "mixed": ":indeterminate, [aria-checked='mixed']",
+    "disabled": ":disabled, [aria-disabled='true']",
+    "invalid": ":invalid, [aria-invalid='true']",
+    "focus": ":focus-visible"
+  }
+}

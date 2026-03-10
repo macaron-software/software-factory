@@ -1,0 +1,20 @@
+team_id: team-analytics
+technology: product
+phase_type: development
+description: Team team-analytics — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: data_analyst
+  - id: ai-product-manager
+  - id: product_manager
+task: 'Analyze product metrics for a SaaS app: MRR $50k, 200 customers, 15% monthly churn, NPS 32, average onboarding time
+  14 days. Identify the biggest problem, propose 3 hypotheses, and design experiments to validate.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

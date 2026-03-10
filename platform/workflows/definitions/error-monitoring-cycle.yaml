@@ -1,0 +1,120 @@
+id: error-monitoring-cycle
+name: Error Monitoring Cycle
+description: >
+  Intelligent error monitoring pipeline: scan incidents → cluster by root cause →
+  detect NEW/REGRESSION/ONGOING status → apply suppression logic → trigger auto-heal
+  for actionable clusters. Runs on a schedule (every 5 min) or on-demand.
+icon: 🔍
+is_builtin: true
+phases:
+  - id: scan-incidents
+    pattern_id: sequential
+    name: Scan & Cluster Incidents
+    description: >
+      Scan open platform_incidents, group by error type, apply multi-stage clustering
+      (strict → regex → LLM semantic) to reduce noise. Generate natural-language signatures.
+    gate: Incidents scanned and clustered into actionable groups
+    config:
+      agents:
+        - monitoring-ops
+        - ops-agent
+      skills:
+        - error-monitoring
+
+  - id: status-analysis
+    pattern_id: sequential
+    name: Status & Severity Analysis
+    description: >
+      For each cluster: determine status (NEW/REGRESSION/ONGOING) from error_signatures history,
+      classify severity (S1-S4), apply suppression rules (mutes, 24h window, open tickets).
+    gate: Each cluster has status + severity + alert decision
+    config:
+      agents:
+        - monitoring-ops
+      skills:
+        - error-monitoring
+
+  - id: alert-or-suppress
+    pattern_id: network
+    name: Alert / Suppress / Heal
+    description: >
+      For clusters that should alert: trigger auto-heal TMA workflow, emit notification.
+      For suppressed clusters: log suppression reason, update signature last_seen.
+      Mark alerted signatures to enforce the 24h suppression window.
+    gate: All actionable clusters have triggered heals or been suppressed with reason
+    config:
+      agents:
+        - monitoring-ops
+        - ops-agent
+      skills:
+        - error-monitoring
+
+  - id: report
+    pattern_id: sequential
+    name: Error Monitor Report
+    description: >
+      Generate summary report: top errors, suppression rate, active regressions,
+      muted patterns. Emit to notification channels if configured.
+    gate: Report generated and sent
+    config:
+      agents:
+        - monitoring-ops
+        - doc-writer
+      skills:
+        - error-monitoring
+
+config:
+  schedule: "*/5 * * * *"   # every 5 minutes (informational — scheduling handled externally)
+  graph:
+    nodes:
+      - id: n1
+        agent_id: monitoring-ops
+        x: 100
+        y: 150
+        label: Scan
+        phase: scan-incidents
+      - id: n2
+        agent_id: monitoring-ops
+        x: 300
+        y: 150
+        label: Analyze
+        phase: status-analysis
+      - id: n3
+        agent_id: ops-agent
+        x: 500
+        y: 100
+        label: Alert
+        phase: alert-or-suppress
+      - id: n4
+        agent_id: monitoring-ops
+        x: 500
+        y: 200
+        label: Suppress
+        phase: alert-or-suppress
+      - id: n5
+        agent_id: doc-writer
+        x: 700
+        y: 150
+        label: Report
+        phase: report
+    edges:
+      - from: n1
+        to: n2
+        label: clusters
+        color: "#3fb950"
+      - from: n2
+        to: n3
+        label: alert
+        color: "#f85149"
+      - from: n2
+        to: n4
+        label: suppress
+        color: "#8b949e"
+      - from: n3
+        to: n5
+        label: done
+        color: "#3fb950"
+      - from: n4
+        to: n5
+        label: done
+        color: "#3fb950"

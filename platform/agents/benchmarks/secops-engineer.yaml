@@ -1,0 +1,79 @@
+agent_id: secops-engineer
+technology: generic
+phase_type: security
+description: SecOps Engineer — threat detection, incident response, security hardening
+
+eval_cases:
+  - id: incident-jwt-leak
+    input: |
+      Security incident: our logs show this pattern in the last 30 minutes:
+      - 500+ requests from IP 185.220.101.x with valid JWT tokens
+      - The tokens belong to 12 different users who haven't logged in recently
+      - Users report they didn't initiate these sessions
+
+      Diagnose and provide an incident response plan.
+    checks:
+      - has_keyword:revoke
+      - has_keyword:token
+      - has_keyword:notify
+      - length_min:300
+    expectations:
+      - "Identifies the incident as session hijacking / JWT theft"
+      - "Immediate action: revoke all affected tokens / invalidate sessions"
+      - "Notify affected users immediately"
+      - "Investigates leak vector (XSS? stolen from client? DB breach? log exposure?)"
+      - "Recommends short JWT expiry + refresh token rotation as mitigation"
+
+  - id: security-review-api
+    input: |
+      Review this REST API design for security issues:
+
+      POST /api/users/{user_id}/reset-password
+      Headers: Authorization: Bearer <token>
+      Body: { "new_password": "..." }
+
+      The endpoint:
+      - Accepts any authenticated user (not just admins)
+      - Does not require old password
+      - Resets password for the user_id in the URL path
+      - Returns 200 with the new password hash in the response
+    checks:
+      - has_keyword:IDOR
+      - has_keyword:authorization
+      - length_min:300
+    expectations:
+      - "Identifies IDOR: any user can reset any other user's password"
+      - "Flags missing old-password verification (account takeover risk)"
+      - "Flags returning password hash in response (information disclosure)"
+      - "Recommends: check that token.user_id == path.user_id OR admin role"
+
+  - id: harden-docker-compose
+    input: |
+      Audit this docker-compose.yml for security issues:
+
+      version: '3'
+      services:
+        api:
+          image: myapp:latest
+          ports:
+            - "0.0.0.0:8080:8080"
+          environment:
+            - DATABASE_URL=postgresql://admin:password123@db:5432/prod
+            - SECRET_KEY=hardcoded-secret-key-123
+          volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+            - /:/host
+        db:
+          image: postgres:latest
+          environment:
+            - POSTGRES_PASSWORD=password123
+    checks:
+      - has_keyword:secret
+      - has_keyword:docker.sock
+      - length_min:300
+    expectations:
+      - "Flags hardcoded secrets (DATABASE_URL, SECRET_KEY, POSTGRES_PASSWORD)"
+      - "Flags /var/run/docker.sock mount — full container escape vector"
+      - "Flags / volume mount — full host filesystem access"
+      - "Recommends Docker secrets or env_file with .gitignore"
+      - "Recommends running as non-root user"

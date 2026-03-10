@@ -1,0 +1,20 @@
+team_id: team-product-market-fit
+technology: product
+phase_type: development
+description: Team team-product-market-fit — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: ai-product-manager
+  - id: metier
+  - id: customer-success
+task: 'Assess product-market fit for an AI code review tool: 50 beta users, 30% weekly active, NPS 45, main complaint ''too
+  many false positives''. Recommend 3 priorities to improve PMF score.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

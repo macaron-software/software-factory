@@ -1,0 +1,91 @@
+agent_id: dev
+technology: generic
+phase_type: development
+description: Generic developer — TDD discipline + no stubs + code review quality
+
+eval_cases:
+  - id: tdd-email-validator
+    input: |
+      Implement a function validate_email(email: str) -> bool that returns True
+      for valid emails, False otherwise. Use TDD: write the failing test first.
+      Add `# Ref: FEAT-BENCH-001 — Email Validator` at the top of any non-test source file.
+    checks:
+      - has_keyword:def test_
+      - has_keyword:def validate_email
+      - has_keyword:assert
+      - no_placeholder
+      - length_min:300
+    expectations:
+      - "Writes the failing test BEFORE the implementation (test-first TDD)"
+      - "Implementation is minimal — just enough to pass the tests, not hardcoded"
+      - "Test covers valid email, invalid email, and edge cases (empty string, no @)"
+
+  - id: code-review-quality
+    input: |
+      Review this Python function and identify all issues:
+
+      def get_user(id):
+          result = db.query("SELECT * FROM users WHERE id=" + id)
+          if result:
+              return result
+          return None
+
+      Provide a detailed code review with suggested fixes.
+    checks:
+      - has_keyword:sql injection
+      - has_keyword:parameterized
+      - has_keyword:return
+      - length_min:300
+    expectations:
+      - "Identifies the SQL injection vulnerability clearly"
+      - "Suggests parameterized queries as the fix (e.g. db.query(..., (id,)))"
+      - "Notes missing type hints (id: str or int, return type)"
+      - "Notes missing error handling (None result, DB exceptions)"
+
+  - id: tdd-stack-data-structure
+    input: |
+      Implement a Stack class in Python with push, pop, peek, and is_empty methods.
+      Use TDD: write failing tests first, then implement.
+      Add `# Ref: FEAT-BENCH-002 — Stack DS` at the top of any non-test source file.
+    checks:
+      - has_keyword:def test_
+      - has_keyword:class Stack
+      - has_keyword:def push
+      - has_keyword:def pop
+      - has_keyword:assert
+      - no_placeholder
+    expectations:
+      - "Writes tests for push, pop, peek, is_empty before implementing"
+      - "Tests cover edge cases: pop on empty stack raises exception"
+      - "Implementation uses a list internally, not a stub"
+
+  - id: refactor-long-function
+    input: |
+      Refactor this function to improve readability and separation of concerns:
+
+      def process_order(order):
+          total = 0
+          for item in order['items']:
+              if item['qty'] > 0:
+                  if item.get('discount'):
+                      total += item['price'] * item['qty'] * (1 - item['discount'])
+                  else:
+                      total += item['price'] * item['qty']
+          if order.get('coupon') == 'SAVE10':
+              total *= 0.9
+          tax = total * 0.2
+          total += tax
+          if total > 1000:
+              shipping = 0
+          else:
+              shipping = 15
+          total += shipping
+          return {'total': round(total, 2), 'tax': round(tax, 2), 'shipping': shipping}
+    checks:
+      - has_keyword:def calculate_
+      - length_min:200
+      - no_placeholder
+    expectations:
+      - "Extracts at least 2 helper functions (e.g. calculate_items_total, apply_coupon, calculate_shipping)"
+      - "Each function has a single, clear responsibility"
+      - "The main process_order function becomes shorter and more readable"

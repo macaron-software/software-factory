@@ -1,0 +1,509 @@
+id: product-lifecycle
+name: Cycle de Vie Produit Complet
+description: 'Pipeline bout en bout: ideation → strategic committee GO/NOGO → architecture → dev sprints → CI/CD pipeline
+  → QA campaign → prod deploy → TMA maintenance.'
+icon: rocket
+is_builtin: true
+phases:
+- id: ideation
+  pattern_id: network
+  name: Idéation
+  description: Le Product Manager cadre le sujet et briefe l'équipe. Le métier exprime le besoin. L'UX Designer explore les
+    parcours utilisateur. L'Architecte évalue la faisabilité technique. Débat structuré puis synthèse par le PO.
+  gate: always
+  config:
+    agents:
+    - metier
+    - ux_designer
+    - architecte
+    - product_manager
+    leader: product_manager
+- id: strategic-committee
+  pattern_id: human-in-the-loop
+  name: Comité Stratégique GO/NOGO
+  description: 'Le DSI préside. La CPO défend la valeur produit. Le CTO évalue la faisabilité et les risques techniques. Le
+    Portfolio Manager analyse la capacité et le WSJF. Débat contradictoire. CHECKPOINT: le DSI attend la décision humaine
+    GO, NOGO ou PIVOT.'
+  gate: all_approved
+  config:
+    agents:
+    - strat-cpo
+    - strat-cto
+    - strat-portfolio
+    - lean_portfolio_manager
+    - dsi
+    leader: dsi
+- id: project-setup
+  pattern_id: sequential
+  name: Constitution du Projet
+  description: Le Dir. Programme alloue les ressources → le Product Manager décompose en épics → le Chef de Projet planifie
+    les sprints → le Scrum Master configure les cérémonies. Chaque sortie alimente l'entrée du suivant.
+  gate: always
+  config:
+    agents:
+    - strat-dirprog
+    - product_manager
+    - chef_projet
+    - scrum_master
+    leader: strat-dirprog
+- id: architecture
+  pattern_id: aggregator
+  name: Architecture & Design
+  description: 'En parallèle: le Lead Dev analyse la faisabilité, l''UX crée les maquettes, la Sécurité définit les exigences,
+    le DevOps planifie l''infra. L''Architecte agrège toutes les analyses en un document d''architecture consolidé.'
+  gate: no_veto
+  config:
+    agents:
+    - lead_dev
+    - ux_designer
+    - securite
+    - devops
+    - architecte
+    leader: architecte
+- id: design-system
+  pattern_id: sequential
+  name: Design System & Tokens UI
+  description: 'L''UX Designer crée le mini design system: tokens CSS (couleurs, typo, spacing, radius), base layout responsive,
+    composants de base (header, footer, card, button, form). Le Lead Dev valide l''intégration technique. TOUT le code UI
+    des sprints DOIT utiliser ces tokens.'
+  gate: always
+  config:
+    agents:
+    - ux_designer
+    - lead_dev
+    leader: ux_designer
+- id: dev-sprint
+  pattern_id: hierarchical
+  name: Sprints de Développement
+  description: 'Le Lead Dev distribue les stories. Les devs frontend et backend codent en TDD. Le Test Automation écrit les
+    tests E2E en parallèle. Le Lead fait la code review. Boucle interne: si incomplet, le Lead re-distribue.'
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev_frontend
+    - dev_backend
+    - test_automation
+    leader: lead_dev
+    max_iterations: 3
+- id: build-verify
+  pattern_id: sequential
+  name: Build & Verify
+  description: 'Le DevOps vérifie que TOUT le code compile et que les dépendances sont complètes. Pour chaque langage: install
+    deps (npm install / pip install -r requirements.txt / go mod tidy / cargo build) → compile → run tests. Si des fichiers
+    manquent (requirements.txt, go.mod, Dockerfile), les créer. Si le build échoue, corriger le code. OBJECTIF: le projet
+    doit pouvoir se builder from scratch dans un container Docker propre.'
+  gate: no_veto
+  config:
+    agents:
+    - devops
+    - dev_backend
+    - dev_frontend
+    leader: devops
+- id: cicd
+  pattern_id: sequential
+  name: Pipeline CI/CD
+  description: 'Le Pipeline Engineer configure le pipeline: lint → build → unit tests → integration → E2E. Le DevSecOps intègre
+    les scans SAST/DAST. Le DevOps configure les environments staging et prod.'
+  gate: always
+  config:
+    agents:
+    - pipeline_engineer
+    - devsecops
+    - devops
+    leader: pipeline_engineer
+- id: ux-review
+  pattern_id: loop
+  name: Revue UX & Conformité Design
+  description: 'L''UX Designer vérifie que le code utilise les design tokens, respecte l''accessibilité WCAG AA (aria-*, contrast
+    ≥ 4.5:1, keyboard nav), et la cohérence visuelle. Si VETO: boucle retour avec les corrections demandées aux devs. MANDATORY:
+    run_e2e_tests() pour captures d''écran des parcours.'
+  gate: no_veto
+  config:
+    agents:
+    - ux_designer
+    - dev_frontend
+    leader: ux_designer
+    max_iterations: 2
+- id: qa-campaign
+  pattern_id: loop
+  name: Campagne de Tests QA
+  description: 'The Test Manager plans and launches the campaign. The QA Lead runs suites (E2E, API, perf). On VETO (bugs
+    found): loop back to Test Manager who re-plans fixes. Iterates until APPROVE or max 5 iterations.'
+  gate: all_approved
+  config:
+    agents:
+    - test_manager
+    - qa_lead
+    max_iterations: 5
+- id: qa-execution
+  pattern_id: parallel
+  name: Exécution Tests Parallèle
+  description: 'Le QA Lead dispatche. En parallèle: le Test Automation lance Playwright, le Testeur fait les tests API, le
+    Perf Engineer lance k6. Le QA Lead agrège les résultats.'
+  gate: all_approved
+  config:
+    agents:
+    - qa_lead
+    - test_automation
+    - testeur
+    - performance_engineer
+    leader: qa_lead
+- id: deploy-prod
+  pattern_id: human-in-the-loop
+  name: Deploy Production
+  description: 'Le DevOps déploie en canary (1%). Le SRE monitore les métriques. Le Pipeline Engineer prépare le rollback.
+    CHECKPOINT: le Chef de Projet valide le GO pour 100% après vérification humaine des métriques.'
+  gate: all_approved
+  config:
+    agents:
+    - devops
+    - sre
+    - pipeline_engineer
+    - chef_projet
+    leader: chef_projet
+- id: tma-router
+  pattern_id: router
+  name: Routage Incidents TMA
+  description: 'Le Responsable TMA reçoit les incidents. Il analyse la nature (bug code, perf, infra, sécu) et route vers
+    le spécialiste approprié: Dev TMA pour les bugs, SRE pour l''infra, Test Automation pour les régressions.'
+  gate: always
+  config:
+    agents:
+    - responsable_tma
+    - dev_tma
+    - sre
+    - test_automation
+    leader: responsable_tma
+- id: tma-fix
+  pattern_id: loop
+  name: Correctif & Validation TMA
+  description: 'Le Dev TMA écrit le correctif avec test de non-régression. Le QA Lead valide. Si VETO: boucle retour au Dev
+    TMA avec le feedback. Itère jusqu''à APPROVE.'
+  gate: no_veto
+  config:
+    agents:
+    - dev_tma
+    - qa_lead
+    max_iterations: 3
+config:
+  graph:
+    pattern: hierarchical
+    nodes:
+    - id: n1
+      agent_id: metier
+      x: 100
+      y: 20
+      label: Métier / PO
+    - id: n2
+      agent_id: ux_designer
+      x: 280
+      y: 20
+      label: UX Designer
+    - id: n3
+      agent_id: product_manager
+      x: 460
+      y: 20
+      label: Product Manager
+    - id: n4
+      agent_id: architecte
+      x: 640
+      y: 20
+      label: Architecte
+    - id: n5
+      agent_id: dsi
+      x: 370
+      y: 120
+      label: DSI
+    - id: n6
+      agent_id: strat-cpo
+      x: 200
+      y: 120
+      label: CPO
+    - id: n7
+      agent_id: strat-cto
+      x: 540
+      y: 120
+      label: CTO
+    - id: n8
+      agent_id: strat-portfolio
+      x: 700
+      y: 120
+      label: Portfolio
+    - id: n9
+      agent_id: strat-dirprog
+      x: 100
+      y: 220
+      label: Dir Programme
+    - id: n10
+      agent_id: chef_projet
+      x: 300
+      y: 220
+      label: Chef de Projet
+    - id: n11
+      agent_id: scrum_master
+      x: 500
+      y: 220
+      label: Scrum Master
+    - id: n12
+      agent_id: lead_dev
+      x: 200
+      y: 320
+      label: Lead Dev
+    - id: n13
+      agent_id: securite
+      x: 400
+      y: 320
+      label: Sécurité
+    - id: n14
+      agent_id: devops
+      x: 600
+      y: 320
+      label: DevOps
+    - id: n15
+      agent_id: dev_frontend
+      x: 100
+      y: 420
+      label: Dev Frontend
+    - id: n16
+      agent_id: dev_backend
+      x: 300
+      y: 420
+      label: Dev Backend
+    - id: n17
+      agent_id: test_automation
+      x: 500
+      y: 420
+      label: Test Automation
+    - id: n18
+      agent_id: pipeline_engineer
+      x: 400
+      y: 520
+      label: Pipeline Eng.
+    - id: n19
+      agent_id: devsecops
+      x: 600
+      y: 520
+      label: DevSecOps
+    - id: n20
+      agent_id: test_manager
+      x: 200
+      y: 620
+      label: Test Manager
+    - id: n21
+      agent_id: qa_lead
+      x: 400
+      y: 620
+      label: QA Lead
+    - id: n22
+      agent_id: testeur
+      x: 550
+      y: 620
+      label: Testeur
+    - id: n23
+      agent_id: performance_engineer
+      x: 700
+      y: 620
+      label: Perf Eng.
+    - id: n24
+      agent_id: sre
+      x: 500
+      y: 720
+      label: SRE
+    - id: n25
+      agent_id: responsable_tma
+      x: 200
+      y: 820
+      label: Resp. TMA
+    - id: n26
+      agent_id: dev_tma
+      x: 400
+      y: 820
+      label: Dev TMA
+    - id: n27
+      agent_id: lean_portfolio_manager
+      x: 100
+      y: 120
+      label: Lean Portfolio
+    edges:
+    - from: n1
+      to: n3
+      label: besoin
+      color: '#3b82f6'
+    - from: n2
+      to: n3
+      label: UX
+      color: '#3b82f6'
+    - from: n4
+      to: n3
+      label: faisabilité
+      color: '#3b82f6'
+    - from: n3
+      to: n5
+      label: dossier
+      color: '#a855f7'
+    - from: n6
+      to: n5
+      label: avis CPO
+      color: '#d946ef'
+    - from: n7
+      to: n5
+      label: avis CTO
+      color: '#d946ef'
+    - from: n8
+      to: n5
+      label: WSJF
+      color: '#10b981'
+    - from: n27
+      to: n8
+      label: lean
+      color: '#06b6d4'
+    - from: n5
+      to: n9
+      label: GO
+      color: '#10b981'
+    - from: n9
+      to: n10
+      label: staffing
+      color: '#8b5cf6'
+    - from: n10
+      to: n11
+      label: planning
+      color: '#8b5cf6'
+    - from: n10
+      to: n12
+      label: specs
+      color: '#f59e0b'
+    - from: n4
+      to: n12
+      label: archi
+      color: '#a855f7'
+    - from: n12
+      to: n13
+      label: review sécu
+      color: '#ef4444'
+    - from: n12
+      to: n14
+      label: infra
+      color: '#8b5cf6'
+    - from: n12
+      to: n15
+      label: stories
+      color: '#f59e0b'
+    - from: n12
+      to: n16
+      label: stories
+      color: '#f59e0b'
+    - from: n12
+      to: n17
+      label: tests E2E
+      color: '#3b82f6'
+    - from: n14
+      to: n18
+      label: pipeline
+      color: '#8b5cf6'
+    - from: n18
+      to: n19
+      label: scans sécu
+      color: '#ef4444'
+    - from: n17
+      to: n18
+      label: tests CI
+      color: '#3b82f6'
+    - from: n18
+      to: n20
+      label: build OK
+      color: '#10b981'
+    - from: n20
+      to: n21
+      label: plan test
+      color: '#a855f7'
+    - from: n21
+      to: n22
+      label: API tests
+      color: '#3b82f6'
+    - from: n21
+      to: n17
+      label: E2E tests
+      color: '#3b82f6'
+    - from: n23
+      to: n20
+      label: perf OK
+      color: '#10b981'
+    - from: n22
+      to: n20
+      label: résultats
+      color: '#10b981'
+    - from: n20
+      to: n10
+      label: GO/NOGO
+      color: '#ef4444'
+    - from: n14
+      to: n24
+      label: canary
+      color: '#8b5cf6'
+    - from: n24
+      to: n10
+      label: prod OK
+      color: '#10b981'
+    - from: n12
+      to: n25
+      label: transfert
+      color: '#d946ef'
+    - from: n25
+      to: n26
+      label: assigner
+      color: '#f59e0b'
+    - from: n20
+      to: n25
+      label: tests régression
+      color: '#3b82f6'
+    - from: n26
+      to: n24
+      label: hotfix
+      color: '#ef4444'
+  agents_permissions:
+    dsi:
+      can_veto: true
+      veto_level: ABSOLUTE
+      can_delegate: true
+      can_approve: true
+    strat-cpo:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    strat-cto:
+      can_veto: true
+      veto_level: STRONG
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: ABSOLUTE
+    test_manager:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    responsable_tma:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+    lead_dev:
+      can_delegate: true
+      can_veto: true
+      veto_level: STRONG
+    chef_projet:
+      can_delegate: true
+      can_approve: true
+    devops:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    sre:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    pipeline_engineer:
+      can_veto: true
+      veto_level: STRONG

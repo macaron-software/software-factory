@@ -1,0 +1,20 @@
+team_id: team-finary
+technology: fintech
+phase_type: development
+description: Team team-finary — end-to-end collaboration bench
+pattern:
+  type: hierarchical
+  agents:
+  - id: agent-neobank-api
+  - id: dev
+  - id: qa_lead
+task: 'Design a personal finance tracking feature: bank account sync via Open Banking API, transaction categorization (ML-based),
+  monthly budget setting, spending alerts, and savings goal tracking.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

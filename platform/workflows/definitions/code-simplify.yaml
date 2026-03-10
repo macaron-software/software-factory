@@ -1,0 +1,43 @@
+id: code-simplify
+name: Code Simplification
+description: 'Analyze recent code changes (git diff) with 3 parallel agents across reuse, quality, and efficiency axes. Optionally apply improvements.'
+icon: zap
+is_builtin: true
+phases:
+- id: simplify-analysis
+  pattern_id: aggregator
+  name: Code Analysis (3 agents parallel)
+  description: 'Three agents analyze the diff simultaneously: reuse analyst (duplications, extractable patterns), quality analyst (naming, structure, dead code), efficiency analyst (N+1, blocking I/O, redundant ops). The aggregator consolidates findings and deduplicates.'
+  gate: Findings consolidated and prioritized
+  config:
+    agents:
+    - code-reviewer
+    - lead-dev
+    - qa
+    goal: |
+      Analyze the following git diff and identify simplification opportunities.
+      AGENT ROLES:
+      - code-reviewer: focus on REUSE (duplications, extractable patterns, reimplemented utilities)
+      - lead-dev: focus on QUALITY (naming, SRP, dead code, error handling)
+      - qa: focus on EFFICIENCY (N+1, blocking I/O, redundant operations, memory leaks)
+
+      For each finding, provide: file, line, severity (high/medium/low), category, message, and concrete suggestion.
+
+      GIT DIFF:
+      {{ diff }}
+
+      Project: {{ project }}
+- id: simplify-apply
+  pattern_id: solo
+  name: Apply Improvements
+  description: 'Lead dev reviews consolidated findings, prioritizes by severity, and applies the high/medium ones. Skips low-severity cosmetic suggestions.'
+  gate: High and medium findings addressed
+  config:
+    agents:
+    - lead-dev
+    goal: |
+      Apply the code improvements identified in the previous phase.
+      Focus on HIGH and MEDIUM severity findings only.
+      For each change: use code_edit to apply the fix, then verify the change is correct.
+      Workspace: {{ cwd }}
+      Project: {{ project }}

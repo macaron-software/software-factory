@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ripgrep && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+COPY platform/requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy code to _platform, symlink as platform (avoids stdlib conflict)
+COPY platform/ /app/_platform/
+COPY cli/ /app/cli/
+COPY skills/ /app/skills/
+COPY projects/ /app/projects/
+RUN ln -s /app/_platform /app/platform
+
+RUN mkdir -p /app/data /app/workspace
+RUN groupadd -r macaron && useradd -r -g macaron -d /app macaron \
+    && chown -R macaron:macaron /app
+USER macaron
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV WORKSPACE_ROOT=/app/workspace
+
+EXPOSE 8099
+CMD ["uvicorn", "platform.server:app", "--host", "0.0.0.0", "--port", "8099", "--ws", "none"]

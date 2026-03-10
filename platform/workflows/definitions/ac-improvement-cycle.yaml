@@ -1,0 +1,234 @@
+id: ac-improvement-cycle
+name: AC — Cycle d'Amélioration SF (DEPRECATED for pilot projects)
+description: >
+  ⚠️ DEPRECATED for pilot project cycles — use feature-sprint + ac-supervision-cycle instead.
+  /api/improvement/start now launches dual sessions: [BUILD] feature-sprint + [SUPERVISE] ac-supervision-cycle.
+
+  Ce workflow reste disponible pour l'amélioration de la SF elle-même (skills, prompts, workflows)
+  quand la supervision AC détecte des problèmes systémiques. Déclenché manuellement par le coach
+  ou automatiquement par le watchdog quand pass_rate < seuil.
+
+  Scope exclusif : skills/*.md, prompts agents, workflows/definitions/*.yaml, patterns.
+  INTERDIT : builder/déployer un projet pilote, toucher aux workspaces projets.
+icon: refresh-cw
+is_builtin: true
+phases:
+- id: ac-inception
+  pattern_id: sequential
+  name: Inception & User Stories
+  description: >
+    L'architecte AC gère le INCEPTION.md pour ce cycle.
+    ACTION IMMÉDIATE (séquence exacte) :
+    1. code_read("INCEPTION.md") — lire le fichier existant
+    2. Si INCEPTION.md contient déjà persona + user stories + AC GIVEN/WHEN/THEN + design tokens + a11y :
+       METTRE À JOUR uniquement la ligne "Cycle N/20" avec le numéro de cycle actuel,
+       puis code_write("INCEPTION.md", contenu_complet_mis_à_jour)
+    3. Si INCEPTION.md est absent ou incomplet :
+       CRÉER depuis zéro avec les 5 éléments obligatoires (persona, user stories, AC, design tokens, a11y),
+       puis code_write("INCEPTION.md", contenu_complet)
+    4. APRÈS code_write : obligatoirement code_read("INCEPTION.md") pour afficher le contenu dans l'evidence
+    RÈGLE ABSOLUE : code_write DOIT être appelé. Sans code_write, la phase est rejetée.
+    Sans code_read après code_write, la phase est rejetée (evidence invisible).
+  gate: all_approved
+  config:
+    agents:
+    - ac-architect
+- id: ac-tdd-sprint
+  pattern_id: loop
+  name: TDD Sprint — Code + Tests
+  description: >
+    Le codeur AC produit le code source du projet.
+    SÉQUENCE EXACTE ET OBLIGATOIRE :
+    1. code_read("INCEPTION.md") — lire les ACs et la stack
+    2. Pour projet HTML/CSS : code_write("src/index.html", ...) + code_write("src/css/styles.css", ...)
+       Pour projet JS/TS : code_write("tests/test_feature.ts", ...) puis code_write("src/feature.ts", ...)
+       Pour projet Rust : code_write("tests/test_main.rs", ...) puis code_write("src/main.rs", ...)
+    3. APRÈS chaque code_write : code_read(même_fichier) — OBLIGATOIRE pour l'evidence
+    4. docker_deploy() — vérifier le build
+    RÈGLE ABSOLUE : Au moins 2 code_write DOIVENT être appelés. Zéro code_write = rejet immédiat.
+    REF : Chaque fichier doit contenir un commentaire // REF: AC-XXX-001
+    list_files est INTERDIT (perte de temps). TDD : tests d'abord pour JS/TS/Rust.
+    Si adversarial feedback disponible (ADVERSARIAL_N.md), l'intégrer comme priorité absolue.
+  gate: all_approved
+  config:
+    agents:
+    - ac-codex
+- id: ac-adversarial-check
+  pattern_id: sequential
+  name: Vérification Adversariale 12 Dimensions
+  description: >
+    Le QA adversarial vérifie les 12 dimensions critiques :
+    1. SÉCURITÉ : pas de secrets dans le code, SAST clean, headers HTTP corrects
+    2. ARCHITECTURE : découplage, SRP, pas de god-class, dépendances directionnelles
+    3. NO-SLOP : code utile, pas de commentaires génériques, pas de placeholder
+    4. FALLBACK : gestion d'erreur réelle (pas juste print(e)), retry logic si réseau
+    5. HONNÊTETÉ : pas de mocks qui passent des tests réels, assertions significatives
+    6. NO-MOCK-DATA : pas de données hardcodées, config via env vars
+    7. NO-HARDCODE : pas d'URL/secrets/configs en dur dans le code
+    8. QUALITÉ TESTS : 1 test = 1 AC, couverture > 80%, tests qui échouent vraiment si bug
+    9. NO-OVER-ENGINEERING : KISS, pas de patterns inutiles, < 500 LOC par fichier
+    10. OBSERVABILITÉ : logs structurés, health endpoint, traces utiles
+    11. RÉSILIENCE : timeout, circuit-breaker, retry sur dépendances externes
+    12. TRAÇABILITÉ : chaque feature → AC → test → commit, refs présentes
+    Output : ADVERSARIAL_N.md avec score/100 par dimension, verdict pass/warn/fail, findings précis.
+    VETO si score < 60 sur sécurité, honnêteté, ou qualité tests (non négociables).
+  gate: no_veto
+  config:
+    agents:
+    - ac-adversarial
+- id: ac-qa-sprint
+  pattern_id: parallel
+  name: QA Complète — a11y + Lighthouse + W3C
+  description: >
+    QA complète en parallèle :
+    - a11y : axe-core scan, WCAG 2.1 AA, contraste > 4.5:1, navigation clavier complète
+    - Lighthouse : Performance > 90, Accessibility > 95, Best Practices > 90, SEO > 80
+    - W3C Validator : HTML/CSS valide, pas d'erreurs
+    - Screenshots : capture de chaque vue (desktop + mobile) avec screenshot()
+    - E2E smoke test : chaque user story AC vérifié par un test playwright
+    OBLIGATIONS :
+    - Appeler docker_deploy() AVANT tout test
+    - Zéro failing test acceptable
+    - Screenshots OBLIGATOIRES pour documentation
+    Output : QA_REPORT_N.md avec tous les scores et screenshots référencés.
+  gate: all_approved
+  config:
+    agents:
+    - ac-qa-agent
+    - ft-e2e-ihm
+    max_iterations: 2
+- id: ac-cicd
+  pattern_id: sequential
+  name: CI/CD — Commit + Push + Enregistrement
+  description: >
+    SÉQUENCE EXACTE ET OBLIGATOIRE :
+    1. git_commit avec message format "fix(ac-{project}): {description} [refs: AC-XXX-001]"
+    2. git_push vers le remote configuré (remote local /app/data/git-remotes/{project}.git)
+       NOTE : il n'y a PAS de GitHub Actions — le push local suffit. Pas d'attente CI.
+    3. ac_inject_cycle avec tous les scores (project_id, cycle_num, git_sha, status="completed", total_score)
+    RÈGLE ABSOLUE :
+    - git_commit DOIT être appelé. Sans git_commit = rejet immédiat.
+    - ac_inject_cycle DOIT être appelé. Sans inject_cycle = rejet immédiat (cycle non enregistré).
+    - git_push peut échouer sans veto (remote local, pas de GitHub Actions).
+    - Récupérer le SHA du commit via git_commit output (7 premiers chars suffisent).
+    - Ne PAS attendre GitHub Actions (inexistant). Ne PAS poller.
+    Lire QA_REPORT_N.md si disponible pour les scores a11y/perf.
+  gate: no_veto
+  config:
+    agents:
+    - ac-cicd-agent
+- id: ac-coach-review
+  pattern_id: sequential
+  name: Coach Review — Décision A/B + Rollback
+  description: >
+    Le Coach AC analyse les résultats du cycle N et décide de la stratégie cycle N+1.
+    LECTURE OBLIGATOIRE : scores N derniers cycles, convergence, adversarial findings, thompson stats.
+    DÉCISIONS :
+    1. score[N] < score[N-1] - 10pts → POST /api/improvement/rollback (git revert + reset DB)
+    2. plateau (variance < 5pts sur 5 cycles) → bascule variante A/B via Thompson
+    3. amélioration → enregistre win Thompson, renforce la stratégie gagnante
+    4. Toujours écrire STRATEGY_N+1.md dans le workspace (lu en priorité absolue par ac-architect)
+    OBLIGATIONS :
+    - Citer le score exact et la raison de la décision dans STRATEGY_N+1.md
+    - Enregistrer l'expérience : POST /api/improvement/experiment (experiment_key, variant_a, variant_b)
+    - Ne jamais rollback sans vérifier que last_git_sha est disponible
+    - Si rollback : écrire ROLLBACK_N.md avec raison + score attendu vs obtenu
+  gate: always
+  config:
+    agents:
+    - ac-coach
+config:
+  max_cycles: 20
+  auto_restart: true
+  default_scope: project
+  projects:
+  - ac-hello-html
+  - ac-hello-vue
+  - ac-fullstack-rs
+  - ac-docusign
+  - ac-ecommerce
+  graph:
+    nodes:
+    - id: n0
+      agent_id: ac-architect
+      x: 400
+      y: 0
+      label: Inception
+      phase: ac-inception
+    - id: n1
+      agent_id: ac-codex
+      x: 400
+      y: 120
+      label: TDD Sprint
+      phase: ac-tdd-sprint
+    - id: n2
+      agent_id: ac-adversarial
+      x: 400
+      y: 240
+      label: Adversarial
+      phase: ac-adversarial-check
+    - id: n3
+      agent_id: ac-qa-agent
+      x: 280
+      y: 360
+      label: QA/a11y/Lighthouse
+      phase: ac-qa-sprint
+    - id: n4
+      agent_id: ft-e2e-ihm
+      x: 520
+      y: 360
+      label: E2E IHM
+      phase: ac-qa-sprint
+    - id: n5
+      agent_id: ac-cicd-agent
+      x: 400
+      y: 480
+      label: CI/CD + Record
+      phase: ac-cicd
+    - id: n6
+      agent_id: ac-coach
+      x: 400
+      y: 600
+      label: Coach Review
+      phase: ac-coach-review
+    edges:
+    - from: n0
+      to: n1
+      label: INCEPTION.md
+      color: '#6c63ff'
+    - from: n1
+      to: n2
+      label: code + tests
+      color: '#58a6ff'
+    - from: n2
+      to: n1
+      label: VETO → recode
+      color: '#ef4444'
+    - from: n2
+      to: n3
+      label: approved
+      color: '#22c55e'
+    - from: n2
+      to: n4
+      label: approved
+      color: '#22c55e'
+    - from: n3
+      to: n5
+      label: QA OK
+      color: '#f59e0b'
+    - from: n4
+      to: n5
+      label: E2E OK
+      color: '#f59e0b'
+    - from: n5
+      to: n6
+      label: scores enregistrés
+      color: '#a855f7'
+    - from: n6
+      to: n0
+      label: next cycle
+      color: '#a855f7'
+    - from: n6
+      to: n1
+      label: rollback → recode
+      color: '#ef4444'

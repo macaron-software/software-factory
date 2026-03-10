@@ -1,0 +1,19 @@
+agent_id: api-designer
+technology: generic
+phase_type: generic
+description: API Designer — role-specific evaluation
+eval_cases:
+- id: role-task
+  input: 'As a API Designer, analyze this situation and provide your expert recommendation:
+
+
+    A startup with 15 engineers is growing to 40 in 6 months. Current process: no formal code review, manual deployments,
+    shared staging environment, Slack for all communication. What are the top 3 improvements you would recommend from your
+    perspective as API Designer?'
+  checks:
+  - has_keyword:recommend
+  - length_min:250
+  expectations:
+  - Provides recommendations relevant to their specific role
+  - Prioritizes improvements logically
+  - Gives actionable steps, not just theory

@@ -1,0 +1,274 @@
+id: ideation-to-prod
+name: Idéation → Production
+description: 'Flux complet SAFe: idéation réseau d''agents → structuration PO → comité stratégique GO/NOGO → setup projet
+  (auto-provision TMA+sécu+CI/CD) → architecture → dev sprint → CI/CD → QA → deploy prod → handoff TMA.'
+icon: zap
+is_builtin: true
+phases:
+- id: ideation
+  pattern_id: network
+  name: Idéation
+  description: '5 agents débattent l''idée: BA analyse le besoin, Archi évalue la faisabilité, UX pense aux utilisateurs,
+    Sécu identifie les risques, PM synthétise.'
+  gate: always
+  config:
+    agents:
+    - business_analyst
+    - enterprise_architect
+    - ux_designer
+    - securite
+    - product_manager
+- id: po-structure
+  pattern_id: sequential
+  name: Structuration PO
+  description: 'Le Product Owner structure: projet, epic, features avec critères d''acceptation, user stories, estimation
+    story points.'
+  gate: always
+  config:
+    agents:
+    - product_manager
+    - business_analyst
+    - scrum_master
+- id: comite-strat
+  pattern_id: human-in-the-loop
+  name: Comité Stratégique — GO/NOGO
+  description: 'Le comité de direction évalue: alignement stratégique, ROI, risques, capacité. Décision GO/NOGO/PIVOT.'
+  gate: checkpoint
+  config:
+    agents:
+    - strat-cpo
+    - strat-cto
+    - lean_portfolio_manager
+    - strat-portfolio
+    - dsi
+- id: project-setup
+  pattern_id: sequential
+  name: Constitution Projet
+  description: 'Setup automatique: git repo, CI/CD pipeline, VISION.md, agents assignés. Auto-provision TMA + centre sécurité
+    + suivi dette technique.'
+  gate: always
+  config:
+    agents:
+    - scrum_master
+    - devops
+    - lead_dev
+    - product_manager
+- id: architecture
+  pattern_id: aggregator
+  name: Architecture & Design
+  description: L'architecte conçoit le système, UX les interfaces, Sécu le modèle de menaces, DevOps l'infra. Le Lead Dev
+    valide l'implémentabilité.
+  gate: always
+  config:
+    agents:
+    - enterprise_architect
+    - ux_designer
+    - securite
+    - devops
+    - lead_dev
+- id: dev-sprint
+  pattern_id: hierarchical
+  name: Sprint Dev
+  description: Le Lead Dev distribue les tâches aux développeurs. Chaque dev implémente en TDD (Red→Green→Refactor). Adversarial
+    review sur chaque commit.
+  gate: always
+  config:
+    agents:
+    - lead_dev
+    - dev_backend
+    - dev_frontend
+    - testeur
+- id: cicd-pipeline
+  pattern_id: sequential
+  name: Pipeline CI/CD
+  description: 'Le pipeline CI/CD s''exécute: build → lint → tests unitaires → tests d''intégration → analyse sécurité → artifact.'
+  gate: always
+  config:
+    agents:
+    - pipeline_engineer
+    - devops
+    - devsecops
+- id: qa-validation
+  pattern_id: loop
+  name: Campagne QA
+  description: Tests fonctionnels, tests de non-régression, tests de charge. Boucle jusqu'à zéro défaut bloquant.
+  gate: no_veto
+  config:
+    agents:
+    - qa_lead
+    - test_automation
+    - performance_engineer
+- id: deploy-prod
+  pattern_id: human-in-the-loop
+  name: Déploiement Production — GO/NOGO
+  description: 'Revue pré-production: QA sign-off, sécu sign-off, DevOps plan de déploiement. Décision GO/NOGO.'
+  gate: checkpoint
+  config:
+    agents:
+    - devops
+    - qa_lead
+    - securite
+    - sre
+    - release_train_engineer
+- id: tma-handoff
+  pattern_id: sequential
+  name: Handoff TMA
+  description: Documentation opérationnelle, formation équipe TMA, activation monitoring, runbook incident. Le projet passe
+    en maintenance.
+  gate: always
+  config:
+    agents:
+    - responsable_tma
+    - dev_tma
+    - sre
+    - tech_writer
+config:
+  graph:
+    nodes:
+    - id: n1
+      agent_id: business_analyst
+      x: 50
+      y: 100
+      label: BA Idéation
+      phase: ideation
+    - id: n2
+      agent_id: enterprise_architect
+      x: 50
+      y: 200
+      label: Archi
+      phase: ideation
+    - id: n3
+      agent_id: product_manager
+      x: 200
+      y: 150
+      label: PO Structure
+      phase: po-structure
+    - id: n4
+      agent_id: strat-cpo
+      x: 350
+      y: 100
+      label: CPO GO/NOGO
+      phase: comite-strat
+    - id: n5
+      agent_id: strat-cto
+      x: 350
+      y: 200
+      label: CTO GO/NOGO
+      phase: comite-strat
+    - id: n6
+      agent_id: devops
+      x: 500
+      y: 150
+      label: Setup Projet
+      phase: project-setup
+    - id: n7
+      agent_id: enterprise_architect
+      x: 650
+      y: 100
+      label: Archi Design
+      phase: architecture
+    - id: n8
+      agent_id: lead_dev
+      x: 800
+      y: 150
+      label: Sprint Dev
+      phase: dev-sprint
+    - id: n9
+      agent_id: pipeline_engineer
+      x: 950
+      y: 150
+      label: CI/CD
+      phase: cicd-pipeline
+    - id: n10
+      agent_id: qa_lead
+      x: 1100
+      y: 150
+      label: QA Loop
+      phase: qa-validation
+    - id: n11
+      agent_id: sre
+      x: 1250
+      y: 100
+      label: Deploy Prod
+      phase: deploy-prod
+    - id: n12
+      agent_id: responsable_tma
+      x: 1400
+      y: 150
+      label: TMA Handoff
+      phase: tma-handoff
+    edges:
+    - from: n1
+      to: n3
+      label: brief
+      color: '#7c3aed'
+    - from: n2
+      to: n3
+      label: feasibility
+      color: '#58a6ff'
+    - from: n3
+      to: n4
+      label: epic
+      color: '#d29922'
+    - from: n3
+      to: n5
+      label: tech spec
+      color: '#d29922'
+    - from: n4
+      to: n6
+      label: GO
+      color: '#3fb950'
+    - from: n5
+      to: n6
+      label: GO
+      color: '#3fb950'
+    - from: n6
+      to: n7
+      label: project
+      color: '#58a6ff'
+    - from: n7
+      to: n8
+      label: design
+      color: '#7c3aed'
+    - from: n8
+      to: n9
+      label: code
+      color: '#3fb950'
+    - from: n9
+      to: n10
+      label: build ok
+      color: '#3fb950'
+    - from: n10
+      to: n11
+      label: qa ok
+      color: '#3fb950'
+    - from: n11
+      to: n12
+      label: deployed
+      color: '#f97316'
+  agents_permissions:
+    strat-cpo:
+      can_veto: true
+      veto_level: ABSOLUTE
+    strat-cto:
+      can_veto: true
+      veto_level: STRONG
+    enterprise_architect:
+      can_veto: true
+      veto_level: STRONG
+    lead_dev:
+      can_delegate: true
+      can_veto: true
+      veto_level: STRONG
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: STRONG
+    devops:
+      can_approve: true
+    sre:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true

@@ -1,0 +1,17 @@
+agent_id: ml_engineer
+technology: generic
+phase_type: data
+description: ML Engineer — data pipeline, analysis
+eval_cases:
+- id: data-pipeline
+  input: 'Design a data pipeline that: 1) Ingests user events from Kafka (10k events/sec), 2) Enriches with user profile data
+    from PostgreSQL, 3) Computes real-time metrics (DAU, session duration, conversion), 4) Stores in a data warehouse for
+    BI dashboards.'
+  checks:
+  - has_keyword:Kafka
+  - has_keyword:warehouse
+  - length_min:300
+  expectations:
+  - Proposes a clear pipeline architecture
+  - Addresses real-time vs batch processing
+  - Considers data quality and deduplication

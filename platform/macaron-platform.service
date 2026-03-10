@@ -1,0 +1,16 @@
+[Unit]
+Description=Macaron Agent Platform
+After=network.target
+
+[Service]
+Type=simple
+User=macaron
+WorkingDirectory=/opt/macaron
+ExecStart=/opt/macaron/venv/bin/uvicorn platform.server:app --host 0.0.0.0 --port 8090
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONPATH=/opt/macaron
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,135 @@
+id: ac-supervision-cycle
+name: AC — Cycle de Supervision Continue
+description: >
+  ⚠️ CE WORKFLOW SUPERVISE les projets pilotes — il NE BUILD PAS.
+  Les builders (feature-sprint) tournent en parallèle dans une session [BUILD] séparée.
+  Ce workflow analyse les outputs des builders et les grade sur qualité, sécurité, a11y,
+  traceability, convergence. Scope : READ-ONLY sur le workspace projet.
+
+  3 phases : specs-review → quality-gates (parallel) → strategic-review.
+  Agents : ac-architect (grader), ac-adversarial (code quality), ac-qa-agent (QA grade), ac-coach (strategy).
+  Aucun agent ne peut appeler code_write, code_edit, git_commit, git_push, docker_deploy.
+icon: eye
+is_builtin: true
+
+phases:
+  - id: ac-specs-review
+    pattern_id: sequential
+    name: Specs Review & Validation
+    description: >
+      ac-architect SUPERVISE les specs produites par le builder (feature-sprint).
+      SÉQUENCE EXACTE :
+      1. code_read("INCEPTION.md") — lire les specs produites par l'équipe builder
+      2. Évaluer sur 5 critères (0-100 chacun) :
+         - Structure (sections complètes : persona, US, AC, design tokens, a11y)
+         - Clarté (pas de jargon, US testables, AC vérifiables)
+         - Traceability (chaque US a un AC GIVEN/WHEN/THEN)
+         - A11y (WCAG AA : contraste, focus-visible, aria-labels, keyboard nav)
+         - Design tokens (tokens CSS définis, cohérents avec le brief)
+      3. Score moyen < 70 → VETO avec justification détaillée
+      4. Score moyen >= 70 → APPROVE avec findings pour amélioration
+      5. memory_store() — stocker le rapport de supervision dans la mémoire projet
+      INTERDIT : code_write, code_edit — le superviseur NE MODIFIE PAS les specs.
+    gate: all_approved
+    config:
+      agents:
+        - ac-architect
+
+  - id: ac-quality-gates
+    pattern_id: parallel
+    name: Quality Gates — Code & Tests
+    description: >
+      ac-adversarial + ac-qa-agent évaluent EN PARALLÈLE les outputs du builder.
+      Chaque agent lit le code, les tests, les rapports et grade sans modifier.
+
+      ac-adversarial (13 dimensions) :
+      1. code_read() tous les fichiers src/ et tests/
+      2. Grader sur : security, architecture, tests, no-slop, html-semantics,
+         css-quality, a11y, performance, error-handling, documentation,
+         code-style, naming, complexity
+      3. memory_store() le rapport SUPERVISION_ADVERSARIAL_N
+
+      ac-qa-agent (QA grade) :
+      1. code_read() les rapports QA du builder (QA_REPORT_N.md si existant)
+      2. screenshot() pour capturer l'état actuel du déploiement builder
+      3. Grader sur : a11y (axe-core), Lighthouse score, W3C validation,
+         E2E test pass rate, visual regression
+      4. memory_store() le rapport SUPERVISION_QA_N
+
+      INTERDIT : code_write, docker_deploy — les superviseurs ne buildent pas.
+    gate: no_veto
+    config:
+      agents:
+        - ac-adversarial
+        - ac-qa-agent
+
+  - id: ac-strategic-review
+    pattern_id: sequential
+    name: Strategic Review & A/B Decisions
+    description: >
+      ac-coach analyse la convergence et décide de la stratégie pour le prochain cycle.
+      SÉQUENCE :
+      1. memory_search() — récupérer les scores des cycles précédents
+      2. ac_get_project_state() — état courant (convergence, RL hint, Thompson state)
+      3. Analyser la tendance :
+         - Amélioration → renforcer le variant de skill courant
+         - Plateau → recommander un A/B test (nouveau prompt, nouveau model)
+         - Régression → recommander un rollback au builder
+         - Spike failure → diagnostiquer la cause racine (LLM error, tool error, spec error)
+      4. ac_inject_cycle() — enregistrer les scores de supervision dans ac_cycles
+      5. memory_store() — stocker SUPERVISION_STRATEGY_N+1 avec recommandations
+      INTERDIT : code_write, git_commit — le coach ne modifie rien.
+    gate: always
+    config:
+      agents:
+        - ac-coach
+
+config:
+  max_cycles: 20
+  auto_restart: false
+  default_scope: project
+
+  graph:
+    nodes:
+      - id: n0
+        agent_id: ac-architect
+        x: 400
+        y: 0
+        label: Specs Review
+        phase: ac-specs-review
+      - id: n1
+        agent_id: ac-adversarial
+        x: 280
+        y: 120
+        label: Code Quality
+        phase: ac-quality-gates
+      - id: n2
+        agent_id: ac-qa-agent
+        x: 520
+        y: 120
+        label: QA Grade
+        phase: ac-quality-gates
+      - id: n3
+        agent_id: ac-coach
+        x: 400
+        y: 240
+        label: Strategic Review
+        phase: ac-strategic-review
+
+    edges:
+      - from: n0
+        to: n1
+        label: specs graded
+        color: '#22c55e'
+      - from: n0
+        to: n2
+        label: specs graded
+        color: '#22c55e'
+      - from: n1
+        to: n3
+        label: quality graded
+        color: '#f59e0b'
+      - from: n2
+        to: n3
+        label: qa graded
+        color: '#f59e0b'

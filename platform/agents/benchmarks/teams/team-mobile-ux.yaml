@@ -1,0 +1,20 @@
+team_id: team-mobile-ux
+technology: mobile
+phase_type: development
+description: Team team-mobile-ux — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: mobile_ux
+  - id: mobile_archi
+  - id: qa-mobile-lead
+task: 'Design and review a cross-platform navigation architecture: tab bar with 5 sections, deep linking support, state preservation
+  on tab switch, accessibility labels for screen readers.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -600,7 +600,7 @@ async def ideation_create_epic(request: Request):
         "new_feature": "feature-request",
         "bug_fix": "sf-pipeline",
         "tech_debt": "tech-debt-reduction",
-        "migration": "feature-request",
+        "migration": "migration-angular",
         "security_audit": "review-cycle",
     }
     mission_type = type_map.get(request_type, "epic")

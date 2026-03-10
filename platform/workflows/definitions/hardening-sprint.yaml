@@ -1,0 +1,63 @@
+id: hardening-sprint
+name: Hardening Sprint — Refactoring Auto
+description: >
+  Déclenché automatiquement quand le total_score AC < 85 après un cycle complet.
+  Cible les 3 dimensions les plus impactantes : no_slop, architecture, over_engineering.
+  Cycle court (< 2h) : scan → fix LLM → re-score → injection du cycle corrigé.
+icon: tool
+is_builtin: true
+phases:
+  - id: hardening-scan
+    pattern_id: parallel
+    name: Scan Hardening
+    description: >
+      Analyse ciblée des 3 dimensions basses du cycle AC précédent.
+      no_slop : cherche TODO/FIXME, dead code, placeholders, copier-coller.
+      architecture : couplage, classes God, violations SOLID, cyclomatic > 10.
+      over_engineering : abstractions inutiles, interfaces non utilisées, > 3 niveaux.
+      Chaque agent produit une liste de fichiers + lignes à corriger, scorée 0-100.
+      CRITÈRE DE SORTIE : 3 scorecards avec fichiers/lignes ciblés.
+    gate: Trois scorecards produits avec fichiers et lignes spécifiques
+    config:
+      agents:
+        - qa
+        - architecte
+        - lead_dev
+
+  - id: hardening-fix
+    pattern_id: hierarchical
+    name: Refactoring LLM
+    description: >
+      Le lead_dev supervise les corrections ciblées.
+      Règles strictes (YOLO mode = no human approval) :
+      - Supprimer TODO/FIXME ou les résoudre
+      - Éliminer le dead code et les placeholders
+      - Extraire les God classes en modules distincts
+      - Supprimer les abstractions YAGNI
+      - Réduire la cyclomatic complexity par extraction de fonctions
+      INTERDIT : toucher aux fonctionnalités, aux tests, aux APIs publiques.
+      Commits atomiques par fichier. Chaque commit référence la dimension corrigée.
+      CRITÈRE DE SORTIE : code refactoré, tous les tests verts, git push.
+    gate: Tests verts + git push + rapport de diff
+    config:
+      agents:
+        - lead_dev
+      skill_agents:
+        - dev_backend
+        - dev_frontend
+
+  - id: hardening-rescore
+    pattern_id: solo
+    name: Re-score AC
+    description: >
+      Relance le scan des 3 dimensions ciblées sur le code corrigé.
+      Compare les scores avant/après.
+      Injecte le cycle de hardening dans le board AC via POST /api/improvement/inject-cycle
+      avec les nouveaux scores et fix_summary = "hardening-sprint auto".
+      Si score toujours < 85 : note le delta et marque comme "hardening_partial".
+      Si score >= 85 : marque "hardening_complete".
+      CRITÈRE DE SORTIE : cycle injecté dans le board AC.
+    gate: always
+    config:
+      agents:
+        - qa

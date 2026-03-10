@@ -1,0 +1,32 @@
+agent_id: ac-architect
+technology: generic
+phase_type: architecture
+description: AC Architect — system design, architecture decisions
+eval_cases:
+- id: system-design
+  input: 'Design a real-time collaborative document editor (like Google Docs) for a startup. Requirements: 100 concurrent
+    users per document, offline support, conflict resolution. Provide architecture diagram description, technology choices,
+    and key trade-offs.'
+  checks:
+  - has_keyword:websocket
+  - has_keyword:conflict
+  - length_min:400
+  expectations:
+  - Proposes CRDT or OT for conflict resolution
+  - Addresses real-time sync (WebSocket/SSE)
+  - Mentions offline-first strategy
+  - Discusses scalability approach
+- id: adr-write
+  input: 'Write an ADR (Architecture Decision Record) for choosing between REST and GraphQL for a new mobile banking API.
+    The mobile team currently uses REST, the web team wants GraphQL. Requirements: 50+ endpoints, complex nested data (accounts
+    → transactions → categories).'
+  checks:
+  - has_keyword:decision
+  - has_keyword:REST
+  - has_keyword:GraphQL
+  - length_min:300
+  expectations:
+  - Follows ADR format (context, decision, consequences)
+  - Compares both options objectively
+  - Makes a clear decision with justification
+  - Lists consequences (positive and negative)

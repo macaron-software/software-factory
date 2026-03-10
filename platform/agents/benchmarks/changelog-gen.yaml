@@ -1,0 +1,27 @@
+agent_id: changelog-gen
+technology: generic
+phase_type: planning
+description: Release Manager — planning, task breakdown, coordination
+eval_cases:
+- id: sprint-planning
+  input: Plan a 2-week sprint for 3 developers to build a user notification system (email + in-app + push). Break down into
+    stories with estimates and dependencies.
+  checks:
+  - has_keyword:story
+  - has_keyword:notification
+  - length_min:300
+  expectations:
+  - Breaks work into at least 4 stories
+  - Identifies dependencies between stories
+  - Includes testing and integration tasks
+- id: risk-assessment
+  input: 'Assess risks for migrating a monolithic PHP application to microservices architecture. The team has 5 developers,
+    2 with microservices experience. Timeline: 6 months. Current system: 200k LOC, 50 DB tables.'
+  checks:
+  - has_keyword:risk
+  - has_keyword:migration
+  - length_min:300
+  expectations:
+  - Identifies at least 3 distinct risks
+  - Provides mitigation strategies
+  - Considers team skill gap

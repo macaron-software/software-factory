@@ -1,0 +1,20 @@
+team_id: team-sre
+technology: ops
+phase_type: development
+description: Team team-sre — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: sre
+  - id: monitoring-ops
+  - id: incident-commander
+task: 'Create an SRE runbook for a critical service outage: define SLOs (99.9% availability, p99 < 200ms), incident severity
+  levels, escalation procedures, communication templates, and post-mortem format.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -1,0 +1,17 @@
+agent_id: mkt-trend
+technology: generic
+phase_type: marketing
+description: Market & Trend Analyst — marketing strategy, content
+eval_cases:
+- id: launch-strategy
+  input: 'Create a launch strategy for a B2B SaaS project management tool targeting small agencies (5-20 people). Budget:
+    5000 EUR/month. Competitors: Asana, Monday.com. Differentiator: AI-powered sprint planning.'
+  checks:
+  - has_keyword:target
+  - has_keyword:channel
+  - length_min:300
+  expectations:
+  - Defines target audience clearly
+  - Proposes at least 3 acquisition channels
+  - Includes messaging around AI differentiator
+  - Provides metrics/KPIs to track

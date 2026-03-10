@@ -1,0 +1,102 @@
+description: |
+  AC LLM Bench — verify each model responds correctly with adapted parameters.
+  Tests basic generation, JSON, code, reasoning, long output, think-leak prevention.
+  Model-agnostic prompts; checks adapted to each model's behavior.
+
+eval_cases:
+  - id: basic-text
+    input: |
+      Explain what a mutex is in exactly 3 sentences.
+      Be concise and technical.
+    checks:
+      - "not_empty:true"
+      - "length_min:80"
+      - "not_contains:<think>"
+      - "has_keyword:mutex"
+
+  - id: json-output
+    input: |
+      Return a JSON object with these exact keys: "name", "age", "skills".
+      - name: string
+      - age: integer
+      - skills: array of strings (at least 2)
+      Do NOT include any text outside the JSON. Only return raw JSON.
+    system_prompt: "You are a helpful assistant. Always respond with valid JSON when asked."
+    checks:
+      - valid_json
+      - "json_has_key:name"
+      - "json_has_key:age"
+      - "json_has_key:skills"
+      - "not_contains:<think>"
+
+  - id: code-generation
+    input: |
+      Write a Python function called `fibonacci` that takes an integer n and returns
+      the nth Fibonacci number. Use iteration, not recursion. Include a docstring.
+    checks:
+      - "has_keyword:def fibonacci"
+      - "has_keyword:return"
+      - "regex:def fibonacci\\(.*n.*\\)"
+      - "length_min:100"
+      - "not_contains:<think>"
+
+  - id: reasoning-quality
+    input: |
+      A farmer has 17 sheep. All but 9 die. How many sheep does the farmer have left?
+      Give only the final number, nothing else.
+    checks:
+      - "has_keyword:9"
+      - "not_contains:<think>"
+      - "length_max:50"
+
+  - id: long-output
+    input: |
+      Write a comprehensive guide on setting up a CI/CD pipeline with GitHub Actions
+      for a Python project. Include:
+      1. Workflow file structure
+      2. Testing stage
+      3. Linting stage
+      4. Build and deploy stage
+      5. Environment secrets management
+      Be detailed with YAML examples for each stage.
+    max_tokens: 8192
+    checks:
+      - "length_min:1500"
+      - "has_keyword:workflow"
+      - "has_keyword:pytest"
+      - "has_keyword:deploy"
+      - "not_contains:<think>"
+
+  - id: no-think-leak
+    input: |
+      Calculate 127 multiplied by 43. Show only the final answer as a single number.
+    checks:
+      - "has_keyword:5461"
+      - "not_contains:<think>"
+      - "not_contains:</think>"
+      - "length_max:100"
+
+  - id: structured-json
+    input: |
+      Compare REST API vs GraphQL. Return a JSON object with this exact structure:
+      {
+        "comparison": [
+          {"criterion": "...", "rest": "...", "graphql": "...", "winner": "..."}
+        ],
+        "recommendation": "..."
+      }
+      Include at least 4 criteria. Only return raw JSON, no markdown fences, no explanation.
+    system_prompt: "You are a technical architect. Respond only with valid JSON."
+    checks:
+      - valid_json
+      - "json_has_key:comparison"
+      - "json_has_key:recommendation"
+      - "length_min:300"
+      - "not_contains:<think>"
+
+  - id: minimal-prompt
+    input: "Hi"
+    checks:
+      - "not_empty:true"
+      - "length_min:1"
+      - "not_contains:<think>"

@@ -1,0 +1,38 @@
+agent_id: plat-product
+technology: generic
+phase_type: product
+description: Platform Product Owner — product vision, feature specification
+eval_cases:
+- id: feature-spec
+  input: 'Write a product specification for a ''Smart Notifications'' feature: users should be able to configure notification
+    preferences (channels: email/push/SMS, frequency: instant/daily digest/weekly), with AI-powered priority scoring that
+    surfaces important notifications first.'
+  checks:
+  - has_keyword:user story
+  - has_keyword:acceptance criteria
+  - length_min:400
+  expectations:
+  - Includes user stories with acceptance criteria
+  - Defines notification channels and frequency options
+  - Describes AI priority scoring mechanism
+  - Considers edge cases (notification fatigue, opt-out)
+- id: backlog-prioritization
+  input: 'Prioritize this backlog using WSJF (Weighted Shortest Job First):
+
+    1. OAuth2 SSO integration (high business value, 3 sprints)
+
+    2. Dashboard performance optimization (medium value, 1 sprint)
+
+    3. Multi-language support (high value, 4 sprints)
+
+    4. API rate limiting (low value, 0.5 sprint)
+
+    5. Dark mode (medium value, 1 sprint)'
+  checks:
+  - has_keyword:WSJF
+  - has_keyword:priority
+  - length_min:300
+  expectations:
+  - Calculates WSJF scores for each item
+  - Produces a ranked priority list
+  - Justifies the ranking with business reasoning

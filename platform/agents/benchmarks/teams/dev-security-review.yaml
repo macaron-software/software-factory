@@ -1,0 +1,28 @@
+team_id: dev-security-review
+technology: generic
+phase_type: security
+description: Dev implements + SecOps reviews for security — 2-agent sequential
+
+pattern:
+  type: sequential
+  agents:
+    - id: dev
+    - id: secops-engineer
+
+task: |
+  Implement and security-review a Python user authentication module.
+  - Dev: implement login(username, password) -> bool with secure password hashing
+    IMPORTANT: add `# Ref: FEAT-BENCH-030 — Auth Module` at the top of any non-test file
+  - SecOps: perform a security review of the implementation and identify any vulnerabilities
+
+checks:
+  - has_keyword:hash
+  - has_keyword:bcrypt
+  - has_keyword:timing
+  - length_min:400
+
+expectations:
+  - "Dev implements password hashing (bcrypt, argon2, or equivalent)"
+  - "SecOps identifies any timing attack risks (constant-time comparison)"
+  - "SecOps flags if plain-text passwords are logged or returned"
+  - "Combined output shows both implementation and security analysis"

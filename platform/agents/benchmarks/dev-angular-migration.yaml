@@ -1,0 +1,119 @@
+agent_id: dev-angular
+technology: angular_16
+phase_type: development
+description: Angular 16→17 migration — standalone components, signals, new control flow
+
+eval_cases:
+  - id: migrate-module-to-standalone
+    input: |
+      Migrate this Angular 16 module-based component to Angular 17 standalone:
+
+      // user-list.module.ts
+      @NgModule({
+        declarations: [UserListComponent],
+        imports: [CommonModule, FormsModule, RouterModule],
+        exports: [UserListComponent]
+      })
+      export class UserListModule {}
+
+      // user-list.component.ts
+      @Component({
+        selector: 'app-user-list',
+        templateUrl: './user-list.component.html',
+      })
+      export class UserListComponent implements OnInit {
+        users: User[] = [];
+        searchTerm = '';
+        constructor(private userService: UserService, private router: Router) {}
+        ngOnInit() { this.userService.getUsers().subscribe(u => this.users = u); }
+        filteredUsers() {
+          return this.users.filter(u => u.name.includes(this.searchTerm));
+        }
+        goToUser(id: number) { this.router.navigate(['/users', id]); }
+      }
+
+      Produce the migrated standalone component. Delete the module file.
+    checks:
+      - "has_keyword:standalone"
+      - "has_keyword:imports"
+      - "has_keyword:CommonModule"
+      - "length_min:300"
+    expectations:
+      - "Adds standalone: true to @Component decorator"
+      - "Moves imports (CommonModule, FormsModule, RouterModule) into @Component.imports"
+      - "Removes the NgModule file entirely"
+      - "Keeps the same functionality (template, service injection, routing)"
+
+  - id: migrate-ngif-to-control-flow
+    input: |
+      Migrate this Angular 16 template to Angular 17 new built-in control flow syntax:
+
+      <div *ngIf="isLoading; else content">
+        <app-spinner></app-spinner>
+      </div>
+      <ng-template #content>
+        <div *ngIf="error; else list">
+          <p class="error">{{ error }}</p>
+        </div>
+        <ng-template #list>
+          <ul>
+            <li *ngFor="let item of items; trackBy: trackById">
+              <span [ngSwitch]="item.status">
+                <span *ngSwitchCase="'active'" class="badge-green">Active</span>
+                <span *ngSwitchCase="'pending'" class="badge-yellow">Pending</span>
+                <span *ngSwitchDefault class="badge-gray">Unknown</span>
+              </span>
+              {{ item.name }}
+            </li>
+          </ul>
+          <p *ngIf="items.length === 0">No items found.</p>
+        </ng-template>
+      </ng-template>
+
+      Use @if, @else, @for, @switch, @empty.
+    checks:
+      - "has_keyword:@if"
+      - "has_keyword:@for"
+      - "has_keyword:@switch"
+      - "has_keyword:track"
+      - "length_min:200"
+    expectations:
+      - "Replaces *ngIf with @if / @else blocks"
+      - "Replaces *ngFor with @for (item of items; track item.id) or trackById"
+      - "Replaces [ngSwitch]/*ngSwitchCase with @switch/@case/@default"
+      - "Uses @empty block for the empty-list message"
+      - "Removes ng-template #refs (no longer needed)"
+
+  - id: migrate-to-signals
+    input: |
+      Migrate this Angular 16 component to use Angular 17 signals:
+
+      @Component({
+        selector: 'app-counter',
+        standalone: true,
+        template: `
+          <p>Count: {{ count }}</p>
+          <p>Double: {{ doubleCount }}</p>
+          <button (click)="increment()">+1</button>
+          <button (click)="reset()">Reset</button>
+        `
+      })
+      export class CounterComponent {
+        count = 0;
+        get doubleCount() { return this.count * 2; }
+        increment() { this.count++; }
+        reset() { this.count = 0; }
+      }
+
+      Use signal(), computed(), and update(). Keep the template working.
+    checks:
+      - "has_keyword:signal("
+      - "has_keyword:computed("
+      - "has_keyword:update("
+      - "length_min:200"
+    expectations:
+      - "Converts count to signal(0)"
+      - "Converts doubleCount getter to computed(() => this.count() * 2)"
+      - "Uses this.count.update(v => v + 1) or this.count.set() for increment"
+      - "Uses this.count.set(0) for reset"
+      - "Template uses count() with parentheses (signal read)"

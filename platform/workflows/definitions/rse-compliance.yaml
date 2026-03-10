@@ -1,0 +1,225 @@
+id: rse-compliance
+name: RSE — Audit Responsabilité Sociétale
+description: 'Pipeline complet d''audit RSE: RGPD/Privacy → Juridique numérique (DSA/DMA/AI Act) → Green IT & Éco-conception
+  (RGESN) → Accessibilité (RGAA/WCAG) → Éthique IA (biais, explicabilité) → Audit social (diversité, inclusion) → Synthèse
+  RSE avec GO/NOGO. Agents avec accès web pour veille réglementaire.'
+icon: heart
+is_builtin: true
+phases:
+- id: rgpd-audit
+  pattern_id: sequential
+  name: Audit RGPD & Privacy
+  description: 'La DPO Margaux Leroy audite la conformité RGPD: base légale des traitements, minimisation, durées de conservation,
+    droits des personnes (accès, effacement, portabilité), PIA si nécessaire. Le Juriste complète sur les transferts hors
+    UE et sous-traitants. Web search for latest CNIL decisions.'
+  gate: always
+  config:
+    agents:
+    - rse-dpo
+    - rse-juriste
+- id: legal-audit
+  pattern_id: sequential
+  name: Audit Juridique Numérique
+  description: 'Le Juriste Étienne Vasseur audite la conformité: DSA (modération, transparence), DMA (interopérabilité), AI
+    Act (classification risque IA), ePrivacy (cookies, traceurs), LCEN (mentions légales), CGU/CGV (clauses abusives), propriété
+    intellectuelle (licences open source). Veille sur les dernières évolutions réglementaires EU.'
+  gate: always
+  config:
+    agents:
+    - rse-juriste
+    - rse-dpo
+- id: green-it-audit
+  pattern_id: network
+  name: Audit Green IT & Éco-conception
+  description: 'Débat entre l''Expert NR Tristan Beaumont et l''Expert Éco-conception Raphaël Morin. RGESN (79 critères),
+    poids des pages, bundle JS, requêtes optimisées, hébergement vert, dimensionnement infrastructure. Mesures: EcoIndex,
+    Lighthouse, Website Carbon Calculator. Propositions sobres et budget carbone par feature.'
+  gate: always
+  config:
+    agents:
+    - rse-nr
+    - rse-eco
+    - rse-manager
+- id: a11y-audit
+  pattern_id: sequential
+  name: Audit Accessibilité — RGAA & WCAG
+  description: Noémie Garnier audite selon RGAA 4.1 (106 critères) et WCAG 2.2 AA. Contraste, navigation clavier, lecteur
+    d'écran (NVDA, VoiceOver), formulaires, images alt, focus visible, zoom 200%. Test avec axe-core, pa11y, et manuellement.
+    Directive EAA (European Accessibility Act) applicable juin 2025.
+  gate: always
+  config:
+    agents:
+    - rse-a11y
+    - accessibility_expert
+- id: ethique-ia-audit
+  pattern_id: network
+  name: Audit Éthique IA & Biais
+  description: 'Aïssatou Diallo audite les systèmes IA: classification AI Act, biais (disparate impact, equal opportunity),
+    explicabilité (SHAP, LIME), transparence, human oversight. Avec le ML Engineer pour les aspects techniques. Veille AI
+    Act articles et guidelines HLEG via web.'
+  gate: always
+  config:
+    agents:
+    - rse-ethique-ia
+    - ml_engineer
+    - rse-manager
+- id: social-audit
+  pattern_id: sequential
+  name: Audit Social & Inclusion
+  description: 'Ibrahim Keïta audite l''impact social: diversité équipes (genre, origines, handicap, index Pénicaud), conditions
+    de travail IT (charge cognitive, on-call equity), inclusion produit (illectronisme, fracture numérique). Avec l''experte
+    accessibilité pour l''inclusion numérique.'
+  gate: always
+  config:
+    agents:
+    - rse-audit-social
+    - rse-a11y
+- id: rse-synthesis
+  pattern_id: human-in-the-loop
+  name: Synthèse RSE — GO/NOGO
+  description: 'La Directrice RSE Sabrina Okafor consolide tous les audits. Score ESG global, conformité par pilier (E/S/G).
+    Le Juriste confirme les risques juridiques. La DPO valide la conformité RGPD. Checkpoint: GO (conforme), NOGO (non-conformités
+    critiques), PIVOT (plan de remediation avec jalons).'
+  gate: checkpoint
+  config:
+    agents:
+    - rse-manager
+    - rse-dpo
+    - rse-juriste
+    - rse-ethique-ia
+config:
+  orchestrator: rse-manager
+  graph:
+    pattern: sequential
+    nodes:
+    - id: r1
+      agent_id: rse-dpo
+      x: 100
+      y: 30
+      label: DPO
+      phase: rgpd-audit
+    - id: r2
+      agent_id: rse-juriste
+      x: 350
+      y: 30
+      label: Juriste
+      phase: legal-audit
+    - id: r3
+      agent_id: rse-nr
+      x: 100
+      y: 150
+      label: Expert NR
+      phase: green-it-audit
+    - id: r4
+      agent_id: rse-eco
+      x: 350
+      y: 150
+      label: Éco-conception
+      phase: green-it-audit
+    - id: r5
+      agent_id: rse-a11y
+      x: 100
+      y: 270
+      label: A11Y Lead
+      phase: a11y-audit
+    - id: r6
+      agent_id: accessibility_expert
+      x: 350
+      y: 270
+      label: Expert A11Y
+      phase: a11y-audit
+    - id: r7
+      agent_id: rse-ethique-ia
+      x: 100
+      y: 390
+      label: Éthique IA
+      phase: ethique-ia-audit
+    - id: r8
+      agent_id: ml_engineer
+      x: 350
+      y: 390
+      label: ML Engineer
+      phase: ethique-ia-audit
+    - id: r9
+      agent_id: rse-audit-social
+      x: 225
+      y: 500
+      label: Audit Social
+      phase: social-audit
+    - id: r10
+      agent_id: rse-manager
+      x: 225
+      y: 620
+      label: Dir. RSE
+      phase: rse-synthesis
+    edges:
+    - from: r1
+      to: r2
+      label: privacy → legal
+      color: '#8b5cf6'
+    - from: r2
+      to: r3
+      label: compliant → green
+      color: '#22c55e'
+    - from: r3
+      to: r4
+      label: NR ↔ éco
+      color: '#22c55e'
+    - from: r4
+      to: r5
+      label: green → a11y
+      color: '#06b6d4'
+    - from: r5
+      to: r6
+      label: lead ↔ expert
+      color: '#06b6d4'
+    - from: r6
+      to: r7
+      label: a11y → éthique
+      color: '#f59e0b'
+    - from: r7
+      to: r8
+      label: éthique ↔ ML
+      color: '#f59e0b'
+    - from: r8
+      to: r9
+      label: IA → social
+      color: '#ec4899'
+    - from: r9
+      to: r10
+      label: all → synthèse
+      color: '#8b5cf6'
+    - from: r1
+      to: r10
+      label: RGPD report
+      color: '#8b5cf6'
+    - from: r3
+      to: r10
+      label: Green report
+      color: '#22c55e'
+    - from: r5
+      to: r10
+      label: A11Y report
+      color: '#06b6d4'
+    - from: r7
+      to: r10
+      label: Ethics report
+      color: '#f59e0b'
+  agents_permissions:
+    rse-manager:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+      can_approve: true
+    rse-dpo:
+      can_veto: true
+      veto_level: STRONG
+    rse-juriste:
+      can_veto: true
+      veto_level: STRONG
+    rse-a11y:
+      can_veto: true
+      veto_level: STRONG
+    rse-ethique-ia:
+      can_veto: true
+      veto_level: STRONG

@@ -1,0 +1,20 @@
+team_id: team-services
+technology: service
+phase_type: development
+description: Team team-services — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: solution_manager
+  - id: customer-success
+  - id: chef_projet
+task: 'Create a service level framework for a B2B SaaS: define SLA tiers (Bronze/Silver/Gold), response times, uptime guarantees,
+  escalation matrix, and quarterly business review template.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -1,0 +1,57 @@
+id: retrospective-quality
+name: Quality Retrospective
+description: 'End-of-sprint/PI quality retrospective: collect ROTI, REX, incidents, quality metrics. Analyze patterns. Generate
+  and implement improvement actions for the SF itself.'
+icon: workflow
+is_builtin: true
+phases:
+- id: retro-collect
+  pattern_id: solo
+  name: Collect Feedback
+  description: 'Collect all sprint data: quality snapshots, adversarial rejections, platform incidents, session outcomes (success/fail/interrupted),
+    LLM usage, ROTI feedback, retrospective notes from memory.'
+  gate: Sprint data collected and structured
+  config:
+    agents:
+    - rte
+- id: retro-analyze
+  pattern_id: network
+  name: Pattern Analysis
+  description: 'Analyze collected data for patterns: recurring failures, common adversarial rejections, quality regressions,
+    successful improvements. Identify systemic vs one-off issues. Compute improvement velocity.'
+  gate: Patterns identified with evidence
+  config:
+    agents:
+    - rte
+    - architecte
+    - product-owner
+- id: retro-actions
+  pattern_id: network
+  name: Generate Actions
+  description: 'Generate concrete improvement actions for the SF itself: update agent skills (YAML), modify protocols (_EXEC_PROTOCOL,
+    _DECOMPOSE_PROTOCOL), add new adversarial checks, tune workflow phases, improve tool schemas.'
+  gate: Actionable improvement items with owner and target
+  config:
+    agents:
+    - lead-dev
+    - architecte
+    - product-owner
+- id: retro-implement
+  pattern_id: hierarchical
+  name: Implement SF Improvements
+  description: 'Implement the improvement actions: modify YAML skill definitions, update protocol strings in engine.py, add
+    adversarial checks, tune workflow configurations. Use code_write to make changes.'
+  gate: SF improvements implemented and verified
+  config:
+    agents:
+    - lead-dev
+    - dev-1
+- id: retro-validate
+  pattern_id: solo
+  name: Validate Changes
+  description: Run quality scan on the SF platform code itself. Verify no regressions. Store improvement results in memory_global
+    for next iteration.
+  gate: always
+  config:
+    agents:
+    - qa

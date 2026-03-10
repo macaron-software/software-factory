@@ -1,0 +1,27 @@
+agent_id: architecte
+eval_cases:
+- checks:
+  - has_keyword:architecture
+  - has_keyword:scalab
+  - length_min:200
+  - tool_called:code_write
+  expectations:
+  - Proposes a clear architecture with components and interactions
+  - Addresses scalability and high-availability concerns
+  - Includes technology choices with justification
+  id: arch-design
+  input: Design the architecture for a real-time notification system supporting 100k
+    concurrent users
+- checks:
+  - has_keyword:bottleneck
+  - has_keyword:database
+  - length_min:150
+  expectations:
+  - Identifies scaling limitations of the monolithic approach
+  - Recommends database migration path
+  - Provides actionable improvement steps
+  id: arch-review
+  input: 'Review this architecture: monolithic Python app with SQLite, deployed on
+    a single server, handling 10k requests/day growing 20% monthly'
+phase_type: architecture
+technology: generic

@@ -1,0 +1,68 @@
+id: tech-go
+name: "Go"
+stack: go
+description: "Go production patterns — HTTP, errors, concurrency, testing"
+
+content: |
+  ## Build & Test
+  go build ./...         # build all packages
+  go test ./... -v       # run all tests
+  go test ./... -race    # race condition detector
+  go vet ./...           # static analysis
+  golangci-lint run      # comprehensive lint
+  go mod tidy            # clean up go.mod
+
+  ## Project Structure
+  cmd/api/main.go        # entry point
+  internal/
+  ├── handler/           # HTTP handlers
+  ├── service/           # business logic
+  ├── repository/        # DB access
+  ├── model/             # domain structs
+  └── middleware/        # HTTP middleware
+  pkg/                   # exportable utilities
+
+  ## HTTP (stdlib or chi)
+  mux := http.NewServeMux()
+  mux.HandleFunc("GET /items/{id}", h.GetItem)
+  mux.HandleFunc("POST /items", h.CreateItem)
+  srv := &http.Server{Addr: ":8080", Handler: mux, ReadTimeout: 5*time.Second}
+  - Chi router: `r := chi.NewRouter(); r.Get("/items/{id}", handler)`
+  - JSON: `json.NewEncoder(w).Encode(resp)` + `w.Header().Set("Content-Type", "application/json")`
+  - Decode: `json.NewDecoder(r.Body).Decode(&req)` — check error
+
+  ## Error Handling
+  // Always wrap errors with context
+  if err != nil {
+      return fmt.Errorf("creating item: %w", err)
+  }
+  // Check specific errors
+  if errors.Is(err, ErrNotFound) { ... }
+  var myErr *MyError
+  if errors.As(err, &myErr) { ... }
+  - Sentinel errors: `var ErrNotFound = errors.New("not found")`
+  - Never ignore errors: `_ = err` only for intentional discards
+
+  ## Concurrency
+  // Goroutines: always use context
+  go func(ctx context.Context) {
+      select {
+      case <-ctx.Done(): return
+      case result := <-resultCh: process(result)
+      }
+  }(ctx)
+  - WaitGroup: `wg.Add(1); defer wg.Done()` inside goroutine
+  - Channels: close from sender only. Check ok: `val, ok := <-ch`
+  - Mutex: protect shared state. `defer mu.Unlock()` after `mu.Lock()`
+
+  ## Testing
+  func TestCreateItem(t *testing.T) {
+      t.Parallel()
+      svc := NewService(mockRepo)
+      item, err := svc.Create(context.Background(), CreateReq{Name: "x"})
+      require.NoError(t, err)
+      assert.Equal(t, "x", item.Name)
+  }
+  - `testify/require` (fatal on fail) vs `testify/assert` (continue)
+  - Table-driven: `tests := []struct{name,input,want}{ ... }; for _, tc := range tests { t.Run(tc.name, ...) }`
+  - HTTP handler tests: `httptest.NewRecorder()` + `httptest.NewServer()`

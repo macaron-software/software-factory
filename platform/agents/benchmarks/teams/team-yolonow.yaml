@@ -1,0 +1,20 @@
+team_id: team-yolonow
+technology: react
+phase_type: development
+description: Team team-yolonow — end-to-end collaboration bench
+pattern:
+  type: hierarchical
+  agents:
+  - id: brain
+  - id: dev-react
+  - id: dev
+task: 'Build a spontaneous activity booking system: real-time availability for last-minute activities, instant booking with
+  payment, location-based recommendations, and social feed of friends'' activities.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

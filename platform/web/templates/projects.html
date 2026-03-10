@@ -169,7 +169,7 @@ document.addEventListener('click', async function(e) {
     const card = e.target.closest('.item-card[data-id]');
     if (!card) return;
     e.preventDefault();
-    const domain = prompt('Domaine client (ex: Finance, Santé, Retail…)', card.dataset.domain || '');
+    const domain = prompt('Domaine client (ex: Finance, Santé, Industrie…)', card.dataset.domain || '');
     if (domain === null) return;
     const res = await fetch('/api/projects/' + card.dataset.id, {
         method: 'PATCH',

@@ -1,0 +1,84 @@
+id: backup-restore
+name: Backup & Disaster Recovery
+description: Automated backup strategy, restore verification, and disaster recovery runbook.
+icon: 💾
+is_builtin: true
+phases:
+- id: backup-strategy
+  pattern_id: sequential
+  name: Backup Strategy
+  description: Define RPO/RTO targets, backup types (full/incremental), retention policies
+  gate: RPO and RTO defined, strategy documented
+  config:
+    agents:
+    - backup-ops
+    - sre
+- id: backup-impl
+  pattern_id: sequential
+  name: Backup Implementation
+  description: Create backup scripts, cron schedules, cloud storage sync, encryption
+  gate: Backup scripts created and scheduled
+  config:
+    agents:
+    - backup-ops
+    - devops
+- id: restore-test
+  pattern_id: adversarial-pair
+  name: Restore Verification
+  description: Test restore procedure, verify data integrity, measure actual RTO
+  gate: Restore tested successfully, RTO within target
+  config:
+    agents:
+    - backup-ops
+    - testeur
+- id: dr-runbook
+  pattern_id: sequential
+  name: DR Runbook
+  description: Document disaster recovery procedures, escalation paths, communication plan
+  gate: DR runbook complete with step-by-step instructions
+  config:
+    agents:
+    - backup-ops
+    - doc-writer
+config:
+  critical: true
+  schedule: weekly
+  graph:
+    nodes:
+    - id: n1
+      agent_id: backup-ops
+      x: 100
+      y: 150
+      label: Strategy
+      phase: backup-strategy
+    - id: n2
+      agent_id: backup-ops
+      x: 300
+      y: 150
+      label: Implement
+      phase: backup-impl
+    - id: n3
+      agent_id: testeur
+      x: 500
+      y: 150
+      label: Test Restore
+      phase: restore-test
+    - id: n4
+      agent_id: doc-writer
+      x: 700
+      y: 150
+      label: DR Runbook
+      phase: dr-runbook
+    edges:
+    - from: n1
+      to: n2
+      label: strategy defined
+      color: '#ef4444'
+    - from: n2
+      to: n3
+      label: scripts ready
+      color: '#f59e0b'
+    - from: n3
+      to: n4
+      label: restore ok
+      color: '#3fb950'

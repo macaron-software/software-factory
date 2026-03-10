@@ -1,0 +1,202 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Factory process (headless — agents, missions, watchdog, A2A bus) ──────
+  platform-factory: &platform
+    build:
+      context: /opt/macaron
+      dockerfile: platform/deploy/Dockerfile
+    expose:
+      - "8091"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    env_file:
+      - /opt/macaron/.env
+    environment:
+      - PLATFORM_MODE=factory
+      - PORT=8091
+      - PLATFORM_LLM_PROVIDER=azure-openai
+      - PLATFORM_LLM_MODEL=gpt-5-mini
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-https://ascii-ui-openai.openai.azure.com}
+      - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
+      - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-5-mini}
+      - SF_ROOT=/app
+      - MF_ROOT=/app/mf_projects
+      - ANDROID_BUILDER_CONTAINER=android-builder
+      - AZURE_DEPLOY=1
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - SANDBOX_ENABLED=true
+      - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
+      - SANDBOX_NETWORK=bridge
+      - WATCHDOG_HEALTH_URL=http://localhost:8091/api/health
+      - JIRA_URL=${JIRA_URL:-}
+      - JIRA_PROJECT=${JIRA_PROJECT:-}
+      - JIRA_BOARD_ID=${JIRA_BOARD_ID:-}
+      - JIRA_TOKEN=${JIRA_TOKEN:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - REDIS_URL=redis://redis:6379/0
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - PG_POOL_MAX_SIZE=20
+      - OTEL_ENABLED=1
+      - OTEL_SERVICE_NAME=macaron-factory
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+    volumes:
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /opt/macaron/mcp_lrm:/app/mcp_lrm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8091/api/health', timeout=10)"]
+      interval: 60s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  # ── UI process blue/green (IHM — web routes, templates, static) ─────────
+  platform-blue: &platform-web
+    build:
+      context: /opt/macaron
+      dockerfile: platform/deploy/Dockerfile
+    expose:
+      - "8090"
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    env_file:
+      - /opt/macaron/.env
+    environment:
+      - PLATFORM_MODE=ui
+      - PLATFORM_LLM_PROVIDER=azure-openai
+      - PLATFORM_LLM_MODEL=gpt-5-mini
+      - AZURE_OPENAI_ENDPOINT=${AZURE_OPENAI_ENDPOINT:-https://ascii-ui-openai.openai.azure.com}
+      - FOUNDRY_PROJECT_ENDPOINT=${FOUNDRY_PROJECT_ENDPOINT:-}
+      - FOUNDRY_MODEL_DEPLOYMENT_NAME=${FOUNDRY_MODEL_DEPLOYMENT_NAME:-gpt-5-mini}
+      - SF_ROOT=/app
+      - MF_ROOT=/app/mf_projects
+      - AZURE_DEPLOY=1
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - REDIS_URL=redis://redis:6379/0
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - PG_POOL_MAX_SIZE=5
+      - SANDBOX_ENABLED=true
+      - SANDBOX_WORKSPACE_VOLUME=deploy_workspace-data
+      - SANDBOX_NETWORK=bridge
+      - OTEL_ENABLED=1
+      - OTEL_SERVICE_NAME=macaron-ui
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+    volumes:
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/api/health', timeout=10)"]
+      interval: 60s
+      timeout: 30s
+      retries: 10
+      start_period: 60s
+
+  platform-green:
+    <<: *platform-web
+    volumes:
+      - platform-data:/app/data
+      - workspace-data:/app/workspace
+      - /opt/macaron/.factory-keys:/app/.config/factory:ro
+      - /opt/macaron/slots/green:/app/macaron_platform
+      - /opt/macaron/core:/app/core
+      - /opt/macaron/skills:/app/skills
+      - /opt/macaron/projects:/app/projects
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "2"
+
+  android-builder:
+    build:
+      context: /opt/macaron/platform/deploy/android-builder
+      dockerfile: Dockerfile
+    container_name: android-builder
+    volumes:
+      - platform-data:/workspace
+    devices:
+      - /dev/kvm:/dev/kvm
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /home/azureadmin/macaron-nginx-conf:/etc/nginx/conf.d:ro
+      - /home/azureadmin/macaron-nginx-ssl:/etc/nginx/ssl:ro
+      - /opt/macaron/.htpasswd:/etc/nginx/.htpasswd:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /opt/macaron/webroot:/var/www/certbot:ro
+    depends_on:
+      - platform-blue
+    restart: unless-stopped
+
+volumes:
+  platform-data:
+  workspace-data:
+  pg-data:

@@ -1,0 +1,76 @@
+agent_id: code-reviewer
+technology: generic
+phase_type: development
+description: Code Reviewer — security, quality, correctness, and actionability of reviews
+
+eval_cases:
+  - id: review-sql-injection
+    input: |
+      Review this Python function:
+
+      def get_user_orders(user_id, status="all"):
+          if status == "all":
+              q = f"SELECT * FROM orders WHERE user_id={user_id}"
+          else:
+              q = f"SELECT * FROM orders WHERE user_id={user_id} AND status='{status}'"
+          return db.execute(q).fetchall()
+    checks:
+      - has_keyword:sql injection
+      - has_keyword:parameterized
+      - length_min:200
+    expectations:
+      - "Flags SQL injection in both branches"
+      - "Recommends parameterized queries with concrete example"
+      - "Notes missing input validation on status parameter"
+
+  - id: review-race-condition
+    input: |
+      Review this Python code:
+
+      class UserWallet:
+          def __init__(self, balance=0):
+              self.balance = balance
+
+          def debit(self, amount):
+              if self.balance >= amount:
+                  time.sleep(0.01)  # simulate DB latency
+                  self.balance -= amount
+                  return True
+              return False
+    checks:
+      - has_keyword:race condition
+      - has_keyword:lock
+      - length_min:200
+    expectations:
+      - "Identifies the race condition (check-then-act pattern)"
+      - "Recommends a mutex/lock or atomic operation"
+      - "Notes the risk of negative balance under concurrent access"
+
+  - id: review-memory-leak
+    input: |
+      Review this JavaScript / Node.js code:
+
+      const cache = {};
+
+      function getCachedUser(userId) {
+          if (!cache[userId]) {
+              cache[userId] = fetchUserFromDB(userId);
+          }
+          return cache[userId];
+      }
+
+      setInterval(() => {
+          Object.keys(cache).forEach(k => {
+              if (cache[k].lastAccess < Date.now() - 60000) {
+                  // TODO: clean old entries
+              }
+          });
+      }, 30000);
+    checks:
+      - has_keyword:memory
+      - has_keyword:TTL
+      - length_min:200
+    expectations:
+      - "Identifies the memory leak (cache grows indefinitely, TODO never removes entries)"
+      - "Recommends TTL-based eviction or a proper LRU cache"
+      - "Notes that the cleanup loop has a bug (lastAccess not set, entries never removed)"

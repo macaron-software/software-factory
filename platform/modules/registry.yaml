@@ -1,0 +1,572 @@
+# Optional External MCP Modules Registry
+# ========================================
+# Each module is a knowledge source or tool provider that agents can use.
+# Enable/disable from Settings → Modules.
+# install: command to run to populate local DB/data
+# requires: optional env vars or system dependencies
+
+modules:
+
+  # ── UX / DESIGN ────────────────────────────────────────────────────────────
+
+  - id: component-gallery
+    name: "The Component Gallery"
+    description: "60 UI components cross-referenced across 50+ Design Systems (Material, Carbon, Atlassian, Ant, Spectrum...). 2676 implementations with markup, ARIA, CSS patterns."
+    category: ux-design
+    icon: "grid"
+    source_url: "https://component.gallery"
+    repo_url: "https://github.com/inbn/component-gallery"
+    license: "No explicit license (public data)"
+    tools:
+      - component_gallery_list
+      - component_gallery_get
+      - component_gallery_search
+      - component_gallery_ds
+    install: "python -m mcp_lrm.component_gallery_scraper"
+    update: "python -m mcp_lrm.component_gallery_scraper --update"
+    data_file: "data/component_gallery.db"
+    builtin: true
+
+  - id: laws-of-ux
+    name: "Laws of UX"
+    description: "30 evidence-based cognitive and psychological principles for UI/UX design (Jon Yablonski, MIT). Injected into agent context for user story writing, UX audit, and design critique. Covers Hick's Law, Miller's Law, Fitts's Law, Cognitive Load, Peak-End Rule, Doherty Threshold, Pareto, Tesler, and 22 more."
+    category: ux-design
+    icon: "book"
+    source_url: "https://lawsofux.com"
+    repo_url: "https://github.com/nicedoc/lawsofux"
+    license: "MIT"
+    tools:
+      - lrm_ux_laws_list
+      - lrm_ux_laws_get
+      - lrm_ux_laws_for_context
+    install: "python -m mcp_lrm.ux_laws_scraper"
+    update: "python -m mcp_lrm.ux_laws_scraper --update"
+    data_file: "data/ux_laws.db"
+    builtin: true
+    skill: "skills/ux-laws.md"
+    # SOURCE: Jon Yablonski — https://lawsofux.com (MIT)
+    # WHY: 30 cognitive laws directly applicable to US acceptance criteria,
+    #      UX audit checklists, and design critique prompts. Agents use these
+    #      to validate UI proposals against cognitive science before shipping.
+
+  # ── DEVELOPMENT ────────────────────────────────────────────────────────────
+
+  - id: npm-registry
+    name: "npm Package Registry"
+    description: "Search npm packages, get download stats, check for deprecations, find alternatives. Helps agents choose the right dependency."
+    category: development
+    icon: "package"
+    source_url: "https://registry.npmjs.org"
+    license: "Public API"
+    builtin: true
+    tools:
+      - npm_search
+      - npm_package_info
+      - npm_weekly_downloads
+    install: "# no install needed — live API calls"
+    requires:
+      - "internet access"
+
+  - id: pypi-registry
+    name: "PyPI Package Registry"
+    description: "Search Python packages on PyPI. Get versions, dependencies, download stats, security advisories. Used by agents for Python dependency decisions."
+    category: development
+    icon: "code"
+    source_url: "https://pypi.org"
+    license: "Public API"
+    builtin: true
+    tools:
+      - pypi_search
+      - pypi_package_info
+    install: "# no install needed — live API calls"
+    requires:
+      - "internet access"
+
+  - id: scrapy
+    name: "Scrapy"
+    description: "Industrial-strength web scraping framework. Agents can use Scrapy spiders to harvest structured data from any website. Foundation for building custom knowledge scrapers."
+    category: development
+    icon: "globe"
+    source_url: "https://scrapy.org"
+    repo_url: "https://github.com/scrapy/scrapy"
+    license: "BSD-3-Clause"
+    builtin: true
+    tools:
+      - scrapy_run_spider
+      - scrapy_fetch_url
+    install: "pip install scrapy"
+    check_cmd: "python3 -c \"import scrapy\""
+    requires: []
+
+  - id: gsd
+    name: "GSD — Get Shit Done"
+    description: "Context engineering toolkit: prevents context rot, meta-prompting strategies, progressive summarization. Helps agents stay focused across long sessions without losing critical context."
+    category: development
+    icon: "target"
+    source_url: "https://github.com/gsd-build/get-shit-done"
+    license: "MIT"
+    builtin: true
+    tools:
+      - gsd_summarize_context
+      - gsd_apply_patterns
+    install: "npm install -g get-shit-done-cc"
+    check_cmd: "gsd --version"
+    requires: []
+
+  # ── SECURITY ───────────────────────────────────────────────────────────────
+
+  - id: trivy
+    name: "Trivy — Container & Repo Scanner"
+    description: "Aqua Security's open-source vulnerability scanner. Scans containers, repos, filesystems, and IaC for CVEs, misconfigs, and secrets. Integrates with sast_check workflow."
+    category: security
+    icon: "shield"
+    source_url: "https://trivy.dev"
+    repo_url: "https://github.com/aquasecurity/trivy"
+    license: "Apache-2.0"
+    builtin: true
+    tools:
+      - trivy_scan_repo
+      - trivy_scan_image
+      - trivy_scan_fs
+    install: "brew install trivy  # or: apt-get install trivy"
+    check_cmd: "trivy --version"
+    requires: []
+
+  - id: snyk-vuln
+    name: "Snyk Vulnerability DB"
+    description: "Snyk open-source vulnerability database for npm, PyPI, Maven, Go packages. Richer than NVD for library-level CVEs. Free tier API."
+    category: security
+    icon: "alert-triangle"
+    source_url: "https://security.snyk.io"
+    license: "Free tier API"
+    builtin: true
+    tools:
+      - snyk_search
+      - snyk_vuln_get
+    install: "# live API — set SNYK_TOKEN for authenticated access"
+    requires:
+      - "SNYK_TOKEN (optional)"
+
+  - id: infisical
+    name: "Infisical — Secrets Vault"
+    description: "Open-source secrets manager. Agents can read, list, rotate secrets via Infisical. All agent secret access goes through platform/tools/infisical_tools.py — write ops require 'secrets_manager' role."
+    category: security
+    icon: "lock"
+    source_url: "https://infisical.com"
+    repo_url: "https://github.com/Infisical/infisical"
+    license: "MIT"
+    tools:
+      - get_secret
+      - list_secrets
+      - set_secret
+      - rotate_secret
+    install: "pip install infisical-python"
+    check_cmd: "python3 -c \"import infisical\""
+    builtin: true
+    requires:
+      - "INFISICAL_TOKEN"
+      - "INFISICAL_PROJECT_ID"
+
+  - id: landlock
+    name: "Landlock — Kernel Filesystem Sandbox"
+    description: "Linux Landlock LSM (kernel ≥5.13): filesystem-level isolation for agent shell commands. Restricts read/write paths per agent run. Implemented in platform/tools/sandbox.py + bundled landlock-runner binary. Enabled via Settings → Security → security.landlock_enabled."
+    category: security
+    icon: "shield-off"
+    source_url: "https://landlock.io"
+    repo_url: "https://github.com/landlock-lsm/rust-landlock"
+    license: "MIT"
+    tools:
+      - sandbox_run
+      - sandbox_check
+    install: "# bundled — Linux kernel ≥5.13 required. macOS: sandboxed via subprocess only."
+    check_cmd: "python3 -c \"from platform_module.tools.sandbox import is_landlock_available; print(is_landlock_available())\""
+    builtin: true
+    # SOURCE: https://landlock.io — Linux security module for sandboxing
+    # WHY: agent shell commands must be scoped to project directory.
+    #      Landlock provides kernel-enforced path restriction with near-zero overhead.
+    #      On macOS dev: falls back to process-level containment (no kernel support).
+
+  # ── DEVOPS / INFRA ─────────────────────────────────────────────────────────
+
+  - id: rtk
+    name: "RTK — Rust Token Killer"
+    description: "Token compression CLI for LLM pipelines. Reduces tokens by 40-90% via diff-style output, aggressive log filtering, signature extraction. Tracks savings per command and provider."
+    category: infra
+    icon: "zap"
+    source_url: "https://github.com/macaron-software/rtk"
+    license: "MIT"
+    tools:
+      - rtk_run
+      - rtk_wrap
+    install: "# bundled — available at ~/.local/bin/rtk"
+    check_cmd: "rtk --version"
+    builtin: true
+
+  - id: redis
+    name: "Redis — Cache & Queue"
+    description: "In-memory data store used by the platform as cache backend and rate-limit store. Agents can use redis for fast state sharing, pub/sub messaging, and job queues."
+    category: infra
+    icon: "database"
+    source_url: "https://redis.io"
+    repo_url: "https://github.com/redis/redis"
+    license: "BSD-3-Clause"
+    tools: []
+    install: "pip install redis  # server: brew install redis"
+    check_cmd: "python3 -c \"import redis\""
+    builtin: true
+    requires:
+      - "REDIS_URL (default: redis://localhost:6379)"
+
+  - id: error-monitoring
+    name: "Error Monitoring Pipeline"
+    description: "Airweave-inspired error clustering and triage pipeline. Groups similar errors by fingerprint, auto-assigns severity, triggers agent remediation. Implements ops/error_clustering.py + error_state.py."
+    category: infra
+    icon: "alert-circle"
+    source_url: "https://github.com/airweave-ai/error-monitoring-agent"
+    license: "MIT (ported concepts)"
+    tools: []
+    install: "# bundled — no install needed"
+    builtin: true
+
+  - id: chaos-endurance
+    name: "Chaos Endurance"
+    description: "Continuous resilience testing via periodic fault injection (container restart, CPU stress, network latency, disk fill, etc.). Runs every 2-6h, measures MTTR, logs to chaos_runs table. Disable to pause all chaos scenarios — acts as runtime killswitch alongside CHAOS_ENABLED env var."
+    category: infra
+    icon: "zap"
+    source_url: ""
+    license: "Internal"
+    tools: []
+    install: "# bundled — set CHAOS_ENABLED=1 to activate the loop"
+    builtin: true
+    # KILLSWITCH: disable this module in Settings → Modules to pause chaos runs
+    # without restarting the server. The chaos loop checks DB enabled state
+    # before each scenario execution (in addition to CHAOS_ENABLED env var).
+
+  # ── BROWSER ────────────────────────────────────────────────────────────────
+
+  - id: browser-cli
+    name: "agent-browser (browser-cli)"
+    description: "Rust CLI wrapping Playwright/Chromium for headless browser automation. Agents get accessibility tree snapshots (@refs), can click, fill, screenshot — LLM-friendly, no fragile CSS selectors."
+    category: browser
+    icon: "compass"
+    source_url: "https://github.com/vercel-labs/agent-browser"
+    license: "MIT"
+    tools:
+      - browser_snapshot
+      - browser_click
+      - browser_fill
+      - browser_screenshot
+      - browser_get_text
+    install: "npm install -g agent-browser && agent-browser install"
+    check_cmd: "agent-browser"
+    builtin: true
+
+  - id: playwright-mcp
+    name: "Playwright MCP"
+    description: "Playwright as MCP server for browser automation. Provides accessibility snapshot tools via the MCP LRM bus. Bundled in platform/mcps/store.py."
+    category: browser
+    icon: "play"
+    source_url: "https://github.com/microsoft/playwright-mcp"
+    license: "Apache-2.0"
+    tools:
+      - playwright_navigate
+      - playwright_screenshot
+      - playwright_click
+      - playwright_fill
+    install: "npm install -g @playwright/mcp@latest && npx playwright install"
+    check_cmd: "npx @playwright/mcp --version"
+    builtin: true
+
+  # ── AI / LLM ───────────────────────────────────────────────────────────────
+
+  - id: huggingface-models
+    name: "HuggingFace Model Hub"
+    description: "Search HuggingFace models by task, language, license, size. Find the right open-source model for a task (classification, NER, translation, etc.)."
+    category: ai-llm
+    icon: "cpu"
+    source_url: "https://huggingface.co/models"
+    license: "HF API — free tier"
+    builtin: true
+    tools:
+      - hf_model_search
+      - hf_model_get
+      - hf_dataset_search
+    install: "# live API — set HF_TOKEN for private models"
+    requires:
+      - "HF_TOKEN (optional)"
+
+  - id: mflux
+    name: "mflux — Apple Silicon Image Gen"
+    description: "Local image generation on Apple Silicon (M1/M2/M3/M4) via MLX. Run FLUX models locally without API keys. Requires macOS + Apple Silicon."
+    category: ai-llm
+    icon: "layers"
+    source_url: "https://github.com/filipstrand/mflux"
+    license: "MIT"
+    builtin: true
+    tools:
+      - mflux_generate
+    install: "pip install mflux"
+    check_cmd: "python3 -c \"import mflux\""
+    requires:
+      - "Apple Silicon (M1/M2/M3/M4)"
+      - "macOS"
+
+  # ── KNOWLEDGE ──────────────────────────────────────────────────────────────
+
+  # ── META / QUALITY ─────────────────────────────────────────────────────────
+
+  - id: bmad-method
+    name: "BMAD Method"
+    description: "Agile AI development framework (Build More Architect Dreams). Concepts ported to SF: (1) scale-domain-adaptive planning via min_complexity on workflow phases, (3) context-aware /sf-help guidance via 'sf guide' command + sf-guide.md skill. Not installed as IDE plugin — concepts adapted to SF autonomous agent platform."
+    category: meta
+    icon: "zap"
+    source_url: "https://github.com/bmad-code-org/BMAD-METHOD"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/sf-guide.md"
+    # SOURCE: BMAD Method v6 (bmad-code-org, MIT)
+    # WHY: 3 concepts worth porting to SF:
+    #   1. Scale-domain-adaptive — WorkflowPhase.min_complexity field, run_workflow(complexity=)
+    #      → lightweight workflows for simple tasks, full phases for enterprise
+    #   2. (skipped) Persona enrichment for 192 agents — too broad, out of scope
+    #   3. /bmad-help equivalent — 'sf guide [context]' command in sf_commands.py
+    #      + skills/sf-guide.md for agent-level context navigation
+    # NOT PORTED: .skill packaging, claude -p CLI, IDE-specific .claude/.augment configs
+
+  - id: claude-api-skill
+    name: "Claude API Integration Patterns"
+    description: "LLM integration guidance for agents that generate Anthropic SDK code: surface selection (direct/tool/batch/streaming/agent-sdk), Opus 4.6 behavioural changes, structured outputs, agentic loop patterns, tool use best practices. Activate for US that produce LLM integration code."
+    category: meta
+    icon: "cpu"
+    source_url: "https://github.com/anthropics/skills/tree/main/skills/claude-api"
+    repo_url: "https://github.com/anthropics/skills"
+    license: "Apache-2.0"
+    builtin: true
+    tools: []
+    skill: "skills/llm-integration.md"
+    # SOURCE: Anthropic skills/claude-api (Apache 2.0)
+    # WHY: Our code-gen agents produce Anthropic SDK code with 5 documented pitfalls:
+    #      (1) using budget_tokens instead of adaptive thinking on Opus 4.6,
+    #      (2) assistant prefill returning 400 on Opus 4.6,
+    #      (3) missing streaming for large max_tokens causing timeouts,
+    #      (4) using deprecated output_format param,
+    #      (5) raw string matching on tool inputs (breaks with Opus 4.6 JSON escaping).
+    #      This skill prevents all 5 at authoring time.
+    # WHAT WE KEPT: pitfalls, surface selection matrix, model catalog, tool use patterns,
+    #      structured outputs constraints, SDK anti-reimplementation rules.
+    # WHAT WE DROPPED: language detection (we're Python-centric), per-language dirs,
+    #      Agent SDK patterns (we have our own framework), WebFetch live-sources.
+    # OFF by default — activate only for missions that generate LLM integration code.
+
+  - id: skill-creator
+    name: "Anthropic Skill Creator"
+    description: "Eval loop for SF skills: draft → eval_cases → execute → grade → iterate. skill-creator.md guides skill authoring, skill-grader.md grades outputs PASS/FAIL with evidence, skill-eval workflow runs the full loop. Prevents skill quality drift — 44+ skills with no regression coverage."
+    category: meta
+    icon: "zap"
+    source_url: "https://github.com/anthropics/skills/tree/main/skills/skill-creator"
+    repo_url: "https://github.com/anthropics/skills"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/skill-creator.md"
+    # SOURCE: Anthropic skill-creator (MIT)
+    # WHY: Our 44 skills had no way to test if they work. The eval loop provides
+    #      a repeatable quality gate: write eval_cases in skill frontmatter, run
+    #      them via skill-eval workflow, grade with skill-grader (PASS/FAIL +
+    #      evidence), iterate until pass_rate >= 0.8.
+    # ADAPTATIONS: eval_cases in YAML frontmatter (not evals.json), no .skill
+    #      packaging, no claude -p CLI, grading via skill-grader.md skill.
+
+  - id: spec-driven-quality
+    name: "Spec-Driven Quality Gates"
+    description: "Pre-code quality gates ported from GitHub spec-kit (MIT): (1) Constitution — project governing principles as PRINCIPLES.md, (2) Clarify — surface ambiguities before planning with typed questions + defaults, (3) Checklist — 5-dimension requirements QA (completeness/clarity/consistency/testability/feasibility), (4) Analyze — cross-artifact consistency check (spec ↔ plan ↔ tasks). Activate for architect/PM agents on new missions."
+    category: meta
+    icon: "clipboard-check"
+    source_url: "https://github.com/github/spec-kit"
+    repo_url: "https://github.com/github/spec-kit"
+    license: "MIT"
+    builtin: true
+    tools: []
+    skill: "skills/spec-driven-quality.md"
+    # SOURCE: GitHub spec-kit (MIT)
+    # https://github.com/github/spec-kit
+    #
+    # WHY: SF agents skip directly from user request → plan → code. spec-kit
+    #      formalises three quality gates we were missing:
+    #      (1) Clarify before planning — prevents rework from ambiguous requirements
+    #      (2) Checklist on requirements — catches gaps/contradictions before tasking
+    #      (3) Analyze after tasks — ensures spec/plan/tasks are mutually consistent
+    #      We also port Constitution: project governing principles as a first-class
+    #      artefact that anchors all decisions (maps to PRINCIPLES.md per project).
+    #
+    # WHAT WE KEPT: Constitution structure, Clarify protocol + ambiguity taxonomy,
+    #      Checklist 5 dimensions, Analyze cross-artifact matrix.
+    # WHAT WE DROPPED: specify/plan/implement commands (SF has missions + loops),
+    #      specify init CLI (SF has sf CLI), multi-framework scaffolding.
+    # ADAPTATIONS: Constitution → PRINCIPLES.md, steps reference SF concepts
+    #      (mission, backlog item, agent role), checklist runs inline.
+
+  - id: perf-auditor
+    name: "Performance Auditor"
+    description: "Performance audit agent using Chrome DevTools MCP (Apache-2.0): Lighthouse scores (perf/a11y/seo/best-practices), Core Web Vitals (LCP/CLS/INP), CDP traces, slow network analysis, console error detection, mobile emulation. Tools: perf_audit_lighthouse, perf_trace_start/stop, perf_analyze_insight, perf_network_slow, perf_console_errors, perf_emulate_mobile."
+    category: quality
+    icon: "gauge"
+    source_url: "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    repo_url: "https://github.com/ChromeDevTools/chrome-devtools-mcp"
+    license: "Apache-2.0"
+    builtin: true
+    tools:
+      - perf_audit_lighthouse
+      - perf_trace_start
+      - perf_trace_stop
+      - perf_analyze_insight
+      - perf_network_slow
+      - perf_console_errors
+      - perf_emulate_mobile
+    skill: "skills/perf-audit.md"
+    mcp: "mcp-chrome-devtools"
+    # SOURCE: Chrome DevTools team (Google) — chrome-devtools-mcp (Apache-2.0)
+    # https://github.com/ChromeDevTools/chrome-devtools-mcp
+    #
+    # WHY: playwright-mcp handles browser automation. chrome-devtools-mcp adds
+    #      what playwright can't: Lighthouse audits, CDP performance traces,
+    #      Core Web Vitals (LCP/CLS/INP), network request analysis, console errors.
+    #      SF agents that deploy features had no way to measure performance impact.
+    #      This fills the gap: a perf-auditor agent with the same tooling a developer
+    #      has in Chrome DevTools, wired into the TMA auto-heal loop for regressions.
+    #
+    # ARCHITECTURE: Two coexisting browser MCPs (not competing):
+    #   - mcp-playwright     → automation (click, fill, navigate, test execution)
+    #   - mcp-chrome-devtools → diagnostics (perf traces, Lighthouse, CWV, network)
+    # Tools: perf_audit_tools.py (BaseTool subclasses, not tool_runner functions)
+    # Routing: mcp_cdp_<tool> → _tool_mcp_dynamic → mcp-chrome-devtools MCP server
+
+  - id: incident-diag
+    name: "Incident Diagnosis"
+    description: "Root cause analysis agent for production incidents. Structured RCA workflow: collect → correlate → hypothesise → confirm → recommend. Tools: diag_logs, diag_process_stats, diag_db_stats, diag_endpoint_latency, diag_queue_depth, diag_correlate. Read-only — investigation only, no auto-fix."
+    category: ops
+    icon: "stethoscope"
+    builtin: true
+    tools:
+      - diag_logs
+      - diag_process_stats
+      - diag_db_stats
+      - diag_endpoint_latency
+      - diag_queue_depth
+      - diag_correlate
+    skill: "skills/incident-diagnosis.md"
+    agent_role: "diagnostic"
+    # SOURCE: Original — inspired by structured incident management practices
+    # (Google SRE handbook, Netflix Chaos Engineering, PagerDuty runbooks)
+    #
+    # WHY: SF's auto-heal (ops/auto_heal.py) reacts to known patterns.
+    #      When it doesn't trigger — or when you need to understand WHY something
+    #      is slow/broken before applying a fix — there was no dedicated investigation
+    #      path. Existing agents (devops, qa) have shell tools but no structured RCA
+    #      workflow and no correlation step.
+    #
+    # DESIGN CHOICES:
+    # - Read-only tools only (no code_write, no deployments) — diagnostic agent
+    #   should never modify production state during investigation
+    # - diag_correlate returns a structured PROMPT (not computed answer) — RCA
+    #   is a reasoning task, not a computation. The LLM reasons over evidence.
+    # - All tools fail-open with graceful degradation (missing psutil, no PG, etc.)
+    # - diag_queue_depth checks platform-internal queues (missions/agents/incidents)
+    #   not external message brokers — SF uses SQLite queues, not Kafka/RabbitMQ
+    #
+    # INTEGRATION: diagnostic role in ROLE_TOOL_MAP (tool_schemas.py) includes
+    #   error-monitoring read tools + perf-audit tools (if that module is enabled)
+    #   → one agent can run a complete incident investigation without tool-hopping
+
+  - id: agent-reward
+    name: "Agent Reward Scoring"
+    description: "Reward function pattern inspired by ART (OpenPipe, Apache-2.0): assigns an explicit composite score (0-1) to every agent run based on outcome, spec-quality, anti-slop, tool efficiency, latency. Stores scores in agent_rewards table. Dual purpose: quality monitoring now + ART training data readiness later. Tools: reward_score_run, reward_get_history, reward_summary, reward_export_art."
+    category: quality
+    icon: "star"
+    builtin: true
+    tools:
+      - reward_score_run
+      - reward_get_history
+      - reward_summary
+      - reward_export_art
+    skill: "skills/agent-reward.md"
+    # SOURCE: Reward function design inspired by ART (OpenPipe, Apache-2.0)
+    # https://github.com/OpenPipe/ART
+    #
+    # WHY: SF agents have no explicit quality signal per run. Mission status (done/failed)
+    #      is binary and doesn't capture: "succeeded but sloppy", "failed cleanly",
+    #      "succeeded but took 15 retries". We need a numeric reward for two reasons:
+    #      1. NOW — quality monitoring: detect which agent roles are degrading
+    #      2. LATER — ART readiness: Qwen GRPO training needs (trajectory, reward) pairs.
+    #         We don't have GPU infra today (API-only: MiniMax/Azure), but collecting
+    #         reward-annotated trajectories NOW means zero rewrite when we do.
+    #
+    # WHY NOT full ART yet:
+    #      ART needs: local model weights + GPU (A100/H100) + vLLM server.
+    #      SF runs on API LLMs (4CPU/16GB Azure, OVH VPS). Not today.
+    #      But the data format is ART-compatible → reward_export_art() writes
+    #      {messages, reward, metadata} JSONL that ART TrainableModel can ingest directly.
+    #
+    # DESIGN:
+    #      composite = outcome×0.40 + quality×0.25 + slop×0.20 + tools×0.10 + latency×0.05
+    #      Weights emphasise task success (40%) over speed (5%).
+    #      All components optional — partial scoring still gives a useful composite.
+    #      agent_rewards table created lazily (no schema migration required).
+
+  - id: wiki-guidelines
+    name: "Architecture Guidelines (Wiki DSI)"
+    description: "Injects org/project architectural guidelines from Confluence, GitLab Wiki, or Markdown into agent system prompts. Agents automatically respect tech stack constraints, forbidden libs, and standards."
+    category: knowledge
+    icon: "book-open"
+    builtin: true
+    source_url: ""
+    license: "Internal — your org's wiki"
+    tools:
+      - lrm_guidelines_summary
+      - lrm_guidelines_search
+      - lrm_guidelines_get
+      - lrm_guidelines_stack
+    install: "python -m mcp_lrm.guidelines_scraper --source confluence --space EXAMPLE --project myproject"
+    data_file: "data/guidelines.db"
+    config:
+      source: confluence
+      space: ""
+      confluence_url: ""
+      token_env: "CONFLUENCE_TOKEN"
+      auto_inject: true
+      roles:
+        - dev
+        - architecture
+        - security
+        - reviewer
+      scrape_frequency: weekly
+    requires:
+      - "CONFLUENCE_TOKEN or GITLAB_TOKEN"
+
+  - id: fractal-worktree
+    name: "Fractal Worktree"
+    description: "Recursive task decomposition + git worktrees per leaf agent. Classify gate (atomic vs composite) before decomposing. Each leaf executes in an isolated git branch — no parallel file conflicts. Includes Backpropagation Merge pattern for bottom-up synthesis."
+    category: orchestration
+    icon: "git-branch"
+    builtin: true
+    source_url: "https://github.com/TinyAGI/fractals"
+    license: "MIT"
+    # SOURCE: TinyAGI/fractals (MIT) — https://github.com/TinyAGI/fractals
+    # DECISION: port two key innovations to SF's Python/AgentExecutor stack:
+    #   1. Classify gate (atomic vs composite) — deterministic, reviewable decomposition
+    #      before any code is written. Addresses "agent goes rogue" in unstructured parallel.
+    #   2. git worktrees per leaf — each code-writing agent works in isolation (own branch).
+    #      No FS conflicts in parallel missions. Ref: fractals executor.ts::runInWorktree()
+    #   3. Backpropagation merge — after leaves complete, merge agent synthesizes bottom-up.
+    #      Ref: fractals roadmap "Backpropagation (merge agent)" section.
+    # We do NOT spawn Claude/Codex CLI (fractals approach) — SF's AgentExecutor handles it.
+    # git worktrees degrade gracefully: if no git repo → plain parallel execution.
+    patterns:
+      - fractal-worktree
+      - backprop-merge
+    config:
+      max_depth: 3
+      max_children: 5
+      use_worktrees: true   # set false to disable git worktree isolation
+      worktree_base: ".git/fractal-worktrees"

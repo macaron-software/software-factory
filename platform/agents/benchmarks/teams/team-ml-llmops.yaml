@@ -1,0 +1,20 @@
+team_id: team-ml-llmops
+technology: ai
+phase_type: development
+description: Team team-ml-llmops — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: ml_engineer
+  - id: llm-ops-engineer
+  - id: prompt-engineer
+task: 'Design an LLMOps pipeline: prompt versioning, A/B testing framework for prompts, cost tracking per model/endpoint,
+  quality scoring with human-in-the-loop feedback, and automated regression detection.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

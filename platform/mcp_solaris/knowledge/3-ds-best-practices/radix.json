@@ -1,0 +1,208 @@
+{
+  "_meta": {
+    "source": "radix-ui",
+    "url": "https://www.radix-ui.com/",
+    "version": "1.x",
+    "updated": "2026-01-06"
+  },
+
+  "principles": {
+    "unstyled": "Components ship with zero styles",
+    "accessible": "WAI-ARIA compliant out of the box",
+    "composable": "Granular parts for full control",
+    "uncontrolled_by_default": "Works without state management"
+  },
+
+  "composition_pattern": {
+    "description": "Each component exposes granular parts",
+    "example": {
+      "component": "Accordion",
+      "parts": ["Root", "Item", "Header", "Trigger", "Content"],
+      "usage": "Compose parts to build custom layouts"
+    }
+  },
+
+  "components": {
+    "accordion": {
+      "parts": ["Root", "Item", "Header", "Trigger", "Content"],
+      "props": {
+        "Root": {
+          "type": ["single", "multiple"],
+          "collapsible": "boolean",
+          "defaultValue": "string",
+          "value": "string",
+          "onValueChange": "function"
+        },
+        "Item": {
+          "value": "string (required)",
+          "disabled": "boolean"
+        }
+      },
+      "data_attributes": {
+        "state": ["open", "closed"],
+        "disabled": "present when disabled"
+      }
+    },
+
+    "dialog": {
+      "parts": ["Root", "Trigger", "Portal", "Overlay", "Content", "Title", "Description", "Close"],
+      "props": {
+        "Root": {
+          "open": "boolean",
+          "defaultOpen": "boolean",
+          "onOpenChange": "function",
+          "modal": "boolean (default: true)"
+        },
+        "Content": {
+          "onOpenAutoFocus": "function",
+          "onCloseAutoFocus": "function",
+          "onEscapeKeyDown": "function",
+          "onPointerDownOutside": "function",
+          "onInteractOutside": "function"
+        }
+      },
+      "accessibility": {
+        "aria-labelledby": "auto-linked to Title",
+        "aria-describedby": "auto-linked to Description",
+        "focus_trap": true,
+        "scroll_lock": true
+      }
+    },
+
+    "dropdown_menu": {
+      "parts": ["Root", "Trigger", "Portal", "Content", "Item", "CheckboxItem", "RadioGroup", "RadioItem", "Sub", "SubTrigger", "SubContent", "Separator", "Label"],
+      "keyboard": {
+        "Space/Enter": "activate item",
+        "ArrowDown": "next item",
+        "ArrowUp": "previous item",
+        "ArrowRight": "open submenu",
+        "ArrowLeft": "close submenu",
+        "Escape": "close menu"
+      },
+      "typeahead": true
+    },
+
+    "select": {
+      "parts": ["Root", "Trigger", "Value", "Icon", "Portal", "Content", "Viewport", "Item", "ItemText", "ItemIndicator", "Group", "Label", "Separator", "ScrollUpButton", "ScrollDownButton"],
+      "props": {
+        "Root": {
+          "value": "string",
+          "defaultValue": "string",
+          "onValueChange": "function",
+          "open": "boolean",
+          "onOpenChange": "function",
+          "dir": "ltr | rtl",
+          "name": "string",
+          "disabled": "boolean",
+          "required": "boolean"
+        }
+      },
+      "positioning": {
+        "side": ["top", "right", "bottom", "left"],
+        "sideOffset": "number",
+        "align": ["start", "center", "end"],
+        "alignOffset": "number"
+      }
+    },
+
+    "tabs": {
+      "parts": ["Root", "List", "Trigger", "Content"],
+      "props": {
+        "Root": {
+          "defaultValue": "string",
+          "value": "string",
+          "onValueChange": "function",
+          "orientation": "horizontal | vertical",
+          "dir": "ltr | rtl",
+          "activationMode": "automatic | manual"
+        }
+      },
+      "data_attributes": {
+        "state": ["active", "inactive"],
+        "orientation": ["horizontal", "vertical"]
+      }
+    },
+
+    "tooltip": {
+      "parts": ["Provider", "Root", "Trigger", "Portal", "Content", "Arrow"],
+      "props": {
+        "Provider": {
+          "delayDuration": "number (default: 700)",
+          "skipDelayDuration": "number (default: 300)",
+          "disableHoverableContent": "boolean"
+        },
+        "Root": {
+          "defaultOpen": "boolean",
+          "open": "boolean",
+          "onOpenChange": "function",
+          "delayDuration": "number"
+        }
+      }
+    },
+
+    "checkbox": {
+      "parts": ["Root", "Indicator"],
+      "props": {
+        "Root": {
+          "checked": "boolean | 'indeterminate'",
+          "defaultChecked": "boolean",
+          "onCheckedChange": "function",
+          "disabled": "boolean",
+          "required": "boolean",
+          "name": "string",
+          "value": "string"
+        }
+      },
+      "data_attributes": {
+        "state": ["checked", "unchecked", "indeterminate"],
+        "disabled": "present when disabled"
+      }
+    },
+
+    "switch": {
+      "parts": ["Root", "Thumb"],
+      "props": {
+        "Root": {
+          "checked": "boolean",
+          "defaultChecked": "boolean",
+          "onCheckedChange": "function",
+          "disabled": "boolean",
+          "required": "boolean",
+          "name": "string",
+          "value": "string"
+        }
+      },
+      "data_attributes": {
+        "state": ["checked", "unchecked"],
+        "disabled": "present when disabled"
+      }
+    },
+
+    "slider": {
+      "parts": ["Root", "Track", "Range", "Thumb"],
+      "props": {
+        "Root": {
+          "value": "number[]",
+          "defaultValue": "number[]",
+          "onValueChange": "function",
+          "onValueCommit": "function",
+          "min": "number",
+          "max": "number",
+          "step": "number",
+          "minStepsBetweenThumbs": "number",
+          "orientation": "horizontal | vertical",
+          "disabled": "boolean"
+        }
+      }
+    }
+  },
+
+  "styling_approach": {
+    "data_attributes_for_state": "Use [data-state='open'] instead of .is-open",
+    "css_variables": "Expose --radix-* for animations",
+    "example_animation_vars": {
+      "accordion": ["--radix-accordion-content-height", "--radix-accordion-content-width"],
+      "collapsible": ["--radix-collapsible-content-height", "--radix-collapsible-content-width"]
+    }
+  }
+}

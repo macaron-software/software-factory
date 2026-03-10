@@ -15,7 +15,7 @@ from .helpers import _templates
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-_GITLAB_ENABLED = bool(os.getenv("GITLAB_TOKEN"))
+_GITLAB_ENABLED = bool(os.getenv("GITLAB_ENTERPRISE_TOKEN"))
 
 
 def _wiki_db():

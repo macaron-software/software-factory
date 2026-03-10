@@ -1,0 +1,386 @@
+"""
+Code Tools - File read/write/search operations for agents.
+============================================================
+"""
+
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+from pathlib import Path
+
+from ..models import AgentInstance
+from .registry import BaseTool
+
+# Allowed base directories for code_write / code_edit operations.
+# Paths MUST resolve to one of these prefixes or they are rejected.
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent  # repo root
+# _CWD_DATA: for systemd deployments where WorkingDirectory != code dir
+# (e.g. Innovation: code in /home/sfadmin/slots/green/, data in /home/sfadmin/data/)
+_CWD_DATA = Path(os.getcwd()).resolve()
+_ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
+    _BASE_DIR / "data" / "workspaces",  # agent mission workspaces
+    _CWD_DATA / "data" / "workspaces",  # systemd deployments (cwd != code dir)
+    _BASE_DIR / "workspaces",  # project workspaces (supabase-lite etc.)
+    _CWD_DATA / "workspaces",
+    _BASE_DIR / "tests",  # test files
+    _BASE_DIR
+    / "platform",  # SF self-improvement: quality-improvement workflow can edit platform source
+    _CWD_DATA / "platform",  # systemd deployments
+    Path("/tmp"),  # scratch
+)
+
+# REF: arXiv:2602.20021 — SBD-02/SBD-08: block reads/writes of sensitive credential files
+# regardless of path location (defense-in-depth against info disclosure + destructive actions).
+_SENSITIVE_FILE_RE = re.compile(
+    r"(?:/|^)(?:\.env(?:\.(?!example|sample|template|test)[^/]*)?$|\.ssh/|id_rsa$|id_ecdsa$|id_ed25519$|\.aws/credentials|"
+    r"\.gnupg/|secrets?\.(json|ya?ml)$|.*\.(pem|key|pfx|p12|p8|crt)$)",
+    re.IGNORECASE,
+)
+
+
+def _is_path_allowed(resolved_path: str) -> bool:
+    """Return True if resolved_path is under one of the allowed write roots."""
+    p = Path(resolved_path)
+    return any(
+        p == root or str(p).startswith(str(root) + os.sep)
+        for root in _ALLOWED_WRITE_ROOTS
+    )
+
+
+class CodeReadTool(BaseTool):
+    name = "code_read"
+    description = "Read the contents of a file"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        path = params.get("path", "")
+        if not path or not os.path.exists(path):
+            return f"Error: File not found: {path}"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
+        # REF: arXiv:2602.20021 — SBD-02/SBD-03: block reads of sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_cr
+
+            _log_cr.getLogger(__name__).warning(
+                "code_read BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: reading '{path}' is not allowed (sensitive credential file)"
+        # If path is a directory, fallback to listing its contents
+        if os.path.isdir(path):
+            try:
+                entries = sorted(os.listdir(path))[:100]
+                listing = "\n".join(
+                    f"{'  ' if not os.path.isdir(os.path.join(path, e)) else ''}{e}{'/' if os.path.isdir(os.path.join(path, e)) else ''}"
+                    for e in entries
+                )
+                return f"Note: '{path}' is a directory. Contents:\n{listing}"
+            except Exception as e:
+                return f"Error listing directory {path}: {e}"
+        try:
+            max_lines = int(params.get("max_lines", 500))
+            with open(path) as f:
+                lines = f.readlines()[:max_lines]
+            return "".join(lines)
+        except Exception as e:
+            return f"Error reading {path}: {e}"
+
+
+class CodeWriteTool(BaseTool):
+    name = "code_write"
+    description = "Write content to a file (creates backup)"
+    category = "code"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        path = params.get("path", "")
+        content = params.get("content", "")
+        if not path:
+            return "Error: path required"
+        # Reject placeholder/slop content
+        stripped = content.strip()
+        if stripped in (
+            "// your code here\n...",
+            "// your code here",
+            "// TODO",
+            "...",
+        ):
+            return (
+                "Error: placeholder content rejected — write real implementation code"
+            )
+        if len(stripped) < 10 and not path.endswith((".env", ".gitignore", ".gitkeep")):
+            return f"Error: content too short ({len(stripped)} chars) — write real code"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
+        # Agent-specific path restriction: ac-architect may only write INCEPTION.md
+        _agent_id = getattr(agent, "id", "")
+        if _agent_id == "ac-architect" and os.path.basename(path) != "INCEPTION.md":
+            return (
+                f"Error: ac-architect is restricted to writing INCEPTION.md only. "
+                f"Path '{path}' is not allowed. "
+                f"Call code_write with the correct INCEPTION.md path. "
+                f"All other files (tests, Dockerfiles, etc.) are written by ac-codex."
+            )
+        # REF: arXiv:2602.20021 — SBD-08: block writes to sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_cw2
+
+            _log_cw2.getLogger(__name__).warning(
+                "code_write BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: writing to '{path}' is not allowed (sensitive file path)"
+        # Workspace restriction: reject writes outside allowed directories
+        if not _is_path_allowed(path):
+            import logging as _log_cw
+
+            _log_cw.getLogger(__name__).warning(
+                "code_write BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
+            )
+            allowed = ", ".join(str(r) for r in _ALLOWED_WRITE_ROOTS if r.exists())
+            return (
+                f"Error: path '{path}' is outside allowed workspace directories. "
+                f"You MUST use an absolute path starting with one of: {allowed}. "
+                f"Check your WORKSPACE variable and prefix all paths with it."
+            )
+        try:
+            p = Path(path)
+            if p.exists():
+                p.with_suffix(p.suffix + ".bak").write_text(p.read_text())
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(content)
+            # REF: arXiv:2602.20021 — SBD-08: audit destructive file writes
+            try:
+                from ..security.audit import audit_log as _audit
+
+                _audit(
+                    "code_write",
+                    "file",
+                    path,
+                    f"{len(content)} chars",
+                    actor=getattr(agent, "id", "?"),
+                )
+            except Exception:
+                pass
+            return f"Written {len(content)} chars to {path}"
+        except Exception as e:
+            return f"Error writing {path}: {e}"
+
+
+class CodeEditTool(BaseTool):
+    name = "code_edit"
+    description = "Replace a string in a file"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        path = params.get("path", "")
+        old = params.get("old_str", "")
+        new = params.get("new_str", "")
+        if not path or not old:
+            return "Error: path and old_str required"
+        # Resolve symlinks to prevent path traversal
+        path = os.path.realpath(path)
+        # REF: arXiv:2602.20021 — SBD-08: block edits to sensitive credential files
+        if _SENSITIVE_FILE_RE.search(path):
+            import logging as _log_ce2
+
+            _log_ce2.getLogger(__name__).warning(
+                "code_edit BLOCKED (sensitive file): path=%s", path
+            )
+            return f"Error: editing '{path}' is not allowed (sensitive file path)"
+        # Workspace restriction
+        if not _is_path_allowed(path):
+            import logging as _log_ce
+
+            _log_ce.getLogger(__name__).warning(
+                "code_edit BLOCKED: agent=%s path=%s", getattr(agent, "id", "?"), path
+            )
+            allowed = ", ".join(str(r) for r in _ALLOWED_WRITE_ROOTS if r.exists())
+            return (
+                f"Error: path '{path}' is outside allowed workspace directories. "
+                f"Use an absolute path starting with one of: {allowed}."
+            )
+        try:
+            content = Path(path).read_text()
+            if old not in content:
+                # Fuzzy fallback: normalize whitespace (trailing spaces, CRLF, indent drift)
+                import re as _re
+
+                def _norm(s: str) -> str:
+                    return _re.sub(r"[ \t]+\n", "\n", s.replace("\r\n", "\n"))
+
+                old_n, content_n = _norm(old), _norm(content)
+                if old_n in content_n:
+                    # Apply on normalized content
+                    content = _norm(content).replace(old_n, _norm(new), 1)
+                    Path(path).write_text(content)
+                    return f"Edited {path} (whitespace-normalized match)"
+                return f"Error: old_str not found in {path}"
+            if content.count(old) > 1:
+                return f"Error: old_str found multiple times in {path}"
+            content = content.replace(old, new, 1)
+            Path(path).write_text(content)
+            return f"Edited {path}"
+        except Exception as e:
+            return f"Error editing {path}: {e}"
+
+
+class CodeSearchTool(BaseTool):
+    name = "code_search"
+    description = "Search for a pattern in files using ripgrep"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        pattern = params.get("pattern", "")
+        path = params.get("path", ".")
+        glob = params.get("glob", "")
+        if not pattern:
+            return "Error: pattern required"
+        cmd = ["rg", "--no-heading", "-n", "--max-count", "20", pattern, path]
+        if glob:
+            cmd.extend(["--glob", glob])
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            return result.stdout[:5000] or "No matches found"
+        except Exception as e:
+            return f"Error: {e}"
+
+
+# ── Claude Code-compatible tool aliases ──────────────────────────────────────
+# Models trained on Claude data (MiniMax, Gemini, etc.) hallucinate these tool
+# names. Registering them as real tools makes those calls succeed instead of
+# producing "tool not found" errors.
+
+
+class ReadFileTool(BaseTool):
+    name = "read_file"
+    description = "Read the contents of a file (alias: code_read)"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return await CodeReadTool().execute(params, agent)
+
+
+class WriteFileTool(BaseTool):
+    name = "write_file"
+    description = "Write content to a file (alias: code_write)"
+    category = "code"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        # Claude Code uses (path, content) — same as code_write
+        return await CodeWriteTool().execute(params, agent)
+
+
+class ReadManyFilesTool(BaseTool):
+    name = "read_many_files"
+    description = "Read the contents of multiple files at once"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        paths = params.get("paths", [])
+        if isinstance(paths, str):
+            paths = [paths]
+        if not paths:
+            return "Error: paths list required"
+        reader = CodeReadTool()
+        results = []
+        for p in paths[:20]:  # cap at 20 files
+            content = await reader.execute({"path": p}, agent)
+            results.append(f"=== {p} ===\n{content}")
+        return "\n\n".join(results)
+
+
+class EditFileTool(BaseTool):
+    name = "edit_file"
+    description = "Replace a string in a file (alias: code_edit)"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        return await CodeEditTool().execute(params, agent)
+
+
+class ListFilesTool(BaseTool):
+    name = "list_files"
+    description = "List files and directories at a path"
+    category = "code"
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        path = params.get("path", ".")
+        if not os.path.exists(path):
+            return f"Error: path not found: {path}"
+        if os.path.isfile(path):
+            return path
+        try:
+            lines = []
+            for root, dirs, files in os.walk(path):
+                dirs.sort()
+                depth = root.replace(path, "").count(os.sep)
+                if depth > 3:
+                    dirs.clear()
+                    continue
+                indent = "  " * depth
+                lines.append(f"{indent}{os.path.basename(root)}/")
+                for f in sorted(files):
+                    lines.append(f"{indent}  {f}")
+            return "\n".join(lines[:200])
+        except Exception as e:
+            return f"Error listing {path}: {e}"
+
+
+class BashTool(BaseTool):
+    name = "bash"
+    description = "Execute a bash command and return its output"
+    category = "code"
+    requires_approval = True
+
+    async def execute(self, params: dict, agent: AgentInstance = None) -> str:
+        command = params.get("command", params.get("cmd", ""))
+        if not command:
+            return "Error: command required"
+        # Route through Docker sandbox when enabled (e.g. during bench runs)
+        try:
+            from . import sandbox as _sb  # late import to allow monkey-patching
+
+            if _sb.SANDBOX_ENABLED:
+                workspace = (
+                    getattr(agent, "project_path", None)
+                    or _sb.SANDBOX_WORKSPACE_VOLUME
+                    or "."
+                )
+                executor = _sb.SandboxExecutor(workspace=workspace)
+                r = executor.run(command, timeout=30)
+                return r.output[:5000] or f"(exit {r.returncode})"
+        except Exception:
+            pass  # sandbox unavailable — fall through to direct execution
+        # Direct execution fallback (non-bench context)
+        _blocked = ("rm -rf /", "mkfs", ":(){:|:&};:", "dd if=/dev/zero")
+        if any(b in command for b in _blocked):
+            return "Error: command blocked for safety"
+        try:
+            result = subprocess.run(
+                command, shell=True, capture_output=True, text=True, timeout=30
+            )
+            out = result.stdout + result.stderr
+            return out[:5000] or f"(exit {result.returncode})"
+        except subprocess.TimeoutExpired:
+            return "Error: command timed out after 30s"
+        except Exception as e:
+            return f"Error: {e}"
+
+
+def register_code_tools(registry):
+    """Register all code tools."""
+    registry.register(CodeReadTool())
+    registry.register(CodeWriteTool())
+    registry.register(CodeEditTool())
+    registry.register(CodeSearchTool())
+    # Claude Code-compatible aliases — models trained on Claude data hallucinate
+    # these tool names; registering them as real tools makes those calls work.
+    registry.register(ReadFileTool())
+    registry.register(WriteFileTool())
+    registry.register(ReadManyFilesTool())
+    registry.register(EditFileTool())
+    registry.register(ListFilesTool())
+    registry.register(BashTool())

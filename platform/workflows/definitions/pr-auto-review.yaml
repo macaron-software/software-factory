@@ -1,0 +1,22 @@
+id: pr-auto-review
+name: Automated PR Review
+description: 'Automated code review on a GitHub Pull Request by the code-reviewer agent. Fetches diff, analyzes, posts structured feedback.'
+icon: eye
+is_builtin: true
+phases:
+- id: review
+  pattern_id: solo-chat
+  name: PR Code Review
+  description: code-reviewer fetches the PR diff and posts a structured review
+  gate: always
+  config:
+    agent_id: code-reviewer
+    goal: |
+      Review the Pull Request and post feedback directly on GitHub.
+      Steps:
+      1. Use git_get_pr_diff with pr="{{ pr_ref }}" to fetch the diff
+      2. Analyze: correctness, security, performance, test coverage
+      3. Use git_post_pr_review with pr="{{ pr_ref }}", event="COMMENT", body="<your review>"
+      PR URL: {{ pr_url }}
+      PR title: {{ pr_title }}
+      Workspace: {{ cwd }}

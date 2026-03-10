@@ -1,0 +1,209 @@
+id: feature-sprint
+name: Feature Sprint — TDD Cycle
+description: Workflow réutilisable pour chaque Feature d'un Epic. Design → TDD Sprint → Adversarial Review → E2E Tests → Deploy.
+  Utilisé par chaque Feature Team dans le cadre d'un epic-decompose.
+icon: repeat
+is_builtin: true
+phases:
+- id: feature-design
+  pattern_id: aggregator
+  name: Feature Design
+  description: >
+    Lead + Archi analysent le brief et DÉCIDENT du workflow adapté.
+    RÈGLE CRITIQUE — avant tout design, évaluer la complexité :
+    • Si le brief décrit UNE fonction / UN endpoint / UN module simple (< 5 fichiers estimés)
+      → continuer en feature-sprint normalement.
+    • Si le brief décrit UN système complet (auth, API multi-routes, CRUD, microservice, etc.)
+      → émettre exactement [ESCALATE: epic-decompose] dans la réponse pour basculer
+        automatiquement vers la décomposition en Epic avec Feature Teams parallèles.
+    En cas d'escalade, ne pas écrire de code — juste [ESCALATE: epic-decompose] + 1 phrase
+    expliquant pourquoi.
+    Sinon : définir OBLIGATOIREMENT pour chaque feature :
+    1. PERSONA : qui utilise ce feature (nom, rôle, besoin concret) — pas "casual user"
+    2. USER STORIES : "En tant que [persona], je veux [action] afin de [bénéfice]"
+    3. ACCEPTANCE CRITERIA testables : conditions précises vérifiables par un test E2E
+    4. DEFINITION OF DONE : build Docker OK + tests E2E passent + screenshots capturés
+    Sans ces 4 éléments, la phase n'est pas terminée.
+  gate: always
+  skip_on_failure: true
+  timeout: 600
+  config:
+    agents:
+    - product
+    - system-architect-art
+    dynamic_lead: true
+- id: env-setup
+  pattern_id: sequential
+  name: Environment Setup
+  description: >
+    DevOps lit le brief et détecte la stack technique (Rust/Node/Python/Go/etc.).
+    Écrit Dockerfile adapté à la stack (multi-stage si nécessaire). Attention aux versions :
+    Rust WASM nécessite rust:latest (pas 1.77), Node WASM nécessite node:20+.
+    OBLIGATOIRE — appeler docker_deploy(cwd=workspace, mission_id=...) pour vérifier que
+    le build Docker réussit réellement. Un Dockerfile "bien écrit" ne suffit PAS — il faut
+    que docker build + docker run + health check passent tous. Si docker_deploy retourne FAIL,
+    corriger les erreurs de compilation/configuration avant de passer à la suite.
+    BLOQUANT : la phase tdd-sprint ne démarre pas tant que docker_deploy ne retourne pas OK.
+    Ne jamais utiliser uniquement build() (cargo/npm natif) — toujours docker_deploy().
+  gate: always
+  skip_on_failure: true
+  timeout: 600
+  config:
+    agents:
+    - ft-infra-lead
+- id: tdd-sprint
+  pattern_id: loop
+  name: TDD Sprint
+  description: 'Devs implémentent en TDD. RED→GREEN→REFACTOR. FRACTAL: feature/guards/failures.'
+  gate: no_veto
+  skip_on_failure: true
+  timeout: 1200
+  config:
+    agents: []
+    max_iterations: 3
+    dynamic_team: true
+- id: adversarial-review
+  pattern_id: sequential
+  name: Adversarial Review
+  description: L0 fast checks → L1 code critic → L2 architecture critic. Multi-vendor cascade.
+  gate: all_approved
+  skip_on_failure: false
+  timeout: 600
+  config:
+    agents:
+    - system-architect-art
+    dynamic_reviewers: true
+- id: feature-e2e
+  pattern_id: parallel
+  name: Tests E2E
+  description: >
+    Tests E2E API + IHM en parallèle. Smoke + journeys complets.
+    OBLIGATOIRE — AVANT tout test Playwright, appeler docker_deploy(cwd=workspace, mission_id=...)
+    pour démarrer le container projet et obtenir l'URL (ex: http://127.0.0.1:9100).
+    Utiliser CETTE URL dans tous les tests (pas localhost:8080 en dur).
+    Vérifier que docker_deploy retourne OK et une URL valide avant de lancer playwright_test.
+    Si docker_deploy échoue, signaler VETO avec les logs d'erreur — ne pas lancer les tests.
+    Après les tests, prendre des screenshots avec screenshot(url=...) pour documenter les journeys.
+    Un résultat {"status":"failed","failedTests":[]} signifie que le serveur n'était PAS démarré
+    — c'est un ÉCHEC, pas un succès. Toujours vérifier status="passed" ET failedTests=[].
+  gate: all_approved
+  skip_on_failure: true
+  timeout: 900
+  config:
+    agents:
+    - ft-e2e-api
+    - ft-e2e-ihm
+    max_iterations: 2
+- id: feature-deploy
+  pattern_id: sequential
+  name: Deploy Feature
+  description: Build → Staging → Canary. Rollback auto si erreur.
+  gate: no_veto
+  skip_on_failure: true
+  timeout: 600
+  config:
+    agents:
+    - ft-infra-lead
+    dynamic_deployer: true
+config:
+  graph:
+    nodes:
+    - id: n0
+      agent_id: ft-infra-lead
+      x: 400
+      y: -80
+      label: Env Setup
+      phase: env-setup
+    - id: n1
+      agent_id: system-architect-art
+      x: 400
+      y: 20
+      label: Design
+      phase: feature-design
+    - id: n2
+      agent_id: ft-auth-lead
+      x: 200
+      y: 150
+      label: TDD Dev 1
+      phase: tdd-sprint
+    - id: n3
+      agent_id: ft-auth-dev1
+      x: 400
+      y: 150
+      label: TDD Dev 2
+      phase: tdd-sprint
+    - id: n4
+      agent_id: ft-auth-dev2
+      x: 600
+      y: 150
+      label: TDD Dev 3
+      phase: tdd-sprint
+    - id: n5
+      agent_id: system-architect-art
+      x: 400
+      y: 280
+      label: Review
+      phase: adversarial-review
+    - id: n6
+      agent_id: ft-e2e-api
+      x: 300
+      y: 380
+      label: E2E API
+      phase: feature-e2e
+    - id: n7
+      agent_id: ft-e2e-ihm
+      x: 500
+      y: 380
+      label: E2E IHM
+      phase: feature-e2e
+    - id: n8
+      agent_id: ft-infra-lead
+      x: 400
+      y: 480
+      label: Deploy
+      phase: feature-deploy
+    edges:
+    - from: n0
+      to: n1
+      label: env ready
+      color: '#a855f7'
+    - from: n1
+      to: n2
+      label: stories
+      color: '#58a6ff'
+    - from: n1
+      to: n3
+      label: stories
+      color: '#58a6ff'
+    - from: n1
+      to: n4
+      label: stories
+      color: '#58a6ff'
+    - from: n2
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n3
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n4
+      to: n5
+      label: code
+      color: '#3fb950'
+    - from: n5
+      to: n6
+      label: approved
+      color: '#ec4899'
+    - from: n5
+      to: n7
+      label: approved
+      color: '#ec4899'
+    - from: n6
+      to: n8
+      label: pass
+      color: '#d29922'
+    - from: n7
+      to: n8
+      label: pass
+      color: '#d29922'

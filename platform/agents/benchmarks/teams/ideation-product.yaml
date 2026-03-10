@@ -1,0 +1,34 @@
+team_id: ideation-product
+technology: generic
+phase_type: ideation
+description: Product ideation team — brain + product manager brainstorm
+
+pattern:
+  type: sequential
+  agents:
+    - id: brain
+    - id: dev
+
+task: |
+  Brainstorm and design a new feature for a mobile banking app:
+  "Smart Savings Goals" — users set savings targets and the app
+  automatically rounds up transactions and transfers spare change.
+
+  Produce:
+  1. User stories (at least 5)
+  2. Technical architecture overview
+  3. MVP scope (what's in v1 vs later)
+  4. Key risks and mitigations
+
+checks:
+  - has_keyword:user story
+  - has_keyword:MVP
+  - has_keyword:risk
+  - has_keyword:architecture
+  - length_min:500
+
+expectations:
+  - "Produces at least 5 clear user stories in Given/When/Then or As a/I want/So that format"
+  - "Defines a technical architecture with key components (API, scheduler, bank integration)"
+  - "Clearly separates MVP scope from future iterations"
+  - "Identifies realistic risks (bank API, regulatory, UX)"

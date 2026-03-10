@@ -1,0 +1,20 @@
+team_id: team-data-pipeline
+technology: data
+phase_type: development
+description: Team team-data-pipeline — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: data_engineer
+  - id: data_analyst
+  - id: ml_engineer
+task: 'Design a real-time analytics pipeline: ingest user events (page views, clicks, purchases), compute key metrics (DAU,
+  conversion rate, revenue), store for dashboarding, and train a churn prediction model.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

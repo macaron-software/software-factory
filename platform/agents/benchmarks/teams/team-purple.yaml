@@ -1,0 +1,20 @@
+team_id: team-purple
+technology: generic
+phase_type: development
+description: Team team-purple — end-to-end collaboration bench
+pattern:
+  type: sequential
+  agents:
+  - id: security-dev-lead
+  - id: security-backend-dev
+  - id: security-frontend-dev
+task: 'Implement secure file upload: validate file types (images only), scan for embedded malware signatures, sanitize metadata,
+  store outside webroot, serve via signed URLs with expiry. Write security tests.'
+checks:
+- has_keyword:implement
+- has_keyword:test
+- length_min:300
+expectations:
+- Each agent contributes according to their role
+- Output is coherent and addresses the full task
+- Code or technical content is present where expected

@@ -1,0 +1,53 @@
+id: tech-rust
+name: "Rust"
+stack: rust
+description: "Rust production patterns — memory safety, async, error handling, testing"
+
+content: |
+  ## Build & Test
+  cargo build --release          # prod build
+  cargo test                     # all tests
+  cargo test -- --nocapture      # show println!
+  cargo clippy -- -D warnings    # lint as errors
+  cargo fmt                      # format
+  cargo audit                    # security audit
+
+  ## Error Handling
+  - Use `?` operator — never `.unwrap()` or `.expect()` in production code
+  - `anyhow::Result<T>` for application errors (propagation)
+  - `thiserror` for library errors (typed, Display impl)
+  - Wrap with context: `err.context("reading config")`
+  - `errors.Is()` equivalent: `matches!(e, MyError::Variant)`
+
+  ## Async (Tokio)
+  - `#[tokio::main]` on main, `#[tokio::test]` on tests
+  - `tokio::spawn()` for background tasks — store `JoinHandle`
+  - `tokio::select!` for racing futures
+  - `Arc<Mutex<T>>` for shared state — prefer channels (`tokio::sync::mpsc`)
+  - `timeout(Duration, future).await` — always set timeouts on I/O
+
+  ## Axum (HTTP)
+  Router::new()
+    .route("/health", get(health_handler))
+    .route("/api/items", post(create_item).get(list_items))
+    .with_state(Arc::new(AppState { db: pool }))
+  - Handler: `async fn handler(State(state): State<Arc<AppState>>) -> impl IntoResponse`
+  - Error response: return `(StatusCode::BAD_REQUEST, Json(json!({"error": "..."}))).into_response()`
+  - Extractors: `Json<T>`, `Path<T>`, `Query<T>`, `State<T>` — all implement `FromRequest`
+
+  ## Memory Rules
+  - Prefer `&T` over `.clone()` — only clone when lifetime requires it
+  - `Vec::with_capacity(n)` when size is known
+  - Drop large values early: explicit `drop(val)` before long operations
+  - Avoid `Arc<Mutex<Vec<...>>>` hot paths — use channels instead
+
+  ## Testing
+  #[cfg(test)]
+  mod tests {
+      use super::*;
+      #[tokio::test]
+      async fn test_handler() { ... }
+  }
+  - Integration: `axum_test::TestServer` or `reqwest` against real server
+  - Mock HTTP: `wiremock` crate
+  - Snapshot: `insta` crate

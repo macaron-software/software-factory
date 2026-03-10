@@ -1,0 +1,29 @@
+agent_id: devops
+technology: generic
+phase_type: operations
+description: DevOps / SRE — CI/CD, infrastructure, deployment
+eval_cases:
+- id: cicd-pipeline
+  input: 'Design a CI/CD pipeline for a Python FastAPI application with: unit tests (pytest), linting (ruff), Docker build,
+    staging deploy, E2E tests (Playwright), production deploy with canary. Use GitHub Actions YAML format.'
+  checks:
+  - has_keyword:pytest
+  - has_keyword:docker
+  - has_keyword:deploy
+  - length_min:300
+  expectations:
+  - Produces valid GitHub Actions YAML structure
+  - Includes all requested stages in order
+  - Implements canary deployment strategy
+  - Includes rollback mechanism
+- id: incident-response
+  input: 'Production alert: API response time increased from 50ms to 2000ms in the last 15 minutes. CPU is at 30%, memory
+    at 60%, DB connections at 95%. Describe your incident response steps, diagnosis approach, and likely root cause.'
+  checks:
+  - has_keyword:connection
+  - has_keyword:database
+  - length_min:250
+  expectations:
+  - Identifies DB connection pool exhaustion as likely cause
+  - Provides step-by-step diagnosis approach
+  - Suggests immediate mitigation (increase pool, kill idle connections)

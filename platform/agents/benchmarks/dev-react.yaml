@@ -1,0 +1,75 @@
+agent_id: dev_fullstack
+technology: react_18
+phase_type: development
+description: React 18 — hooks, server components, TypeScript, testing with React Testing Library
+
+eval_cases:
+  - id: custom-hook-data-fetching
+    input: |
+      Create a custom React hook useAsync<T>(asyncFn, deps) that:
+      - Manages loading, error, data states
+      - Cancels pending requests on unmount or dependency change
+      - Supports retry with exponential backoff (max 3 retries)
+      - Returns { data, error, loading, retry, reset }
+
+      Write the hook in TypeScript and test it with React Testing Library + jest.
+      Include tests for: successful fetch, error handling, retry logic,
+      cleanup on unmount, dependency change cancellation.
+    checks:
+      - has_keyword:useState
+      - has_keyword:useEffect
+      - has_keyword:AbortController
+      - has_keyword:retry
+      - has_keyword:render
+      - length_min:400
+    expectations:
+      - "Hook uses useState for data/error/loading state management"
+      - "Uses AbortController for request cancellation on cleanup"
+      - "Implements exponential backoff retry (delay doubles each attempt)"
+      - "Tests verify loading→success and loading→error transitions"
+      - "Tests verify cleanup/cancellation on unmount"
+
+  - id: performance-optimization
+    input: |
+      This React component re-renders too often. Identify the issues and fix them:
+
+      function UserDashboard({ userId }) {
+        const [user, setUser] = useState(null);
+        const [posts, setPosts] = useState([]);
+        const [filter, setFilter] = useState('');
+
+        useEffect(() => {
+          fetch(`/api/users/${userId}`).then(r => r.json()).then(setUser);
+          fetch(`/api/users/${userId}/posts`).then(r => r.json()).then(setPosts);
+        }, [userId]);
+
+        const filteredPosts = posts.filter(p =>
+          p.title.toLowerCase().includes(filter.toLowerCase())
+        );
+
+        const stats = {
+          total: posts.length,
+          published: posts.filter(p => p.status === 'published').length,
+          draft: posts.filter(p => p.status === 'draft').length,
+        };
+
+        return (
+          <div>
+            <UserHeader user={user} stats={stats} />
+            <input value={filter} onChange={e => setFilter(e.target.value)} />
+            <PostList posts={filteredPosts} />
+          </div>
+        );
+      }
+
+      Apply React.memo, useMemo, useCallback where needed. Explain each fix.
+    checks:
+      - has_keyword:useMemo
+      - has_keyword:memo
+      - has_keyword:useCallback
+      - length_min:300
+    expectations:
+      - "Memoizes filteredPosts with useMemo (recomputes only when posts or filter change)"
+      - "Memoizes stats object with useMemo (object reference stability)"
+      - "Wraps UserHeader and/or PostList with React.memo"
+      - "Explains WHY each optimization prevents unnecessary re-renders"

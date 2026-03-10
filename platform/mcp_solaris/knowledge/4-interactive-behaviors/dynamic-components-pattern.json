@@ -1,0 +1,194 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-09",
+  "description": "Pattern for dynamic components that have multiple states (expanded/collapsed, open/closed, etc.)",
+  
+  "problem": {
+    "description": "Figma exports separate variants for each state (Collapsed, Expanded). The generator creates separate HTML for each variant. But a real component needs ALL states in the same DOM structure, with CSS/JS toggling between them.",
+    "example": {
+      "figma_export": [
+        "Accordion State=Collapsed → HTML without content",
+        "Accordion State=Expanded → HTML with content"
+      ],
+      "expected_html": "Single accordion with header + content, content hidden/shown via CSS/JS"
+    }
+  },
+  
+  "solution": {
+    "approach": "State Merging",
+    "description": "When generating HTML for a dynamic component, merge the structures from all state variants into a single DOM. Use CSS classes and data-attributes to toggle between states.",
+    "steps": [
+      "1. Identify state property (State, Open, Expanded, etc.)",
+      "2. Find the 'expanded' or 'open' variant that has the most complete structure",
+      "3. Use that structure as the base HTML",
+      "4. Apply the 'collapsed' or 'closed' styles as default",
+      "5. Add data-state attribute for JS toggling",
+      "6. Hide expandable content with CSS by default",
+      "7. JS toggles data-state and CSS shows/hides content"
+    ]
+  },
+  
+  "components_with_dynamic_states": {
+    "accordion": {
+      "state_property": "State",
+      "states": ["Collapsed", "Expanded", "Hover", "Focus", "Disabled"],
+      "dynamic_states": ["Collapsed", "Expanded"],
+      "static_states": ["Hover", "Focus", "Disabled"],
+      "content_element": "__content",
+      "trigger_element": "__title-wrapper"
+    },
+    "modal": {
+      "state_property": "State",
+      "states": ["Closed", "Open"],
+      "dynamic_states": ["Closed", "Open"],
+      "content_element": "__dialog",
+      "trigger_element": "external button"
+    },
+    "dropdown": {
+      "state_property": "State", 
+      "states": ["Closed", "Open"],
+      "dynamic_states": ["Closed", "Open"],
+      "content_element": "__menu",
+      "trigger_element": "__trigger"
+    },
+    "select": {
+      "state_property": "State",
+      "states": ["Closed", "Open"],
+      "dynamic_states": ["Closed", "Open"],
+      "content_element": "__listbox",
+      "trigger_element": "__button"
+    },
+    "tooltip": {
+      "state_property": "Visible",
+      "states": ["Hidden", "Visible"],
+      "dynamic_states": ["Hidden", "Visible"],
+      "content_element": "__content",
+      "trigger_element": "external element"
+    },
+    "tabs": {
+      "state_property": "Selected",
+      "states": ["Default", "Selected"],
+      "dynamic_states": ["Default", "Selected"],
+      "content_element": "__panel",
+      "trigger_element": "__tab"
+    }
+  },
+  
+  "reference_implementations": {
+    "radix_ui": {
+      "url": "https://www.radix-ui.com/primitives/docs/components/accordion",
+      "pattern": {
+        "structure": "Root > Item > (Trigger + Content)",
+        "state_management": "data-state attribute",
+        "animation": "CSS transitions on [data-state=open/closed]",
+        "accessibility": "aria-expanded on trigger, aria-controls linking"
+      },
+      "code_example": "<Accordion.Item><AccordionTrigger/><AccordionContent/></Accordion.Item>"
+    },
+    "chakra_ui": {
+      "url": "https://chakra-ui.com/docs/components/accordion",
+      "pattern": {
+        "structure": "Root > Item > (ItemTrigger + ItemContent > ItemBody)",
+        "state_management": "useAccordionItemContext for item.open",
+        "props": ["collapsible", "multiple", "lazyMount", "unmountOnExit"],
+        "accessibility": "Built-in ARIA management"
+      }
+    },
+    "carbon_design": {
+      "url": "https://carbondesignsystem.com/components/accordion/usage/",
+      "pattern": {
+        "structure": "Accordion > AccordionItem > (title + content)",
+        "state_management": "open prop on AccordionItem",
+        "animation": "CSS max-height transition"
+      }
+    }
+  },
+  
+  "html_pattern": {
+    "accordion": {
+      "structure": [
+        "<div class='accordion' data-component='accordion'>",
+        "  <div class='accordion__item' data-state='collapsed'>",
+        "    <button class='accordion__trigger' aria-expanded='false' aria-controls='panel-1'>",
+        "      <span class='accordion__title'>Title</span>",
+        "      <svg class='accordion__icon'>chevron</svg>",
+        "    </button>",
+        "    <div class='accordion__panel' id='panel-1' role='region' aria-labelledby='trigger-1' hidden>",
+        "      <div class='accordion__content'>Content here</div>",
+        "    </div>",
+        "  </div>",
+        "</div>"
+      ],
+      "key_points": [
+        "Content is ALWAYS in DOM, just hidden",
+        "Button is the trigger (natively focusable)",
+        "aria-expanded toggles with state",
+        "hidden attribute or CSS hides panel",
+        "data-state for CSS styling hooks"
+      ]
+    }
+  },
+  
+  "css_pattern": {
+    "accordion": {
+      "collapsed": {
+        ".accordion__panel": "max-height: 0; overflow: hidden;",
+        ".accordion__icon": "transform: rotate(0deg);"
+      },
+      "expanded": {
+        ".accordion__panel": "max-height: var(--panel-height, 1000px);",
+        ".accordion__icon": "transform: rotate(180deg);"
+      },
+      "transitions": {
+        ".accordion__panel": "transition: max-height 0.3s ease;",
+        ".accordion__icon": "transition: transform 0.3s ease;"
+      }
+    }
+  },
+  
+  "js_pattern": {
+    "accordion": {
+      "toggle": [
+        "const trigger = accordion.querySelector('.accordion__trigger');",
+        "const panel = accordion.querySelector('.accordion__panel');",
+        "const isExpanded = trigger.getAttribute('aria-expanded') === 'true';",
+        "",
+        "trigger.setAttribute('aria-expanded', !isExpanded);",
+        "accordion.setAttribute('data-state', isExpanded ? 'collapsed' : 'expanded');",
+        "panel.hidden = isExpanded;"
+      ],
+      "keyboard": {
+        "Enter": "toggle",
+        "Space": "toggle",
+        "ArrowDown": "focus next trigger",
+        "ArrowUp": "focus previous trigger",
+        "Home": "focus first trigger",
+        "End": "focus last trigger"
+      }
+    }
+  },
+  
+  "generator_implementation": {
+    "approach": "State Merging in Generator",
+    "pseudo_code": [
+      "function generateDynamicComponent(componentSet) {",
+      "  const stateProperty = findStateProperty(componentSet);",
+      "  if (!stateProperty) return generateStatic(componentSet);",
+      "  ",
+      "  // Find expanded variant (has most complete structure)",
+      "  const expandedVariant = findVariantWithState(componentSet, 'Expanded');",
+      "  const collapsedVariant = findVariantWithState(componentSet, 'Collapsed');",
+      "  ",
+      "  // Use expanded structure as base",
+      "  const html = generateHTMLFromVariant(expandedVariant);",
+      "  ",
+      "  // Apply collapsed state as default",
+      "  html.setAttribute('data-state', 'collapsed');",
+      "  html.querySelector('[aria-expanded]')?.setAttribute('aria-expanded', 'false');",
+      "  html.querySelector('.accordion__panel')?.setAttribute('hidden', '');",
+      "  ",
+      "  return html;",
+      "}"
+    ]
+  }
+}

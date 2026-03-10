@@ -1,0 +1,39 @@
+team_id: tma-maintenance
+technology: generic
+phase_type: maintenance
+description: TMA maintenance team — wave pattern for incident response
+
+pattern:
+  type: sequential
+  agents:
+    - id: brain
+    - id: dev
+    - id: secops-engineer
+
+task: |
+  Handle a production incident:
+  The application is returning HTTP 500 errors on the /api/users endpoint.
+  Error log shows:
+  ```
+  [ERROR] ConnectionError: too many connections (max=100, active=98)
+  [ERROR] TimeoutError: query exceeded 30s limit on users table
+  [WARN] Memory usage at 89% (threshold: 85%)
+  ```
+
+  1. Diagnose the root cause
+  2. Propose immediate mitigation (< 5 min)
+  3. Propose long-term fix
+  4. Security review of the incident
+
+checks:
+  - has_keyword:connection
+  - has_keyword:pool
+  - has_keyword:timeout
+  - has_keyword:memory
+  - length_min:400
+
+expectations:
+  - "Root cause analysis identifies connection pool exhaustion as primary issue"
+  - "Immediate mitigation includes connection pool restart or limit increase"
+  - "Long-term fix addresses query optimization and connection pooling config"
+  - "Security review checks for potential DoS vector or connection leak"

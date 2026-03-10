@@ -1,0 +1,55 @@
+# Agent definition template — copy and customize.
+# Supported fields (all optional except id, name, role):
+
+id: my_custom_agent
+name: "My Custom Agent"
+version: "1.0"
+
+# Visual identity (optional — fallback to role-level defaults)
+icon: bot           # lucide icon name
+color: "#6366f1"    # hex color for card/avatar
+avatar: "MC"        # 2-letter initials
+tagline: "Short punchy tagline"
+
+description: "One-line description shown in agent cards and marketplace."
+
+persona:
+  description: >
+    Longer description of personality, expertise and working style.
+  traits:
+    - Trait 1
+    - Trait 2
+
+motivation: "What drives this agent."
+
+system_prompt: |
+  You are [role description]. Your responsibilities:
+  1. ...
+  2. ...
+
+# LLM settings (optional — inherits platform defaults)
+llm:
+  provider: minimax   # optional override
+  model: MiniMax-M2.5  # optional override
+  temperature: 0.7
+  max_tokens: 4096
+
+skills:
+  - tdd
+
+tools:
+  - code_read
+  - code_search
+  - memory_search
+
+mcps: []
+
+permissions:
+  can_veto: false
+  can_delegate: false
+  can_approve: false
+
+hierarchy_rank: 50   # 1-100, higher = more senior
+
+tags: []  # use SAFe tags: portfolio, solution, art, team, transverse
+          # or domain tags: llm, ops, security, qa, frontend, etc.

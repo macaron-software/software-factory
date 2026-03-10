@@ -1,0 +1,174 @@
+id: cicd-pipeline
+name: Pipeline CI/CD
+description: Configuration pipeline → build & tests → quality gates → déploiement canary → monitoring.
+icon: zap
+is_builtin: true
+phases:
+- id: setup
+  pattern_id: hierarchical
+  name: Setup Pipeline
+  description: Le Pipeline Engineer conçoit le workflow GitHub Actions/GitLab CI. Le DevOps définit les environments (staging,
+    canary, prod). Le DevSecOps configure les scans de sécurité.
+  gate: always
+  config:
+    agents:
+    - pipeline_engineer
+    - devops
+    - devsecops
+- id: build-test
+  pattern_id: sequential
+  name: Build & Tests
+  description: 'Le Pipeline Engineer configure les jobs: lint → build → unit tests → integration tests. Le Test Automation
+    intègre les tests E2E. Le Lead Dev valide les configurations.'
+  gate: always
+  config:
+    agents:
+    - pipeline_engineer
+    - test_automation
+    - lead_dev
+- id: quality-gates
+  pattern_id: parallel
+  name: Quality Gates
+  description: 'En parallèle: le QA valide la couverture (≥80%), la Sécurité lance le SAST/DAST, le Perf Engineer configure
+    les benchmarks. Tous les gates doivent passer.'
+  gate: all_approved
+  config:
+    agents:
+    - qa_lead
+    - securite
+    - performance_engineer
+    - pipeline_engineer
+- id: deploy
+  pattern_id: sequential
+  name: Deploy Canary → Prod
+  description: Le DevOps déploie en canary (1%→10%→50%→100%). Le SRE monitore les métriques. Rollback automatique si error_rate
+    > baseline+5%. Le Chef de Projet valide le GO prod.
+  gate: all_approved
+  config:
+    agents:
+    - devops
+    - sre
+    - pipeline_engineer
+    - chef_projet
+config:
+  graph:
+    pattern: sequential
+    nodes:
+    - id: n1
+      agent_id: pipeline_engineer
+      x: 400
+      y: 20
+      label: Pipeline Engineer
+    - id: n2
+      agent_id: devops
+      x: 250
+      y: 130
+      label: DevOps
+    - id: n3
+      agent_id: devsecops
+      x: 550
+      y: 130
+      label: DevSecOps
+    - id: n4
+      agent_id: test_automation
+      x: 200
+      y: 260
+      label: Test Automation
+    - id: n5
+      agent_id: lead_dev
+      x: 400
+      y: 260
+      label: Lead Dev
+    - id: n6
+      agent_id: qa_lead
+      x: 150
+      y: 370
+      label: QA Lead
+    - id: n7
+      agent_id: securite
+      x: 350
+      y: 370
+      label: Sécurité
+    - id: n8
+      agent_id: performance_engineer
+      x: 550
+      y: 370
+      label: Perf Engineer
+    - id: n9
+      agent_id: sre
+      x: 300
+      y: 480
+      label: SRE
+    - id: n10
+      agent_id: chef_projet
+      x: 500
+      y: 480
+      label: Chef de Projet
+    edges:
+    - from: n1
+      to: n2
+      label: environments
+      color: '#a855f7'
+    - from: n1
+      to: n3
+      label: scans sécu
+      color: '#a855f7'
+    - from: n1
+      to: n4
+      label: tests E2E
+      color: '#3b82f6'
+    - from: n1
+      to: n5
+      label: config
+      color: '#3b82f6'
+    - from: n4
+      to: n6
+      label: couverture
+      color: '#10b981'
+    - from: n3
+      to: n7
+      label: SAST/DAST
+      color: '#ef4444'
+    - from: n5
+      to: n8
+      label: benchmarks
+      color: '#f59e0b'
+    - from: n6
+      to: n1
+      label: GO QA
+      color: '#10b981'
+    - from: n7
+      to: n1
+      label: GO sécu
+      color: '#10b981'
+    - from: n8
+      to: n1
+      label: GO perf
+      color: '#10b981'
+    - from: n2
+      to: n9
+      label: canary
+      color: '#8b5cf6'
+    - from: n9
+      to: n10
+      label: GO prod
+      color: '#ef4444'
+  agents_permissions:
+    pipeline_engineer:
+      can_veto: true
+      veto_level: STRONG
+      can_delegate: true
+    devops:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true
+    qa_lead:
+      can_veto: true
+      veto_level: ABSOLUTE
+    securite:
+      can_veto: true
+      veto_level: ABSOLUTE
+    sre:
+      can_veto: true
+      veto_level: STRONG
+      can_approve: true

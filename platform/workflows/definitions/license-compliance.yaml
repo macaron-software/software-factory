@@ -1,0 +1,85 @@
+id: license-compliance
+name: License & SBOM Compliance
+description: Automated dependency license scanning, SBOM generation, and vulnerability audit.
+icon: 📜
+is_builtin: true
+phases:
+- id: dep-scan
+  pattern_id: parallel
+  name: Dependency Scan
+  description: Scan all dependency manifests (package.json, requirements.txt, Cargo.toml, go.mod)
+  gate: All dependencies inventoried with licenses
+  config:
+    agents:
+    - license-scanner
+- id: license-audit
+  pattern_id: sequential
+  name: License Audit
+  description: Classify licenses (permissive/copyleft/proprietary), flag incompatibilities
+  gate: No license conflicts detected or exceptions documented
+  config:
+    agents:
+    - license-scanner
+    - compliance_officer
+- id: sbom-gen
+  pattern_id: sequential
+  name: SBOM Generation
+  description: Generate Software Bill of Materials in SPDX/CycloneDX format
+  gate: SBOM generated and validated
+  config:
+    agents:
+    - license-scanner
+- id: vuln-check
+  pattern_id: sequential
+  name: Vulnerability Check
+  description: Cross-reference dependencies against CVE databases (NVD, GitHub Advisory)
+  gate: No critical/high CVEs or mitigation plan in place
+  config:
+    agents:
+    - license-scanner
+    - securite
+config:
+  schedule: per-release
+  graph:
+    nodes:
+    - id: n1
+      agent_id: license-scanner
+      x: 100
+      y: 150
+      label: Dep Scan
+      phase: dep-scan
+    - id: n2
+      agent_id: license-scanner
+      x: 300
+      y: 100
+      label: License Audit
+      phase: license-audit
+    - id: n3
+      agent_id: license-scanner
+      x: 300
+      y: 200
+      label: SBOM
+      phase: sbom-gen
+    - id: n4
+      agent_id: securite
+      x: 500
+      y: 150
+      label: CVE Check
+      phase: vuln-check
+    edges:
+    - from: n1
+      to: n2
+      label: deps found
+      color: '#10b981'
+    - from: n1
+      to: n3
+      label: inventory
+      color: '#10b981'
+    - from: n2
+      to: n4
+      label: licenses ok
+      color: '#3fb950'
+    - from: n3
+      to: n4
+      label: sbom ready
+      color: '#3fb950'

@@ -1,0 +1,38 @@
+team_id: security-audit
+technology: generic
+phase_type: security
+description: Security audit team — adversarial cascade with CISO leading
+
+pattern:
+  type: sequential
+  agents:
+    - id: ciso
+    - id: secops-engineer
+
+task: |
+  Perform a security audit of the following FastAPI endpoint:
+
+  ```python
+  @app.post("/api/login")
+  async def login(username: str = Form(), password: str = Form()):
+      user = db.execute("SELECT * FROM users WHERE username='" + username + "'")
+      if user and user.password == password:
+          token = jwt.encode({"sub": username}, "secret123", algorithm="HS256")
+          return {"token": token}
+      raise HTTPException(401, "Invalid credentials")
+  ```
+
+  Identify all security vulnerabilities and provide remediation steps.
+
+checks:
+  - has_keyword:SQL injection
+  - has_keyword:password
+  - has_keyword:secret
+  - has_keyword:remediation
+  - length_min:400
+
+expectations:
+  - "Identifies SQL injection vulnerability in the query construction"
+  - "Flags hardcoded JWT secret as a critical issue"
+  - "Identifies plain-text password comparison (no hashing)"
+  - "Provides concrete remediation code or steps for each vulnerability"
