@@ -426,6 +426,7 @@ class PgConnectionWrapper:
                         psycopg.errors.DuplicateColumn,
                         psycopg.errors.DuplicateObject,
                         psycopg.errors.UniqueViolation,
+                        psycopg.errors.UndefinedTable,
                     ),
                 )
                 if is_harmless:

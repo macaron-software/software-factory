@@ -1013,7 +1013,25 @@ CREATE TABLE IF NOT EXISTS mercato_transfers (
 -- PERFORMANCE INDEXES v2 (added 2026-03-08)
 -- ============================================================================
 
--- phase_outcomes: engine reads AVG(duration_s) WHERE pattern_id=? on every phase
+-- phase_outcomes: GA/RL empirical data (must exist before indexes)
+CREATE TABLE IF NOT EXISTS phase_outcomes (
+    id SERIAL PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    pattern_id TEXT NOT NULL,
+    phase_id TEXT NOT NULL,
+    agent_ids TEXT NOT NULL,
+    team_size INTEGER DEFAULT 1,
+    success INTEGER DEFAULT 0,
+    quality_score REAL DEFAULT 0.0,
+    duration_s REAL DEFAULT 0.0,
+    complexity_tier TEXT DEFAULT 'simple',
+    ab_group TEXT DEFAULT '',
+    rejection_count INTEGER DEFAULT 0,
+    mem_store_count INTEGER DEFAULT 0,
+    mem_retrieve_count INTEGER DEFAULT 0,
+    mem_prune_count INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 CREATE INDEX IF NOT EXISTS idx_po_pattern ON phase_outcomes(pattern_id);
 CREATE INDEX IF NOT EXISTS idx_po_created ON phase_outcomes(created_at DESC);
 
@@ -1045,7 +1063,25 @@ CREATE INDEX IF NOT EXISTS idx_llt_session_created ON llm_traces(session_id, cre
 -- rl_experience: created_at for future purge/window queries
 CREATE INDEX IF NOT EXISTS idx_rl_exp_created ON rl_experience(created_at DESC);
 
--- admin_audit_log: resource-level lookups
+-- admin_audit_log: security audit log (must exist before indexes)
+CREATE TABLE IF NOT EXISTS admin_audit_log (
+    id SERIAL PRIMARY KEY,
+    actor TEXT,
+    action TEXT,
+    resource_type TEXT,
+    resource_id TEXT,
+    detail TEXT,
+    ip TEXT,
+    user_agent TEXT,
+    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+    event_type TEXT,
+    actor_id TEXT,
+    target_type TEXT,
+    target_id TEXT,
+    severity TEXT,
+    blocked BOOLEAN DEFAULT false,
+    context_json TEXT
+);
 CREATE INDEX IF NOT EXISTS idx_aal_resource ON admin_audit_log(resource_type, resource_id);
 
 -- tool_calls: agent activity windows
