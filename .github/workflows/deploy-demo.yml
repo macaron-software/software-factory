@@ -267,7 +267,10 @@ jobs:
           TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           SHA=$(git rev-parse --short HEAD)
           echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
-          rsync -az --checksum --delete \
+          # Fix ownership on dirs that platform process may have created as root
+          ssh sfadmin@${{ secrets.SF_NODE1_IP }} \
+            'sudo chown -R sfadmin:sfadmin /home/sfadmin/platform/ 2>/dev/null || true'
+          rsync -az --checksum --delete --force \
             --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
             platform/ \
             sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/platform/
@@ -287,7 +290,9 @@ jobs:
         if: steps.skip.outputs.skipped != 'true'
         run: |
           ssh-keyscan -H "${{ secrets.SF_NODE2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
-          rsync -az --checksum --delete \
+          ssh sfadmin@${{ secrets.SF_NODE2_IP }} \
+            'sudo chown -R sfadmin:sfadmin /home/sfadmin/platform/ 2>/dev/null || true'
+          rsync -az --checksum --delete --force \
             --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
             platform/ \
             sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/platform/
