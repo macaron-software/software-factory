@@ -106,6 +106,7 @@ phases:
     - ft-infra-lead
     dynamic_deployer: true
 config:
+  pm_driven: true
   graph:
     nodes:
     - id: n0
