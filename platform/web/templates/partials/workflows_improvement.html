@@ -1,0 +1,680 @@
+{# Amélioration Continue Tab — AC projects overview + cycle history #}
+
+{% macro fi(name, size=14) %}
+<svg xmlns="http://www.w3.org/2000/svg" width="{{ size }}" height="{{ size }}" viewBox="0 0 24 24"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+  style="display:inline-block;vertical-align:middle;flex-shrink:0">
+  {% if name == 'refresh-cw' %}<polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+  {% elif name == 'play' %}<polygon points="5 3 19 12 5 21 5 3"></polygon>
+  {% elif name == 'check-circle' %}<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>
+  {% elif name == 'x-circle' %}<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>
+  {% elif name == 'clock' %}<circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline>
+  {% elif name == 'shield-off' %}<path d="M19.69 14a6.9 6.9 0 0 0 .31-2V5l-8-3-3.16 1.18"></path><path d="M4.73 4.73L4 5v7c0 6 8 10 8 10a20.29 20.29 0 0 0 5.62-4.38"></path><line x1="1" y1="1" x2="23" y2="23"></line>
+  {% elif name == 'trending-up' %}<polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline>
+  {% elif name == 'alert-triangle' %}<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>
+  {% elif name == 'layers' %}<polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline>
+  {% elif name == 'link' %}<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+  {% elif name == 'zap' %}<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+  {% elif name == 'bar-chart-2' %}<line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line>
+  {% elif name == 'activity' %}<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+  {% elif name == 'cpu' %}<rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line><line x1="9" y1="20" x2="9" y2="23"></line><line x1="15" y1="20" x2="15" y2="23"></line><line x1="20" y1="9" x2="23" y2="9"></line><line x1="20" y1="14" x2="23" y2="14"></line><line x1="1" y1="9" x2="4" y2="9"></line><line x1="1" y1="14" x2="4" y2="14"></line>
+  {% elif name == 'git-branch' %}<line x1="6" y1="3" x2="6" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path>
+  {% endif %}
+</svg>
+{% endmacro %}
+
+<style>
+.ac-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.75rem; }
+.ac-card { background:var(--bg-secondary); border:1px solid var(--border); border-left:3px solid var(--border); border-radius:.5rem; padding:1rem; cursor:pointer; transition:box-shadow .15s; }
+.ac-card:hover { box-shadow:0 0 0 2px var(--purple); }
+.ac-card.selected { box-shadow:0 0 0 2px var(--purple); }
+.ac-card .tier-label { font-size:.65rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); }
+.ac-card .proj-name { font-weight:600; font-size:.85rem; margin:.25rem 0; }
+.ac-card .score-big { font-size:1.8rem; font-weight:700; line-height:1; }
+/* Tier accent colors */
+.ac-card.tier-simple          { border-left-color: var(--green); }
+.ac-card.tier-simple-compile  { border-left-color: var(--blue-bright); }
+.ac-card.tier-medium          { border-left-color: var(--yellow-deep); }
+.ac-card.tier-complex         { border-left-color: var(--purple); }
+.ac-card.tier-enterprise      { border-left-color: var(--red); }
+.ac-card.tier-game-browser    { border-left-color: #06b6d4; }
+.ac-card.tier-game-compiled   { border-left-color: #f97316; }
+.ac-card.tier-migration       { border-left-color: #a78bfa; }
+.ac-bar { height:4px; border-radius:2px; background:var(--border); margin-top:.5rem; }
+.ac-bar-fill { height:100%; border-radius:2px; transition:width .5s; background:var(--purple); }
+.ac-bar-fill.tier-simple          { background: var(--green); }
+.ac-bar-fill.tier-simple-compile  { background: var(--blue-bright); }
+.ac-bar-fill.tier-medium          { background: var(--yellow-deep); }
+.ac-bar-fill.tier-complex         { background: var(--purple); }
+.ac-bar-fill.tier-enterprise      { background: var(--red); }
+.ac-bar-fill.tier-game-browser    { background: #06b6d4; }
+.ac-bar-fill.tier-game-compiled   { background: #f97316; }
+.ac-bar-fill.tier-migration       { background: #a78bfa; }
+.ac-section-title { font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin-bottom:.5rem; }
+.ac-table { width:100%; font-size:.75rem; border-collapse:collapse; }
+.ac-table th { text-align:left; padding:.35rem .5rem; color:var(--text-secondary); font-weight:500; border-bottom:1px solid var(--border); }
+.ac-table td { padding:.35rem .5rem; border-bottom:1px solid var(--border); }
+.score-green { color:var(--green); font-weight:700; }
+.score-yellow { color:var(--yellow-deep); font-weight:700; }
+.score-red { color:var(--red); font-weight:700; }
+.verdict-pass { background:rgba(63,185,80,.15); color:var(--green); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-warn { background:rgba(210,153,34,.15); color:var(--yellow-deep); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.verdict-fail { background:rgba(248,81,73,.15); color:var(--red); font-size:.65rem; padding:.1rem .4rem; border-radius:.25rem; }
+.adv-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.5rem; margin-top:.5rem; }
+.adv-card { background:var(--bg-secondary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem; }
+/* Intelligence panel */
+.intel-panel { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.5rem; margin-top:.5rem; }
+.intel-metric { background:var(--bg-secondary); border:1px solid var(--border); border-radius:.4rem; padding:.6rem .75rem; }
+.intel-metric .label { font-size:.65rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); margin-bottom:.2rem; }
+.intel-metric .value { font-size:1.1rem; font-weight:700; }
+.conv-improving { color:var(--green); }
+.conv-plateau    { color:var(--yellow-deep); }
+.conv-regression { color:var(--red); }
+.conv-spike_failure { color:var(--red); }
+.conv-cold_start { color:var(--gray); }
+.conv-converging { color:var(--blue-bright); }
+/* Project status */
+.status-running   { color:var(--green); }
+.status-completed { color:var(--blue-bright); }
+.status-default   { color:var(--gray); }
+/* Phase score cells */
+.phase-ok   { text-align:center; color:var(--green); }
+.phase-warn { text-align:center; color:var(--yellow-deep); }
+.phase-fail { text-align:center; color:var(--red); }
+.phase-none { text-align:center; color:var(--text-secondary); }
+/* Cycle table cells */
+.defect-high { color:var(--red); }
+.defect-ok   { color:var(--gray); }
+.fix-label   { font-size:.7rem; color:var(--yellow-deep); max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* mini sparkline */
+.sparkline { display:flex; align-items:flex-end; gap:2px; height:32px; margin-top:.3rem; }
+.spark-bar { flex:1; border-radius:2px 2px 0 0; min-width:4px; background:var(--purple); opacity:.7; transition:opacity .15s; }
+.spark-bar:hover { opacity:1; }
+.spark-ok   { background:var(--green); }
+.spark-warn { background:var(--yellow-deep); }
+.spark-bad  { background:var(--red); }
+/* Thompson stats */
+.thompson-row td { font-size:.7rem; padding:.3rem .4rem; }
+.thompson-win { color:var(--green); }
+.thompson-lose { color:var(--red); }
+</style>
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+  <div style="display:flex;align-items:center;gap:.5rem">
+    {{ fi('refresh-cw', 18) }}
+    <strong>Amélioration Continue</strong>
+    <span style="font-size:.7rem;color:var(--text-secondary)">{{ projects|length }} projets · 20 cycles max · Thompson + RL + GA · Lighthouse · axe · lint · adversarial</span>
+  </div>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    <span style="font-size:.7rem;color:var(--purple)">Cycle moyen : {{ "%.1f"|format(avg_cycle) }}/20</span>
+  </div>
+</div>
+<div id="ac-status-bar" style="display:none;margin-bottom:.75rem;padding:.4rem .75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.4rem;font-size:.75rem;color:var(--text-secondary)"></div>
+
+{# ── Intelligence metrics panel (always open) ────────────────────────────── #}
+<div id="ac-intel-panel" style="margin-bottom:1rem;padding:.75rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:.5rem">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
+    <div style="font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);display:flex;align-items:center;gap:.4rem">
+      {{ fi('cpu', 12) }} Métriques Intelligence — <span id="ac-intel-proj-label" style="color:var(--purple)">—</span>
+    </div>
+    <button onclick="acRefreshIntel()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.7rem;display:flex;align-items:center;gap:.3rem">
+      {{ fi('refresh-cw', 11) }} Actualiser
+    </button>
+  </div>
+
+  <div class="intel-panel" id="ac-intel-metrics">
+    <div class="intel-metric"><div class="label">Convergence</div><div class="value conv-cold_start" id="im-conv">—</div></div>
+    <div class="intel-metric"><div class="label">RL Reward moy.</div><div class="value" id="im-reward">—</div></div>
+    <div class="intel-metric"><div class="label">Cycles total</div><div class="value" id="im-cycles">—</div></div>
+    <div class="intel-metric"><div class="label">Score moy.</div><div class="value" id="im-avg">—</div></div>
+    <div class="intel-metric"><div class="label">Hint RL</div><div class="value" style="font-size:.75rem" id="im-hint">—</div></div>
+    <div class="intel-metric"><div class="label">Skill Eval</div><div class="value" style="font-size:.7rem;color:var(--yellow-deep)" id="im-eval">—</div></div>
+  </div>
+
+  {# Sparkline #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle (5 derniers)</div>
+    <div class="sparkline" id="ac-sparkline"></div>
+  </div>
+
+  {# Thompson stats table #}
+  <div style="margin-top:.75rem">
+    <div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">
+      {{ fi('activity', 11) }} Thompson Sampling — skills
+    </div>
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>Skill</th><th>Variant</th><th>Wins</th><th>Losses</th><th>Avg score</th><th>Thompson prob.</th>
+        </tr>
+      </thead>
+      <tbody id="ac-thompson-tbody">
+        <tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d'abord</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# ── Project cards ─────────────────────────────────────────────────────────── #}
+<div class="ac-section-title">Projets pilotes</div>
+<div class="ac-grid" id="ac-proj-grid">
+  {% for p in projects %}
+  {% set score = p.total_score_avg|int %}
+  {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+  <div class="ac-card tier-{{ p.tier }} {% if loop.first %}selected{% endif %}"
+       id="ac-card-{{ p.id }}"
+       onclick="acSelectProject('{{ p.id }}', this)"
+       style="display:flex;flex-direction:column"
+       title="Clic: sélectionner · Voir détail avec bouton ⤢">
+    {# Top: tier label + detail button #}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div class="tier-label">{{ p.tier_label }}</div>
+      <button onclick="event.stopPropagation();acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+        style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:.65rem;padding:0;line-height:1"
+        title="Voir détail / suivi live">⤢</button>
+    </div>
+    {# Middle: name + tech + score — takes all remaining space #}
+    <div style="flex:1">
+      <div class="proj-name">{{ p.name }}</div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin:.4rem 0">
+        <div>
+          {% for tech in p.tech[:3] %}
+          <span style="font-size:.65rem;background:var(--bg-tertiary);padding:.1rem .35rem;border-radius:.2rem;margin-right:.2rem;font-family:monospace">{{ tech }}</span>
+          {% endfor %}
+        </div>
+        <div class="{{ score_cls }} score-big">{{ score if score > 0 else '—' }}</div>
+      </div>
+    </div>
+    {# Bottom: cycle info + bar + controls #}
+    <div>
+      <div style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.25rem">
+        Cycle {{ p.current_cycle }}/{{ p.max_cycles }}
+        &nbsp;·&nbsp;
+        <span class="status-{{ p.status if p.status in ('running','completed') else 'default' }}" id="ac-status-{{ p.id }}">{{ p.status }}</span>
+      </div>
+      <div class="ac-bar" style="margin-bottom:.5rem"><div class="ac-bar-fill tier-{{ p.tier }}" style="width:{{ ((p.current_cycle / p.max_cycles)*100)|int }}%"></div></div>
+      {# Per-card controls #}
+      <div style="display:flex;gap:.4rem" onclick="event.stopPropagation()">
+        {% if p.status == 'running' %}
+        <button onclick="acStopProject('{{ p.id }}')"
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.25rem .5rem;background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem">
+          {{ fi('x-circle', 11) }} Stop
+        </button>
+        {% else %}
+        <button onclick="acStartProject('{{ p.id }}')"
+          {% if p.current_cycle >= p.max_cycles %}disabled{% endif %}
+          style="flex:1;display:flex;align-items:center;justify-content:center;gap:.25rem;padding:.25rem .5rem;background:rgba(168,85,247,.15);color:var(--purple);border:1px solid rgba(168,85,247,.3);border-radius:.25rem;cursor:pointer;font-size:.65rem{% if p.current_cycle >= p.max_cycles %};opacity:.4;cursor:default{% endif %}">
+          {{ fi('play', 11) }} {% if p.current_cycle == 0 %}Démarrer{% else %}Cycle {{ p.current_cycle + 1 }}{% endif %}
+        </button>
+        {% endif %}
+        <button onclick="acOpenModal('{{ p.id }}', '{{ p.name | e }}')"
+          style="display:flex;align-items:center;justify-content:center;padding:.25rem .4rem;background:none;color:var(--text-secondary);border:1px solid var(--border);border-radius:.25rem;cursor:pointer;font-size:.65rem"
+          title="Suivi détaillé">
+          {{ fi('activity', 11) }}
+        </button>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div style="color:var(--text-secondary);font-size:.8rem;padding:2rem 0">
+    Aucun projet actif — cliquer "Démarrer" pour lancer le premier cycle.
+  </div>
+  {% endfor %}
+</div>
+
+{# ── Cycle history for selected project ────────────────────────────────────── #}
+<div style="margin-top:1.5rem">
+  <div class="ac-section-title" id="ac-history-title">
+    Historique — {{ projects[0].name if projects else '—' }}
+  </div>
+  <div id="ac-history-content">
+    {% if cycles %}
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Git SHA</th>
+          {% for ph in phases %}<th>{{ ph[:7] }}</th>{% endfor %}
+          <th>Score</th>
+          <th>RL R</th>
+          <th>Défauts</th>
+          <th>Fix</th>
+          <th>Img</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cycles[-10:]|reverse %}
+        {% set ps = c.phase_scores|tojson if c.phase_scores is string else '{}' %}
+        {% set score = c.total_score|int %}
+        {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+        {% set rl_r = c.rl_reward|float %}
+        {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
+        <tr>
+          <td style="font-family:monospace;font-weight:700">{{ c.cycle_num }}</td>
+          <td><code style="font-size:.7rem;background:var(--bg-tertiary);padding:.1rem .3rem;border-radius:.2rem">{{ c.git_sha[:7] if c.git_sha else '—' }}</code></td>
+          {% for ph in phases %}
+          {% set s = c.phase_scores_dict.get(ph) if c.phase_scores_dict is defined else none %}
+          <td class="{% if s is not none %}{% if s >= 80 %}phase-ok{% elif s >= 60 %}phase-warn{% else %}phase-fail{% endif %}{% else %}phase-none{% endif %}">{{ s if s is not none else '·' }}</td>
+          {% endfor %}
+          <td class="{{ score_cls }}">{{ score if score > 0 else '—' }}</td>
+          <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.7rem">{{ "%.3f"|format(rl_r) if rl_r != 0 else '—' }}</td>
+          <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
+          <td class="fix-label" title="{{ c.fix_summary or '' }}">{{ c.fix_summary or '—' }}</td>
+          <td style="width:48px;padding:.15rem .3rem">
+            <a href="/api/improvement/screenshot/{{ projects[0].id if projects else '' }}/{{ c.cycle_num }}" target="_blank"
+               title="Prod screenshot — cycle {{ c.cycle_num }}">
+              <img src="/api/improvement/screenshot/{{ projects[0].id if projects else '' }}/{{ c.cycle_num }}"
+                   style="width:44px;height:28px;object-fit:cover;border-radius:3px;border:1px solid var(--border);background:var(--bg-tertiary)"
+                   loading="lazy" onerror="this.parentElement.style.display='none'">
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Adversarial scores ─────────────────────────────────────────────────────── #}
+{% if adversarial %}
+<div style="margin-top:1.5rem">
+  <div class="ac-section-title">Dimensions Adversariales — dernier cycle</div>
+  <div class="adv-grid">
+    {% for d in adversarial %}
+    {% set verdict_cls = 'verdict-pass' if d.verdict == 'pass' else ('verdict-warn' if d.verdict == 'warn' else 'verdict-fail') %}
+    <div class="adv-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+        <span style="font-size:.75rem;font-weight:600">{{ d.dimension }}</span>
+        <span class="{{ verdict_cls }}">{{ d.verdict }}</span>
+      </div>
+      <div style="background:var(--border);border-radius:2px;height:3px">
+        <div style="height:100%;border-radius:2px;width:{{ d.score }}%" class="{% if d.score >= 80 %}spark-ok{% elif d.score >= 50 %}spark-warn{% else %}spark-bad{% endif %}"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--text-secondary);margin-top:.25rem">{{ d.score }}/100</div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+var _acSelectedProject = '{{ projects[0].id if projects else "" }}';
+
+function acSelectProject(projectId, card) {
+  _acSelectedProject = projectId;
+  document.querySelectorAll('.ac-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  htmx.ajax('GET', '/workflows/improvement/cycles/' + projectId, {
+    target: '#ac-history-content',
+    swap: 'innerHTML'
+  });
+  const title = document.getElementById('ac-history-title');
+  if (title) title.textContent = 'Historique — ' + card.querySelector('.proj-name').textContent;
+  _acStartIntelPoll();
+}
+
+var _acModalPollId = null;
+
+async function acStartProject(projectId) {
+  const card = document.getElementById('ac-card-' + projectId);
+  const statusEl = document.getElementById('ac-status-' + projectId);
+  if (card) card.style.opacity = '.6';
+  try {
+    const res = await fetch('/api/improvement/start/' + projectId, { method: 'POST' });
+    const data = await res.json();
+    if (data.run_id) {
+      if (statusEl) statusEl.textContent = 'running';
+      // Launch the workflow (required to actually execute phases)
+      await fetch('/api/missions/' + data.run_id + '/launch', { method: 'POST' });
+      // Full partial reload to update card controls
+      setTimeout(() => {
+        const t = document.querySelector('[id$="amelio-container"]') || document.getElementById('ac-container');
+        if (t) htmx.ajax('GET', '/workflows/improvement', {target: t, swap: 'innerHTML'});
+      }, 1500);
+    } else {
+      alert('Erreur : ' + (data.detail || data.error || 'unknown'));
+    }
+  } catch(e) {
+    alert('Erreur réseau : ' + e.message);
+  }
+  if (card) card.style.opacity = '1';
+}
+
+async function acStopProject(projectId) {
+  if (!confirm('Arrêter le cycle en cours pour ce projet ?')) return;
+  const card = document.getElementById('ac-card-' + projectId);
+  if (card) card.style.opacity = '.6';
+  try {
+    await fetch('/api/improvement/stop/' + projectId, { method: 'POST' });
+    setTimeout(() => {
+      const t = document.querySelector('[id$="amelio-container"]') || document.getElementById('ac-container');
+      if (t) htmx.ajax('GET', '/workflows/improvement', {target: t, swap: 'innerHTML'});
+    }, 800);
+  } catch(e) { console.error(e); }
+  if (card) card.style.opacity = '1';
+}
+
+async function acOpenModal(projectId, projectName) {
+  if (_acModalPollId) { clearInterval(_acModalPollId); _acModalPollId = null; }
+
+  var overlay = document.getElementById('ac-detail-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ac-detail-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center';
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        if (_acModalPollId) { clearInterval(_acModalPollId); _acModalPollId = null; }
+        overlay.remove();
+      }
+    });
+    document.body.appendChild(overlay);
+  }
+
+  overlay.innerHTML = '<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:.75rem;width:min(820px,95vw);max-height:88vh;overflow-y:auto;position:relative;display:flex;flex-direction:column">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:1rem 1.25rem;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-secondary);z-index:1">'
+    + '<div><span style="font-weight:700;font-size:.95rem" id="ac-modal-title">' + (projectName||projectId) + '</span>'
+    + '<span style="margin-left:.75rem;font-size:.7rem;padding:.15rem .4rem;border-radius:.25rem;background:var(--bg-tertiary)" id="ac-modal-status-badge">…</span>'
+    + '<span style="margin-left:.5rem;font-size:.65rem;color:var(--text-secondary)" id="ac-modal-live-dot"></span></div>'
+    + '<button onclick="if(window._acModalPollId){clearInterval(window._acModalPollId);window._acModalPollId=null;}document.getElementById(\'ac-detail-overlay\').remove()" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);font-size:1.1rem;padding:.25rem">✕</button>'
+    + '</div>'
+    + '<div id="ac-modal-body" style="padding:1.25rem;flex:1">Chargement…</div>'
+    + '</div>';
+  overlay.style.display = 'flex';
+
+  async function acFetchAndRender() {
+    try {
+      var res = await fetch('/api/improvement/live/' + projectId);
+      var d = await res.json();
+
+      var statusEl = document.getElementById('ac-modal-status-badge');
+      var liveEl = document.getElementById('ac-modal-live-dot');
+      var st = d.state || {};
+      var status = st.status || 'idle';
+      var isRunning = status === 'running';
+
+      if (statusEl) {
+        statusEl.textContent = status;
+        statusEl.style.color = isRunning ? 'var(--green)' : status === 'completed' ? 'var(--blue-bright)' : 'var(--text-secondary)';
+      }
+      if (liveEl) {
+        liveEl.textContent = isRunning ? '● LIVE' : '';
+        liveEl.style.color = 'var(--green)';
+      }
+
+      // --- Phase timeline ---
+      var phases = d.phases || [];
+      var latestPhaseScores = (d.latest_cycle && d.latest_cycle.phase_scores) || {};
+      var phaseHtml = '<div style="margin-bottom:1rem">';
+      phaseHtml += '<div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.5rem">Phases — dernier cycle</div>';
+      phaseHtml += '<div style="display:flex;gap:.3rem;flex-wrap:wrap">';
+      phases.forEach(function(ph) {
+        var s = latestPhaseScores[ph];
+        var col = s === undefined ? 'var(--text-secondary)' : s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+        var bg = s === undefined ? 'var(--bg-tertiary)' : s >= 80 ? 'rgba(63,185,80,.12)' : s >= 60 ? 'rgba(210,153,34,.12)' : 'rgba(248,81,73,.12)';
+        phaseHtml += '<div style="background:' + bg + ';border-radius:.3rem;padding:.3rem .6rem;text-align:center;min-width:80px">'
+          + '<div style="font-size:.6rem;color:var(--text-secondary);text-transform:uppercase">' + ph + '</div>'
+          + '<div style="font-size:.9rem;font-weight:700;color:' + col + '">' + (s !== undefined ? s : '·') + '</div>'
+          + '</div>';
+      });
+      phaseHtml += '</div></div>';
+
+      // --- KPI grid (row 1: scores / row 2: activity) ---
+      var lc = d.latest_cycle || {};
+      var conv = d.convergence || {};
+      var totalToolCalls = d.total_tool_calls || 0;
+      var agentsActive = d.agents_active || [];
+      function kpi(label, val, col) {
+        return '<div style="background:var(--bg-tertiary);border-radius:.35rem;padding:.5rem .75rem">'
+          + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.2rem">' + label + '</div>'
+          + '<div style="font-size:1.05rem;font-weight:700;color:' + (col||'var(--text-primary)') + '">' + val + '</div>'
+          + '</div>';
+      }
+      var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.4rem;margin-bottom:.75rem">';
+      kpiHtml += kpi('Score moy.', st.total_score_avg ? Math.round(st.total_score_avg) + '/100' : '—', st.total_score_avg >= 80 ? 'var(--green)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('Cycle', st.current_cycle + '/20', 'var(--blue-bright)');
+      kpiHtml += kpi('Convergence', conv.status || 'cold_start', conv.status === 'improving' ? 'var(--green)' : conv.status === 'regression' ? 'var(--red)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('CI/CD', st.ci_status || '—', st.ci_status === 'green' ? 'var(--green)' : st.ci_status === 'red' ? 'var(--red)' : 'var(--text-secondary)');
+      kpiHtml += kpi('RL Reward', lc.rl_reward ? lc.rl_reward.toFixed(3) : '—', lc.rl_reward > 0.2 ? 'var(--green)' : lc.rl_reward < -0.2 ? 'var(--red)' : 'var(--yellow-deep)');
+      kpiHtml += kpi('Défauts', lc.defect_count !== undefined ? lc.defect_count : '—', lc.defect_count > 5 ? 'var(--red)' : 'var(--green)');
+      kpiHtml += kpi('Veto', lc.veto_count !== undefined ? lc.veto_count : '—', lc.veto_count > 0 ? 'var(--red)' : 'var(--green)');
+      kpiHtml += kpi('Traçabilité', lc.traceability_score ? lc.traceability_score + '%' : '—', lc.traceability_score >= 90 ? 'var(--green)' : 'var(--yellow-deep)');
+      kpiHtml += '</div>';
+
+      // --- Score sparkline ---
+      var sparkHtml = '';
+      var allScores = d.all_scores || [];
+      if (allScores.length) {
+        sparkHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;color:var(--text-secondary);margin-bottom:.3rem">Score par cycle</div>'
+          + '<div style="display:flex;align-items:flex-end;gap:3px;height:40px">';
+        allScores.forEach(function(s, i) {
+          var h = Math.max(3, Math.round((s/100)*36));
+          var c = s >= 80 ? 'var(--green)' : s >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+          sparkHtml += '<div style="flex:0 0 10px;height:' + h + 'px;background:' + c + ';border-radius:2px 2px 0 0;min-width:10px" title="Cycle ' + (i+1) + ': ' + s + '/100"></div>';
+        });
+        sparkHtml += '</div></div>';
+      }
+
+      // --- Mission run section ---
+      var runHtml = '';
+      var run = d.run || {};
+      if (run.id) {
+        var runColor = run.status === 'running' || run.status === 'active' ? 'var(--green)' : run.status === 'completed' ? 'var(--blue-bright)' : run.status === 'failed' ? 'var(--red)' : 'var(--text-secondary)';
+        runHtml = '<div style="margin-bottom:.75rem;padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:.4rem;font-size:.72rem">'
+          + '<div style="display:flex;justify-content:space-between;margin-bottom:.25rem">'
+          + '<strong>Mission</strong><span style="color:' + runColor + '">' + run.status + '</span></div>'
+          + '<div style="color:var(--text-secondary)">' + run.name + '</div>'
+          + (run.current_phase ? '<div style="margin-top:.25rem">Phase active : <strong style="color:var(--purple)">' + run.current_phase + '</strong></div>' : '')
+          + '<div style="margin-top:.2rem;color:var(--text-secondary);font-size:.65rem">run ' + run.id.slice(0,8) + ' · démarré ' + (run.started_at || '—').slice(0,19) + '</div>'
+          + '</div>';
+      }
+
+      // --- Agents actifs + tools appelés ---
+      var activityHtml = '';
+      if (agentsActive.length || totalToolCalls > 0) {
+        activityHtml = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:.75rem">';
+        // Agents
+        activityHtml += '<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.6rem">';
+        activityHtml += '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">Agents actifs (' + agentsActive.length + ')</div>';
+        if (agentsActive.length) {
+          agentsActive.forEach(function(a) {
+            activityHtml += '<div style="display:flex;justify-content:space-between;font-size:.68rem;padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+              + '<span style="font-family:monospace;color:var(--text-primary)">' + a.id + '</span>'
+              + '<span style="color:var(--text-secondary)">' + a.activity + ' act.</span></div>';
+          });
+        } else {
+          activityHtml += '<div style="font-size:.68rem;color:var(--text-secondary)">En attente…</div>';
+        }
+        activityHtml += '</div>';
+        // Tools
+        var toolData = d.tool_activity || [];
+        activityHtml += '<div style="background:var(--bg-tertiary);border-radius:.4rem;padding:.6rem">';
+        activityHtml += '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.4rem">Outils appelés (' + totalToolCalls + ')</div>';
+        if (toolData.length) {
+          toolData.slice(0, 6).forEach(function(t) {
+            var tpct = totalToolCalls > 0 ? Math.round((t.count/totalToolCalls)*100) : 0;
+            activityHtml += '<div style="margin-bottom:.25rem">'
+              + '<div style="display:flex;justify-content:space-between;font-size:.68rem">'
+              + '<span style="font-family:monospace">' + t.tool + '</span>'
+              + '<span style="color:var(--text-secondary)">' + t.count + '</span></div>'
+              + '<div style="height:2px;background:var(--border);border-radius:1px;margin-top:2px">'
+              + '<div style="height:100%;width:' + tpct + '%;background:var(--purple);border-radius:1px"></div></div></div>';
+          });
+        } else {
+          activityHtml += '<div style="font-size:.68rem;color:var(--text-secondary)">En attente…</div>';
+        }
+        activityHtml += '</div>';
+        activityHtml += '</div>';
+      }
+
+      // --- Live events feed ---
+      var eventsHtml = '';
+      var evtsData = d.live_events || [];
+      if (evtsData.length) {
+        eventsHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Activité live</div>';
+        eventsHtml += '<div style="max-height:140px;overflow-y:auto;font-size:.68rem">';
+        evtsData.slice(0,15).forEach(function(e) {
+          var typeCol = e.type && e.type.includes('error') ? 'var(--red)' : e.type && e.type.includes('done') ? 'var(--green)' : 'var(--text-secondary)';
+          var ts = (e.ts || '').slice(11,19);
+          eventsHtml += '<div style="display:flex;gap:.5rem;padding:.15rem 0;border-bottom:1px solid rgba(255,255,255,.04)">'
+            + '<span style="color:var(--text-secondary);font-family:monospace;flex-shrink:0">' + ts + '</span>'
+            + '<span style="color:' + typeCol + ';flex-shrink:0;font-family:monospace">' + (e.type||'').slice(0,16) + '</span>'
+            + (e.actor ? '<span style="color:var(--purple);flex-shrink:0">' + e.actor + '</span>' : '')
+            + '<span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (e.summary || e.tool || '') + '</span>'
+            + '</div>';
+        });
+        eventsHtml += '</div></div>';
+      } else if (isRunning) {
+        eventsHtml = '<div style="margin-bottom:.75rem;font-size:.68rem;color:var(--text-secondary);padding:.5rem;background:var(--bg-tertiary);border-radius:.3rem">En attente des premiers événements… (refresh auto toutes 4s)</div>';
+      }
+
+      // --- Fix summary ---
+      var fixHtml = '';
+      if (lc.fix_summary) {
+        fixHtml = '<div style="margin-bottom:.75rem;padding:.6rem .75rem;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:.4rem;font-size:.72rem">'
+          + '<div style="font-size:.6rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:.3rem">Fix Summary — cycle ' + lc.cycle_num + '</div>'
+          + '<div style="color:var(--text-primary)">' + lc.fix_summary + '</div>'
+          + (lc.git_sha ? '<div style="margin-top:.25rem;font-family:monospace;font-size:.65rem;color:var(--text-secondary)">git: ' + lc.git_sha.slice(0,12) + '</div>' : '')
+          + '</div>';
+      }
+
+      // --- Adversarial findings ---
+      var advHtml = '';
+      var advData = d.adversarial || [];
+      if (advData.length) {
+        advHtml = '<div style="margin-bottom:.75rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Adversarial — derniers cycles</div>';
+        advHtml += '<table style="width:100%;font-size:.7rem;border-collapse:collapse">';
+        advHtml += '<thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Cycle</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Dimension</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Score</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Verdict</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Findings</th></tr></thead><tbody>';
+        advData.slice(0, 15).forEach(function(r) {
+          var vc = r.verdict === 'pass' ? 'var(--green)' : r.verdict === 'warn' ? 'var(--yellow-deep)' : 'var(--red)';
+          var sc = r.score >= 80 ? 'var(--green)' : r.score >= 50 ? 'var(--yellow-deep)' : 'var(--red)';
+          var findings = Array.isArray(r.findings) ? r.findings.join('; ') : (r.findings || '');
+          advHtml += '<tr><td style="padding:.2rem .4rem;color:var(--text-secondary)">' + r.cycle_num + '</td>'
+            + '<td style="padding:.2rem .4rem;font-family:monospace">' + r.dimension + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + sc + ';font-weight:700">' + r.score + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + vc + '">' + r.verdict + '</td>'
+            + '<td style="padding:.2rem .4rem;color:var(--text-secondary);font-size:.65rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + findings + '">' + (findings || '—') + '</td></tr>';
+        });
+        advHtml += '</tbody></table></div>';
+      }
+
+      // --- Cycle history mini-table ---
+      var cyclesHtml = '';
+      var cyclesData = d.cycles || [];
+      if (cyclesData.length) {
+        cyclesHtml = '<div><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-secondary);margin-bottom:.4rem">Historique cycles</div>';
+        cyclesHtml += '<table style="width:100%;font-size:.7rem;border-collapse:collapse">';
+        cyclesHtml += '<thead><tr style="color:var(--text-secondary)"><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">#</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Score</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">RL R</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Défauts</th><th style="padding:.2rem .4rem;border-bottom:1px solid var(--border)">Veto</th><th style="text-align:left;padding:.2rem .4rem;border-bottom:1px solid var(--border)">Status</th></tr></thead><tbody>';
+        cyclesData.slice(-10).reverse().forEach(function(c) {
+          var sc = c.total_score >= 80 ? 'var(--green)' : c.total_score >= 60 ? 'var(--yellow-deep)' : 'var(--red)';
+          var rl = typeof c.rl_reward === 'number' ? c.rl_reward.toFixed(3) : '—';
+          cyclesHtml += '<tr><td style="padding:.2rem .4rem;font-family:monospace;font-weight:700">' + c.cycle_num + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + sc + ';font-weight:700">' + (c.total_score || '—') + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;font-family:monospace;font-size:.65rem">' + rl + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + (c.defect_count > 5 ? 'var(--red)' : 'var(--text-secondary)') + '">' + (c.defect_count !== undefined ? c.defect_count : '—') + '</td>'
+            + '<td style="text-align:center;padding:.2rem .4rem;color:' + (c.veto_count > 0 ? 'var(--red)' : 'var(--text-secondary)') + '">' + (c.veto_count !== undefined ? c.veto_count : '—') + '</td>'
+            + '<td style="padding:.2rem .4rem;color:' + (c.status === 'completed' ? 'var(--green)' : 'var(--text-secondary)') + '">' + (c.status||'—') + '</td></tr>';
+        });
+        cyclesHtml += '</tbody></table></div>';
+      }
+
+      var body = document.getElementById('ac-modal-body');
+      if (body) {
+        body.innerHTML = phaseHtml + kpiHtml + sparkHtml + runHtml + activityHtml + eventsHtml + fixHtml + advHtml + cyclesHtml;
+      }
+
+      // Schedule next poll if running
+      if (isRunning && document.getElementById('ac-detail-overlay')) {
+        _acModalPollId = setTimeout(acFetchAndRender, 4000);
+      }
+    } catch(e) {
+      var body = document.getElementById('ac-modal-body');
+      if (body) body.textContent = 'Erreur chargement : ' + e.message;
+    }
+  }
+
+  acFetchAndRender();
+}
+
+async function acRefreshIntel() {
+  if (!_acSelectedProject) return;
+  const labelEl = document.getElementById('ac-intel-proj-label');
+  if (labelEl) labelEl.textContent = _acSelectedProject;
+  try {
+    const [stateRes, scoresRes] = await Promise.all([
+      fetch('/api/improvement/project/' + _acSelectedProject),
+      fetch('/api/improvement/scores/' + _acSelectedProject)
+    ]);
+    const state = await stateRes.json();
+    const scores = await scoresRes.json();
+
+    const conv = state.convergence || {};
+    const convEl = document.getElementById('im-conv');
+    if (convEl) { convEl.textContent = conv.status || '—'; convEl.className = 'value conv-' + (conv.status || 'cold_start'); }
+
+    const rewardEl = document.getElementById('im-reward');
+    if (rewardEl) rewardEl.textContent = scores.avg_reward !== undefined ? scores.avg_reward.toFixed(3) : '—';
+
+    const cyclesEl = document.getElementById('im-cycles');
+    if (cyclesEl) cyclesEl.textContent = state.cycle_count || 0;
+
+    const avgEl = document.getElementById('im-avg');
+    if (avgEl) avgEl.textContent = state.total_score_avg ? Math.round(state.total_score_avg) : '—';
+
+    const hint = state.next_cycle_hint;
+    const hintEl = document.getElementById('im-hint');
+    if (hintEl) hintEl.textContent = hint ? (hint.action || '—') + (hint.confidence ? ' (' + hint.confidence.toFixed(2) + ')' : '') : '—';
+
+    const evalEl = document.getElementById('im-eval');
+    const evalPending = state.skill_eval_pending;
+    if (evalEl) evalEl.textContent = evalPending && evalPending.length ? evalPending.join(', ') : 'aucun';
+
+    const sparkEl = document.getElementById('ac-sparkline');
+    const recent = state.recent_scores || [];
+    if (sparkEl) {
+      if (recent.length) {
+        sparkEl.innerHTML = recent.map(s => {
+          const h = Math.round((s/100)*32);
+          const cls = s>=80?'spark-ok':s>=60?'spark-warn':'spark-bad';
+          return `<div class="spark-bar ${cls}" style="height:${Math.max(h,3)}px;flex:0 0 8px;min-width:8px" title="${s}/100"></div>`;
+        }).join('');
+      } else {
+        sparkEl.innerHTML = '<span style="color:var(--text-secondary);font-size:.7rem">pas de données</span>';
+      }
+    }
+
+    const tbody = document.getElementById('ac-thompson-tbody');
+    if (tbody) {
+      const skillStats = scores.skill_stats || {};
+      const rows = [];
+      for (const [skill, variants] of Object.entries(skillStats)) {
+        for (const [variant, stats] of Object.entries(variants)) {
+          const prob = stats.wins / Math.max(1, stats.wins + stats.losses);
+          rows.push(`<tr><td style="font-family:monospace">${skill}</td><td style="font-family:monospace;font-size:.65rem">${variant}</td><td class="thompson-win">${stats.wins}</td><td class="thompson-lose">${stats.losses}</td><td>${stats.avg_score ? Math.round(stats.avg_score) : '—'}</td><td style="font-family:monospace">${(prob*100).toFixed(1)}%</td></tr>`);
+        }
+      }
+      tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="6" style="color:var(--text-secondary);text-align:center;font-size:.75rem">Aucune donnée — lancer des cycles d\'abord</td></tr>';
+    }
+  } catch(e) { console.error('AC intel fetch error', e); }
+}
+
+async function acStartCycle() {
+  // Legacy — now handled per-card via acStartProject
+  var pid = _acSelectedProject;
+  if (pid) acStartProject(pid);
+}
+
+// Auto-refresh intel on load + every 30s
+let _acIntelPollId = null;
+function _acStartIntelPoll() {
+  if (_acIntelPollId) clearInterval(_acIntelPollId);
+  if (_acSelectedProject) {
+    acRefreshIntel();
+    _acIntelPollId = setInterval(acRefreshIntel, 30000);
+  }
+}
+_acStartIntelPoll();
+</script>

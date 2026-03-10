@@ -1,0 +1,272 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* ── Project Overview ── */
+.po-layout{max-width:1200px;margin:0 auto;padding:1.5rem 1rem}
+.po-header{display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+.po-title{font-size:1.5rem;font-weight:700;color:var(--text-primary)}
+.po-badge{font-size:0.7rem;padding:0.15rem 0.6rem;border-radius:99px;font-weight:600;text-transform:uppercase}
+.po-badge.planning{background:var(--purple);color:#fff}
+.po-badge.active{background:var(--green);color:#fff}
+.po-desc{color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem;max-width:700px;line-height:1.5}
+
+/* Grid sections */
+.po-grid{display:grid;grid-template-columns:1fr 320px;gap:1.5rem;align-items:start}
+@media(max-width:900px){.po-grid{grid-template-columns:1fr}}
+
+.po-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;margin-bottom:1rem}
+.po-card-title{font-size:0.85rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.75rem;display:flex;align-items:center;gap:0.5rem}
+.po-card-title svg{width:16px;height:16px;color:var(--purple)}
+
+/* Stack pills */
+.po-stack{display:flex;gap:0.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.po-pill{font-size:0.7rem;padding:0.2rem 0.6rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+
+/* Path */
+.po-path{font-size:0.75rem;color:var(--text-tertiary);font-family:monospace;padding:0.4rem 0.6rem;background:var(--bg-tertiary);border-radius:var(--radius-sm);display:flex;align-items:center;gap:0.5rem;margin-bottom:1rem}
+.po-path svg{width:14px;height:14px;flex-shrink:0;color:var(--green)}
+
+/* Team */
+.po-team{display:flex;flex-direction:column;gap:0.5rem}
+.po-member{display:flex;align-items:center;gap:0.6rem;padding:0.4rem;border-radius:var(--radius-sm);transition:background 0.15s}
+.po-member:hover{background:var(--bg-tertiary)}
+.po-member-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--border)}
+.po-member-avatar.placeholder{background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600;color:var(--text-secondary)}
+.po-member-info{flex:1;min-width:0}
+.po-member-name{font-size:0.8rem;font-weight:600;color:var(--text-primary)}
+.po-member-role{font-size:0.7rem;color:var(--text-secondary)}
+
+/* Epic */
+.po-epic{border-left:3px solid var(--purple);padding-left:0.75rem;margin-bottom:1rem}
+.po-epic-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:0.3rem}
+.po-epic-desc{font-size:0.8rem;color:var(--text-secondary);line-height:1.5;margin-bottom:0.5rem}
+.po-epic-goal{font-size:0.75rem;color:var(--text-tertiary);padding:0.4rem 0.6rem;background:var(--bg-tertiary);border-radius:var(--radius-sm);line-height:1.4}
+.po-epic-goal strong{color:var(--text-secondary)}
+
+/* Features */
+.po-feat{background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0.6rem 0.75rem;margin-bottom:0.5rem;cursor:pointer;transition:border-color 0.15s}
+.po-feat:hover{border-color:var(--purple)}
+.po-feat-header{display:flex;align-items:center;justify-content:space-between;gap:0.5rem}
+.po-feat-name{font-size:0.85rem;font-weight:600;color:var(--text-primary)}
+.po-feat-pts{font-size:0.65rem;padding:0.1rem 0.4rem;border-radius:99px;background:var(--purple);color:#fff;font-weight:600;flex-shrink:0}
+.po-feat-desc{font-size:0.75rem;color:var(--text-secondary);margin-top:0.3rem;line-height:1.4}
+.po-feat-stories{display:none;margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border)}
+.po-feat.open .po-feat-stories{display:block}
+.po-feat-chevron{width:14px;height:14px;color:var(--text-tertiary);transition:transform 0.2s;flex-shrink:0}
+.po-feat.open .po-feat-chevron{transform:rotate(90deg)}
+
+/* User stories */
+.po-story{font-size:0.75rem;color:var(--text-secondary);padding:0.3rem 0;padding-left:0.75rem;border-left:2px solid var(--border);margin-bottom:0.3rem;line-height:1.4}
+.po-story-pts{font-size:0.6rem;color:var(--text-tertiary);margin-left:0.3rem}
+.po-story-criteria{font-size:0.7rem;color:var(--text-tertiary);font-style:italic;margin-top:0.15rem}
+
+/* Stats bar */
+.po-stats{display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.po-stat{text-align:center}
+.po-stat-val{font-size:1.4rem;font-weight:700;color:var(--text-primary)}
+.po-stat-label{font-size:0.65rem;color:var(--text-tertiary);text-transform:uppercase}
+
+/* Actions */
+.po-actions{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:1rem}
+</style>
+
+<div class="po-layout">
+    <!-- Header -->
+    <div class="po-header">
+        <svg class="icon" style="width:28px;height:28px;color:var(--purple)"><use href="#icon-rocket"/></svg>
+        <span class="po-title">{{ project.name }}</span>
+        <span class="po-badge {{ project.status }}">{{ project.status }}</span>
+    </div>
+
+    {% if project.description %}
+    <div class="po-desc">{{ project.description }}</div>
+    {% endif %}
+
+    <!-- Stats -->
+    <div class="po-stats">
+        <div class="po-stat">
+            <div class="po-stat-val">{{ epics|length }}</div>
+            <div class="po-stat-label">{{ _("epics") }}</div>
+        </div>
+        <div class="po-stat">
+            <div class="po-stat-val" id="featCount">0</div>
+            <div class="po-stat-label">{{ _("features") }}</div>
+        </div>
+        <div class="po-stat">
+            <div class="po-stat-val" id="storyCount">0</div>
+            <div class="po-stat-label">{{ _("user_stories") }}</div>
+        </div>
+        <div class="po-stat">
+            <div class="po-stat-val" id="pointsCount">0</div>
+            <div class="po-stat-label">{{ _("story_points") }}</div>
+        </div>
+    </div>
+
+    <div class="po-grid">
+        <!-- LEFT: Main content -->
+        <div>
+            <!-- Path & Stack -->
+            {% if project.path %}
+            <div class="po-path">
+                <svg><use href="#icon-folder"/></svg>
+                {{ project.path }}
+            </div>
+            {% endif %}
+
+            {% if epics and epics[0].stack %}
+            <div class="po-stack">
+                {% for s in epics[0].stack %}
+                <span class="po-pill">{{ s }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Epics & Features -->
+            {% for ep in epics %}
+            <div class="po-card">
+                <div class="po-card-title">
+                    <svg><use href="#icon-target"/></svg> Epic
+                </div>
+                <div class="po-epic">
+                    <div class="po-epic-title">{{ ep.name }}</div>
+                    {% if ep.description %}
+                    <div class="po-epic-desc">{{ ep.description }}</div>
+                    {% endif %}
+                    {% if ep.goal %}
+                    <div class="po-epic-goal"><strong>{{ _("objectifs") }}</strong> {{ ep.goal }}</div>
+                    {% endif %}
+                </div>
+
+                <!-- Features -->
+                <div class="po-card-title" style="margin-top:1rem">
+                    <svg><use href="#icon-layers"/></svg> Features ({{ ep.features|length }})
+                </div>
+
+                {% for f in ep.features %}
+                <div class="po-feat" onclick="this.classList.toggle('open')">
+                    <div class="po-feat-header">
+                        <svg class="po-feat-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                        <span class="po-feat-name" style="flex:1">{{ f.name }}</span>
+                        <span class="po-feat-pts">{{ f.story_points }} pts</span>
+                    </div>
+                    {% if f.description %}
+                    <div class="po-feat-desc">{{ f.description }}</div>
+                    {% endif %}
+
+                    <!-- User Stories -->
+                    <div class="po-feat-stories">
+                        {% for s in f.stories %}
+                        <div class="po-story">
+                            {{ s.title }}
+                            <span class="po-story-pts">({{ s.story_points }} pts)</span>
+                            {% if s.acceptance_criteria %}
+                            <div class="po-story-criteria">{{ s.acceptance_criteria }}</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if not f.stories %}
+                        <div class="po-story" style="opacity:0.5">{{ _('no_story') }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not ep.features %}
+                <div style="font-size:0.8rem;color:var(--text-tertiary);padding:0.5rem 0">{{ _('no_feature_yet') }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if not epics %}
+            <div class="po-card">
+                <div style="text-align:center;padding:2rem;color:var(--text-tertiary)">
+                    {{ _('no_epics_project') }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="po-actions">
+                <a href="/product?project={{ project.id }}" class="btn btn-primary btn-sm">
+                    <svg class="icon icon-xs"><use href="#icon-kanban"/></svg> Product Backlog
+                </a>
+                <a href="/projects/{{ project.id }}" class="btn btn-sm" style="border:1px solid var(--border)">
+                    <svg class="icon icon-xs"><use href="#icon-terminal"/></svg> Espace Projet
+                </a>
+                <a href="/ideation" class="btn btn-sm" style="border:1px solid var(--border)">
+                    <svg class="icon icon-xs"><use href="#icon-lightning"/></svg> {{ _('back_ideation') }}
+                </a>
+            </div>
+        </div>
+
+        <!-- RIGHT: Team -->
+        <div>
+            <div class="po-card">
+                <div class="po-card-title">
+                    <svg><use href="#icon-users"/></svg> Équipe proposée
+                </div>
+                <div class="po-team">
+                    {% for t in team_agents %}
+                    <div class="po-member">
+                        {% if t.avatar_url %}
+                        <img class="po-member-avatar" src="{{ t.avatar_url }}" alt="{{ t.name }}">
+                        {% else %}
+                        <div class="po-member-avatar placeholder">{{ t.name[:2] }}</div>
+                        {% endif %}
+                        <div class="po-member-info">
+                            <div class="po-member-name">{{ t.name }}</div>
+                            <div class="po-member-role">{{ t.label }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    {% if not team_agents %}
+                    {% for ep in epics %}{% for t in ep.team %}
+                    <div class="po-member">
+                        <div class="po-member-avatar placeholder">{{ t.label[:2] }}</div>
+                        <div class="po-member-info">
+                            <div class="po-member-name">{{ t.label }}</div>
+                            <div class="po-member-role">{{ t.role }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}{% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Project info card -->
+            <div class="po-card">
+                <div class="po-card-title">
+                    <svg><use href="#icon-settings"/></svg> Informations
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem">
+                    <div><strong>{{ _("type") }}</strong> {{ project.factory_type }}</div>
+                    <div><strong>{{ _("lead_2") }}</strong> {{ project.lead_agent_id }}</div>
+                    {% if project.values %}
+                    <div><strong>{{ _("valeurs") }}</strong> {{ project.values|join(', ') }}</div>
+                    {% endif %}
+                    {% if project.domains %}
+                    <div><strong>{{ _("domaines") }}</strong> {{ project.domains|join(', ') }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Count stats from DOM
+document.addEventListener('DOMContentLoaded', () => {
+    const feats = document.querySelectorAll('.po-feat');
+    const stories = document.querySelectorAll('.po-story');
+    let totalPts = 0;
+    document.querySelectorAll('.po-feat-pts').forEach(el => {
+        totalPts += parseInt(el.textContent) || 0;
+    });
+    document.getElementById('featCount').textContent = feats.length;
+    document.getElementById('storyCount').textContent = stories.length;
+    document.getElementById('pointsCount').textContent = totalPts;
+});
+</script>
+{% endblock %}

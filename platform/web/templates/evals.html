@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.evals-layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; height: calc(100vh - 80px); }
+.evals-sidebar { background: var(--bg-secondary); border-radius: 10px; padding: 14px; overflow-y: auto; border: 1px solid var(--border); }
+.evals-main { display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.ds-item { padding: 8px 10px; border-radius: 7px; cursor: pointer; border: 1px solid transparent; font-size: 0.85rem; }
+.ds-item:hover, .ds-item.active { background: var(--bg-tertiary); border-color: var(--border); }
+.ds-item .ds-name { font-weight: 600; color: var(--text-primary); }
+.ds-item .ds-meta { color: var(--text-secondary); font-size: 0.78rem; margin-top: 2px; }
+.eval-card { background: var(--bg-secondary); border-radius: 10px; padding: 16px; border: 1px solid var(--border); }
+.eval-card h3 { margin: 0 0 12px; font-size: 1rem; color: var(--text-primary); }
+.cases-table, .runs-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.cases-table th, .runs-table th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); color: var(--text-secondary); font-weight: 600; }
+.cases-table td, .runs-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-subtle, #30363d); color: var(--text-primary); vertical-align: top; }
+.cases-table td:first-child { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.score-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: 700; }
+.score-hi { background: #1c4322; color: #3fb950; }
+.score-mid { background: #3d2a00; color: #d29922; }
+.score-lo { background: #3c1c1c; color: #f47067; }
+.status-running { color: #58a6ff; }
+.status-completed { color: #3fb950; }
+.status-failed { color: #f47067; }
+.btn-sm { padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; font-size: 0.8rem; }
+.btn-sm:hover { background: var(--bg-hover); }
+.btn-primary { background: var(--accent, #238636); border-color: transparent; color: #fff; }
+textarea.form-input { font-family: monospace; font-size: 0.8rem; resize: vertical; }
+</style>
+
+<div class="page-header" style="margin-bottom:16px">
+  <h2 style="margin:0;font-size:1.3rem">Evaluations</h2>
+  <button class="btn-sm btn-primary" onclick="showCreateDataset()">+ Dataset</button>
+</div>
+
+<div class="evals-layout">
+  <!-- Sidebar datasets -->
+  <div class="evals-sidebar">
+    <div style="font-size:0.78rem;font-weight:700;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Datasets</div>
+    <div id="datasets-list"></div>
+  </div>
+
+  <!-- Main panel -->
+  <div class="evals-main">
+    <!-- Create dataset form (hidden) -->
+    <div id="create-dataset-form" class="eval-card" style="display:none">
+      <h3>Nouveau Dataset</h3>
+      <div style="display:grid;gap:8px">
+        <input id="ds-name" class="form-input" placeholder="Nom du dataset" style="padding:6px 10px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
+        <input id="ds-agent" class="form-input" placeholder="Agent ID (ex: worker, brain)" style="padding:6px 10px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
+        <textarea id="ds-desc" class="form-input" rows="2" placeholder="Description..." style="padding:6px 10px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)"></textarea>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sm btn-primary" onclick="createDataset()">Créer</button>
+          <button class="btn-sm" onclick="document.getElementById('create-dataset-form').style.display='none'">Annuler</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cases section -->
+    <div id="cases-section" class="eval-card" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 id="ds-title" style="margin:0"></h3>
+        <button class="btn-sm btn-primary" onclick="showAddCase()">+ Case</button>
+      </div>
+
+      <!-- Add case form -->
+      <div id="add-case-form" style="display:none;margin-bottom:12px;padding:12px;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+        <div style="display:grid;gap:8px">
+          <textarea id="case-prompt" class="form-input" rows="3" placeholder="Prompt à évaluer..." style="padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);width:100%;box-sizing:border-box"></textarea>
+          <textarea id="case-expected" class="form-input" rows="3" placeholder="Output attendu (optionnel, pour scoring LLM-as-judge)..." style="padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);width:100%;box-sizing:border-box"></textarea>
+          <input id="case-tags" class="form-input" placeholder="Tags (virgule séparés)" style="padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary)">
+          <div style="display:flex;gap:8px">
+            <button class="btn-sm btn-primary" onclick="addCase()">Ajouter</button>
+            <button class="btn-sm" onclick="document.getElementById('add-case-form').style.display='none'">Annuler</button>
+          </div>
+        </div>
+      </div>
+
+      <table class="cases-table">
+        <thead><tr><th>Prompt</th><th>Expected</th><th>Tags</th><th></th></tr></thead>
+        <tbody id="cases-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Run section -->
+    <div id="run-section" class="eval-card" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Lancer un Run</h3>
+        <button class="btn-sm btn-primary" onclick="launchRun()">▶ Lancer</button>
+      </div>
+      <div style="font-size:0.82rem;color:var(--text-secondary)">Lance chaque case du dataset via l'agent, puis un LLM-as-judge attribue un score 0-10.</div>
+    </div>
+
+    <!-- Runs history -->
+    <div class="eval-card">
+      <h3>Historique des Runs</h3>
+      <table class="runs-table">
+        <thead><tr><th>ID</th><th>Dataset</th><th>Agent</th><th>Status</th><th>Score</th><th>Date</th><th></th></tr></thead>
+        <tbody id="runs-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Run detail -->
+    <div id="run-detail" class="eval-card" style="display:none">
+      <h3 id="run-detail-title">Résultats</h3>
+      <table class="cases-table">
+        <thead><tr><th>Prompt</th><th>Actual Output</th><th>Score</th><th>Feedback</th><th>Latency</th></tr></thead>
+        <tbody id="results-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentDatasetId = null;
+
+async function loadDatasets() {
+  const resp = await fetch('/api/evals/datasets');
+  const datasets = await resp.json();
+  const el = document.getElementById('datasets-list');
+  el.innerHTML = datasets.map(d => `
+    <div class="ds-item ${d.id===currentDatasetId?'active':''}" onclick="selectDataset('${d.id}','${d.name}','${d.agent_id||''}')">
+      <div class="ds-name">${d.name}</div>
+      <div class="ds-meta">${d.agent_id||'any agent'}</div>
+    </div>
+  `).join('') || '<div style="color:var(--text-secondary);font-size:0.8rem">Aucun dataset</div>';
+}
+
+async function selectDataset(id, name, agentId) {
+  currentDatasetId = id;
+  document.getElementById('ds-title').textContent = name;
+  document.getElementById('cases-section').style.display = '';
+  document.getElementById('run-section').style.display = '';
+  loadDatasets();
+  loadCases();
+}
+
+async function loadCases() {
+  if (!currentDatasetId) return;
+  const resp = await fetch(`/api/evals/datasets/${currentDatasetId}/cases`);
+  const cases = await resp.json();
+  document.getElementById('cases-tbody').innerHTML = cases.map(c => `
+    <tr>
+      <td title="${c.prompt}">${c.prompt.slice(0,80)}${c.prompt.length>80?'…':''}</td>
+      <td title="${c.expected_output||''}">${(c.expected_output||'').slice(0,60)}${(c.expected_output||'').length>60?'…':''}</td>
+      <td><small>${JSON.parse(c.tags||'[]').join(', ')}</small></td>
+      <td><button class="btn-sm" onclick="deleteCase('${c.id}')">×</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="color:var(--text-secondary);text-align:center">Aucun cas</td></tr>';
+}
+
+function showCreateDataset() {
+  document.getElementById('create-dataset-form').style.display = '';
+  document.getElementById('ds-name').focus();
+}
+
+async function createDataset() {
+  const name = document.getElementById('ds-name').value.trim();
+  if (!name) return;
+  await fetch('/api/evals/datasets', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ name, description: document.getElementById('ds-desc').value, agent_id: document.getElementById('ds-agent').value })
+  });
+  document.getElementById('create-dataset-form').style.display = 'none';
+  loadDatasets();
+}
+
+function showAddCase() { document.getElementById('add-case-form').style.display = ''; }
+
+async function addCase() {
+  const prompt = document.getElementById('case-prompt').value.trim();
+  if (!prompt || !currentDatasetId) return;
+  const tags = document.getElementById('case-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  await fetch(`/api/evals/datasets/${currentDatasetId}/cases`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ prompt, expected_output: document.getElementById('case-expected').value, tags })
+  });
+  document.getElementById('add-case-form').style.display = 'none';
+  loadCases();
+}
+
+async function deleteCase(caseId) {
+  if (!confirm('Supprimer ce cas ?')) return;
+  await fetch(`/api/evals/cases/${caseId}`, { method: 'DELETE' });
+  loadCases();
+}
+
+async function launchRun() {
+  if (!currentDatasetId) return;
+  const resp = await fetch('/api/evals/runs', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ dataset_id: currentDatasetId })
+  });
+  const data = await resp.json();
+  alert(`Run lancé: ${data.id}`);
+  loadRuns();
+}
+
+async function loadRuns() {
+  const resp = await fetch('/api/evals/runs');
+  const runs = await resp.json();
+  document.getElementById('runs-tbody').innerHTML = runs.map(r => {
+    const scoreClass = r.score_avg >= 0.7 ? 'score-hi' : r.score_avg >= 0.4 ? 'score-mid' : 'score-lo';
+    const score = r.score_avg != null ? `<span class="score-badge ${scoreClass}">${(r.score_avg*10).toFixed(1)}/10</span>` : '-';
+    return `<tr>
+      <td style="font-family:monospace;font-size:0.75rem">${r.id.slice(0,8)}</td>
+      <td>${r.dataset_name||r.dataset_id.slice(0,8)}</td>
+      <td>${r.agent_id||'-'}</td>
+      <td class="status-${r.status}">${r.status}</td>
+      <td>${score}</td>
+      <td style="font-size:0.78rem">${(r.created_at||'').slice(0,16)}</td>
+      <td><button class="btn-sm" onclick="viewRunDetail('${r.id}')">Détail</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="color:var(--text-secondary);text-align:center">Aucun run</td></tr>';
+}
+
+async function viewRunDetail(runId) {
+  const resp = await fetch(`/api/evals/runs/${runId}/results`);
+  const data = await resp.json();
+  document.getElementById('run-detail').style.display = '';
+  document.getElementById('run-detail-title').textContent = `Résultats — Run ${runId.slice(0,8)} (score: ${data.run.score_avg != null ? (data.run.score_avg*10).toFixed(1)+'/10' : 'N/A'})`;
+  document.getElementById('results-tbody').innerHTML = data.results.map(r => {
+    const scoreClass = r.score >= 0.7 ? 'score-hi' : r.score >= 0.4 ? 'score-mid' : 'score-lo';
+    return `<tr>
+      <td title="${r.prompt||''}" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">${(r.prompt||'').slice(0,60)}</td>
+      <td style="max-width:220px;font-size:0.78rem">${(r.actual_output||'').slice(0,120)}${(r.actual_output||'').length>120?'…':''}</td>
+      <td><span class="score-badge ${scoreClass}">${r.score != null ? (r.score*10).toFixed(1) : '-'}</span></td>
+      <td style="font-size:0.78rem;max-width:180px">${r.judge_feedback||'-'}</td>
+      <td style="font-size:0.78rem">${r.latency_ms}ms</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="color:var(--text-secondary);text-align:center">Aucun résultat</td></tr>';
+  document.getElementById('run-detail').scrollIntoView({ behavior: 'smooth' });
+}
+
+loadDatasets();
+loadRuns();
+setInterval(loadRuns, 5000);
+</script>
+{% endblock %}

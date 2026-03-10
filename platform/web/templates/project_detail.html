@@ -1,0 +1,907 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<div class="project-topbar-info">
+    <span class="project-type-dot {{ project.factory_type }} dot-lg"></span>
+    <span style="font-size:0.8rem;color:var(--text-secondary)">{{ project.path }}</span>
+    <span id="projectQualityBadge"
+          hx-get="/api/dashboard/quality-badge?project_id={{ project.id }}"
+          hx-trigger="load"
+          hx-swap="innerHTML"></span>
+    <a href="/projects/{{ project.id }}/hub" class="btn btn-sm btn-ghost" title="Project Hub">
+        <svg class="icon icon-sm"><use href="#icon-home"/></svg> Hub
+    </a>
+    <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost" title="Workspace">
+        <svg class="icon icon-sm"><use href="#icon-terminal"/></svg> Workspace
+    </a>
+    <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost" title="Kanban Board">
+        <svg class="icon icon-sm"><use href="#icon-columns"/></svg> Board
+    </a>
+    <button class="btn btn-sm btn-ghost" onclick="document.getElementById('project-sidebar').classList.toggle('open')" title="Project info">
+        <svg class="icon icon-sm"><use href="#icon-settings"/></svg> Info
+    </button>
+    {% if project.factory_type == 'sf' %}
+    <button class="btn btn-primary btn-sm" title="Run Brain analysis">
+        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Brain
+    </button>
+    {% elif project.factory_type == 'mf' %}
+    <button class="btn btn-primary btn-sm" title="Run Migration analysis">
+        <svg class="icon icon-sm"><use href="#icon-zap"/></svg> Analyze
+    </button>
+    {% endif %}
+    <button onclick="document.getElementById('importGitModal').style.display='flex'" style="padding:4px 10px;background:#2d4a6d;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px" title="Importer un dépôt GitHub"> Import</button>
+    <button onclick="openCmdPalette()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:11px" title="Palette de commandes (⌘K)">⌘K</button>
+    <button onclick="wsShowPanel('aichat')" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Assistant IA"></button>
+    <button onclick="wsShowPanel('prs');wsPrLoad()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Pull Requests"></button>
+    <button onclick="wsShowPanel('deploylogs');wsDeployLogsStart()" style="padding:3px 8px;background:#2a2a2a;color:#888;border:1px solid #444;border-radius:4px;cursor:pointer;font-size:13px" title="Deploy Logs"></button>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="project-chat-layout">
+
+    <!-- ═══ Main: ChatGPT-style conversation ═══ -->
+    <div class="project-chat-main">
+        <!-- Conversation header -->
+        <div class="chat-header">
+            <div class="chat-header-left">
+                <button class="btn btn-ghost btn-sm chat-history-btn" onclick="toggleConversationList()" title="Conversation history">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+                </button>
+                <span class="chat-header-title" id="chat-conv-title">
+                    {% if active_session %}{{ active_session.name }}{% else %}New conversation{% endif %}
+                </span>
+                {% if messages %}
+                <span class="chat-header-count">{{ messages|length }} messages</span>
+                {% endif %}
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="newConversation()" title="New conversation">
+                <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                New
+            </button>
+        </div>
+
+        <!-- Conversation list (hidden by default) -->
+        <div class="chat-conv-list" id="chat-conv-list" style="display:none">
+            {% for s in sessions %}
+            {% set is_workflow = (s.config or {}).get('workflow_id') %}
+            <a class="chat-conv-item {{ 'active' if active_session and s.id == active_session.id }}"
+               href="{% if is_workflow %}/sessions/{{ s.id }}/live{% else %}/projects/{{ project.id }}?session={{ s.id }}{% endif %}">
+                {% if is_workflow %}<svg class="icon icon-xs" style="flex-shrink:0"><use href="#icon-workflow"/></svg>{% endif %}
+                <span class="chat-conv-name">{{ s.name }}</span>
+                <span class="chat-conv-date">{{ s.created_at | ts }}</span>
+            </a>
+            {% endfor %}
+            {% if not sessions %}
+            <div class="chat-conv-empty">{{ _("no_conversations_yet") }}</div>
+            {% endif %}
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+            {% if messages %}
+                {% for msg in messages %}
+                <div class="chat-msg {{ 'chat-msg-user' if msg.from_agent == 'user' else 'chat-msg-agent' }}">
+                    {% if msg.from_agent != 'user' %}
+                    {% if lead_avatar_url %}
+                    <img src="{{ lead_avatar_url }}" alt="" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex-shrink:0">
+                    {% elif lead_agent and lead_agent.avatar != 'bot' %}
+                    <div class="chat-msg-avatar agent-avatar-sm" style="background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px">
+                        {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                    </div>
+                    {% else %}
+                    <div class="chat-msg-avatar agent-avatar-sm">
+                        <svg class="icon icon-sm"><use href="#icon-bot"/></svg>
+                    </div>
+                    {% endif %}
+                    {% endif %}
+                    <div class="chat-msg-body">
+                        {% if msg.from_agent != 'user' and msg.from_agent != 'system' %}
+                        <div class="chat-msg-sender">
+                            {% if lead_agent %}{{ lead_agent.name }}{% else %}{{ project.name }}{% endif %}
+                        </div>
+                        {% endif %}
+                        {% if msg.from_agent == 'user' %}
+                        <div class="chat-msg-text">{{ msg.content }}</div>
+                        {% else %}
+                        <div class="chat-msg-text md-rendered">{{ msg.content | markdown | safe }}</div>
+                        {% endif %}
+                        {% if msg.metadata and msg.metadata.tool_calls %}
+                        <div class="chat-msg-tools">
+                            {% for tc in msg.metadata.tool_calls %}
+                            <span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> {{ tc.name }}</span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% if msg.from_agent == 'user' %}
+                    <div class="chat-msg-avatar user">S</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="chat-welcome">
+                    <div class="chat-welcome-icon">
+                        {% if lead_avatar_url %}
+                        <img src="{{ lead_avatar_url }}" alt="{{ lead_agent.name }}" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid {{ lead_agent.color or 'var(--purple)' }}">
+                        {% elif lead_agent and lead_agent.avatar != 'bot' %}
+                        <div style="width:64px;height:64px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:1.4rem;display:flex;align-items:center;justify-content:center">
+                            {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                        </div>
+                        {% elif lead_agent and lead_agent.avatar %}
+                        <svg class="icon" style="width:48px;height:48px;color:{{ lead_agent.color }}"><use href="#icon-{{ lead_agent.avatar }}"/></svg>
+                        {% else %}
+                        <svg class="icon" style="width:48px;height:48px;color:var(--purple)"><use href="#icon-bot"/></svg>
+                        {% endif %}
+                    </div>
+                    <h3>{% if lead_agent %}{{ lead_agent.name }}{% else %}{{ project.name }}{% endif %}</h3>
+                    {% if lead_agent and lead_agent.tagline %}
+                    <p style="color:var(--text-secondary);font-style:italic;margin-bottom:0.5rem">{{ lead_agent.tagline }}</p>
+                    {% endif %}
+                    <p>{{ _("ask_anything_about_this_project_the") }}</p>
+                    <div class="chat-suggestions">
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("what_is_this_project_about") }}</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("show_me_the_project_structure") }}</button>
+                        <button class="chat-suggestion" onclick="document.getElementById('chat-input').value=this.textContent;sendChat()">{{ _("what_are_the_recent_changes") }}</button>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Input bar -->
+        <div class="chat-input-bar">
+            <form id="chat-form">
+                <div class="chat-input-row">
+                    <textarea id="chat-input" name="content" rows="1" placeholder="Message {{ project.name }}…"
+                              onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"
+                              oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+                    <button type="button" class="chat-send-btn" onclick="sendChat()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ═══ Sidebar: Project info (collapsible) ═══ -->
+    <aside class="project-sidebar" id="project-sidebar">
+        <div class="ps-section">
+            <h4>{{ _("vision") }}</h4>
+            {% if project.vision %}
+            <div class="ps-text md-rendered">{{ project.vision[:800] | markdown | safe }}</div>
+            {% else %}
+            <p class="ps-empty">{{ _("no_vision_defined_add_a_vision") }}</p>
+            {% endif %}
+        </div>
+
+        <div class="ps-section">
+            <h4>{{ _("values") }}</h4>
+            <div class="ps-tags">
+                {% for v in project.values %}
+                <span class="item-tag">{{ v }}</span>
+                {% endfor %}
+                {% if not project.values %}
+                <span class="ps-empty">{{ _("no_values") }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if lead_agent %}
+        <div class="ps-section">
+            <h4>{{ _("lead_agent") }}</h4>
+            <div style="display:flex;align-items:center;gap:0.5rem">
+                {% if lead_avatar_url %}
+                <img src="{{ lead_avatar_url }}" alt="{{ lead_agent.name }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid {{ lead_agent.color or 'var(--purple)' }};flex-shrink:0">
+                {% else %}
+                <div style="width:28px;height:28px;border-radius:50%;background:{{ lead_agent.color }};color:#fff;font-weight:700;font-size:0.6rem;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                    {{ lead_agent.name.split()[0][0] }}{{ lead_agent.name.split()[-1][0] if lead_agent.name.split()|length > 1 else '' }}
+                </div>
+                {% endif %}
+                <div>
+                    <div style="font-weight:600;font-size:0.8rem">{{ lead_agent.name }}</div>
+                    <div style="font-size:0.65rem;color:var(--text-secondary)">{{ lead_agent.role }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="ps-section">
+            <h4>{{ _("domains") }}</h4>
+            <div class="ps-tags">
+                {% for d in project.domains %}
+                <span class="item-tag">{{ d }}</span>
+                {% endfor %}
+                {% if project.arch_domain %}
+                <span class="item-tag" style="background:rgba(0,101,255,.12);color:#0065ff;border-color:rgba(0,101,255,.3);font-weight:600">
+                    <svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-book-open"/></svg>
+                    DSI: {{ project.arch_domain | upper }}
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Memory files (auto-loaded) -->
+        <div class="ps-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-filetext"/></svg> Memory</h4>
+            {% if memory_files %}
+            <div class="ps-memory-list">
+                {% for mf in memory_files %}
+                <details class="ps-memory-file">
+                    <summary>
+                        <span class="ps-memory-name">{{ mf.path }}</span>
+                        <span class="ps-memory-size">{{ (mf.size / 1024) | round(1) }}K</span>
+                    </summary>
+                    <div class="ps-memory-content md-rendered">{{ mf.content[:800] | markdown | safe }}{% if mf.content|length > 800 %}<p class="ps-empty">… (truncated)</p>{% endif %}</div>
+                </details>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="ps-empty">{{ _("no_memory_files_found_claude_md") }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Git panel -->
+        <div class="ps-section" id="git-panel"
+             hx-get="/api/projects/{{ project.id }}/git"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <p class="ps-empty">{{ _("loading_git") }}</p>
+        </div>
+
+        <!-- Task panel -->
+        <div class="ps-section" id="task-panel"
+             hx-get="/api/projects/{{ project.id }}/tasks"
+             hx-trigger="load, every 30s"
+             hx-swap="innerHTML">
+            <p class="ps-empty">{{ _("loading_tasks") }}</p>
+        </div>
+
+        {% if project.factory_type in ('sf', 'mf') %}
+        <div class="ps-section">
+            <h4>{{ _("pipeline") }}</h4>
+            <div class="ps-pipeline">
+                {% if project.factory_type == 'sf' %}
+                    {% for step in ['Brain', 'TDD', 'Review', 'Build', 'Deploy'] %}
+                    <span class="ps-pipe-step">{{ step }}</span>{% if not loop.last %}<span class="ps-pipe-arrow">→</span>{% endif %}
+                    {% endfor %}
+                {% else %}
+                    {% for step in ['Analyze', 'Transform', 'Compare', 'Deploy'] %}
+                    <span class="ps-pipe-step">{{ step }}</span>{% if not loop.last %}<span class="ps-pipe-arrow">→</span>{% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if missions %}
+        <div class="ps-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
+            {% for m in missions %}
+            <a href="/epics/{{ m.id }}" class="ps-workflow-card" style="text-decoration:none;display:block">
+                <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.25rem">
+                    <span class="status-dot {% if m.status == 'active' %}active{% elif m.status == 'completed' %}done{% else %}idle{% endif %}" style="width:7px;height:7px"></span>
+                    <span class="ps-workflow-name" style="margin:0">{{ m.name }}</span>
+                </div>
+                {% if m.goal %}
+                <div class="ps-workflow-desc">{{ m.goal[:80] }}{% if m.goal|length > 80 %}…{% endif %}</div>
+                {% endif %}
+            </a>
+            {% endfor %}
+            <a href="/epics?project={{ project.id }}&action=new" class="btn btn-sm btn-ghost" style="width:100%;margin-top:0.5rem">
+                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> {{ _('new_mission') }}
+            </a>
+        </div>
+        {% else %}
+        <div class="ps-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-rocket"/></svg> Epics</h4>
+            <p class="ps-empty">{{ _('no_epic') }}</p>
+            <a href="/epics?project={{ project.id }}&action=new" class="btn btn-sm btn-primary" style="width:100%">
+                <svg class="icon icon-xs"><use href="#icon-plus"/></svg> Creer une epic
+            </a>
+        </div>
+        {% endif %}
+
+        {% if workflows %}
+        <div class="ps-section">
+            <h4><svg class="icon icon-xs" style="vertical-align:middle"><use href="#icon-workflow"/></svg> Workflows</h4>
+            {% for witem in workflows %}
+            <div class="ps-workflow-card">
+                <div class="ps-workflow-name">{{ witem.wf.name }}</div>
+                <div class="ps-workflow-desc">{{ witem.wf.description[:120] }}{% if witem.wf.description|length > 120 %}…{% endif %}</div>
+                <div class="ps-workflow-actions">
+                    {% if witem.session %}
+                    <a href="/sessions/{{ witem.session.id }}/live" class="btn btn-sm btn-primary" title="Live multi-agent view">
+                        <svg class="icon icon-xs"><use href="#icon-share"/></svg> Live
+                    </a>
+                    {% endif %}
+                    <a href="/workflows/{{ witem.wf.id }}/edit" class="btn btn-sm btn-ghost" title="Edit workflow">
+                        <svg class="icon icon-xs"><use href="#icon-edit"/></svg> Editor
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Danger Zone -->
+        <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid rgba(239,68,68,.2)">
+            <h4 style="font-size:0.72rem;text-transform:uppercase;color:var(--red);opacity:.7;margin-bottom:0.5rem;letter-spacing:0.05em">Zone dangereuse</h4>
+            {% if project.is_protected %}
+            <button class="btn btn-sm" style="width:100%;opacity:.4;cursor:not-allowed" disabled title="Ce projet est protégé et ne peut pas être supprimé">
+                <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Projet protégé
+            </button>
+            {% else %}
+            <button class="btn btn-sm btn-danger" style="width:100%" onclick="deleteProject('{{ project.id }}','{{ project.name|replace("'","&#39;") }}')">
+                <svg style="width:13px;height:13px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                Supprimer ce projet
+            </button>
+            {% endif %}
+        </div>
+    </aside>
+</div>
+
+<!-- ══ Explorer panel (floating sidebar) ══ -->
+<div id="panel-explorer" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:300px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;display:none;flex-direction:column">
+  <div style="padding:8px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
+    <span style="font-size:13px;font-weight:600"> Explorateur</span>
+    <span id="explorerPath" style="font-size:11px;color:#888;flex:1"></span>
+    <button onclick="wsExplorerLoad('')" style="background:none;border:none;color:#888;cursor:pointer;font-size:14px" title="Racine">⬆️</button>
+    <button onclick="document.getElementById('panel-explorer').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
+  </div>
+  <div id="explorerList" style="padding:4px;font-size:12px;overflow-y:auto;flex:1"></div>
+  <div id="filePreview" style="display:none;border-top:1px solid #333;flex-direction:column">
+    <div style="padding:6px 12px;display:flex;align-items:center;justify-content:space-between;background:#1a1a1a">
+      <span id="filePreviewName" style="font-size:11px;color:#aaa;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1"></span>
+      <button onclick="document.getElementById('filePreview').style.display='none'" style="background:none;border:none;color:#888;cursor:pointer;flex-shrink:0"></button>
+    </div>
+    <pre id="filePreviewContent" style="margin:0;padding:8px;font-size:11px;line-height:1.5;overflow:auto;max-height:300px;background:#111;color:#ddd;white-space:pre-wrap;word-break:break-all"></pre>
+  </div>
+</div>
+
+<!-- ══ AI Chat panel ══ -->
+<div id="panel-aichat" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:600"> Assistant IA</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="wsAiClearChat()" style="background:none;border:none;color:#666;cursor:pointer;font-size:11px">Vider</button>
+        <button onclick="wsClosePanel('aichat')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
+      </div>
+    </div>
+    <div id="aiChatMessages" style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px;min-height:200px;max-height:calc(100vh - 300px)"></div>
+    <div style="padding:6px 8px;border-top:1px solid #222;font-size:11px;color:#666">
+      Contexte: <select id="aiContextSelect" style="background:#1a1a1a;color:#aaa;border:1px solid #333;border-radius:3px;font-size:11px;padding:1px 4px">
+        <option value="">Aucun</option>
+        <option value="file">Fichier ouvert</option>
+        <option value="error">Dernière erreur</option>
+      </select>
+    </div>
+    <div style="padding:8px;border-top:1px solid #333;display:flex;gap:6px">
+      <textarea id="aiChatInput" placeholder="Pose une question…" onkeydown="if((event.metaKey||event.ctrlKey)&&event.key==='Enter')wsAiSend()"
+                style="flex:1;background:#1a1a1a;color:#ddd;border:1px solid #444;border-radius:4px;padding:6px;font-size:12px;resize:none;height:52px;font-family:inherit"></textarea>
+      <button onclick="wsAiSend()" style="padding:6px 10px;background:#2d6a4f;color:#fff;border:none;border-radius:4px;cursor:pointer;align-self:flex-end">↑</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PR Viewer panel ══ -->
+<div id="panel-prs" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
+  <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
+    <span style="font-size:13px;font-weight:600"> Pull Requests</span>
+    <span id="prRepo" style="font-size:11px;color:#888;flex:1"></span>
+    <button onclick="wsPrLoad()" style="background:none;border:none;color:#888;cursor:pointer">↻</button>
+    <button onclick="wsClosePanel('prs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px"></button>
+  </div>
+  <div id="prList" style="padding:8px;font-size:12px;overflow-y:auto;flex:1"></div>
+</div>
+
+<!-- ══ Deploy Logs panel ══ -->
+<div id="panel-deploylogs" class="ws-panel" style="display:none;position:fixed;top:56px;right:0;width:320px;height:calc(100vh - 56px);background:#161616;border-left:1px solid #333;z-index:50;flex-direction:column">
+  <div style="padding:10px 12px;border-bottom:1px solid #333;display:flex;align-items:center;gap:8px">
+    <span style="font-size:13px;font-weight:600"> Deploy Logs</span>
+    <button onclick="wsDeployLogsStart()" style="padding:2px 8px;font-size:11px;background:#333;color:#aaa;border:none;border-radius:4px;cursor:pointer">↻ Stream</button>
+    <button onclick="wsDeployLogsClear()" style="background:none;border:none;color:#666;cursor:pointer;font-size:11px">Vider</button>
+    <button onclick="wsClosePanel('deploylogs')" style="background:none;border:none;color:#888;cursor:pointer;font-size:16px;margin-left:auto"></button>
+  </div>
+  <div id="deployLogsList" style="padding:6px;font-size:11px;font-family:monospace;overflow-y:auto;flex:1;background:#0d0d0d;color:#aaa;line-height:1.4"></div>
+</div>
+
+<!-- ══ Import GitHub modal ══ --> style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center">
+  <div style="background:#1e1e1e;border:1px solid #444;border-radius:8px;padding:24px;width:480px;max-width:90vw">
+    <h3 style="margin:0 0 16px;font-size:15px;color:#eee"> Importer un dépôt GitHub</h3>
+    <input id="importGitUrl" type="text" placeholder="https://github.com/user/repo"
+           style="width:100%;box-sizing:border-box;background:#111;color:#eee;border:1px solid #444;border-radius:4px;padding:8px;font-size:13px;margin-bottom:12px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('importGitModal').style.display='none'" style="padding:6px 14px;background:#333;color:#ccc;border:none;border-radius:4px;cursor:pointer">Annuler</button>
+      <button onclick="wsImportGit()" style="padding:6px 14px;background:#2d6a4f;color:#fff;border:none;border-radius:4px;cursor:pointer"> Cloner</button>
+    </div>
+    <div id="importGitLog" style="display:none;margin-top:12px;background:#111;border-radius:4px;padding:8px;max-height:200px;overflow-y:auto;font-size:11px;font-family:monospace;color:#aaa"></div>
+  </div>
+</div>
+
+<!-- ══ Command palette ══ -->
+<div id="cmdPalette" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:300;align-items:flex-start;justify-content:center;padding-top:15vh">
+  <div style="background:#1e1e1e;border:1px solid #555;border-radius:8px;width:560px;max-width:90vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;padding:12px 16px;gap:10px;border-bottom:1px solid #333">
+      <span style="color:#888;font-size:14px">⌘</span>
+      <input id="cmdInput" type="text" placeholder="Rechercher fichiers, actions…"
+             oninput="cmdFilter()" onkeydown="cmdKey(event)"
+             style="flex:1;background:none;border:none;color:#eee;font-size:14px;outline:none">
+      <kbd style="font-size:11px;color:#666;background:#2a2a2a;padding:2px 6px;border-radius:3px">Esc</kbd>
+    </div>
+    <div id="cmdResults" style="max-height:380px;overflow-y:auto;padding:4px 0"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const PROJECT_ID = "{{ project.id }}";
+const PROJECT_NAME = "{{ project.name }}";
+const SESSION_ID = "{{ active_session.id if active_session else '' }}";
+const AGENT_AVATAR = "{{ lead_agent.avatar if lead_agent and lead_agent.avatar else '' }}";
+const AGENT_COLOR = "{{ lead_agent.color if lead_agent and lead_agent.color else '#bc8cff' }}";
+const AGENT_NAME = "{{ lead_agent.name if lead_agent else project.name }}";
+const AGENT_INITIALS = (() => {
+    const parts = AGENT_NAME.split(' ');
+    return parts.length > 1 ? parts[0][0] + parts[parts.length-1][0] : parts[0][0];
+})();
+let chatBusy = false;
+
+function scrollChat() {
+    const el = document.getElementById('chat-messages');
+    el.scrollTop = el.scrollHeight;
+}
+
+function addUserBubble(text) {
+    const esc = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
+        `<div class="chat-msg chat-msg-user"><div class="chat-msg-body"><div class="chat-msg-text">${esc}</div></div><div class="chat-msg-avatar user">S</div></div>`);
+    // Remove welcome screen
+    const w = document.querySelector('.chat-welcome');
+    if (w) w.remove();
+    scrollChat();
+}
+
+function addStreamingBubble() {
+    const id = 'stream-' + Date.now();
+    const avatarHtml = (AGENT_AVATAR && AGENT_AVATAR !== 'bot')
+        ? `<div class="chat-msg-avatar agent-avatar-sm" style="background:${AGENT_COLOR};color:#fff;font-weight:700;font-size:0.7rem;display:flex;align-items:center;justify-content:center;border-radius:50%;width:32px;height:32px">${AGENT_INITIALS}</div>`
+        : `<div class="chat-msg-avatar"><svg class="icon icon-sm"><use href="#icon-bot"/></svg></div>`;
+    document.getElementById('chat-messages').insertAdjacentHTML('beforeend',
+        `<div class="chat-msg chat-msg-agent" id="${id}">
+            ${avatarHtml}
+            <div class="chat-msg-body">
+                <div class="chat-msg-sender">${AGENT_NAME}</div>
+                <div class="chat-stream-status">
+                    <div class="stream-dots"><span></span><span></span><span></span></div>
+                    <span class="stream-label">Thinking…</span>
+                </div>
+                <div class="chat-msg-text md-rendered" style="display:none"></div>
+                <div class="chat-msg-tools"></div>
+            </div>
+        </div>`);
+    scrollChat();
+    return id;
+}
+
+function updateStreamStatus(bubbleId, label) {
+    const el = document.querySelector(`#${bubbleId} .stream-label`);
+    if (el) el.textContent = label;
+    scrollChat();
+}
+
+function addStreamTool(bubbleId, name) {
+    const tools = document.querySelector(`#${bubbleId} .chat-msg-tools`);
+    if (tools) {
+        const esc = name.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        tools.insertAdjacentHTML('beforeend', `<span class="chat-tool-pill"><svg class="icon icon-xs"><use href="#icon-wrench"/></svg> ${esc}</span>`);
+    }
+}
+
+const _streamAccum = {};
+function streamChunk(bubbleId, text) {
+    if (!_streamAccum[bubbleId]) _streamAccum[bubbleId] = '';
+    _streamAccum[bubbleId] += text;
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    // Hide status, show text area
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.style.display = 'none';
+    const el = bubble.querySelector('.chat-msg-text');
+    if (el) {
+        el.style.display = '';
+        // Render markdown if available, else show as pre-formatted text
+        if (typeof marked !== 'undefined') {
+            el.innerHTML = marked.parse(_streamAccum[bubbleId]);
+        } else {
+            el.textContent = _streamAccum[bubbleId];
+        }
+    }
+    scrollChat();
+}
+
+function finalizeStream(bubbleId, html) {
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    // Remove status indicator
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.remove();
+    // Show rendered content
+    const text = bubble.querySelector('.chat-msg-text');
+    if (text) { text.innerHTML = html; text.style.display = ''; }
+    scrollChat();
+}
+
+function failStream(bubbleId, error) {
+    const bubble = document.getElementById(bubbleId);
+    if (!bubble) return;
+    const status = bubble.querySelector('.chat-stream-status');
+    if (status) status.remove();
+    const text = bubble.querySelector('.chat-msg-text');
+    if (text) {
+        text.innerHTML = `<p style="color:var(--text-secondary);opacity:.6">${error || 'Request failed'}</p>`;
+        text.style.display = '';
+    }
+}
+
+function toggleConversationList() {
+    const list = document.getElementById('chat-conv-list');
+    list.style.display = list.style.display === 'none' ? 'block' : 'none';
+}
+
+async function newConversation() {
+    const resp = await fetch(`/api/projects/${PROJECT_ID}/conversations`, { method: 'POST' });
+    if (resp.ok) {
+        const data = await resp.json();
+        window.location.href = `/projects/${PROJECT_ID}?session=${data.session_id}`;
+    }
+}
+
+// Scroll to bottom on page load (existing messages)
+document.addEventListener('DOMContentLoaded', () => { scrollChat(); });
+
+async function sendChat() {
+    if (chatBusy) return;
+    const input = document.getElementById('chat-input');
+    const content = input.value.trim();
+    if (!content) return;
+
+    chatBusy = true;
+    input.value = '';
+    input.style.height = 'auto';
+    document.querySelector('.chat-send-btn').disabled = true;
+
+    addUserBubble(content);
+    const bubbleId = addStreamingBubble();
+
+    try {
+        const resp = await fetch(`/api/projects/${PROJECT_ID}/chat/stream`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'content=' + encodeURIComponent(content) + (SESSION_ID ? '&session_id=' + SESSION_ID : ''),
+        });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const {value, done} = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, {stream: true});
+
+            // Parse SSE lines
+            const lines = buffer.split('\n');
+            buffer = lines.pop();  // keep incomplete line
+
+            let eventType = 'message';
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    eventType = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                    const raw = line.slice(6);
+                    try {
+                        const data = JSON.parse(raw);
+                        if (eventType === 'status') {
+                            updateStreamStatus(bubbleId, data.label || 'Working…');
+                        } else if (eventType === 'tool') {
+                            addStreamTool(bubbleId, data.name || 'tool');
+                            updateStreamStatus(bubbleId, data.label || 'Working…');
+                        } else if (eventType === 'chunk') {
+                            streamChunk(bubbleId, data.text || '');
+                        } else if (eventType === 'done') {
+                            finalizeStream(bubbleId, data.html || '');
+                        } else if (eventType === 'error') {
+                            failStream(bubbleId, data.message || 'Error');
+                        }
+                    } catch(e) {}
+                    eventType = 'message';
+                }
+            }
+        }
+        // If stream closed without 'done', check if we got content
+        if (document.querySelector(`#${bubbleId} .chat-stream-status`)) {
+            failStream(bubbleId, 'Stream ended unexpectedly');
+        }
+    } catch(e) {
+        failStream(bubbleId, e.message || 'Network error');
+    } finally {
+        chatBusy = false;
+        document.querySelector('.chat-send-btn').disabled = false;
+        input.focus();
+    }
+}
+
+function deleteProject(projectId, projectName) {
+    openDeleteModal({
+        title: 'Supprimer ce projet',
+        subtitle: 'Supprime le projet et TOUTES les données associées',
+        warning: 'Toutes les epics, epics, features, user stories, sprints, tâches, sessions, messages, mémoire projet et agents associés seront définitivement supprimés.',
+        expectedName: projectName,
+        onConfirm: async () => {
+            const r = await fetch(`/api/projects/${projectId}`, {method:'DELETE'});
+            if (r.ok) window.location.href = '/';
+            else { const j = await r.json(); throw j.error || 'Erreur'; }
+        }
+    });
+}
+
+// ── Feature 1: File Explorer ──────────────────────────────────
+let _explorerCurrentPath = '';
+async function wsExplorerLoad(path) {
+    _explorerCurrentPath = path;
+    const list = document.getElementById('explorerList');
+    const pathEl = document.getElementById('explorerPath');
+    list.innerHTML = '<span style="color:#888;padding:8px;display:block">Chargement…</span>';
+    pathEl.textContent = path || '/';
+    const r = await fetch(`/api/projects/${PROJECT_ID}/workspace/files?path=${encodeURIComponent(path)}`);
+    const d = await r.json();
+    if (d.error) { list.innerHTML = `<span style="color:#e57373;padding:8px">${d.error}</span>`; return; }
+    if (d.items.length === 0) { list.innerHTML = '<span style="color:#888;padding:8px">Dossier vide</span>'; return; }
+    list.innerHTML = d.items.map(item => `
+        <div onclick="${item.type==='dir'?`wsExplorerLoad('${item.path.replace(/'/g,"\\'")}')` : `wsFilePreview('${item.path.replace(/'/g,"\\'")}')` }"
+             style="padding:4px 8px;cursor:pointer;display:flex;align-items:center;gap:6px;border-radius:3px"
+             onmouseover="this.style.background='#2a2a2a'" onmouseout="this.style.background=''">
+          <span>${item.type==='dir'?'':''}</span>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.name}</span>
+          ${item.type==='file'?`<span style="color:#555;font-size:10px">${item.size>1024?Math.round(item.size/1024)+'k':item.size+'b'}</span>`:''}
+        </div>`).join('');
+}
+let _currentFilePath = '';
+async function wsFilePreview(path) {
+    _currentFilePath = path;
+    const preview = document.getElementById('filePreview');
+    const content = document.getElementById('filePreviewContent');
+    const name = document.getElementById('filePreviewName');
+    name.textContent = path;
+    content.textContent = 'Chargement…';
+    preview.style.display = 'flex';
+    const r = await fetch(`/api/projects/${PROJECT_ID}/workspace/file-content?path=${encodeURIComponent(path)}`);
+    const d = await r.json();
+    if (d.error) { content.textContent = d.error; return; }
+    content.textContent = d.content;
+}
+
+// ── Feature 2: GitHub Import ──────────────────────────────────
+async function wsImportGit() {
+    const url = document.getElementById('importGitUrl').value.trim();
+    const log = document.getElementById('importGitLog');
+    log.style.display = 'block';
+    log.innerHTML = '';
+    const resp = await fetch(`/api/projects/${PROJECT_ID}/workspace/import-git`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url})
+    });
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value);
+        const parts = buf.split('\n\n');
+        buf = parts.pop();
+        for (const part of parts) {
+            const line = part.replace(/^data: /, '');
+            try {
+                const e = JSON.parse(line);
+                const div = document.createElement('div');
+                div.textContent = e.msg;
+                if (e.type === 'error') div.style.color = '#e57373';
+                if (e.type === 'done') { div.style.color = '#81c784'; wsExplorerLoad(''); }
+                log.appendChild(div);
+                log.scrollTop = log.scrollHeight;
+            } catch (ex) {}
+        }
+    }
+}
+
+// ── Feature 3: Command Palette ────────────────────────────────
+const CMD_ACTIONS = [
+    {icon:'', label:'Explorateur de fichiers', action: ()=>{ closeCmdPalette(); document.getElementById('panel-explorer').style.display='flex'; wsExplorerLoad(''); }},
+    {icon:'', label:'Importer un dépôt GitHub', action: ()=>{ closeCmdPalette(); document.getElementById('importGitModal').style.display='flex'; }},
+    {icon:'', label:'Analytics & Coûts', action: ()=>window.open('/analytics','_blank')},
+    {icon:'⚙️', label:'Paramètres du projet', action: ()=>window.location.href=`/projects/${PROJECT_ID}/settings`},
+];
+let _cmdSelected = 0;
+
+function openCmdPalette() {
+    document.getElementById('cmdPalette').style.display = 'flex';
+    setTimeout(()=>document.getElementById('cmdInput').focus(), 50);
+    cmdFilter();
+}
+function closeCmdPalette() {
+    document.getElementById('cmdPalette').style.display = 'none';
+    document.getElementById('cmdInput').value = '';
+}
+function cmdFilter() {
+    const q = document.getElementById('cmdInput').value.toLowerCase();
+    const results = document.getElementById('cmdResults');
+    _cmdSelected = 0;
+    const items = CMD_ACTIONS.filter(a => !q || a.label.toLowerCase().includes(q));
+    results.innerHTML = items.slice(0, 12).map((item, i) => `
+        <div class="cmd-item" data-idx="${i}" onclick="window.cmdItems[${i}].action()"
+             style="padding:8px 16px;cursor:pointer;display:flex;align-items:center;gap:10px;${i===0?'background:#2a3a4a':''}">
+          <span style="font-size:16px;width:20px">${item.icon}</span>
+          <span style="flex:1">
+            <span style="font-size:13px;color:#eee">${item.label}</span>
+            <span style="font-size:11px;color:#666;display:block">Action</span>
+          </span>
+        </div>`).join('');
+    window.cmdItems = items.slice(0, 12);
+}
+function cmdKey(e) {
+    const items = document.querySelectorAll('.cmd-item');
+    if (e.key === 'Escape') { closeCmdPalette(); return; }
+    if (e.key === 'ArrowDown') { _cmdSelected = Math.min(_cmdSelected + 1, items.length - 1); }
+    if (e.key === 'ArrowUp') { _cmdSelected = Math.max(_cmdSelected - 1, 0); }
+    if (e.key === 'Enter') { if (window.cmdItems && window.cmdItems[_cmdSelected]) window.cmdItems[_cmdSelected].action(); return; }
+    items.forEach((el, i) => el.style.background = i === _cmdSelected ? '#2a3a4a' : '');
+}
+document.addEventListener('keydown', e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); openCmdPalette(); }
+    if (e.key === 'Escape' && document.getElementById('cmdPalette').style.display !== 'none') closeCmdPalette();
+});
+document.getElementById('cmdPalette').addEventListener('click', e => {
+    if (e.target === document.getElementById('cmdPalette')) closeCmdPalette();
+});
+
+// ── Feature 4: Panel management ───────────────────────────────
+const _WS_PANELS = ['explorer', 'aichat', 'prs', 'deploylogs'];
+function wsShowPanel(name) {
+    _WS_PANELS.forEach(p => {
+        const el = document.getElementById('panel-' + p);
+        if (el) el.style.display = (p === name) ? 'flex' : 'none';
+    });
+}
+function wsClosePanel(name) {
+    const el = document.getElementById('panel-' + name);
+    if (el) el.style.display = 'none';
+}
+
+// ── Feature 5: AI Chat ─────────────────────────────────────────
+let _aiChatHistory = [];
+function wsAiClearChat() {
+    _aiChatHistory = [];
+    document.getElementById('aiChatMessages').innerHTML = '';
+}
+async function wsAiSend() {
+    const input = document.getElementById('aiChatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    let context = '';
+    const ctxSel = document.getElementById('aiContextSelect').value;
+    if (ctxSel === 'file' && _currentFilePath) {
+        context = 'Fichier: ' + _currentFilePath + '\n' + (document.getElementById('filePreviewContent')?.textContent?.slice(0, 2000) || '');
+    } else if (ctxSel === 'error') {
+        context = document.querySelector('.ws-error-last')?.textContent || '';
+    }
+
+    const msgs = document.getElementById('aiChatMessages');
+    msgs.innerHTML += `<div style="background:#1a3a5c;border-radius:6px;padding:8px 10px;font-size:12px;color:#ddd;align-self:flex-end;max-width:90%">${msg.replace(/</g,'&lt;')}</div>`;
+
+    const botId = 'ai-msg-' + Date.now();
+    msgs.innerHTML += `<div id="${botId}" style="background:#1e2a1e;border-radius:6px;padding:8px 10px;font-size:12px;color:#aaa;align-self:flex-start;max-width:90%;white-space:pre-wrap">⏳</div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+
+    try {
+        const resp = await fetch(`/api/projects/${PROJECT_ID}/workspace/chat`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg, context})
+        });
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '', fullText = '';
+        const botEl = document.getElementById(botId);
+        botEl.textContent = '';
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value);
+            const parts = buf.split('\n\n');
+            buf = parts.pop();
+            for (const part of parts) {
+                if (!part.startsWith('data: ')) continue;
+                try {
+                    const e = JSON.parse(part.slice(6));
+                    if (e.type === 'chunk') {
+                        fullText += e.text;
+                        botEl.textContent = fullText;
+                        msgs.scrollTop = msgs.scrollHeight;
+                    } else if (e.type === 'error') {
+                        botEl.textContent = ' ' + e.text;
+                    }
+                } catch (ex) {}
+            }
+        }
+    } catch (ex) {
+        document.getElementById(botId).textContent = ' Erreur: ' + ex.message;
+    }
+}
+
+// ── Feature 6: PR Viewer ───────────────────────────────────────
+async function wsPrLoad() {
+    const list = document.getElementById('prList');
+    const repoEl = document.getElementById('prRepo');
+    list.innerHTML = '<span style="color:#888">Chargement…</span>';
+    try {
+        const r = await fetch(`/api/projects/${PROJECT_ID}/workspace/prs`);
+        const d = await r.json();
+        if (d.repo) repoEl.textContent = d.repo;
+        if (d.error && d.prs.length === 0) { list.innerHTML = `<span style="color:#888">${d.error}</span>`; return; }
+        if (d.prs.length === 0) { list.innerHTML = '<span style="color:#888">Aucune PR ouverte</span>'; return; }
+        list.innerHTML = d.prs.map(pr => `
+            <a href="${pr.url}" target="_blank" style="text-decoration:none;display:block;padding:8px;border:1px solid #333;border-radius:6px;margin-bottom:6px;background:#1a1a1a" onmouseover="this.style.borderColor='#555'" onmouseout="this.style.borderColor='#333'">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+                <span style="color:#4fc3f7;font-weight:600">#${pr.number}</span>
+                ${pr.draft ? '<span style="background:#444;color:#aaa;font-size:10px;padding:1px 5px;border-radius:10px">Draft</span>' : ''}
+                <span style="color:#ddd;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pr.title.replace(/</g,'&lt;')}</span>
+              </div>
+              <div style="color:#666;font-size:10px">${pr.branch} → ${pr.base} · ${pr.author} · ${pr.created_at}</div>
+            </a>`).join('');
+    } catch (ex) {
+        list.innerHTML = `<span style="color:#e57373"> ${ex.message}</span>`;
+    }
+}
+
+// ── Feature 7: Deploy Logs ─────────────────────────────────────
+let _deployLogsReader = null;
+function wsDeployLogsClear() { document.getElementById('deployLogsList').innerHTML = ''; }
+async function wsDeployLogsStart() {
+    if (_deployLogsReader) { try { _deployLogsReader.cancel(); } catch (e) {} }
+    const list = document.getElementById('deployLogsList');
+    list.innerHTML += '<div style="color:#4fc3f7">▶ Connexion…</div>';
+    try {
+        const resp = await fetch(`/api/projects/${PROJECT_ID}/workspace/deploy-logs`);
+        _deployLogsReader = resp.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+            const {done, value} = await _deployLogsReader.read();
+            if (done) break;
+            buf += decoder.decode(value);
+            const parts = buf.split('\n\n');
+            buf = parts.pop();
+            for (const part of parts) {
+                if (!part.startsWith('data: ')) continue;
+                try {
+                    const e = JSON.parse(part.slice(6));
+                    const div = document.createElement('div');
+                    div.textContent = e.line;
+                    if (e.src === 'error') div.style.color = '#e57373';
+                    if (e.src === 'system') div.style.color = '#4fc3f7';
+                    list.appendChild(div);
+                    list.scrollTop = list.scrollHeight;
+                } catch (ex) {}
+            }
+        }
+    } catch (ex) {
+        list.innerHTML += `<div style="color:#e57373"> ${ex.message}</div>`;
+    }
+}
+</script>
+{% endblock %}

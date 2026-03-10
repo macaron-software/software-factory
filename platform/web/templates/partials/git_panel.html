@@ -1,0 +1,49 @@
+<!-- Git panel partial — HTMX refreshable -->
+{% if git %}
+<div class="panel-header">
+    <h3><svg class="icon icon-sm"><use href="#icon-git-branch"/></svg> {{ _("git") }}</h3>
+    <span class="badge badge-{% if git.clean %}green{% else %}yellow{% endif %}">
+        {{ git.branch }}
+    </span>
+</div>
+<div class="panel-body">
+    <!-- Status -->
+    {% if not git.clean %}
+    <div class="git-status-bar">
+        {% if git.staged %}<span class="git-count staged">{{ git.staged }} staged</span>{% endif %}
+        {% if git.modified %}<span class="git-count modified">{{ git.modified }} modified</span>{% endif %}
+        {% if git.untracked %}<span class="git-count untracked">{{ git.untracked }} untracked</span>{% endif %}
+    </div>
+    {% endif %}
+
+    <!-- File changes -->
+    {% if changes %}
+    <div class="git-changes">
+        {% for c in changes[:12] %}
+        <div class="git-change-row">
+            <span class="git-change-status {{ c.status }}">{{ c.status }}</span>
+            <span class="git-change-file">{{ c.path }}</span>
+        </div>
+        {% endfor %}
+        {% if changes | length > 12 %}
+        <div class="git-more">+ {{ changes | length - 12 }} more files</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Recent commits -->
+    <div class="git-commits">
+        <h4>{{ _("recent_commits") }}</h4>
+        {% for c in commits[:8] %}
+        <div class="git-commit-row">
+            <span class="commit-hash">{{ c.short_hash }}</span>
+            <span class="commit-msg">{{ c.message[:60] }}{% if c.message|length > 60 %}...{% endif %}</span>
+            <span class="commit-date">{{ c.date }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% else %}
+<div class="panel-header"><h3>Git</h3></div>
+<div class="panel-body"><p class="empty-state">{{ _("no_git_repository_found") }}</p></div>
+{% endif %}

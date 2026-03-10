@@ -1,0 +1,1198 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+/* ── Project Hub ── */
+.hub{max-width:1400px;margin:0 auto;padding:1.5rem 1rem}
+
+/* Header */
+.hub-header{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap}
+.hub-title{font-size:1.4rem;font-weight:700;color:var(--text-primary);margin:0}
+.hub-type{font-size:.7rem;padding:.15rem .55rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);font-weight:600;text-transform:uppercase}
+.hub-health{display:flex;align-items:center;gap:.5rem;margin-left:auto}
+.hub-health-label{font-size:.75rem;color:var(--text-secondary)}
+.hub-health-bar{width:80px;height:8px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden}
+.hub-health-fill{height:100%;border-radius:4px;background:var(--green);transition:width .4s}
+.hub-health-fill.med{background:var(--yellow)}
+.hub-health-fill.low{background:var(--red)}
+.hub-health-score{font-size:.8rem;font-weight:700;color:var(--text-primary);min-width:2.5rem}
+
+/* Nav tabs */
+.hub-tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:1.25rem;overflow-x:auto}
+.hub-tab{padding:.55rem 1.1rem;font-size:.82rem;font-weight:500;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s,border-color .15s}
+.hub-tab:hover{color:var(--text-primary)}
+.hub-tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:700}
+.hub-tab-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;background:var(--accent-dim);color:var(--accent);border-radius:99px;font-size:.65rem;font-weight:700;margin-left:.35rem}
+
+/* Tab panels */
+.hub-panel{display:none}.hub-panel.active{display:block}
+
+/* Stats row */
+.hub-stats{display:flex;gap:.6rem;margin-bottom:1.25rem;flex-wrap:wrap}
+.hub-stat{display:flex;flex-direction:column;align-items:center;padding:.45rem .85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);min-width:65px;cursor:default}
+.hub-stat-val{font-size:1.25rem;font-weight:700;color:var(--text-primary);line-height:1.1}
+.hub-stat-lbl{font-size:.6rem;color:var(--text-tertiary);text-transform:uppercase;margin-top:.1rem;letter-spacing:.04em}
+
+/* Lifecycle bar */
+.lifecycle{display:flex;align-items:center;gap:0;margin-bottom:1.25rem;overflow-x:auto;padding:.65rem 1rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
+.lc-phase{display:flex;align-items:center;gap:.4rem;padding:.4rem .85rem;border-radius:99px;font-size:.78rem;font-weight:500;cursor:pointer;white-space:nowrap;color:var(--text-secondary);transition:background .15s,color .15s;border:2px solid transparent}
+.lc-phase:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.lc-phase.current{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:700}
+.lc-phase.passed{background:var(--bg-tertiary);color:var(--text-secondary);border-color:var(--border)}
+.lc-arrow{color:var(--border);font-size:.9rem;flex-shrink:0;margin:0 .1rem}
+.lc-add{font-size:.75rem;color:var(--text-tertiary);padding:.3rem .7rem;cursor:pointer;border:1px dashed var(--border);border-radius:99px;margin-left:.5rem;white-space:nowrap}
+.lc-add:hover{border-color:var(--accent);color:var(--accent)}
+
+/* Overview 3-column grid */
+.hub-grid{display:grid;grid-template-columns:1fr 1fr 300px;gap:1rem;align-items:start}
+@media(max-width:1100px){.hub-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){.hub-grid{grid-template-columns:1fr}}
+
+/* Column titles */
+.hub-col-title{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem}
+.hub-col-title svg{width:13px;height:13px}
+
+/* Epic / item cards */
+.hub-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem .85rem;margin-bottom:.45rem;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.hub-card:hover{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+.hub-card-name{font-size:.82rem;font-weight:600;color:var(--text-primary);margin-bottom:.2rem}
+.hub-card-meta{display:flex;align-items:center;gap:.35rem;flex-wrap:wrap}
+.badge-status{font-size:.65rem;padding:.12rem .4rem;border-radius:99px;font-weight:600}
+.badge-status.active{background:#1a4a1a;color:var(--green)}
+.badge-status.planning{background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border)}
+.badge-status.completed{background:#1a3a4a;color:#7dd3fc}
+.badge-status.blocked{background:#4a1a1a;color:var(--red)}
+.badge-status.backlog{background:var(--bg-tertiary);color:var(--text-tertiary);border:1px solid var(--border)}
+.badge-status.in_progress{background:#2a3a1a;color:#86efac}
+.badge-status.done{background:#1a3a4a;color:#7dd3fc}
+.badge-status.paused{background:var(--bg-tertiary);color:var(--yellow)}
+.badge-type{font-size:.62rem;color:var(--text-tertiary);background:var(--bg-tertiary);padding:.08rem .32rem;border-radius:3px}
+.badge-wsjf{font-size:.62rem;color:var(--text-tertiary);margin-left:auto}
+.badge-pts{font-size:.62rem;color:var(--text-tertiary);background:var(--bg-tertiary);padding:.08rem .32rem;border-radius:3px}
+
+/* Empty state */
+.hub-empty{text-align:center;padding:1.25rem;color:var(--text-tertiary);font-size:.8rem;border:1px dashed var(--border);border-radius:var(--radius);margin-bottom:.5rem}
+
+/* ── SAFe Tree (tab 2) ── */
+.safe-tree{display:flex;flex-direction:column;gap:.6rem}
+.safe-epic{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;background:var(--bg-secondary)}
+.safe-epic-header{display:flex;align-items:center;gap:.6rem;padding:.65rem 1rem;cursor:pointer;background:var(--bg-secondary);transition:background .15s}
+.safe-epic-header:hover{background:var(--bg-tertiary)}
+.safe-epic-caret{color:var(--text-tertiary);font-size:.75rem;transition:transform .2s;flex-shrink:0}
+.safe-epic-header.open .safe-epic-caret{transform:rotate(90deg)}
+.safe-epic-name{font-size:.88rem;font-weight:700;color:var(--text-primary);flex:1}
+.safe-epic-body{display:none;padding:.5rem 1rem 1rem;border-top:1px solid var(--border)}
+.safe-epic-body.open{display:block}
+.safe-features{display:flex;flex-direction:column;gap:.4rem;padding-left:.75rem}
+.safe-feature{border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-primary);overflow:hidden}
+.safe-feature-header{display:flex;align-items:center;gap:.5rem;padding:.5rem .75rem;cursor:pointer;transition:background .15s}
+.safe-feature-header:hover{background:var(--bg-secondary)}
+.safe-feature-name{font-size:.8rem;font-weight:600;color:var(--text-primary);flex:1}
+.safe-feature-body{display:none;padding:.4rem .75rem .6rem;border-top:1px solid var(--border)}
+.safe-feature-body.open{display:block}
+.safe-stories{display:flex;flex-direction:column;gap:.3rem;padding-left:.5rem}
+.safe-story{display:flex;align-items:center;gap:.5rem;padding:.35rem .6rem;border-radius:var(--radius-sm);background:var(--bg-secondary);border:1px solid var(--border);font-size:.76rem;color:var(--text-primary)}
+.safe-story-title{flex:1}
+.safe-empty{color:var(--text-tertiary);font-size:.75rem;padding:.3rem .5rem}
+.safe-add-btn{font-size:.72rem;padding:.2rem .6rem;background:none;border:1px dashed var(--border);border-radius:var(--radius-sm);color:var(--text-tertiary);cursor:pointer;margin-top:.4rem}
+.safe-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ── Backlog (tab 3) ── */
+.backlog-table{width:100%;border-collapse:collapse;font-size:.8rem}
+.backlog-table th{text-align:left;padding:.5rem .75rem;font-size:.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--border);background:var(--bg-secondary)}
+.backlog-table td{padding:.5rem .75rem;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle}
+.backlog-table tr:hover td{background:var(--bg-secondary)}
+
+/* ── Overview cockpit 2 colonnes ── */
+.hub-cockpit{display:grid;grid-template-columns:280px 1fr;gap:1rem}
+.hub-cockpit-left{display:flex;flex-direction:column;gap:.75rem}
+.hub-cockpit-right{min-width:0}
+@media(max-width:900px){.hub-cockpit{grid-template-columns:1fr}}
+.vision-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem}
+.vision-card-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);margin-bottom:.5rem}
+.vision-pill{display:inline-flex;align-items:center;font-size:.7rem;padding:.18rem .55rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);margin:.1rem}
+.vision-ep{padding:.4rem .55rem;border-radius:var(--radius-sm);border:1px solid var(--border);cursor:pointer;transition:background .12s;margin-bottom:.3rem}
+.vision-ep:hover{background:var(--bg-tertiary)}
+.vision-ep-bar{height:3px;border-radius:2px;background:var(--bg-tertiary);margin-top:.3rem}
+.vision-ep-fill{height:3px;border-radius:2px;transition:width .4s}
+.vision-run{padding:.3rem .55rem;border-radius:var(--radius-sm);border-left:2px solid var(--green);background:rgba(74,222,128,.06);margin-bottom:.3rem;font-size:.73rem}
+.vision-team-member{display:flex;align-items:center;gap:.4rem;padding:.25rem 0;border-bottom:1px solid var(--border);font-size:.75rem}
+.vision-team-member:last-child{border-bottom:none}
+.vision-avatar{width:22px;height:22px;border-radius:50%;background:var(--bg-tertiary);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:var(--text-secondary);flex-shrink:0}
+
+/* ── Board tab ── */
+.board-view-btn{font-size:.75rem;padding:.3rem .8rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;transition:all .15s}
+.board-view-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.board-view-btn:hover:not(.active){background:var(--bg-secondary);color:var(--text-primary)}
+
+/* ── History filters ── */
+.hist-filter.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.hist-filter:hover:not(.active){background:var(--bg-secondary)!important;color:var(--text-primary)!important}
+.hist-row{cursor:pointer}
+.hist-row:hover td{background:var(--bg-secondary)!important}
+
+/* ── PM/PO Agent card ── */
+.pm-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.9rem 1rem;margin-bottom:.75rem}
+.pm-avatar-wrap{display:flex;align-items:center;gap:.75rem;margin-bottom:.55rem}
+.pm-avatar-big{width:54px;height:54px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.15rem;font-weight:700;color:#fff;overflow:hidden}
+.pm-avatar-big img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.pm-name{font-size:.88rem;font-weight:700;color:var(--text-primary);line-height:1.2}
+.pm-role{font-size:.68rem;color:var(--text-tertiary);margin-top:.1rem}
+.pm-tagline{font-size:.71rem;color:var(--text-secondary);font-style:italic;margin-bottom:.5rem;line-height:1.4}
+.pm-persona{font-size:.69rem;color:var(--text-secondary);line-height:1.45;margin-bottom:.5rem;max-height:54px;overflow:hidden}
+.pm-section-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-tertiary);margin:.4rem 0 .2rem}
+.pm-tags{display:flex;flex-wrap:wrap;gap:.2rem;margin-bottom:.3rem}
+.pm-tag{font-size:.61rem;padding:.1rem .38rem;border-radius:99px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary)}
+.pm-tag.skill{background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.3);color:#a78bfa}
+.pm-tag.tool{background:rgba(6,182,212,.1);border-color:rgba(6,182,212,.25);color:#22d3ee}
+.pm-tag.mcp{background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.3);color:#fb923c}
+.pm-btn-row{display:flex;gap:.4rem;margin-top:.65rem}
+.pm-btn{flex:1;padding:.32rem .5rem;font-size:.71rem;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;text-align:center;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:.25rem}
+.pm-btn-chat{background:var(--accent);color:#fff;border-color:var(--accent)}.pm-btn-chat:hover{opacity:.88}
+.pm-btn-ghost{background:none;color:var(--text-secondary)}.pm-btn-ghost:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+/* ── Docs sub-tabs ── */
+.docs-subtabs{display:flex;gap:.3rem;margin-bottom:1rem;border-bottom:1px solid var(--border);padding-bottom:.5rem;flex-wrap:wrap}
+.docs-stab{padding:.3rem .7rem;font-size:.76rem;font-weight:500;border:1px solid var(--border);border-radius:99px;background:none;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:.3rem;transition:all .15s}
+.docs-stab:hover{background:var(--bg-secondary);color:var(--text-primary)}.docs-stab.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.docs-subpanel{display:none}.docs-subpanel.active{display:block}
+
+/* ── Chat (tab 4) ── */
+.hub-chat-layout{display:grid;grid-template-columns:200px 1fr;gap:0;height:calc(100vh - 280px);min-height:400px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+@media(max-width:700px){.hub-chat-layout{grid-template-columns:1fr}}
+.hub-chat-sidebar{border-right:1px solid var(--border);overflow-y:auto;background:var(--bg-primary)}
+.hub-chat-sidebar-title{padding:.6rem .75rem;font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;border-bottom:1px solid var(--border)}
+.hub-conv-item{display:block;padding:.45rem .75rem;font-size:.75rem;color:var(--text-secondary);cursor:pointer;border-bottom:1px solid var(--border);text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .12s}
+.hub-conv-item:hover{background:var(--bg-secondary);color:var(--text-primary)}
+.hub-conv-item.active{background:var(--accent-dim);color:var(--accent);font-weight:600}
+.hub-chat-main{display:flex;flex-direction:column;overflow:hidden}
+.hub-chat-header{padding:.6rem 1rem;border-bottom:1px solid var(--border);font-size:.82rem;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+.hub-chat-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:.75rem}
+.hub-chat-msg-wrap{display:flex;gap:.6rem;align-items:flex-start}
+.hub-chat-msg-wrap.user{flex-direction:row-reverse}
+.hub-chat-bubble{max-width:75%;padding:.55rem .8rem;border-radius:var(--radius);font-size:.82rem;line-height:1.55;color:var(--text-primary);background:var(--bg-tertiary)}
+.hub-chat-msg-wrap.user .hub-chat-bubble{background:var(--accent);color:#fff}
+.hub-chat-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;flex-shrink:0;background:var(--bg-tertiary);color:var(--text-secondary);overflow:hidden}
+.hub-chat-avatar img{width:100%;height:100%;object-fit:cover}
+.hub-chat-input-area{padding:.75rem 1rem;border-top:1px solid var(--border);display:flex;gap:.5rem;flex-shrink:0;background:var(--bg-secondary)}
+.hub-chat-input{flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.5rem .75rem;font-size:.82rem;color:var(--text-primary);outline:none;resize:none;min-height:36px;max-height:120px;font-family:inherit}
+.hub-chat-input:focus{border-color:var(--accent)}
+.hub-chat-send-btn{padding:.5rem 1rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:.82rem;cursor:pointer;font-weight:600;flex-shrink:0}
+.hub-chat-send-btn:hover{opacity:.88}
+.hub-chat-thinking{opacity:.5;font-style:italic}
+</style>
+
+<div class="hub">
+  <!-- Header -->
+  <div class="hub-header">
+    <div>
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+        <h1 class="hub-title">{{ project.name }}</h1>
+        <span class="hub-type">{{ project.factory_type }}</span>
+        {% if project.current_phase %}
+        <span class="hub-type" style="color:var(--accent);border-color:var(--accent)">{{ project.current_phase }}</span>
+        {% endif %}
+      </div>
+      {% if project.description %}
+      <p style="margin:.2rem 0 0;font-size:.8rem;color:var(--text-secondary)">{{ project.description[:120] }}{% if project.description|length > 120 %}…{% endif %}</p>
+      {% endif %}
+    </div>
+    <div class="hub-health">
+      <span class="hub-health-label">Santé</span>
+      <div class="hub-health-bar"><div class="hub-health-fill {% if health >= 70 %}{% elif health >= 40 %}med{% else %}low{% endif %}" style="width:{{ health }}%"></div></div>
+      <span class="hub-health-score">{{ health }}%</span>
+    </div>
+    <button onclick="location.reload()" title="Actualiser" style="padding:.35rem .5rem;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:.3rem;font-size:.78rem"><svg class="icon icon-xs"><use href="#icon-refresh-cw"/></svg></button>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+      <a href="/projects/{{ project.id }}/board" class="btn btn-sm btn-ghost">Board</a>
+      <a href="/projects/{{ project.id }}/workspace" class="btn btn-sm btn-ghost">Workspace</a>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="hub-stats">
+    <div class="hub-stat"><span class="hub-stat-val">{{ stats.total }}</span><span class="hub-stat-lbl">Epics</span></div>
+    <div class="hub-stat"><span class="hub-stat-val" style="color:var(--green)">{{ stats.active }}</span><span class="hub-stat-lbl">Actifs</span></div>
+    <div class="hub-stat"><span class="hub-stat-val" style="color:#7dd3fc">{{ stats.completed }}</span><span class="hub-stat-lbl">Complétés</span></div>
+    <div class="hub-stat"><span class="hub-stat-val">{{ stats.features }}</span><span class="hub-stat-lbl">Features</span></div>
+    <div class="hub-stat"><span class="hub-stat-val">{{ stats.stories }}</span><span class="hub-stat-lbl">Stories</span></div>
+    {% if stats.story_points %}<div class="hub-stat"><span class="hub-stat-val" style="color:var(--accent)">{{ stats.story_points }}</span><span class="hub-stat-lbl">Points</span></div>{% endif %}
+    {% if stats.blocked > 0 %}<div class="hub-stat"><span class="hub-stat-val" style="color:var(--red)">{{ stats.blocked }}</span><span class="hub-stat-lbl">Bloqués</span></div>{% endif %}
+  </div>
+
+  <!-- Tabs -->
+  <div class="hub-tabs">
+    <div class="hub-tab active" onclick="hubTab(this,'overview')">Vue d'ensemble</div>
+    <div class="hub-tab" onclick="hubTab(this,'board')">Board <span class="hub-tab-badge">{{ stats.total }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'activite')">Activite {% if epic_runs_active %}<span class="hub-tab-badge" style="background:#4a1a1a;color:var(--red)">{{ epic_runs_active|length }}</span>{% endif %}</div>
+    <div class="hub-tab" onclick="hubTab(this,'docs')">Docs</div>
+    <div class="hub-tab" onclick="hubTab(this,'safe')">SAFe <span class="hub-tab-badge">{{ stats.total }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'personas')">Personas <span class="hub-tab-badge">{{ (project.config or {}).get('personas', []) | length if project.config else 0 }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'backlog')">Backlog <span class="hub-tab-badge">{{ stats.stories }}</span></div>
+    <div class="hub-tab" onclick="hubTab(this,'chat')"><svg class="icon icon-xs" style="margin-right:.3rem"><use href="#icon-message-circle"/></svg>Chat Agent</div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: OVERVIEW ═══════════════════════════ -->
+  <div class="hub-panel active" id="panel-overview">
+  <div class="hub-cockpit">
+
+    <!-- ── LEFT: Vision PM ── -->
+    <div class="hub-cockpit-left">
+
+      <!-- Project identity -->
+      <div class="vision-card">
+        <div class="vision-card-title">Projet</div>
+        <div style="font-size:.9rem;font-weight:700;color:var(--text-primary);margin-bottom:.3rem">{{ project.name }}</div>
+        {% if project.description %}
+        <div style="font-size:.75rem;color:var(--text-secondary);line-height:1.4;margin-bottom:.5rem">{{ project.description[:140] }}{% if project.description|length > 140 %}…{% endif %}</div>
+        {% endif %}
+        {% if project.path %}<div style="font-size:.68rem;color:var(--text-tertiary);font-family:monospace">{{ project.path }}</div>{% endif %}
+      </div>
+
+      <!-- Stack -->
+      {% set stack = (project.config or {}).get('stack', []) if project.config else [] %}
+      {% if stack %}
+      <div class="vision-card">
+        <div class="vision-card-title">Stack technique</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.2rem">
+          {% for tech in stack %}<span class="vision-pill">{{ tech }}</span>{% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Global progression -->
+      <div class="vision-card">
+        <div class="vision-card-title">Progression</div>
+        {% set total_stories = stats.stories %}
+        {% set done_stories = epics_tree | sum(attribute='stories_done') %}
+        {% set pct_global = (done_stories / total_stories * 100)|int if total_stories > 0 else 0 %}
+        <div style="display:flex;justify-content:space-between;font-size:.75rem;color:var(--text-secondary);margin-bottom:.4rem">
+          <span>{{ done_stories }}/{{ total_stories }} stories</span>
+          <span style="font-weight:700;color:{% if pct_global >= 80 %}var(--green){% elif pct_global >= 40 %}var(--yellow){% else %}var(--accent){% endif %}">{{ pct_global }}%</span>
+        </div>
+        <div style="height:6px;background:var(--bg-tertiary);border-radius:3px">
+          <div style="height:6px;background:{% if pct_global >= 80 %}var(--green){% elif pct_global >= 40 %}var(--yellow){% else %}var(--accent){% endif %};border-radius:3px;width:{{ pct_global }}%;transition:width .5s"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem .5rem;margin-top:.6rem">
+          <div style="font-size:.68rem;color:var(--text-tertiary)">Epics <span style="color:var(--text-primary);font-weight:600">{{ stats.total }}</span></div>
+          <div style="font-size:.68rem;color:var(--text-tertiary)">Actifs <span style="color:var(--green);font-weight:600">{{ stats.active }}</span></div>
+          <div style="font-size:.68rem;color:var(--text-tertiary)">Features <span style="color:var(--text-primary);font-weight:600">{{ stats.features }}</span></div>
+          {% if stats.story_points %}<div style="font-size:.68rem;color:var(--text-tertiary)">Points <span style="color:var(--accent);font-weight:600">{{ stats.story_points }}</span></div>{% endif %}
+        </div>
+      </div>
+
+      <!-- All epics mini-list -->
+      <div class="vision-card" style="flex:1;overflow:hidden">
+        <div class="vision-card-title" style="display:flex;justify-content:space-between">Epics <a href="#" onclick="hubTab(document.querySelector('[onclick*=\",\\\'board\\\'\"]'),'board');return false" style="font-size:.65rem;color:var(--accent);text-decoration:none">Board →</a></div>
+        <div style="overflow-y:auto;max-height:260px">
+          {% for ep in epics_tree %}
+          <div class="vision-ep" onclick="location.href='/epics/{{ ep.id }}'">
+            <div style="display:flex;align-items:center;gap:.3rem">
+              <span style="font-size:.6rem;padding:.06rem .3rem;border-radius:3px;flex-shrink:0;font-weight:700;{% if ep.type == 'tma' %}background:#4a2a00;color:#fb923c{% elif ep.type in ('security','sast') %}background:#4a0a0a;color:#f87171{% elif ep.type in ('debt','tech-debt') %}background:#3a3a00;color:#fbbf24{% else %}background:var(--accent-dim);color:var(--accent){% endif %}">{{ ep.type[:4] }}</span>
+              <span style="font-size:.75rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ ep.name[:40] }}</span>
+              <span style="font-size:.6rem;color:var(--text-tertiary);margin-left:auto;flex-shrink:0">{{ ep.progress_pct }}%</span>
+            </div>
+            {% if ep.stories_total > 0 %}
+            <div class="vision-ep-bar"><div class="vision-ep-fill" style="width:{{ ep.progress_pct }}%;background:{% if ep.progress_pct >= 80 %}var(--green){% elif ep.progress_pct >= 40 %}var(--yellow){% else %}var(--accent){% endif %}"></div></div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="hub-empty">Aucun epic</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Active runs -->
+      {% if epic_runs_active %}
+      <div class="vision-card">
+        <div class="vision-card-title" style="display:flex;justify-content:space-between">En cours <span style="font-size:.65rem;font-weight:400;background:#4a1a1a;color:var(--red);padding:.05rem .3rem;border-radius:99px">{{ epic_runs_active|length }}</span></div>
+        {% for run in epic_runs_active[:3] %}
+        <div class="vision-run">
+          <div style="font-weight:600;color:var(--text-primary)">{{ run.workflow_name[:35] }}</div>
+          {% if run.current_phase %}<div style="color:var(--text-tertiary)">{{ run.current_phase }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        {% if epic_runs_active|length > 3 %}<div style="font-size:.68rem;color:var(--text-tertiary);text-align:center;margin-top:.2rem">+{{ epic_runs_active|length - 3 }} autres</div>{% endif %}
+      </div>
+      {% endif %}
+
+      <!-- Team -->
+      {% if lead_agents_for_personas %}
+      <div class="vision-card">
+        <div class="vision-card-title">Equipe</div>
+        {% for ag in lead_agents_for_personas[:5] %}
+        <div class="vision-team-member">
+          <div class="vision-avatar">{{ ag.name[:2] | upper }}</div>
+          <div>
+            <div style="font-weight:600;color:var(--text-primary)">{{ ag.name[:25] }}</div>
+            <div style="font-size:.65rem;color:var(--text-tertiary)">{{ ag.role[:30] }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div><!-- /hub-cockpit-left -->
+
+    <!-- ── RIGHT: Board de pilotage ── -->
+    <div class="hub-cockpit-right">
+
+    <!-- Lifecycle bar -->
+    {% set eff_phases = phases if phases else [] %}
+    {% if eff_phases %}
+    <div class="lifecycle">
+      {% for ph in eff_phases %}
+      {% if not loop.first %}<span class="lc-arrow">›</span>{% endif %}
+      <div class="lc-phase {% if project.current_phase == ph.id %}current{% endif %}" onclick="hubSetPhase('{{ ph.id }}')">
+        {% if ph.icon %}<span class="lc-icon">{{ ph.icon }}</span>{% endif %}
+        {{ ph.name }}
+      </div>
+      {% endfor %}
+      <span class="lc-add" onclick="hubSuggestChat('Ajoute une nouvelle phase au cycle de vie du projet')">+ Phase</span>
+    </div>
+    {% endif %}
+
+    <!-- 3 columns -->
+    <div class="hub-grid">
+      <!-- System Epics -->
+      <div>
+        <div class="hub-col-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Epics Système
+          <span style="font-size:.62rem;font-weight:400;color:var(--text-tertiary)">(TMA / Sécu / Dette)</span>
+        </div>
+        {% set sys_epics = epics_tree | selectattr('category', 'equalto', 'system') | list %}
+        {% for ep in sys_epics %}
+        <div class="hub-card" onclick="location.href='/epics/{{ ep.id }}'">
+          <div class="hub-card-name">{{ ep.name }}</div>
+          <div class="hub-card-meta">
+            <span class="badge-status {{ ep.status }}">{{ ep.status }}</span>
+            <span class="badge-type">{{ ep.type }}</span>
+            <span class="badge-wsjf">WSJF {{ ep.wsjf_score }}</span>
+          </div>
+          {% if ep.stories_total > 0 %}
+          <div style="margin-top:.4rem">
+            <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--text-tertiary);margin-bottom:.2rem"><span>{{ ep.stories_done }}/{{ ep.stories_total }} stories</span><span>{{ ep.progress_pct }}%</span></div>
+            <div style="height:4px;background:var(--bg-tertiary);border-radius:2px"><div style="height:4px;background:{% if ep.progress_pct >= 80 %}var(--green){% elif ep.progress_pct >= 40 %}var(--yellow){% else %}var(--accent){% endif %};border-radius:2px;width:{{ ep.progress_pct }}%"></div></div>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="hub-empty">Aucun epic système — <a href="#" onclick="hubHealEpics();return false">Générer</a></div>
+        {% endfor %}
+  
+      </div>
+
+      <!-- Functional Epics -->
+      <div>
+        <div class="hub-col-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Epics Fonctionnelles
+          <button onclick="hubSuggestChat('Crée un nouvel epic fonctionnel pour ce projet')" style="margin-left:auto;font-size:.65rem;padding:.18rem .5rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">+ Epic</button>
+        </div>
+        {% set func_epics = epics_tree | rejectattr('category', 'equalto', 'system') | list %}
+        {% for ep in func_epics %}
+        <div class="hub-card" onclick="location.href='/epics/{{ ep.id }}'">
+          <div class="hub-card-name">{{ ep.name }}</div>
+          <div class="hub-card-meta">
+            <span class="badge-status {{ ep.status }}">{{ ep.status }}</span>
+            <span class="badge-type">{{ ep.type }}</span>
+            <span class="badge-wsjf">WSJF {{ ep.wsjf_score }}</span>
+            <span class="badge-pts" style="color:var(--accent)">{{ ep.kanban_status }}</span>
+          </div>
+          {% if ep.stories_total > 0 %}
+          <div style="margin-top:.4rem">
+            <div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--text-tertiary);margin-bottom:.2rem"><span>{{ ep.stories_done }}/{{ ep.stories_total }} stories</span><span>{{ ep.progress_pct }}%</span></div>
+            <div style="height:4px;background:var(--bg-tertiary);border-radius:2px"><div style="height:4px;background:{% if ep.progress_pct >= 80 %}var(--green){% elif ep.progress_pct >= 40 %}var(--yellow){% else %}var(--accent){% endif %};border-radius:2px;width:{{ ep.progress_pct }}%"></div></div>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="hub-empty">Aucun epic fonctionnelle</div>
+        {% endfor %}
+      </div>
+
+      <!-- PM/PO Agent card + quick chat (right column) -->
+      <div>
+        {% if lead_agent %}
+        <div class="pm-card">
+          <div class="pm-avatar-wrap">
+            <div class="pm-avatar-big" style="background:{{ lead_agent.color or 'var(--accent)' }}">
+              {% if lead_avatar_url %}<img src="{{ lead_avatar_url }}" alt="{{ lead_agent.name }}">{% else %}{{ lead_agent.name[:2] | upper }}{% endif %}
+            </div>
+            <div>
+              <div class="pm-name">{{ lead_agent.name }}</div>
+              <div class="pm-role">{{ lead_agent.role or 'Product Manager' }}</div>
+            </div>
+          </div>
+          {% if lead_agent.tagline %}
+          <div class="pm-tagline">"{{ lead_agent.tagline }}"</div>
+          {% endif %}
+          {% if lead_agent.persona %}
+          <div class="pm-persona">{{ lead_agent.persona[:180] }}{% if lead_agent.persona|length > 180 %}…{% endif %}</div>
+          {% endif %}
+          {% if lead_agent.skills %}
+          <div class="pm-section-title">Compétences</div>
+          <div class="pm-tags">
+            {% for s in lead_agent.skills[:6] %}<span class="pm-tag skill">{{ s }}</span>{% endfor %}
+          </div>
+          {% endif %}
+          {% if lead_agent.tools %}
+          <div class="pm-section-title">Outils</div>
+          <div class="pm-tags">
+            {% for t in lead_agent.tools[:5] %}
+              {% if t.startswith('mcp:') %}<span class="pm-tag mcp">{{ t[4:] }}</span>
+              {% else %}<span class="pm-tag tool">{{ t[:22] }}</span>{% endif %}
+            {% endfor %}
+          </div>
+          {% endif %}
+          <div class="pm-btn-row">
+            <button class="pm-btn pm-btn-chat" onclick="hubTab(document.querySelector('[onclick*=\',\\\'chat\\\'\']'), 'chat')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Discuter
+            </button>
+            <button class="pm-btn pm-btn-ghost" onclick="hubSuggestChat('Analyse l\\'état du projet et propose les prochaines actions')">Analyser</button>
+          </div>
+        </div>
+        {% endif %}
+        <!-- Compact quick chat -->
+        <div class="hub-col-title" style="margin-top:.1rem">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          Message rapide
+          <button onclick="hubTab(document.querySelector('[onclick*=\",\\\'chat\\\'\"]'), 'chat')" style="margin-left:auto;font-size:.65rem;padding:.18rem .5rem;background:none;border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer;flex-shrink:0">Agrandir →</button>
+        </div>
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+          <div style="height:130px;overflow-y:auto;padding:.6rem .75rem;display:flex;flex-direction:column;gap:.4rem" id="quickChatMsgs">
+            {% for msg in messages[-4:] %}
+            <div style="font-size:.75rem;line-height:1.45;padding:.35rem .55rem;border-radius:var(--radius-sm);{% if msg.from_agent == 'user' %}background:var(--accent);color:#fff;align-self:flex-end{% else %}background:var(--bg-tertiary);color:var(--text-primary);border-left:2px solid {{ lead_agent.color if lead_agent else 'var(--accent)' }}{% endif %}">{{ msg.content[:150] }}{% if msg.content|length > 150 %}…{% endif %}</div>
+            {% else %}
+            <div style="font-size:.75rem;color:var(--text-tertiary);padding:.5rem;text-align:center">{% if lead_agent %}{{ lead_agent.name }} est disponible…{% else %}Démarrez une conversation…{% endif %}</div>
+            {% endfor %}
+          </div>
+          <div style="display:flex;gap:.35rem;padding:.45rem .55rem;border-top:1px solid var(--border)">
+            <input type="text" id="quickChatInput" placeholder="Message à {{ lead_agent.name if lead_agent else 'l\'agent' }}…" onkeydown="if(event.key==='Enter')quickSend()"
+              style="flex:1;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.32rem .55rem;font-size:.76rem;color:var(--text-primary);outline:none">
+            <button onclick="quickSend()" style="padding:.32rem .65rem;background:{{ lead_agent.color if lead_agent else 'var(--accent)' }};color:#fff;border:none;border-radius:var(--radius-sm);font-size:.76rem;cursor:pointer;font-weight:600">→</button>
+          </div>
+        </div>
+        <div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.3rem">
+          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border);font-size:.72rem" onclick="hubSuggestChat('Génère les features et stories manquantes pour ce projet')">Générer stories</button>
+          <button class="hub-card" style="text-align:left;background:none;width:100%;border:1px dashed var(--border);font-size:.72rem" onclick="hubSuggestChat('Quelle est la prochaine étape recommandée pour ce projet ?')">Prochaine étape</button>
+        </div>
+      </div>
+    </div><!-- /hub-grid -->
+    </div><!-- /hub-cockpit-right -->
+  </div><!-- /hub-cockpit -->
+  </div><!-- /panel-overview -->
+
+  <!-- ═══════════════════════════════ TAB: BOARD ══════════════════════════ -->
+  <div class="hub-panel" id="panel-board">
+    <!-- Sub-view toggle -->
+    <div style="display:flex;gap:.4rem;margin-bottom:1.25rem;flex-wrap:wrap">
+      <button class="board-view-btn active" id="bv-kanban" onclick="boardView('kanban')">Epic Kanban</button>
+      <button class="board-view-btn" id="bv-feature" onclick="boardView('feature')">Feature Board</button>
+      <button class="board-view-btn" id="bv-sprint" onclick="boardView('sprint')">Sprint Board</button>
+    </div>
+
+    <!-- ── Epic Kanban ── -->
+    <div id="bview-kanban">
+      <div style="display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:.75rem;overflow-x:auto">
+        {% set kanban_cols = [('funnel','Funnel','var(--text-tertiary)'),('analyzing','Analyzing','var(--accent)'),('backlog','Backlog','var(--yellow)'),('implementing','Implementing','#3b82f6'),('done','Done','var(--green)')] %}
+        {% for col_id, col_label, col_color in kanban_cols %}
+        <div>
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:{{ col_color }};margin-bottom:.6rem;display:flex;align-items:center;gap:.4rem">
+            {{ col_label }}
+            <span style="font-size:.65rem;font-weight:400;color:var(--text-tertiary)">({{ (epics_kanban.get(col_id) or []) | length }})</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;min-height:80px">
+            {% for ep in (epics_kanban.get(col_id) or []) %}
+            <div style="background:var(--bg-secondary);border:1px solid var(--border);border-left:3px solid {{ col_color }};border-radius:var(--radius);padding:.6rem .7rem;cursor:pointer" onclick="boardSetFeatureEpic('{{ ep.id }}')">
+              <div style="font-size:.75rem;font-weight:600;color:var(--text-primary);margin-bottom:.25rem;line-height:1.3">{{ ep.name[:45] }}</div>
+              <div style="display:flex;align-items:center;gap:.35rem;flex-wrap:wrap;margin-bottom:.3rem">
+                <span style="font-size:.6rem;padding:.1rem .35rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary)">{{ ep.type }}</span>
+                {% if ep.wsjf_score %}<span style="font-size:.6rem;color:var(--text-tertiary)">WSJF {{ ep.wsjf_score }}</span>{% endif %}
+              </div>
+              {% if ep.stories_total %}
+              <div style="background:var(--bg-tertiary);border-radius:99px;height:4px;overflow:hidden">
+                <div style="height:4px;border-radius:99px;background:{{ col_color }};width:{{ ep.progress_pct }}%"></div>
+              </div>
+              <div style="font-size:.6rem;color:var(--text-tertiary);margin-top:.2rem">{{ ep.stories_done }}/{{ ep.stories_total }} stories</div>
+              {% endif %}
+              {% if ep.features %}
+              <div style="font-size:.6rem;color:var(--text-tertiary);margin-top:.15rem">{{ ep.features | length }} feature(s)</div>
+              {% endif %}
+            </div>
+            {% else %}
+            <div style="font-size:.7rem;color:var(--text-tertiary);text-align:center;padding:.5rem 0;border:1px dashed var(--border);border-radius:var(--radius)">—</div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- ── Feature Board ── -->
+    <div id="bview-feature" style="display:none">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+        <span style="font-size:.78rem;color:var(--text-secondary);font-weight:600">Epic :</span>
+        <select id="fb-epic-select" onchange="renderFeatureBoard()" style="font-size:.78rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.25rem .5rem;color:var(--text-primary)">
+          {% for ep in epics_tree %}
+          <option value="{{ ep.id }}">{{ ep.name[:50] }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div id="feature-board-cols" style="display:grid;grid-template-columns:repeat(5,minmax(160px,1fr));gap:.75rem;overflow-x:auto">
+        <!-- filled by JS -->
+      </div>
+    </div>
+
+    <!-- ── Sprint Board ── -->
+    <div id="bview-sprint" style="display:none">
+      {% if current_sprint %}
+      <div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:1rem;display:flex;align-items:center;gap:.5rem">
+        <span style="font-weight:600">Sprint actif :</span> {{ current_sprint.name }} ({{ current_sprint.epic }})
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:.75rem;overflow-x:auto">
+        {% for col_id, col_label, col_color in [('backlog','Backlog','var(--text-tertiary)'),('in_progress','En cours','#3b82f6'),('review','Review','var(--yellow)'),('done','Done','var(--green)')] %}
+        <div>
+          <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;color:{{ col_color }};margin-bottom:.6rem">{{ col_label }} <span style="font-weight:400;color:var(--text-tertiary)">({{ (sprint_stories_by_status.get(col_id) or []) | length }})</span></div>
+          {% for s in (sprint_stories_by_status.get(col_id) or []) %}
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-left:3px solid {{ col_color }};border-radius:var(--radius);padding:.5rem .65rem;margin-bottom:.4rem;font-size:.75rem">
+            <div style="font-weight:600;color:var(--text-primary);margin-bottom:.15rem">{{ s.title[:50] }}</div>
+            <div style="font-size:.65rem;color:var(--text-tertiary)">{{ s.feature }}</div>
+            {% if s.story_points %}<span style="font-size:.6rem;background:var(--bg-tertiary);padding:.1rem .3rem;border-radius:3px;color:var(--text-secondary)">{{ s.story_points }} pts</span>{% endif %}
+          </div>
+          {% else %}
+          <div style="font-size:.7rem;color:var(--text-tertiary);text-align:center;padding:.5rem;border:1px dashed var(--border);border-radius:var(--radius)">—</div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="hub-empty">Aucun sprint actif</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: ACTIVITE ════════════════════════ -->
+  <div class="hub-panel" id="panel-activite">
+    <!-- Runs actifs -->
+    <div style="margin-bottom:1.5rem">
+      <div class="hub-col-title" style="margin-bottom:.75rem">En cours {% if epic_runs_active %}<span class="hub-tab-badge" style="background:#4a1a1a;color:var(--red)">{{ epic_runs_active|length }}</span>{% endif %}</div>
+      {% if epic_runs_active %}
+      {% for run in epic_runs_active %}
+      <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.75rem 1rem;margin-bottom:.6rem">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem;flex-wrap:wrap">
+          <span style="font-size:.8rem;font-weight:700;color:var(--text-primary)">{{ run.workflow_name }}</span>
+          <span style="font-size:.65rem;padding:.1rem .4rem;border-radius:99px;background:#1a4a1a;color:var(--green)">▶ {{ run.status }}</span>
+          {% if run.current_phase %}<span style="font-size:.65rem;color:var(--text-tertiary)">phase: {{ run.current_phase }}</span>{% endif %}
+          <span style="font-size:.62rem;color:var(--text-tertiary);margin-left:auto">{{ run.created_at[:16] }}</span>
+        </div>
+        {% if run.phases %}
+        <div style="display:flex;align-items:center;gap:.2rem;overflow-x:auto;padding:.2rem 0;flex-wrap:nowrap">
+          {% for ph in run.phases %}
+          {% if not loop.first %}<span style="color:var(--border);font-size:.7rem;flex-shrink:0">→</span>{% endif %}
+          <div style="flex-shrink:0;padding:.25rem .55rem;border-radius:var(--radius-sm);font-size:.7rem;white-space:nowrap;border:1px solid;
+            {% if ph.status == 'completed' or ph.status == 'done' %}background:#0a2a0a;border-color:var(--green);color:var(--green)
+            {% elif ph.status == 'running' or ph.status == 'pending' and ph.started_at %}background:#1a2a3a;border-color:var(--accent);color:var(--accent)
+            {% else %}background:var(--bg-tertiary);border-color:var(--border);color:var(--text-tertiary){% endif %}">
+            {% if ph.pattern_id == 'loop' %}[loop]{% elif ph.pattern_id == 'adversarial-pair' or ph.pattern_id == 'adversarial' %}[adv]{% elif ph.pattern_id == 'parallel' %}[//]{% endif %}
+            {{ ph.phase_name or ph.phase_id }}
+            {% if ph.iteration and ph.iteration > 0 %} {{ ph.iteration }}{% if ph.sprint_count %}/{{ ph.sprint_count }}{% endif %}{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if run.brief %}<div style="font-size:.7rem;color:var(--text-tertiary);margin-top:.35rem">{{ run.brief }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="hub-empty">Aucun workflow en cours — <a href="#" onclick="hubSuggestChat('Lance le workflow ideation-to-prod pour ce projet');return false">Démarrer</a></div>
+      {% endif %}
+    </div>
+
+    <!-- Historique -->
+    <div>
+      <div class="hub-col-title" style="margin-bottom:.75rem">Historique <span style="font-size:.65rem;font-weight:400;color:var(--text-tertiary)">({{ epic_runs_history|length }} runs)</span></div>
+      <!-- Filter buttons -->
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.75rem">
+        <button class="hist-filter active" onclick="histFilter(this,'')" style="font-size:.7rem;padding:.2rem .55rem;border-radius:99px;background:var(--accent);color:#fff;border:none;cursor:pointer">Tous</button>
+        <button class="hist-filter" onclick="histFilter(this,'feature-sprint')" style="font-size:.7rem;padding:.2rem .55rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">Feature Sprint</button>
+        <button class="hist-filter" onclick="histFilter(this,'tma')" style="font-size:.7rem;padding:.2rem .55rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">TMA</button>
+        <button class="hist-filter" onclick="histFilter(this,'sast')" style="font-size:.7rem;padding:.2rem .55rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">Securite</button>
+        <button class="hist-filter" onclick="histFilter(this,'tech-debt')" style="font-size:.7rem;padding:.2rem .55rem;border-radius:99px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);cursor:pointer">Dette</button>
+      </div>
+      <div id="histTable" style="overflow-x:auto">
+        <table class="backlog-table">
+          <thead><tr><th>Workflow</th><th>Statut</th><th>Phase finale</th><th>Date</th><th></th></tr></thead>
+          <tbody>
+            {% for run in epic_runs_history %}
+            <tr class="hist-row" data-wf="{{ run.workflow_id }}">
+              <td style="font-weight:600">{{ run.workflow_name[:40] }}</td>
+              <td><span class="badge-status {% if run.status == 'completed' %}done{% elif run.status == 'failed' %}blocked{% else %}backlog{% endif %}">{{ run.status }}</span></td>
+              <td style="font-size:.75rem;color:var(--text-secondary)">{{ run.current_phase or '—' }}</td>
+              <td style="font-size:.72rem;color:var(--text-tertiary)">{{ run.created_at[:16] }}</td>
+              <td><button onclick="toggleHistDetail('{{ run.id }}')" style="font-size:.65rem;padding:.1rem .4rem;background:none;border:1px solid var(--border);border-radius:3px;cursor:pointer;color:var(--text-secondary)">Phases</button></td>
+            </tr>
+            <tr id="hist-{{ run.id }}" style="display:none">
+              <td colspan="5" style="padding:.5rem 1rem;background:var(--bg-tertiary)">
+                <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+                  {% for ph in run.phases %}
+                  <span style="font-size:.68rem;padding:.2rem .4rem;border-radius:3px;
+                    {% if ph.status == 'completed' or ph.status == 'done' %}background:#0a2a0a;color:var(--green)
+                    {% elif ph.status == 'failed' %}background:#2a0a0a;color:var(--red)
+                    {% else %}background:var(--bg-secondary);color:var(--text-tertiary){% endif %}">
+                    {{ ph.phase_name or ph.phase_id }}{% if ph.iteration and ph.iteration > 0 %} ({{ ph.iteration }}){% endif %}
+                  </span>
+                  {% endfor %}
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" style="text-align:center;color:var(--text-tertiary);padding:1rem">Aucun historique</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: DOCS ════════════════════════════ -->
+  <div class="hub-panel" id="panel-docs">
+    {% set doc_cat_labels = {'vision':'Vision','architecture':'Architecture','decisions':'Decisions','development':'Developpement','quality':'Qualite','team':'Equipe','convention':'Conventions','phase-summary':'Phases','product':'Produit','security':'Securite','infrastructure':'Infrastructure','general':'General'} %}
+
+    <!-- Doc sub-tabs -->
+    <div class="docs-subtabs">
+      <button class="docs-stab active" onclick="docsTab(this,'dp-dev')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>Dev
+      </button>
+      <button class="docs-stab" onclick="docsTab(this,'dp-po')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>PO
+      </button>
+      <button class="docs-stab" onclick="docsTab(this,'dp-archi')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>Archi
+      </button>
+      <button class="docs-stab" onclick="docsTab(this,'dp-qa')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>QA
+      </button>
+      <button class="docs-stab" onclick="docsTab(this,'dp-wiki')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>Wiki
+      </button>
+      <button class="docs-stab" onclick="docsTab(this,'dp-secu')">
+        <svg style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Sécu
+      </button>
+    </div>
+
+    {% macro doc_grid(docs) %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.5rem">
+      {% for doc in docs %}
+      <div class="hub-card" onclick="showDocModal('{{ doc.id }}','{{ doc.key | replace("'","") }}')">
+        <div style="font-size:.8rem;font-weight:600;color:var(--text-primary);margin-bottom:.2rem">{{ doc.key[:50] }}</div>
+        <div style="font-size:.72rem;color:var(--text-secondary);line-height:1.4;margin-bottom:.25rem">{{ doc.excerpt[:120] }}{% if doc.excerpt|length > 100 %}…{% endif %}</div>
+        <div style="display:flex;gap:.4rem;align-items:center">
+          {% if doc.agent_role %}<span style="font-size:.6rem;color:var(--text-tertiary)">{{ doc.agent_role }}</span>{% endif %}
+          <span style="font-size:.6rem;color:var(--text-tertiary);margin-left:auto">{{ doc.created_at[:10] }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endmacro %}
+
+    <!-- Sub-panel: Dev (development) -->
+    <div class="docs-subpanel active" id="dp-dev">
+      {% set dev_docs = memory_docs.get('development', []) %}
+      {% if dev_docs %}{{ doc_grid(dev_docs) }}
+      {% else %}<div class="hub-empty">Aucun doc dev — <a href="#" onclick="hubSuggestChat('Génère la documentation de développement pour ce projet');return false">Générer</a></div>{% endif %}
+    </div>
+
+    <!-- Sub-panel: PO (product + vision) -->
+    <div class="docs-subpanel" id="dp-po">
+      {% set po_docs = memory_docs.get('product', []) + memory_docs.get('vision', []) %}
+      {% if po_docs %}{{ doc_grid(po_docs) }}
+      {% else %}<div class="hub-empty">Aucun doc PO — <a href="#" onclick="hubSuggestChat('Génère la vision produit et le backlog pour ce projet');return false">Générer vision PO</a></div>{% endif %}
+    </div>
+
+    <!-- Sub-panel: Archi -->
+    <div class="docs-subpanel" id="dp-archi">
+      {% set archi_docs = memory_docs.get('architecture', []) %}
+      {% if archi_docs %}{{ doc_grid(archi_docs) }}
+      {% else %}<div class="hub-empty">Aucun doc architecture — <a href="#" onclick="hubSuggestChat('Génère la documentation architecture pour ce projet');return false">Générer archi</a></div>{% endif %}
+    </div>
+
+    <!-- Sub-panel: QA (quality scores + quality docs) -->
+    <div class="docs-subpanel" id="dp-qa">
+      {% if quality_scores %}
+      <div style="margin-bottom:1.5rem">
+        <div class="hub-col-title" style="margin-bottom:.75rem">Scores Qualité</div>
+        <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+          {% for qs in quality_scores %}
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem .75rem;min-width:120px">
+            <div style="font-size:.65rem;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.2rem">{{ qs.dimension }}</div>
+            <div style="font-size:1.2rem;font-weight:700;color:{% if qs.avg_score >= 8 %}var(--green){% elif qs.avg_score >= 6 %}var(--yellow){% else %}var(--red){% endif %}">{{ qs.avg_score }}<span style="font-size:.65rem;color:var(--text-tertiary)">/10</span></div>
+            <div style="font-size:.58rem;color:var(--text-tertiary)">{{ qs.count }} mesures</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% set qa_docs = memory_docs.get('quality', []) %}
+      {% if qa_docs %}{{ doc_grid(qa_docs) }}
+      {% elif not quality_scores %}<div class="hub-empty">Aucun rapport QA — <a href="#" onclick="hubSuggestChat('Lance un audit qualité pour ce projet');return false">Lancer audit</a></div>{% endif %}
+    </div>
+
+    <!-- Sub-panel: Wiki (general, convention, team, decisions, phase-summary, infrastructure) -->
+    <div class="docs-subpanel" id="dp-wiki">
+      {% set wiki_found = false %}
+      {% for cat in ['general','convention','team','decisions','phase-summary','infrastructure'] %}
+        {% set docs = memory_docs.get(cat, []) %}
+        {% if docs %}{% set wiki_found = true %}
+        <div style="margin-bottom:1.25rem">
+          <div class="hub-col-title" style="margin-bottom:.4rem;text-transform:uppercase">{{ doc_cat_labels.get(cat, cat) }}</div>
+          {{ doc_grid(docs) }}
+        </div>
+        {% endif %}
+      {% endfor %}
+      {% if not wiki_found %}<div class="hub-empty">Aucun doc wiki — <a href="#" onclick="hubSuggestChat('Génère le wiki et les conventions du projet');return false">Générer wiki</a></div>{% endif %}
+    </div>
+
+    <!-- Sub-panel: Sécu -->
+    <div class="docs-subpanel" id="dp-secu">
+      {% set secu_docs = memory_docs.get('security', []) %}
+      {% if secu_docs %}{{ doc_grid(secu_docs) }}
+      {% else %}<div class="hub-empty">Aucun rapport sécurité — <a href="#" onclick="hubSuggestChat('Lance un audit de sécurité pour ce projet');return false">Lancer audit sécu</a></div>{% endif %}
+    </div>
+  </div>
+  <!-- Doc modal -->
+  <div id="docModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center" onclick="if(event.target===this)closeDocModal()">
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);max-width:700px;width:90%;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:.5rem;padding:.75rem 1rem;border-bottom:1px solid var(--border)">
+        <span id="docModalTitle" style="font-size:.9rem;font-weight:700;color:var(--text-primary);flex:1"></span>
+        <button onclick="closeDocModal()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;color:var(--text-tertiary)"></button>
+      </div>
+      <div id="docModalContent" style="padding:1rem;overflow-y:auto;font-size:.82rem;color:var(--text-secondary);line-height:1.6;white-space:pre-wrap"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: SAFe TREE ════════════════════════ -->
+  <div class="hub-panel" id="panel-safe">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <span style="font-size:.8rem;color:var(--text-secondary)">Hiérarchie SAFe : Epics → Features → Stories</span>
+      <button onclick="hubSuggestChat('Génère la hiérarchie complète SAFe pour ce projet : features et user stories pour chaque epic')" style="font-size:.72rem;padding:.3rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-left:auto">Générer hiérarchie</button>
+    </div>
+    <div class="safe-tree">
+      {% for ep in epics_tree %}
+      <div class="safe-epic">
+        <div class="safe-epic-header" onclick="safeToggle(this)">
+          <span class="safe-epic-caret">▶</span>
+          <span class="safe-epic-name">{{ ep.name }}</span>
+          <span class="badge-status {{ ep.status }}">{{ ep.status }}</span>
+          <span class="badge-type">{{ ep.category }}</span>
+          <span style="font-size:.68rem;color:var(--text-tertiary);margin-left:.5rem">{{ ep.features|length }} features</span>
+        </div>
+        <div class="safe-epic-body">
+          {% if ep.features %}
+          <div class="safe-features">
+            {% for f in ep.features %}
+            <div class="safe-feature">
+              <div class="safe-feature-header" onclick="safeToggle(this)">
+                <span class="safe-epic-caret" style="font-size:.65rem">▶</span>
+                <span class="safe-feature-name">{{ f.name }}</span>
+                <span class="badge-status {{ f.status }}">{{ f.status }}</span>
+                {% if f.story_points %}<span class="badge-pts">{{ f.story_points }} pts</span>{% endif %}
+                <span style="font-size:.65rem;color:var(--text-tertiary);margin-left:.35rem">{{ f.stories|length }} stories</span>
+              </div>
+              <div class="safe-feature-body">
+                {% if f.stories %}
+                <div class="safe-stories">
+                  {% for s in f.stories %}
+                  <div class="safe-story">
+                    <span class="safe-story-title">{{ s.title }}</span>
+                    <span class="badge-status {{ s.status }}">{{ s.status }}</span>
+                    {% if s.story_points %}<span class="badge-pts">{{ s.story_points }}pt</span>{% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+                {% else %}
+                <div class="safe-empty">Aucune story — <a href="#" onclick="hubSuggestChat('Génère des user stories pour la feature {{ f.name }}');return false">Générer</a></div>
+                {% endif %}
+                <button class="safe-add-btn" onclick="hubSuggestChat('Ajoute une user story à la feature {{ f.name }}')">+ Story</button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="safe-empty" style="margin:.5rem 0">Aucune feature — <a href="#" onclick="hubSuggestChat('Génère des features pour l\\'epic {{ ep.name }}');return false">Générer</a></div>
+          {% endif %}
+          <button class="safe-add-btn" onclick="hubSuggestChat('Ajoute une feature à l\\'epic {{ ep.name }}')">+ Feature</button>
+        </div>
+      </div>
+      {% else %}
+      <div class="hub-empty">Aucun epic — utilisez le chat pour en créer</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: PERSONAS ══════════════════════ -->
+  <div class="hub-panel" id="panel-personas">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <span style="font-size:.8rem;color:var(--text-secondary)">Utilisateurs cibles &amp; personas du projet</span>
+      <button onclick="hubSuggestChat('Génère les personas utilisateurs pour ce projet avec leurs besoins et cas d\'usage SAFe')" style="font-size:.72rem;padding:.3rem .7rem;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;margin-left:auto;display:flex;align-items:center;gap:.3rem"><svg class="icon icon-xs"><use href="#icon-users"/></svg> Générer personas</button>
+    </div>
+    {% set personas = (project.config or {}).get('personas', []) if project.config else [] %}
+    {% if personas %}
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.75rem">
+      {% for p in personas %}
+      <div class="hub-card" style="cursor:default">
+        <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.4rem">
+          <div style="width:36px;height:36px;border-radius:50%;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;flex-shrink:0">{{ p.get('initials', p.get('name','?')[:1] | upper) }}</div>
+          <div>
+            <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)">{{ p.get('name', '?') }}</div>
+            <div style="font-size:.72rem;color:var(--text-secondary)">{{ p.get('role', '') }}</div>
+          </div>
+        </div>
+        {% if p.get('needs') %}
+        <div style="font-size:.76rem;color:var(--text-secondary);margin-bottom:.3rem"><strong>Besoins :</strong> {{ p.get('needs') }}</div>
+        {% endif %}
+        {% if p.get('pain_points') %}
+        <div style="font-size:.76rem;color:var(--text-secondary)"><strong>Frustrations :</strong> {{ p.get('pain_points') }}</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="hub-empty">
+      <svg class="icon" style="width:32px;height:32px;margin-bottom:.5rem;opacity:.3"><use href="#icon-users"/></svg>
+      <div>Aucun persona défini</div>
+      <div style="margin-top:.5rem;font-size:.75rem">Demandez à l'agent de générer les personas utilisateurs pour ce projet</div>
+    </div>
+    {% endif %}
+
+    {% if lead_agents_for_personas %}
+    <div style="margin-top:1.25rem">
+      <div class="hub-col-title"><svg class="icon icon-xs"><use href="#icon-users"/></svg> Équipe agents</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.5rem">
+        {% for a in lead_agents_for_personas %}
+        <div class="hub-card" style="cursor:default;display:flex;align-items:center;gap:.6rem">
+          {% if a.avatar_url %}<img src="{{ a.avatar_url }}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">{% else %}
+          <div style="width:28px;height:28px;border-radius:50%;background:{{ a.color or 'var(--accent)' }};color:#fff;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700">{{ a.name[:2] | upper }}</div>{% endif %}
+          <div><div style="font-size:.78rem;font-weight:600;color:var(--text-primary)">{{ a.name }}</div><div style="font-size:.68rem;color:var(--text-secondary)">{{ a.role }}</div></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+    <!-- ═══════════════════════════════ TAB: BACKLOG ══════════════════════════ -->
+  <div class="hub-panel" id="panel-backlog">
+    <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1rem">
+      <span style="font-size:.8rem;color:var(--text-secondary)">{{ backlog_stories|length }} stories en attente</span>
+
+    </div>
+    {% if backlog_stories %}
+    <div style="overflow-x:auto">
+      <table class="backlog-table">
+        <thead><tr>
+          <th>Story</th><th>Feature</th><th>Epic</th><th>Statut</th><th>Pts</th>
+        </tr></thead>
+        <tbody>
+          {% for s in backlog_stories %}
+          <tr>
+            <td>{{ s.title }}</td>
+            <td style="color:var(--text-secondary);font-size:.75rem">{{ s.feature }}</td>
+            <td style="color:var(--text-tertiary);font-size:.72rem">{{ s.epic }}</td>
+            <td><span class="badge-status {{ s.status }}">{{ s.status }}</span></td>
+            <td style="color:var(--text-secondary)">{% if s.story_points %}{{ s.story_points }}{% else %}—{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="hub-empty">Aucune story en backlog — <a href="#" onclick="hubSuggestChat('Génère le product backlog complet avec user stories pour ce projet');hubTab(document.querySelector('[onclick*=\",\\\'chat\\\'\"]'),'chat');return false">Demander à l'agent</a></div>
+    {% endif %}
+  </div>
+
+  <!-- ═══════════════════════════════ TAB: CHAT ════════════════════════════ -->
+  <div class="hub-panel" id="panel-chat">
+    <div class="hub-chat-layout">
+      <!-- Sidebar: conversations list -->
+      <div class="hub-chat-sidebar">
+        <div class="hub-chat-sidebar-title">Conversations</div>
+        <a href="/projects/{{ project.id }}/hub?tab=chat&new=1" class="hub-conv-item" style="color:var(--accent)">+ Nouvelle conversation</a>
+        {% for s in sessions %}
+        <a href="/projects/{{ project.id }}/hub?tab=chat&session={{ s.id }}" class="hub-conv-item {% if active_session and s.id == active_session.id %}active{% endif %}">
+          {{ s.name or (s.id[:8] + '…') }}
+        </a>
+        {% else %}
+        <div style="padding:.75rem;font-size:.75rem;color:var(--text-tertiary)">Aucune conversation</div>
+        {% endfor %}
+      </div>
+      <!-- Main chat area -->
+      <div class="hub-chat-main">
+        <div class="hub-chat-header">
+          {% if lead_agent %}
+          <div class="hub-chat-avatar" style="background:{{ lead_agent.color or '#333' }};color:#fff;font-size:.7rem;font-weight:700">
+            {% if lead_avatar_url %}<img src="{{ lead_avatar_url }}" alt="">{% else %}{{ lead_agent.name[:2] | upper }}{% endif %}
+          </div>
+          <span>{{ lead_agent.name }} — {{ project.name }}</span>
+          {% else %}
+          <span>Agent — {{ project.name }}</span>
+          {% endif %}
+          {% if active_session %}<span style="font-size:.72rem;color:var(--text-tertiary);margin-left:auto">{{ active_session.name or active_session.id[:8] }}</span>{% endif %}
+        </div>
+        <div class="hub-chat-messages" id="hubChatMessages">
+          {% if messages %}
+            {% for msg in messages %}
+            <div class="hub-chat-msg-wrap {{ 'user' if msg.from_agent == 'user' else 'agent' }}">
+              <div class="hub-chat-avatar {% if msg.from_agent == 'user' %}{% else %}" style="background:{{ (lead_agent.color if lead_agent else '#333') }};color:#fff;font-size:.65rem;font-weight:700{% endif %}">
+                {% if msg.from_agent == 'user' %}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg>
+                {% elif lead_avatar_url %}
+                <img src="{{ lead_avatar_url }}" alt="">
+                {% else %}
+                {{ (lead_agent.name[:2] | upper) if lead_agent else 'AI' }}
+                {% endif %}
+              </div>
+              <div class="hub-chat-bubble">{{ msg.content }}</div>
+            </div>
+            {% endfor %}
+          {% else %}
+          <div style="text-align:center;color:var(--text-tertiary);padding:2rem;font-size:.85rem">
+            <div style="font-size:2rem;margin-bottom:.5rem"></div>
+            <div>Démarrez la conversation avec l'agent du projet</div>
+            <div style="margin-top:1rem;display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center">
+              <button onclick="hubFullSuggest('Présente-toi et donne un résumé de l\\'état du projet')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Présentation</button>
+              <button onclick="hubFullSuggest('Quelle est la prochaine action prioritaire ?')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Prochaine action</button>
+              <button onclick="hubFullSuggest('Génère le backlog complet du projet avec user stories')" style="font-size:.75rem;padding:.4rem .8rem;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);cursor:pointer">Créer backlog</button>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="hub-chat-input-area">
+          <textarea id="hubChatInput" class="hub-chat-input" placeholder="Message à l'agent du projet… (Entrée pour envoyer, Maj+Entrée pour saut de ligne)" rows="1"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();hubFullSend()}"
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+          <button class="hub-chat-send-btn" onclick="hubFullSend()">Envoyer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var _hubProjId = {{ project.id | tojson }};
+var _hubProjName = {{ project.name | tojson }};
+var _hubActiveSession = {{ (active_session.id if active_session else '') | tojson }};
+
+// ── Tabs ──
+function hubTab(el, name) {
+  document.querySelectorAll('.hub-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.hub-panel').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  var panel = document.getElementById('panel-' + name);
+  if (panel) panel.classList.add('active');
+  if (name === 'chat') { var msgs = document.getElementById('hubChatMessages'); if (msgs) msgs.scrollTop = msgs.scrollHeight; }
+}
+
+// ── Board sub-views ──
+function boardView(viewId) {
+  document.querySelectorAll('.board-view-btn').forEach(function(b){ b.classList.remove('active'); });
+  var activeBtn = document.getElementById('bv-' + viewId);
+  if (activeBtn) activeBtn.classList.add('active');
+  ['bview-kanban','bview-feature','bview-sprint'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.display = id === 'bview-' + viewId ? '' : 'none';
+  });
+  if (viewId === 'feature') {
+    var sel = document.getElementById('fb-epic-select');
+    if (sel) renderFeatureBoard(sel.value);
+  }
+}
+
+// ── Feature board rendering ──
+var _hubEpicsTree = {{ epics_tree | tojson }};
+function renderFeatureBoard(epicId) {
+  var cols = document.getElementById('feature-board-cols');
+  if (!cols) return;
+  if (!epicId) { cols.innerHTML = ''; return; }
+  var ep = _hubEpicsTree.find(function(e){ return e.id === epicId; });
+  if (!ep) { cols.innerHTML = ''; return; }
+  var statuses = [{id:'backlog',label:'Backlog',color:'var(--text-tertiary)'},{id:'ready',label:'Ready',color:'#7dd3fc'},{id:'in_progress',label:'En cours',color:'var(--green)'},{id:'done',label:'Terminé',color:'var(--accent)'},{id:'blocked',label:'Bloqué',color:'var(--red)'}];
+  var byStatus = {};
+  statuses.forEach(function(s){ byStatus[s.id] = []; });
+  (ep.features || []).forEach(function(f){
+    var st = f.status || 'backlog';
+    if (!byStatus[st]) byStatus[st] = [];
+    byStatus[st].push(f);
+  });
+  cols.innerHTML = statuses.map(function(s){
+    var cards = (byStatus[s.id] || []).map(function(f){
+      var pts = f.story_points ? '<span style="font-size:.6rem;background:var(--accent-dim);color:var(--accent);padding:.05rem .3rem;border-radius:3px">'+f.story_points+'pts</span>' : '';
+      return '<div class="hub-card" style="margin-bottom:.4rem"><div style="font-size:.78rem;font-weight:600;margin-bottom:.2rem">'+f.name.substring(0,60)+'</div><div style="display:flex;gap:.3rem;flex-wrap:wrap">'+pts+'</div></div>';
+    }).join('');
+    return '<div><div style="font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:'+s.color+';padding:.3rem .5rem;border-bottom:2px solid '+s.color+';margin-bottom:.5rem">'+s.label+' <span style="font-size:.65rem;color:var(--text-tertiary)">('+byStatus[s.id].length+')</span></div>'+(cards || '<div style="font-size:.72rem;color:var(--text-tertiary);text-align:center;padding:.75rem .5rem;border:1px dashed var(--border);border-radius:var(--radius-sm)">—</div>')+'</div>';
+  }).join('');
+}
+
+// ── History toggle detail ──
+function toggleHistDetail(runId) {
+  var row = document.getElementById('hist-' + runId);
+  if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
+}
+
+// ── Board: jump to feature board for a specific epic ──
+function boardSetFeatureEpic(epicId) {
+  var sel = document.getElementById('fb-epic-select');
+  if (sel) { sel.value = epicId; }
+  // Switch hub to Board tab
+  var boardTab = document.querySelector('.hub-tab[onclick*="\'board\'"]');
+  if (boardTab) hubTab(boardTab, 'board');
+  boardView('feature');
+}
+
+// ── History filter ──
+function histFilter(btn, wf) {
+  document.querySelectorAll('.hist-filter').forEach(function(b){ b.classList.remove('active'); b.style.background='var(--bg-tertiary)'; b.style.color='var(--text-secondary)'; b.style.borderColor='var(--border)'; });
+  btn.classList.add('active');
+  document.querySelectorAll('.hist-row').forEach(function(row){
+    row.style.display = (!wf || row.dataset.wf.toLowerCase().includes(wf)) ? '' : 'none';
+  });
+}
+
+// ── Doc modal ──
+var _hubMemoryDocs = {{ memory_docs | tojson if memory_docs else '{}' }};
+function showDocModal(docId, title) {
+  var modal = document.getElementById('docModal');
+  var titleEl = document.getElementById('docModalTitle');
+  var content = document.getElementById('docModalContent');
+  if (!modal) return;
+  titleEl.textContent = title;
+  var allDocs = [];
+  Object.values(_hubMemoryDocs).forEach(function(docs){ allDocs = allDocs.concat(docs); });
+  var doc = allDocs.find(function(d){ return String(d.id) === String(docId); });
+  content.textContent = doc ? doc.value : 'Contenu non disponible.';
+  modal.style.display = 'flex';
+}
+function closeDocModal() {
+  var modal = document.getElementById('docModal');
+  if (modal) modal.style.display = 'none';
+}
+
+
+function safeToggle(header) {
+  var caret = header.querySelector('.safe-epic-caret');
+  var body = header.nextElementSibling;
+  if (!body) return;
+  header.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+// ── Lifecycle phase ──
+function hubSetPhase(phaseId) {
+  if (!confirm('Passer en phase "' + phaseId + '" ?')) return;
+  fetch('/api/projects/' + encodeURIComponent(_hubProjId) + '/phase', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({phase: phaseId})
+  }).then(function(r){ return r.json(); }).then(function(d){ if(d.ok) location.reload(); else alert('Erreur: '+(d.detail||'inconnue')); });
+}
+
+// ── Heal epics ──
+function hubHealEpics() {
+  fetch('/api/projects/' + encodeURIComponent(_hubProjId) + '/scaffold', {method:'POST'})
+    .then(function(){ location.reload(); });
+}
+
+// ── Quick chat (overview tab) ──
+function quickSend() {
+  var input = document.getElementById('quickChatInput');
+  var msg = input.value.trim(); if (!msg) return;
+  input.value = '';
+  var msgs = document.getElementById('quickChatMsgs');
+  msgs.insertAdjacentHTML('beforeend', '<div style="font-size:.75rem;line-height:1.45;padding:.35rem .55rem;border-radius:var(--radius-sm);background:var(--accent);color:#fff;align-self:flex-end">' + _esc(msg) + '</div>');
+  msgs.scrollTop = msgs.scrollHeight;
+  var thinking = document.createElement('div');
+  thinking.style.cssText = 'font-size:.75rem;padding:.35rem .55rem;border-radius:var(--radius-sm);background:var(--bg-tertiary);border-left:2px solid var(--accent);color:var(--text-primary)';
+  thinking.textContent = '…';
+  msgs.appendChild(thinking);
+  msgs.scrollTop = msgs.scrollHeight;
+  _streamChat(msg, thinking, msgs);
+}
+
+function hubSuggestChat(msg) {
+  document.getElementById('quickChatInput').value = msg;
+  quickSend();
+}
+
+// ── Full chat (chat tab) ──
+function hubFullSuggest(msg) {
+  document.getElementById('hubChatInput').value = msg;
+  hubFullSend();
+}
+
+function hubFullSend() {
+  var input = document.getElementById('hubChatInput');
+  var msg = input.value.trim(); if (!msg) return;
+  input.value = ''; input.style.height = 'auto';
+  var msgs = document.getElementById('hubChatMessages');
+  msgs.insertAdjacentHTML('beforeend',
+    '<div class="hub-chat-msg-wrap user"><div class="hub-chat-avatar"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M6 20v-2a6 6 0 0 1 12 0v2"/></svg></div><div class="hub-chat-bubble">' + _esc(msg) + '</div></div>');
+  msgs.scrollTop = msgs.scrollHeight;
+  var bubble = document.createElement('div');
+  bubble.className = 'hub-chat-bubble hub-chat-thinking';
+  bubble.textContent = '…';
+  var wrap = document.createElement('div');
+  wrap.className = 'hub-chat-msg-wrap agent';
+  wrap.appendChild(document.createElement('div')).className = 'hub-chat-avatar';
+  wrap.appendChild(bubble);
+  msgs.appendChild(wrap);
+  msgs.scrollTop = msgs.scrollHeight;
+  _streamChat(msg, bubble, msgs, function(){ bubble.classList.remove('hub-chat-thinking'); });
+}
+
+// ── Shared streaming ──
+function _streamChat(msg, target, scroller, done) {
+  var ctx = 'Projet: ' + _hubProjName + '. Epics: {{ stats.total }}. Santé: {{ health }}%.';
+  fetch('/api/projects/' + encodeURIComponent(_hubProjId) + '/chat/stream', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({message: msg, context: ctx, session_id: _hubActiveSession || undefined})
+  }).then(function(r){
+    if (!r.ok) { target.textContent = 'Erreur de connexion.'; return; }
+    var reader = r.body.getReader(); var dec = new TextDecoder(); var text = '';
+    function read(){ reader.read().then(function(v){
+      if (v.done){ if(done) done(); return; }
+      dec.decode(v.value,{stream:true}).split('\n').forEach(function(line){
+        if (line.startsWith('data: ')){ var d=line.slice(6); if(d==='[DONE]') return;
+          try{ var j=JSON.parse(d); text+=(j.text||j.delta||''); target.textContent=text; if(scroller) scroller.scrollTop=scroller.scrollHeight; }catch(e){}
+        }
+      }); read();
+    }); } read();
+  }).catch(function(e){ target.textContent='Agent non disponible: '+e.message; if(done) done(); });
+}
+
+function docsTab(el, panelId) {
+  document.querySelectorAll('.docs-stab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('.docs-subpanel').forEach(function(p){ p.classList.remove('active'); });
+  el.classList.add('active');
+  document.getElementById(panelId).classList.add('active');
+}
+
+function _esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Auto-open tab from URL param ──
+(function(){
+  var params = new URLSearchParams(location.search);
+  var tab = params.get('tab');
+  if (tab) {
+    var idx = {overview:0,safe:1,backlog:2,chat:3}[tab];
+    if (idx !== undefined) {
+      var tabs = document.querySelectorAll('.hub-tab');
+      if (tabs[idx]) hubTab(tabs[idx], tab);
+    }
+  }
+  // Scroll chat to bottom on load
+  var cm = document.getElementById('hubChatMessages');
+  if (cm) cm.scrollTop = cm.scrollHeight;
+})();
+</script>
+{% endblock %}

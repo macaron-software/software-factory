@@ -1,0 +1,1098 @@
+<div class="partial-analytics">
+<style>
+        .analytics-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 1.5rem 1rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl, 12px);
+            padding: 1.25rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .stat-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-xl, 12px);
+            background: rgba(167, 139, 250, 0.04);
+            opacity: 0;
+            transition: opacity 0.25s;
+            pointer-events: none;
+        }
+        .stat-card:hover {
+            border-color: var(--purple);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(167,139,250,0.1);
+        }
+        .stat-card:hover::before { opacity: 1; }
+        
+        .stat-card h3 {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin: 0 0 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+        
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        
+        .chart-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl, 12px);
+            padding: 1.25rem;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        .chart-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: var(--radius-xl, 12px);
+            background: rgba(167, 139, 250, 0.04);
+            opacity: 0;
+            transition: opacity 0.25s;
+            pointer-events: none;
+        }
+        .chart-card:hover {
+            border-color: var(--purple);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.25), 0 0 0 1px rgba(167,139,250,0.1);
+        }
+        .chart-card:hover::before { opacity: 1; }
+        
+        .chart-card h2 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0 0 1.5rem;
+            color: var(--text-primary);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+        }
+        
+        /* Agent cards */
+        .agent-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 0.75rem;
+        }
+        .agent-card {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 0.5rem; padding: 1rem 0.75rem; text-align: center;
+            background: var(--bg-tertiary, #161b22); border-radius: 10px;
+            border: 1px solid var(--border); transition: transform 0.15s, border-color 0.15s;
+        }
+        .agent-card:hover { transform: translateY(-2px); border-color: var(--purple, #8b5cf6); }
+        .agent-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem; font-weight: 700; color: #fff; flex-shrink: 0;
+            border: 2px solid rgba(255,255,255,0.12);
+            overflow: hidden;
+        }
+        .agent-avatar img {
+            width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+        }
+        .agent-card-name { font-size: 0.78rem; font-weight: 600; color: var(--text-primary); line-height: 1.2; }
+        .agent-card-role { font-size: 0.68rem; color: var(--text-secondary); line-height: 1.3; }
+        .agent-card-stat { font-size: 0.72rem; color: var(--text-tertiary); margin-top: 0.1rem; }
+        
+        .refresh-btn {
+            background: var(--purple, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 0.4rem 1rem;
+            border-radius: var(--radius-md, 8px);
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .refresh-btn:hover {
+            background: var(--purple-hover, #7c3aed);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+        
+        .timestamp {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            margin-left: 1rem;
+        }
+        
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .analytics-header h3 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-primary);
+        }
+    </style>
+<div class="analytics-container">
+    <div class="analytics-header">
+        <h3><svg class="icon icon-xs" style="vertical-align:-2px"><use href="#icon-bar-chart-2"/></svg> Analytics Dashboard</h3>
+        <div style="display:flex;align-items:center;gap:0.75rem">
+            <button class="refresh-btn" onclick="refreshData()">
+                <svg class="icon icon-xs" style="vertical-align:-1px"><use href="#icon-refresh-cw"/></svg> Refresh
+            </button>
+            <span class="timestamp" id="last-update"></span>
+        </div>
+    </div>
+    
+    <!-- Key Metrics -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Total Epics</h3>
+            <div class="stat-value" id="stat-missions">—</div>
+            <div class="stat-label">Active missions tracked</div>
+        </div>
+        <div class="stat-card">
+            <h3>Success Rate</h3>
+            <div class="stat-value" id="stat-success">—</div>
+            <div class="stat-label">Epic completion rate</div>
+        </div>
+        <div class="stat-card">
+            <h3>Active Agents</h3>
+            <div class="stat-value" id="stat-agents">—</div>
+            <div class="stat-label">Deployed agents</div>
+        </div>
+        <div class="stat-card">
+            <h3>Skills Used</h3>
+            <div class="stat-value" id="stat-skills">—</div>
+            <div class="stat-label">Unique skills utilized</div>
+        </div>
+    </div>
+    
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Epics by Status</h2>
+            <div class="chart-container">
+                <canvas id="chart-missions"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>Top Skills Used</h2>
+            <div class="chart-container">
+                <canvas id="chart-skills"></canvas>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>Agent Performance</h2>
+            <div id="agent-cards-container" class="agent-cards-grid">
+                <div style="color: var(--text-tertiary); font-size: 0.85rem; padding: 2rem; text-align: center; grid-column: 1/-1;">Loading agents…</div>
+            </div>
+        </div>
+        
+        <div class="chart-card">
+            <h2>System Health</h2>
+            <div class="chart-container">
+                <canvas id="chart-system"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tracing / OTEL Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        OpenTelemetry Tracing
+    </h2>
+    <div class="stats-grid" id="tracing-stats">
+        <div class="stat-card">
+            <h3>Traces (1h)</h3>
+            <p class="stat-value" id="trace-count">—</p>
+            <p class="stat-label">requests traced</p>
+        </div>
+        <div class="stat-card">
+            <h3>Latency P95</h3>
+            <p class="stat-value" id="trace-p95">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+        <div class="stat-card">
+            <h3>Error Rate</h3>
+            <p class="stat-value" id="trace-errors">—</p>
+            <p class="stat-label">% of requests</p>
+        </div>
+        <div class="stat-card">
+            <h3>Avg Latency</h3>
+            <p class="stat-value" id="trace-avg">—</p>
+            <p class="stat-label">milliseconds</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Top Operations (latency)</h2>
+            <div class="chart-container">
+                <canvas id="chart-tracing-ops"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Recent Traces</h2>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.85rem;" id="traces-table">
+                    <thead><tr>
+                        <th style="text-align: left; padding: 4px 8px;">Operation</th>
+                        <th style="text-align: right; padding: 4px 8px;">Duration</th>
+                        <th style="text-align: right; padding: 4px 8px;">Spans</th>
+                        <th style="text-align: right; padding: 4px 8px;">Status</th>
+                    </tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════ ADAPTIVE INTELLIGENCE ══════ -->
+    <h2 style="margin: 2.5rem 0 0.4rem; font-size: 1.4rem; font-weight: 700; color: var(--purple-light);">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -4px; margin-right: 8px;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Adaptive Intelligence — 3 Layers
+    </h2>
+    <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1.2rem">Thompson Sampling (live) · Genetic Algorithm (evolution) · Reinforcement Learning (adaptation)</p>
+
+    <!-- Layer badges -->
+    <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem;flex-wrap:wrap">
+        <div style="background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;box-shadow:0 0 6px #10b981"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#10b981">Layer 1 · Thompson Sampling</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px">LIVE</span>
+        </div>
+        <div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.4);border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;box-shadow:0 0 6px #8b5cf6;opacity:0.6"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#8b5cf6">Layer 2 · Genetic Algorithm</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(139,92,246,0.15);padding:1px 6px;border-radius:4px">COMING</span>
+        </div>
+        <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.4);border-radius:8px;padding:0.5rem 0.9rem;display:flex;align-items:center;gap:0.5rem">
+            <div style="width:8px;height:8px;border-radius:50%;background:#f59e0b;box-shadow:0 0 6px #f59e0b;opacity:0.6"></div>
+            <span style="font-size:0.75rem;font-weight:600;color:#f59e0b">Layer 3 · Reinforcement Learning</span>
+            <span style="font-size:0.68rem;color:var(--text-muted);background:rgba(245,158,11,0.15);padding:1px 6px;border-radius:4px">COMING</span>
+        </div>
+    </div>
+
+    <!-- OKR KPI bar -->
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.75rem">OKRs</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem" id="okr-grid">
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O1 · Qualité agents</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-quality">—</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 0.75</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-quality-bar" style="height:4px;background:#10b981;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O1 · Taux rejet</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-rejection">—</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible &lt;20%</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-rejection-bar" style="height:4px;background:#f59e0b;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O2 · Propositions GA</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-proposals">0</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 2/mois</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-proposals-bar" style="height:4px;background:#8b5cf6;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+            <div class="okr-item">
+                <div style="font-size:0.7rem;color:var(--text-secondary)">O3 · Décisions RL</div>
+                <div style="font-size:0.82rem;font-weight:700;margin:2px 0"><span id="okr-rl">0</span> <span style="font-size:0.68rem;color:var(--text-muted)">/ cible 100/sem</span></div>
+                <div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div id="okr-rl-bar" style="height:4px;background:#f59e0b;border-radius:2px;width:0%;transition:width 0.5s"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thompson Sampling Section -->
+    <h2 style="margin: 2rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+        Layer 1 · Thompson Sampling — Agent Selection
+        <span style="font-size:0.7rem;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid #10b981;border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">LIVE</span>
+    </h2>
+    <div class="stats-grid" id="thompson-stats">
+        <div class="stat-card">
+            <h3>Agents actifs</h3>
+            <p class="stat-value" id="ts-total-agents">—</p>
+            <p class="stat-label">avec données</p>
+        </div>
+        <div class="stat-card">
+            <h3>Appels acceptés</h3>
+            <p class="stat-value" id="ts-accepted">—</p>
+            <p class="stat-label">total tous agents</p>
+        </div>
+        <div class="stat-card">
+            <h3>Rejets adversariaux</h3>
+            <p class="stat-value" id="ts-rejected" style="color: #f59e0b;">—</p>
+            <p class="stat-label">total tous agents</p>
+        </div>
+        <div class="stat-card">
+            <h3>Escalade azure-openai</h3>
+            <p class="stat-value" id="ts-high-rej" style="color: #ef4444;">—</p>
+            <p class="stat-label">agents > 40% rejet</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card" style="grid-column: 1 / -1;">
+            <h2>Scores par rôle d'agent</h2>
+            <div style="overflow-x: auto; max-height: 420px; overflow-y: auto;">
+                <table style="width: 100%; font-size: 0.85rem; border-collapse: collapse;" id="ts-table">
+                    <thead>
+                        <tr style="position: sticky; top: 0; background: var(--bg-card, #1e293b); z-index: 1;">
+                            <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Agent</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Provider</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Appels</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Acceptés</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Rejetés</th>
+                            <th style="text-align: right; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Taux succès</th>
+                            <th style="text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border, #334155);">Barre</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ts-tbody">
+                        <tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-tertiary);">Chargement…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Layer 2: Genetic Algorithm -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M12 3a9 9 0 1 0 9 9"/><path d="M12 3v4"/><path d="M12 3l3 3"/><path d="M12 3l-3 3"/></svg>
+        Layer 2 · Genetic Algorithm — Workflow Evolution
+        <span style="font-size:0.7rem;background:rgba(139,92,246,0.12);color:#8b5cf6;border:1px solid rgba(139,92,246,0.4);border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">COMING</span>
+    </h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Propositions en attente</h3>
+            <p class="stat-value" id="ga-pending" style="color:#8b5cf6">—</p>
+            <p class="stat-label">à approuver</p>
+        </div>
+        <div class="stat-card">
+            <h3>Générations exécutées</h3>
+            <p class="stat-value" id="ga-generations">—</p>
+            <p class="stat-label">total GA runs</p>
+        </div>
+        <div class="stat-card">
+            <h3>Meilleur fitness</h3>
+            <p class="stat-value" id="ga-best-fitness" style="color:#10b981">—</p>
+            <p class="stat-label">vs baseline</p>
+        </div>
+        <div class="stat-card">
+            <h3>Runs simulateur</h3>
+            <p class="stat-value" id="ga-sim-runs">—</p>
+            <p class="stat-label">données synthétiques</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card" style="grid-column: 1 / -1">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+                <h2 style="margin:0">Fitness par génération</h2>
+                <button onclick="triggerGARun()" style="font-size:0.75rem;padding:4px 12px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);color:#8b5cf6;border-radius:6px;cursor:pointer">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Lancer évolution
+                </button>
+            </div>
+            <div class="chart-container" style="min-height:160px;display:flex;align-items:center;justify-content:center" id="ga-chart-wrap">
+                <div style="text-align:center;color:var(--text-muted);font-size:0.82rem">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="1.5" style="opacity:0.4;margin-bottom:8px;display:block;margin-inline:auto"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    En attente du premier run GA nightly (02:00 UTC)<br>
+                    <span style="font-size:0.72rem">ou cliquez "Lancer évolution" pour un run manuel</span>
+                </div>
+            </div>
+            <canvas id="chart-ga-fitness" style="display:none"></canvas>
+        </div>
+    </div>
+    <!-- GA Proposals table -->
+    <div class="charts-grid" style="margin-top:0.5rem">
+        <div class="chart-card" style="grid-column: 1 / -1">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem">
+                <h2 style="margin:0">Propositions d'évolution</h2>
+                <a href="/workflows" style="font-size:0.72rem;color:var(--purple-light);margin-left:auto">Gérer dans Workflows →</a>
+            </div>
+            <div id="ga-proposals-table" style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:1.5rem">
+                Aucune proposition — le GA n'a pas encore tourné
+            </div>
+        </div>
+    </div>
+
+    <!-- Layer 3: Reinforcement Learning -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Layer 3 · Reinforcement Learning — Adaptation Mid-Mission
+        <span style="font-size:0.7rem;background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.4);border-radius:4px;padding:1px 7px;margin-left:8px;vertical-align:2px">COMING</span>
+    </h2>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>Décisions RL</h3>
+            <p class="stat-value" id="rl-decisions" style="color:#f59e0b">—</p>
+            <p class="stat-label">total recommend()</p>
+        </div>
+        <div class="stat-card">
+            <h3>Q-table coverage</h3>
+            <p class="stat-value" id="rl-coverage">—</p>
+            <p class="stat-label">états observés</p>
+        </div>
+        <div class="stat-card">
+            <h3>Confiance moy.</h3>
+            <p class="stat-value" id="rl-confidence">—</p>
+            <p class="stat-label">seuil activation: 0.7</p>
+        </div>
+        <div class="stat-card">
+            <h3>Expériences stockées</h3>
+            <p class="stat-value" id="rl-experiences">—</p>
+            <p class="stat-label">rl_experience buffer</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Actions recommandées</h2>
+            <div style="min-height:160px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.8rem" id="rl-actions-wrap">
+                <div style="text-align:center">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="opacity:0.4;margin-bottom:6px;display:block;margin-inline:auto"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    En attente de données d'expérience
+                </div>
+            </div>
+            <canvas id="chart-rl-actions" style="display:none"></canvas>
+        </div>
+        <div class="chart-card">
+            <h2>Reward moyen par action</h2>
+            <div style="min-height:160px;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.8rem" id="rl-rewards-wrap">
+                <div style="text-align:center">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="1.5" style="opacity:0.4;margin-bottom:6px;display:block;margin-inline:auto"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    En attente de données Q-table
+                </div>
+            </div>
+            <canvas id="chart-rl-rewards" style="display:none"></canvas>
+        </div>
+    </div>
+
+    <!-- Pipeline Failure Analysis Section -->
+    <h2 style="margin: 2.5rem 0 1rem; font-size: 1.3rem; font-weight: 700;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -3px; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+        Pipeline Failure Analysis
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 12px;" onclick="loadFailures()">Analyze</button>
+        <button class="refresh-btn" style="font-size: 0.8rem; padding: 4px 12px; margin-left: 6px; background: #10b981;" onclick="resumeAll()">Resume All Paused</button>
+    </h2>
+    <div class="stats-grid" id="failure-stats">
+        <div class="stat-card">
+            <h3>Failed Runs</h3>
+            <p class="stat-value" id="fail-count">—</p>
+            <p class="stat-label">total failed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Paused (resumable)</h3>
+            <p class="stat-value" id="fail-resumable">—</p>
+            <p class="stat-label">can be auto-resumed</p>
+        </div>
+        <div class="stat-card">
+            <h3>Top Error</h3>
+            <p class="stat-value" id="fail-top-error" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">most common category</p>
+        </div>
+        <div class="stat-card">
+            <h3>Worst Phase</h3>
+            <p class="stat-value" id="fail-worst-phase" style="font-size: 1.2rem;">—</p>
+            <p class="stat-label">highest failure rate</p>
+        </div>
+    </div>
+    <div class="charts-grid">
+        <div class="chart-card">
+            <h2>Error Categories</h2>
+            <div class="chart-container">
+                <canvas id="chart-error-cats"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h2>Phase Failure Rates</h2>
+            <div class="chart-container">
+                <canvas id="chart-phase-fails"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Recommendations -->
+    <div id="failure-recs" style="margin: 1rem 0 2rem; padding: 1rem 1.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); display: none;">
+        <h3 style="margin: 0 0 0.5rem; font-size: 1rem;">Recommendations</h3>
+        <div id="failure-recs-list" style="font-size: 0.9rem;"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+let charts = {};
+
+async function loadAnalytics() {
+    try {
+        const res = await fetch('/api/analytics/overview');
+        const data = await res.json();
+        
+        if (data.success) {
+            updateStats(data.data);
+            renderCharts(data.data);
+            document.getElementById('last-update').textContent = 
+                'Updated: ' + new Date().toLocaleTimeString();
+        }
+    } catch (err) {
+        console.error('Analytics load error:', err);
+    }
+}
+
+function updateStats(data) {
+    function set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+    set('stat-missions', data.missions?.status?.total || 0);
+    const successRate = data.missions?.performance?.success_rate || 0;
+    set('stat-success', successRate.toFixed(1) + '%');
+    set('stat-agents', data.agents?.utilization?.total || 0);
+    set('stat-skills', data.skills?.top?.length || 0);
+}
+
+function renderCharts(data) {
+    // Missions Status Chart
+    if (data.missions?.status?.by_status) {
+        const ctx = document.getElementById('chart-missions');
+        if (charts.missions) charts.missions.destroy();
+        
+        const statuses = data.missions.status.by_status;
+        charts.missions = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(statuses),
+                datasets: [{
+                    data: Object.values(statuses),
+                    backgroundColor: ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' }}
+            }
+        });
+    }
+    
+    // Skills Chart
+    if (data.skills?.top && data.skills.top.length > 0) {
+        const ctx = document.getElementById('chart-skills');
+        if (charts.skills) charts.skills.destroy();
+        
+        const top10 = data.skills.top.slice(0, 10);
+        charts.skills = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(s => s.skill_name || s.name),
+                datasets: [{
+                    label: 'Usage Count',
+                    data: top10.map(s => s.usage_count || 0),
+                    backgroundColor: '#8b5cf6'
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+    
+    // Agent Cards
+    const container = document.getElementById('agent-cards-container');
+    if (container && data.agents?.leaderboard && data.agents.leaderboard.length > 0) {
+        const agents = data.agents.leaderboard;
+        const maxCalls = Math.max(...agents.map(a => a.skills_used || 0), 1);
+        container.innerHTML = agents.map(a => {
+            const color = a.color || '#8b5cf6';
+            const initials = (a.avatar && !a.avatar.startsWith('http'))
+                ? a.avatar.slice(0, 2).toUpperCase()
+                : (a.name || a.id || '?').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            const avatarHtml = (a.avatar && a.avatar.startsWith('http'))
+                ? `<img src="${a.avatar}" alt="${a.name}" loading="lazy" onerror="this.parentElement.innerHTML='${initials}'">`
+                : initials;
+            const calls = a.skills_used || 0;
+            const roleLabel = a.role ? a.role.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '';
+            const pct = Math.round((calls / maxCalls) * 100);
+            return `<div class="agent-card" title="${a.name} — ${calls} tool calls">
+                <div class="agent-avatar" style="background: ${color}33; border-color: ${color}66; color: ${color};">${avatarHtml}</div>
+                <div class="agent-card-name">${a.name || a.id}</div>
+                <div class="agent-card-role">${roleLabel}</div>
+                <div class="agent-card-stat">
+                    <div style="background: var(--border); border-radius: 3px; height: 4px; width: 80px; margin: 2px auto;">
+                        <div style="background: ${color}; width: ${pct}%; height: 100%; border-radius: 3px;"></div>
+                    </div>
+                    <span style="font-size: 0.65rem; color: var(--text-tertiary);">${calls.toLocaleString()} calls</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
+    
+    // System Health Chart
+    if (data.system?.tables) {
+        const ctx = document.getElementById('chart-system');
+        if (charts.system) charts.system.destroy();
+        
+        const top10 = data.system.tables.slice(0, 10);
+        charts.system = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(t => t.table),
+                datasets: [{
+                    label: 'Rows',
+                    data: top10.map(t => t.rows),
+                    backgroundColor: '#10b981'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+    }
+}
+
+function refreshData() {
+    loadAnalytics();
+    loadTracing();
+}
+
+// Tracing data loader
+async function loadTracing() {
+    try {
+        const [statsRes, tracesRes] = await Promise.all([
+            fetch('/api/analytics/tracing/stats?lookback=1h'),
+            fetch('/api/analytics/tracing/traces?limit=20&lookback=1h'),
+        ]);
+        const stats = await statsRes.json();
+        const traces = await tracesRes.json();
+
+        if (stats.success && stats.data.traces > 0) {
+            const d = stats.data;
+            document.getElementById('trace-count').textContent = d.traces;
+            document.getElementById('trace-p95').textContent = d.latency.p95 + 'ms';
+            document.getElementById('trace-errors').textContent = d.error_rate + '%';
+            document.getElementById('trace-avg').textContent = d.latency.avg + 'ms';
+
+            // Top operations chart
+            if (d.top_operations && d.top_operations.length > 0) {
+                const ctx = document.getElementById('chart-tracing-ops');
+                if (charts.tracingOps) charts.tracingOps.destroy();
+                charts.tracingOps = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: d.top_operations.map(o => o.operation.substring(0, 30)),
+                        datasets: [
+                            {
+                                label: 'Avg (ms)',
+                                data: d.top_operations.map(o => o.avg_ms),
+                                backgroundColor: '#8b5cf6',
+                            },
+                            {
+                                label: 'P95 (ms)',
+                                data: d.top_operations.map(o => o.p95_ms),
+                                backgroundColor: '#f59e0b',
+                            },
+                        ],
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                    },
+                });
+            }
+        } else {
+            document.getElementById('trace-count').textContent = '0';
+            document.getElementById('trace-p95').textContent = '—';
+            document.getElementById('trace-errors').textContent = '—';
+            document.getElementById('trace-avg').textContent = stats.error || 'No traces';
+        }
+
+        // Traces table
+        if (traces.success && traces.data.length > 0) {
+            const tbody = document.querySelector('#traces-table tbody');
+            tbody.innerHTML = traces.data.map(t => `<tr>
+                <td style="padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;">${t.operation}</td>
+                <td style="padding: 4px 8px; text-align: right; font-family: monospace;">${t.duration_ms}ms</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.spans_count}</td>
+                <td style="padding: 4px 8px; text-align: right;">${t.tags?.['http.status_code'] || '—'}</td>
+            </tr>`).join('');
+        }
+    } catch (e) {
+        console.warn('Tracing load failed:', e);
+        document.getElementById('trace-count').textContent = 'N/A';
+    }
+}
+
+// Initial load
+loadAnalytics();
+loadTracing();
+loadFailures();
+
+// Auto-refresh every 30s
+setInterval(loadAnalytics, 30000);
+
+// Failure analysis loader
+async function loadFailures() {
+    try {
+        const res = await fetch('/api/analytics/failures');
+        const data = await res.json();
+        if (!data.success) return;
+        const d = data.data;
+
+        // Stats
+        const failedCount = d.run_status?.failed || 0;
+        document.getElementById('fail-count').textContent = failedCount;
+        document.getElementById('fail-resumable').textContent = d.resumable_count || 0;
+
+        if (d.error_categories?.length > 0) {
+            document.getElementById('fail-top-error').textContent =
+                d.error_categories[0].category + ' (' + d.error_categories[0].count + ')';
+        }
+        if (d.phase_failures?.length > 0) {
+            const worst = d.phase_failures[0];
+            document.getElementById('fail-worst-phase').textContent =
+                worst.phase.substring(0, 20) + ' (' + worst.fail_rate + '%)';
+        }
+
+        // Error categories chart
+        if (d.error_categories?.length > 0) {
+            const ctx = document.getElementById('chart-error-cats');
+            if (charts.errorCats) charts.errorCats.destroy();
+            const colors = {'timeout': '#f59e0b', 'rate_limit': '#ef4444', 'llm_error': '#dc2626',
+                           'tool_error': '#8b5cf6', 'network': '#06b6d4', 'config_error': '#ec4899', 'other': '#6b7280'};
+            charts.errorCats = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: d.error_categories.map(c => c.category),
+                    datasets: [{
+                        data: d.error_categories.map(c => c.count),
+                        backgroundColor: d.error_categories.map(c => colors[c.category] || '#6b7280'),
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' }}}
+            });
+        }
+
+        // Phase failure rates chart
+        if (d.phase_failures?.length > 0) {
+            const ctx = document.getElementById('chart-phase-fails');
+            if (charts.phaseFails) charts.phaseFails.destroy();
+            const top10 = d.phase_failures.slice(0, 10);
+            charts.phaseFails = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: top10.map(p => p.phase.substring(0, 25)),
+                    datasets: [
+                        { label: 'Failed', data: top10.map(p => p.failed), backgroundColor: '#ef4444' },
+                        { label: 'Timeout', data: top10.map(p => p.timeout), backgroundColor: '#f59e0b' },
+                        { label: 'OK', data: top10.map(p => p.total - p.failed - p.timeout), backgroundColor: '#10b981' },
+                    ]
+                },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true }}}
+            });
+        }
+
+        // Recommendations
+        if (d.recommendations?.length > 0) {
+            const recsDiv = document.getElementById('failure-recs');
+            const recsList = document.getElementById('failure-recs-list');
+            recsDiv.style.display = 'block';
+            recsList.innerHTML = d.recommendations.map(r => `<p style="margin: 4px 0;">${r}</p>`).join('');
+        }
+    } catch (e) {
+        console.warn('Failure analysis load error:', e);
+    }
+}
+
+async function resumeAll() {
+    if (!confirm('Resume all paused mission runs?')) return;
+    try {
+        const res = await fetch('/api/analytics/failures/resume-all', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Resumed ${data.resumed} runs (${data.errors} errors)`);
+            loadFailures();
+        } else {
+            alert('Error: ' + (data.error || 'unknown'));
+        }
+    } catch (e) {
+        alert('Resume failed: ' + e.message);
+    }
+}
+
+async function loadThompsonScores() {
+    try {
+        const d = await fetch('/api/analytics/agents/scores').then(r => r.json());
+        if (!d.success) return;
+        const s = d.summary;
+        document.getElementById('ts-total-agents').textContent = s.total_agents;
+        document.getElementById('ts-accepted').textContent = s.total_accepted.toLocaleString();
+        document.getElementById('ts-rejected').textContent = s.total_rejected.toLocaleString();
+        document.getElementById('ts-high-rej').textContent = s.high_rejection_count;
+
+        const tbody = document.getElementById('ts-tbody');
+        if (!d.agents.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-tertiary);">Aucune donn\u00e9e \u2014 les scores s\'accumulent en cours d\'epic</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.agents.map(a => {
+            const pct = a.success_pct ?? 0;
+            const barColor = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
+            const rowBg = a.rejection_pct > 40 ? 'background: rgba(239,68,68,0.08);' : '';
+            const badge = a.rejection_pct > 40
+                ? '<span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px;margin-left:6px;">escalade</span>'
+                : '';
+            return `<tr style="${rowBg}">
+                <td style="padding:7px 12px;">${a.agent_name}${badge}</td>
+                <td style="padding:7px 12px;text-align:right;color:var(--text-tertiary);font-size:0.8rem;">${a.provider}</td>
+                <td style="padding:7px 12px;text-align:right;">${a.iterations}</td>
+                <td style="padding:7px 12px;text-align:right;color:#10b981;">${a.accepted}</td>
+                <td style="padding:7px 12px;text-align:right;color:#f59e0b;">${a.rejected}</td>
+                <td style="padding:7px 12px;text-align:right;font-weight:600;">${pct}%</td>
+                <td style="padding:7px 12px;min-width:100px;">
+                    <div style="background:var(--border,#334155);border-radius:3px;height:6px;width:100%;">
+                        <div style="background:${barColor};border-radius:3px;height:6px;width:${pct}%;"></div>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    } catch(e) { console.warn('Thompson scores load error:', e); }
+}
+
+// Load Thompson on init
+loadThompsonScores();
+
+// OKR update from Thompson data
+async function updateOKRs() {
+    try {
+        const d = await fetch('/api/analytics/agents/scores').then(r => r.json());
+        if (!d.success) return;
+        const s = d.summary;
+        // O1 quality
+        const avgQ = d.agents.length ? (d.agents.reduce((a,b) => a + (b.quality_score||0), 0) / d.agents.length) : 0;
+        const qPct = Math.min(100, (avgQ / 0.75) * 100);
+        document.getElementById('okr-quality').textContent = avgQ.toFixed(2);
+        document.getElementById('okr-quality-bar').style.width = qPct + '%';
+        document.getElementById('okr-quality-bar').style.background = avgQ >= 0.75 ? '#10b981' : avgQ >= 0.55 ? '#f59e0b' : '#ef4444';
+        // O1 rejection
+        const totalIter = s.total_accepted + s.total_rejected;
+        const rejPct = totalIter > 0 ? Math.round((s.total_rejected / totalIter) * 100) : 0;
+        document.getElementById('okr-rejection').textContent = rejPct + '%';
+        const rejBar = Math.min(100, (rejPct / 20) * 100);
+        document.getElementById('okr-rejection-bar').style.width = rejBar + '%';
+        document.getElementById('okr-rejection-bar').style.background = rejPct <= 20 ? '#10b981' : rejPct <= 35 ? '#f59e0b' : '#ef4444';
+    } catch(e) {}
+    // GA stats
+    try {
+        const ga = await fetch('/api/evolution/proposals').then(r => r.json()).catch(() => null);
+        if (ga && ga.proposals !== undefined) {
+            const pending = (ga.proposals || []).filter(p => p.status === 'pending').length;
+            document.getElementById('ga-pending').textContent = pending;
+            document.getElementById('ga-generations').textContent = ga.total_runs || 0;
+            document.getElementById('ga-best-fitness').textContent = ga.best_fitness ? ga.best_fitness.toFixed(3) : '—';
+            document.getElementById('ga-sim-runs').textContent = ga.sim_runs || 0;
+            const pctGoal = Math.min(100, (pending / 2) * 100);
+            document.getElementById('okr-proposals-bar').style.width = pctGoal + '%';
+            document.getElementById('okr-proposals').textContent = pending;
+            if (ga.proposals && ga.proposals.length) renderGAProposals(ga.proposals);
+            if (ga.fitness_history && ga.fitness_history.length) renderGAChart(ga.fitness_history);
+        }
+    } catch(e) {}
+    // RL stats
+    try {
+        const rl = await fetch('/api/rl/policy/stats').then(r => r.json()).catch(() => null);
+        if (rl && rl.decisions !== undefined) {
+            document.getElementById('rl-decisions').textContent = (rl.decisions || 0).toLocaleString();
+            document.getElementById('rl-coverage').textContent = rl.coverage ? Math.round(rl.coverage * 100) + '%' : '—';
+            document.getElementById('rl-confidence').textContent = rl.avg_confidence ? rl.avg_confidence.toFixed(2) : '—';
+            document.getElementById('rl-experiences').textContent = (rl.experience_count || 0).toLocaleString();
+            const rlPctGoal = Math.min(100, ((rl.decisions || 0) / 100) * 100);
+            document.getElementById('okr-rl-bar').style.width = rlPctGoal + '%';
+            document.getElementById('okr-rl').textContent = rl.decisions || 0;
+            if (rl.action_counts) renderRLCharts(rl);
+        }
+    } catch(e) {}
+}
+
+function renderGAProposals(proposals) {
+    const el = document.getElementById('ga-proposals-table');
+    const rows = proposals.map(p => `
+        <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:7px 10px;font-size:0.8rem">${p.base_wf_id || '—'}</td>
+            <td style="padding:7px 10px;font-size:0.8rem;color:#8b5cf6;font-weight:600">${p.fitness ? p.fitness.toFixed(3) : '—'}</td>
+            <td style="padding:7px 10px;font-size:0.75rem;color:var(--text-muted)">Gen ${p.generation || 0}</td>
+            <td style="padding:7px 10px">
+                <span style="font-size:0.68rem;padding:1px 7px;border-radius:4px;background:${p.status==='pending'?'rgba(245,158,11,0.15)':p.status==='approved'?'rgba(16,185,129,0.15)':'rgba(239,68,68,0.1)'};color:${p.status==='pending'?'#f59e0b':p.status==='approved'?'#10b981':'#ef4444'}">${p.status}</span>
+            </td>
+            <td style="padding:7px 10px">
+                ${p.status === 'pending' ? `<button onclick="approveProposal('${p.id}')" style="font-size:0.68rem;padding:2px 8px;background:rgba(16,185,129,0.15);border:1px solid #10b981;color:#10b981;border-radius:4px;cursor:pointer;margin-right:4px">Approuver</button>
+                <button onclick="rejectProposal('${p.id}')" style="font-size:0.68rem;padding:2px 8px;background:rgba(239,68,68,0.1);border:1px solid #ef4444;color:#ef4444;border-radius:4px;cursor:pointer">Rejeter</button>` : ''}
+            </td>
+        </tr>`).join('');
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.83rem">
+        <thead><tr style="background:var(--bg-tertiary)">
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Workflow base</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Fitness</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Génération</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Statut</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.72rem;color:var(--text-secondary)">Actions</th>
+        </tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+function renderGAChart(fitnessHistory) {
+    document.getElementById('ga-chart-wrap').style.display = 'none';
+    const canvas = document.getElementById('chart-ga-fitness');
+    canvas.style.display = 'block';
+    new Chart(canvas, { type: 'line',
+        data: { labels: fitnessHistory.map((_,i) => `Gen ${i+1}`),
+            datasets: [{label:'Fitness max', data: fitnessHistory.map(f => f.max_fitness), borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.1)', tension:0.3, fill:true},
+                {label:'Fitness moy', data: fitnessHistory.map(f => f.avg_fitness), borderColor:'rgba(139,92,246,0.5)', borderDash:[4,4], tension:0.3, fill:false}]},
+        options: {responsive:true, scales:{y:{beginAtZero:false, min:0, max:1}}, plugins:{legend:{labels:{color:'var(--text-secondary)',font:{size:11}}}}}
+    });
+}
+
+function renderRLCharts(rl) {
+    if (rl.action_counts) {
+        document.getElementById('rl-actions-wrap').style.display = 'none';
+        const canvas = document.getElementById('chart-rl-actions');
+        canvas.style.display = 'block';
+        const actions = Object.keys(rl.action_counts);
+        new Chart(canvas, { type: 'doughnut',
+            data: { labels: actions, datasets: [{data: actions.map(a => rl.action_counts[a]),
+                backgroundColor:['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#06b6d4']}]},
+            options: {responsive:true, plugins:{legend:{labels:{color:'var(--text-secondary)',font:{size:11}}}}}
+        });
+    }
+    if (rl.avg_rewards) {
+        document.getElementById('rl-rewards-wrap').style.display = 'none';
+        const canvas = document.getElementById('chart-rl-rewards');
+        canvas.style.display = 'block';
+        const actions = Object.keys(rl.avg_rewards);
+        new Chart(canvas, { type: 'bar',
+            data: { labels: actions, datasets: [{label:'Reward moyen', data: actions.map(a => rl.avg_rewards[a]),
+                backgroundColor: actions.map(a => rl.avg_rewards[a] >= 0 ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.7)')}]},
+            options: {responsive:true, scales:{y:{beginAtZero:true}}, plugins:{legend:{display:false}}}
+        });
+    }
+}
+
+async function triggerGARun() {
+    const btn = event.target.closest('button');
+    btn.disabled = true; btn.textContent = 'En cours…';
+    try {
+        await fetch('/api/evolution/run/all', {method:'POST'});
+        setTimeout(() => updateOKRs(), 2000);
+    } catch(e) {}
+    btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:4px"><polygon points="5 3 19 12 5 21 5 3"/></svg>Lancer évolution';
+}
+
+async function approveProposal(id) {
+    await fetch(`/api/evolution/proposals/${id}/approve`, {method:'POST'});
+    updateOKRs();
+}
+async function rejectProposal(id) {
+    await fetch(`/api/evolution/proposals/${id}/reject`, {method:'POST'});
+    updateOKRs();
+}
+
+updateOKRs();
+
+async function updateCosts() {
+    try {
+        const d = await fetch('/api/analytics/costs').then(r => r.json());
+        if (d.error) return;
+        document.getElementById('cost-total').textContent = '$' + (d.total_cost_usd || 0).toFixed(4);
+        const azure = (d.by_provider || []).filter(p => p.provider === 'azure-openai').reduce((a, b) => a + b.cost_usd, 0);
+        const minimax = (d.by_provider || []).filter(p => p.provider === 'minimax').reduce((a, b) => a + b.cost_usd, 0);
+        document.getElementById('cost-azure').textContent = '$' + azure.toFixed(4);
+        document.getElementById('cost-minimax').textContent = '$' + minimax.toFixed(4);
+        const agentEl = document.getElementById('cost-by-agent');
+        if (d.by_agent && d.by_agent.length) {
+            agentEl.innerHTML = '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">Top agents par coût</div>' +
+                d.by_agent.slice(0,5).map(a =>
+                    `<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border)">
+                        <span>${a.agent_id || '—'}</span>
+                        <span style="color:var(--text-secondary)">$${a.cost_usd.toFixed(4)} (${a.calls} calls)</span>
+                    </div>`
+                ).join('');
+        }
+    } catch(e) {}
+}
+updateCosts();
+
+async function updateRtk() {
+    try {
+        const d = await fetch('/api/analytics/rtk').then(r => r.json());
+        const fmt = b => b >= 1048576 ? (b/1048576).toFixed(1)+'MB' : b >= 1024 ? (b/1024).toFixed(1)+'KB' : b+'B';
+        document.getElementById('rtk-calls').textContent = (d.calls||0).toLocaleString();
+        document.getElementById('rtk-saved').textContent = fmt(d.bytes_saved||0);
+        document.getElementById('rtk-ratio').textContent = (d.ratio_pct||0) + '%';
+        document.getElementById('rtk-tokens').textContent = (d.tokens_saved_est||0).toLocaleString();
+    } catch(e) {}
+}
+updateRtk();
+window.refreshData = refreshData;
+window.loadFailures = loadFailures;
+window.resumeAll = resumeAll;
+window.triggerGARun = triggerGARun;
+window.approveProposal = approveProposal;
+window.rejectProposal = rejectProposal;
+})();
+
+</script>
+
+<div style="margin-top:2rem">
+  <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:0.75rem">Coûts LLM</div>
+  <div class="stats-grid" style="margin-bottom:1rem">
+    <div class="stat-card"><h3>Total</h3><p class="stat-value" id="cost-total">—</p><p class="stat-label">USD ce mois</p></div>
+    <div class="stat-card"><h3>Azure OpenAI</h3><p class="stat-value" id="cost-azure">—</p><p class="stat-label">USD</p></div>
+    <div class="stat-card"><h3>MiniMax</h3><p class="stat-value" id="cost-minimax">—</p><p class="stat-label">USD</p></div>
+  </div>
+  <div id="cost-by-agent" style="font-size:0.82rem"></div>
+</div>
+
+<div style="margin-top:2rem">
+  <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);margin-bottom:0.75rem">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    RTK — Compression de contexte
+  </div>
+  <div class="stats-grid" style="margin-bottom:0.5rem">
+    <div class="stat-card"><h3>Appels compressés</h3><p class="stat-value" id="rtk-calls" style="color:#10b981">—</p><p class="stat-label">depuis démarrage</p></div>
+    <div class="stat-card"><h3>Bytes économisés</h3><p class="stat-value" id="rtk-saved" style="color:#10b981">—</p><p class="stat-label">raw − compressed</p></div>
+    <div class="stat-card"><h3>Taux compression</h3><p class="stat-value" id="rtk-ratio" style="color:#10b981">—</p><p class="stat-label">% réduit</p></div>
+    <div class="stat-card"><h3>Tokens estimés économisés</h3><p class="stat-value" id="rtk-tokens" style="color:#10b981">—</p><p class="stat-label">~4 chars/token</p></div>
+  </div>
+</div>

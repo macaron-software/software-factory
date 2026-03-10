@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<span class="badge" style="background:var(--purple);color:#fff;font-size:0.72rem;padding:0.2rem 0.6rem;border-radius:4px">
+    {{ mission.status.value|upper }}
+</span>
+<button class="btn btn-ghost btn-sm" onclick="replayMission()" title="Replay this mission run">
+    <svg class="icon icon-sm"><use href="#icon-refresh"/></svg> Replay
+</button>
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="/static/css/mission-control.css?v=20260221">
+
+
+<!-- SVG defs for pattern-colored arrow markers -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <marker id="mc-arrow-sequential" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3b82f6" opacity="0.8"/></marker>
+    <marker id="mc-arrow-hierarchical" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/></marker>
+    <marker id="mc-arrow-parallel" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#10b981" opacity="0.8"/></marker>
+    <marker id="mc-arrow-loop" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ec4899" opacity="0.8"/></marker>
+    <marker id="mc-arrow-network" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/></marker>
+    <marker id="mc-arrow-router" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#06b6d4" opacity="0.8"/></marker>
+    <marker id="mc-arrow-default" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280" opacity="0.6"/></marker>
+  </defs>
+</svg>
+
+<div class="mc-layout">
+    <!-- ====== MAIN: Timeline + Accordions ====== -->
+    <div class="mc-main">
+        {% if mission.brief %}
+        <div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;margin-bottom:0.5rem;display:flex;align-items:baseline;gap:0.5rem">
+            <span style="font-size:0.7rem;color:var(--purple);font-weight:700;white-space:nowrap">{{ _("demande") }}</span>
+            <span style="font-size:0.82rem;color:var(--text-primary);line-height:1.4">{{ mission.brief }}</span>
+        </div>
+        {% endif %}
+
+        {# ── Result Banner: screenshots + build/run + deploy URL ── #}
+        {% if result_screenshots or result_build_cmd or result_deploy_url or result_launch_cmd %}
+        <div class="mc-result-banner">
+            <div class="mc-result-header">
+                <span style="font-size:0.7rem;color:var(--green);font-weight:700">{{ _("resultat") }}</span>
+                {% if result_project_type %}
+                <span style="font-size:0.65rem;background:var(--bg-tertiary);color:var(--purple-light);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ {'macos-native':'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-cpu"/></svg> macOS','ios-native':'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-smartphone"/></svg> iOS','android-native':'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-smartphone"/></svg> Android','web-docker':'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-package"/></svg> Docker','web-node':'<svg class="icon icon-sm" style="vertical-align:middle"><use href="#icon-server"/></svg> Node.js','web-static':'Static'}.get(result_project_type, result_project_type) }}</span>
+                {% endif %}
+                {% if result_deploy_url %}
+                <a href="{{ result_deploy_url }}" target="_blank" class="mc-result-link">{{ result_deploy_url }}</a>
+                {% endif %}
+                {% if result_launch_cmd %}
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_launch_cmd }}" title="▶ Cliquer pour exécuter" style="color:var(--green);border-color:var(--green);cursor:pointer"><svg class="icon icon-sm" style="vertical-align:middle;margin-right:4px"><use href="#icon-rocket"/></svg>{{ result_launch_cmd }}</code>
+                {% endif %}
+                {% if result_run_cmd and result_run_cmd != result_launch_cmd %}
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_run_cmd }}" title="▶ Cliquer pour exécuter" style="cursor:pointer">▶ {{ result_run_cmd }}</code>
+                {% endif %}
+                {% if result_build_cmd and result_build_cmd != result_run_cmd %}
+                <code class="mc-result-cmd mc-exec-btn" data-cmd="{{ result_build_cmd }}" title="▶ Cliquer pour exécuter" style="color:var(--text-secondary);cursor:pointer"><svg class="icon icon-sm" style="vertical-align:middle;margin-right:4px"><use href="#icon-wrench"/></svg>{{ result_build_cmd }}</code>
+                {% endif %}
+            </div>
+            <!-- Inline terminal for command output -->
+            <div id="mc-terminal" style="display:none;background:#0a0a12;border:1px solid var(--border);border-radius:6px;padding:8px 12px;margin-top:6px;max-height:200px;overflow-y:auto;font-family:var(--font-mono);font-size:0.75rem;line-height:1.5">
+                <div id="mc-terminal-header" style="color:var(--text-secondary);margin-bottom:4px">
+                    <span id="mc-terminal-cmd" style="color:var(--purple-light)"></span>
+                    <span id="mc-terminal-status" style="float:right"></span>
+                </div>
+                <pre id="mc-terminal-output" style="margin:0;white-space:pre-wrap;color:var(--text-primary)"></pre>
+            </div>
+            {% if result_screenshots %}
+            <div class="mc-result-shots">
+                {% for s in result_screenshots %}
+                <img src="/workspace/{{ mission.id }}/{{ s }}" alt="{{ s }}" loading="lazy" onclick="window.open(this.src)" onerror="this.style.display='none'">
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        <div class="mc-stats">
+            <div class="mc-stat-item"><span class="val" id="mc-done-count">{{ mission.phases|selectattr('status.value','equalto','done')|list|length }}</span>/<span>{{ mission.phases|length }}</span> phases</div>
+            <div class="mc-progress-bar"><div class="mc-progress-fill" id="mc-progress-bar" style="width:{{ ((mission.phases|selectattr('status.value','equalto','done')|list|length / mission.phases|length) * 100)|round|int if mission.phases|length > 0 else 0 }}%"></div></div>
+            <div class="mc-stat-item"><span class="val" id="mc-progress">{{ ((mission.phases|selectattr('status.value','equalto','done')|list|length / mission.phases|length) * 100)|round|int if mission.phases|length > 0 else 0 }}%</span></div>
+        </div>
+
+        <!-- Tab bar -->
+        <div class="mc-tabs">
+            {% for tp in tab_profile %}
+            <button class="mc-tab-btn{% if loop.first %} active{% endif %}" data-tab="{{ tp.id }}" onclick="switchTab('{{ tp.id }}')"><svg class="icon"><use href="#icon-{{ tp.icon }}"/></svg> {{ tp.label }}</button>
+            {% endfor %}
+        </div>
+
+        <!-- Tab: Phases (default) -->
+        <div class="mc-tab-panel" data-tab="phases" style="display:block">
+        <div class="mc-pipeline" id="mc-pipeline">
+            {% for phase in mission.phases %}
+            {% set pa = phase_agents.get(phase.phase_id, []) %}
+            <div class="mc-phase{% if phase.status.value == 'running' %} open{% endif %}" data-phase-id="{{ phase.phase_id }}" data-status="{{ phase.status.value }}">
+                <div class="mc-phase-line">
+                    <div class="mc-phase-dot"></div>
+                    <div class="mc-phase-connector"></div>
+                </div>
+                <div class="mc-phase-card">
+                    <div class="mc-phase-header" onclick="togglePhase(this)">
+                        <span class="mc-phase-num">{{ loop.index }}</span>
+                        <span class="mc-phase-name">{{ phase.phase_name }}</span>
+                        <div class="mc-phase-avatars">
+                            {% for a in pa[:4] %}
+                            <img src="{{ a.avatar_url }}" title="{{ a.name }} — {{ a.role }}" onclick="showMcPopover('{{ a.id }}',event);event.stopPropagation()" style="cursor:pointer" onerror="this.style.display='none'">
+                            {% endfor %}
+                            {% if pa|length > 4 %}<span class="more">+{{ pa|length - 4 }}</span>{% endif %}
+                        </div>
+                        <span class="mc-phase-pattern">{{ phase.pattern_id }}</span>
+                        <span class="mc-phase-status-badge {{ phase.status.value }}">{{ phase.status.value }}</span>
+                        <button class="btn btn-sm btn-ghost" style="padding:0.1rem 0.4rem;font-size:0.7rem;margin-left:auto" onclick="event.stopPropagation();toggleDebug('{{ phase.phase_id }}')" title="Debug info">Debug</button>
+                        <span class="mc-phase-chevron"><svg class="icon icon-xs mc-phase-chevron-icon"><use href="#icon-chevron-right"/></svg></span>
+                    </div>
+                    <div class="mc-phase-summary" id="summary-{{ phase.phase_id }}">
+                        {% if phase.summary %}<div class="mc-summary-line"><span class="mc-summary-text">{{ phase.summary[:300] }}</span></div>{% endif %}
+                        {% set shots = phase_screenshots.get(phase.phase_id, []) if phase_screenshots is defined else [] %}
+                        {% if shots %}
+                        <div class="mc-phase-thumbs">
+                            {% for s in shots %}
+                            <img class="mc-phase-thumb" src="/workspace/{{ mission.id }}/{{ s }}" alt="Screenshot" loading="lazy" onclick="window.open(this.src)" onerror="this.src='/workspace/{{ s }}'">
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <!-- Debug drawer for this phase -->
+                    <div id="debug-{{ phase.phase_id }}" style="display:none;padding:0.5rem 0.75rem;border-top:1px solid var(--border);background:var(--bg-tertiary);font-size:0.75rem;font-family:var(--font-mono)">
+                        <div><strong>Phase:</strong> {{ phase.phase_name }} ({{ phase.phase_id }})</div>
+                        <div><strong>Status:</strong> {{ phase.status.value }} | <strong>Pattern:</strong> {{ phase.pattern_id }}</div>
+                        {% if phase.started_at %}<div><strong>Started:</strong> {{ phase.started_at }}</div>{% endif %}
+                        {% if phase.completed_at %}<div><strong>Completed:</strong> {{ phase.completed_at }}</div>{% endif %}
+                        {% if phase.quality_score is not none %}<div><strong>Quality:</strong> {{ phase.quality_score }}/100</div>{% endif %}
+                        {% if phase.summary %}
+                        <details style="margin-top:0.25rem">
+                            <summary style="cursor:pointer;color:var(--text-secondary)">Output ({{ phase.summary|length }} chars)</summary>
+                            <pre style="margin:0.25rem 0 0;white-space:pre-wrap;max-height:200px;overflow-y:auto">{{ phase.summary[:500] }}{% if phase.summary|length > 500 %}...{% endif %}</pre>
+                        </details>
+                        {% endif %}
+                    </div>
+                    <div class="mc-phase-body">
+                        <!-- Full flow graph -->
+                        <div class="mc-phase-graph" id="graph-{{ phase.phase_id }}"></div>
+                        <!-- Discussion below graph -->
+                        <div class="mc-phase-discuss" id="discuss-{{ phase.phase_id }}">
+                            {% set pmsgs = phase_messages.get(phase.phase_id, []) %}
+                            {% if pmsgs %}
+                                {% for msg in pmsgs %}
+                                {% set msg_mode = "chat" %}
+                                {% include "partials/msg_unified.html" %}
+                                {% endfor %}
+                            {% else %}
+                                <div class="mc-discuss-empty">{{ _("en_attente_d_execution") }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if phase.status.value == 'waiting_validation' %}
+                    <div class="mc-checkpoint">
+                        <h4>{{ _("checkpoint_validation_requise") }}</h4>
+                        <div class="mc-checkpoint-actions">
+                            <button class="mc-btn-go" onclick="validateMission('GO')">{{ _("go") }}</button>
+                            <button class="mc-btn-nogo" onclick="validateMission('NOGO')">{{ _("nogo") }}</button>
+                            <button class="mc-btn-pivot" onclick="validateMission('PIVOT')">{{ _("pivot") }}</button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if phase.summary %}
+                    <div style="padding:0.35rem 0.75rem;font-size:0.72rem;color:var(--text-secondary);border-top:1px solid var(--border)">{{ phase.summary[:300] }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        </div>{# end tab: phases #}
+
+        {% if workflow_type == 'security-hacking' %}
+        {% include 'partials/mc_tabs_security.html' %}
+
+        {% elif workflow_type == 'rse-compliance' %}
+        {% include 'partials/mc_tabs_rse.html' %}
+
+        {% elif workflow_type in ('tma-maintenance', 'dsi-platform-tma') %}
+        {% include 'partials/mc_tabs_tma.html' %}
+
+        {% else %}
+        {% include 'partials/mc_tabs_default.html' %}
+
+        {% endif %}{# end workflow_type conditional tabs #}
+
+        <!-- Tab: Timeline (all workflows) -->
+        <div class="mc-tab-panel" data-tab="timeline">
+            <div style="padding:0.75rem 0 0.25rem">
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:0.75rem">
+                    Durée et statut de chaque phase · {% if mission.llm_cost_usd %}<span style="color:var(--yellow)">${{ "%.4f"|format(mission.llm_cost_usd) }}</span> LLM cost{% endif %}
+                </div>
+                {% if mission.phases %}
+                {% set completed_phases = mission.phases|selectattr('completed_at')|list %}
+                {% set started_phases = mission.phases|selectattr('started_at')|list %}
+                {% set t_start = (mission.phases|selectattr('started_at')|map(attribute='started_at')|list|sort|first) if started_phases else mission.created_at %}
+                <div class="mc-timeline-grid">
+                    {% for phase in mission.phases %}
+                    <div class="mc-tl-row">
+                        <div class="mc-tl-label" title="{{ phase.phase_id }}">
+                            {{ phase.phase_name or phase.phase_id }}
+                        </div>
+                        <div class="mc-tl-bar-wrap">
+                            {% if phase.started_at %}
+                            {% set offset_s = (phase.started_at - t_start).total_seconds() if t_start else 0 %}
+                            {% set dur_s = ((phase.completed_at - phase.started_at).total_seconds() if phase.completed_at else 0) %}
+                            {% set total_s = ((mission.completed_at or mission.updated_at) - t_start).total_seconds() if t_start else 1 %}
+                            {% set pct_start = [(offset_s / total_s * 100)|round(1)|float, 0]|max %}
+                            {% set pct_width = [(dur_s / total_s * 100)|round(1)|float, 2]|max if dur_s > 0 else 2 %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}"
+                                 style="margin-left:{{ pct_start }}%;width:{{ [pct_width, 100 - pct_start]|min }}%"
+                                 title="{{ phase.phase_name }}: {{ dur_s|int }}s">
+                                {% if dur_s > 10 %}<span class="mc-tl-dur">{{ dur_s|int }}s</span>{% endif %}
+                            </div>
+                            {% else %}
+                            <div class="mc-tl-bar mc-tl-bar--{{ phase.status.value }}" style="width:4px;opacity:0.3"></div>
+                            {% endif %}
+                        </div>
+                        <div class="mc-tl-status">
+                            <span class="mc-tl-dot mc-tl-dot--{{ phase.status.value }}"></span>
+                            {% if phase.quality_score is not none %}
+                            <span class="mc-tl-quality" title="Quality score">Q{{ phase.quality_score }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div style="color:var(--text-secondary);font-size:0.82rem;padding:2rem;text-align:center">Aucune phase</div>
+                {% endif %}
+            </div>
+        </div>{# end tab: timeline #}
+    </div>
+
+    <!-- ====== RIGHT SIDEBAR ====== -->
+    {% include 'partials/mc_sidebar.html' %}
+</div>
+
+{% include 'partials/mc_scripts.html' %}
+
+<script>
+function toggleDebug(phaseId) {
+    const el = document.getElementById('debug-' + phaseId);
+    if (el) el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function replayMission() {
+    if (!confirm('Create a new replay run for this mission?')) return;
+    try {
+        const res = await fetch('/api/epics/' + MISSION_ID + '/replay', {method: 'POST'});
+        const data = await res.json();
+        if (data.new_run_id) {
+            window.location.href = '/epics/' + data.new_run_id + '/control';
+        } else {
+            alert('Replay failed: ' + JSON.stringify(data));
+        }
+    } catch(e) { alert('Replay error: ' + e); }
+}
+</script>
+{% endblock %}

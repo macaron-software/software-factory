@@ -1,0 +1,1280 @@
+<!DOCTYPE html>
+<html lang="{{ request.state.lang|default('en') }}" dir="{{ 'rtl' if request.state.lang|default('en') == 'ar' else 'ltr' }}" data-theme="dark">
+<head>
+    <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('macaron_theme') || 'dark')</script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ page_title }} — Software Factory</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6c63ff">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SF Platform">
+    <link rel="stylesheet" href="/static/css/main.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/components.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/agents.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/projects.css?v=20260225a">
+    <link rel="stylesheet" href="/static/css/mkt_ideation.css?v=20260226">
+    <link rel="stylesheet" href="/static/css/ideation.css?v=20260221">
+    {% block extra_head %}{% endblock %}
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/sortable.min.js"></script>
+    <script src="/static/js/sse.js" defer></script>
+    <script>
+    /* JS i18n — mirrors server-side _() */
+    window.__i18n = {{ i18n_catalog | tojson }};
+    function _(key) { return window.__i18n[key] || key; }
+
+    /* Global error handler → auto-create TMA ticket */
+    (function() {
+        const _reported = new Set();
+        const _throttle = 60000; /* 1 ticket per unique error per minute */
+        window.addEventListener('error', function(e) {
+            const sig = (e.message || '') + ':' + (e.filename || '') + ':' + (e.lineno || 0);
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        message: e.message || 'Unknown error',
+                        source: e.filename || location.pathname,
+                        line: e.lineno || 0,
+                        col: e.colno || 0,
+                        url: location.href,
+                        ua: navigator.userAgent.slice(0, 120)
+                    })
+                });
+            } catch(_) {}
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+            const msg = (e.reason && e.reason.message) || String(e.reason || 'Unhandled promise rejection');
+            const sig = 'promise:' + msg;
+            if (_reported.has(sig)) return;
+            _reported.add(sig);
+            setTimeout(() => _reported.delete(sig), _throttle);
+            try {
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: msg, source: 'promise', url: location.href })
+                });
+            } catch(_) {}
+        });
+
+        // Intercept console.error → TMA
+        const _origConsoleError = console.error.bind(console);
+        console.error = function(...args) {
+            _origConsoleError(...args);
+            try {
+                const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ').slice(0, 200);
+                const sig = 'console:' + msg;
+                if (_reported.has(sig)) return;
+                _reported.add(sig);
+                setTimeout(() => _reported.delete(sig), _throttle);
+                fetch('/api/tma/js-error', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ message: '[console.error] ' + msg, source: 'console', url: location.href })
+                });
+            } catch(_) {}
+        };
+    })();
+    </script>
+</head>
+<body>
+    {% include "partials/svg_sprites.html" %}
+    <div class="layout">
+        <!-- Sidebar (icon-only) -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo"><svg class="icon icon-logo"><use href="#icon-macaron"/></svg></h1>
+            </div>
+
+            {% set p = request.state.perspective|default('admin') %}
+            <div class="sidebar-section">
+                <ul class="nav-links">
+                    <li><a href="/cockpit" data-tooltip="Cockpit" class="{% if page_title == 'Cockpit' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-activity"/></svg>
+                    </a></li>
+                    <li><a href="/" data-tooltip="Home" class="{% if page_title == 'Home' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-home"/></svg>
+                    </a></li>
+                    <li><a href="/portfolio" data-tooltip="Dashboard" class="{% if page_title in ('Portfolio', 'DSI Board', 'Vue Métier') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
+                    </a></li>
+                    {% set _full = ('admin', 'overview', 'dsi') %}
+                    {% if p in _full + ('portfolio_manager', 'product_owner', 'architect', 'business_owner') %}
+                    <li><a href="/backlog" data-tooltip="Backlog" class="{% if page_title in ('Backlog', 'Product', 'Idéation') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-layers"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in _full + ('portfolio_manager', 'rte', 'product_owner', 'scrum_master', 'architect', 'business_owner') %}
+                    <li><a href="/pi" data-tooltip="PI Board" class="{% if page_title in ('PI Board', 'Program Increment', 'Epics', 'Epic', 'Epic Control') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-rocket"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in _full + ('rte', 'scrum_master', 'qa_security') %}
+                    <li><a href="/workflows" data-tooltip="Workflows" class="{% if page_title in ('Workflows', 'Patterns') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-workflow"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in _full + ('product_owner', 'developer', 'architect', 'qa_security') %}
+                    <li><a href="/projects" data-tooltip="Projects" class="{% if page_title in ('Projects', 'Project') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-folder"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in _full + ('rte', 'product_owner', 'scrum_master', 'developer', 'qa_security') %}
+                    <li><a href="/sessions" data-tooltip="Sessions" class="{% if page_title in ('Live', 'Sessions', 'Session') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-message-circle"/></svg>
+                    </a></li>
+                    {% endif %}
+                    {% if p in _full + ('rte', 'scrum_master', 'developer') %}
+                    <li><a href="/art" data-tooltip="Teams" class="{% if page_title in ('ART', 'Agents', 'Organisation SAFe', 'Team Generator', 'Mercato') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-users"/></svg>
+                    </a></li>
+                    {% endif %}
+                    <li><a href="/world" data-tooltip="World 3D" class="{% if page_title in ('Agent World', 'World') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-globe"/></svg>
+                    </a></li>
+                    {% if p in _full + ('developer', 'architect') %}
+                    <li><a href="/toolbox" data-tooltip="Toolbox" class="{% if page_title in ('Toolbox', 'Skills', 'Memory', 'MCPs', 'Design System', 'Wiki') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-plug"/></svg>
+                    </a></li>
+                    <li><a href="/tool-builder" data-tooltip="Tool Builder" class="{% if page_title == 'Tool Builder' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-zap"/></svg>
+                    </a></li>
+                    {% endif %}
+                    <li><a href="/metrics" data-tooltip="Metrics" class="{% if page_title in ('Metrics', 'Ops') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-chart"/></svg>
+                    </a></li>
+                    <li><a href="/analytics" data-tooltip="Cost Analytics" class="{% if page_title == 'Analytics' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-trending-up"/></svg>
+                    </a></li>
+                    <li><a href="/evals" data-tooltip="Evaluations" class="{% if page_title == 'Evaluations' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-check-circle"/></svg>
+                    </a></li>
+                    {% if request.state.user and request.state.user.role == 'admin' %}
+                    <li><a href="/rbac" data-tooltip="Users & Roles" class="{% if page_title in ('RBAC', 'Users & Roles') %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-shield"/></svg>
+                    </a></li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="sidebar-section" style="margin-top: auto">
+                <!-- Language selector -->
+                <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
+                    <select id="langSelect" title="{{ _("tt_language") }}" style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:2px 4px;font-size:0.7rem;width:100%;cursor:pointer;text-align:center">
+                        <option value="en" {% if request.state.lang|default('en') == 'en' %}selected{% endif %}>EN</option>
+                        <option value="fr" {% if request.state.lang|default('en') == 'fr' %}selected{% endif %}>FR</option>
+                        <option value="zh" {% if request.state.lang|default('en') == 'zh' %}selected{% endif %}>中文</option>
+                        <option value="es" {% if request.state.lang|default('en') == 'es' %}selected{% endif %}>ES</option>
+                        <option value="ja" {% if request.state.lang|default('en') == 'ja' %}selected{% endif %}>日本語</option>
+                        <option value="pt" {% if request.state.lang|default('en') == 'pt' %}selected{% endif %}>PT</option>
+                        <option value="de" {% if request.state.lang|default('en') == 'de' %}selected{% endif %}>DE</option>
+                        <option value="ko" {% if request.state.lang|default('en') == 'ko' %}selected{% endif %}>한국어</option>
+                        <option value="hi" {% if request.state.lang|default('en') == 'hi' %}selected{% endif %}>हिन्दी</option>
+                        <option value="ru" {% if request.state.lang|default('en') == 'ru' %}selected{% endif %}>RU</option>
+                        <option value="ar" {% if request.state.lang|default('en') == 'ar' %}selected{% endif %}>العربية</option>
+                        <option value="id" {% if request.state.lang|default('en') == 'id' %}selected{% endif %}>ID</option>
+                        <option value="tr" {% if request.state.lang|default('en') == 'tr' %}selected{% endif %}>TR</option>
+                        <option value="it" {% if request.state.lang|default('en') == 'it' %}selected{% endif %}>IT</option>
+                        <option value="nl" {% if request.state.lang|default('en') == 'nl' %}selected{% endif %}>NL</option>
+                        <option value="vi" {% if request.state.lang|default('en') == 'vi' %}selected{% endif %}>VI</option>
+                        <option value="pl" {% if request.state.lang|default('en') == 'pl' %}selected{% endif %}>PL</option>
+                        <option value="sv" {% if request.state.lang|default('en') == 'sv' %}selected{% endif %}>SV</option>
+                    </select>
+                </div>
+                <!-- Theme toggle -->
+                <div class="sidebar-view-switch" style="margin-bottom:0.2rem">
+                    <button class="view-switch-btn theme-toggle-btn" id="themeToggle" title="Changer le theme">
+                        <svg class="icon icon-xs theme-icon-sun"><use href="#icon-sun"/></svg>
+                        <svg class="icon icon-xs theme-icon-moon"><use href="#icon-moon"/></svg>
+                    </button>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="/settings" data-tooltip="Settings" class="{% if page_title == 'Settings' %}active{% endif %}">
+                        <svg class="icon"><use href="#icon-settings"/></svg>
+                    </a></li>
+                </ul>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="workspace-badge" onclick="location.href='/workspaces'" title="Changer de workspace" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin:4px 6px;border-radius:8px;cursor:pointer;background:var(--bg-secondary);border:1px solid var(--border);font-size:0.72rem;color:var(--text-secondary);overflow:hidden">
+                    <span class="ws-dot" style="flex-shrink:0;width:8px;height:8px;border-radius:50%;background:{{ request.state.workspace_color | default('#6366f1') }}"></span>
+                    <span class="ws-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ request.state.workspace_name | default('Default') }}</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="content">
+            <header class="topbar">
+                <h2>{{ page_title }} <span class="app-version" title="commit {{ app_commit }}">{{ app_version }}</span></h2>
+                <div class="topbar-right">
+                    {% block topbar_actions %}{% endblock %}
+                    <!-- SAFe Perspective Selector -->
+                    <div class="perspective-wrapper" style="position:relative">
+                        <button class="perspective-btn" id="perspectiveBtn" onclick="document.getElementById('perspectiveDropdown').classList.toggle('show')" title="SAFe Perspective">
+                            <svg class="icon icon-sm"><use href="#icon-shield"/></svg>
+                            <span class="perspective-label">{% if p == 'overview' %}OVW{% elif p == 'dsi' %}DSI{% elif p == 'portfolio_manager' %}PM{% elif p == 'rte' %}RTE{% elif p == 'product_owner' %}PO{% elif p == 'scrum_master' %}SM{% elif p == 'developer' %}Dev{% elif p == 'architect' %}Arch{% elif p == 'qa_security' %}QA{% elif p == 'business_owner' %}BO{% else %}All{% endif %}</span>
+                        </button>
+                        <div class="perspective-dropdown" id="perspectiveDropdown">
+                            <div class="perspective-dropdown-title">SAFe Perspective</div>
+                            <a class="perspective-item {% if p == 'overview' %}active{% endif %}" onclick="setPerspective('overview')">Overview</a>
+                            <a class="perspective-item {% if p == 'dsi' %}active{% endif %}" onclick="setPerspective('dsi')">DSI</a>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:4px 0">
+                            <a class="perspective-item {% if p == 'portfolio_manager' %}active{% endif %}" onclick="setPerspective('portfolio_manager')">Portfolio Manager</a>
+                            <a class="perspective-item {% if p == 'rte' %}active{% endif %}" onclick="setPerspective('rte')">RTE</a>
+                            <a class="perspective-item {% if p == 'product_owner' %}active{% endif %}" onclick="setPerspective('product_owner')">Product Owner</a>
+                            <a class="perspective-item {% if p == 'scrum_master' %}active{% endif %}" onclick="setPerspective('scrum_master')">Scrum Master</a>
+                            <a class="perspective-item {% if p == 'developer' %}active{% endif %}" onclick="setPerspective('developer')">Developer</a>
+                            <a class="perspective-item {% if p == 'architect' %}active{% endif %}" onclick="setPerspective('architect')">Architect</a>
+                            <a class="perspective-item {% if p == 'qa_security' %}active{% endif %}" onclick="setPerspective('qa_security')">QA / Security</a>
+                            <a class="perspective-item {% if p == 'business_owner' %}active{% endif %}" onclick="setPerspective('business_owner')">Business Owner</a>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:4px 0">
+                            <a class="perspective-item {% if p == 'admin' %}active{% endif %}" onclick="setPerspective('admin')">Admin (all)</a>
+                        </div>
+                    </div>
+                    <div class="tma-heartbeat-wrapper" id="tmaHeartbeat"
+                         hx-get="/api/autoheal/heartbeat"
+                         hx-trigger="load, every 30s"
+                         hx-swap="innerHTML">
+                    </div>
+                    <div class="cluster-nodes-wrapper"
+                         hx-get="/api/cluster/nodes-badge"
+                         hx-trigger="load, every 30s"
+                         hx-swap="innerHTML">
+                    </div>
+                     <div class="notif-wrapper" id="notifWrapper">
+                        <button class="topbar-bell" id="notifBell" aria-label="Notifications">
+                            <svg class="icon icon-sm"><use href="#icon-bell"/></svg>
+                            <span id="notifBadge"
+                                  hx-get="/api/notifications/badge"
+                                  hx-trigger="load, every 30s"
+                                  hx-swap="innerHTML"></span>
+                        </button>
+                        <div class="notif-dropdown" id="notifDropdown"
+                             hx-get="/api/notifications/dropdown"
+                             hx-trigger="notif-open"
+                             hx-swap="innerHTML"></div>
+                    </div>
+                    <!-- Spec / Persona bar toggle -->
+                    <button id="sfSpecBtn" class="topbar-bell" title="Spec — feature, persona, user stories (clic)" onclick="toggleSpecBar()" aria-label="Toggle spec bar">
+                        <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    </button>
+                    <!-- Wireframe Mode Toggle -->
+                    <button id="sfWireframeBtn" class="topbar-bell" title="Wireframe mode — lo-fi skeleton view" onclick="toggleWireframeMode()" aria-label="Toggle wireframe mode">
+                        <svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M3 15h6"/></svg>
+                    </button>
+                    <button id="sfPushBtn" class="topbar-bell" aria-label="Enable push notifications"
+                            title="Enable push notifications"
+                            onclick="sfRequestPush().then(ok=>{ if(ok) this.style.display='none'; })"
+                            style="display:none"><svg style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
+                    <div class="user-menu-wrapper" style="position:relative">
+                        <button class="topbar-avatar" id="userMenuBtn" onclick="document.getElementById('userDropdown').classList.toggle('show')" title="{{ request.state.user.display_name if request.state.user else 'User' }}">
+                            {{ (request.state.user.display_name[:1] if request.state.user else 'U') | upper }}
+                        </button>
+                        <div class="user-dropdown" id="userDropdown">
+                            {% if request.state.user %}
+                            <div class="user-dropdown-header">
+                                <strong>{{ request.state.user.display_name }}</strong>
+                                <small>{{ request.state.user.email }}</small>
+                                <span class="user-role-badge">{{ request.state.user.role }}</span>
+                            </div>
+                            <hr style="border:0;border-top:1px solid var(--border);margin:0">
+                            {% if request.state.user.role == 'admin' %}
+                            <a href="/admin/users" class="user-dropdown-item">Manage Users</a>
+                            {% endif %}
+                            <a href="#" class="user-dropdown-item" onclick="doLogout()">Sign out</a>
+                            {% else %}
+                            <a href="/login" class="user-dropdown-item">Sign in</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ── SAFe Spec bar ── -->
+            <div id="sfSpecBar" style="display:none;background:var(--bg-secondary,#f6f8fa);border-bottom:1px solid var(--border,#d0d7de);padding:0;flex-shrink:0;overflow:hidden;transition:max-height .25s ease;max-height:0">
+              <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--border,#d0d7de)">
+                <!-- Programme -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Programme
+                  </div>
+                  <div id="spec-programme" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                  <div id="spec-programme-sub" style="font-size:.65rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
+                </div>
+                <!-- Epic -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>Epic
+                  </div>
+                  <div id="spec-epic" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                </div>
+                <!-- Feature -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>Feature
+                  </div>
+                  <div id="spec-feature" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                  <div id="spec-feature-status" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);margin-top:1px"></div>
+                </div>
+                <!-- User Stories / Tasks -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Stories / Tasks
+                  </div>
+                  <div id="spec-stories" style="font-size:.68rem;color:var(--text-secondary,#57606a);line-height:1.5">—</div>
+                </div>
+                <!-- Persona -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Persona
+                  </div>
+                  <div id="spec-persona-card" style="font-size:.75rem;font-weight:600;color:var(--text-primary,#1f2328)">—</div>
+                </div>
+                <!-- RBAC -->
+                <div style="background:var(--bg-secondary,#f6f8fa);padding:10px 16px">
+                  <div style="font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6e7781);margin-bottom:4px;display:flex;align-items:center;gap:4px">
+                    <svg style="width:9px;height:9px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>RBAC
+                  </div>
+                  <div id="spec-rbac" style="font-size:.68rem;color:var(--text-secondary,#57606a);line-height:1.5;display:flex;flex-wrap:wrap;gap:3px">—</div>
+                </div>
+              </div>
+              <!-- Footer bar -->
+              <div id="spec-footer" style="background:var(--bg-tertiary,#f6f8fa);padding:5px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border,#d0d7de)">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <span id="spec-page-slug" style="font-size:.62rem;color:var(--text-tertiary,#6e7781);font-family:monospace"></span>
+                </div>
+                <div style="display:flex;gap:10px;align-items:center">
+                  <span id="spec-not-linked" style="display:none;font-size:.65rem;color:var(--text-tertiary,#6e7781);font-style:italic">Page non liée — </span>
+                  <button id="spec-ann-link" onclick="if(window.toggleAnnotate){window.toggleAnnotate()}else{window.open('/annotate/_sf','_blank')}" style="font-size:.65rem;color:var(--accent,#0969da);text-decoration:none;display:flex;align-items:center;gap:3px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit">
+                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>Annoter cette page
+                  </button>
+                  <a id="spec-backlog-link" href="/backlog" target="_blank" style="font-size:.65rem;color:var(--text-secondary,#57606a);text-decoration:none;display:flex;align-items:center;gap:3px">
+                    <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>Backlog SAFe
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            <div class="main-area">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <style>
+    /* SAFe Perspective selector */
+    .perspective-btn{display:flex;align-items:center;gap:4px;background:var(--bg-tertiary,#21262d);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--text-primary);cursor:pointer;font-size:0.75rem;font-weight:600;white-space:nowrap}
+    .perspective-btn:hover{border-color:var(--purple)}
+    .perspective-label{color:var(--purple-light,#c084fc)}
+    .perspective-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:200px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden;padding:4px 0}
+    .perspective-dropdown.show{display:block}
+    .perspective-dropdown-title{padding:6px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-secondary);font-weight:600}
+    .perspective-item{display:block;padding:6px 12px;color:var(--text-primary);text-decoration:none;font-size:0.8125rem;cursor:pointer;border-radius:0}
+    .perspective-item:hover{background:var(--bg-tertiary,#21262d)}
+    .perspective-item.active{color:var(--purple-light);font-weight:600}
+    .perspective-item.active::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--purple);margin-right:6px}
+
+    /* User dropdown menu */
+    .topbar-avatar{cursor:pointer;border:none;background:var(--accent);color:#fff;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.875rem}
+    .user-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden}
+    .user-dropdown.show{display:block}
+    .user-dropdown-header{padding:0.75rem 1rem}
+    .user-dropdown-header strong{display:block;color:var(--text-primary);font-size:0.875rem}
+    .user-dropdown-header small{color:var(--text-secondary);font-size:0.75rem}
+    .user-role-badge{display:inline-block;margin-top:0.25rem;padding:0.125rem 0.5rem;border-radius:9999px;background:var(--bg-tertiary,#21262d);color:var(--text-secondary);font-size:0.6875rem;text-transform:uppercase;letter-spacing:0.05em}
+    .user-dropdown-item{display:block;padding:0.5rem 1rem;color:var(--text-primary);text-decoration:none;font-size:0.8125rem}
+    .user-dropdown-item:hover{background:var(--bg-tertiary,#21262d)}
+
+    /* Notification bell + dropdown */
+    .notif-wrapper{position:relative}
+    .topbar-bell{position:relative}
+    #notifBadge .notif-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;line-height:1;pointer-events:none}
+    .notif-dropdown{display:none;position:absolute;top:calc(100% + 8px);right:0;width:360px;max-height:480px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 32px rgba(0,0,0,.4);z-index:999;overflow:hidden}
+    .notif-dropdown.open{display:flex;flex-direction:column}
+    .notif-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+    .notif-header h4{margin:0;font-size:var(--text-sm);color:var(--text-primary)}
+    .notif-mark-all{background:none;border:none;color:var(--purple-light);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:4px}
+    .notif-mark-all:hover{background:var(--bg-tertiary)}
+    .notif-list{overflow-y:auto;flex:1;max-height:380px}
+    .notif-item{display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border-subtle, rgba(255,255,255,.05));cursor:pointer;transition:background .1s}
+    .notif-item:hover{background:var(--bg-tertiary)}
+    .notif-item.unread{background:rgba(168,85,247,.06)}
+    .notif-item.unread .notif-dot{display:block}
+    .notif-dot{display:none;width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;margin-top:5px}
+    .notif-body{flex:1;min-width:0}
+    .notif-title{font-size:12px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .notif-msg{font-size:11px;color:var(--text-secondary);margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .notif-time{font-size:10px;color:var(--text-muted, var(--text-secondary));margin-top:3px}
+    .notif-sev{width:3px;border-radius:2px;flex-shrink:0}
+    .notif-sev.info{background:var(--blue, #3b82f6)}
+    .notif-sev.warning{background:#f59e0b}
+    .notif-sev.critical{background:#ef4444}
+    .notif-footer{padding:8px 16px;border-top:1px solid var(--border);text-align:center}
+    .notif-footer a{color:var(--purple-light);font-size:11px;text-decoration:none}
+    .notif-footer a:hover{text-decoration:underline}
+    .notif-empty{padding:24px;text-align:center;color:var(--text-secondary);font-size:12px}
+    /* Checkpoint notification action buttons */
+    .notif-checkpoint{cursor:default;align-items:flex-start}
+    .notif-checkpoint:hover{background:rgba(245,158,11,.06)}
+    .notif-btn{font-size:11px;font-weight:600;padding:3px 10px;border-radius:5px;border:1px solid;cursor:pointer;transition:opacity .1s}
+    .notif-btn:hover{opacity:.8}
+    .notif-btn-go{background:rgba(34,197,94,.15);border-color:#22c55e;color:#22c55e}
+    .notif-btn-nogo{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+    .notif-btn-pivot{background:rgba(245,158,11,.15);border-color:#f59e0b;color:#f59e0b}
+    /* TMA heartbeat — animated ECG icon in topbar */
+    .tma-heartbeat-wrapper{position:relative;display:flex;align-items:center}
+    .tma-hb{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-full);cursor:help;transition:background .15s}
+    .tma-hb:hover{background:var(--bg-tertiary)}
+    .tma-hb svg{width:16px;height:16px;color:var(--tma-color)}
+    .tma-hb.alive svg{animation:hb-beat 1.2s ease-in-out infinite}
+    .tma-hb.healing svg{animation:hb-beat .6s ease-in-out infinite}
+    .tma-hb.starting svg{opacity:.6;animation:hb-fade 2s ease-in-out infinite}
+    .cluster-nodes-wrapper{display:flex;align-items:center}
+    .cluster-nodes-inner{display:flex;align-items:center;gap:6px}
+    .cluster-node-wrapper{position:relative}
+    .cluster-node-badge{display:flex;align-items:center;gap:3px;padding:2px 6px;border-radius:4px;background:var(--bg-tertiary);border:1px solid var(--border);cursor:pointer;font-size:0.65rem;color:var(--text-secondary);white-space:nowrap;user-select:none}
+    .cluster-node-badge:hover{border-color:var(--purple);color:var(--text-primary)}
+    .cluster-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;animation:cluster-pulse 2s ease-in-out infinite}
+    .cluster-label{font-family:var(--font-mono);font-size:0.6rem;letter-spacing:0.02em}
+    @keyframes cluster-pulse{0%,100%{opacity:1}50%{opacity:.6}}
+    .cluster-node-pop{position:absolute;top:calc(100% + 8px);right:0;min-width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:999;padding:0;overflow:hidden}
+    .cnp-header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg-tertiary)}
+    .cnp-header strong{flex:1;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-primary)}
+    .cnp-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+    .cnp-status{font-size:0.65rem;padding:1px 6px;border-radius:3px;font-weight:600}
+    .cnp-status-ok{background:rgba(34,197,94,.15);color:#22c55e}
+    .cnp-status-err{background:rgba(239,68,68,.15);color:#ef4444}
+    .cnp-row{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;font-size:0.72rem;border-bottom:1px solid rgba(255,255,255,.04)}
+    .cnp-row:last-child{border-bottom:none}
+    .cnp-row>span:first-child{color:var(--text-secondary);min-width:72px}
+    .cnp-row>span:last-child{color:var(--text-primary);font-family:var(--font-mono);font-size:0.68rem}
+    .tma-hb.stale svg{opacity:.4;animation:none}
+    @keyframes hb-fade{0%,100%{opacity:.3}50%{opacity:.8}}
+    @keyframes hb-beat{0%,100%{transform:scale(1);opacity:1}15%{transform:scale(1.25);opacity:1}30%{transform:scale(1);opacity:.7}45%{transform:scale(1.15);opacity:1}60%{transform:scale(1);opacity:1}}
+    /* TMA hover popover */
+    .tma-tip{display:none;position:absolute;top:calc(100% + 8px);right:0;width:220px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:999;padding:10px 12px;pointer-events:none}
+    .tma-hb:hover .tma-tip{display:block}
+    .tma-tip-title{font-size:11px;font-weight:700;margin-bottom:8px;letter-spacing:.3px}
+    .tma-tip-grid{display:flex;flex-direction:column;gap:3px}
+    .tma-tip-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text-secondary)}
+    .tma-tip-row span:last-child{font-weight:600;color:var(--text-primary);font-variant-numeric:tabular-nums}
+    .tma-tip-sep{height:1px;background:var(--border);margin:4px 0}
+    .tma-tip-footer{font-size:9px;color:var(--text-secondary);margin-top:8px;opacity:.7}
+    .sidebar-view-switch{display:flex;justify-content:center;gap:2px;padding:0.3rem 0.4rem;margin:0 0.3rem 0.3rem;background:var(--bg-tertiary);border-radius:8px}
+    .view-switch-btn{background:none;border:none;color:var(--text-secondary);padding:0.3rem;border-radius:6px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:center}
+    .view-switch-btn:hover{color:var(--text-primary);background:var(--bg-secondary)}
+    .view-switch-btn.active{color:#fff;background:var(--purple)}
+    .nav-links li.view-hidden{display:none}
+    /* Theme toggle */
+    .theme-toggle-btn{position:relative;width:28px;height:28px;overflow:hidden}
+    .theme-icon-sun,.theme-icon-moon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);transition:opacity .2s,transform .3s}
+    [data-theme="dark"] .theme-icon-sun{opacity:1;transform:translate(-50%,-50%) rotate(0deg)}
+    [data-theme="dark"] .theme-icon-moon{opacity:0;transform:translate(-50%,-50%) rotate(90deg)}
+    [data-theme="light"] .theme-icon-sun{opacity:0;transform:translate(-50%,-50%) rotate(-90deg)}
+    [data-theme="light"] .theme-icon-moon{opacity:1;transform:translate(-50%,-50%) rotate(0deg)}
+    </style>
+    <script>
+    /* Theme toggle (light/dark) — persists in localStorage */
+    (function(){
+      const html = document.documentElement;
+      const saved = localStorage.getItem('macaron_theme') || 'dark';
+      html.setAttribute('data-theme', saved);
+
+      document.getElementById('themeToggle')?.addEventListener('click', function(){
+        const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('macaron_theme', next);
+      });
+    })();
+    </script>
+    <script>
+    /* Notification bell toggle */
+    (function(){
+      const bell = document.getElementById('notifBell');
+      const dd = document.getElementById('notifDropdown');
+      if (!bell || !dd) return;
+      bell.addEventListener('click', function(e){
+        e.stopPropagation();
+        const isOpen = dd.classList.toggle('open');
+        if (isOpen) htmx.trigger(dd, 'notif-open');
+      });
+      document.addEventListener('click', function(e){
+        if (!dd.contains(e.target) && !bell.contains(e.target)) dd.classList.remove('open');
+      });
+      document.addEventListener('keydown', function(e){
+        if (e.key === 'Escape') dd.classList.remove('open');
+      });
+    })();
+    </script>
+    <script>
+    /* Language selector */
+    document.getElementById('langSelect')?.addEventListener('change', function(){
+      fetch('/api/set-lang/' + this.value).then(function(){ location.reload(); });
+    });
+    </script>
+    <script>
+    (function(){
+      // Force "all" view mode permanently
+      const currentView = 'all';
+
+      function applyView(mode){
+        // Always show all nav items
+        document.querySelectorAll('.nav-links a[data-views]').forEach(a=>{
+          a.closest('li').classList.remove('view-hidden');
+        });
+      }
+
+      // Init
+      applyView(currentView);
+    })();
+    </script>
+
+    <script src="/static/js/workspace.js" defer></script>
+    {% block scripts %}{% endblock %}
+
+<!-- DigitalOcean-style Delete Confirmation Modal -->
+<div id="deleteConfirmModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.65);align-items:center;justify-content:center">
+  <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;max-width:460px;width:90%;padding:1.5rem;box-shadow:0 20px 60px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:1rem">
+      <div style="width:36px;height:36px;border-radius:8px;background:rgba(239,68,68,.12);color:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg style="width:20px;height:20px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      </div>
+      <div>
+        <h3 id="dcm-title" style="margin:0;font-size:1rem;color:var(--text-primary)">Supprimer</h3>
+        <p id="dcm-subtitle" style="margin:0;font-size:0.78rem;color:var(--text-secondary)">Cette action est irréversible</p>
+      </div>
+    </div>
+    <p id="dcm-warning" style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1rem;line-height:1.5"></p>
+    <label style="font-size:0.78rem;color:var(--text-secondary);display:block;margin-bottom:0.4rem">
+      Tapez <strong id="dcm-expected" style="color:var(--red)"></strong> pour confirmer
+    </label>
+    <input id="dcm-input" type="text" autocomplete="off" spellcheck="false"
+      style="width:100%;padding:0.5rem 0.7rem;border:1px solid var(--border);border-radius:6px;background:var(--bg-primary);color:var(--text-primary);font-size:0.85rem;font-family:var(--font-mono);box-sizing:border-box"
+      oninput="document.getElementById('dcm-confirm-btn').disabled=(this.value!==this.dataset.expected)">
+    <div style="display:flex;gap:0.6rem;margin-top:1rem;justify-content:flex-end">
+      <button onclick="closeDeleteModal()" style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);cursor:pointer;font-size:0.82rem">Annuler</button>
+      <button id="dcm-confirm-btn" disabled onclick="executeDelete()"
+        style="padding:0.45rem 1rem;border-radius:6px;border:1px solid var(--red);background:rgba(239,68,68,.15);color:var(--red);cursor:pointer;font-size:0.82rem;font-weight:600;transition:all .15s">
+        Supprimer
+      </button>
+    </div>
+  </div>
+</div>
+<script>
+let _dcmCallback = null;
+function openDeleteModal({title, subtitle, warning, expectedName, onConfirm}) {
+    document.getElementById('dcm-title').textContent = title || 'Supprimer';
+    document.getElementById('dcm-subtitle').textContent = subtitle || 'Cette action est irréversible';
+    document.getElementById('dcm-warning').innerHTML = warning || '';
+    document.getElementById('dcm-expected').textContent = expectedName;
+    const input = document.getElementById('dcm-input');
+    input.value = '';
+    input.dataset.expected = expectedName;
+    document.getElementById('dcm-confirm-btn').disabled = true;
+    _dcmCallback = onConfirm;
+    document.getElementById('deleteConfirmModal').style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+}
+function closeDeleteModal() {
+    document.getElementById('deleteConfirmModal').style.display = 'none';
+    _dcmCallback = null;
+}
+async function executeDelete() {
+    if (_dcmCallback) {
+        const btn = document.getElementById('dcm-confirm-btn');
+        btn.disabled = true;
+        btn.textContent = 'Suppression...';
+        try { await _dcmCallback(); }
+        catch(e) { alert(e); }
+        finally { btn.textContent = 'Supprimer'; closeDeleteModal(); }
+    }
+}
+document.getElementById('deleteConfirmModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+/* User menu — close on outside click + logout */
+document.addEventListener('click', function(e) {
+    const dd = document.getElementById('userDropdown');
+    const btn = document.getElementById('userMenuBtn');
+    if (dd && btn && !btn.contains(e.target) && !dd.contains(e.target)) {
+        dd.classList.remove('show');
+    }
+    const pd = document.getElementById('perspectiveDropdown');
+    const pb = document.getElementById('perspectiveBtn');
+    if (pd && pb && !pb.contains(e.target) && !pd.contains(e.target)) {
+        pd.classList.remove('show');
+    }
+});
+async function doLogout() {
+    await fetch('/api/auth/logout', {method:'POST'});
+    location.href = '/login';
+}
+async function setPerspective(p) {
+    await fetch('/api/perspective', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({perspective:p})});
+    location.reload();
+}
+function sfToggleNodePop(id) {
+    const pop = document.getElementById(id);
+    if (!pop) return;
+    const isOpen = pop.style.display !== 'none';
+    // close all other popovers first
+    document.querySelectorAll('.cluster-node-pop').forEach(p => p.style.display = 'none');
+    if (!isOpen) {
+        pop.style.display = 'block';
+        // close on outside click
+        setTimeout(() => {
+            const handler = (e) => {
+                if (!pop.contains(e.target) && !e.target.closest('.cluster-node-badge')) {
+                    pop.style.display = 'none';
+                    document.removeEventListener('click', handler);
+                }
+            };
+            document.addEventListener('click', handler);
+        }, 0);
+    }
+}
+
+// ── Browser Web Push Registration ──────────────────────────────────
+(async function initPush() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const sw = await navigator.serviceWorker.register('/sw.js', {scope: '/'});
+    const keyRes = await fetch('/api/push/vapid-public-key');
+    const keyData = await keyRes.json();
+    if (!keyData.enabled) return;
+    // Check existing subscription
+    const existing = await sw.pushManager.getSubscription();
+    if (existing) return; // already subscribed
+    // Show the "Enable notifications" button when permission not yet decided
+    if (Notification.permission === 'default') {
+      const btn = document.getElementById('sfPushBtn');
+      if (btn) btn.style.display = '';
+      window.__sfPushReady = async function() {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+        await _sfSubscribePush(sw, keyData.publicKey);
+      };
+      return; // Permission will be requested on first click via sfRequestPush()
+    }
+    if (Notification.permission === 'granted') {
+      await _sfSubscribePush(sw, keyData.publicKey);
+    }
+  } catch(e) { console.debug('Push init:', e); }
+})();
+
+async function _sfSubscribePush(sw, vapidKey) {
+  try {
+    const sub = await sw.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _urlB64ToUint8Array(vapidKey)
+    });
+    await fetch('/api/push/subscribe', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(sub.toJSON())});
+    localStorage.setItem('sf_push_subscribed', '1');
+  } catch(e) { console.debug('Push subscribe:', e); }
+}
+
+function _urlB64ToUint8Array(b64) {
+  const pad = '='.repeat((4 - b64.length % 4) % 4);
+  const raw = atob((b64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+// Call this from a user interaction (button click) to request push permission
+window.sfRequestPush = async function() {
+  if (!('serviceWorker' in navigator)) return false;
+  const sw = await navigator.serviceWorker.ready;
+  const keyRes = await fetch('/api/push/vapid-public-key');
+  const keyData = await keyRes.json();
+  if (!keyData.enabled) return false;
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') return false;
+  await _sfSubscribePush(sw, keyData.publicKey);
+  return true;
+};
+</script>
+
+<!-- Umami Analytics — hostname-aware website ID (skipped on localhost) -->
+<script>(function(){
+  if(location.hostname==='localhost'||location.hostname==='127.0.0.1')return;
+  var _uids={'sf.macaron-software.com':'218aebc5-f5b3-4761-93b5-badbc2089214','AZURE_VM_IP':'3a4d67fb-1d12-4095-ad29-c0d33cc8b7c7'};
+  var _uid=_uids[location.hostname]||'218aebc5-f5b3-4761-93b5-badbc2089214';
+  var s=document.createElement('script');s.defer=true;
+  s.src='https://analytics.macaron-software.com/script.js';
+  s.setAttribute('data-website-id',_uid);
+  document.head.appendChild(s);
+})();</script>
+
+<script>
+/* ── SF Analytics helper ──────────────────────────────────────────
+   Wraps umami.track() — safe to call even before Umami loads.
+   Usage: sfTrack('event_name', { prop: value })
+──────────────────────────────────────────────────────────────────*/
+window.sfTrack = function(name, props) {
+  if (typeof umami !== 'undefined' && umami.track) {
+    umami.track(name, props || {});
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+
+  /* ── 1. Sidebar navigation ────────────────────────────────────*/
+  document.querySelectorAll('.nav-links a[data-tooltip], .nav-links a[href]').forEach(function(a) {
+    a.addEventListener('click', function() {
+      sfTrack('nav_click', { label: a.dataset.tooltip || a.getAttribute('href') });
+    });
+  });
+
+  /* ── 2. Tab clicks (event delegation on document) ─────────────
+     Catches: .session-tab[data-tab], .metrics-tab[data-tab],
+              .ws-activity-btn[data-view], .ws-tab[data-btab],
+              [data-tab] (mission-control, ceremonies, backlog…)  */
+  document.addEventListener('click', function(e) {
+    var el = e.target.closest('[data-tab],[data-btab],[data-view]');
+    if (!el) return;
+    var isTab = el.classList.contains('session-tab') ||
+                el.classList.contains('metrics-tab') ||
+                el.classList.contains('ws-activity-btn') ||
+                el.classList.contains('ws-tab') ||
+                el.hasAttribute('data-tab');
+    if (!isTab) return;
+    var label = el.dataset.tab || el.dataset.btab || el.dataset.view || el.textContent.trim().slice(0, 40);
+    sfTrack('tab_click', { tab: label, page: document.title.split('—')[0].trim() });
+  });
+
+  /* ── 3. Chat sends ────────────────────────────────────────────*/
+
+  /* 3a. Session live: #btnSend */
+  var btnSend = document.getElementById('btnSend');
+  if (btnSend) {
+    btnSend.addEventListener('click', function() {
+      sfTrack('chat_send', { context: 'session' });
+    });
+  }
+
+  /* 3b. CTO Panel: #cto-send-btn */
+  var ctoBtn = document.getElementById('cto-send-btn');
+  if (ctoBtn) {
+    ctoBtn.addEventListener('click', function() {
+      sfTrack('chat_send', { context: 'cto_panel' });
+    });
+  }
+
+  /* 3c. Workspace AI: patch wsAiSend after it's defined */
+  function _patchWsAiSend() {
+    if (typeof window.wsAiSend === 'function' && !window.wsAiSend._sfPatched) {
+      var _orig = window.wsAiSend;
+      window.wsAiSend = function() {
+        sfTrack('chat_send', { context: 'workspace_ai' });
+        return _orig.apply(this, arguments);
+      };
+      window.wsAiSend._sfPatched = true;
+    }
+  }
+  setTimeout(_patchWsAiSend, 500);
+
+  /* ── 4. Ideation / quick-start prompts ───────────────────────*/
+  document.addEventListener('click', function(e) {
+    var chip = e.target.closest('.cto-chip, .ideation-chip, [data-prompt]');
+    if (chip) {
+      sfTrack('prompt_chip', { label: (chip.textContent||'').trim().slice(0, 60) });
+    }
+  });
+
+  /* ── 5. HTMX POST tracking (mission start, runs, workflows) ──*/
+  document.addEventListener('htmx:beforeRequest', function(e) {
+    var path = (e.detail.requestConfig || {}).path || '';
+    var method = ((e.detail.requestConfig || {}).verb || '').toUpperCase();
+    if (method !== 'POST') return;
+    if (/\/epics\/[^/]+\/start/.test(path))       sfTrack('mission_start', { path: path });
+    else if (/\/epics\/[^/]+\/sprints/.test(path)) sfTrack('sprint_create', { path: path });
+    else if (/\/sessions\/[^/]+\/run-pattern/.test(path)) sfTrack('run_pattern', {});
+    else if (/\/sessions\/[^/]+\/run-workflow/.test(path)) sfTrack('run_workflow', {});
+    else if (/\/api\/ideation/.test(path) || /\/mkt-ideation/.test(path)) sfTrack('ideation_submit', {});
+    else if (/\/api\/auth\/login/.test(path) || path === '/login') sfTrack('login', {});
+    else if (/\/api\/workflows/.test(path)) sfTrack('workflow_action', { path: path });
+    else if (/\/api\/agents/.test(path)) sfTrack('agent_action', { path: path });
+  });
+
+});
+</script>
+<!-- SF Self-Annotation Mode (activated in Settings) -->
+<script>
+(function() {
+  // Always inject sf-annotate — toolbar appears as small floating button
+  window.SF_ANNOTATE = {
+    projectId: '_sf',
+    apiBase: '/api/projects/_sf',
+    selfMode: true,
+    pageName: document.title,
+    startActive: false  // toolbar visible but annotation OFF until user clicks
+  };
+  var link = document.createElement('link');
+  link.rel = 'stylesheet'; link.href = '/static/sf-annotate.css';
+  document.head.appendChild(link);
+  var s = document.createElement('script');
+  s.src = '/static/sf-annotate.js';
+  document.head.appendChild(s);
+})();
+</script>
+<!-- SF Wireframe Mode + Annotation Help -->
+<style>
+/* ── Skeleton shimmer — light gray on dark ── */
+@keyframes sf-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+/* Text skeleton bar — adapts to light/dark via CSS vars */
+.sf-skel-bar {
+  display: inline-block;
+  height: .75em;
+  border-radius: 3px;
+  background: linear-gradient(90deg,
+    var(--bg-tertiary, #e6eaef) 25%,
+    var(--border, #d0d7de) 50%,
+    var(--bg-tertiary, #e6eaef) 75%) !important;
+  background-size: 400px 100% !important;
+  animation: sf-shimmer 1.4s infinite linear !important;
+  vertical-align: middle;
+  min-width: 40px;
+}
+/* Block skeleton */
+.sf-skel-block {
+  border-radius: 6px !important;
+  background: linear-gradient(90deg,
+    var(--bg-tertiary, #e6eaef) 25%,
+    var(--border, #d0d7de) 50%,
+    var(--bg-tertiary, #e6eaef) 75%) !important;
+  background-size: 400px 100% !important;
+  animation: sf-shimmer 1.4s infinite linear !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.sf-skel-block > * { visibility: hidden !important; }
+
+/* ── Wireframe layout shell — uses theme vars ── */
+body.sf-wireframe { background: var(--bg-primary, #ffffff) !important; }
+body.sf-wireframe .sidebar {
+  background: var(--bg-secondary, #f6f8fa) !important;
+  border-right: 1px dashed var(--border, #d0d7de) !important;
+}
+body.sf-wireframe .topbar {
+  background: var(--bg-secondary, #f6f8fa) !important;
+  border-bottom: 1px dashed var(--border, #d0d7de) !important;
+}
+body.sf-wireframe .main-area { background: var(--bg-primary, #ffffff) !important; }
+
+body.sf-wireframe #sfWireframeBtn {
+  color: var(--accent, #0969da) !important;
+  background: color-mix(in srgb, var(--accent, #0969da) 15%, transparent) !important;
+  border-radius: 6px !important;
+}
+
+/* ── Annotation help panel ── */
+#sfAnnHelp {
+  position: fixed; bottom: 20px; right: 20px; z-index: 9999;
+  background: var(--bg-secondary, #f6f8fa);
+  border: 1px solid var(--border, #d0d7de);
+  border-radius: 10px;
+  padding: 16px 20px; width: 280px; box-shadow: 0 8px 32px rgba(0,0,0,.15);
+  font-size: .78rem; color: var(--text-secondary, #57606a); display: none;
+}
+#sfAnnHelp h4 { margin: 0 0 10px; color: var(--text-primary, #1f2328); font-size: .85rem; display: flex; align-items: center; gap: 6px; }
+#sfAnnHelp .ann-step { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+#sfAnnHelp .ann-step-num { width: 20px; height: 20px; border-radius: 50%; background: var(--accent,#0969da); color: #fff; font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+#sfAnnHelp .ann-step-text { line-height: 1.4; }
+#sfAnnHelp .ann-step-text strong { color: var(--text-primary,#1f2328); }
+#sfAnnHelp a.ann-cta { display: block; margin-top: 12px; background: var(--accent,#0969da); color: #fff !important; border-radius: 6px; padding: 7px 12px; text-align: center; text-decoration: none; font-size: .78rem; font-weight: 600; }
+#sfAnnHelp a.ann-cta:hover { opacity: .88; }
+#sfAnnHelp .ann-close { position: absolute; top: 10px; right: 12px; cursor: pointer; color: var(--text-tertiary,#6e7781); font-size: 1rem; line-height: 1; background: none; border: none; }
+</style>
+
+<!-- Annotation Help Panel -->
+<div id="sfAnnHelp">
+  <button class="ann-close" onclick="document.getElementById('sfAnnHelp').style.display='none'">×</button>
+  <h4>
+    <svg style="width:14px;height:14px;stroke:#58a6ff;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+    Annotations SF
+  </h4>
+  <div class="ann-step">
+    <span class="ann-step-num">1</span>
+    <span class="ann-step-text">Activez <strong>Self-Annotation Mode</strong> dans Settings → General</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">2</span>
+    <span class="ann-step-text">Une <strong>toolbar flottante</strong> apparaît — cliquez un élément, sélectionnez du texte, ou faites glisser une zone</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">3</span>
+    <span class="ann-step-text">Chaque annotation est sauvegardée. Allez sur <strong>/annotate/_sf</strong> pour tout voir</span>
+  </div>
+  <div class="ann-step">
+    <span class="ann-step-num">4</span>
+    <span class="ann-step-text">Cliquez <strong>Fix All</strong> → un agent crée automatiquement les missions pour corriger chaque point</span>
+  </div>
+  <a class="ann-cta" href="/settings#panel-general" target="_blank">Activer Self-Annotation →</a>
+  <a class="ann-cta" href="/annotate/_sf" target="_blank" style="background:var(--bg-tertiary,#f6f8fa);color:var(--text-primary,#1f2328);margin-top:6px">Voir les annotations →</a>
+</div>
+
+<script>
+(function() {
+  var WF_KEY = 'sf_wireframe_mode';
+  var btn = document.getElementById('sfWireframeBtn');
+  var _origText = [];  /* [{node, orig}] to restore */
+  var _skelBlocks = [];
+
+  /* Helpers */
+  var SKIP = ['SCRIPT','STYLE','#sfAnnHelp','#sfSpecBar','.sf-annotate-toolbar','[id^="sfAnn"]','[id^="sfSpec"]'];
+  function isProtected(el) {
+    return SKIP.some(function(s) { try { return el.closest && el.closest(s); } catch(e) { return false; } });
+  }
+
+  /* Replace a single text node with a shimmer bar */
+  function skelText(node) {
+    var txt = node.textContent.trim();
+    if (!txt || txt.length < 2) return;
+    var w = Math.min(Math.max(txt.length * 7, 40), 220);
+    var span = document.createElement('span');
+    span.className = 'sf-skel-bar sf-skel-inserted';
+    span.style.width = w + 'px';
+    span.setAttribute('aria-hidden', 'true');
+    _origText.push({ node: node, parent: node.parentNode, next: node.nextSibling, text: node.textContent });
+    node.parentNode.replaceChild(span, node);
+  }
+
+  /* Walk leaf text nodes inside an element */
+  function walkText(root) {
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: function(n) {
+        if (n.textContent.trim().length < 2) return NodeFilter.FILTER_REJECT;
+        var p = n.parentElement;
+        if (!p) return NodeFilter.FILTER_REJECT;
+        if (isProtected(p)) return NodeFilter.FILTER_REJECT;
+        /* Skip structural/nav labels we want to keep readable */
+        var tag = p.tagName;
+        if (['SCRIPT','STYLE','OPTION'].includes(tag)) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    }, false);
+    var nodes = [];
+    var n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    nodes.forEach(skelText);
+  }
+
+  /* Block-level skeleton for images, charts, avatars, stat numbers */
+  function skelBlocks() {
+    var blockSels = [
+      'img:not([src^="data:svg"]):not(.topbar img)',
+      '.avatar', '.user-avatar',
+      'canvas',
+      '.metric-value', '.stat-value', '.stat-number', '.kpi-value',
+      'input:not([type=hidden])', 'select', 'textarea',
+    ];
+    blockSels.forEach(function(sel) {
+      try {
+        document.querySelectorAll(sel).forEach(function(el) {
+          if (isProtected(el) || el.classList.contains('sf-skel-block')) return;
+          el.classList.add('sf-skel-block');
+          _skelBlocks.push(el);
+        });
+      } catch(e) {}
+    });
+  }
+
+  function applySkeleton() {
+    /* Main content area only — skip sidebar nav + topbar */
+    var targets = document.querySelectorAll('.main-area, .content-area, main, [role="main"]');
+    if (!targets.length) targets = [document.body];
+    targets.forEach(function(root) {
+      if (!isProtected(root)) walkText(root);
+    });
+    skelBlocks();
+  }
+
+  function removeSkeleton() {
+    /* Restore text nodes */
+    _origText.forEach(function(item) {
+      var inserted = item.parent && item.parent.querySelector('.sf-skel-inserted');
+      if (item.parent && item.next && item.next.parentNode === item.parent) {
+        try { item.parent.insertBefore(item.node, item.next); } catch(e) {}
+      } else if (item.parent && item.parent.parentNode) {
+        try { item.parent.appendChild(item.node); } catch(e) {}
+      }
+    });
+    _origText = [];
+    /* Remove inserted skeleton spans */
+    document.querySelectorAll('.sf-skel-inserted').forEach(function(el) { el.remove(); });
+    /* Remove block skeletons */
+    _skelBlocks.forEach(function(el) { el.classList.remove('sf-skel-block'); });
+    _skelBlocks = [];
+  }
+
+  function activate() {
+    document.body.classList.add('sf-wireframe');
+    if (btn) { btn.title = 'Quitter le mode wireframe'; }
+    setTimeout(applySkeleton, 50);
+  }
+
+  if (sessionStorage.getItem(WF_KEY) === '1') {
+    document.addEventListener('DOMContentLoaded', activate);
+  }
+
+  window.toggleWireframeMode = function() {
+    if (document.body.classList.contains('sf-wireframe')) {
+      document.body.classList.remove('sf-wireframe');
+      sessionStorage.setItem(WF_KEY, '0');
+      if (btn) btn.title = 'Wireframe — skeleton view';
+      removeSkeleton();
+    } else {
+      sessionStorage.setItem(WF_KEY, '1');
+      activate();
+    }
+  };
+
+  /* Right-click / long-press → annotation help */
+  if (btn) {
+    var pressTimer;
+    btn.addEventListener('mousedown', function() {
+      pressTimer = setTimeout(function() {
+        var p = document.getElementById('sfAnnHelp');
+        p.style.display = p.style.display === 'block' ? 'none' : 'block';
+      }, 600);
+    });
+    btn.addEventListener('mouseup',    function() { clearTimeout(pressTimer); });
+    btn.addEventListener('mouseleave', function() { clearTimeout(pressTimer); });
+    btn.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      var p = document.getElementById('sfAnnHelp');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    });
+  }
+})();
+</script>
+
+<!-- Spec / Persona bar JS -->
+<script>
+(function() {
+  var SPEC_KEY = 'sf_spec_bar';
+  var specOpen = sessionStorage.getItem(SPEC_KEY) === '1';
+  var specLoaded = false;
+
+  function setSpecBarState(open) {
+    var bar = document.getElementById('sfSpecBar');
+    var btn = document.getElementById('sfSpecBtn');
+    if (!bar) return;
+    bar.style.display = 'block';
+    bar.style.maxHeight = open ? '200px' : '0';
+    bar.style.borderBottom = open ? '1px solid #21262d' : 'none';
+    if (btn) {
+      btn.style.color = open ? '#58a6ff' : '';
+      btn.style.background = open ? 'rgba(88,166,255,.15)' : '';
+      btn.style.borderRadius = open ? '6px' : '';
+    }
+    if (open && !specLoaded) loadSpecData();
+  }
+
+  window.toggleSpecBar = function() {
+    specOpen = !specOpen;
+    sessionStorage.setItem(SPEC_KEY, specOpen ? '1' : '0');
+    setSpecBarState(specOpen);
+  };
+
+  function loadSpecData() {
+    var slug = location.pathname.replace(/\//g, '-').replace(/^-/, '') || 'home';
+    var slugEl = document.getElementById('spec-page-slug');
+    if (slugEl) slugEl.textContent = location.pathname;
+
+    var annLink = document.getElementById('spec-ann-link');
+    if (annLink) annLink.href = '/annotate/_sf?page=' + encodeURIComponent(location.pathname);
+
+    fetch('/api/projects/_sf/screens/' + encodeURIComponent(slug) + '/traceability')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) {
+        specLoaded = true;
+        if (!d) { showSpecNotLinked(); return; }
+
+        // Programme
+        var progEl = document.getElementById('spec-programme');
+        if (progEl) progEl.textContent = (d.programme && d.programme.name) ? d.programme.name : 'Software Factory';
+
+        // Epic
+        var epicEl = document.getElementById('spec-epic');
+        if (epicEl) epicEl.textContent = (d.epic && d.epic.name) ? d.epic.name : '—';
+
+        // Feature
+        var featEl = document.getElementById('spec-feature');
+        var featStatusEl = document.getElementById('spec-feature-status');
+        if (d.feature) {
+          if (featEl) featEl.textContent = d.feature.name || '—';
+          if (featStatusEl) featStatusEl.textContent = d.feature.status || '';
+        } else {
+          if (featEl) featEl.innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Non liée</span>';
+          showSpecNotLinked();
+        }
+
+        // Stories / Tasks
+        if (d.user_stories && d.user_stories.length) {
+          document.getElementById('spec-stories').innerHTML = d.user_stories.slice(0, 3).map(function(s) {
+            var dot = s.status === 'done' ? '✓' : '·';
+            return '<div style="display:flex;gap:3px"><span style="color:var(--accent,#0969da)">' + dot + '</span>' + s.title + '</div>';
+          }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da);margin-top:2px">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
+        }
+
+        // Persona card
+        var personaCardEl = document.getElementById('spec-persona-card');
+        if (personaCardEl) personaCardEl.textContent = d.persona || '—';
+
+        // RBAC card
+        var rbacEl = document.getElementById('spec-rbac');
+        if (rbacEl) {
+          if (d.rbac_roles && d.rbac_roles.length) {
+            var ROLE_COLORS = { admin: '#cf222e', project_manager: '#8250df', developer: '#0969da', viewer: '#1a7f37' };
+            rbacEl.innerHTML = d.rbac_roles.map(function(r) {
+              var c = ROLE_COLORS[r] || '#57606a';
+              return '<span style="display:inline-flex;align-items:center;padding:1px 6px;border-radius:10px;background:' + c + '20;color:' + c + ';font-size:.6rem;font-weight:600;border:1px solid ' + c + '40">' + r + '</span>';
+            }).join('');
+          } else {
+            rbacEl.textContent = '—';
+          }
+        }
+      }).catch(function() { showSpecNotLinked(); });
+  }
+
+  function showSpecNotLinked() {
+    var notLinked = document.getElementById('spec-not-linked');
+    if (notLinked) notLinked.style.display = 'inline';
+  }
+
+  /* External API: update SpecBar with pre-fetched data object */
+  window.updateSpecBarWithData = function(d) {
+    if (!d) { showSpecNotLinked(); return; }
+    var progEl = document.getElementById('spec-programme');
+    var progSub = document.getElementById('spec-programme-sub');
+    var epicEl = document.getElementById('spec-epic');
+    var featEl = document.getElementById('spec-feature');
+    var featStatusEl = document.getElementById('spec-feature-status');
+    var storiesEl = document.getElementById('spec-stories');
+    var personaEl = document.getElementById('spec-persona-card');
+    var rbacEl = document.getElementById('spec-rbac');
+    var notLinked = document.getElementById('spec-not-linked');
+    var slugEl = document.getElementById('spec-page-slug');
+    if (progEl) progEl.textContent = d.programme || 'Software Factory';
+    if (progSub) progSub.textContent = d.programme_sub || '';
+    if (epicEl) epicEl.textContent = d.epic ? (d.epic.name || d.epic) : '—';
+    if (featEl) {
+      if (d.feature) {
+        featEl.textContent = d.feature.name || d.feature;
+        if (featStatusEl) featStatusEl.textContent = d.feature.status || '';
+      } else {
+        featEl.innerHTML = '<span style="color:var(--text-tertiary,#6e7781);font-weight:400;font-size:.68rem">Non liée</span>';
+      }
+    }
+    if (storiesEl) {
+      if (d.user_stories && d.user_stories.length) {
+        storiesEl.innerHTML = d.user_stories.slice(0,3).map(function(s) {
+          var dot = (s.status === 'done' || s.status === 'completed') ? '✓' : '·';
+          var color = dot === '✓' ? 'var(--green,#1a7f37)' : 'var(--accent,#0969da)';
+          return '<div style="display:flex;gap:3px"><span style="color:' + color + '">' + dot + '</span>' + (s.title || s) + '</div>';
+        }).join('') + (d.user_stories.length > 3 ? '<div style="color:var(--accent,#0969da);margin-top:2px">+' + (d.user_stories.length - 3) + ' autres</div>' : '');
+      } else {
+        storiesEl.textContent = '—';
+      }
+    }
+    if (personaEl) personaEl.textContent = d.persona || '—';
+    if (rbacEl) {
+      if (d.rbac_roles && d.rbac_roles.length) {
+        var RC = {admin:'#cf222e',project_manager:'#8250df',developer:'#0969da',viewer:'#1a7f37'};
+        rbacEl.innerHTML = d.rbac_roles.map(function(r) {
+          var c = RC[r] || '#57606a';
+          return '<span style="display:inline-flex;align-items:center;padding:1px 6px;border-radius:10px;background:'+c+'20;color:'+c+';font-size:.6rem;font-weight:600;border:1px solid '+c+'40">' + r + '</span>';
+        }).join('');
+      } else { rbacEl.textContent = '—'; }
+    }
+    if (notLinked) notLinked.style.display = 'none';
+    if (slugEl) slugEl.textContent = d.slug || location.pathname;
+    specLoaded = true;
+  };
+
+  /* External API: fetch SpecBar data from a URL and apply it */
+  window.loadSpecBarFromUrl = function(url) {
+    fetch(url)
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(d) { window.updateSpecBarWithData(d); })
+      .catch(function() { showSpecNotLinked(); });
+  };
+
+  /* Init on load */
+  document.addEventListener('DOMContentLoaded', function() {
+    if (specOpen) setSpecBarState(true);
+  });
+})();
+</script>
+<!-- HTMX / fetch error toast ─────────────────────────────────────────── -->
+<style>#sf-err-toast{display:none}#sf-err-toast.visible{display:flex}</style>
+<div id="sf-err-toast" style="
+  position:fixed;bottom:1.4rem;left:50%;transform:translateX(-50%);
+  background:var(--bg-secondary);border:1px solid var(--red-light);border-radius:8px;
+  padding:0.75rem 1.2rem 0.75rem 1rem;
+  color:var(--text-primary);font-size:0.88rem;line-height:1.4;
+  box-shadow:0 4px 24px rgba(0,0,0,.35);z-index:99999;
+  align-items:flex-start;gap:0.75rem;max-width:420px" aria-live="assertive" role="alert">
+  <svg style="flex-shrink:0;margin-top:2px;color:var(--red-light)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <div style="flex:1">
+    <div id="sf-err-toast-title" style="font-weight:600;margin-bottom:0.2rem">Temporary error</div>
+    <div id="sf-err-toast-msg">We've been notified and are working on it — please try again in a few minutes.</div>
+  </div>
+  <button onclick="document.getElementById('sf-err-toast').classList.remove('visible')" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:0;line-height:1;flex-shrink:0" aria-label="Dismiss">✕</button>
+</div>
+<script>
+(function(){
+  var toast = document.getElementById('sf-err-toast');
+  var toastTitle = document.getElementById('sf-err-toast-title');
+  var toastMsg = document.getElementById('sf-err-toast-msg');
+  var _hideTimer = null;
+
+  function showErrToast(title, msg) {
+    if (!toast) return;
+    toastTitle.textContent = title || 'Temporary error';
+    toastMsg.textContent = msg || 'We\'ve been notified and are working on it — please try again in a few minutes.';
+    toast.classList.add('visible');
+    clearTimeout(_hideTimer);
+    _hideTimer = setTimeout(function(){ toast.classList.remove('visible'); }, 8000);
+  }
+
+  // HTMX partial errors (4xx / 5xx on hx-get/hx-post)
+  document.addEventListener('htmx:responseError', function(evt) {
+    var status = evt.detail && evt.detail.xhr && evt.detail.xhr.status;
+    if (!status) return;
+    // On 401: stop any polling on this element and redirect to login
+    if (status === 401) {
+      var elt = evt.detail.elt;
+      if (elt) { elt.removeAttribute('hx-trigger'); htmx.remove(elt); }
+      window.location.href = '/login';
+      return;
+    }
+    if (status === 404) {
+      showErrToast('Page not found (404)', 'This section is not available yet. Try refreshing or come back later.');
+    } else if (status >= 500) {
+      showErrToast('Temporary error (' + status + ')', 'Something went wrong on our end — we\'ve been notified. Please try again in a few minutes.');
+    } else if (status >= 400) {
+      showErrToast('Request error (' + status + ')', 'The request could not be completed. Please try again.');
+    }
+  });
+
+  // Also catch htmx:sendError (network failure)
+  document.addEventListener('htmx:sendError', function() {
+    showErrToast('Network error', 'Could not reach the server. Check your connection and try again.');
+  });
+})();
+</script>
+</body>
+</html>

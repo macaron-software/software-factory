@@ -1,0 +1,55 @@
+{# ══════ WORKFLOW GRAPH TAB ══════ #}
+{# Shared by all mission control tab profiles — shows global workflow DAG #}
+
+        <!-- Tab: Workflow Graph -->
+        <div class="mc-tab-panel" data-tab="workflow">
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem">
+                <svg class="icon icon-sm" style="color:var(--purple-light)"><use href="#icon-share-2"/></svg>
+                <span style="font-size:0.82rem;font-weight:600;color:var(--text-primary)">{{ workflow_graph.wf_name if workflow_graph else workflow_type }}</span>
+                <span style="font-size:0.7rem;color:var(--text-secondary);background:var(--bg-tertiary);padding:2px 8px;border-radius:10px;border:1px solid var(--border)">{{ workflow_type }}</span>
+                <a href="/workflows/{{ workflow_type }}/edit" class="btn btn-sm" style="margin-left:auto;font-size:0.7rem" target="_blank">
+                    <svg class="icon icon-xs"><use href="#icon-edit"/></svg> Éditer
+                </a>
+            </div>
+
+            {# Phase pipeline mini #}
+            {% if workflow_graph and workflow_graph.phases %}
+            <div style="display:flex;gap:0;margin-bottom:1rem;overflow-x:auto;padding-bottom:4px">
+                {% for ph in workflow_graph.phases %}
+                <div style="display:flex;align-items:center;min-width:0">
+                    <div style="flex-shrink:0;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.3rem 0.6rem;font-size:0.68rem;text-align:center;min-width:80px;max-width:120px">
+                        <div style="font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ph.name }}</div>
+                        <div style="color:var(--text-muted);font-size:0.62rem;margin-top:1px">{{ ph.pattern_id }}</div>
+                    </div>
+                    {% if not loop.last %}
+                    <div style="width:20px;height:1px;background:var(--border);flex-shrink:0;position:relative">
+                        <div style="position:absolute;right:-4px;top:-4px;width:0;height:0;border-left:6px solid var(--border);border-top:4px solid transparent;border-bottom:4px solid transparent"></div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {# Global DAG #}
+            <div id="wf-global-graph" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:0.5rem;overflow:auto;min-height:100px"></div>
+
+            {# Per-phase graphs #}
+            {% if phase_graphs %}
+            <details style="margin-top:1rem">
+                <summary style="font-size:0.72rem;font-weight:600;color:var(--text-secondary);cursor:pointer;padding:0.3rem 0">
+                    <svg class="icon icon-xs"><use href="#icon-layers"/></svg> Graphes par phase ({{ phase_graphs|length }})
+                </summary>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:0.75rem;margin-top:0.5rem">
+                    {% for phase in mission.phases %}
+                    {% if phase_graphs.get(phase.phase_id) and phase_graphs[phase.phase_id].nodes %}
+                    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0.5rem">
+                        <div style="font-size:0.68rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem">{{ phase.phase_name }}</div>
+                        <div class="mc-phase-graph" id="graph-wftab-{{ phase.phase_id }}" data-phase-id="{{ phase.phase_id }}"></div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        </div>

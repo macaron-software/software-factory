@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block topbar_actions %}
+<div class="wallet-badge" id="walletBadge">
+    <svg class="icon" width="16" height="16"><use href="#icon-database"/></svg>
+    <span id="walletBalance">—</span> tokens
+</div>
+{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="/static/css/mercato.css?v=20260223">
+
+<div class="mercato-layout">
+
+    <!-- Left: Transfer List -->
+    <div class="mercato-main">
+        <div class="section-header">
+            <h2>Transfer List</h2>
+            <div class="section-header__actions">
+                <select id="filterProject" onchange="filterListings()" class="input-sm">
+                    <option value="">All projects</option>
+                    {% for p in projects %}
+                    <option value="{{ p.id }}">{{ p.name }}</option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn--sm btn--secondary" onclick="toggleFreeAgents()">
+                    <svg class="icon" width="14" height="14"><use href="#icon-users"/></svg>
+                    Free Agents ({{ free_agents|length }})
+                </button>
+            </div>
+        </div>
+
+        <!-- Active Listings -->
+        <div class="mercato-grid" id="listingsGrid">
+            {% if listings %}
+            {% for item in listings %}
+            <div class="mercato-card" data-seller="{{ item.listing.seller_project }}">
+                <div class="mercato-card__header">
+                    <img src="/static/avatars/{{ item.agent.id }}.jpg"
+                         onerror="this.src='/static/avatars/default.jpg'"
+                         class="mercato-card__avatar">
+                    <div class="mercato-card__info">
+                        <div class="mercato-card__name">{{ item.agent.name }}</div>
+                        <div class="mercato-card__role">{{ item.agent.role }}</div>
+                    </div>
+                    <span class="mercato-badge mercato-badge--{{ item.listing.listing_type }}">
+                        {{ item.listing.listing_type | upper }}
+                    </span>
+                </div>
+                <div class="mercato-card__stats">
+                    <span title="Skills">{{ item.agent.skills|length }} skills</span>
+                    <span title="Tools">{{ item.agent.tools|length }} tools</span>
+                    <span title="Rank">Rank {{ item.agent.hierarchy_rank }}</span>
+                </div>
+                <div class="mercato-card__footer">
+                    <div class="mercato-card__price">
+                        {{ item.listing.asking_price }} tokens
+                        {% if item.listing.listing_type == 'loan' and item.listing.loan_weeks %}
+                        <small>/ {{ item.listing.loan_weeks }} wk</small>
+                        {% endif %}
+                    </div>
+                    <div class="mercato-card__actions">
+                        <button class="btn btn--sm btn--primary"
+                                onclick="buyAgent('{{ item.listing.id }}', {{ item.listing.asking_price }})">
+                            {% if item.listing.listing_type == 'loan' %}Borrow{% else %}Buy{% endif %}
+                        </button>
+                    </div>
+                </div>
+                <div class="mercato-card__market">
+                    Market value: {{ item.market_value }} tokens
+                    {% if item.listing.asking_price < item.market_value %}
+                    <span class="mercato-deal">DEAL</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <svg class="icon" width="48" height="48"><use href="#icon-shopping-bag"/></svg>
+                <p>No active listings</p>
+                <small>Put agents on the transfer list from the project roster</small>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Free Agents (hidden by default) -->
+        <div id="freeAgentsSection" style="display:none">
+            <div class="section-header" style="margin-top:1.5rem">
+                <h2>Free Agents</h2>
+                <small>Draft them for free</small>
+            </div>
+            <div class="mercato-grid">
+                {% for item in free_agents %}
+                <div class="mercato-card mercato-card--free">
+                    <div class="mercato-card__header">
+                        <img src="/static/avatars/{{ item.agent.id }}.jpg"
+                             onerror="this.src='/static/avatars/default.jpg'"
+                             class="mercato-card__avatar">
+                        <div class="mercato-card__info">
+                            <div class="mercato-card__name">{{ item.agent.name }}</div>
+                            <div class="mercato-card__role">{{ item.agent.role }}</div>
+                        </div>
+                        <span class="mercato-badge mercato-badge--free">FREE</span>
+                    </div>
+                    <div class="mercato-card__stats">
+                        <span>{{ item.agent.skills|length }} skills</span>
+                        <span>{{ item.agent.tools|length }} tools</span>
+                        <span>Rank {{ item.agent.hierarchy_rank }}</span>
+                    </div>
+                    <div class="mercato-card__footer">
+                        <div class="mercato-card__price">
+                            Value: {{ item.market_value }} tokens
+                        </div>
+                        <div class="mercato-card__actions">
+                            <button class="btn btn--sm btn--primary"
+                                    onclick="draftAgent('{{ item.agent.id }}')">
+                                Draft
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right: Sidebar -->
+    <div class="mercato-sidebar">
+        <!-- Project Selector -->
+        <div class="mercato-panel">
+            <h3>My Project</h3>
+            <select id="activeProject" onchange="loadRoster()" class="input-full">
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+            <div id="projectWallet" class="mercato-wallet">
+                <div class="mercato-wallet__balance">
+                    <span id="sidebarBalance">—</span> tokens
+                </div>
+                <div class="mercato-wallet__stats">
+                    <small>Earned: <span id="totalEarned">0</span></small>
+                    <small>Spent: <span id="totalSpent">0</span></small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Roster -->
+        <div class="mercato-panel">
+            <h3>Roster</h3>
+            <div id="rosterCards" class="mercato-roster">
+                <p class="empty-state">Select a project</p>
+            </div>
+        </div>
+
+        <!-- Transfer History -->
+        <div class="mercato-panel">
+            <h3>Recent Transfers</h3>
+            <div class="mercato-history">
+                {% for t in transfers %}
+                <div class="mercato-history__item">
+                    <div class="mercato-history__type mercato-history__type--{{ t.transfer_type }}">
+                        {{ t.transfer_type | upper }}
+                    </div>
+                    <div class="mercato-history__details">
+                        <strong>{{ agent_map[t.agent_id].name if t.agent_id in agent_map else t.agent_id }}</strong>
+                        <small>{{ t.from_project }} &rarr; {{ t.to_project }}</small>
+                    </div>
+                    <div class="mercato-history__price">{{ t.price }}</div>
+                </div>
+                {% endfor %}
+                {% if not transfers %}
+                <p class="empty-state">No transfers yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const activeProjectEl = document.getElementById('activeProject');
+
+function getProject() { return activeProjectEl?.value || ''; }
+
+async function loadWallet() {
+    const pid = getProject();
+    if (!pid) return;
+    try {
+        const r = await fetch(`/api/mercato/wallet/${pid}`);
+        const d = await r.json();
+        document.getElementById('walletBalance').textContent = d.balance;
+        document.getElementById('sidebarBalance').textContent = d.balance;
+        document.getElementById('totalEarned').textContent = d.total_earned;
+        document.getElementById('totalSpent').textContent = d.total_spent;
+    } catch(e) { console.error('wallet', e); }
+}
+
+async function loadRoster() {
+    const pid = getProject();
+    if (!pid) return;
+    loadWallet();
+    try {
+        const r = await fetch(`/api/mercato/project-roster/${pid}`);
+        document.getElementById('rosterCards').innerHTML = await r.text();
+    } catch(e) { console.error('roster', e); }
+}
+
+function filterListings() {
+    const v = document.getElementById('filterProject').value;
+    document.querySelectorAll('#listingsGrid .mercato-card').forEach(c => {
+        c.style.display = (!v || c.dataset.seller === v) ? '' : 'none';
+    });
+}
+
+function toggleFreeAgents() {
+    const s = document.getElementById('freeAgentsSection');
+    s.style.display = s.style.display === 'none' ? '' : 'none';
+}
+
+async function buyAgent(listingId, price) {
+    const pid = getProject();
+    if (!pid) { alert('Select a project first'); return; }
+    if (!confirm(`Buy for ${price} tokens?`)) return;
+    try {
+        const r = await fetch('/api/mercato/transfers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({listing_id: listingId, buyer_project: pid}),
+        });
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        location.reload();
+    } catch(e) { alert('Transfer failed'); }
+}
+
+async function draftAgent(agentId) {
+    const pid = getProject();
+    if (!pid) { alert('Select a project first'); return; }
+    try {
+        const r = await fetch(`/api/mercato/draft/${agentId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({project_id: pid}),
+        });
+        const d = await r.json();
+        if (d.error) { alert(d.error); return; }
+        location.reload();
+    } catch(e) { alert('Draft failed'); }
+}
+
+// Init
+if (activeProjectEl?.value) loadRoster();
+</script>
+{% endblock %}

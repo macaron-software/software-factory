@@ -1,0 +1,13 @@
+{# Quality score badge — reusable partial #}
+{# Usage: {% include "partials/quality_badge.html" %} with quality_score set #}
+{% set qs = quality_score|default(0) %}
+{% set qcolor = '#16a34a' if qs >= 80 else '#3b82f6' if qs >= 60 else '#ea580c' if qs >= 40 else '#dc2626' %}
+{% set qlabel = 'Elite' if qs >= 80 else 'High' if qs >= 60 else 'Medium' if qs >= 40 else 'Low' %}
+<span class="quality-badge" style="
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600;
+    background: {{ qcolor }}22; color: {{ qcolor }};
+" title="Quality Score: {{ qs }}/100">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+    {{ qs|round|int }}/100
+</span>

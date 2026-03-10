@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="document.getElementById('create-ws-form').classList.toggle('hidden')">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> Nouveau workspace
+</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- Create form -->
+<div id="create-ws-form" class="hidden" style="margin-bottom:1.5rem;padding:1.25rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;max-width:520px">
+    <h3 style="margin:0 0 1rem;font-size:1rem">Créer un workspace</h3>
+    <form id="ws-create-form" style="display:flex;flex-direction:column;gap:0.75rem">
+        <div>
+            <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:3px">Nom</label>
+            <input id="ws-name" type="text" class="input" placeholder="Mon workspace" required style="width:100%">
+        </div>
+        <div>
+            <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:3px">Slug</label>
+            <input id="ws-slug" type="text" class="input" placeholder="mon-workspace" required style="width:100%">
+        </div>
+        <div>
+            <label style="font-size:0.8rem;color:var(--text-secondary);display:block;margin-bottom:3px">Description</label>
+            <input id="ws-desc" type="text" class="input" placeholder="Description optionnelle" style="width:100%">
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem">
+            <label style="font-size:0.8rem;color:var(--text-secondary)">Couleur</label>
+            <input id="ws-color" type="color" value="#6366f1" style="width:36px;height:28px;border:none;cursor:pointer;border-radius:6px;padding:2px">
+        </div>
+        <div style="display:flex;gap:0.5rem;margin-top:0.25rem">
+            <button type="submit" class="btn btn-primary btn-sm">Créer</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('create-ws-form').classList.add('hidden')">Annuler</button>
+        </div>
+    </form>
+</div>
+
+<!-- Workspace grid -->
+<div class="item-grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
+    {% for ws in workspaces %}
+    <div class="item-card" data-id="{{ ws.id }}" style="position:relative">
+        <div class="item-icon">
+            <div style="width:40px;height:40px;border-radius:10px;background:{{ ws.color }}20;display:flex;align-items:center;justify-content:center">
+                <span style="width:14px;height:14px;border-radius:50%;background:{{ ws.color }};display:inline-block"></span>
+            </div>
+        </div>
+        <div class="item-main">
+            <div class="item-title" style="display:flex;align-items:center;gap:8px">
+                {{ ws.name }}
+                {% if ws.id == workspace_id %}
+                <span class="item-badge" style="background:{{ ws.color }}20;color:{{ ws.color }};font-size:0.68rem">actif</span>
+                {% endif %}
+            </div>
+            {% if ws.description %}
+            <div class="item-subtitle">{{ ws.description }}</div>
+            {% endif %}
+            <div style="font-size:0.72rem;color:var(--text-tertiary);margin-top:4px">
+                <span>{{ ws.member_count or 0 }} membre{% if ws.member_count != 1 %}s{% endif %}</span>
+                &middot; <span style="font-family:monospace">{{ ws.slug }}</span>
+            </div>
+        </div>
+        <div class="item-actions">
+            {% if ws.id != workspace_id %}
+            <button class="btn btn-sm btn-primary ws-switch-btn" data-id="{{ ws.id }}" data-color="{{ ws.color }}" title="Activer ce workspace">
+                Activer
+            </button>
+            {% endif %}
+            {% if ws.id != 'default' %}
+            <button class="btn btn-sm btn-ghost ws-delete-btn" data-id="{{ ws.id }}" title="Supprimer">
+                <svg class="icon icon-sm"><use href="#icon-trash"/></svg>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+    {% if not workspaces %}
+    <div class="empty-state">Aucun workspace trouvé.</div>
+    {% endif %}
+</div>
+
+<script>
+// Auto-generate slug from name
+document.getElementById('ws-name').addEventListener('input', function() {
+    document.getElementById('ws-slug').value = this.value.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+});
+
+// Create form submit
+document.getElementById('ws-create-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const payload = {
+        name: document.getElementById('ws-name').value,
+        slug: document.getElementById('ws-slug').value,
+        description: document.getElementById('ws-desc').value,
+        color: document.getElementById('ws-color').value,
+    };
+    const res = await fetch('/api/workspaces', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+    if (res.ok) { location.reload(); }
+    else { const e = await res.json(); alert(e.error || 'Erreur'); }
+});
+
+// Switch workspace
+document.querySelectorAll('.ws-switch-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const id = this.dataset.id;
+        await fetch(`/api/workspaces/${id}/switch`, {method: 'POST'});
+        location.reload();
+    });
+});
+
+// Delete workspace
+document.querySelectorAll('.ws-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        if (!confirm('Supprimer ce workspace ?')) return;
+        const id = this.dataset.id;
+        const res = await fetch(`/api/workspaces/${id}`, {method: 'DELETE'});
+        if (res.ok) { location.reload(); }
+        else { const e = await res.json(); alert(e.error || 'Erreur'); }
+    });
+});
+</script>
+{% endblock %}

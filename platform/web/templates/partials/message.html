@@ -1,0 +1,14 @@
+<!-- Single message partial — A2A message in timeline -->
+<div class="message message-{{ message.message_type.value if message.message_type else 'info' }}"
+     id="msg-{{ message.id }}">
+    <div class="message-header">
+        <span class="message-from">{{ message.from_agent | replace('_', ' ') | title }}</span>
+        {% if message.to_agent %}
+        <span class="message-arrow">→</span>
+        <span class="message-to">{{ message.to_agent | replace('_', ' ') | title }}</span>
+        {% endif %}
+        <span class="message-type badge">{{ message.message_type.value if message.message_type else '' }}</span>
+        <span class="message-time">{{ message.timestamp }}</span>
+    </div>
+    <div class="message-body">{{ message.content }}</div>
+</div>

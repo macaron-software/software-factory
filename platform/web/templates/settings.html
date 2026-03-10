@@ -1,0 +1,1873 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.settings-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.5rem}
+.settings-tab{padding:0.6rem 1.2rem;font-size:0.82rem;font-weight:600;color:var(--text-secondary);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;background:none;border-top:none;border-left:none;border-right:none;font-family:inherit}
+.settings-tab:hover{color:var(--text-primary)}
+.settings-tab.active{color:var(--purple);border-bottom-color:var(--purple)}
+.settings-panel{display:none}
+.settings-panel.active{display:block}
+.integ-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem}
+.integ-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1.2rem;transition:border-color .15s}
+.integ-card:hover{border-color:var(--purple-dim)}
+.integ-card.enabled{border-color:rgba(34,197,94,.3)}
+.integ-header{display:flex;align-items:center;gap:0.8rem;margin-bottom:0.8rem}
+.integ-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.3rem}
+.integ-icon.jira{background:rgba(0,82,204,.15);color:#0052cc}
+.integ-icon.confluence{background:rgba(0,101,255,.15);color:#0065ff}
+.integ-icon.xray{background:rgba(101,84,192,.15);color:#6554c0}
+.integ-icon.sonarqube{background:rgba(78,154,6,.15);color:#4e9a06}
+.integ-icon.gitlab{background:rgba(252,109,38,.15);color:#fc6d26}
+.integ-icon.azure-devops{background:rgba(0,120,212,.15);color:#0078d4}
+.integ-info{flex:1;min-width:0}
+.integ-name{font-size:0.92rem;font-weight:700;color:var(--text-primary)}
+.integ-type{font-size:0.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.3px}
+.integ-toggle{position:relative;width:44px;height:24px;flex-shrink:0}
+.integ-toggle input{opacity:0;width:0;height:0}
+.integ-toggle .slider{position:absolute;inset:0;background:var(--bg-tertiary);border-radius:12px;cursor:pointer;transition:.2s;border:1px solid var(--border)}
+.integ-toggle .slider:before{content:"";position:absolute;height:18px;width:18px;left:2px;bottom:2px;background:var(--text-secondary);border-radius:50%;transition:.2s}
+.integ-toggle input:checked+.slider{background:var(--purple);border-color:var(--purple)}
+.integ-toggle input:checked+.slider:before{transform:translateX(20px);background:#fff}
+.integ-body{display:flex;flex-direction:column;gap:0.6rem}
+.integ-field{display:flex;flex-direction:column;gap:0.2rem}
+.integ-field label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.3px}
+.integ-field input,.integ-field select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.4rem 0.6rem;font-size:0.82rem;font-family:inherit;outline:none}
+.integ-field input:focus,.integ-field select:focus{border-color:var(--purple)}
+.integ-status{display:flex;align-items:center;gap:0.4rem;margin-top:0.4rem;font-size:0.72rem}
+.integ-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.integ-status-dot.connected{background:var(--green)}
+.integ-status-dot.disconnected{background:var(--text-secondary)}
+.integ-status-dot.error{background:var(--red)}
+.integ-actions{display:flex;gap:0.4rem;margin-top:0.5rem}
+.integ-desc{font-size:0.78rem;color:var(--text-secondary);line-height:1.4;margin-bottom:0.4rem}
+.integ-icon-emoji{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:1.4rem;background:var(--bg-tertiary)}
+.integ-roles{display:flex;flex-wrap:wrap;gap:0.25rem;margin:0.4rem 0}
+.integ-role-badge{font-size:0.65rem;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.15);color:var(--purple-light,#a78bfa);border:1px solid rgba(139,92,246,.2)}
+.integ-cat-btn{font-size:0.73rem;padding:0.25rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;cursor:pointer;color:var(--text-secondary)}
+.integ-cat-btn.active{background:var(--purple);border-color:var(--purple);color:#fff}
+.integ-card.hidden{display:none}
+/* LLM tab */
+.llm-provider-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem}
+.llm-provider-card.active{border-color:rgba(34,197,94,.4)}
+.llm-provider-card.inactive{opacity:.65}
+.llm-prov-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
+.llm-prov-name{font-weight:700;font-size:0.9rem;color:var(--text-primary)}
+.llm-prov-models{font-size:0.73rem;color:var(--text-secondary);margin-top:2px}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.routing-select{background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.35rem 0.6rem;font-size:0.81rem;font-family:inherit;outline:none;min-width:200px}
+.routing-select:focus{border-color:var(--purple)}
+.routing-row td{padding:0.55rem 0.8rem;border-bottom:1px solid rgba(255,255,255,0.04)}
+.routing-category{font-weight:600;font-size:0.83rem;color:var(--text-primary)}
+.routing-category small{display:block;font-weight:400;font-size:0.71rem;color:var(--text-secondary);margin-top:1px}
+.llm-ab-row{display:flex;align-items:center;gap:0.8rem;padding:0.6rem 0.8rem;background:var(--bg-secondary);border-radius:8px;margin-bottom:0.5rem;font-size:0.81rem}
+.llm-ab-badge{padding:2px 8px;border-radius:12px;font-size:0.68rem;font-weight:700;text-transform:uppercase}
+.llm-ab-badge.pending{background:rgba(234,179,8,.15);color:#eab308}
+.llm-ab-badge.won-a{background:rgba(34,197,94,.15);color:#22c55e}
+.llm-ab-badge.won-b{background:rgba(168,85,247,.15);color:#a855f7}
+</style>
+
+<div class="settings-page">
+    <div class="settings-tabs">
+        <button class="settings-tab active" onclick="showSettingsTab('general')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-settings"/></svg> General
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('orchestrator')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-activity"/></svg> Orchestrator
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('integrations')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Integrations
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('llm')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-cpu"/></svg> LLM
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('notifications')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-bell"/></svg> Notifications
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('modules')">
+            <svg class="icon icon-sm" style="vertical-align:-2px;margin-right:4px"><use href="#icon-plug"/></svg> Modules
+        </button>
+        <button class="settings-tab" onclick="showSettingsTab('security')">Security</button>
+    </div>
+
+    <!-- ═══ General ═══ -->
+    <div class="settings-panel active" id="panel-general">
+        <section class="settings-section">
+            <h3>{{ _("server") }}</h3>
+            <div class="form-group">
+                <label>{{ _("host") }}</label>
+                <input type="text" value="{{ config.server.host }}" readonly>
+            </div>
+            <div class="form-group">
+                <label>{{ _("port") }}</label>
+                <input type="number" value="{{ config.server.port }}" readonly>
+            </div>
+        </section>
+        <section class="settings-section">
+            <h3>{{ _("orchestrator") }}</h3>
+            <div class="form-group">
+                <label>{{ _("default_pattern") }}</label>
+                <input type="text" value="{{ config.orchestrator.default_pattern }}" readonly>
+            </div>
+            <div class="form-group">
+                <label>{{ _("max_concurrent_sessions") }}</label>
+                <input type="number" value="{{ config.orchestrator.max_parallel_agents }}" readonly>
+            </div>
+            <hr style="border-color:var(--border);margin:1.2rem 0">
+        </section>
+        <section class="settings-section">
+            <h3>
+                <svg style="width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;vertical-align:-2px;margin-right:6px" viewBox="0 0 24 24"><path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                Self-Annotation Mode
+            </h3>
+            <p style="color:var(--text-secondary);font-size:0.82rem;margin-bottom:1rem">
+                Activate the visual annotation overlay on the SF platform itself. Business users can navigate any SF page and add feedback, bug reports, or UX suggestions directly on the interface.
+            </p>
+            <div style="display:flex;align-items:center;gap:12px">
+                <label class="toggle-label" style="display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" id="self-ann-toggle" style="display:none" onchange="setSelfAnnotation(this.checked)">
+                    <span id="self-ann-track" style="width:40px;height:22px;border-radius:11px;background:var(--bg-tertiary,#21262d);border:1px solid var(--border,#30363d);display:inline-flex;align-items:center;padding:2px;transition:background .2s;cursor:pointer" onclick="document.getElementById('self-ann-toggle').click()">
+                        <span id="self-ann-thumb" style="width:16px;height:16px;border-radius:50%;background:#8b949e;transition:transform .2s,background .2s;display:block"></span>
+                    </span>
+                    <span id="self-ann-label" style="font-size:0.82rem;color:var(--text-secondary)">Désactivé</span>
+                </label>
+                <a href="/annotate/_sf" target="_blank" style="font-size:0.78rem;color:var(--accent,#58a6ff);text-decoration:none">
+                    <svg style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;margin-right:3px;vertical-align:-1px" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Voir les annotations SF
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══ Orchestrator ═══ -->
+    <div class="settings-panel" id="panel-orchestrator">
+        <section class="settings-section">
+            <h3>Epic Queue</h3>
+            <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.2rem">
+                Control how missions are scheduled, throttled, and distributed across nodes.
+                Changes are applied live without restart.
+            </p>
+            <form id="orch-concurrency-form" style="display:flex;flex-direction:column;gap:1rem">
+
+              <!-- Concurrency -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Concurrency</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.8rem">
+                <div class="form-group">
+                  <label>Max concurrent epics</label>
+                  <input type="number" id="oc-semaphore" name="mission_semaphore"
+                    value="{{ config.orchestrator.mission_semaphore }}" min="1" max="10" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">running in parallel</span>
+                </div>
+                <div class="form-group">
+                  <label>Startup batch max</label>
+                  <input type="number" name="resume_batch_startup"
+                    value="{{ config.orchestrator.resume_batch_startup }}" min="1" max="20" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">epics per boot pass</span>
+                </div>
+                <div class="form-group">
+                  <label>Startup stagger (s)</label>
+                  <input type="number" name="resume_stagger_startup"
+                    value="{{ config.orchestrator.resume_stagger_startup }}" min="1" max="300" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">delay between launches on boot</span>
+                </div>
+                <div class="form-group">
+                  <label>Watchdog stagger (s)</label>
+                  <input type="number" name="resume_stagger_watchdog"
+                    value="{{ config.orchestrator.resume_stagger_watchdog }}" min="1" max="60" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">delay per watchdog cycle</span>
+                </div>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
+              <!-- Project Slots -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Deployed App Containers</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
+                Deployed apps run as Docker containers (<code>macaron-app-*</code>). Limit active slots to avoid RAM saturation.
+                The watchdog stops the oldest containers beyond the slot limit, and stops any container older than the TTL.
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:0.8rem">
+                <div class="form-group">
+                  <label>Max active project slots</label>
+                  <input type="number" name="max_active_projects"
+                    value="{{ config.orchestrator.max_active_projects }}" min="0" max="20" step="1" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">0 = unlimited</span>
+                </div>
+                <div class="form-group">
+                  <label>Container TTL (hours)</label>
+                  <input type="number" name="deployed_container_ttl_hours"
+                    value="{{ config.orchestrator.deployed_container_ttl_hours }}" min="0" max="168" step="0.5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.4rem">0 = no auto-stop</span>
+                </div>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
+              <!-- Backpressure -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">CPU / RAM Backpressure</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
+                Before each launch, the watchdog checks system load and adapts automatically.
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.8rem">
+                <div class="form-group">
+                  <label style="display:flex;align-items:center;gap:0.4rem">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4ade80"></span> CPU green (%)
+                  </label>
+                  <input type="number" name="cpu_green"
+                    value="{{ config.orchestrator.cpu_green }}" min="10" max="60" step="5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.3rem">launch freely</span>
+                </div>
+                <div class="form-group">
+                  <label style="display:flex;align-items:center;gap:0.4rem">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#facc15"></span> CPU yellow (%)
+                  </label>
+                  <input type="number" name="cpu_yellow"
+                    value="{{ config.orchestrator.cpu_yellow }}" min="30" max="80" step="5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.3rem">2× stagger</span>
+                </div>
+                <div class="form-group">
+                  <label style="display:flex;align-items:center;gap:0.4rem">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f87171"></span> CPU red (%)
+                  </label>
+                  <input type="number" name="cpu_red"
+                    value="{{ config.orchestrator.cpu_red }}" min="50" max="95" step="5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.3rem">skip cycle</span>
+                </div>
+                <div class="form-group">
+                  <label style="display:flex;align-items:center;gap:0.4rem">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f87171"></span> RAM red (%)
+                  </label>
+                  <input type="number" name="ram_red"
+                    value="{{ config.orchestrator.ram_red }}" min="50" max="95" step="5" style="width:80px">
+                  <span style="color:var(--text-secondary);font-size:0.75rem;margin-left:0.3rem">skip cycle</span>
+                </div>
+              </div>
+
+              <!-- Live load indicator -->
+              <div id="load-indicator" style="display:flex;gap:1.5rem;padding:0.8rem 1rem;background:var(--bg-tertiary);border-radius:8px;font-size:0.82rem;border:1px solid var(--border)">
+                <span style="color:var(--text-secondary)">Live load:</span>
+                <span>CPU <strong id="li-cpu">—</strong></span>
+                <span>RAM <strong id="li-ram">—</strong></span>
+                <span>Active missions <strong id="li-missions">—</strong></span>
+                <span>Score <strong id="li-score">—</strong></span>
+                <button type="button" onclick="refreshLoad()" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--text-secondary);padding:0.2rem 0.6rem;border-radius:4px;cursor:pointer;font-size:0.78rem">Refresh</button>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
+              <!-- YOLO mode -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Human-in-the-Loop</div>
+              <div style="display:flex;align-items:center;gap:1rem;padding:0.7rem 0.9rem;background:var(--bg-tertiary);border-radius:8px;border:1px solid var(--border)">
+                <label class="switch" style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">
+                  <input type="checkbox" name="yolo_mode" id="yolo_mode_toggle" {% if config.orchestrator.yolo_mode %}checked{% endif %}
+                    style="opacity:0;width:0;height:0">
+                  <span style="position:absolute;cursor:pointer;inset:0;background:{% if config.orchestrator.yolo_mode %}var(--yellow,#eab308){% else %}var(--border){% endif %};border-radius:22px;transition:.2s"
+                        id="yolo_slider"></span>
+                  <span style="position:absolute;left:{% if config.orchestrator.yolo_mode %}20px{% else %}3px{% endif %};top:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s;pointer-events:none"
+                        id="yolo_knob"></span>
+                </label>
+                <div>
+                  <div style="font-size:0.88rem;font-weight:600;color:var(--text-primary)">
+                    YOLO Mode — Auto-approve all checkpoints
+                  </div>
+                  <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.1rem">
+                    When enabled, <code>human-in-the-loop</code> phases are auto-approved without pausing.
+                    Useful for testing or fully automated runs. <strong style="color:var(--yellow,#eab308)">⚠ Use with care.</strong>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Resume all paused workflows -->
+              <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:0.3rem">
+                <button type="button" onclick="resumeAllWorkflows()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.5rem 1.2rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:0.4rem">
+                  <svg class="icon icon-sm"><use href="#icon-play"/></svg> Reprendre tous les workflows pausés
+                </button>
+                <span id="resume-all-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
+              <!-- AC Quality Thresholds -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Quality Gates — AC / Hardening</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem;margin-bottom:0.6rem">
+                Seuils du cycle d'Amélioration Continue. Si le <code>total_score</code> d'un cycle est inférieur au seuil,
+                un <strong>Hardening Sprint</strong> est déclenché automatiquement (<code>no_slop</code> + architecture + over_engineering).
+              </div>
+              <div id="quality-settings-form" style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem;max-width:640px">
+                <div class="form-group">
+                  <label>Seuil Hardening Sprint <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-hardening-threshold" min="50" max="100" step="1" style="width:80px"
+                      value="85">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">déclenche refactoring si score &lt; seuil</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Warn <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-warn" min="0" max="100" step="5" style="width:80px"
+                      value="60">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">jaune en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Adversarial Fail <span style="color:var(--text-secondary)">(0-100)</span></label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-adversarial-fail" min="0" max="100" step="5" style="width:80px"
+                      value="40">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">rouge en-dessous</span>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Max Hardenings / cycle</label>
+                  <div style="display:flex;align-items:center;gap:0.5rem">
+                    <input type="number" id="qs-max-hardening" min="1" max="5" step="1" style="width:80px"
+                      value="1">
+                    <span style="font-size:0.78rem;color:var(--text-secondary)">force progression après N sprints</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:0.8rem;margin-top:0.3rem">
+                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.88rem">
+                  <input type="checkbox" id="qs-auto-hardening" checked>
+                  <span>Auto-hardening activé</span>
+                </label>
+              </div>
+              <div style="margin-top:0.5rem;display:flex;align-items:center;gap:0.8rem">
+                <button type="button" onclick="saveQualitySettings()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.4rem 1.1rem;border-radius:6px;cursor:pointer;font-size:0.85rem;font-weight:600">
+                  Save Quality Gates
+                </button>
+                <span id="quality-save-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+
+              <hr style="border-color:var(--border);margin:0.2rem 0">
+
+              <!-- Worker nodes -->
+              <div style="color:var(--text-secondary);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;font-weight:600">Worker Nodes</div>
+              <div style="color:var(--text-secondary);font-size:0.8rem;margin-top:-0.4rem">
+                Missions are dispatched to the least-loaded node. Each node must expose <code>/api/metrics/load</code>.
+                Leave empty to run everything locally.
+              </div>
+              <div class="form-group">
+                <label>Node URLs (one per line)</label>
+                <textarea name="worker_nodes" rows="4"
+                  style="width:100%;max-width:520px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.6rem;font-family:var(--font-mono);font-size:0.82rem;resize:vertical"
+                  placeholder="https://sf.macaron-software.com&#10;https://worker2.example.com">{{ config.orchestrator.worker_nodes | join('\n') }}</textarea>
+              </div>
+
+              <div id="worker-status" style="display:none;padding:0.6rem 1rem;background:var(--bg-tertiary);border-radius:8px;font-size:0.8rem;border:1px solid var(--border)"></div>
+
+              <div style="display:flex;align-items:center;gap:1rem;margin-top:0.4rem">
+                <button type="button" onclick="saveOrchSettings()"
+                  style="background:var(--purple);color:#fff;border:none;padding:0.5rem 1.4rem;border-radius:6px;cursor:pointer;font-size:0.9rem;font-weight:600">
+                  Save
+                </button>
+                <button type="button" onclick="pingWorkers()"
+                  style="background:none;border:1px solid var(--border);color:var(--text-secondary);padding:0.5rem 1rem;border-radius:6px;cursor:pointer;font-size:0.85rem">
+                  Ping workers
+                </button>
+                <span id="orch-save-status" style="font-size:0.82rem;color:var(--text-secondary)"></span>
+              </div>
+            </form>
+        </section>
+    </div>
+
+    <!-- ═══ Integrations ═══ -->
+    <div class="settings-panel" id="panel-integrations">
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.2rem">
+            Connect external tools to all agents — dev, QA, security, TMA, MCO, TMC, marketing and more. Configured credentials are available to agents with matching roles.
+        </p>
+
+        <!-- Category filter tabs -->
+        <div id="integ-cat-tabs" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:1.2rem">
+            <button class="btn btn-sm integ-cat-btn active" data-cat="all" onclick="filterIntegCat('all',this)">All</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="devops" onclick="filterIntegCat('devops',this)">Dev/DevOps</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="communication" onclick="filterIntegCat('communication',this)">Communication</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="monitoring" onclick="filterIntegCat('monitoring',this)">Monitoring</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="security" onclick="filterIntegCat('security',this)">Security</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="itsm" onclick="filterIntegCat('itsm',this)">ITSM/TMA</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="marketing" onclick="filterIntegCat('marketing',this)">Marketing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="infra" onclick="filterIntegCat('infra',this)">Cloud/Infra</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="testing" onclick="filterIntegCat('testing',this)">Testing</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="design" onclick="filterIntegCat('design',this)">Design</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="architecture" onclick="filterIntegCat('architecture',this)">Architecture</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="github_tool" onclick="filterIntegCat('github_tool',this)">GitHub OSS</button>
+            <button class="btn btn-sm integ-cat-btn" data-cat="platform" onclick="filterIntegCat('platform',this)">⚙️ Platform</button>
+        </div>
+
+        <div class="integ-grid" id="integ-grid">
+        {% for integ in integrations %}
+            {% set cfg = integ.config %}
+            <div class="integ-card {% if integ.enabled %}enabled{% endif %}" id="integ-{{ integ.id }}" data-cat="{{ integ.category or integ.type }}">
+                <div class="integ-header">
+                    <div class="integ-icon-emoji">
+                        {% if integ.icon and integ.icon.startswith('http') %}
+                        <img src="{{ integ.icon }}" style="width:28px;height:28px;object-fit:contain;border-radius:4px" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'" alt="">
+                        
+                        {% else %}
+                        {{ integ.icon or '' }}
+                        {% endif %}
+                    </div>
+                    <div class="integ-info">
+                        <div class="integ-name">{{ integ.name }}</div>
+                        <div class="integ-type">{{ (integ.category or integ.type)|replace('_',' ') }}</div>
+                    </div>
+                    <label class="integ-toggle">
+                        <input type="checkbox" {% if integ.enabled %}checked{% endif %} onchange="toggleInteg('{{ integ.id }}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% if integ.description %}
+                <div class="integ-desc">{{ integ.description }}</div>
+                {% endif %}
+                <div class="integ-body">
+                    <!-- Dynamic fields from config JSON keys -->
+                    {% for key, val in cfg.items() %}
+                        {% if key not in ['type','enabled','auto_publish','ci_sync','boards_sync','quality_gate','test_plan_sync','auto_inject','notify_on','tls'] and val is not mapping %}
+                        <div class="integ-field">
+                            <label>{{ key|replace('_',' ')|title }}</label>
+                            {% if 'token' in key or 'secret' in key or 'password' in key or 'api_key' in key or 'key_id' in key or 'client_secret' in key %}
+                            <form onsubmit="return false"><input type="password" placeholder="••••••••" data-integ="{{ integ.id }}" data-key="{{ key }}"></form>
+                            {% elif 'url' in key or key == 'instance' or key == 'domain' %}
+                            <input type="url" placeholder="https://..." value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            {% elif val is sameas true or val is sameas false %}
+                            <select data-integ="{{ integ.id }}" data-key="{{ key }}">
+                                <option value="true" {% if val %}selected{% endif %}>Enabled</option>
+                                <option value="false" {% if not val %}selected{% endif %}>Disabled</option>
+                            </select>
+                            {% else %}
+                            <input type="text" value="{{ val if val else '' }}" data-integ="{{ integ.id }}" data-key="{{ key }}">
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% if integ.agent_roles %}
+                <div class="integ-roles">
+                    <span style="font-size:0.7rem;opacity:.5;margin-right:4px">Roles:</span>
+                    {% for role in integ.agent_roles %}
+                    <span class="integ-role-badge">{{ role }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                <div class="integ-status">
+                    <span class="integ-status-dot {{ integ.status }}"></span>
+                    <span>{{ integ.status }}</span>
+                    {% if integ.last_sync %}<span style="margin-left:auto;opacity:.6">Sync: {{ integ.last_sync | ts }}</span>{% endif %}
+                </div>
+                <div class="integ-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="saveInteg('{{ integ.id }}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="testInteg('{{ integ.id }}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="showIntegStats('{{ integ.id }}', '{{ integ.name }}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-bar-chart"/></svg> Stats
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    <!-- ═══ Notifications ═══ -->
+    <div class="settings-panel" id="panel-notifications">
+        <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1.5rem">
+            Configure notifications when missions complete, fail, or need attention.<br>
+            Set environment variables on the server, then test each channel below.
+        </p>
+
+        <!-- Status badges -->
+        <div id="notif-status-row" style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.5rem">
+            <span class="badge badge-idle" id="ns-slack"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="#icon-message-circle"/></svg>Slack</span>
+            <span class="badge badge-idle" id="ns-email"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="#icon-mail"/></svg>Email</span>
+            <span class="badge badge-idle" id="ns-webhook"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="#icon-send"/></svg>Webhook</span>
+            <span class="badge badge-idle" id="ns-whatsapp"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="#icon-smartphone"/></svg>WhatsApp</span>
+            <span class="badge badge-idle" id="ns-push"><svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="#icon-bell"/></svg>Browser Push</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1.2rem">
+
+            <!-- Slack -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">
+                    <svg class="icon" style="width:18px;height:18px;color:var(--purple)"><use href="#icon-message-circle"/></svg> Slack
+                </div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">Incoming Webhook. Créez-en un sur <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--purple)">api.slack.com</a>.</div>
+                <div class="integ-field"><label>NOTIFY_SLACK_WEBHOOK</label>
+                  <input type="url" id="notif-slack-url" placeholder="https://hooks.slack.com/services/..." style="width:100%"></div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('slack')" style="margin-top:0.5rem">
+                    <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Tester
+                </button>
+                <div id="notif-slack-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- Webhook -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">
+                    <svg class="icon" style="width:18px;height:18px;color:var(--purple)"><use href="#icon-send"/></svg> Webhook générique
+                </div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">POST JSON vers n'importe quel endpoint (n8n, Make, Zapier…).</div>
+                <div class="integ-field"><label>NOTIFY_WEBHOOK_URL</label>
+                  <input type="url" id="notif-webhook-url" placeholder="https://hooks.n8n.io/..." style="width:100%"></div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('webhook')" style="margin-top:0.5rem">
+                    <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Tester
+                </button>
+                <div id="notif-webhook-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- WhatsApp Twilio -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">
+                    <svg class="icon" style="width:18px;height:18px;color:var(--purple)"><use href="#icon-smartphone"/></svg> WhatsApp (Twilio)
+                </div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">
+                    Via <a href="https://www.twilio.com/whatsapp" target="_blank" style="color:var(--purple)">Twilio WhatsApp API</a>. Sandbox gratuit pour les tests.
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:6px;padding:0.5rem 0.7rem;font-family:var(--font-mono);line-height:1.8">
+                    NOTIFY_TWILIO_ACCOUNT_SID=ACxxx<br>
+                    NOTIFY_TWILIO_AUTH_TOKEN=xxx<br>
+                    NOTIFY_TWILIO_WHATSAPP_FROM=whatsapp:+14155238886<br>
+                    NOTIFY_WHATSAPP_TO=whatsapp:+336xxxxxxxx
+                </div>
+                <button class="btn btn-ghost btn-sm" onclick="notifTest('whatsapp')" style="margin-top:0.8rem">
+                    <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Tester
+                </button>
+                <div id="notif-whatsapp-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+            </div>
+
+            <!-- Browser Push -->
+            <div class="integ-card" style="padding:1rem">
+                <div style="display:flex;align-items:center;gap:0.5rem;font-weight:700;font-size:0.9rem;margin-bottom:0.6rem">
+                    <svg class="icon" style="width:18px;height:18px;color:var(--purple)"><use href="#icon-bell"/></svg> Browser Push (Web Push)
+                </div>
+                <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.8rem">
+                    Notifications natives dans votre navigateur. Gratuit, pas de compte tiers.
+                </div>
+                <div id="push-keys-info" style="font-size:0.75rem;color:var(--text-secondary);background:var(--bg-tertiary);border-radius:6px;padding:0.5rem 0.7rem;font-family:var(--font-mono)">
+                    NOTIFY_VAPID_PUBLIC_KEY=…<br>
+                    NOTIFY_VAPID_PRIVATE_KEY=…<br>
+                    NOTIFY_VAPID_EMAIL=admin@example.com
+                </div>
+                <div style="display:flex;gap:0.5rem;margin-top:0.8rem;flex-wrap:wrap">
+                    <button class="btn btn-ghost btn-sm" onclick="sfRequestPush().then(ok => document.getElementById('notif-push-result').textContent = ok ? '✓ Abonné !' : '✗ Refusé')">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-bell"/></svg> Activer les notifs
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="notifTest('push')">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Tester
+                    </button>
+                </div>
+                <div id="notif-push-result" style="font-size:0.75rem;margin-top:0.4rem;color:var(--text-secondary)"></div>
+                <div id="push-sub-count" style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.3rem"></div>
+            </div>
+
+        </div>
+
+        <script>
+        const _notifIcons = {
+            slack: '#icon-message-circle', email: '#icon-mail',
+            webhook: '#icon-send', whatsapp: '#icon-smartphone', browser_push: '#icon-bell'
+        };
+        const _notifLabels = {slack:'Slack',email:'Email',webhook:'Webhook',whatsapp:'WhatsApp',browser_push:'Browser Push'};
+        async function loadNotifStatus() {
+          try {
+            const r = await fetch('/api/push/status');
+            const d = await r.json();
+            const map = {slack:'ns-slack',email:'ns-email',webhook:'ns-webhook',whatsapp:'ns-whatsapp',browser_push:'ns-push'};
+            for(const [k, elId] of Object.entries(map)) {
+              const el = document.getElementById(elId);
+              if(!el) continue;
+              const icon = `<svg class="icon icon-sm" style="vertical-align:-2px;margin-right:3px"><use href="${_notifIcons[k]}"/></svg>`;
+              el.innerHTML = icon + _notifLabels[k];
+              el.className = 'badge ' + (d[k] ? 'badge-ok' : 'badge-idle');
+            }
+            const pc = document.getElementById('push-sub-count');
+            if(pc) pc.textContent = d.push_subscriptions + ' abonnement(s) navigateur actif(s)';
+          } catch(e) {}
+        }
+
+        async function notifTest(channel) {
+          const el = document.getElementById('notif-'+channel+'-result');
+          if(el) el.textContent = '⏳ Envoi…';
+          try {
+            const r = await fetch('/api/notifications/test', {method:'POST',
+              headers:{'Content-Type':'application/json'},
+              body: JSON.stringify({channel, slack_url: document.getElementById('notif-slack-url')?.value, webhook_url: document.getElementById('notif-webhook-url')?.value})
+            });
+            const d = await r.json();
+            if(el) el.textContent = d.ok ? '' + (d.message||'Envoyé !') : 'Erreur: ' + (d.error||'Erreur');
+          } catch(e) {
+            if(el) el.textContent = 'Erreur: ' + e.message;
+          }
+        }
+
+        if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadNotifStatus);
+        else loadNotifStatus();
+        </script>
+    </div>
+
+    <!-- ═══ LLM ═══ -->
+    <div class="settings-panel" id="panel-llm">
+
+        <!-- Providers -->
+        <section class="settings-section">
+            <h3>Providers</h3>
+            <div id="llm-providers-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+
+        <!-- Routing assignment matrix -->
+        <section class="settings-section" style="margin-top:2rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+                <div>
+                    <h3 style="margin:0">Routing</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">Assign LLM models per task category. Darwin Thompson Sampling will learn which model performs best for each team × category.</p>
+                </div>
+                <div style="display:flex;gap:.5rem">
+                    <button class="btn btn-ghost btn-sm" onclick="resetLLMRouting()" id="routing-reset-btn" title="Reset to auto-detected defaults (primary provider)">
+                        <svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="saveLLMRouting()" id="routing-save-btn">
+                        <svg class="icon icon-sm"><use href="#icon-save"/></svg> Save
+                    </button>
+                </div>
+            </div>
+            <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:0.83rem" id="routing-table">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border)">
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Category</th>
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Lourd (heavy)</th>
+                        <th style="text-align:left;padding:0.5rem 0.8rem;color:var(--text-secondary);font-weight:600;font-size:0.72rem;text-transform:uppercase;letter-spacing:.3px">Léger (light)</th>
+                    </tr>
+                </thead>
+                <tbody id="routing-tbody">
+                    <tr><td colspan="3" style="padding:1rem;color:var(--text-secondary)">Loading...</td></tr>
+                </tbody>
+            </table>
+            </div>
+        </section>
+
+        <!-- Image Generation -->
+        <section class="settings-section" style="margin-top:2rem">
+            <h3>Image Generation</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem">Providers used by agents to generate visual assets (sprites, backgrounds, concept art). Used in game dev and design workflows.</p>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem" id="image-gen-grid">
+                <!-- fal.ai / Flux -->
+                <div class="llm-provider-card" id="imgprov-falai">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">fal.ai — Flux</div>
+                            <div class="llm-prov-models">flux-pro · flux-dev · flux-schnell</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-falai-toggle" onchange="saveImageProviderKey('falai', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Best quality for general assets, backgrounds, concept art. ~$0.05/image.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-falai-key" placeholder="FAL_KEY (fal.ai API key)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('falai')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('falai')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- PixelLab -->
+                <div class="llm-provider-card" id="imgprov-pixellab">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">PixelLab</div>
+                            <div class="llm-prov-models">sprites · tilesets · animations</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-pixellab-toggle" onchange="saveImageProviderKey('pixellab', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Purpose-built for pixel art game assets. Sprite sheets, rotations, animation frames.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-pixellab-key" placeholder="PixelLab API key" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('pixellab')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('pixellab')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- Gemini Image (Nano Banana) -->
+                <div class="llm-provider-card" id="imgprov-gemini-image">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">Gemini Image (Nano Banana)</div>
+                            <div class="llm-prov-models">gemini-2.5-flash · imagen-3</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-gemini-image-toggle" onchange="saveImageProviderKey('gemini-image', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">UI mockups, screens & flows. Generate full interface designs from a prompt, then feed image to Claude to implement. Uses your existing GEMINI_API_KEY.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-gemini-image-key" placeholder="GEMINI_API_KEY (reuse existing)" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('gemini-image')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('gemini-image')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+                <!-- Replicate -->
+                <div class="llm-provider-card" id="imgprov-replicate">
+                    <div class="llm-prov-header">
+                        <div>
+                            <div class="llm-prov-name">Replicate</div>
+                            <div class="llm-prov-models">flux · sdxl · custom LoRA</div>
+                        </div>
+                        <label class="integ-toggle">
+                            <input type="checkbox" id="imgprov-replicate-toggle" onchange="saveImageProviderKey('replicate', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <p style="font-size:0.75rem;color:var(--text-secondary);margin:0.4rem 0 0.6rem">Access to all open models (Flux, SDXL + LoRAs). Good for experimentation and style-consistent asset libraries.</p>
+                    <form onsubmit="return false"><input type="password" id="imgprov-replicate-key" placeholder="REPLICATE_API_TOKEN" autocomplete="off"
+                        style="width:100%;box-sizing:border-box;padding:0.4rem 0.6rem;font-size:0.78rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);margin-bottom:0.5rem"
+                        oninput="markImageProviderDirty('replicate')"></form>
+                    <button class="btn btn-ghost btn-sm" onclick="saveImageProviderKey('replicate')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save key
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Darwin LLM Thompson Sampling -->
+        <section class="settings-section" style="margin-top:2rem">
+            <h3>Darwin LLM A/B</h3>
+            <p style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:1rem">Thompson Sampling comparing the same team (agent+pattern) across different LLM models. Winners emerge from real mission outcomes.</p>
+            <div id="llm-ab-list">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+            <div style="margin-top:1rem">
+                <a href="/teams" style="font-size:0.78rem;color:var(--purple)">View full LLM leaderboard on Teams tab →</a>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- ═══ Modules ═══ -->
+    <div class="settings-panel" id="panel-modules">
+        <section class="settings-section">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem">
+                <div>
+                    <h3 style="margin:0">Optional Modules</h3>
+                    <p style="font-size:0.78rem;color:var(--text-secondary);margin:4px 0 0">External knowledge sources and tool providers for agents. Enable to make tools available in MCP LRM.</p>
+                </div>
+            </div>
+            <div id="modules-container">
+                <p style="color:var(--text-secondary);font-size:0.85rem">Loading...</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- ═══ Security ═══ -->
+    <div class="settings-panel" id="panel-security">
+        <section class="settings-section">
+            <h3>Agent Sandbox</h3>
+            <p style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:1.2rem">
+                Isolement filesystem des commandes shell exécutées par les agents. Chaque agent est restreint à son workspace projet — accès à la source platform et aux autres workspaces bloqué.
+            </p>
+
+            <!-- Landlock card -->
+            <div class="integ-card" id="landlock-card" style="max-width:560px">
+                <div style="display:flex;align-items:flex-start;gap:1rem">
+                    <div style="font-size:2rem;line-height:1;margin-top:2px;color:var(--text-secondary);font-weight:700">[LL]</div>
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.3rem">
+                            <span style="font-weight:700;font-size:0.95rem">Landlock Filesystem Sandbox</span>
+                            <span id="landlock-status-badge" class="ck-badge badge-off" style="font-size:0.65rem">Chargement…</span>
+                        </div>
+                        <p style="font-size:0.78rem;color:var(--text-secondary);margin:0 0 0.6rem 0;line-height:1.5">
+                            Linux Security Module (kernel ≥ 5.13). Sandbox léger kernel-level — zéro overhead contrairement au Docker sandbox. Restreint l'accès fichiers de chaque shell agent à son workspace + chemins système en lecture seule.
+                        </p>
+                        <div id="landlock-binary-info" style="font-size:0.72rem;color:var(--text-secondary);font-family:monospace;margin-bottom:0.8rem">—</div>
+                        <div style="display:flex;align-items:center;gap:1rem">
+                            <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;font-weight:600">
+                                <div class="toggle-switch" id="landlock-toggle" onclick="toggleLandlock()" style="position:relative;width:40px;height:22px;cursor:pointer">
+                                    <input type="checkbox" id="landlock-checkbox" style="opacity:0;width:0;height:0;position:absolute">
+                                    <span id="landlock-slider" style="position:absolute;inset:0;border-radius:22px;background:var(--border);transition:.3s;display:flex;align-items:center">
+                                        <span id="landlock-knob" style="width:16px;height:16px;border-radius:50%;background:#fff;margin-left:3px;transition:transform .3s;display:block;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+                                    </span>
+                                </div>
+                                <span id="landlock-toggle-label">—</span>
+                            </label>
+                            <span id="landlock-save-hint" style="font-size:0.72rem;color:var(--purple);display:none">Saved</span>
+                        </div>
+                    </div>
+                </div>
+                <div style="margin-top:1rem;padding-top:0.75rem;border-top:1px solid var(--border);font-size:0.75rem;color:var(--text-secondary)">
+                    <strong>Politique appliquée :</strong>
+                    <span style="margin-left:0.4rem">workspace → RW · /bin /usr /lib /etc /tmp → RO · /app/platform + autres workspaces → <span style="color:#ef4444;font-weight:600">BLOQUÉ</span></span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+</div>
+
+<!-- ═══ Modules Panel (injected after LLM panel) ═══ -->
+<style>
+.module-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;display:flex;flex-direction:column;gap:0.5rem;transition:border-color .15s}
+.module-card.enabled{border-color:var(--purple);background:var(--bg-highlight,rgba(139,92,246,.04))}
+.module-card-header{display:flex;align-items:flex-start;gap:0.75rem}
+.module-icon{font-size:1.5rem;line-height:1;flex-shrink:0;margin-top:2px}
+.module-info{flex:1;min-width:0}
+.module-name{font-weight:600;font-size:0.88rem;color:var(--text-primary)}
+.module-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:2px;line-height:1.4}
+.module-meta{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.3rem}
+.module-cat-badge{font-size:0.68rem;padding:2px 7px;border-radius:4px;background:var(--bg-secondary);color:var(--text-secondary);border:1px solid var(--border);text-transform:uppercase;letter-spacing:.3px}
+.module-tools{font-size:0.72rem;color:var(--text-secondary);font-family:monospace;margin-top:0.3rem}
+.module-actions{display:flex;align-items:center;gap:0.75rem;margin-top:0.5rem;border-top:1px solid var(--border);padding-top:0.6rem}
+.module-toggle{display:flex;align-items:center;gap:0.5rem;cursor:pointer}
+.modules-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem;margin-top:1rem}
+.modules-cat-section{margin-bottom:2rem}
+.modules-cat-title{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:0.75rem;border-bottom:1px solid var(--border);padding-bottom:0.4rem}
+</style>
+
+<script>
+const _CAT_LABELS = {
+  'ux-design':'UX / Design','development':'Development','security':'Security',
+  'infra':'Infra / DevOps','browser':'Browser','ai-llm':'AI / LLM','knowledge':'Knowledge','legal':'Legal','marketing-seo':'Marketing','data':'Data'
+};
+
+async function loadModulesTab(force) {
+    const container = document.getElementById('modules-container');
+    if (!container || (container.dataset.loaded && !force)) return;
+    container.dataset.loaded = '1';
+    try {
+        const r = await fetch('/api/modules');
+        const modules = await r.json();
+        renderModules(modules);
+    } catch(e) {
+        if (!force) container.innerHTML = `<p style="color:var(--text-secondary)">Failed to load modules: ${e.message}</p>`;
+    }
+}
+
+let _modulesPoller = null;
+function _startModulesPoller() {
+    if (_modulesPoller) return;
+    _modulesPoller = setInterval(() => loadModulesTab(true), 30000);
+}
+function _stopModulesPoller() {
+    if (_modulesPoller) { clearInterval(_modulesPoller); _modulesPoller = null; }
+}
+
+function renderModules(modules) {
+    const container = document.getElementById('modules-container');
+    // Group by category
+    const byCat = {};
+    modules.forEach(m => {
+        const c = m.category || 'other';
+        if (!byCat[c]) byCat[c] = [];
+        byCat[c].push(m);
+    });
+
+    const catOrder = ['ux-design','development','security','infra','browser','ai-llm','knowledge','legal','marketing-seo','data','other'];
+    let html = '';
+    catOrder.filter(c => byCat[c]).forEach(cat => {
+        const label = _CAT_LABELS[cat] || cat;
+        html += `<div class="modules-cat-section">
+            <div class="modules-cat-title">${label}</div>
+            <div class="modules-grid">`;
+        byCat[cat].forEach(m => { html += moduleCard(m); });
+        html += `</div></div>`;
+    });
+    container.innerHTML = html;
+}
+
+function moduleCard(m) {
+    const tools = (m.tools || []).map(t => `<code>${t}</code>`).join(' ');
+    const needsInstall = m.data_file && !m.installed;
+    const installBtn = needsInstall
+        ? `<button class="btn btn-sm" style="font-size:0.72rem" onclick="installModule('${m.id}',this)">⬇ Install</button>`
+        : (m.installed && m.data_file ? `<span style="font-size:0.72rem;color:var(--green)">✓ Installed</span>` : `<span style="font-size:0.72rem;color:var(--text-secondary)">No install needed</span>`);
+    const repoLink = m.repo_url ? `<a href="${m.repo_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">GitHub ↗</a>` : '';
+    const srcLink = m.source_url ? `<a href="${m.source_url}" target="_blank" style="font-size:0.72rem;color:var(--purple)">${m.name} ↗</a>` : '';
+    return `
+    <div class="module-card ${m.enabled?'enabled':''}" id="module-card-${m.id}">
+        <div class="module-card-header">
+            <span class="module-icon"><svg class="icon" style="width:20px;height:20px;opacity:.8"><use href="#icon-${m.icon||'plug'}"/></svg></span>
+            <div class="module-info">
+                <div class="module-name">${m.name}</div>
+                <div class="module-desc">${m.description}</div>
+                <div class="module-meta">
+                    <span class="module-cat-badge">${m.category||'other'}</span>
+                    ${m.license?`<span class="module-cat-badge" style="border-style:dashed">${m.license}</span>`:''}
+                    ${m.builtin?`<span class="module-cat-badge" style="background:rgba(139,92,246,.1);color:var(--purple);border-color:var(--purple)">built-in</span>`:''}
+                </div>
+                ${tools?`<div class="module-tools">Tools: ${tools}</div>`:''}
+            </div>
+            <label title="${m.builtin?'Built-in — always loaded at startup':'Toggle to enable/disable in MCP LRM (restart required)'}" style="cursor:pointer;display:flex;align-items:center;gap:0;margin:0;flex-shrink:0" onclick="toggleModule(event,'${m.id}')">
+                <span style="display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;background:${m.enabled?'var(--purple)':'var(--border)'};transition:background .2s" id="mod-track-${m.id}">
+                    <span style="position:absolute;top:2px;left:${m.enabled?'16px':'2px'};width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s" id="mod-thumb-${m.id}"></span>
+                </span>
+            </label>
+        </div>
+        <div class="module-actions">
+            ${installBtn}
+            <div style="flex:1"></div>
+            ${srcLink}
+            ${repoLink}
+        </div>
+    </div>`;
+}
+
+async function toggleModule(event, id) {
+    event.preventDefault();
+    const track = document.getElementById('mod-track-'+id);
+    const thumb = document.getElementById('mod-thumb-'+id);
+    const card  = document.getElementById('module-card-'+id);
+    try {
+        const r = await fetch('/api/modules/'+id+'/toggle', {method:'POST'});
+        const d = await r.json();
+        if (!d.ok) return;
+        track.style.background = d.enabled ? 'var(--purple)' : 'var(--border)';
+        thumb.style.left = d.enabled ? '16px' : '2px';
+        card.classList.toggle('enabled', d.enabled);
+    } catch(e) { console.error(e); }
+}
+
+async function installModule(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Installing...';
+    try {
+        const r = await fetch('/api/modules/'+id+'/install', {method:'POST'});
+        const d = await r.json();
+        if (d.ok) {
+            btn.textContent = '✓ Done';
+            btn.style.color = 'var(--green)';
+            // Reload to refresh installed status
+            setTimeout(() => loadModulesTab(true), 1000);
+        } else {
+            btn.textContent = '✗ Failed';
+            btn.style.color = 'var(--red)';
+            alert('Install failed:\n' + (d.error || d.stderr || ''));
+            btn.disabled = false;
+        }
+    } catch(e) { btn.textContent = '✗ Error'; btn.disabled = false; }
+}
+</script>
+
+<script>
+function showSettingsTab(id) {
+    document.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-'+id).classList.add('active');
+    try { event.target.closest('.settings-tab').classList.add('active'); } catch(_) {
+        document.querySelectorAll('.settings-tab').forEach(function(t){
+            if ((t.getAttribute('onclick')||'').includes("'"+id+"'")) t.classList.add('active');
+        });
+    }
+    try { localStorage.setItem('settings_tab', id); } catch(e){}
+    if (id === 'llm') loadLLMTab();
+    if (id === 'orchestrator') { refreshLoad(); loadQualitySettings(); }
+    if (id === 'modules') { loadModulesTab(); _startModulesPoller(); }
+    else _stopModulesPoller();
+}
+// Restore last tab
+try {
+    const last = localStorage.getItem('settings_tab');
+    if (last) showSettingsTab(last);
+} catch(e){}
+
+async function saveOrchSettings() {
+  const form = document.getElementById('orch-concurrency-form');
+  const data = {};
+  form.querySelectorAll('input[name]').forEach(el => {
+    data[el.name] = el.type === 'number' ? Number(el.value) : el.value;
+  });
+  const ta = form.querySelector('textarea[name="worker_nodes"]');
+  if (ta) data['worker_nodes'] = ta.value;
+  const yolo = form.querySelector('#yolo_mode_toggle');
+  if (yolo) data['yolo_mode'] = yolo.checked;
+  const st = document.getElementById('orch-save-status');
+  st.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/settings/orchestrator', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    const j = await r.json();
+    if (j.ok) {
+      st.style.color = 'var(--green, #4ade80)';
+      st.textContent = 'Saved — applied live';
+      setTimeout(() => { st.textContent = ''; }, 3000);
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Error: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Error: ' + e.message;
+  }
+}
+
+// ── Quality Gates (AC Hardening) ─────────────────────────────────────────────
+async function loadQualitySettings() {
+  try {
+    const r = await fetch('/api/settings/quality');
+    const j = await r.json();
+    if (!j.ok) return;
+    const s = j.settings;
+    const el = (id) => document.getElementById(id);
+    if (s.ac_hardening_threshold) el('qs-hardening-threshold').value = s.ac_hardening_threshold;
+    if (s.ac_adversarial_warn)    el('qs-adversarial-warn').value    = s.ac_adversarial_warn;
+    if (s.ac_adversarial_fail)    el('qs-adversarial-fail').value    = s.ac_adversarial_fail;
+    if (s.ac_max_hardening_per_cycle) el('qs-max-hardening').value   = s.ac_max_hardening_per_cycle;
+    if (s.ac_auto_hardening_enabled !== undefined)
+      el('qs-auto-hardening').checked = (s.ac_auto_hardening_enabled === 'true');
+  } catch(e) { /* silent */ }
+}
+
+async function saveQualitySettings() {
+  const el = (id) => document.getElementById(id);
+  const data = {
+    ac_hardening_threshold:    parseInt(el('qs-hardening-threshold').value, 10),
+    ac_adversarial_warn:       parseInt(el('qs-adversarial-warn').value, 10),
+    ac_adversarial_fail:       parseInt(el('qs-adversarial-fail').value, 10),
+    ac_max_hardening_per_cycle:parseInt(el('qs-max-hardening').value, 10),
+    ac_auto_hardening_enabled: String(el('qs-auto-hardening').checked),
+  };
+  const st = el('quality-save-status');
+  st.textContent = 'Saving…';
+  try {
+    const r = await fetch('/api/settings/quality', {
+      method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+    });
+    const j = await r.json();
+    if (j.ok) {
+      st.style.color = 'var(--green, #4ade80)';
+      st.textContent = 'Saved — applied live';
+      setTimeout(() => { st.textContent = ''; }, 3000);
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Error: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Error: ' + e.message;
+  }
+}
+
+// YOLO toggle animation
+(function() {
+  const tog = document.getElementById('yolo_mode_toggle');
+  if (!tog) return;
+  const slider = document.getElementById('yolo_slider');
+  const knob = document.getElementById('yolo_knob');
+  tog.addEventListener('change', function() {
+    const on = tog.checked;
+    slider.style.background = on ? 'var(--yellow,#eab308)' : 'var(--border)';
+    knob.style.left = on ? '20px' : '3px';
+  });
+})();
+
+async function resumeAllWorkflows() {
+  const st = document.getElementById('resume-all-status');
+  st.style.color = 'var(--text-secondary)';
+  st.textContent = 'Reprise en cours…';
+  try {
+    const r = await fetch('/api/workflows/resume-all', { method: 'POST' });
+    const j = await r.json();
+    if (j.resumed !== undefined) {
+      st.style.color = 'var(--green,#4ade80)';
+      st.textContent = j.resumed > 0
+        ? `${j.resumed} workflow(s) repris`
+        : 'Aucun workflow pausé trouvé';
+    } else {
+      st.style.color = 'var(--accent)';
+      st.textContent = 'Erreur: ' + JSON.stringify(j);
+    }
+  } catch(e) {
+    st.style.color = 'var(--accent)';
+    st.textContent = 'Erreur: ' + e.message;
+  }
+  setTimeout(() => { st.textContent = ''; }, 5000);
+}
+
+async function refreshLoad() {
+  try {
+    const r = await fetch('/api/metrics/load');
+    const d = await r.json();
+    const cpu = d.cpu_percent ?? '—';
+    const ram = d.ram_percent ?? '—';
+    const score = d.load_score ?? '—';
+    const missions = d.active_epics ?? '—';
+    document.getElementById('li-cpu').textContent = cpu + '%';
+    document.getElementById('li-ram').textContent = ram + '%';
+    document.getElementById('li-missions').textContent = missions;
+    document.getElementById('li-score').textContent = score;
+    const li = document.getElementById('load-indicator');
+    const color = cpu >= 85 ? '#f87171' : cpu >= 70 ? '#facc15' : '#4ade80';
+    li.style.borderColor = color;
+  } catch(e) {}
+}
+
+async function pingWorkers() {
+  const ta = document.querySelector('textarea[name="worker_nodes"]');
+  const urls = (ta?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  const box = document.getElementById('worker-status');
+  if (!urls.length) { box.style.display='none'; return; }
+  box.style.display = 'block';
+  box.innerHTML = 'Pinging…';
+  const results = await Promise.all(urls.map(async url => {
+    try {
+      const r = await fetch(url.replace(/\/$/, '') + '/api/metrics/load', {signal: AbortSignal.timeout(4000)});
+      if (!r.ok) return `<span style="color:#f87171">${url} — HTTP ${r.status}</span>`;
+      const d = await r.json();
+      const color = d.load_score >= 85 ? '#f87171' : d.load_score >= 70 ? '#facc15' : '#4ade80';
+      return `<span style="color:${color}">${url} — CPU ${d.cpu_percent}% RAM ${d.ram_percent}% score ${d.load_score} (${d.active_epics} missions)</span>`;
+    } catch(e) {
+      return `<span style="color:#f87171">${url} — unreachable: ${e.message}</span>`;
+    }
+  }));
+  box.innerHTML = results.join('<br>');
+}
+
+function filterIntegCat(cat, btn) {
+    document.querySelectorAll('.integ-cat-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.integ-card').forEach(card => {
+        if (cat === 'all' || (card.dataset.cat||'').includes(cat)) {
+            card.classList.remove('hidden');
+        } else {
+            card.classList.add('hidden');
+        }
+    });
+}
+
+async function toggleInteg(id, enabled) {
+    await fetch(`/api/integrations/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({enabled})
+    });
+    document.getElementById('integ-'+id).classList.toggle('enabled', enabled);
+}
+
+function _gatherConfig(id) {
+    const cfg = {};
+    document.querySelectorAll(`[data-integ="${id}"]`).forEach(el => {
+        const k = el.dataset.key;
+        if (k === 'api_token' && !el.value) return;
+        cfg[k] = el.value;
+    });
+    return cfg;
+}
+
+async function saveInteg(id) {
+    const cfg = _gatherConfig(id);
+    const r = await fetch(`/api/integrations/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({config: cfg})
+    });
+    const j = await r.json();
+    if (j.ok) {
+        const btn = event.target.closest('button');
+        btn.textContent = '[+] Saved'; setTimeout(() => btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-save"/></svg> Save', 1500);
+    }
+}
+
+async function testInteg(id) {
+    const btn = event.target.closest('button');
+    btn.disabled = true; btn.textContent = 'Testing...';
+    const r = await fetch(`/api/integrations/${id}/test`, {method: 'POST'});
+    const j = await r.json();
+    const dot = document.querySelector(`#integ-${id} .integ-status-dot`);
+    const label = document.querySelector(`#integ-${id} .integ-status span:last-of-type`);
+    dot.className = 'integ-status-dot ' + (j.ok ? 'connected' : 'error');
+    if (label) label.textContent = j.ok ? 'connected' : 'error: ' + (j.error || 'failed');
+    btn.disabled = false; btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+}
+
+// Custom AI Providers
+async function loadCustomProviders() {
+    try {
+        const r = await fetch('/api/ai-providers');
+        const j = await r.json();
+        const list = document.getElementById('custom-providers-list');
+        
+        if (!j.ok || !j.providers || j.providers.length === 0) {
+            list.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem">No custom providers configured</p>';
+            return;
+        }
+        
+        list.innerHTML = j.providers.map(p => `
+            <div class="integ-card ${p.enabled ? 'enabled' : ''}" style="margin-bottom:1rem">
+                <div class="integ-header">
+                    <div class="integ-icon" style="background:rgba(124,58,237,.15);color:#7c3aed">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6M23 12h-6m-6 0H5"/></svg>
+                    </div>
+                    <div class="integ-info">
+                        <div class="integ-name">${p.name}</div>
+                        <div class="integ-type">${p.provider_type}</div>
+                    </div>
+                    <label class="integ-toggle">
+                        <input type="checkbox" ${p.enabled ? 'checked' : ''} onchange="toggleCustomProvider('${p.id}', this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="integ-desc">
+                    Base URL: ${p.base_url}<br>
+                    Model: ${p.default_model}
+                </div>
+                <div class="integ-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="testCustomProvider('${p.id}')" style="font-size:0.72rem">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="deleteCustomProvider('${p.id}')" style="font-size:0.72rem;color:var(--red)">
+                        <svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-trash"/></svg> Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        console.error('Failed to load custom providers:', e);
+    }
+}
+
+function showAddProviderModal() {
+    document.getElementById('add-provider-modal').style.display = 'block';
+    document.getElementById('add-provider-form').reset();
+}
+
+async function saveCustomProvider(e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = {
+        name: form.name.value,
+        provider_type: form.provider_type.value,
+        base_url: form.base_url.value,
+        api_key: form.api_key.value,
+        default_model: form.default_model.value
+    };
+    
+    try {
+        const r = await fetch('/api/ai-providers', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+        const j = await r.json();
+        
+        if (j.ok) {
+            document.getElementById('add-provider-modal').style.display = 'none';
+            loadCustomProviders();
+        } else {
+            alert('Error: ' + (j.error || 'Failed to save provider'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+async function toggleCustomProvider(id, enabled) {
+    await fetch(`/api/ai-providers/${id}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({enabled})
+    });
+}
+
+async function testCustomProvider(id) {
+    const btn = event.target.closest('button');
+    btn.disabled = true;
+    btn.textContent = 'Testing...';
+    
+    try {
+        const r = await fetch(`/api/ai-providers/${id}/test`, {method: 'POST'});
+        const j = await r.json();
+        
+        if (j.ok) {
+            btn.textContent = '[+] Connected';
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+            }, 2000);
+        } else {
+            alert('Connection failed: ' + (j.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="icon icon-sm" style="width:13px;height:13px"><use href="#icon-zap"/></svg> Test';
+    }
+}
+
+async function deleteCustomProvider(id) {
+    if (!confirm('Delete this provider?')) return;
+    
+    try {
+        const r = await fetch(`/api/ai-providers/${id}`, {method: 'DELETE'});
+        const j = await r.json();
+        
+        if (j.ok) {
+            loadCustomProviders();
+        } else {
+            alert('Error: ' + (j.error || 'Failed to delete'));
+        }
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
+}
+
+// ── LLM Tab ──────────────────────────────────────────────────────────────
+
+// Image Generation providers — keys stored as integrations
+const _IMAGE_PROVIDERS = {
+    falai:          { integ_id: 'image-gen-falai',         env_key: 'FAL_KEY' },
+    pixellab:       { integ_id: 'image-gen-pixellab',      env_key: 'PIXELLAB_API_KEY' },
+    'gemini-image': { integ_id: 'image-gen-gemini-image',  env_key: 'GEMINI_API_KEY' },
+    replicate:      { integ_id: 'image-gen-replicate',     env_key: 'REPLICATE_API_TOKEN' },
+};
+
+function markImageProviderDirty(id) {
+    const btn = document.querySelector(`#imgprov-${id} button`);
+    if (btn) btn.style.opacity = '1';
+}
+
+async function saveImageProviderKey(id, enabled) {
+    const keyInput = document.getElementById(`imgprov-${id}-key`);
+    const toggle = document.getElementById(`imgprov-${id}-toggle`);
+    const { integ_id, env_key } = _IMAGE_PROVIDERS[id];
+    const key = keyInput ? keyInput.value.trim() : '';
+    const isEnabled = enabled !== undefined ? enabled : (toggle ? toggle.checked : false);
+    const cfg = { env_key };
+    if (key) cfg.api_key = key;
+    await fetch(`/api/integrations/${integ_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: isEnabled, config: cfg }),
+    });
+    if (keyInput && key) { keyInput.value = ''; keyInput.placeholder = '••••••••  (saved)'; }
+}
+
+async function loadImageGenProviders() {
+    try {
+        const r = await fetch('/api/integrations');
+        const rows = await r.json();
+        for (const [id, { integ_id }] of Object.entries(_IMAGE_PROVIDERS)) {
+            const row = rows.find(r => r.id === integ_id);
+            if (row) {
+                const toggle = document.getElementById(`imgprov-${id}-toggle`);
+                const card = document.getElementById(`imgprov-${id}`);
+                if (toggle) toggle.checked = !!row.enabled;
+                if (card) card.classList.toggle('active', !!row.enabled);
+            }
+        }
+    } catch(e) { /* silent */ }
+}
+
+let _llmModels = [];
+const _ROUTING_ROWS = [
+    {key_heavy:'reasoning_heavy', key_light:'reasoning_light', label:'Reasoning', sub:'Architecture, planning, strategy'},
+    {key_heavy:'production_heavy', key_light:'production_light', label:'Production / Code', sub:'Developer, tester, security'},
+    {key_heavy:'tasks_heavy',  key_light:'tasks_light',  label:'Tasks', sub:'Generic agent work, tools'},
+    {key_heavy:'redaction_heavy', key_light:'redaction_light', label:'Redaction', sub:'Docs, summaries, reports'},
+];
+
+async function loadLLMTab() {
+    try {
+        const r = await fetch('/api/llm/routing');
+        const d = await r.json();
+        _llmModels = d.models || [];
+        renderProviders(d.providers || []);
+        renderRoutingTable(d.routing || {});
+        loadLLMABTests();
+        loadImageGenProviders();
+    } catch(e) {
+        document.getElementById('llm-providers-grid').innerHTML = '<p style="color:var(--red)">Failed to load: ' + e.message + '</p>';
+    }
+}
+
+function renderProviders(providers) {
+    const grid = document.getElementById('llm-providers-grid');
+    if (!providers.length) { grid.innerHTML = '<p style="color:var(--text-secondary)">No providers configured</p>'; return; }
+    const colors = {'azure-ai':'rgba(0,120,212,.15)','azure-openai':'rgba(0,120,212,.12)','minimax':'rgba(34,197,94,.12)','nvidia':'rgba(118,185,0,.12)','opencode':'rgba(124,58,237,.12)','local-mlx':'rgba(234,179,8,.12)','ollama':'rgba(20,184,166,.12)'};
+    const textColors = {'azure-ai':'#0078d4','azure-openai':'#0065b3','minimax':'#22c55e','nvidia':'#76b900','opencode':'#7c3aed','local-mlx':'#eab308','ollama':'#14b8a6'};
+    // Providers that support live model fetching
+    const liveModelProviders = new Set(['azure-ai','azure-openai','ollama','local-mlx','opencode']);
+    grid.innerHTML = providers.map(p => {
+        const canToggle = p.has_key;
+        const statusLabel = !p.has_key ? 'no key' : (p.manually_disabled ? 'disabled' : 'active');
+        const statusClass = !p.has_key ? 'badge-red' : (p.manually_disabled ? 'badge-yellow' : 'badge-green');
+        const toggleChecked = p.enabled ? 'checked' : '';
+        const toggleDisabled = !p.has_key ? 'disabled' : '';
+        const toggleTitle = !p.has_key ? `Set ${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY to enable` : (p.enabled ? 'Click to disable' : 'Click to enable');
+        const hasLiveFetch = liveModelProviders.has(p.id);
+        const modelsDisplay = p.models && p.models.length ? p.models.join(' · ') : '—';
+        const refreshBtn = hasLiveFetch ? `
+            <button onclick="refreshProviderModels('${p.id}')" id="refresh-btn-${p.id}"
+                title="Fetch models from ${p.name} API"
+                style="background:none;border:none;cursor:pointer;padding:0 2px;color:var(--text-secondary);opacity:.7;font-size:0.9rem;line-height:1"
+                >↻</button>` : '';
+        const ensureBtn = p.id === 'local-mlx' ? `
+            <button onclick="ensureLocalServer()" id="ensure-local-btn"
+                title="Start / restart local MLX server"
+                style="font-size:0.7rem;padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer;margin-left:4px"
+                >▶ Start</button>` : '';
+        return `
+        <div class="llm-provider-card ${p.enabled ? 'active' : 'inactive'}" id="prov-card-${p.id}">
+            <div class="llm-prov-header">
+                <div style="display:flex;align-items:center;gap:0.6rem">
+                    <div style="width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:${colors[p.id]||'rgba(124,58,237,.12)'};color:${textColors[p.id]||'#7c3aed'};font-size:0.75rem;font-weight:800">${p.id.split('-').map(w=>w[0].toUpperCase()).join('')}</div>
+                    <div>
+                        <div class="llm-prov-name">${p.name}</div>
+                        <div class="llm-prov-models" id="prov-models-${p.id}">${modelsDisplay}${refreshBtn}${ensureBtn}</div>
+                    </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.7rem">
+                    <span class="badge ${statusClass}" style="font-size:0.68rem" id="prov-badge-${p.id}">${statusLabel}</span>
+                    <label title="${toggleTitle}" style="cursor:${canToggle?'pointer':'not-allowed'};display:flex;align-items:center;gap:0;margin:0" onclick="toggleProvider(event,'${p.id}')">
+                        <input type="checkbox" ${toggleChecked} ${toggleDisabled}
+                            style="display:none"
+                            id="prov-toggle-${p.id}">
+                        <span style="
+                            display:inline-block;width:34px;height:18px;border-radius:9px;position:relative;
+                            background:${p.enabled?'var(--purple)':'var(--border)'};
+                            transition:background .2s;
+                            opacity:${canToggle?'1':'.45'}
+                        " id="prov-track-${p.id}">
+                            <span style="
+                                position:absolute;top:2px;left:${p.enabled?'16px':'2px'};
+                                width:14px;height:14px;border-radius:50%;background:#fff;
+                                transition:left .2s;
+                            " id="prov-thumb-${p.id}"></span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+            ${!p.has_key ? `<p style="font-size:0.72rem;color:var(--text-secondary);margin:0.4rem 0 0">Set <code>${p.id.toUpperCase().replace(/-/g,'_')}_API_KEY</code> env var to enable</p>` : ''}
+        </div>`;
+    }).join('');
+}
+
+// Live model fetch for a provider — updates card + routing selects.
+// WHY: Azure Foundry, ollama, opencode expose a /models or /api/tags endpoint.
+// Polling it lets the routing table show real deployed models without code change.
+async function refreshProviderModels(providerId) {
+    const btn = document.getElementById('refresh-btn-' + providerId);
+    const modelsDiv = document.getElementById('prov-models-' + providerId);
+    if (btn) { btn.style.opacity = '0.3'; btn.style.animation = 'spin 1s linear infinite'; }
+    try {
+        const r = await fetch(`/api/llm/providers/${providerId}/models`);
+        const d = await r.json();
+        if (!d.ok) throw new Error(d.error || 'failed');
+        const models = d.models || [];
+        if (!models.length) { if (btn) { btn.style.opacity='0.7'; btn.style.animation=''; } return; }
+        // Update _llmModels for this provider
+        _llmModels = _llmModels.filter(m => m.provider !== providerId);
+        models.forEach(m => _llmModels.push({
+            value: `${providerId}::${m}`,
+            label: `${d.provider_id || providerId} / ${m}`,
+            provider: providerId,
+            model: m,
+            enabled: true,
+        }));
+        // Re-render routing selects without full reload
+        const routing = {};
+        document.querySelectorAll('[data-routing-key]').forEach(sel => {
+            const [prov, mod] = sel.value.split('::');
+            routing[sel.dataset.routingKey] = {provider: prov, model: mod};
+        });
+        renderRoutingTable(routing);
+        // Update the model list text in the card
+        const refreshBtn = btn ? btn.outerHTML : '';
+        modelsDiv.innerHTML = models.join(' · ') + refreshBtn;
+    } catch(e) {
+        console.error('refreshProviderModels', providerId, e);
+    } finally {
+        if (btn) { btn.style.opacity='0.7'; btn.style.animation=''; }
+    }
+}
+
+// Ensure local-mlx server is running — calls _ensure_mlx_server() on the platform.
+// Shows status inline in the button. Takes up to LLM_TIMEOUT_MLX_WAIT seconds.
+async function ensureLocalServer() {
+    const btn = document.getElementById('ensure-local-btn');
+    if (!btn) return;
+    btn.textContent = '⏳ Starting…';
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/local/ensure', {method: 'POST'});
+        const d = await r.json();
+        if (d.status === 'running' || d.status === 'started') {
+            btn.textContent = '' + (d.status === 'running' ? 'Running' : 'Started');
+            btn.style.color = 'var(--green, #22c55e)';
+            // Refresh models list
+            refreshProviderModels('local-mlx');
+        } else if (d.status === 'disabled') {
+            btn.textContent = '—';
+        } else {
+            btn.textContent = 'Erreur: Failed';
+            btn.style.color = 'var(--red, #ef4444)';
+            btn.title = d.message || 'Server did not start';
+        }
+    } catch(e) {
+        btn.textContent = 'Erreur: Error';
+        console.error('ensureLocalServer', e);
+    } finally {
+        btn.disabled = false;
+        setTimeout(() => { if(btn){ btn.textContent='▶ Start'; btn.style.color=''; } }, 5000);
+    }
+}
+
+async function toggleProvider(event, providerId) {
+    event.preventDefault();
+    const card = document.getElementById('prov-card-' + providerId);
+    const track = document.getElementById('prov-track-' + providerId);
+    const thumb = document.getElementById('prov-thumb-' + providerId);
+    const badge = document.getElementById('prov-badge-' + providerId);
+    const input = document.getElementById('prov-toggle-' + providerId);
+    if (input.disabled) return;
+    try {
+        const r = await fetch('/api/llm/providers/' + providerId + '/toggle', {method:'POST'});
+        const d = await r.json();
+        if (!d.ok) { console.error('toggle failed', d); return; }
+        const enabled = d.enabled;
+        input.checked = enabled;
+        card.classList.toggle('active', enabled);
+        card.classList.toggle('inactive', !enabled);
+        track.style.background = enabled ? 'var(--purple)' : 'var(--border)';
+        thumb.style.left = enabled ? '16px' : '2px';
+        badge.textContent = enabled ? 'active' : 'disabled';
+        badge.className = 'badge ' + (enabled ? 'badge-green' : 'badge-yellow');
+        badge.style.fontSize = '0.68rem';
+    } catch(e) { console.error(e); }
+}
+
+function _modelSelect(key, currentVal) {
+    const opts = _llmModels.map(m => {
+        const val = m.provider + '::' + m.model;
+        const cur = currentVal ? (currentVal.provider + '::' + currentVal.model) : '';
+        const disabled = !m.enabled ? ' style="color:var(--text-secondary)"' : '';
+        // Short label: "ProviderName / model-basename" (strip HuggingFace org prefix)
+        const modelShort = m.model.includes('/') ? m.model.split('/').pop() : m.model;
+        const provShort = m.label.split(' / ')[0];
+        const displayLabel = provShort + ' / ' + modelShort;
+        return `<option value="${val}" ${val===cur?'selected':''}${disabled}>${displayLabel}</option>`;
+    }).join('');
+    return `<select class="routing-select" data-routing-key="${key}">${opts}</select>`;
+}
+
+function renderRoutingTable(routing) {
+    const tbody = document.getElementById('routing-tbody');
+    tbody.innerHTML = _ROUTING_ROWS.map(row => `
+        <tr class="routing-row">
+            <td><span class="routing-category">${row.label}<small>${row.sub}</small></span></td>
+            <td>${_modelSelect(row.key_heavy, routing[row.key_heavy])}</td>
+            <td>${_modelSelect(row.key_light, routing[row.key_light])}</td>
+        </tr>
+    `).join('');
+}
+
+async function saveLLMRouting() {
+    const btn = document.getElementById('routing-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const routing = {};
+    document.querySelectorAll('[data-routing-key]').forEach(sel => {
+        const [provider, model] = sel.value.split('::');
+        routing[sel.dataset.routingKey] = {provider, model};
+    });
+    try {
+        const r = await fetch('/api/llm/routing', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({routing})
+        });
+        const j = await r.json();
+        if (j.ok) {
+            btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-check"/></svg> Saved';
+            setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save'; }, 2000);
+        } else {
+            alert('Error: ' + (j.error || 'failed'));
+            btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
+        }
+    } catch(e) {
+        alert(e.message); btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-save"/></svg> Save';
+    }
+}
+
+async function resetLLMRouting() {
+    if (!confirm('Réinitialiser le routing aux valeurs par défaut (provider primaire auto-détecté) ?')) return;
+    const btn = document.getElementById('routing-reset-btn');
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/llm/routing/reset', {method:'POST'});
+        const j = await r.json();
+        if (j.ok) {
+            renderRoutingTable(j.routing || {});
+            btn.innerHTML = '<svg class="icon icon-sm"><use href="#icon-check"/></svg> Reset';
+            setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg class="icon icon-sm"><use href="#icon-refresh-cw"/></svg> Reset'; }, 2000);
+        }
+    } catch(e) { console.error(e); btn.disabled=false; }
+}
+
+async function loadLLMABTests() {
+    try {
+        const r = await fetch('/api/teams/llm-ab-tests?limit=10');
+        const d = await r.json();
+        const el = document.getElementById('llm-ab-list');
+        if (!d.data || !d.data.length) {
+            el.innerHTML = '<p style="color:var(--text-secondary);font-size:0.82rem">No LLM A/B tests yet. They start automatically once missions accumulate fitness data for multiple models per team.</p>';
+            return;
+        }
+        el.innerHTML = d.data.map(t => {
+            const badge = t.winner_llm ? (t.winner_llm === t.llm_a ? 'won-a' : 'won-b') : 'pending';
+            const winner = t.winner_llm || 'pending';
+            return `
+            <div class="llm-ab-row">
+                <div style="flex:1;min-width:0">
+                    <div style="font-weight:600;font-size:0.81rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.agent_id} · ${t.pattern_id}</div>
+                    <div style="font-size:0.72rem;color:var(--text-secondary)">${t.technology}/${t.phase_type}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.78rem">
+                    <span style="color:var(--text-secondary)">${t.llm_a}</span>
+                    <span style="color:var(--text-secondary)">vs</span>
+                    <span style="color:var(--text-secondary)">${t.llm_b}</span>
+                </div>
+                <span class="llm-ab-badge ${badge}">${winner}</span>
+                ${t.llm_a_score != null ? `<span style="font-size:0.72rem;color:var(--text-secondary)">${t.llm_a_score?.toFixed(1)} / ${t.llm_b_score?.toFixed(1)}</span>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { console.error(e); }
+}
+</script>
+
+<!-- Integration Stats Modal -->
+<div id="integ-stats-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;width:min(700px,95vw);max-height:85vh;overflow-y:auto;padding:1.5rem">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.2rem">
+            <h3 id="integ-stats-title" style="margin:0;font-size:1rem;font-weight:700">Integration Stats</h3>
+            <button onclick="closeIntegStats()" style="background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.3rem;line-height:1">×</button>
+        </div>
+        <div id="integ-stats-body" style="color:var(--text-secondary);font-size:0.85rem">Loading...</div>
+    </div>
+</div>
+<script>
+function showIntegStats(integId, integName) {
+    document.getElementById('integ-stats-title').textContent = integName + ' — Stats';
+    document.getElementById('integ-stats-body').innerHTML = '<div style="text-align:center;padding:2rem;opacity:.6">Loading...</div>';
+    const modal = document.getElementById('integ-stats-modal');
+    modal.style.display = 'flex';
+
+    fetch('/api/integrations/' + integId + '/stats')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.ok) { document.getElementById('integ-stats-body').textContent = d.error || 'Error'; return; }
+            let html = '';
+            if (integId === 'rtk-compression') {
+                const saved = d.total_tokens_saved || 0;
+                const savedK = saved >= 1000 ? (saved/1000).toFixed(1) + 'K' : saved;
+                html = `
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1.2rem">
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--purple)">${d.total_calls}</div>
+                        <div style="font-size:.75rem;opacity:.6">Total calls</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#4ade80">${savedK}</div>
+                        <div style="font-size:.75rem;opacity:.6">Tokens saved</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#facc15">${d.avg_savings_pct}%</div>
+                        <div style="font-size:.75rem;opacity:.6">Avg compression</div>
+                    </div>
+                    <div style="background:var(--bg-tertiary,#1a1a2e);border-radius:8px;padding:.8rem;text-align:center">
+                        <div style="font-size:1.5rem;font-weight:700;color:#60a5fa">${d.last_24h.calls}</div>
+                        <div style="font-size:.75rem;opacity:.6">Last 24h calls</div>
+                    </div>
+                </div>`;
+                if (d.by_provider && d.by_provider.length) {
+                    html += '<div style="margin-bottom:1rem"><div style="font-weight:600;margin-bottom:.5rem;font-size:.82rem;opacity:.8">By Provider</div>';
+                    html += '<table style="width:100%;border-collapse:collapse;font-size:.8rem">';
+                    html += '<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:.4rem">Provider</th><th style="text-align:right;padding:.4rem">Calls</th><th style="text-align:right;padding:.4rem">Orig tokens</th><th style="text-align:right;padding:.4rem">Compressed</th><th style="text-align:right;padding:.4rem">Saving</th></tr></thead><tbody>';
+                    d.by_provider.forEach(p => {
+                        const pct = p.avg_pct ? p.avg_pct.toFixed(1) : '0';
+                        html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:.4rem">${p.provider}</td><td style="text-align:right;padding:.4rem">${p.calls}</td><td style="text-align:right;padding:.4rem">${(p.orig_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.4rem">${(p.comp_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.4rem;color:#4ade80">${pct}%</td></tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                if (d.recent && d.recent.length) {
+                    html += '<div><div style="font-weight:600;margin-bottom:.5rem;font-size:.82rem;opacity:.8">Recent calls (last 20)</div>';
+                    html += '<table style="width:100%;border-collapse:collapse;font-size:.78rem">';
+                    html += '<thead><tr style="border-bottom:1px solid var(--border)"><th style="text-align:left;padding:.3rem">Provider</th><th style="text-align:right;padding:.3rem">Orig</th><th style="text-align:right;padding:.3rem">Compressed</th><th style="text-align:right;padding:.3rem">Saving</th><th style="text-align:right;padding:.3rem">Time</th></tr></thead><tbody>';
+                    d.recent.forEach(r => {
+                        const pct = r.savings_pct ? r.savings_pct.toFixed(1) : '0';
+                        const t = r.ts ? r.ts.slice(0,16).replace('T',' ') : '';
+                        html += `<tr style="border-bottom:1px solid var(--border)"><td style="padding:.3rem">${r.provider}</td><td style="text-align:right;padding:.3rem">${(r.original_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.3rem">${(r.compressed_tokens||0).toLocaleString()}</td><td style="text-align:right;padding:.3rem;color:#4ade80">${pct}%</td><td style="text-align:right;padding:.3rem;opacity:.6">${t}</td></tr>`;
+                    });
+                    html += '</tbody></table></div>';
+                }
+                if (!d.total_calls) html = '<div style="text-align:center;padding:2rem;opacity:.5">No compression stats yet.<br>Stats appear after the first LLM call with RTK enabled.</div>';
+            } else {
+                html = `<div style="display:grid;gap:.5rem">
+                    <div><span style="opacity:.5">Status:</span> ${d.status || 'unknown'}</div>
+                    <div><span style="opacity:.5">Last sync:</span> ${d.last_sync || 'never'}</div>
+                    <div><span style="opacity:.5">Updated:</span> ${d.updated_at || '-'}</div>
+                    ${d.note ? '<div style="opacity:.5;margin-top:.5rem">'+d.note+'</div>' : ''}
+                </div>`;
+            }
+            document.getElementById('integ-stats-body').innerHTML = html;
+        })
+        .catch(e => { document.getElementById('integ-stats-body').textContent = 'Error: ' + e; });
+}
+
+function closeIntegStats() {
+    document.getElementById('integ-stats-modal').style.display = 'none';
+}
+document.getElementById('integ-stats-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeIntegStats();
+});
+</script>
+
+<script>
+// Self-Annotation toggle
+(function() {
+  fetch('/api/settings/general').then(r=>r.json()).then(d => {
+    const enabled = d.self_annotation_enabled === 'true';
+    const cb = document.getElementById('self-ann-toggle');
+    const track = document.getElementById('self-ann-track');
+    const thumb = document.getElementById('self-ann-thumb');
+    const lbl = document.getElementById('self-ann-label');
+    if (!cb) return;
+    cb.checked = enabled;
+    if (enabled) {
+      track.style.background = '#1d4ed8';
+      thumb.style.transform = 'translateX(18px)';
+      thumb.style.background = '#fff';
+      lbl.textContent = 'Activé';
+      lbl.style.color = '#60a5fa';
+    }
+  }).catch(()=>{});
+})();
+
+function setSelfAnnotation(enabled) {
+  const track = document.getElementById('self-ann-track');
+  const thumb = document.getElementById('self-ann-thumb');
+  const lbl = document.getElementById('self-ann-label');
+  if (enabled) {
+    track.style.background = '#1d4ed8';
+    thumb.style.transform = 'translateX(18px)';
+    thumb.style.background = '#fff';
+    lbl.textContent = 'Activé';
+    lbl.style.color = '#60a5fa';
+  } else {
+    track.style.background = 'var(--bg-tertiary,#21262d)';
+    thumb.style.transform = 'translateX(0)';
+    thumb.style.background = '#8b949e';
+    lbl.textContent = 'Désactivé';
+    lbl.style.color = 'var(--text-secondary)';
+  }
+  fetch('/api/settings/general', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({self_annotation_enabled: enabled ? 'true' : 'false'})
+  });
+}
+</script>
+
+<script>
+// ── Security tab — Landlock ──────────────────────────────────────
+let _landlock_state = false;
+
+async function loadSecurityTab() {
+    try {
+        const r = await fetch('/api/settings/security');
+        const d = await r.json();
+        _landlock_state = d.landlock_enabled;
+        renderLandlock(d);
+    } catch(e) {
+        console.warn('Security settings load failed', e);
+    }
+}
+
+function renderLandlock(d) {
+    const card = document.getElementById('landlock-card');
+    const badge = document.getElementById('landlock-status-badge');
+    const binaryInfo = document.getElementById('landlock-binary-info');
+    const slider = document.getElementById('landlock-slider');
+    const knob = document.getElementById('landlock-knob');
+    const label = document.getElementById('landlock-toggle-label');
+    if (!card) return;
+
+    const active = d.landlock_active;
+    const enabled = d.landlock_enabled;
+    const found = d.landlock_binary_found;
+
+    // Badge
+    if (active) {
+        badge.className = 'ck-badge badge-ok';
+        badge.textContent = 'active';
+    } else if (found && !enabled) {
+        badge.className = 'ck-badge badge-warn';
+        badge.textContent = 'disabled';
+    } else {
+        badge.className = 'ck-badge badge-off';
+        badge.textContent = found ? 'off' : 'binary missing';
+    }
+
+    // Card border
+    card.className = 'integ-card' + (active ? ' enabled' : '');
+
+    // Binary path
+    binaryInfo.textContent = found ? d.landlock_binary_path : 'binary not found — Linux kernel required';
+
+    // Toggle
+    if (enabled) {
+        slider.style.background = 'var(--purple)';
+        knob.style.transform = 'translateX(18px)';
+    } else {
+        slider.style.background = 'var(--border)';
+        knob.style.transform = 'translateX(0)';
+    }
+    label.textContent = enabled ? 'Activé' : 'Désactivé';
+
+    if (!found) {
+        document.getElementById('landlock-toggle').style.opacity = '0.5';
+        document.getElementById('landlock-toggle').style.pointerEvents = 'none';
+    }
+}
+
+async function toggleLandlock() {
+    _landlock_state = !_landlock_state;
+    try {
+        const r = await fetch('/api/settings/security', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({landlock_enabled: _landlock_state})
+        });
+        const d = await r.json();
+        // Reload full status
+        const r2 = await fetch('/api/settings/security');
+        const d2 = await r2.json();
+        renderLandlock(d2);
+        const hint = document.getElementById('landlock-save-hint');
+        hint.style.display = 'inline';
+        setTimeout(() => { hint.style.display = 'none'; }, 2000);
+    } catch(e) {
+        console.error('Toggle failed', e);
+        _landlock_state = !_landlock_state; // revert
+    }
+}
+
+// Hook into tab switching
+const _secOrigShow = window.showSettingsTab;
+window.showSettingsTab = function(tab) {
+    _secOrigShow && _secOrigShow(tab);
+    if (tab === 'security') loadSecurityTab();
+};
+</script>
+
+{% endblock %}

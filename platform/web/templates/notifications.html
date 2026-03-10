@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% if unread %}
+<button class="btn btn-sm btn-secondary"
+        onclick="fetch('/api/notifications/read-all',{method:'POST'}).then(()=>location.reload())">
+    Mark all as read ({{ unread }})
+</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="notifications-page">
+    {% if notifications %}
+    <div class="notif-full-list">
+        {% for n in notifications %}
+        {% if n.type == 'checkpoint' %}
+        <div class="notif-full-item {% if not n.is_read %}unread{% endif %}" style="cursor:default;align-items:flex-start">
+            <div class="notif-sev warning" style="width:4px;min-height:100%;border-radius:2px;background:#f59e0b"></div>
+            {% if not n.is_read %}<div class="notif-dot"></div>{% endif %}
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                    <span class="notif-type-tag" style="background:rgba(245,158,11,.15);color:#f59e0b">checkpoint</span>
+                    <span style="font-size:13px;font-weight:500">{{ n.title }}</span>
+                    <span style="margin-left:auto;font-size:11px;color:var(--text-secondary)">{{ n.created_at | ts }}</span>
+                </div>
+                {% if n.message %}<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{{ n.message }}</div>{% endif %}
+                <div style="display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap">
+                    <button class="notif-btn notif-btn-go"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"GO"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> GO</button>
+                    <button class="notif-btn notif-btn-nogo"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"NOGO"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> NOGO</button>
+                    <button class="notif-btn notif-btn-pivot"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"PIVOT"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); this.closest('.notif-full-item').style.opacity='.4'"> PIVOT</button>
+                    <a href="{{ n.url }}" style="font-size:12px;color:var(--purple-light);margin-left:auto">Voir la conversation de l'équipe →</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="notif-full-item {% if not n.is_read %}unread{% endif %}"
+             {% if not n.is_read %}
+             hx-post="/api/notifications/{{ n.id }}/read"
+             hx-swap="none"
+             hx-trigger="click once"
+             {% endif %}>
+            <div class="notif-sev {{ n.severity }}" style="width:4px;min-height:100%;border-radius:2px"></div>
+            {% if not n.is_read %}<div class="notif-dot"></div>{% endif %}
+            <div style="flex:1;min-width:0">
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="notif-type-tag">{{ n.type }}</span>
+                    <span class="notif-title" style="font-size:13px">{{ n.title }}</span>
+                    <span style="margin-left:auto;font-size:11px;color:var(--text-secondary);white-space:nowrap">{{ n.created_at | ts }}</span>
+                </div>
+                {% if n.message %}
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{{ n.message }}</div>
+                {% endif %}
+                {% if n.url %}
+                <a href="{{ n.url }}" style="font-size:11px;color:var(--purple-light);margin-top:4px;display:inline-block">View details</a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="text-align:center;padding:60px 20px">
+        <svg class="icon" style="width:48px;height:48px;color:var(--text-secondary);margin-bottom:16px"><use href="#icon-bell"/></svg>
+        <h3 style="color:var(--text-secondary);margin:0">No notifications</h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin-top:8px">Notifications from epics, auto-heal, and system events will appear here.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.notifications-page{max-width:720px;margin:0 auto}
+.notif-full-list{display:flex;flex-direction:column;gap:2px}
+.notif-full-item{display:flex;gap:10px;padding:12px 16px;background:var(--bg-secondary);border-radius:var(--radius);cursor:pointer;transition:background .1s}
+.notif-full-item:hover{background:var(--bg-tertiary)}
+.notif-full-item.unread{background:rgba(168,85,247,.08)}
+.notif-type-tag{font-size:10px;text-transform:uppercase;padding:1px 6px;border-radius:4px;background:var(--bg-tertiary);color:var(--text-secondary);font-weight:600;letter-spacing:.5px}
+.notif-btn{font-size:12px;font-weight:600;padding:4px 12px;border-radius:6px;border:1px solid;cursor:pointer;transition:opacity .1s}
+.notif-btn:hover{opacity:.8}
+.notif-btn-go{background:rgba(34,197,94,.15);border-color:#22c55e;color:#22c55e}
+.notif-btn-nogo{background:rgba(239,68,68,.15);border-color:#ef4444;color:#ef4444}
+.notif-btn-pivot{background:rgba(245,158,11,.15);border-color:#f59e0b;color:#f59e0b}
+</style>
+{% endblock %}

@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.wg-wrap { display: flex; flex-direction: column; height: calc(100vh - 56px); background: var(--bg-page); }
+.wg-topbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--bg-card); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.wg-topbar h2 { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; flex: 1; }
+.wg-btn { padding: 0.35rem 0.75rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-page); color: var(--text); font-size: 0.78rem; cursor: pointer; }
+.wg-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.wg-content { display: flex; flex: 1; overflow: hidden; }
+.wg-sidebar { width: 240px; background: var(--bg-card); border-right: 1px solid var(--border); overflow-y: auto; padding: 0.75rem; flex-shrink: 0; }
+.wg-sidebar h3 { font-size: 0.72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 0.5rem; }
+.wg-canvas-wrap { flex: 1; overflow: hidden; position: relative; }
+#wgCanvas { width: 100%; height: 100%; }
+.wg-info { width: 260px; background: var(--bg-card); border-left: 1px solid var(--border); padding: 0.75rem; overflow-y: auto; flex-shrink: 0; }
+.wg-info h3 { font-size: 0.82rem; font-weight: 600; margin-bottom: 0.5rem; }
+.wg-info label { display: block; font-size: 0.72rem; color: var(--text-muted); margin-top: 0.5rem; }
+.wg-info input, .wg-info select, .wg-info textarea { width: 100%; font-size: 0.78rem; padding: 0.3rem; background: var(--bg-page); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
+.wg-info textarea { min-height: 60px; resize: vertical; }
+.phase-item { padding: 0.4rem 0.5rem; border-radius: 5px; background: var(--bg-page); border: 1px solid var(--border); margin-bottom: 0.3rem; font-size: 0.78rem; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; }
+.phase-item:hover { border-color: var(--accent); }
+.phase-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.wg-legend { display: flex; gap: 1rem; font-size: 0.7rem; color: var(--text-muted); padding: 0.3rem 1rem; background: var(--bg-card); border-top: 1px solid var(--border); flex-shrink: 0; }
+.wg-legend span { display: flex; align-items: center; gap: 0.3rem; }
+.wg-legend .dot { width: 10px; height: 10px; border-radius: 2px; }
+</style>
+
+<div class="wg-wrap">
+  <div class="wg-topbar">
+    <a href="/workflows/{{ workflow.id }}/edit" class="wg-btn">← Edit</a>
+    <h2>{{ workflow.icon | default('⚡') }} {{ workflow.name }}</h2>
+    <span style="font-size:0.72rem;color:var(--text-muted)">{{ workflow.description[:60] if workflow.description else '' }}</span>
+    <a href="/workflows" class="wg-btn">All Workflows</a>
+  </div>
+
+  <div class="wg-content">
+    <!-- Phase list sidebar -->
+    <div class="wg-sidebar">
+      <h3>Phases ({{ workflow.phases | length }})</h3>
+      <div id="phaseList">
+        {% for phase in workflow.phases %}
+        <div class="phase-item" onclick="selectNode('{{ phase.id }}')" id="list-{{ phase.id }}">
+          <span class="phase-dot" style="background:{{ ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316'][loop.index0 % 7] }}"></span>
+          <span>{{ phase.name[:28] }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div style="margin-top:1rem">
+        <h3>Patterns</h3>
+        {% for p in patterns %}
+        <div style="font-size:0.72rem;color:var(--text-muted);padding:0.15rem 0">{{ p.id }}</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- SVG Canvas -->
+    <div class="wg-canvas-wrap">
+      <svg id="wgCanvas" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--text-muted)"/>
+          </marker>
+          <marker id="arrow-sel" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="var(--accent)"/>
+          </marker>
+        </defs>
+        <g id="edges"></g>
+        <g id="nodes"></g>
+      </svg>
+    </div>
+
+    <!-- Phase detail panel -->
+    <div class="wg-info" id="phaseDetail" style="display:none">
+      <h3 id="detailTitle">Phase</h3>
+      <label>Name</label><input id="detailName" readonly>
+      <label>Pattern</label><input id="detailPattern" readonly>
+      <label>Agents</label><input id="detailAgents" readonly>
+      <label>Gate</label><textarea id="detailGate" readonly></textarea>
+      <label>Description</label><textarea id="detailDesc" readonly></textarea>
+    </div>
+  </div>
+
+  <div class="wg-legend">
+    <span><span class="dot" style="background:#6366f1"></span>Phase</span>
+    <span><span class="dot" style="background:#10b981;border-radius:50%"></span>Start</span>
+    <span><span class="dot" style="background:#ef4444;border-radius:50%"></span>End</span>
+    <span style="margin-left:auto">Click a node to inspect</span>
+  </div>
+</div>
+
+<script>
+const WF_ID = "{{ workflow.id }}";
+const PHASES = {{ workflow.phases | tojson | safe }};
+let selectedNode = null;
+
+const COLORS = ['#6366f1','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899','#84cc16'];
+
+function computeLayout(phases) {
+  // Simple vertical layout with slight horizontal offset for readability
+  const NODE_W = 180, NODE_H = 54, H_GAP = 60, V_GAP = 80;
+  const svgEl = document.getElementById('wgCanvas');
+  const W = svgEl.clientWidth || 800;
+  const cx = W / 2;
+  const nodes = phases.map((p, i) => ({
+    id: p.id,
+    label: p.name,
+    x: cx - NODE_W / 2,
+    y: 30 + i * (NODE_H + V_GAP),
+    w: NODE_W,
+    h: NODE_H,
+    phase: p,
+    color: COLORS[i % COLORS.length]
+  }));
+  return nodes;
+}
+
+function render() {
+  const nodes = computeLayout(PHASES);
+  const nodeMap = {};
+  nodes.forEach(n => nodeMap[n.id] = n);
+
+  // Draw edges
+  const edgesG = document.getElementById('edges');
+  edgesG.innerHTML = '';
+  PHASES.forEach((p, i) => {
+    if (i > 0) {
+      const from = nodes[i - 1];
+      const to = nodes[i];
+      const x1 = from.x + from.w / 2;
+      const y1 = from.y + from.h;
+      const x2 = to.x + to.w / 2;
+      const y2 = to.y;
+      const mid = (y1 + y2) / 2;
+      const path = `M${x1},${y1} C${x1},${mid} ${x2},${mid} ${x2},${y2}`;
+      const el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      el.setAttribute('d', path);
+      el.setAttribute('fill', 'none');
+      el.setAttribute('stroke', 'var(--border)');
+      el.setAttribute('stroke-width', '2');
+      el.setAttribute('marker-end', 'url(#arrow)');
+      el.id = `edge-${from.id}-${to.id}`;
+      edgesG.appendChild(el);
+    }
+  });
+
+  // Draw nodes
+  const nodesG = document.getElementById('nodes');
+  nodesG.innerHTML = '';
+  nodes.forEach((n, i) => {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('cursor', 'pointer');
+    g.onclick = () => selectNode(n.id);
+    g.id = `node-${n.id}`;
+
+    // Shadow rect
+    const shadow = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    shadow.setAttribute('x', n.x + 3); shadow.setAttribute('y', n.y + 3);
+    shadow.setAttribute('width', n.w); shadow.setAttribute('height', n.h);
+    shadow.setAttribute('rx', '8'); shadow.setAttribute('fill', 'rgba(0,0,0,0.15)');
+    g.appendChild(shadow);
+
+    // Main rect
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('x', n.x); rect.setAttribute('y', n.y);
+    rect.setAttribute('width', n.w); rect.setAttribute('height', n.h);
+    rect.setAttribute('rx', '8');
+    rect.setAttribute('fill', i === 0 ? '#10b981' : i === nodes.length - 1 ? '#ef4444' : n.color);
+    rect.setAttribute('fill-opacity', '0.15');
+    rect.setAttribute('stroke', n.color);
+    rect.setAttribute('stroke-width', '2');
+    rect.id = `rect-${n.id}`;
+    g.appendChild(rect);
+
+    // Number badge
+    const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    badge.setAttribute('cx', n.x + 18); badge.setAttribute('cy', n.y + n.h / 2);
+    badge.setAttribute('r', '12'); badge.setAttribute('fill', n.color);
+    g.appendChild(badge);
+    const badgeTxt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    badgeTxt.setAttribute('x', n.x + 18); badgeTxt.setAttribute('y', n.y + n.h / 2 + 4);
+    badgeTxt.setAttribute('text-anchor', 'middle'); badgeTxt.setAttribute('font-size', '10');
+    badgeTxt.setAttribute('fill', '#fff'); badgeTxt.setAttribute('font-weight', 'bold');
+    badgeTxt.textContent = i + 1;
+    g.appendChild(badgeTxt);
+
+    // Label
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', n.x + 36); label.setAttribute('y', n.y + 22);
+    label.setAttribute('font-size', '12'); label.setAttribute('font-weight', '600');
+    label.setAttribute('fill', 'var(--text)');
+    label.textContent = n.label.length > 22 ? n.label.slice(0, 20) + '…' : n.label;
+    g.appendChild(label);
+
+    // Pattern tag
+    const ptag = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    ptag.setAttribute('x', n.x + 36); ptag.setAttribute('y', n.y + 38);
+    ptag.setAttribute('font-size', '10'); ptag.setAttribute('fill', 'var(--text-muted)');
+    const agents = (n.phase.config?.agents || []).slice(0, 3).join(', ');
+    ptag.textContent = (n.phase.pattern_id || '') + (agents ? ' · ' + agents : '');
+    g.appendChild(ptag);
+
+    nodesG.appendChild(g);
+  });
+
+  // Set SVG viewBox
+  const totalH = nodes.length * (54 + 80) + 60;
+  const svgEl = document.getElementById('wgCanvas');
+  svgEl.setAttribute('viewBox', `0 0 ${svgEl.clientWidth || 800} ${totalH}`);
+  svgEl.style.height = totalH + 'px';
+}
+
+function selectNode(nodeId) {
+  // Deselect previous
+  if (selectedNode) {
+    const prev = document.getElementById(`rect-${selectedNode}`);
+    if (prev) prev.setAttribute('stroke-width', '2');
+    const prevList = document.getElementById(`list-${selectedNode}`);
+    if (prevList) prevList.style.borderColor = '';
+  }
+  selectedNode = nodeId;
+
+  // Highlight selected
+  const rect = document.getElementById(`rect-${nodeId}`);
+  if (rect) rect.setAttribute('stroke-width', '3.5');
+  const listItem = document.getElementById(`list-${nodeId}`);
+  if (listItem) { listItem.style.borderColor = 'var(--accent)'; listItem.scrollIntoView({block:'nearest'}); }
+
+  // Fill detail panel
+  const phase = PHASES.find(p => p.id === nodeId);
+  if (phase) {
+    document.getElementById('phaseDetail').style.display = '';
+    document.getElementById('detailTitle').textContent = phase.name;
+    document.getElementById('detailName').value = phase.name;
+    document.getElementById('detailPattern').value = phase.pattern_id || '';
+    document.getElementById('detailAgents').value = (phase.config?.agents || []).join(', ');
+    document.getElementById('detailGate').value = phase.gate || '';
+    document.getElementById('detailDesc').value = phase.description || '';
+  }
+}
+
+window.addEventListener('load', render);
+window.addEventListener('resize', render);
+</script>
+{% endblock %}

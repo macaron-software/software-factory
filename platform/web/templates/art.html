@@ -1,0 +1,1900 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+.art-dash{display:flex;flex-direction:column;gap:1.2rem}
+.art-kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:0.7rem;margin-bottom:0.5rem}
+@media(max-width:800px){.art-kpis{grid-template-columns:repeat(2,1fr)}}
+.art-kpi{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:0.6rem 0.8rem;text-align:center}
+.art-kpi .num{font-size:1.4rem;font-weight:800;color:var(--purple)}
+.art-kpi .lbl{font-size:0.62rem;color:var(--text-muted);margin-top:0.1rem;text-transform:uppercase;letter-spacing:0.03em}
+
+.art-portfolio{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.art-portfolio-header{display:flex;align-items:center;justify-content:space-between;padding:0.65rem 1rem;background:rgba(124,58,237,.08);border-bottom:1px solid var(--border)}
+.art-portfolio-title{font-size:0.85rem;font-weight:700;display:flex;align-items:center;gap:0.5rem}
+.art-portfolio-title svg{width:16px;height:16px;color:var(--purple)}
+.art-budget{font-size:0.68rem;display:flex;gap:0.8rem;align-items:center;color:var(--text-muted)}
+.art-budget-bar{width:100px;height:5px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.art-budget-fill{height:100%;border-radius:3px}
+
+.art-section{padding:0.6rem 0.8rem}
+.art-block{margin-bottom:1rem;padding:0.6rem 0.7rem;background:var(--bg-tertiary);border-radius:8px;border-left:3px solid var(--blue)}
+.art-block[data-type="security"]{border-left-color:var(--red)}
+.art-block[data-type="rse"]{border-left-color:var(--green)}
+.art-block[data-type="knowledge"]{border-left-color:var(--yellow)}
+.art-block-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem}
+.art-block-title{font-size:0.8rem;font-weight:700;display:flex;align-items:center;gap:0.4rem}
+.art-block-title svg{width:14px;height:14px}
+.art-block-meta{font-size:0.6rem;color:var(--text-muted)}
+.art-block-lead{font-size:0.6rem;color:var(--text-secondary);margin-top:0.1rem}
+
+.art-teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:0.6rem}
+.art-team{padding:0.6rem;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);transition:border-color .15s}
+.art-team:hover{border-color:var(--purple-dim)}
+.art-team-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem}
+.art-team-name{font-size:0.75rem;font-weight:700;color:var(--text-primary)}
+.art-team-badges{display:flex;gap:0.3rem;align-items:center}
+.art-team-badge{font-size:0.5rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:600}
+.badge-wip{background:rgba(250,204,21,.12);color:#eab308}
+.badge-cap{background:rgba(59,130,246,.12);color:var(--blue)}
+.art-team-sm{font-size:0.58rem;color:var(--purple-light);margin-bottom:0.4rem}
+
+.art-members{display:flex;flex-direction:column;gap:0.2rem}
+.art-member{display:flex;align-items:center;gap:0.45rem;padding:0.2rem 0.35rem;border-radius:5px;transition:background .15s}
+.art-member:hover{background:rgba(124,58,237,.06)}
+.art-member-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:700;color:#fff;flex-shrink:0;overflow:hidden}
+.art-member-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.art-member-info{flex:1;min-width:0}
+.art-member-name{font-size:0.7rem;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.art-member-tagline{font-size:0.55rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.art-role{font-size:0.48rem;padding:0.08rem 0.3rem;border-radius:3px;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;flex-shrink:0}
+.r-lead{background:rgba(168,85,247,.15);color:var(--purple-light)}
+.r-qa{background:rgba(250,204,21,.12);color:#eab308}
+.r-devops,.r-sre,.r-cloud,.r-secops{background:rgba(59,130,246,.12);color:var(--blue)}
+.r-security,.r-exploit,.r-threat-intel,.r-governance,.r-analyst,.r-review,.r-compliance{background:rgba(239,68,68,.12);color:var(--red)}
+.r-data,.r-dba,.r-ml,.r-perf{background:rgba(16,185,129,.12);color:var(--green)}
+.r-a11y,.r-docs,.r-ux,.r-social,.r-ethique{background:rgba(244,114,182,.12);color:#f472b6}
+.r-legal{background:rgba(168,85,247,.12);color:var(--purple-light)}
+.r-default{background:rgba(148,163,184,.1);color:var(--text-secondary)}
+
+/* ── Team Modal ── */
+.art-team{cursor:pointer}
+.art-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:900;opacity:0;pointer-events:none;transition:opacity .2s}
+.art-overlay.open{opacity:1;pointer-events:auto}
+.art-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.96);z-index:910;background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;width:min(520px,92vw);max-height:85vh;overflow-y:auto;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+.art-modal.open{opacity:1;pointer-events:auto;transform:translate(-50%,-50%) scale(1)}
+.art-modal-head{display:flex;align-items:center;justify-content:space-between;padding:0.8rem 1rem;border-bottom:1px solid var(--border);background:rgba(124,58,237,.06)}
+.art-modal-head h3{font-size:0.85rem;font-weight:700;margin:0;display:flex;align-items:center;gap:0.4rem}
+.art-modal-head h3 svg{width:15px;height:15px;color:var(--purple)}
+.art-modal-close{background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0.2rem;border-radius:4px;display:flex}
+.art-modal-close:hover{color:var(--text-primary);background:var(--bg-tertiary)}
+.art-modal-close svg{width:16px;height:16px}
+.art-modal-meta{display:flex;gap:0.6rem;padding:0.5rem 1rem;font-size:0.62rem;color:var(--text-muted);border-bottom:1px solid var(--border)}
+.art-modal-meta span{display:flex;align-items:center;gap:0.25rem}
+.art-modal-meta svg{width:12px;height:12px}
+.art-modal-members{padding:0.5rem 0.7rem}
+.art-modal-member{display:flex;align-items:center;gap:0.6rem;padding:0.45rem 0.5rem;border-radius:8px;cursor:pointer;transition:background .15s}
+.art-modal-member:hover{background:rgba(124,58,237,.08)}
+.art-modal-member-av{width:38px;height:38px;border-radius:50%;flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;color:#fff}
+.art-modal-member-av img{width:100%;height:100%;object-fit:cover}
+.art-modal-member-info{flex:1;min-width:0}
+.art-modal-member-name{font-size:0.75rem;font-weight:700;color:var(--text-primary)}
+.art-modal-member-tag{font-size:0.6rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.art-modal-member-role{font-size:0.5rem;padding:0.1rem 0.35rem;border-radius:3px;font-weight:700;text-transform:uppercase;flex-shrink:0;background:rgba(124,58,237,.12);color:var(--purple-light)}
+.art-modal-member-arrow{color:var(--text-muted);flex-shrink:0}
+.art-modal-member-arrow svg{width:14px;height:14px}
+
+/* ── Agent Fiche Modal ── */
+.fiche-modal{width:min(560px,92vw)}
+.fiche-header{display:flex;gap:1rem;padding:1rem;border-bottom:1px solid var(--border)}
+.fiche-photo{width:72px;height:72px;border-radius:50%;overflow:hidden;flex-shrink:0;border:3px solid var(--purple);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:800;color:#fff}
+.fiche-photo img{width:100%;height:100%;object-fit:cover}
+.fiche-identity{flex:1;min-width:0}
+.fiche-name{font-size:1rem;font-weight:800;color:var(--text-primary);margin-bottom:0.1rem}
+.fiche-role{font-size:0.65rem;font-weight:700;color:var(--purple-light);text-transform:uppercase;letter-spacing:0.04em}
+.fiche-tagline{font-size:0.7rem;color:var(--text-secondary);margin-top:0.2rem}
+.fiche-rank{font-size:0.55rem;color:var(--text-muted);margin-top:0.15rem;display:flex;align-items:center;gap:0.3rem}
+.fiche-rank svg{width:12px;height:12px}
+.fiche-body{padding:0.7rem 1rem;display:flex;flex-direction:column;gap:0.7rem}
+.fiche-section{background:var(--bg-tertiary);border-radius:8px;padding:0.55rem 0.7rem}
+.fiche-section-title{font-size:0.6rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:0.3rem;display:flex;align-items:center;gap:0.3rem}
+.fiche-section-title svg{width:12px;height:12px;color:var(--purple)}
+.fiche-text{font-size:0.7rem;color:var(--text-secondary);line-height:1.5}
+.fiche-badges{display:flex;flex-wrap:wrap;gap:0.25rem}
+.fiche-badge{font-size:0.58rem;padding:0.15rem 0.4rem;border-radius:4px;font-weight:600;background:rgba(124,58,237,.1);color:var(--purple-light)}
+.fiche-badge.tool{background:rgba(59,130,246,.1);color:var(--blue)}
+.fiche-badge.tag{background:rgba(16,185,129,.1);color:var(--green)}
+.fiche-perms{display:flex;gap:0.5rem;flex-wrap:wrap}
+.fiche-perm{font-size:0.6rem;display:flex;align-items:center;gap:0.2rem;padding:0.15rem 0.4rem;border-radius:4px}
+.fiche-perm.yes{background:rgba(16,185,129,.12);color:var(--green)}
+.fiche-perm.no{background:rgba(148,163,184,.08);color:var(--text-muted)}
+.fiche-perm svg{width:11px;height:11px}
+.fiche-loading{text-align:center;padding:2rem;color:var(--text-muted);font-size:0.75rem}
+.ac-stab{padding:0.35rem 0.9rem;border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;font-size:0.82rem;background:transparent;color:var(--text-secondary);transition:background 0.15s}
+.ac-stab:hover{background:var(--bg-tertiary)}
+.ac-stab.active{background:var(--bg-secondary);border-color:var(--border,#333);color:var(--text-primary);font-weight:600}
+/* AC team graph — mirrors ideation.css ig-* classes */
+.idea-graph{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.idea-graph-header{display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0.6rem;cursor:pointer;user-select:none}
+.idea-graph-header:hover{background:var(--bg-tertiary)}
+.idea-graph-title{font-size:0.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:.4rem}
+.idea-graph-toggle{width:16px;height:16px;color:var(--text-secondary);transition:transform .2s}
+.idea-graph-toggle.open{transform:rotate(180deg)}
+.idea-graph-canvas{height:280px;position:relative;overflow:hidden;cursor:grab;background:var(--bg-primary);border-top:1px solid var(--border)}
+.idea-graph-canvas svg{width:100%;height:100%}
+.idea-graph-legend{display:flex;gap:.75rem;padding:.35rem .6rem;border-top:1px solid var(--border);flex-wrap:wrap}
+.idea-graph-legend-item{display:flex;align-items:center;gap:.3rem;font-size:.65rem;color:var(--text-secondary)}
+.ig-node{cursor:pointer}
+.ig-node:hover .ig-node-bg{filter:brightness(1.15)}
+.ig-node-bg{fill:var(--bg-secondary);stroke:var(--border);stroke-width:1;rx:8;ry:8}
+.ig-node-name{font-size:11px;fill:var(--text-primary);font-weight:600}
+.ig-node-role{font-size:9px;fill:var(--text-secondary)}
+.ig-edge{fill:none;stroke-width:1.8;opacity:.6}
+.ig-edge.active{opacity:1;stroke-width:2.5;filter:drop-shadow(0 0 4px currentColor)}
+.ig-edge-label{font-size:8px;fill:var(--text-secondary);text-anchor:middle}
+.ig-node.active .ig-node-bg{filter:brightness(1.3);stroke:var(--purple);stroke-width:2}
+</style>
+
+<div class="tabs" style="margin-bottom:1rem">
+    <button class="tab active" onclick="artSwitchTab(this, 'art-org')">Organisation</button>
+    <button class="tab" onclick="artSwitchTab(this, 'art-amelio-container')" id="tab-amelio">Amélioration Continue</button>
+</div>
+<div id="art-org">
+<div class="art-dash">
+    <!-- KPIs -->
+    <div class="art-kpis">
+        <div class="art-kpi"><div class="num">{{ portfolios|length }}</div><div class="lbl">{{ _("portfolios") }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_arts }}</div><div class="lbl">{{ _("arts") }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_teams }}</div><div class="lbl">{{ _('teams') }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_members }}</div><div class="lbl">{{ _("agents") }}</div></div>
+        <div class="art-kpi"><div class="num">{{ total_teams * 10 }}</div><div class="lbl">{{ _("pi_weeks") }}</div></div>
+    </div>
+
+    <!-- Org Tree -->
+    {% for p in org_tree %}
+    <div class="art-portfolio">
+        <div class="art-portfolio-header">
+            <div class="art-portfolio-title">
+                <svg><use href="#icon-briefcase"/></svg>
+                {{ p.name }}
+                {% if p.lead %}<span style="font-weight:400;font-size:0.68rem;color:var(--text-muted)">— {{ p.lead }}</span>{% endif %}
+            </div>
+            <div class="art-budget">
+                {% set pct = ((p.budget_consumed / p.budget * 100)|int) if p.budget > 0 else 0 %}
+                <span>{{ "%.0f"|format(p.budget_consumed/1000) }}k / {{ "%.0f"|format(p.budget/1000) }}k €</span>
+                <div class="art-budget-bar">
+                    <div class="art-budget-fill" style="width:{{ pct }}%;background:{% if pct > 80 %}var(--red){% elif pct > 60 %}var(--yellow){% else %}var(--green){% endif %}"></div>
+                </div>
+            </div>
+        </div>
+        <div class="art-section">
+        {% for art in p.children %}
+            {% set art_type = 'security' if 'Security' in art.name else ('rse' if 'RSE' in art.name else ('knowledge' if 'Knowledge' in art.name else 'default')) %}
+            <div class="art-block" data-type="{{ art_type }}">
+                <div class="art-block-header">
+                    <div>
+                        <div class="art-block-title" style="color:{% if art_type=='security' %}var(--red){% elif art_type=='rse' %}var(--green){% elif art_type=='knowledge' %}var(--yellow){% else %}var(--blue){% endif %}">
+                            <svg class="icon-sm"><use href="#icon-{% if art_type=='security' %}shield{% elif art_type=='rse' %}heart{% elif art_type=='knowledge' %}database{% else %}git-branch{% endif %}"/></svg>
+                            {{ art.name }}
+                        </div>
+                        {% if art.lead %}<div class="art-block-lead">Lead: {{ art.lead }}</div>{% endif %}
+                    </div>
+                    <div class="art-block-meta">PI {{ art.pi_cadence }}w · {{ art.children|length }} teams · {{ art.children|sum(attribute='members'|length) if false else art.children|map(attribute='members')|map('length')|sum }} agents</div>
+                </div>
+                <div class="art-teams">
+                {% for team in art.children %}
+                    <div class="art-team">
+                        <div class="art-team-header">
+                            <div class="art-team-name">{{ team.name }}</div>
+                            <div class="art-team-badges">
+                                <span class="art-team-badge badge-wip">WIP {{ team.wip_limit }}</span>
+                                <span class="art-team-badge badge-cap">{{ team.members|length }}/{{ team.capacity }}</span>
+                            </div>
+                        </div>
+                        {% if team.scrum_master %}<div class="art-team-sm"><svg class="icon-xs"><use href="#icon-user"/></svg> {{ team.scrum_master }}</div>{% endif %}
+                        <div class="art-members">
+                        {% for m in team.members %}
+                        <div class="art-member" data-agent-id="{{ m.agent_id }}">
+                            {% set bg = m.color if m.color else '#7c3aed' %}
+                            <div class="art-member-avatar" style="background:{{ bg }}">
+                                {% if m.avatar and '/' in m.avatar %}
+                                    <img src="{{ m.avatar }}" alt="{{ m.name }}" loading="lazy">
+                                {% else %}
+                                    {{ m.avatar if m.avatar else m.name[:1]|upper }}
+                                {% endif %}
+                            </div>
+                            <div class="art-member-info">
+                                <div class="art-member-name">{{ m.name }}</div>
+                                {% if m.tagline %}<div class="art-member-tagline">{{ m.tagline }}</div>{% endif %}
+                            </div>
+                            {% set r = m.role %}
+                            <span class="art-role r-{% if r in ['lead','tech-lead'] %}lead{% elif r == 'qa' %}qa{% elif r in ['devops','sre','cloud'] %}devops{% elif r in ['security','exploit','threat-intel','governance','analyst','review','compliance'] %}security{% elif r in ['data','dba','ml','perf'] %}data{% elif r in ['a11y','docs','ux','social','ethique'] %}a11y{% elif r == 'legal' %}legal{% elif r in ['secops'] %}secops{% else %}default{% endif %}">{{ r }}</span>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:2rem;color:var(--text-muted);font-size:0.8rem">
+        {{ _('no_org') }}
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Overlay -->
+<div class="art-overlay" id="artOverlay" onclick="closeAllModals()"></div>
+
+<!-- Team Detail Modal -->
+<div class="art-modal" id="teamModal">
+    <div class="art-modal-head">
+        <h3><svg><use href="#icon-users"/></svg> <span id="tmName"></span></h3>
+        <button class="art-modal-close" onclick="closeAllModals()"><svg><use href="#icon-x"/></svg></button>
+    </div>
+    <div class="art-modal-meta" id="tmMeta"></div>
+    <div class="art-modal-members" id="tmMembers"></div>
+</div>
+
+<!-- Agent Fiche Modal -->
+<div class="art-modal fiche-modal" id="ficheModal">
+    <div class="art-modal-head">
+        <h3><svg><use href="#icon-user"/></svg> <span id="fhTitle">{{ _("agent") }}</span></h3>
+        <button class="art-modal-close" onclick="closeFiche()"><svg><use href="#icon-x"/></svg></button>
+    </div>
+    <div id="fhContent"><div class="fiche-loading">{{ _('loading') }}</div></div>
+</div>
+</div><!-- /art-org -->
+
+<!-- Amélioration Continue container — 4 sub-tabs -->
+<div id="art-amelio-container" style="display:none">
+
+    <!-- AC Team Graph Card -->
+    <div class="idea-graph" id="acTeamGraph" style="margin-bottom:1.25rem">
+        <div class="idea-graph-header" onclick="toggleAcTeamGraph()">
+            <div class="idea-graph-title">
+                <svg><use href="#icon-git-branch"/></svg> Équipe Amélioration Continue
+            </div>
+            <svg class="idea-graph-toggle open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="idea-graph-canvas" id="acGraphCanvas">
+            <svg id="acGraphSvg" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                    <marker id="ac-arrow-h" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" opacity="0.8"/>
+                    </marker>
+                    <marker id="ac-arrow-n" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6" opacity="0.8"/>
+                    </marker>
+                    <marker id="ac-arrow-r" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444" opacity="0.8"/>
+                    </marker>
+                </defs>
+                <g id="acEdges"></g>
+                <g id="acNodes"></g>
+            </svg>
+        </div>
+        <div class="idea-graph-legend" id="acGraphLegend"></div>
+    </div>
+
+    <!-- Sub-tab nav -->
+    <div style="display:flex;gap:0.25rem;margin-bottom:1.25rem;border-bottom:1px solid var(--border,#333);padding-bottom:0">
+        <button class="ac-stab active" id="ac-stab-cycles" onclick="acSwitchTab(this,'ac-panel-cycles')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            Cycles AC
+        </button>
+        <button class="ac-stab" id="ac-stab-skills" onclick="acSwitchTab(this,'ac-panel-skills')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Skills Health
+        </button>
+        <button class="ac-stab" id="ac-stab-thompson" onclick="acSwitchTab(this,'ac-panel-thompson')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            Thompson
+        </button>
+        <button class="ac-stab" id="ac-stab-darwin" onclick="acSwitchTab(this,'ac-panel-darwin')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Darwin Teams
+        </button>
+        <button class="ac-stab" id="ac-stab-evolution" onclick="acSwitchTab(this,'ac-panel-evolution')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Evolution
+        </button>
+        <button class="ac-stab" id="ac-stab-rl" onclick="acSwitchTab(this,'ac-panel-rl')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            RL
+        </button>
+        <button class="ac-stab" id="ac-stab-heal" onclick="acSwitchTab(this,'ac-panel-heal')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Self Healing
+        </button>
+        <button class="ac-stab" id="ac-stab-instincts" onclick="acSwitchTab(this,'ac-panel-instincts')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Instincts
+        </button>
+    </div>
+
+    <!-- Cycles AC sub-panel -->
+    <div id="ac-panel-cycles">
+        <div id="art-amelio-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
+    <!-- Skills Health sub-panel -->
+    <div id="ac-panel-skills" style="display:none">
+        <!-- KPIs + progress -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1rem">
+            <div class="art-kpi"><div class="num" id="sk-total">–</div><div class="lbl">Total skills</div></div>
+            <div class="art-kpi"><div class="num" id="sk-coverage">–%</div><div class="lbl">With evals</div></div>
+            <div class="art-kpi"><div class="num" id="sk-passing">–</div><div class="lbl">Passing ≥80%</div></div>
+            <div class="art-kpi"><div class="num" id="sk-run">–</div><div class="lbl">Ever run</div></div>
+        </div>
+        <div style="background:var(--bg-secondary);border-radius:4px;height:6px;margin-bottom:1.25rem;overflow:hidden">
+            <div id="sk-progress" style="background:#6366f1;height:100%;width:0%;transition:width 0.4s"></div>
+        </div>
+
+        <!-- Toolbar -->
+        <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem">
+            <button id="sk-run-all-btn" onclick="skRunAll()" style="background:#6366f1;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:0.8rem;font-weight:600;cursor:pointer">
+                ▶ Run all evals
+            </button>
+            <span id="sk-run-all-status" style="font-size:0.78rem;color:var(--text-tertiary)"></span>
+            <label style="margin-left:auto;font-size:0.78rem;color:var(--text-secondary)">
+                Filter:
+                <select id="sk-filter" onchange="skFilterTable()" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:0.78rem;color:var(--text-primary);margin-left:4px">
+                    <option value="all">All skills</option>
+                    <option value="evals">With evals</option>
+                    <option value="missing">Missing evals</option>
+                    <option value="fail">Failing</option>
+                    <option value="tech">Tech stack</option>
+                </select>
+            </label>
+        </div>
+
+        <!-- Main skill grid -->
+        <div class="card" style="padding:0;overflow:hidden;margin-bottom:1.25rem">
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse" id="sk-main-table">
+                <thead>
+                    <tr style="background:var(--bg-secondary);font-size:0.7rem;color:var(--text-tertiary)">
+                        <th style="text-align:left;padding:8px 12px;border-bottom:1px solid var(--border)">Skill</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Cases</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Determ.</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Judge</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Pass rate</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Last run</th>
+                        <th style="text-align:center;padding:8px 8px;border-bottom:1px solid var(--border)">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="sk-main-tbody">
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Case detail panel (shown on row expand) -->
+        <div id="sk-case-detail" style="display:none;margin-bottom:1.25rem"></div>
+
+        <!-- Pipeline diagram (collapsible) -->
+        <details style="margin-bottom:0.5rem">
+            <summary style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);cursor:pointer;padding:0.5rem 0;user-select:none">
+                Testing pipeline — philschmid.de/testing-skills
+            </summary>
+            <div class="card" style="padding:1.25rem;margin-top:0.5rem">
+                <svg viewBox="0 0 760 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:760px;display:block;font-family:inherit">
+                    <defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/></marker></defs>
+                    <rect x="10" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="55" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Test Case</text>
+                    <text x="55" y="89" text-anchor="middle" font-size="9" fill="#6b7280">prompt</text>
+                    <text x="55" y="100" text-anchor="middle" font-size="9" fill="#6b7280">checks · expect</text>
+                    <rect x="130" y="55" width="90" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="175" y="75" text-anchor="middle" font-size="10" fill="#9ca3af">Skill Selector</text>
+                    <text x="175" y="90" text-anchor="middle" font-size="9" fill="#6b7280">trigger match?</text>
+                    <text x="175" y="101" text-anchor="middle" font-size="9" fill="#6b7280">load / skip</text>
+                    <rect x="250" y="55" width="80" height="50" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="290" y="78" text-anchor="middle" font-size="10" fill="#9ca3af">LLM</text>
+                    <text x="290" y="93" text-anchor="middle" font-size="9" fill="#6b7280">± skill loaded</text>
+                    <rect x="360" y="55" width="70" height="50" rx="6" fill="none" stroke="#4b5563" stroke-width="1.5"/>
+                    <text x="395" y="83" text-anchor="middle" font-size="10" fill="#d1d5db">Output</text>
+                    <rect x="460" y="10" width="105" height="55" rx="6" fill="none" stroke="#3b82f6" stroke-width="1.5"/>
+                    <text x="512" y="27" text-anchor="middle" font-size="9" fill="#93c5fd">Deterministic</text>
+                    <text x="512" y="40" text-anchor="middle" font-size="8" fill="#6b7280">regex · length</text>
+                    <text x="512" y="52" text-anchor="middle" font-size="8" fill="#6b7280">no_placeholder</text>
+                    <text x="512" y="62" text-anchor="middle" font-size="8" fill="#4ade80">fast · free</text>
+                    <rect x="460" y="95" width="105" height="55" rx="6" fill="none" stroke="#8b5cf6" stroke-width="1.5"/>
+                    <text x="512" y="112" text-anchor="middle" font-size="9" fill="#c4b5fd">LLM Judge</text>
+                    <text x="512" y="125" text-anchor="middle" font-size="8" fill="#6b7280">expectations</text>
+                    <text x="512" y="137" text-anchor="middle" font-size="8" fill="#6b7280">outcome · style</text>
+                    <text x="512" y="148" text-anchor="middle" font-size="8" fill="#a78bfa">qualitative</text>
+                    <rect x="600" y="45" width="110" height="70" rx="6" fill="none" stroke="#374151" stroke-width="1.5"/>
+                    <text x="655" y="64" text-anchor="middle" font-size="10" fill="#9ca3af">Verdict</text>
+                    <text x="655" y="80" text-anchor="middle" font-size="8" fill="#4ade80"> pass</text>
+                    <text x="655" y="93" text-anchor="middle" font-size="8" fill="#f59e0b">~ regression</text>
+                    <text x="655" y="106" text-anchor="middle" font-size="8" fill="#f87171"> fail</text>
+                    <text x="655" y="117" text-anchor="middle" font-size="8" fill="#6b7280">retire (100%+)</text>
+                    <line x1="100" y1="80" x2="128" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="220" y1="80" x2="248" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="330" y1="80" x2="358" y2="80" stroke="#6b7280" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="430" y1="70" x2="458" y2="37" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="430" y1="90" x2="458" y2="120" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="565" y1="37" x2="598" y2="68" stroke="#3b82f6" stroke-width="1.2" marker-end="url(#arr)"/>
+                    <line x1="565" y1="120" x2="598" y2="100" stroke="#8b5cf6" stroke-width="1.2" marker-end="url(#arr)"/>
+                </svg>
+            </div>
+        </details>
+        <div style="font-size:0.72rem;color:var(--text-tertiary);margin-top:0.5rem">
+            Graduation: pass rate 100% → regression tests. Skill passes without loading → retire.
+        </div>
+    </div>
+
+    <!-- Thompson Sampling sub-panel -->
+    <div id="ac-panel-thompson" style="display:none">
+        <div style="margin-bottom:1.5rem;display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem" id="ts-art-stats">
+            <div class="stat-card"><h3>Agents actifs</h3><p class="stat-value" id="ts-art-total">—</p><p class="stat-label">avec données LLM</p></div>
+            <div class="stat-card"><h3>Appels LLM totaux</h3><p class="stat-value" id="ts-art-accepted">—</p><p class="stat-label">toutes traces</p></div>
+            <div class="stat-card"><h3>Erreurs LLM</h3><p class="stat-value" id="ts-art-rejected" style="color:#f59e0b">—</p><p class="stat-label">total tous agents</p></div>
+            <div class="stat-card"><h3>Darwin Fitness</h3><p class="stat-value" id="ts-art-hirej" style="color:#a78bfa">—</p><p class="stat-label">scores accumulés</p></div>
+        </div>
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Comparaison Providers (Thompson A/B)</div>
+        <div id="ts-ab-grid" style="display:grid;gap:0.6rem;margin-bottom:1.5rem"></div>
+        <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Performance par Agent × Modèle</div>
+        <div style="overflow-x:auto">
+            <table style="width:100%;font-size:0.85rem;border-collapse:collapse" id="ts-art-table">
+                <thead><tr style="background:var(--bg-secondary,#1e293b)">
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Provider / Modèle</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Appels</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Erreurs</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Succès</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Durée moy.</th>
+                    <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Tokens</th>
+                    <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:90px">Score</th>
+                </tr></thead>
+                <tbody id="ts-art-tbody"><tr><td colspan="8" style="text-align:center;padding:3rem;color:var(--text-tertiary)">Chargement…</td></tr></tbody>
+            </table>
+        </div>
+        <div id="ts-darwin-section" style="margin-top:1.5rem;display:none">
+            <div style="margin-bottom:0.5rem;font-size:0.75rem;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em">Darwin Team Fitness (Thompson Sampling par contexte)</div>
+            <div style="overflow-x:auto">
+                <table style="width:100%;font-size:0.85rem;border-collapse:collapse">
+                    <thead><tr style="background:var(--bg-secondary,#1e293b)">
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Agent</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Pattern</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Tech</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border)">Phase</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Wins</th>
+                        <th style="text-align:right;padding:9px 12px;border-bottom:1px solid var(--border)">Losses</th>
+                        <th style="text-align:left;padding:9px 12px;border-bottom:1px solid var(--border);min-width:100px">Fitness</th>
+                    </tr></thead>
+                    <tbody id="ts-darwin-tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Darwin Teams sub-panel -->
+    <div id="ac-panel-darwin" style="display:none">
+        <div id="art-teams-content">
+            <p style="color:var(--text-secondary);padding:2rem;text-align:center">Loading Darwin Teams…</p>
+        </div>
+    </div>
+
+    <!-- Evolution sub-panel — GA proposals + run history -->
+    <div id="ac-panel-evolution" style="display:none">
+        <div id="art-evolution-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
+    <!-- RL sub-panel — reward policy stats -->
+    <div id="ac-panel-rl" style="display:none">
+        <div id="art-rl-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
+    <!-- Self Healing sub-panel -->
+    <div id="ac-panel-heal" style="display:none">
+        <div id="art-heal-content">
+            <div style="color:var(--text-secondary);padding:2rem;text-align:center;font-size:0.85rem">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                Chargement…
+            </div>
+        </div>
+    </div>
+
+    <!-- Instincts panel — ECC continuous-learning-v2 adaptation -->
+    <div id="ac-panel-instincts" style="display:none">
+        <!-- KPI bar -->
+        <div style="display:flex;gap:0.6rem;margin-bottom:1rem;flex-wrap:wrap" id="instinct-kpis">
+            <div class="art-kpi"><div class="num" id="ik-total">–</div><div class="lbl">Instincts</div></div>
+            <div class="art-kpi"><div class="num" id="ik-conf">–</div><div class="lbl">Conf. moy.</div></div>
+            <div class="art-kpi"><div class="num" id="ik-high">–</div><div class="lbl">≥0.7 établis</div></div>
+            <div class="art-kpi"><div class="num" id="ik-evolved">–</div><div class="lbl">Évolués → skill</div></div>
+        </div>
+        <!-- Filters -->
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.75rem;flex-wrap:wrap;align-items:center">
+            <select id="if-agent" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les agents</option>
+            </select>
+            <select id="if-domain" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les domaines</option>
+                <option value="code">code</option>
+                <option value="git">git</option>
+                <option value="security">security</option>
+                <option value="testing">testing</option>
+                <option value="architecture">architecture</option>
+                <option value="general">general</option>
+            </select>
+            <select id="if-scope" style="font-size:0.78rem;padding:0.2rem 0.5rem;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border,#333);border-radius:4px" onchange="loadInstinctsTab()">
+                <option value="">Tous les scopes</option>
+                <option value="project">project</option>
+                <option value="global">global</option>
+            </select>
+            <button onclick="evolveInstincts()" style="margin-left:auto;font-size:0.75rem;padding:0.25rem 0.75rem;background:var(--purple,#7c3aed);color:#fff;border:none;border-radius:4px;cursor:pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                Evolve → Skills
+            </button>
+        </div>
+        <!-- Instincts table -->
+        <div style="overflow-x:auto;margin-bottom:1.25rem">
+            <table style="width:100%;font-size:0.78rem;border-collapse:collapse" id="instinct-table">
+                <thead>
+                    <tr style="border-bottom:1px solid var(--border,#333);color:var(--text-muted)">
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Trigger</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Action</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Conf.</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Domaine</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Agent</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Scope</th>
+                        <th style="text-align:left;padding:0.3rem 0.5rem;font-weight:600">Source</th>
+                    </tr>
+                </thead>
+                <tbody id="instinct-tbody">
+                    <tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Chargement…</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <!-- Skill Stocktake -->
+        <div style="border-top:1px solid var(--border,#333);padding-top:0.85rem">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.6rem">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text-muted)"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span style="font-size:0.78rem;font-weight:600;color:var(--text-secondary)">Skill Stocktake</span>
+                <button onclick="loadStocktake()" style="font-size:0.72rem;padding:0.15rem 0.55rem;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border,#333);border-radius:3px;cursor:pointer;margin-left:auto">Audit</button>
+            </div>
+            <div id="instinct-stocktake" style="font-size:0.78rem;color:var(--text-secondary);padding:0.5rem 0">Cliquez Audit pour analyser les skills YAML.</div>
+        </div>
+        <!-- Evolve result -->
+        <div id="instinct-evolve-result" style="display:none;margin-top:0.75rem;padding:0.6rem 0.75rem;background:var(--bg-tertiary);border:1px solid var(--border,#333);border-radius:6px;font-size:0.78rem"></div>
+    </div>
+
+</div>
+
+
+{% block scripts %}
+<script>
+(function(){
+  const overlay = document.getElementById('artOverlay');
+  const teamModal = document.getElementById('teamModal');
+  const ficheModal = document.getElementById('ficheModal');
+
+  // Attach click on each .art-team card
+  document.querySelectorAll('.art-team').forEach(card => {
+    card.addEventListener('click', () => {
+      const name = card.querySelector('.art-team-name').textContent.trim();
+      const sm = card.querySelector('.art-team-sm');
+      const badges = card.querySelector('.art-team-badges');
+      const members = card.querySelectorAll('.art-member');
+
+      document.getElementById('tmName').textContent = name;
+
+      // Meta bar
+      const metaEl = document.getElementById('tmMeta');
+      const wipBadge = badges ? badges.querySelector('.badge-wip') : null;
+      const capBadge = badges ? badges.querySelector('.badge-cap') : null;
+      let metaHTML = '';
+      if (wipBadge) metaHTML += `<span><svg><use href="#icon-alert-triangle"/></svg> ${wipBadge.textContent.trim()}</span>`;
+      if (capBadge) metaHTML += `<span><svg><use href="#icon-users"/></svg> Capacité ${capBadge.textContent.trim()}</span>`;
+      if (sm) metaHTML += `<span><svg><use href="#icon-user"/></svg> SM: ${sm.textContent.trim()}</span>`;
+      metaEl.innerHTML = metaHTML;
+
+      // Members list
+      const mbEl = document.getElementById('tmMembers');
+      let mbHTML = '';
+      members.forEach(m => {
+        const avatarEl = m.querySelector('.art-member-avatar');
+        const img = avatarEl.querySelector('img');
+        const bg = avatarEl.style.background || '#7c3aed';
+        const initials = img ? '' : avatarEl.textContent.trim();
+        const avatarSrc = img ? img.src : '';
+        const nameText = m.querySelector('.art-member-name').textContent.trim();
+        const tagEl = m.querySelector('.art-member-tagline');
+        const tagText = tagEl ? tagEl.textContent.trim() : '';
+        const roleEl = m.querySelector('.art-role');
+        const roleText = roleEl ? roleEl.textContent.trim() : '';
+        // Extract agent_id from the member data
+        const agentId = m.dataset.agentId || '';
+
+        mbHTML += `<div class="art-modal-member" onclick="openFiche('${agentId}')" title="{{ _('view_card') }}">`;
+        if (avatarSrc) {
+          mbHTML += `<div class="art-modal-member-av" style="background:${bg}"><img src="${avatarSrc}" alt="${nameText}" loading="lazy"></div>`;
+        } else {
+          mbHTML += `<div class="art-modal-member-av" style="background:${bg}">${initials}</div>`;
+        }
+        mbHTML += `<div class="art-modal-member-info"><div class="art-modal-member-name">${nameText}</div>`;
+        if (tagText) mbHTML += `<div class="art-modal-member-tag">${tagText}</div>`;
+        mbHTML += `</div>`;
+        if (roleText) mbHTML += `<span class="art-modal-member-role">${roleText}</span>`;
+        mbHTML += `<div class="art-modal-member-arrow"><svg><use href="#icon-chevron-right"/></svg></div></div>`;
+      });
+      mbEl.innerHTML = mbHTML;
+
+      // Open
+      overlay.classList.add('open');
+      teamModal.classList.add('open');
+      ficheModal.classList.remove('open');
+    });
+  });
+
+  // Agent fiche
+  window.openFiche = async function(agentId) {
+    if (!agentId) return;
+    const content = document.getElementById('fhContent');
+    content.innerHTML = '<div class="fiche-loading">{{ _('loading') }}</div>';
+    ficheModal.classList.add('open');
+    teamModal.classList.remove('open');
+    document.getElementById('fhTitle').textContent = 'Agent';
+
+    try {
+      const resp = await fetch(`/api/agents/${agentId}/details`);
+      if (!resp.ok) {
+        // Fallback: check AC_NODES for virtual agents not in the DB
+        const acNode = (typeof AC_NODES !== 'undefined') && AC_NODES.find(n => n.id === agentId);
+        if (acNode) {
+          document.getElementById('fhTitle').textContent = acNode.name;
+          let html = '<div class="fiche-header">';
+          html += `<div class="fiche-photo" style="background:${acNode.color}">`;
+          if (acNode.photo) html += `<img src="${acNode.photo}" alt="${acNode.name}">`;
+          else html += acNode.name.charAt(0);
+          html += `</div><div class="fiche-identity">`;
+          html += `<div class="fiche-name">${acNode.name}</div>`;
+          html += `<div class="fiche-role">${acNode.role}</div>`;
+          html += `<div class="fiche-tagline" style="color:${acNode.color}">Amélioration Continue</div>`;
+          html += `</div></div><div class="fiche-body">`;
+          if (acNode.persona) html += `<div class="fiche-section"><div class="fiche-section-title">Persona</div><div class="fiche-text">${esc(acNode.persona)}</div></div>`;
+          if (acNode.motivation) html += `<div class="fiche-section"><div class="fiche-section-title">Motivation</div><div class="fiche-text">${esc(acNode.motivation)}</div></div>`;
+          if (acNode.skills && acNode.skills.length) {
+            html += `<div class="fiche-section"><div class="fiche-section-title">Skills</div><div class="fiche-badges">`;
+            acNode.skills.forEach(s => { html += `<span class="fiche-badge">${esc(s)}</span>`; });
+            html += `</div></div>`;
+          }
+          if (acNode.tools && acNode.tools.length) {
+            html += `<div class="fiche-section"><div class="fiche-section-title">Tools</div><div class="fiche-badges">`;
+            acNode.tools.forEach(t => { html += `<span class="fiche-badge tool">${esc(t)}</span>`; });
+            html += `</div></div>`;
+          }
+          html += '</div>';
+          content.innerHTML = html;
+          return;
+        }
+        throw new Error('Not found');
+      }
+      const a = await resp.json();
+
+      document.getElementById('fhTitle').textContent = a.name;
+
+      const rankLabels = {0:'CEO',10:'VP/Director',15:'Program',20:'Manager',25:'Lead',30:'Senior',35:'Mid',40:'Junior',50:'Intern'};
+      const rankLabel = rankLabels[a.hierarchy_rank] || `Niveau ${a.hierarchy_rank}`;
+
+      let html = '<div class="fiche-header">';
+      if (a.avatar_url) {
+        html += `<div class="fiche-photo" style="background:${a.color}"><img src="${a.avatar_url}" alt="${a.name}"></div>`;
+      } else {
+        html += `<div class="fiche-photo" style="background:${a.color}">${a.name.charAt(0)}</div>`;
+      }
+      html += `<div class="fiche-identity">`;
+      html += `<div class="fiche-name">${a.name}</div>`;
+      html += `<div class="fiche-role">${a.role}</div>`;
+      if (a.tagline) html += `<div class="fiche-tagline">${a.tagline}</div>`;
+      html += `<div class="fiche-rank"><svg><use href="#icon-bar-chart-2"/></svg> ${rankLabel}</div>`;
+      html += `</div></div>`;
+
+      html += '<div class="fiche-body">';
+
+      if (a.persona) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-user"/></svg> Persona</div><div class="fiche-text">${esc(a.persona)}</div></div>`;
+      }
+      if (a.motivation) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-zap"/></svg> Motivation</div><div class="fiche-text">${esc(a.motivation)}</div></div>`;
+      }
+      if (a.description) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-file-text"/></svg> Description</div><div class="fiche-text">${esc(a.description)}</div></div>`;
+      }
+      if (a.skills && a.skills.length) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-star"/></svg> Skills (${a.skills.length})</div><div class="fiche-badges">`;
+        a.skills.forEach(s => { html += `<span class="fiche-badge">${esc(s)}</span>`; });
+        html += `</div></div>`;
+      }
+      if (a.tools && a.tools.length) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-tool"/></svg> Tools (${a.tools.length})</div><div class="fiche-badges">`;
+        a.tools.forEach(t => { html += `<span class="fiche-badge tool">${esc(t)}</span>`; });
+        html += `</div></div>`;
+      }
+      if (a.tags && a.tags.length) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-tag"/></svg> Tags</div><div class="fiche-badges">`;
+        a.tags.forEach(t => { html += `<span class="fiche-badge tag">${esc(t)}</span>`; });
+        html += `</div></div>`;
+      }
+      // Permissions
+      const perms = a.permissions || {};
+      html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-shield"/></svg> Permissions</div><div class="fiche-perms">`;
+      ['can_veto','can_approve','can_delegate'].forEach(p => {
+        const yes = !!perms[p];
+        const label = p.replace('can_','').charAt(0).toUpperCase() + p.replace('can_','').slice(1);
+        html += `<span class="fiche-perm ${yes?'yes':'no'}"><svg><use href="#icon-${yes?'check':'x'}"/></svg> ${label}</span>`;
+      });
+      html += `</div></div>`;
+
+      if (a.provider || a.model) {
+        html += `<div class="fiche-section"><div class="fiche-section-title"><svg><use href="#icon-cpu"/></svg> LLM</div><div class="fiche-text">${esc(a.provider || '')} ${esc(a.model || '')}</div></div>`;
+      }
+
+      html += '</div>';
+      content.innerHTML = html;
+    } catch(e) {
+      content.innerHTML = '<div class="fiche-loading">Agent introuvable</div>';
+    }
+  };
+
+  window.closeFiche = function() {
+    ficheModal.classList.remove('open');
+    teamModal.classList.add('open');
+  };
+
+  window.closeAllModals = function() {
+    overlay.classList.remove('open');
+    teamModal.classList.remove('open');
+    ficheModal.classList.remove('open');
+  };
+
+  // ESC key
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (ficheModal.classList.contains('open')) { closeFiche(); }
+      else { closeAllModals(); }
+    }
+  });
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+})();
+
+// ── AC Team Graph ─────────────────────────────────────────────────────────
+var AC_NW = 130, AC_NH = 56;
+var AC_NODES = [
+    {id:'evolution_scheduler', x:130, y:8,   color:'#7c3aed', name:'Evolution',  role:'Scheduler nightly',  photo:'/static/avatars/solution_train_engineer.jpg',
+     persona:'Orchestre les cycles d\'évolution nocturnes — GA, RL, Thompson, Knowledge.', motivation:'Améliorer continuellement la plateforme sans intervention humaine.',
+     skills:['ga-evolution','thompson-sampling','rl-policy','nightly-jobs'], tools:['evolution_trigger','schedule_runner','fitness_eval']},
+    {id:'watchdog',            x:10,  y:100, color:'#0ea5e9', name:'Watchdog',   role:'Monitor continu',    photo:'/static/avatars/sre.jpg',
+     persona:'Surveille en continu la santé du système — alertes, incidents, SLA.', motivation:'Zéro downtime, zéro régression silencieuse.',
+     skills:['monitoring','alerting','incident-detection'], tools:['health_check','alert_trigger','log_scan']},
+    {id:'thompson',            x:130, y:100, color:'#f59e0b', name:'Thompson',   role:'Sélection LLM',      photo:'/static/avatars/knowledge-manager.jpg',
+     persona:'Sélectionne le meilleur variant skill/LLM par Thompson Sampling bayésien.', motivation:'Chaque token doit être optimal.',
+     skills:['thompson-sampling','bandit-algo','bayesian-stats'], tools:['variant_score','arm_select','reward_update']},
+    {id:'darwin',              x:250, y:100, color:'#10b981', name:'Darwin',     role:'Compétition équipes', photo:'/static/avatars/strat-cto.jpg',
+     persona:'Met en concurrence les équipes et patterns organisationnels — élimine le plus faible.', motivation:'Seuls les meilleurs patterns survivent.',
+     skills:['team-competition','org-fitness','elimination'], tools:['team_score','pattern_eval','survivor_select']},
+    {id:'rl_policy',           x:10,  y:200, color:'#8b5cf6', name:'RL Policy',  role:'Apprentissage cycle', photo:'/static/avatars/worker.jpg',
+     persona:'Attribue des récompenses/pénalités aux agents, skills et workflows pour guider l\'apprentissage par renforcement.', motivation:'Chaque cycle améliore la politique.',
+     skills:['reinforcement-learning','reward-shaping','policy-gradient'], tools:['reward_assign','penalty_apply','policy_update']},
+    {id:'auto_heal',           x:130, y:200, color:'#ef4444', name:'Auto-Heal',  role:'Self-healing 60s',   photo:'/static/avatars/threat-analyst.jpg',
+     persona:'Détecte et corrige automatiquement les régressions et pannes en moins de 60 secondes.', motivation:'La plateforme se répare elle-même.',
+     skills:['self-healing','root-cause','auto-rollback'], tools:['regression_detect','hotfix_apply','rollback_trigger']},
+    {id:'knowledge',           x:250, y:200, color:'#6366f1', name:'Knowledge',  role:'Maintenance nightly', photo:'/static/avatars/knowledge-curator.jpg',
+     persona:'Maintient et enrichit la base de connaissances — skills, patterns, mémoire projet.', motivation:'La connaissance partagée multiplie la performance.',
+     skills:['knowledge-management','skill-eval','memory-maintenance'], tools:['skill_challenge','kb_update','memory_prune']},
+];
+var AC_EDGES = [
+    {from:'evolution_scheduler', to:'thompson',   pat:'h', label:'tune'},
+    {from:'evolution_scheduler', to:'darwin',     pat:'h', label:'evolve'},
+    {from:'evolution_scheduler', to:'rl_policy',  pat:'h', label:'train'},
+    {from:'evolution_scheduler', to:'knowledge',  pat:'h', label:'maintain'},
+    {from:'watchdog',            to:'auto_heal',  pat:'r', label:'alert'},
+    {from:'thompson',            to:'rl_policy',  pat:'n', label:'reward'},
+    {from:'darwin',              to:'auto_heal',  pat:'n', label:'fitness'},
+];
+var AC_PATS = {
+    h: {color:'#f59e0b', dash:'',    label:'Hierarchical'},
+    n: {color:'#8b5cf6', dash:'2 4', label:'Network'},
+    r: {color:'#ef4444', dash:'3 3', label:'Alert'},
+};
+
+function renderAcGraph() {
+    const svg = document.getElementById('acGraphSvg');
+    const W = 400, H = 280;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    const edgesG = document.getElementById('acEdges');
+    edgesG.innerHTML = '';
+    const activePatterns = new Set();
+    AC_EDGES.forEach(e => {
+        const fn = AC_NODES.find(n=>n.id===e.from), tn = AC_NODES.find(n=>n.id===e.to);
+        if (!fn||!tn) return;
+        const pat = AC_PATS[e.pat] || AC_PATS.n;
+        activePatterns.add(e.pat);
+        const x1=fn.x+AC_NW/2, y1=fn.y+AC_NH, x2=tn.x+AC_NW/2, y2=tn.y;
+        const dy=tn.y-fn.y, co=Math.max(20,Math.abs(dy)*0.35);
+        const d = dy > 0
+            ? `M${x1},${y1} C${x1},${y1+co} ${x2},${y2-co} ${x2},${y2}`
+            : `M${x1},${fn.y} C${x1},${fn.y-co} ${x2},${tn.y+AC_NH+co} ${x2},${tn.y+AC_NH}`;
+        const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+        path.setAttribute('d', d); path.setAttribute('class','ig-edge');
+        path.style.stroke = pat.color; path.style.markerEnd = `url(#ac-arrow-${e.pat})`;
+        if (pat.dash) path.style.strokeDasharray = pat.dash;
+        edgesG.appendChild(path);
+        if (e.label) {
+            const mx=(x1+x2)/2, my=(y1+y2)/2-4;
+            const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+            lbl.setAttribute('class','ig-edge-label'); lbl.setAttribute('x',mx); lbl.setAttribute('y',my);
+            lbl.style.fill = pat.color; lbl.textContent = e.label;
+            edgesG.appendChild(lbl);
+        }
+    });
+    const nodesG = document.getElementById('acNodes');
+    nodesG.innerHTML = '';
+    AC_NODES.forEach(n => {
+        const col = n.color;
+        const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+        g.setAttribute('class','ig-node'); g.setAttribute('transform',`translate(${n.x},${n.y})`);
+        g.style.cursor = 'pointer';
+        g.addEventListener('click', () => window.openFiche && window.openFiche(n.id));
+        const clipId = `acp-${n.id}`;
+        const cy = AC_NH/2;
+        g.innerHTML = `
+            <defs><clipPath id="${clipId}"><circle cx="20" cy="${cy}" r="13"/></clipPath></defs>
+            <rect class="ig-node-bg" width="${AC_NW}" height="${AC_NH}" rx="4"/>
+            <line class="ig-node-bar" x1="0" y1="0" x2="${AC_NW}" y2="0" stroke="${col}" stroke-width="3"/>
+            <circle cx="20" cy="${cy}" r="13" fill="${col}" opacity="0.25"/>
+            ${n.photo ? `<image href="${n.photo}" x="7" y="${cy-13}" width="26" height="26" clip-path="url(#${clipId})" preserveAspectRatio="xMidYMid slice"/>` : `<text x="20" y="${cy+4}" text-anchor="middle" style="font-size:10px;fill:${col};font-weight:700">${n.name.substring(0,2)}</text>`}
+            <circle cx="20" cy="${cy}" r="13" fill="none" stroke="${col}" stroke-width="1.5" opacity="0.6"/>
+            <text class="ig-node-name" x="40" y="22">${n.name}</text>
+            <text class="ig-node-role" x="40" y="36">${n.role}</text>
+            <circle class="ig-node-dot" cx="${AC_NW-12}" cy="14" fill="${col}" opacity="0.6"/>`;
+        nodesG.appendChild(g);
+    });
+    const legendEl = document.getElementById('acGraphLegend');
+    legendEl.innerHTML = '';
+    activePatterns.forEach(p => {
+        const s = AC_PATS[p]; if (!s) return;
+        const item = document.createElement('div');
+        item.className = 'idea-graph-legend-item';
+        item.innerHTML = `<svg width="28" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="${s.color}" stroke-width="2" ${s.dash?`stroke-dasharray="${s.dash}"`:''}/><polygon points="20,1 28,5 20,9" fill="${s.color}" opacity="0.8"/></svg><span>${s.label}</span>`;
+        legendEl.appendChild(item);
+    });
+}
+
+function toggleAcTeamGraph() {
+    const canvas = document.getElementById('acGraphCanvas');
+    const legend = document.getElementById('acGraphLegend');
+    const toggle = document.querySelector('#acTeamGraph .idea-graph-toggle');
+    const hidden = canvas.style.display === 'none';
+    canvas.style.display = hidden ? '' : 'none';
+    legend.style.display = hidden ? '' : 'none';
+    toggle.classList.toggle('open', hidden);
+}
+
+
+function artSwitchTab(btn, panelId) {
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    ['art-org','art-amelio-container'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === panelId ? '' : 'none';
+    });
+    if (panelId === 'art-amelio-container') {
+        // Auto-load Cycles AC on first open
+        const content = document.getElementById('art-amelio-content');
+        if (content && !content.dataset.loaded) {
+            content.dataset.loaded = '1';
+            htmx.ajax('GET', '/workflows/improvement', {target: '#art-amelio-content', swap: 'innerHTML'});
+        }
+        // Render AC team graph
+        if (!document.getElementById('acGraphSvg').dataset.rendered) {
+            renderAcGraph();
+            document.getElementById('acGraphSvg').dataset.rendered = '1';
+        }
+        // Update SAFe SpecBar with live AC data (current active sub-tab)
+        const activeStab = document.querySelector('.ac-stab.active');
+        const sub = activeStab ? activeStab.id.replace('ac-stab-', 'ac-panel-') : 'ac-panel-cycles';
+        if (window.loadSpecBarFromUrl) window.loadSpecBarFromUrl('/api/art/amelio/specbar/' + sub);
+    }
+}
+
+function acSwitchTab(btn, subId) {
+    document.querySelectorAll('.ac-stab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    ['ac-panel-cycles','ac-panel-skills','ac-panel-thompson','ac-panel-darwin','ac-panel-evolution','ac-panel-rl','ac-panel-heal','ac-panel-instincts'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = id === subId ? '' : 'none';
+    });
+    // Update SAFe SpecBar live for this sub-tab
+    if (window.loadSpecBarFromUrl) window.loadSpecBarFromUrl('/api/art/amelio/specbar/' + subId);
+    if (subId === 'ac-panel-thompson') loadThompsonTab();
+    if (subId === 'ac-panel-skills') loadSkillsTab();
+    if (subId === 'ac-panel-darwin') {
+        const tc = document.getElementById('art-teams-content');
+        if (tc && !tc.dataset.loaded) {
+            tc.dataset.loaded = '1';
+            htmx.ajax('GET', '/teams/partial', {target: '#art-teams-content', swap: 'innerHTML'});
+        }
+    }
+    if (subId === 'ac-panel-evolution') {
+        const ec = document.getElementById('art-evolution-content');
+        if (ec && !ec.dataset.loaded) {
+            ec.dataset.loaded = '1';
+            htmx.ajax('GET', '/workflows/evolution', {target: '#art-evolution-content', swap: 'innerHTML'});
+        }
+    }
+    if (subId === 'ac-panel-rl') {
+        const rc = document.getElementById('art-rl-content');
+        if (rc && !rc.dataset.loaded) {
+            rc.dataset.loaded = '1';
+            loadRlTab();
+        }
+    }
+    if (subId === 'ac-panel-heal') {
+        const hc = document.getElementById('art-heal-content');
+        if (hc && !hc.dataset.loaded) {
+            hc.dataset.loaded = '1';
+            loadSelfHealTab();
+        }
+    }
+    if (subId === 'ac-panel-instincts') loadInstinctsTab();
+}
+
+async function loadThompsonTab() {
+    const tbody = document.getElementById('ts-art-tbody');
+    if (tbody.dataset.loaded) return;
+    try {
+        const d = await fetch('/api/analytics/agents/scores').then(r => r.json());
+        if (!d.success) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur: ${d.error}</td></tr>`; return; }
+        const s = d.summary;
+        document.getElementById('ts-art-total').textContent = s.total_agents;
+        document.getElementById('ts-art-accepted').textContent = (s.total_calls || s.total_accepted || 0).toLocaleString();
+        document.getElementById('ts-art-rejected').textContent = s.total_rejected.toLocaleString();
+        document.getElementById('ts-art-hirej').textContent = (d.fitness || []).length;
+
+        // Provider A/B breakdown (dynamic cards)
+        const abGrid = document.getElementById('ts-ab-grid');
+        const provColors = ['#6366f1','#0ea5e9','#10b981','#f59e0b','#f87171'];
+        const labels = ['A','B','C','D','E'];
+        if (d.providers && d.providers.length) {
+            const cols = Math.min(d.providers.length, 4);
+            abGrid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+            abGrid.innerHTML = d.providers.map((p, i) => {
+                const col = provColors[i % provColors.length];
+                const lbl = labels[i] || String(i+1);
+                const calls = (p.accepted||0) + (p.rejected||0);
+                const pct = calls > 0 ? Math.round(100*(p.accepted||0)/calls) + '%' : '—';
+                const ms = p.avg_duration_ms ? (p.avg_duration_ms >= 1000 ? (p.avg_duration_ms/1000).toFixed(1)+'s' : Math.round(p.avg_duration_ms)+'ms') : '—';
+                return `<div class="stat-card" style="border:1px solid ${col};border-radius:8px;padding:0.8rem">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:0.6rem">
+                        <span style="background:${col};color:#fff;border-radius:3px;padding:1px 7px;font-size:0.72rem;font-weight:700">${lbl}</span>
+                        <span style="color:var(--text-secondary);font-size:0.8rem;font-weight:600">${p.provider}</span>
+                        <span style="color:var(--text-tertiary);font-size:0.72rem">${p.model || ''}</span>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.4rem;text-align:center">
+                        <div><p style="font-size:1.2rem;font-weight:700;color:${col}">${(p.calls||calls).toLocaleString()}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">appels</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:#10b981">${pct}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">succès</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:#f59e0b">${p.rejected||0}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">erreurs</p></div>
+                        <div><p style="font-size:1.2rem;font-weight:700;color:var(--text-secondary)">${ms}</p><p style="font-size:0.68rem;color:var(--text-tertiary)">moy.</p></div>
+                    </div>
+                </div>`;
+            }).join('');
+        } else {
+            abGrid.innerHTML = '<p style="color:var(--text-tertiary);font-size:0.82rem">Aucun fournisseur LLM actif</p>';
+        }
+
+        // Agent performance table
+        if (!d.agents || !d.agents.length) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune donn\u00e9e \u2014 les scores s\'accumulent en cours d\'epic</td></tr>';
+        } else {
+            tbody.innerHTML = d.agents.map(a => {
+                const pct = a.success_pct ?? 0;
+                const color = pct >= 90 ? '#10b981' : pct >= 70 ? '#f59e0b' : '#ef4444';
+                const badge = a.rejection_pct > 40
+                    ? ' <span style="font-size:0.7rem;background:#ef4444;color:#fff;border-radius:3px;padding:1px 5px"><svg style="width:10px;height:10px;vertical-align:middle"><use href="#icon-alert-triangle"/></svg></span>' : '';
+                const provColor = (a.provider||'').includes('minimax') ? '#6366f1' : '#0ea5e9';
+                const ms = a.avg_duration_ms ? Math.round(a.avg_duration_ms/1000).toFixed(1)+'s' : '—';
+                const tok = a.total_tokens ? (a.total_tokens/1000).toFixed(0)+'k' : '—';
+                return `<tr style="${a.rejection_pct > 40 ? 'background:rgba(239,68,68,0.07)' : ''}">
+                    <td style="padding:7px 12px">${a.agent_name}${badge}</td>
+                    <td style="padding:7px 12px;font-size:0.8rem">
+                        <span style="background:${provColor}22;color:${provColor};border-radius:3px;padding:1px 6px">${a.provider}</span>
+                        <span style="color:var(--text-tertiary);font-size:0.75rem;margin-left:4px">${a.model||''}</span>
+                    </td>
+                    <td style="padding:7px 12px;text-align:right">${a.iterations}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#f87171">${a.rejected}</td>
+                    <td style="padding:7px 12px;text-align:right;font-weight:600;color:${color}">${pct}%</td>
+                    <td style="padding:7px 12px;text-align:right;color:var(--text-secondary)">${ms}</td>
+                    <td style="padding:7px 12px;text-align:right;color:var(--text-tertiary)">${tok}</td>
+                    <td style="padding:7px 12px">
+                        <div style="background:var(--border);border-radius:3px;height:7px">
+                            <div style="background:${color};border-radius:3px;height:7px;width:${pct}%"></div>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+        tbody.dataset.loaded = '1';
+
+        // Darwin fitness section
+        if (d.fitness && d.fitness.length) {
+            document.getElementById('ts-darwin-section').style.display = '';
+            const dfbody = document.getElementById('ts-darwin-tbody');
+            dfbody.innerHTML = d.fitness.map(f => {
+                const sc = f.fitness_score || 0;
+                const col = sc >= 70 ? '#10b981' : sc >= 40 ? '#f59e0b' : '#ef4444';
+                return `<tr>
+                    <td style="padding:7px 12px">${f.agent_name}</td>
+                    <td style="padding:7px 12px;color:var(--text-secondary);font-size:0.82rem">${f.pattern_id||'—'}</td>
+                    <td style="padding:7px 12px;color:var(--text-tertiary);font-size:0.8rem">${f.technology||'generic'}</td>
+                    <td style="padding:7px 12px;color:var(--text-tertiary);font-size:0.8rem">${f.phase_type||'—'}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#10b981">${f.wins}</td>
+                    <td style="padding:7px 12px;text-align:right;color:#f87171">${f.losses}</td>
+                    <td style="padding:7px 12px">
+                        <div style="display:flex;align-items:center;gap:6px">
+                            <div style="background:var(--border);border-radius:3px;height:7px;flex:1">
+                                <div style="background:${col};border-radius:3px;height:7px;width:${sc}%"></div>
+                            </div>
+                            <span style="font-size:0.78rem;font-weight:600;color:${col};min-width:32px">${sc}</span>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+    } catch(e) { tbody.innerHTML = `<tr><td colspan="8" style="padding:2rem;text-align:center;color:#ef4444">Erreur réseau: ${e.message}</td></tr>`; }
+}
+
+// Skills Health — sub-tab switcher
+function skSwitchTab(tab) {
+    const isEtat = tab === 'etat';
+    document.getElementById('sk-panel-etat').style.display = isEtat ? '' : 'none';
+    document.getElementById('sk-panel-amelio').style.display = isEtat ? 'none' : '';
+    document.getElementById('sk-tab-etat').style.background = isEtat ? 'var(--purple,#a855f7)' : 'var(--bg-tertiary,#251a35)';
+    document.getElementById('sk-tab-etat').style.color = isEtat ? '#fff' : 'var(--text-secondary,#aaa)';
+    document.getElementById('sk-tab-etat').style.fontWeight = isEtat ? '600' : 'normal';
+    document.getElementById('sk-tab-amelio').style.background = isEtat ? 'var(--bg-tertiary,#251a35)' : 'var(--purple,#a855f7)';
+    document.getElementById('sk-tab-amelio').style.color = isEtat ? 'var(--text-secondary,#aaa)' : '#fff';
+    document.getElementById('sk-tab-amelio').style.fontWeight = isEtat ? 'normal' : '600';
+    if (!isEtat) loadSkillsAmelio();
+}
+
+
+// ── Skills Health — full eval grid + run controls ─────────────────────────
+// Ref: https://www.philschmid.de/testing-skills
+let _skAllSkills = [];
+let _skJobs = {}; // skill_name → {job_id, status}
+
+async function loadSkillsTab() {
+    const tbody = document.getElementById('sk-main-tbody');
+    if (!tbody) return;
+    try {
+        const [covResp, listResp] = await Promise.all([
+            fetch('/api/skills/eval'),
+            fetch('/api/skills/list'),
+        ]);
+        const coverage = covResp.ok ? await covResp.json() : {};
+        const listRaw = listResp.ok ? await listResp.json() : [];
+        _skAllSkills = Array.isArray(listRaw) ? listRaw : [];
+
+        // KPIs
+        document.getElementById('sk-total').textContent = coverage.total ?? _skAllSkills.length;
+        document.getElementById('sk-coverage').textContent = (coverage.coverage_pct ?? 0) + '%';
+        document.getElementById('sk-passing').textContent = coverage.passing ?? 0;
+        document.getElementById('sk-run').textContent = coverage.run ?? 0;
+        document.getElementById('sk-progress').style.width = (coverage.coverage_pct || 0) + '%';
+
+        skRenderTable(_skAllSkills);
+    } catch(e) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:#ef4444">Error: ${e.message}</td></tr>`;
+    }
+}
+
+function skRenderTable(skills) {
+    const tbody = document.getElementById('sk-main-tbody');
+    if (!tbody) return;
+    const filter = document.getElementById('sk-filter')?.value || 'all';
+    let rows = skills;
+    if (filter === 'evals') rows = skills.filter(s => s.has_evals);
+    else if (filter === 'missing') rows = skills.filter(s => !s.has_evals && s.source !== 'tech');
+    else if (filter === 'fail') rows = skills.filter(s => s.has_evals && s.pass_rate != null && s.pass_rate < 0.8);
+    else if (filter === 'tech') rows = skills.filter(s => s.source === 'tech');
+
+    if (!rows.length) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">No skills matching filter</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = rows.map(s => skRowHtml(s)).join('');
+}
+
+function skFilterTable() { skRenderTable(_skAllSkills); }
+
+function skRowHtml(s) {
+    const pr = s.pass_rate;
+    const prPct = pr != null ? Math.round(pr * 100) : null;
+    const color = pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+
+    // Pass rate badge
+    let badge;
+    if (!s.has_evals) {
+        badge = '<span style="font-size:0.72rem;color:#6b7280;border:1px solid #374151;border-radius:3px;padding:0 5px">no evals</span>';
+    } else if (s.verdict === 'regression') {
+        badge = '<span style="color:#6366f1;font-size:0.75rem;font-weight:600">regression</span>';
+    } else if (s.verdict === 'retire') {
+        badge = '<span style="color:#94a3b8;font-size:0.75rem;font-style:italic">retired</span>';
+    } else if (pr == null) {
+        badge = '<span style="color:#6b7280;font-size:0.75rem">not run</span>';
+    } else {
+        badge = `<span style="font-weight:600;color:${color}">${prPct}%</span>
+            <div style="background:var(--border);border-radius:2px;height:3px;margin-top:3px;width:60px">
+                <div style="background:${color};border-radius:2px;height:3px;width:${prPct}%"></div>
+            </div>`;
+    }
+
+    // Determ / Judge scores
+    const det = s.checks_pass_rate != null ? `<span style="color:${s.checks_pass_rate>=0.8?'#3b82f6':'#f59e0b'}">${Math.round(s.checks_pass_rate*100)}%</span>` : '–';
+    const judge = s.llm_judge_score != null && s.llm_judge_score >= 0 ? `<span style="color:${s.llm_judge_score>=0.8?'#8b5cf6':'#f59e0b'}">${Math.round(s.llm_judge_score*100)}%</span>` : '–';
+    const ran = s.ran_at ? s.ran_at.substring(0,10) : '—';
+
+    // Job state
+    const job = _skJobs[s.name];
+    let actionBtn;
+    if (job && job.status === 'running') {
+        actionBtn = `<button disabled style="background:#1e293b;color:#6b7280;border:1px solid #374151;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:default">
+            <span style="animation:spin 1s linear infinite;display:inline-block">⟳</span> running…
+        </button>`;
+    } else if (!s.has_evals) {
+        actionBtn = '<span style="font-size:0.72rem;color:#374151">—</span>';
+    } else {
+        actionBtn = `<button onclick="skRunOne('${s.name}')" style="background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:pointer">▶ Run</button>`;
+    }
+
+    const caseCount = s.eval_cases ?? 0;
+    const rowBg = s.has_evals && pr != null && pr < 0.6 ? 'background:rgba(239,68,68,0.04)' : '';
+    const techBadge = s.source === 'tech' ? `<span style="margin-left:6px;font-size:0.65rem;background:#1e3a5f;color:#60a5fa;border-radius:3px;padding:1px 5px">${s.stack || 'tech'}</span>` : '';
+    const descTip = s.description ? ` title="${s.description.replace(/"/g,'&quot;')}"` : '';
+    return `<tr style="border-bottom:1px solid var(--border,#2d3748);${rowBg}" data-skill="${s.name}">
+        <td style="padding:7px 12px;font-weight:${s.has_evals?'500':'normal'}"${descTip}>${s.name}${techBadge}</td>
+        <td style="text-align:center;padding:7px 8px;color:var(--text-secondary)">${caseCount || '—'}</td>
+        <td style="text-align:center;padding:7px 8px">${det}</td>
+        <td style="text-align:center;padding:7px 8px">${judge}</td>
+        <td style="text-align:center;padding:7px 8px">${badge}</td>
+        <td style="text-align:center;padding:7px 8px;font-size:0.72rem;color:var(--text-tertiary)">${ran}</td>
+        <td style="text-align:center;padding:7px 8px">${actionBtn}
+            ${s.has_evals && s.pass_rate != null ? `<button onclick="skShowDetail('${s.name}')" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:0.72rem;margin-left:4px">detail</button>` : ''}
+        </td>
+    </tr>`;
+}
+
+async function skRunOne(skillName) {
+    _skJobs[skillName] = {status: 'running'};
+    // Re-render just this row
+    const skill = _skAllSkills.find(s => s.name === skillName);
+    if (skill) {
+        const row = document.querySelector(`tr[data-skill="${skillName}"]`);
+        if (row) row.outerHTML = skRowHtml(skill);
+    }
+    document.getElementById('sk-run-all-status').textContent = `Running ${skillName}…`;
+    try {
+        const resp = await fetch(`/api/skills/eval/${skillName}/run`, {method:'POST'});
+        if (!resp.ok) {
+            _skJobs[skillName] = {status:'error'};
+            document.getElementById('sk-run-all-status').textContent = `Error running ${skillName}`;
+            return;
+        }
+        const {job_id} = await resp.json();
+        _skJobs[skillName] = {status:'running', job_id};
+        skPollJob(skillName, job_id);
+    } catch(e) {
+        _skJobs[skillName] = {status:'error'};
+        document.getElementById('sk-run-all-status').textContent = `Error: ${e.message}`;
+    }
+}
+
+async function skPollJob(skillName, jobId) {
+    for (let i = 0; i < 60; i++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+            const resp = await fetch(`/api/skills/eval/job/${jobId}`);
+            if (!resp.ok) break;
+            const job = await resp.json();
+            if (job.status === 'done' || job.status === 'error') {
+                _skJobs[skillName] = job;
+                // Reload skill data
+                const listResp = await fetch('/api/skills/list');
+                if (listResp.ok) {
+                    _skAllSkills = await listResp.json();
+                    skRenderTable(_skAllSkills);
+                    // Reload KPIs
+                    const covResp = await fetch('/api/skills/eval');
+                    if (covResp.ok) {
+                        const coverage = await covResp.json();
+                        document.getElementById('sk-passing').textContent = coverage.passing ?? 0;
+                        document.getElementById('sk-run').textContent = coverage.run ?? 0;
+                        document.getElementById('sk-progress').style.width = (coverage.coverage_pct||0) + '%';
+                    }
+                }
+                const pr = job.pass_rate != null ? Math.round(job.pass_rate * 100) + '%' : '';
+                document.getElementById('sk-run-all-status').textContent =
+                    job.status === 'done' ? ` ${skillName}: ${pr} in ${job.duration_s?.toFixed(1)}s` : ` ${skillName}: error`;
+                return;
+            }
+        } catch(_) { break; }
+    }
+    _skJobs[skillName] = {status: 'timeout'};
+}
+
+let _skRunAllQueue = [];
+let _skRunAllIdx = 0;
+
+async function skRunAll() {
+    const withEvals = _skAllSkills.filter(s => s.has_evals);
+    if (!withEvals.length) {
+        document.getElementById('sk-run-all-status').textContent = 'No skills with eval_cases';
+        return;
+    }
+    _skRunAllQueue = withEvals.map(s => s.name);
+    _skRunAllIdx = 0;
+    const btn = document.getElementById('sk-run-all-btn');
+    btn.disabled = true; btn.textContent = '⟳ Running…';
+    await skRunAllNext();
+}
+
+async function skRunAllNext() {
+    if (_skRunAllIdx >= _skRunAllQueue.length) {
+        const btn = document.getElementById('sk-run-all-btn');
+        btn.disabled = false; btn.textContent = '▶ Run all evals';
+        document.getElementById('sk-run-all-status').textContent = ` All ${_skRunAllQueue.length} skills evaluated`;
+        return;
+    }
+    const name = _skRunAllQueue[_skRunAllIdx];
+    document.getElementById('sk-run-all-status').textContent = `[${_skRunAllIdx+1}/${_skRunAllQueue.length}] Running ${name}…`;
+    _skJobs[name] = {status: 'running'};
+    skRenderTable(_skAllSkills);
+    try {
+        const resp = await fetch(`/api/skills/eval/${name}/run`, {method:'POST'});
+        if (!resp.ok) { _skRunAllIdx++; await skRunAllNext(); return; }
+        const {job_id} = await resp.json();
+        // Poll until done
+        for (let i = 0; i < 60; i++) {
+            await new Promise(r => setTimeout(r, 3000));
+            const pr = await fetch(`/api/skills/eval/job/${job_id}`).then(r=>r.json()).catch(()=>({status:'error'}));
+            if (pr.status === 'done' || pr.status === 'error') {
+                _skJobs[name] = pr;
+                break;
+            }
+        }
+        // Refresh skill data
+        const listResp = await fetch('/api/skills/list');
+        if (listResp.ok) _skAllSkills = await listResp.json();
+        skRenderTable(_skAllSkills);
+    } catch(_) {}
+    _skRunAllIdx++;
+    await skRunAllNext();
+}
+
+async function skShowDetail(skillName) {
+    const panel = document.getElementById('sk-case-detail');
+    if (!panel) return;
+    if (panel.dataset.skill === skillName && panel.style.display !== 'none') {
+        panel.style.display = 'none'; return;
+    }
+    panel.style.display = '';
+    panel.dataset.skill = skillName;
+    panel.innerHTML = '<div style="padding:1rem;color:var(--text-secondary)">Loading detail…</div>';
+    try {
+        const resp = await fetch(`/api/skills/eval/${skillName}`);
+        if (!resp.ok) { panel.innerHTML = `<div style="padding:1rem;color:#ef4444">Error ${resp.status}</div>`; return; }
+        const d = await resp.json();
+        if (d.status === 'never_run') {
+            panel.innerHTML = `<div class="card" style="padding:1rem;border-left:3px solid #374151">
+                <b>${skillName}</b> — never evaluated. ${d.eval_cases_total} case(s) defined.
+                <button onclick="skRunOne('${skillName}')" style="margin-left:1rem;background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.78rem;cursor:pointer">▶ Run now</button>
+            </div>`;
+            return;
+        }
+        const cases = d.case_results || [];
+        const overallColor = (d.pass_rate||0) >= 0.8 ? '#10b981' : (d.pass_rate||0) >= 0.6 ? '#f59e0b' : '#ef4444';
+        panel.innerHTML = `<div class="card" style="padding:1.25rem;border-left:3px solid ${overallColor}">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+                <div style="font-weight:700">${skillName} — detail</div>
+                <div style="display:flex;gap:1rem;font-size:0.8rem">
+                    <span>Pass rate: <b style="color:${overallColor}">${Math.round((d.pass_rate||0)*100)}%</b></span>
+                    <span style="color:var(--text-tertiary)">${d.eval_cases_total} cases · ${d.trials_per_case||3} trials · ${d.duration_s?.toFixed(1)||'?'}s</span>
+                </div>
+                <button onclick="skRunOne('${skillName}')" style="background:#1e293b;color:#93c5fd;border:1px solid #1d4ed8;border-radius:4px;padding:3px 10px;font-size:0.72rem;cursor:pointer">▶ Re-run</button>
+                <button onclick="document.getElementById('sk-case-detail').style.display='none'" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:1rem"></button>
+            </div>
+            ${cases.map(c => {
+                const cColor = c.overall_pass_rate >= 0.8 ? '#10b981' : c.overall_pass_rate >= 0.6 ? '#f59e0b' : '#ef4444';
+                const detPct = Math.round(c.checks_pass_rate * 100);
+                const judPct = c.llm_judge_score >= 0 ? Math.round(c.llm_judge_score * 100) : null;
+                return `<div style="background:var(--bg-secondary);border-radius:6px;padding:0.75rem;margin-bottom:0.5rem;border-left:3px solid ${cColor}">
+                    <div style="display:flex;align-items:flex-start;gap:0.75rem">
+                        <span style="font-size:0.85rem;font-weight:600;color:${cColor};min-width:40px">${Math.round(c.overall_pass_rate*100)}%</span>
+                        <div style="flex:1">
+                            <div style="font-size:0.82rem;color:var(--text-primary);margin-bottom:0.35rem;font-style:italic">"${c.prompt?.substring(0,120)||''}"</div>
+                            <div style="display:flex;gap:1rem;font-size:0.75rem">
+                                <span style="color:#3b82f6"> Determ: ${detPct}%</span>
+                                ${judPct !== null ? `<span style="color:#8b5cf6">⚖ Judge: ${judPct}%</span>` : ''}
+                                <span style="color:var(--text-tertiary)">${c.trials} trials</span>
+                                ${!c.should_trigger ? '<span style="color:#f59e0b">negative test</span>' : ''}
+                            </div>
+                            ${(c.check_details||c.checks_details) ? `<div style="margin-top:0.35rem;display:flex;flex-wrap:wrap;gap:0.3rem">
+                                ${(c.check_details||c.checks_details).map(ch => `<span style="font-size:0.7rem;padding:1px 6px;border-radius:3px;background:${ch.passed?'rgba(16,185,129,0.12)':'rgba(239,68,68,0.12)'};color:${ch.passed?'#34d399':'#f87171'}" title="${ch.notes||''}">${ch.passed?'✓':'✗'} ${ch.check_spec?.substring(0,35)||ch.spec?.substring(0,35)||''}</span>`).join('')}
+                            </div>` : ''}
+                            ${c.judge_notes ? `<div style="margin-top:0.4rem;padding:0.35rem 0.6rem;background:rgba(99,102,241,0.07);border-left:2px solid #6366f1;border-radius:3px;font-size:0.72rem;color:var(--text-secondary);line-height:1.5"><span style="color:#818cf8;font-weight:600">Judge: </span>${c.judge_notes}</div>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}
+            ${d.coverage_gap?.length ? `<div style="margin-top:0.75rem;padding:0.4rem 0.75rem;background:rgba(245,158,11,0.07);border-left:3px solid #f59e0b;border-radius:4px;font-size:0.72rem;display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center"><span style="color:#f59e0b;font-weight:600;margin-right:0.25rem">Coverage gaps:</span>${d.coverage_gap.map(g=>`<span style="background:rgba(245,158,11,0.12);color:#fbbf24;border-radius:3px;padding:1px 6px">${g}</span>`).join('')}</div>` : ''}
+        </div>`;
+    } catch(e) {
+        panel.innerHTML = `<div style="padding:1rem;color:#ef4444">Error: ${e.message}</div>`;
+    }
+}
+
+
+
+// Skills Amélioration tab — priority backlog + run history
+async function loadSkillsAmelio() {
+    const amelioTbody = document.getElementById('sk-amelio-tbody');
+    if (!amelioTbody || amelioTbody.dataset.loaded) return;
+    amelioTbody.dataset.loaded = '1';
+    const historyEl = document.getElementById('sk-run-history');
+    try {
+        const [listResp, histResp] = await Promise.all([
+            fetch('/api/skills/list'),
+            fetch('/api/skills/eval/history'),
+        ]);
+        const skillList = listResp.ok ? (await listResp.json()) : [];
+        const histData = histResp.ok ? (await histResp.json()) : {};
+
+        // Build priority backlog: no evals first, then low pass rate, then not run
+        const prioritized = [...skillList].sort((a, b) => {
+            // Score: 0 evals = highest priority, then by pass_rate asc
+            const aScore = !a.has_evals ? 0 : (a.pass_rate == null ? 1 : a.pass_rate);
+            const bScore = !b.has_evals ? 0 : (b.pass_rate == null ? 1 : b.pass_rate);
+            return aScore - bScore;
+        }).slice(0, 25);
+
+        if (!prioritized.length) {
+            amelioTbody.innerHTML = '<tr><td colspan="5" style="padding:1rem;text-align:center;color:var(--text-secondary)">Aucun skill à améliorer</td></tr>';
+        } else {
+            amelioTbody.innerHTML = prioritized.map((s, i) => {
+                const pr = s.pass_rate;
+                const prPct = pr !== null && pr !== undefined ? Math.round(pr * 100) : null;
+                const noEvals = !s.has_evals;
+                const priority = noEvals
+                    ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#ef4444"><use href="#icon-alert-circle"/></svg><span style="color:#ef4444">Sans evals</span>'
+                    : (pr == null
+                        ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#f97316"><use href="#icon-alert-triangle"/></svg><span style="color:#f97316">Jamais run</span>'
+                        : (pr < 0.6
+                            ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#ef4444"><use href="#icon-alert-circle"/></svg><span style="color:#ef4444">Critique</span>'
+                            : pr < 0.8
+                                ? '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#f59e0b"><use href="#icon-alert-triangle"/></svg><span style="color:#f59e0b">À améliorer</span>'
+                                : '<svg width="12" height="12" style="vertical-align:middle;margin-right:3px;color:#10b981"><use href="#icon-check-circle"/></svg><span style="color:#10b981">OK</span>'));
+                const prColor = noEvals || pr == null ? '#6b7280' : pr >= 0.8 ? '#10b981' : pr >= 0.6 ? '#f59e0b' : '#ef4444';
+                const prDisplay = noEvals ? '—' : (prPct !== null ? `<span style="color:${prColor};font-weight:600">${prPct}%</span>` : '—');
+                const action = noEvals ? 'Ajouter eval_cases' : (pr == null ? 'Lancer évaluation' : (pr < 0.8 ? 'Améliorer skill' : '—'));
+                return `<tr style="border-bottom:1px solid var(--border,#333)">
+                    <td style="padding:5px 6px;color:var(--text-tertiary);font-size:0.75rem">${i+1}</td>
+                    <td style="padding:5px 6px;font-weight:${noEvals || pr != null && pr < 0.8 ? '600' : 'normal'}">${s.name}</td>
+                    <td style="text-align:center;padding:5px 6px;font-size:0.78rem">${priority}</td>
+                    <td style="text-align:center;padding:5px 6px">${prDisplay}</td>
+                    <td style="padding:5px 6px;font-size:0.75rem;color:var(--text-tertiary)">${action}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Run history
+        const runs = histData.runs || [];
+        if (!runs.length) {
+            historyEl.textContent = 'Aucun cycle lancé — cliquer "Lancer skill-eval"';
+        } else {
+            historyEl.innerHTML = `<table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Mission</th>
+                    <th style="text-align:center;padding:3px 6px">Statut</th>
+                    <th style="text-align:center;padding:3px 6px">Skills run</th>
+                    <th style="text-align:right;padding:3px 6px">Date</th>
+                </tr></thead>
+                <tbody>${runs.map(r => {
+                    const statusColor = r.status === 'done' ? '#10b981' : r.status === 'running' ? '#6366f1' : '#6b7280';
+                    return `<tr style="border-bottom:1px solid var(--border,#333)">
+                        <td style="padding:4px 6px"><a href="/missions/${r.id}/control" style="color:var(--purple-light)">${(r.name||r.id).substring(0,35)}</a></td>
+                        <td style="text-align:center;padding:4px 6px"><span style="color:${statusColor};font-size:0.75rem">${r.status}</span></td>
+                        <td style="text-align:center;padding:4px 6px;color:var(--text-secondary)">${r.skills_run ?? '—'}</td>
+                        <td style="text-align:right;padding:4px 6px;color:var(--text-tertiary);font-size:0.75rem">${(r.created_at||'').substring(0,10)}</td>
+                    </tr>`;
+                }).join('')}</tbody>
+            </table>`;
+        }
+    } catch(e) {
+        if (amelioTbody) amelioTbody.innerHTML = `<tr><td colspan="5" style="padding:1rem;text-align:center;color:#ef4444">Erreur: ${e.message}</td></tr>`;
+    }
+}
+
+async function loadRlTab() {
+    const cont = document.getElementById('art-rl-content');
+    if (!cont) return;
+    try {
+        const d = await fetch('/api/rl/policy/stats').then(r => r.json());
+        const fired = d.recommendations_fired || 0;
+        const total = d.recommendations_total || 0;
+        const pct = total > 0 ? Math.round(fired/total*100) : 0;
+        cont.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.75rem;margin-bottom:1.5rem">
+            <div class="art-kpi"><div class="num">${d.states||0}</div><div class="lbl">États Q-table</div></div>
+            <div class="art-kpi"><div class="num">${d.total_experience||0}</div><div class="lbl">Expériences</div></div>
+            <div class="art-kpi"><div class="num">${fired}</div><div class="lbl">Reco appliquées</div></div>
+            <div class="art-kpi"><div class="num" style="color:${pct>=50?'#22c55e':'#f59e0b'}">${pct}%</div><div class="lbl">Taux adoption</div></div>
+        </div>
+        ${d.actions && d.actions.length ? `
+        <div class="card" style="padding:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Actions les plus recommandées
+            </div>
+            <table style="width:100%;font-size:0.82rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Action</th>
+                    <th style="text-align:right;padding:3px 6px">Q-value</th>
+                </tr></thead>
+                <tbody>${d.actions.map(a => `<tr>
+                    <td style="padding:3px 6px;color:var(--text-primary)">${a.action||a}</td>
+                    <td style="padding:3px 6px;text-align:right;color:var(--purple-light);font-weight:600">${typeof a.q_value !== 'undefined' ? a.q_value.toFixed(3) : '–'}</td>
+                </tr>`).join('')}</tbody>
+            </table>
+        </div>` : `<div style="color:var(--text-secondary);font-size:0.82rem;padding:1rem 0">Pas encore d'expériences RL — les cycles AC accumuleront les rewards au fil du temps.</div>`}
+        <div style="margin-top:1rem;font-size:0.72rem;color:var(--text-tertiary)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Q-learning sur les phases des cycles AC : reward R ∈ [-1, +1] = f(qualité, adversarial, traceability, efficience, régression).
+        </div>`;
+    } catch(e) {
+        cont.innerHTML = `<div style="color:#ef4444;padding:1rem">Erreur chargement RL: ${e.message}</div>`;
+    }
+}
+
+// ── Darwin Teams GA ────────────────────────────────────────────────────────
+
+async function loadDarwinTab() {
+    const [runsRes, lbRes, propsRes, teamsRes] = await Promise.allSettled([
+        fetch('/api/evolution/runs?limit=10').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=15').then(r => r.json()),
+        fetch('/api/evolution/proposals?limit=5').then(r => r.json()),
+        fetch('/api/teams/leaderboard?limit=1').then(r => r.json()), // just for count
+    ]);
+
+    // KPI: runs
+    const runs = runsRes.status === 'fulfilled' ? (runsRes.value.runs || []) : [];
+    document.getElementById('darwin-kpi-runs').textContent = runs.length || '0';
+
+    // KPI: best fitness
+    if (runs.length) {
+        const best = Math.max(...runs.map(r => r.best_fitness || 0));
+        document.getElementById('darwin-kpi-best').textContent = best > 0 ? best.toFixed(3) : '—';
+    }
+
+    // KPI: proposals pending review
+    const props = propsRes.status === 'fulfilled' ? (propsRes.value.proposals || []) : [];
+    const pending = props.filter(p => p.status === 'pending').length;
+    document.getElementById('darwin-kpi-props').textContent = pending;
+
+    // KPI: teams count
+    const lb = lbRes.status === 'fulfilled' ? (lbRes.value.teams || lbRes.value.leaderboard || []) : [];
+    const teamsCount = lbRes.status === 'fulfilled' ? (lbRes.value.total || lb.length) : '—';
+    document.getElementById('darwin-kpi-teams').textContent = teamsCount;
+
+    // GA runs table
+    const runsTbl = document.getElementById('darwin-runs-table');
+    if (!runs.length) {
+        runsTbl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucun run GA. Cliquez "Run GA now" pour démarrer.</p>';
+    } else {
+        runsTbl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Workflow</th>
+                <th style="text-align:right;padding:4px 8px">Best fitness</th>
+                <th style="text-align:right;padding:4px 8px">Générations</th>
+                <th style="text-align:right;padding:4px 8px">Démarré</th>
+            </tr></thead><tbody>
+            ${runs.map(r => `<tr style="border-top:1px solid var(--border)">
+                <td style="padding:4px 8px;font-family:monospace;font-size:0.72rem">${r.wf_id || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:#34d399">${r.best_fitness != null ? (+r.best_fitness).toFixed(3) : '—'}</td>
+                <td style="padding:4px 8px;text-align:right">${r.generations_run || r.generations || '—'}</td>
+                <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${r.started_at ? r.started_at.slice(0,16).replace('T',' ') : '—'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+    }
+
+    // Leaderboard
+    const lbEl = document.getElementById('darwin-leaderboard');
+    if (!lb.length) {
+        lbEl.innerHTML = '<p style="color:var(--text-secondary);font-style:italic;font-size:0.78rem">Aucune donnée fitness. Cliquez "Seed données" d\'abord.</p>';
+    } else {
+        lbEl.innerHTML = `<table style="width:100%;font-size:0.76rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-tertiary);font-size:0.7rem;text-transform:uppercase">
+                <th style="text-align:left;padding:4px 8px">Agent</th>
+                <th style="text-align:left;padding:4px 8px">Pattern</th>
+                <th style="text-align:left;padding:4px 8px">Tech</th>
+                <th style="text-align:right;padding:4px 8px">Fitness</th>
+                <th style="text-align:right;padding:4px 8px">W/L</th>
+            </tr></thead><tbody>
+            ${lb.map(t => {
+                const fit = t.fitness_score || t.score || 0;
+                const color = fit >= 60 ? '#34d399' : fit >= 40 ? '#f59e0b' : '#ef4444';
+                return `<tr style="border-top:1px solid var(--border)">
+                    <td style="padding:4px 8px;font-size:0.72rem">${t.agent_id || t.agent || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.pattern_id || t.pattern || '—'}</td>
+                    <td style="padding:4px 8px;font-size:0.72rem;color:var(--text-secondary)">${t.technology || '—'}</td>
+                    <td style="padding:4px 8px;text-align:right;color:${color};font-weight:600">${(+fit).toFixed(1)}</td>
+                    <td style="padding:4px 8px;text-align:right;color:var(--text-secondary)">${t.wins||0}/${t.losses||0}</td>
+                </tr>`;
+            }).join('')}
+            </tbody></table>`;
+    }
+}
+
+async function darwinRunGA() {
+    const btn = document.getElementById('darwin-run-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Running…';
+    st.style.display = ''; st.textContent = '⚙️ GA démarré en arrière-plan (20 générations, workflow: ac-improvement-cycle)…';
+    try {
+        const r = await fetch('/api/evolution/run/ac-improvement-cycle', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? ' GA lancé — résultats disponibles dans quelques secondes. Rafraîchissez.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 3000);
+    } catch(e) {
+        st.textContent = ` Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run GA now';
+    }
+}
+
+async function darwinSeed() {
+    const btn = document.getElementById('darwin-seed-btn');
+    const st = document.getElementById('darwin-status');
+    btn.disabled = true; btn.textContent = '⏳ Seeding…';
+    st.style.display = ''; st.textContent = '⚙️ Seeding team_fitness warmup data…';
+    try {
+        const r = await fetch('/api/darwin/seed', {method:'POST'});
+        const d = await r.json();
+        st.textContent = d.ok ? ' Seed démarré en arrière-plan. Rafraîchissez dans 5s.' : `⚠ ${d.detail || JSON.stringify(d)}`;
+        setTimeout(() => loadDarwinTab(), 5000);
+    } catch(e) {
+        st.textContent = ` Erreur: ${e.message}`;
+    } finally {
+        btn.disabled = false; btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg> Seed données';
+    }
+}
+
+async function loadSelfHealTab() {
+    // WHY: self-healing is part of the AC intelligence loop — incidents trigger auto-TMA missions,
+    // chaos monkey validates resilience. Surfaced here alongside RL/Thompson for full-loop visibility.
+    const cont = document.getElementById('art-heal-content');
+    if (!cont) return;
+    const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const sev = s => ({critical:'#ef4444',high:'#f97316',medium:'#f59e0b',low:'#6b7280'}[s]||'#6b7280');
+    const sta = s => ({open:'#f59e0b',investigating:'#818cf8',resolved:'#22c55e',closed:'#6b7280'}[s]||'#6b7280');
+    const timeAgoH = ts => {
+        if (!ts) return '—';
+        const d = Math.floor((Date.now()-new Date(ts).getTime())/1000);
+        if (d<60) return `${d}s`;
+        if (d<3600) return `${Math.floor(d/60)}m`;
+        if (d<86400) return `${Math.floor(d/3600)}h`;
+        return `${Math.floor(d/86400)}d`;
+    };
+    try {
+        const [stats, incidents, chaos] = await Promise.all([
+            fetch('/api/autoheal/stats').then(r=>r.json()).catch(()=>({})),
+            fetch('/api/incidents?limit=10').then(r=>r.json()).catch(()=>[]),
+            fetch('/api/chaos/history').then(r=>r.json()).catch(()=>[]),
+        ]);
+        const inc = stats.incidents || {};
+        const epics = stats.epics || {};
+        const hb = stats.heartbeat || 'starting';
+        const hbColor = hb==='alive'?'#22c55e':hb==='stale'?'#ef4444':'#818cf8';
+        const hbLabel = hb==='alive'?'Alive':hb==='stale'?'Stale':'Starting';
+
+        const kpis = [
+            {n:inc.open||0, l:'Incidents open', c:inc.open>0?'#f59e0b':'var(--text-primary)'},
+            {n:inc.investigating||0, l:'Investigating', c:'#818cf8'},
+            {n:inc.resolved||0, l:'Résolus', c:'#22c55e'},
+            {n:epics.active||0, l:'Heals actifs', c:epics.active>0?'#f59e0b':'var(--text-primary)'},
+            {n:epics.completed||0, l:'Heals OK', c:'#22c55e'},
+            {n:epics.failed||0, l:'Heals KO', c:epics.failed>0?'#ef4444':'var(--text-primary)'},
+        ];
+        const kpiHtml = kpis.map(k=>`<div class="art-kpi"><div class="num" style="color:${k.c}">${k.n}</div><div class="lbl">${k.l}</div></div>`).join('');
+
+        const incHtml = Array.isArray(incidents) && incidents.length
+            ? `<table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Incident</th>
+                    <th style="padding:3px 6px">Sévérité</th>
+                    <th style="padding:3px 6px">Statut</th>
+                    <th style="text-align:right;padding:3px 6px">Age</th>
+                </tr></thead>
+                <tbody>${incidents.map(i=>`<tr>
+                    <td style="padding:3px 6px;color:var(--text-primary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(i.title||i.id)}</td>
+                    <td style="padding:3px 6px;text-align:center"><span style="color:${sev(i.severity)};font-weight:600;font-size:0.72rem">${esc(i.severity||'—')}</span></td>
+                    <td style="padding:3px 6px;text-align:center"><span style="color:${sta(i.status)};font-size:0.72rem">${esc(i.status||'—')}</span></td>
+                    <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${timeAgoH(i.created_at)}</td>
+                </tr>`).join('')}</tbody>
+               </table>`
+            : `<div style="color:var(--text-secondary);font-size:0.82rem;padding:0.5rem 0">Aucun incident enregistré.</div>`;
+
+        const chaosRows = Array.isArray(chaos) && chaos.length
+            ? chaos.slice(0,8).map(c=>`<tr>
+                <td style="padding:3px 6px;color:var(--text-primary)">${esc(c.scenario||'—')}</td>
+                <td style="padding:3px 6px;text-align:center">
+                    <span style="color:${c.success?'#22c55e':'#ef4444'};font-size:0.72rem">${c.success?'OK':'KO'}</span>
+                </td>
+                <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${c.mttr_ms!=null?c.mttr_ms+'ms':'—'}</td>
+                <td style="padding:3px 6px;text-align:right;color:var(--text-tertiary)">${timeAgoH(c.ran_at||c.timestamp)}</td>
+              </tr>`).join('')
+            : `<tr><td colspan="4" style="padding:0.5rem;color:var(--text-secondary)">Aucune exécution chaos.</td></tr>`;
+
+        cont.innerHTML = `
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:0.75rem;margin-bottom:1.25rem">
+            ${kpiHtml}
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:1.25rem">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="${hbColor}" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span style="font-size:0.8rem;color:${hbColor};font-weight:600">Auto-Heal ${hbLabel}</span>
+            <span style="font-size:0.72rem;color:var(--text-tertiary);margin-left:4px">· scan /${stats.interval_s||60}s · max ${stats.max_concurrent||3} concurrent</span>
+            <button onclick="triggerHeal(this)" style="margin-left:auto;font-size:0.72rem;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                Trigger
+            </button>
+        </div>
+        <div class="card" style="padding:1rem;margin-bottom:1rem">
+            <div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:0.75rem">
+                Incidents récents
+            </div>
+            ${incHtml}
+        </div>
+        <div class="card" style="padding:1rem">
+            <div style="display:flex;align-items:center;margin-bottom:0.75rem">
+                <span style="font-size:0.75rem;font-weight:600;text-transform:uppercase;color:var(--text-tertiary)">Chaos Monkey</span>
+                <button onclick="triggerChaos(this)" style="margin-left:auto;font-size:0.72rem;padding:3px 10px;border:1px solid var(--border);border-radius:4px;background:transparent;color:var(--text-secondary);cursor:pointer">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    Trigger
+                </button>
+            </div>
+            <table style="width:100%;font-size:0.8rem;border-collapse:collapse">
+                <thead><tr style="color:var(--text-tertiary);font-size:0.7rem">
+                    <th style="text-align:left;padding:3px 6px">Scénario</th>
+                    <th style="padding:3px 6px">Résultat</th>
+                    <th style="text-align:right;padding:3px 6px">MTTR</th>
+                    <th style="text-align:right;padding:3px 6px">Age</th>
+                </tr></thead>
+                <tbody>${chaosRows}</tbody>
+            </table>
+        </div>`;
+    } catch(e) {
+        cont.innerHTML = `<div style="color:#ef4444;padding:1rem">Erreur chargement Self Healing: ${e.message}</div>`;
+    }
+}
+
+async function triggerHeal(btn) {
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/autoheal/trigger', {method:'POST'}).then(r=>r.json());
+        btn.textContent = r.ok ? 'Triggered' : 'Erreur';
+        btn.style.color = r.ok ? '#22c55e' : '#ef4444';
+        setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Trigger'; btn.style.color=''; }, 3000);
+    } catch(e) { btn.disabled=false; }
+}
+
+async function triggerChaos(btn) {
+    btn.disabled = true;
+    try {
+        const r = await fetch('/api/chaos/trigger', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'}).then(r=>r.json());
+        btn.textContent = r.ok ? `OK ${r.mttr_ms}ms` : 'Erreur';
+        btn.style.color = r.ok ? '#22c55e' : '#ef4444';
+        setTimeout(() => { btn.disabled=false; btn.innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg> Trigger'; btn.style.color=''; }, 3000);
+    } catch(e) { btn.disabled=false; }
+}
+
+async function skLaunchCycle() {
+    const btn = document.getElementById('sk-run-btn');
+    const statusEl = document.getElementById('sk-run-status');
+    btn.disabled = true;
+    btn.textContent = 'Lancement…';
+    statusEl.style.display = 'none';
+    try {
+        const resp = await fetch('/api/missions/start', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                workflow_id: 'skill-eval',
+                brief: 'Skill Evaluation Loop — évaluer la couverture et les taux de passage de toutes les skills platform',
+            })
+        });
+        const data = await resp.json();
+        if (data.mission_id) {
+            statusEl.style.display = '';
+            statusEl.style.background = '#22c55e18';
+            statusEl.style.color = '#16a34a';
+            statusEl.innerHTML = `<svg width="13" height="13" style="vertical-align:middle;margin-right:4px"><use href="#icon-check-circle"/></svg> Cycle lancé — mission <a href="/missions/${data.mission_id}/control" style="color:#16a34a;font-weight:600">${data.mission_id}</a> · Suivi → <a href="/missions/${data.mission_id}/control" style="color:#16a34a">Missions</a>`;
+            // reset so next click reloads
+            const t = document.getElementById('sk-amelio-tbody');
+            if (t) delete t.dataset.loaded;
+        } else {
+            statusEl.style.display = '';
+            statusEl.style.background = '#ef444418';
+            statusEl.style.color = '#dc2626';
+            statusEl.textContent = 'Erreur: ' + (data.error || JSON.stringify(data));
+        }
+    } catch(e) {
+        statusEl.style.display = '';
+        statusEl.style.background = '#ef444418';
+        statusEl.style.color = '#dc2626';
+        statusEl.textContent = 'Erreur réseau: ' + e.message;
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Lancer skill-eval';
+}
+
+// ── Instincts panel ───────────────────────────────────────────────────────────
+// SOURCE: ECC continuous-learning-v2 — display instincts extracted from sessions
+const _CONF_COLOR = c => c >= 0.7 ? '#22c55e' : c >= 0.5 ? '#f59e0b' : '#6b7280';
+const _CONF_LABEL = c => c >= 0.9 ? 'near-certain' : c >= 0.7 ? 'established' : c >= 0.5 ? 'developing' : 'tentative';
+
+async function loadInstinctsTab() {
+    const tbody = document.getElementById('instinct-tbody');
+    const agentSel = document.getElementById('if-agent');
+    const domainVal = document.getElementById('if-domain').value;
+    const scopeVal = document.getElementById('if-scope').value;
+    const agentVal = agentSel.value;
+
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:1.5rem;text-align:center;color:var(--text-secondary)">Chargement…</td></tr>';
+    try {
+        const params = new URLSearchParams();
+        if (agentVal) params.set('agent_id', agentVal);
+        if (domainVal) params.set('domain', domainVal);
+        if (scopeVal) params.set('scope', scopeVal);
+        params.set('limit', '100');
+        const [iData, sData] = await Promise.all([
+            fetch('/api/instincts?' + params).then(r => r.json()),
+            fetch('/api/instincts/stats').then(r => r.json()),
+        ]);
+
+        // KPIs
+        if (sData.success) {
+            const s = sData.stats;
+            document.getElementById('ik-total').textContent = s.total ?? '–';
+            document.getElementById('ik-conf').textContent = s.avg_confidence != null ? s.avg_confidence.toFixed(2) : '–';
+            document.getElementById('ik-high').textContent = s.high_confidence ?? '–';
+            document.getElementById('ik-evolved').textContent = s.evolved ?? '–';
+        }
+
+        // Populate agent filter (deduplicate)
+        if (!agentSel.dataset.populated && iData.success) {
+            const agents = [...new Set(iData.instincts.map(i => i.agent_id).filter(Boolean))].sort();
+            agents.forEach(a => {
+                const o = document.createElement('option'); o.value = a; o.textContent = a;
+                agentSel.appendChild(o);
+            });
+            agentSel.value = agentVal;
+            agentSel.dataset.populated = '1';
+        }
+
+        // Table rows
+        if (!iData.success || !iData.instincts.length) {
+            tbody.innerHTML = '<tr><td colspan="7" style="padding:2rem;text-align:center;color:var(--text-secondary)">Aucun instinct enregistré — les agents accumuleront des patterns au fil des sessions.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = iData.instincts.map(inst => {
+            const conf = inst.confidence ?? 0;
+            const pct = Math.round(conf * 100);
+            const col = _CONF_COLOR(conf);
+            const lbl = _CONF_LABEL(conf);
+            const evidCount = (() => { try { return JSON.parse(inst.evidence_json || '[]').length; } catch { return 0; } })();
+            return `<tr style="border-bottom:1px solid var(--border,#2a2a2a)">
+                <td style="padding:0.35rem 0.5rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(inst.trigger)}">${esc(inst.trigger)}</td>
+                <td style="padding:0.35rem 0.5rem;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-secondary)" title="${esc(inst.action)}">${esc(inst.action)}</td>
+                <td style="padding:0.35rem 0.5rem;white-space:nowrap">
+                    <div style="display:flex;align-items:center;gap:0.4rem">
+                        <div style="width:40px;height:5px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+                            <div style="width:${pct}%;height:100%;background:${col};border-radius:3px"></div>
+                        </div>
+                        <span style="color:${col};font-size:0.72rem">${pct}%</span>
+                        <span style="color:var(--text-muted);font-size:0.68rem">${lbl}</span>
+                    </div>
+                </td>
+                <td style="padding:0.35rem 0.5rem"><span style="background:rgba(99,102,241,0.1);color:#818cf8;border-radius:3px;padding:1px 5px;font-size:0.7rem">${esc(inst.domain||'–')}</span></td>
+                <td style="padding:0.35rem 0.5rem;color:var(--text-secondary);font-size:0.74rem">${esc(inst.agent_id||'–')}</td>
+                <td style="padding:0.35rem 0.5rem;font-size:0.72rem">${inst.scope === 'global' ? '<span style="color:#22c55e">global</span>' : '<span style="color:var(--text-muted)">project</span>'}</td>
+                <td style="padding:0.35rem 0.5rem;font-size:0.7rem;color:var(--text-muted)">${esc(inst.source||'–')} ${evidCount ? `· ${evidCount} obs` : ''}</td>
+            </tr>`;
+        }).join('');
+    } catch(e) {
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:1rem;color:#ef4444">Erreur: ${e.message}</td></tr>`;
+    }
+}
+
+async function evolveInstincts() {
+    const btn = event.currentTarget;
+    const res = document.getElementById('instinct-evolve-result');
+    btn.disabled = true; btn.textContent = 'Evolution…';
+    res.style.display = 'none';
+    try {
+        const agentVal = document.getElementById('if-agent').value;
+        const body = agentVal ? {agent_id: agentVal} : {};
+        const d = await fetch('/api/instincts/evolve', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)}).then(r => r.json());
+        res.style.display = '';
+        if (d.success) {
+            const clusters = d.clusters || [];
+            res.innerHTML = `<div style="color:#22c55e;margin-bottom:0.4rem;font-weight:600">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:3px"><polyline points="20 6 9 17 4 12"/></svg>
+                ${clusters.length} cluster(s) générés
+            </div>${clusters.map(c => `<div style="margin-top:0.35rem;padding:0.3rem 0.5rem;background:var(--bg-secondary);border-radius:4px">
+                <span style="color:var(--text-primary);font-weight:600">${esc(c.skill_name||c.domain)}</span>
+                <span style="color:var(--text-muted);font-size:0.72rem;margin-left:0.4rem">${c.instinct_count} instincts · conf. ${(c.avg_confidence||0).toFixed(2)}</span>
+            </div>`).join('')}`;
+            loadInstinctsTab();
+        } else {
+            res.innerHTML = `<span style="color:#ef4444">Erreur: ${esc(d.error||d.detail||'inconnue')}</span>`;
+        }
+    } catch(e) {
+        res.style.display = ''; res.innerHTML = `<span style="color:#ef4444">Erreur réseau: ${e.message}</span>`;
+    }
+    btn.disabled = false; btn.textContent = 'Evolve → Skills';
+}
+
+async function loadStocktake() {
+    const cont = document.getElementById('instinct-stocktake');
+    cont.innerHTML = '<span style="color:var(--text-secondary)">Audit en cours…</span>';
+    try {
+        const d = await fetch('/api/skills/stocktake').then(r => r.json());
+        if (!d.success) { cont.innerHTML = `<span style="color:#ef4444">Erreur: ${d.error}</span>`; return; }
+        const skills = d.skills || [];
+        const summary = d.summary || {};
+        const verdictColor = v => ({'Keep':'#22c55e','Improve':'#f59e0b','Retire':'#ef4444','Update':'#6366f1','Merge':'#a78bfa'})[v] || '#6b7280';
+        cont.innerHTML = `<div style="display:flex;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem">
+            ${['Keep','Improve','Update','Retire','Merge'].map(v => `<span style="font-size:0.72rem;padding:2px 7px;border-radius:3px;background:${verdictColor(v)}22;color:${verdictColor(v)}">${v}: ${summary[v.toLowerCase()]??0}</span>`).join('')}
+        </div>
+        <div style="overflow-x:auto"><table style="width:100%;font-size:0.75rem;border-collapse:collapse">
+            <thead><tr style="color:var(--text-muted);border-bottom:1px solid var(--border,#333)">
+                <th style="text-align:left;padding:0.25rem 0.4rem">Skill</th>
+                <th style="text-align:left;padding:0.25rem 0.4rem">Verdict</th>
+                <th style="text-align:left;padding:0.25rem 0.4rem">Issues</th>
+                <th style="text-align:right;padding:0.25rem 0.4rem">Lignes</th>
+            </tr></thead>
+            <tbody>${skills.map(s => `<tr style="border-bottom:1px solid var(--border,#2a2a2a)">
+                <td style="padding:0.25rem 0.4rem;font-weight:500">${esc(s.name)}</td>
+                <td style="padding:0.25rem 0.4rem"><span style="color:${verdictColor(s.verdict)};font-weight:600">${s.verdict}</span></td>
+                <td style="padding:0.25rem 0.4rem;color:var(--text-muted)">${(s.issues||[]).join(', ')||'–'}</td>
+                <td style="padding:0.25rem 0.4rem;text-align:right;color:var(--text-secondary)">${s.line_count}</td>
+            </tr>`).join('')}
+            </tbody>
+        </table></div>`;
+    } catch(e) {
+        cont.innerHTML = `<span style="color:#ef4444">Erreur: ${e.message}</span>`;
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

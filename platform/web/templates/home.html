@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}{% endblock %}
+
+{% block content %}
+<style>
+/* Make main-area a flex column so #home-tab-panels flex:1 fills the remaining height */
+.main-area { padding:0; overflow:hidden; display:flex; flex-direction:column; }
+.home-tabs { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--bg-secondary); padding:0 1rem; flex-shrink:0; }
+.home-tab { padding:0.6rem 1.1rem; font-size:0.8rem; font-weight:600; color:var(--text-secondary); border:none; border-bottom:2px solid transparent; background:none; cursor:pointer; display:flex; align-items:center; gap:0.4rem; transition:color .15s; white-space:nowrap; }
+.home-tab:hover { color:var(--text-primary); }
+.home-tab.active { color:var(--text-primary); border-bottom-color:var(--purple); }
+.home-tab svg { width:13px; height:13px; }
+#home-tab-panels { flex:1; overflow:hidden; display:flex; flex-direction:column; }
+.home-loading { display:flex; align-items:center; justify-content:center; padding:4rem; color:var(--text-secondary); font-size:0.82rem; gap:0.5rem; }
+/* When layouts are embedded in home panels, use 100% height instead of calc(100vh - Xpx) */
+.home-panel { flex:1; overflow:hidden; display:flex; flex-direction:column; height:100%; }
+.home-panel .idea-layout,
+.home-panel .mkt-layout { height:100%; padding:0; }
+.home-panel .cto-shell { height:100%; }
+</style>
+
+<div class="tabs home-tabs" id="homeTabs">
+  <button class="home-tab" data-tab="cto" onclick="switchTab('cto')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+    CTO Jarvis
+  </button>
+  <button class="home-tab" data-tab="mkt-ideation" onclick="switchTab('mkt-ideation')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    Idéation Business
+  </button>
+  <button class="home-tab" data-tab="ideation" onclick="switchTab('ideation')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg>
+    Idéation Projet
+  </button>
+  <button class="home-tab" data-tab="knowledge" onclick="switchTab('knowledge')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+    Knowledge
+  </button>
+  <button class="home-tab" data-tab="archi" onclick="switchTab('archi')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Architecture
+  </button>
+  <button class="home-tab" data-tab="security" onclick="switchTab('security')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    Sécurité
+  </button>
+  <button class="home-tab" data-tab="data-ai" onclick="switchTab('data-ai')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+    Data &amp; IA
+  </button>
+  <button class="home-tab" data-tab="pi-planning" onclick="switchTab('pi-planning')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    PI Planning
+  </button>
+</div>
+
+<!-- Each tab gets its own persistent panel; content is lazy-loaded once and cached in the DOM -->
+<div id="home-tab-panels" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+</div>
+
+<script>
+const TAB_URLS = {
+  'cto': '/cto', 'mkt-ideation': '/mkt-ideation', 'ideation': '/ideation',
+  'knowledge': '/group/knowledge', 'archi': '/group/archi', 'security': '/group/security',
+  'data-ai': '/group/data-ai', 'pi-planning': '/group/pi-planning'
+};
+
+// In-flight requests tracker — not used for actual abort (htmx doesn't expose XHR),
+// but used as a guard to avoid stacking duplicate loads.
+const _tabLoading = {};
+
+function switchTab(tab, pushState = true) {
+  // Update button states
+  document.querySelectorAll('.home-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  localStorage.setItem('home_tab', tab);
+  if (pushState) history.pushState(null, '', '/?tab=' + tab);
+
+  // Hide all panels
+  document.querySelectorAll('.home-panel').forEach(p => p.style.display = 'none');
+
+  // Show or create this tab's panel
+  let panel = document.getElementById('panel-' + tab);
+  if (!panel) {
+    if (_tabLoading[tab]) return; // already loading, don't stack
+    _tabLoading[tab] = true;
+
+    panel = document.createElement('div');
+    panel.id = 'panel-' + tab;
+    panel.className = 'home-panel';
+    panel.style.cssText = 'flex:1;overflow:hidden;display:flex;flex-direction:column;height:100%;';
+    panel.innerHTML = '<div class="home-loading"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> Chargement…</div>';
+    document.getElementById('home-tab-panels').appendChild(panel);
+    htmx.ajax('GET', TAB_URLS[tab], { target: panel, swap: 'innerHTML' }).then(() => {
+      delete _tabLoading[tab];
+    }).catch(() => {
+      delete _tabLoading[tab];
+      panel.remove(); // allow retry on next click
+    });
+  } else {
+    panel.style.display = 'flex';
+    // Re-size any Chart.js canvases that rendered while panel was hidden
+    if (window.Chart) {
+      panel.querySelectorAll('canvas').forEach(c => {
+        const ch = Chart.getChart(c);
+        if (ch) { try { ch.resize(); } catch(e){} }
+      });
+    }
+  }
+}
+
+// Handle browser back/forward
+window.addEventListener('popstate', () => {
+  const tab = new URLSearchParams(location.search).get('tab') || 'cto';
+  switchTab(tab, false);
+});
+
+// Init on page load
+(function() {
+  const tab = new URLSearchParams(location.search).get('tab') || localStorage.getItem('home_tab') || 'cto';
+  switchTab(tab, false);
+})();
+</script>
+{% endblock %}

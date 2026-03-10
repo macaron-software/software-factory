@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Annotation Studio — {{ project_name }}</title>
+  <link rel="stylesheet" href="/static/main.css">
+  <style>
+    :root { --ann-sidebar: 280px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg-primary, #0f1117); color: var(--text-primary, #e2e8f0); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Header */
+    .ann-header { display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: var(--bg-secondary, #161b22); border-bottom: 1px solid var(--border, #30363d); flex-shrink: 0; }
+    .ann-header-title { font-size: .85rem; font-weight: 600; color: var(--text-primary, #e2e8f0); }
+    .ann-badge { font-size: .65rem; font-weight: 700; padding: 2px 8px; border-radius: 100px; text-transform: uppercase; letter-spacing: .05em; }
+    .ann-badge.live { background: #166534; color: #4ade80; }
+    .ann-badge.wireframe { background: #1e3a5f; color: #60a5fa; }
+    .ann-header-actions { margin-left: auto; display: flex; gap: 8px; }
+    .ann-btn { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border, #30363d); background: transparent; color: var(--text-secondary, #8b949e); cursor: pointer; font-size: .75rem; transition: all .15s; }
+    .ann-btn:hover { background: var(--bg-hover, #21262d); color: var(--text-primary, #e2e8f0); }
+    .ann-btn.primary { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+    .ann-btn.primary:hover { background: #1e40af; }
+    .ann-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* Layout */
+    .ann-layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* Main canvas */
+    .ann-canvas { flex: 1; overflow: auto; position: relative; background: #1a1a2e; display: flex; align-items: flex-start; justify-content: center; padding: 24px; }
+    .ann-canvas-inner { position: relative; }
+    .ann-canvas-inner iframe { display: block; border: none; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,.5); }
+    .ann-canvas-inner img.ann-wireframe-img { display: block; border-radius: 8px; box-shadow: 0 4px 24px rgba(0,0,0,.5); }
+
+    /* Mode toggle */
+    .ann-mode-bar { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.1); border-radius: 8px; padding: 4px; z-index: 10; }
+    .ann-mode-btn { padding: 5px 14px; border-radius: 6px; border: none; background: transparent; color: rgba(255,255,255,.6); font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+    .ann-mode-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; }
+    .ann-mode-btn.active { background: rgba(255,255,255,.12); color: #fff; }
+    .ann-mode-btn:hover:not(.active) { background: rgba(255,255,255,.06); color: rgba(255,255,255,.8); }
+
+    /* Sidebar */
+    .ann-sidebar { width: var(--ann-sidebar); background: var(--bg-secondary, #161b22); border-left: 1px solid var(--border, #30363d); display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    .ann-sidebar-header { padding: 12px 16px; border-bottom: 1px solid var(--border, #30363d); display: flex; align-items: center; justify-content: space-between; }
+    .ann-sidebar-title { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary, #8b949e); }
+    .ann-sidebar-count { font-size: .7rem; background: var(--bg-tertiary, #21262d); color: var(--text-secondary, #8b949e); padding: 1px 7px; border-radius: 100px; }
+    .ann-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .ann-item { padding: 10px 12px; border-radius: 6px; margin-bottom: 4px; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+    .ann-item:hover { background: var(--bg-hover, #21262d); border-color: var(--border, #30363d); }
+    .ann-item.resolved { opacity: .5; }
+    .ann-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .ann-item-num { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 700; flex-shrink: 0; }
+    .ann-item-type { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .ann-item-msg { font-size: .75rem; color: var(--text-secondary, #8b949e); line-height: 1.4; }
+    .ann-item-sel { font-size: .65rem; color: var(--text-tertiary, #6b7280); font-family: monospace; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ann-item-actions { display: flex; gap: 4px; margin-top: 6px; }
+    .ann-item-btn { font-size: .65rem; padding: 2px 8px; border-radius: 4px; border: 1px solid var(--border, #30363d); background: transparent; color: var(--text-secondary, #8b949e); cursor: pointer; }
+    .ann-item-btn:hover { background: var(--bg-hover, #21262d); color: var(--text-primary, #e2e8f0); }
+    .ann-item-btn.resolve { border-color: #166534; color: #4ade80; }
+    .ann-item-btn.resolve:hover { background: #166534; }
+
+    /* Type colors */
+    .type-bug .ann-item-num { background: #7f1d1d; color: #fca5a5; }
+    .type-bug .ann-item-type { color: #f87171; }
+    .type-comment .ann-item-num { background: #1e3a5f; color: #93c5fd; }
+    .type-comment .ann-item-type { color: #60a5fa; }
+    .type-move .ann-item-num { background: #78350f; color: #fcd34d; }
+    .type-move .ann-item-type { color: #f59e0b; }
+    .type-ux .ann-item-num { background: #4c1d95; color: #c4b5fd; }
+    .type-ux .ann-item-type { color: #a78bfa; }
+    .type-text .ann-item-num { background: #064e3b; color: #6ee7b7; }
+    .type-text .ann-item-type { color: #34d399; }
+    .type-area .ann-item-num { background: #14532d; color: #86efac; }
+    .type-area .ann-item-type { color: #4ade80; }
+
+    /* Empty state */
+    .ann-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; text-align: center; }
+    .ann-empty svg { width: 32px; height: 32px; stroke: var(--text-tertiary, #6b7280); fill: none; stroke-width: 1.5; }
+    .ann-empty p { font-size: .75rem; color: var(--text-tertiary, #6b7280); line-height: 1.5; }
+
+    .ann-no-deploy { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; height: 100%; color: var(--text-secondary, #8b949e); text-align: center; }
+    .ann-no-deploy svg { width: 48px; height: 48px; stroke: currentColor; fill: none; stroke-width: 1.5; }
+    .ann-no-deploy h3 { font-size: 1.1rem; color: var(--text-primary, #e2e8f0); }
+    .ann-no-deploy p { font-size: .8rem; max-width: 360px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<header class="ann-header">
+  <svg style="width:18px;height:18px;stroke:var(--accent,#58a6ff);fill:none;stroke-width:2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+  <span class="ann-header-title">{{ project_name }}</span>
+  {% if has_live %}
+  <span class="ann-badge live">Live</span>
+  {% else %}
+  <span class="ann-badge wireframe">Wireframe</span>
+  {% endif %}
+  <div class="ann-header-actions">
+    <button class="ann-btn" id="btnTraceToggle" onclick="toggleTrace()" title="Traceability — feature, persona, user stories, mission">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Traceability
+    </button>
+    <button class="ann-btn" onclick="copyExport()" title="Copy markdown for agents">
+      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+      Export
+    </button>
+    <button class="ann-btn primary" onclick="fixAll()" title="Create agent mission to fix all annotations">
+      <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Fix All
+    </button>
+  </div>
+</header>
+
+<!-- Traceability bar -->
+<div id="annTraceBar" style="background:var(--bg-secondary,#161b22);border-bottom:1px solid var(--border,#30363d);overflow:hidden;max-height:0;transition:max-height .3s ease;flex-shrink:0">
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border,#30363d)">
+    <!-- Feature -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Feature
+      </div>
+      <div id="trace-feature-name" style="font-size:.78rem;font-weight:600;color:var(--text-primary,#e2e8f0);margin-bottom:2px">—</div>
+      <div id="trace-feature-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
+      <select id="trace-feature-select" style="display:none;margin-top:6px;width:100%;font-size:.72rem;background:var(--bg-tertiary,#21262d);border:1px solid var(--border,#30363d);border-radius:4px;color:var(--text-primary,#e2e8f0);padding:3px" onchange="linkScreenFeature(this.value)">
+        <option value="">Lier à une feature...</option>
+      </select>
+    </div>
+    <!-- Persona -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Persona
+      </div>
+      <div id="trace-persona" style="font-size:.75rem;color:var(--text-secondary,#8b949e);line-height:1.4">—</div>
+    </div>
+    <!-- User Stories -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        User Stories
+      </div>
+      <div id="trace-stories" style="font-size:.72rem;color:var(--text-secondary,#8b949e);line-height:1.5">—</div>
+    </div>
+    <!-- Mission -->
+    <div style="background:var(--bg-secondary,#161b22);padding:12px 16px">
+      <div style="font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary,#6b7280);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <svg style="width:10px;height:10px;stroke:currentColor;fill:none;stroke-width:2" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Mission
+      </div>
+      <div id="trace-mission-name" style="font-size:.78rem;font-weight:600;color:var(--text-primary,#e2e8f0);margin-bottom:2px">—</div>
+      <div id="trace-epic-meta" style="font-size:.68rem;color:var(--text-tertiary,#6b7280)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Layout -->
+<div class="ann-layout">
+
+  <!-- Canvas -->
+  <div class="ann-canvas" id="annCanvas">
+    {% if has_live %}
+    <!-- Mode bar -->
+    <div class="ann-mode-bar" id="annModeBar">
+      <button class="ann-mode-btn active" id="btnModeLive" onclick="setMode('live')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>
+        Live
+      </button>
+      <button class="ann-mode-btn" id="btnModeWire" onclick="setMode('wireframe')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        Wireframe
+      </button>
+    </div>
+    <div class="ann-canvas-inner" id="annCanvasInner">
+      <iframe id="annFrame" src="/annotate/{{ project_id }}/proxy/" width="1280" height="800" title="Project Preview"></iframe>
+    </div>
+    {% else %}
+    <div class="ann-no-deploy">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      <h3>No deployed URL yet</h3>
+      <p>This project hasn't been deployed yet. Annotations will be available once the project has a running URL. You can still view and add annotations manually.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="ann-sidebar">
+    <div class="ann-sidebar-header">
+      <span class="ann-sidebar-title">Annotations</span>
+      <span class="ann-sidebar-count" id="annCount">0</span>
+    </div>
+    <div class="ann-list" id="annList">
+      <div class="ann-empty" id="annEmpty">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        <p>No annotations yet.<br>Open the project in Live mode and click elements to annotate.</p>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const PROJECT_ID = "{{ project_id }}";
+const HAS_LIVE = {{ 'true' if has_live else 'false' }};
+let annotations = [];
+let currentMode = 'live';
+
+async function loadAnnotations() {
+  const resp = await fetch(`/api/projects/${PROJECT_ID}/annotations`);
+  annotations = await resp.json();
+  renderAnnotations();
+}
+
+function typeIcon(type) {
+  const icons = {
+    bug: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    comment: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>',
+    move: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>',
+    ux: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>',
+    text: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+    area: '<svg viewBox="0 0 24 24" style="width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>',
+  };
+  return icons[type] || icons.comment;
+}
+
+function renderAnnotations() {
+  const list = document.getElementById('annList');
+  const empty = document.getElementById('annEmpty');
+  const count = document.getElementById('annCount');
+  const open = annotations.filter(a => a.status === 'open');
+  count.textContent = open.length;
+
+  if (!annotations.length) { empty.style.display = ''; list.innerHTML = ''; list.appendChild(empty); return; }
+  empty.style.display = 'none';
+
+  list.innerHTML = annotations.map(a => `
+    <div class="ann-item type-${a.type} ${a.status !== 'open' ? 'resolved' : ''}" id="ann-item-${a.id}">
+      <div class="ann-item-header">
+        <div class="ann-item-num">${a.seq_num}</div>
+        <span class="ann-item-type">${typeIcon(a.type)} ${a.type}</span>
+        ${a.status === 'resolved' ? '<svg style="margin-left:auto;width:12px;height:12px;stroke:#4ade80;fill:none;stroke-width:2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
+      </div>
+      <div class="ann-item-msg">${a.message || '—'}</div>
+      ${a.selector ? `<div class="ann-item-sel">${a.selector}</div>` : ''}
+      ${a.quoted_text ? `<div class="ann-item-msg" style="font-style:italic;margin-top:3px">"${a.quoted_text.substring(0,60)}"</div>` : ''}
+      <div class="ann-item-actions">
+        ${a.status === 'open' ? `<button class="ann-item-btn resolve" onclick="resolveAnn('${a.id}')">Resolve</button>` : ''}
+        <button class="ann-item-btn" onclick="deleteAnn('${a.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function resolveAnn(id) {
+  await fetch(`/api/projects/${PROJECT_ID}/annotations/${id}`, {
+    method: 'PATCH', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status: 'resolved'})
+  });
+  loadAnnotations();
+}
+
+async function deleteAnn(id) {
+  await fetch(`/api/projects/${PROJECT_ID}/annotations/${id}`, {method: 'DELETE'});
+  loadAnnotations();
+}
+
+async function copyExport() {
+  const resp = await fetch(`/api/projects/${PROJECT_ID}/annotations/export`);
+  const data = await resp.json();
+  await navigator.clipboard.writeText(data.markdown);
+  alert('Markdown copied to clipboard!');
+}
+
+async function fixAll() {
+  const resp = await fetch(`/api/projects/${PROJECT_ID}/annotations/fix-all`, {method: 'POST'});
+  const data = await resp.json();
+  if (data.mission_id) {
+    if (confirm(`Mission created! Open in workspace?`)) {
+      window.open(`/projects/${PROJECT_ID}`, '_blank');
+    }
+  } else {
+    alert(data.error || 'Error creating mission');
+  }
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('btnModeLive').classList.toggle('active', mode === 'live');
+  document.getElementById('btnModeWire').classList.toggle('active', mode === 'wireframe');
+  const inner = document.getElementById('annCanvasInner');
+  if (mode === 'live') {
+    inner.innerHTML = `<iframe id="annFrame" src="/annotate/${PROJECT_ID}/proxy/" width="1280" height="800" title="Project Preview"></iframe>`;
+  } else {
+    const frame = document.getElementById('annFrame');
+    const pageUrl = frame ? (frame.contentWindow?.location?.href || '/') : '/';
+    fetch(`/annotate/${PROJECT_ID}/proxy/${pageUrl.replace(/^https?:\/\/[^/]+/, '')}`)
+      .then(r => r.text())
+      .then(html => fetch(`/api/projects/${PROJECT_ID}/wireframe`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({html, url: pageUrl})
+      }))
+      .then(r => r.json())
+      .then(data => {
+        inner.innerHTML = `<img class="ann-wireframe-img" src="/api/projects/${PROJECT_ID}/screens/${data.screen_id}/svg" width="1280" alt="Wireframe">`;
+      });
+  }
+}
+
+// Listen for annotations from injected script (postMessage)
+window.addEventListener('message', (e) => {
+  if (e.data?.type === 'sf-annotation') {
+    loadAnnotations();
+  }
+});
+
+loadAnnotations();
+setInterval(loadAnnotations, 10000);
+
+// ─── Traceability bar ───────────────────────────────────────────────
+let traceOpen = false;
+let traceLoaded = false;
+let currentScreenId = null;
+
+function toggleTrace() {
+  const bar = document.getElementById('annTraceBar');
+  traceOpen = !traceOpen;
+  bar.style.maxHeight = traceOpen ? '200px' : '0';
+  document.getElementById('btnTraceToggle').style.background = traceOpen ? 'rgba(88,166,255,.15)' : '';
+  if (traceOpen && !traceLoaded) loadTraceability();
+}
+
+function loadTraceability(screenId) {
+  if (screenId) currentScreenId = screenId;
+  const sid = currentScreenId || 'current';
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/screens/${sid}/traceability`)
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d) { loadFeaturesForLink(); return; }
+      traceLoaded = true;
+      if (d.feature) {
+        document.getElementById('trace-feature-name').textContent = d.feature.name || '—';
+        document.getElementById('trace-feature-meta').textContent = [d.feature.epic ? `Epic: ${d.feature.epic}` : null, d.feature.story_points ? `${d.feature.story_points} pts` : null].filter(Boolean).join(' · ') || '';
+      } else {
+        document.getElementById('trace-feature-name').textContent = 'Non lié';
+        loadFeaturesForLink();
+      }
+      if (d.persona) document.getElementById('trace-persona').textContent = d.persona;
+      if (d.user_stories && d.user_stories.length) {
+        document.getElementById('trace-stories').innerHTML = d.user_stories.slice(0, 3).map(s => `<div style="margin-bottom:2px">• ${s.title}</div>`).join('') + (d.user_stories.length > 3 ? `<div style="color:var(--accent,#58a6ff)">${d.user_stories.length - 3} autres</div>` : '');
+      }
+      if (d.mission) {
+        document.getElementById('trace-mission-name').textContent = d.mission.name || '—';
+        document.getElementById('trace-epic-meta').textContent = [d.mission.workflow, d.mission.status].filter(Boolean).join(' · ');
+      }
+    }).catch(() => {});
+}
+
+function loadFeaturesForLink() {
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/features`).then(r => r.ok ? r.json() : []).then(features => {
+    const sel = document.getElementById('trace-feature-select');
+    if (!sel || !features.length) return;
+    sel.style.display = 'block';
+    features.forEach(f => {
+      const o = document.createElement('option');
+      o.value = f.id; o.textContent = f.name;
+      sel.appendChild(o);
+    });
+  }).catch(() => {});
+}
+
+function linkScreenFeature(featureId) {
+  if (!featureId || !currentScreenId) return;
+  const pid = '{{ project_id }}';
+  fetch(`/api/projects/${pid}/screens/${currentScreenId}`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({feature_id: featureId})
+  }).then(() => { traceLoaded = false; loadTraceability(); }).catch(() => {});
+}
+</script>
+</body>
+</html>

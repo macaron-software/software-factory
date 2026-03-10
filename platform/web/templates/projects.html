@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+{% include "partials/view_switcher.html" %}
+<a href="/sessions/new" class="btn btn-primary">
+    <svg class="icon icon-sm"><use href="#icon-plus"/></svg> New
+</a>
+{% endblock %}
+
+{% block content %}
+{% set persp = request.state.perspective|default('admin') %}
+<style>
+.pj-toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem}
+.pj-search{display:flex;align-items:center;gap:.25rem;flex:1;min-width:180px;max-width:360px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;padding:0 .5rem}
+.pj-search input{border:0;background:transparent;outline:none;padding:.4rem .25rem;font-size:.875rem;color:var(--text-primary);width:100%}
+.pj-search svg{color:var(--text-secondary);flex-shrink:0}
+.pj-btn{padding:.3rem .75rem;font-size:.8rem;border:1px solid var(--border);border-radius:5px;background:var(--bg-secondary);color:var(--text-secondary);cursor:pointer}
+.pj-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pj-btn.danger.active{background:#dc2626;border-color:#dc2626;color:#fff}
+.pj-count{font-size:.8rem;color:var(--text-secondary);margin-left:auto}
+.ppager{display:flex;gap:.25rem;align-items:center;margin-top:1rem;justify-content:center}
+.ppager a,.ppager span{padding:.3rem .6rem;border:1px solid var(--border);border-radius:5px;font-size:.8rem;color:var(--text-secondary);text-decoration:none;background:var(--bg-secondary)}
+.ppager a:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ppager span.current{background:var(--accent);color:#fff;border-color:var(--accent)}
+.ppager span.ellipsis{border:none;background:none}
+.item-card.ghost{opacity:.45}
+.ghost-badge{font-size:.7rem;padding:1px 5px;border-radius:3px;background:#dc262622;color:#dc2626;border:1px solid #dc262244}
+/* Domain sections */
+.domain-section{margin-bottom:2rem}
+.domain-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.domain-label{font-size:.7rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:.2rem .6rem;border-radius:4px;background:rgba(168,85,247,.15);color:var(--purple-light);border:1px solid rgba(168,85,247,.3)}
+.domain-count{font-size:.75rem;color:var(--text-secondary)}
+.ungrouped-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem;margin-top:.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.ungrouped-label{font-size:.7rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-secondary)}
+.domain-edit-btn{background:none;border:none;cursor:pointer;padding:2px 4px;color:var(--text-secondary);opacity:.5;border-radius:3px;margin-left:auto}
+.domain-edit-btn:hover{opacity:1;background:var(--bg-secondary)}
+.domain-set-form{display:none;align-items:center;gap:.4rem;margin-left:auto}
+.domain-set-form.open{display:flex}
+.domain-set-inp{font-size:.75rem;padding:.2rem .5rem;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);width:140px;outline:none}
+.domain-set-inp:focus{border-color:var(--accent)}
+</style>
+
+<form method="get" action="/projects" id="pjf">
+<input type="hidden" name="ws" id="ws_hidden" value="{{ has_workspace }}">
+<div class="pj-toolbar">
+  <div class="pj-search">
+    <svg class="icon icon-sm"><use href="#icon-search"/></svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher projets…" autocomplete="off">
+  </div>
+  <button type="submit" class="pj-btn {% if not factory_type %}active{% endif %}" name="type" value="">Tous</button>
+  <button type="submit" class="pj-btn {% if factory_type=='sf' %}active{% endif %}" name="type" value="sf">SF</button>
+  <button type="submit" class="pj-btn {% if factory_type=='mf' %}active{% endif %}" name="type" value="mf">MF</button>
+  <button type="submit" class="pj-btn {% if factory_type=='standalone' %}active{% endif %}" name="type" value="standalone">Standalone</button>
+  <span style="width:1px;height:20px;background:var(--border)"></span>
+  <button type="button" class="pj-btn {% if has_workspace=='1' %}active{% endif %}" onclick="setWs('1')">Avec workspace</button>
+  <button type="button" class="pj-btn danger {% if has_workspace=='0' %}active{% endif %}" onclick="setWs('0')">Sans workspace</button>
+  {% if persp == 'developer' %}
+  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;font-size:.78rem;color:var(--text-secondary)">
+    <input type="checkbox" id="filterMyProjects" onchange="filterProjects()" style="accent-color:var(--accent)"> Mes projets
+  </label>
+  {% endif %}
+  <span class="pj-count">{{ total }} projet{{ 's' if total != 1 }}</span>
+</div>
+</form>
+
+{% macro project_card(proj) %}
+<a href="/projects/{{ proj.info.id }}" class="item-card{% if not proj.has_workspace %} ghost{% endif %}" data-lead="{{ proj.info.lead_agent_id or '' }}" data-id="{{ proj.info.id }}" data-domain="{{ proj.info.client_domain or '' }}">
+    <div class="item-icon">
+        <span class="project-type-dot {{ proj.info.factory_type }}"></span>
+    </div>
+    <div class="item-main">
+        <div class="item-title">{{ proj.info.name }}</div>
+        <div class="item-subtitle">{{ proj.info.factory_type | upper }}{% if proj.info.domains %} · {{ proj.info.domains[:2] | join(', ') }}{% endif %}</div>
+        <div class="item-detail">
+            {% if proj.info.vision %}
+            <p class="item-desc">{{ proj.info.vision[:140] }}{% if proj.info.vision|length > 140 %}…{% endif %}</p>
+            {% elif proj.info.description %}
+            <p class="item-desc">{{ proj.info.description[:140] }}{% if proj.info.description|length > 140 %}…{% endif %}</p>
+            {% endif %}
+            {% if proj.info.values %}
+            <div class="item-tags">
+                {% for v in proj.info.values[:3] %}
+                <span class="item-tag">{{ v }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="item-meta">
+        {% if not proj.has_workspace %}
+        <span class="ghost-badge">fantôme</span>
+        {% endif %}
+        {% if proj.info.arch_domain %}
+        <span class="item-badge" style="background:rgba(0,101,255,.12);color:#0065ff;border:1px solid rgba(0,101,255,.25);font-weight:600">{{ proj.info.arch_domain | upper }}</span>
+        {% endif %}
+        <span hx-get="/api/dashboard/quality-badge?project_id={{ proj.info.id }}" hx-trigger="load" hx-swap="innerHTML"></span>
+        {% if proj.info.has_git %}
+        <span class="item-badge" hx-get="/api/projects/{{ proj.info.id }}/git-status" hx-trigger="load" hx-swap="innerHTML">…</span>
+        {% endif %}
+        {% if proj.info.lead_agent_id %}
+        <span class="item-badge accent">{{ proj.info.lead_agent_id }}</span>
+        {% endif %}
+    </div>
+</a>
+{% endmacro %}
+
+{% if not projects %}
+<div class="empty-state">
+    {% if q or factory_type %}
+    <p>Aucun résultat{% if q %} pour « {{ q }} »{% endif %}</p>
+    <a href="/projects" class="btn btn-primary">Effacer</a>
+    {% else %}
+    <p>{{ _("no_projects_found") }}</p>
+    {% endif %}
+</div>
+{% else %}
+
+{% if domain_groups %}
+    {% for group in domain_groups %}
+    <div class="domain-section">
+        <div class="domain-header">
+            <span class="domain-label">{{ group.domain }}</span>
+            <span class="domain-count">{{ group.projects | length }} projet{{ 's' if group.projects | length != 1 }}</span>
+        </div>
+        <div class="item-grid" data-view-grid data-view="card">
+            {% for proj in group.projects %}
+            {{ project_card(proj) }}
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+{% endif %}
+
+{% if ungrouped %}
+    {% if domain_groups %}
+    <div class="ungrouped-header">
+        <span class="ungrouped-label">Autres projets</span>
+        <span class="domain-count">{{ ungrouped | length }} projet{{ 's' if ungrouped | length != 1 }}</span>
+    </div>
+    {% endif %}
+    <div class="item-grid" data-view-grid data-view="card">
+        {% for proj in ungrouped %}
+        {{ project_card(proj) }}
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% endif %}
+
+<script>
+const pjInp = document.querySelector('.pj-search input');
+let _pjt; pjInp.addEventListener('input', () => { clearTimeout(_pjt); _pjt = setTimeout(() => document.getElementById('pjf').submit(), 400); });
+function setWs(v) {
+    const h = document.getElementById('ws_hidden');
+    h.value = (h.value === v) ? '' : v; // toggle
+    document.getElementById('pjf').submit();
+}
+{% if persp == 'developer' %}
+function filterProjects() {
+    const show = document.getElementById('filterMyProjects').checked;
+    document.querySelectorAll('.item-card').forEach(card => {
+        card.style.display = (show && !card.dataset.lead) ? 'none' : '';
+    });
+}
+{% endif %}
+// Domain quick-assign: Shift+click on a card opens domain prompt
+document.addEventListener('click', async function(e) {
+    if (!e.shiftKey) return;
+    const card = e.target.closest('.item-card[data-id]');
+    if (!card) return;
+    e.preventDefault();
+    const domain = prompt('Domaine client (ex: Finance, Santé, Retail…)', card.dataset.domain || '');
+    if (domain === null) return;
+    const res = await fetch('/api/projects/' + card.dataset.id, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({client_domain: domain.trim()})
+    });
+    if (res.ok) location.reload();
+});
+</script>
+{% endblock %}
+

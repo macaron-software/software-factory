@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="32" fill="#7c3aed"/>
+  <circle cx="32" cy="24" r="11" fill="#ede9fe"/>
+  <ellipse cx="32" cy="52" rx="18" ry="14" fill="#ede9fe"/>
+  <circle cx="32" cy="24" r="9" fill="#c4b5fd"/>
+  <path d="M26 22 Q32 18 38 22 Q38 28 32 30 Q26 28 26 22Z" fill="#7c3aed" opacity="0.3"/>
+  <text x="32" y="28" text-anchor="middle" font-size="14" font-weight="bold" fill="#7c3aed" font-family="system-ui">ML</text>
+</svg>

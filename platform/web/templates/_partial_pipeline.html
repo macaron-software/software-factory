@@ -1,0 +1,194 @@
+<div class="partial-pipeline">
+<style>
+.pipeline-container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem; }
+.pipeline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.pipeline-header h3 { margin: 0; font-size: 1.3rem; }
+.pipeline-filters { display: flex; gap: 0.75rem; align-items: center; }
+.pipeline-select {
+    padding: 0.4rem 0.75rem; border-radius: 6px;
+    background: var(--bg-secondary); color: var(--text-primary);
+    border: 1px solid var(--border); font-size: 0.85rem;
+}
+.pipeline-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem; margin-bottom: 2rem;
+}
+.pipeline-card {
+    background: var(--bg-secondary); border-radius: 10px; padding: 1.25rem;
+    border: 1px solid var(--border);
+}
+.pipeline-card h4 { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+.pipeline-stat { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+.pipeline-stat:last-child { border-bottom: none; }
+.pipeline-stat-label { color: var(--text-secondary); }
+.pipeline-stat-value { font-weight: 600; color: var(--text-primary); }
+.pipeline-empty { text-align: center; padding: 3rem; color: var(--text-muted); }
+</style>
+
+<div class="pipeline-container">
+    <div class="pipeline-header">
+        <h3><svg class="icon icon-sm" style="vertical-align:-2px"><use href="#icon-git-branch"/></svg> Pipeline Performance</h3>
+        <div class="pipeline-filters">
+            <select class="pipeline-select" id="pipelineProject" onchange="loadPipelineData()">
+                <option value="">All Projects</option>
+                {% for proj in projects %}
+                <option value="{{ proj.id }}">{{ proj.name }}</option>
+                {% endfor %}
+            </select>
+            <select class="pipeline-select" id="pipelineEpic" onchange="loadBurndown()" style="display:none">
+                <option value="">Select Epic...</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="pipeline-grid">
+        <div class="pipeline-card" style="grid-column: span 2;">
+            <h4>Velocity — Last 12 Sprints</h4>
+            <canvas id="pipelineVelocity" height="220"></canvas>
+            <div id="velocityEmpty" class="pipeline-empty" style="display:none">No sprint data available</div>
+        </div>
+    </div>
+
+    <div class="pipeline-grid">
+        <div class="pipeline-card">
+            <h4>Cycle Time Distribution</h4>
+            <canvas id="pipelineCycleTime" height="220"></canvas>
+            <div id="cycleTimeEmpty" class="pipeline-empty" style="display:none">No completed features yet</div>
+            <div id="cycleTimeStats" style="margin-top:0.75rem; font-size:0.8rem; color:var(--text-secondary)"></div>
+        </div>
+        <div class="pipeline-card">
+            <h4>Burndown</h4>
+            <canvas id="pipelineBurndown" height="220"></canvas>
+            <div id="burndownEmpty" class="pipeline-empty">Select an epic to view burndown</div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    const chartColors = { grid: 'rgba(255,255,255,0.06)', text: 'rgba(255,255,255,0.5)' };
+    const chartOpts = {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } } },
+            y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.text, font: { size: 10 } }, beginAtZero: true },
+        },
+    };
+    let velocityChart, cycleTimeChart, burndownChart;
+
+    window.loadPipelineData = function() {
+        loadVelocity();
+        loadCycleTime();
+        loadEpics();
+    };
+
+    async function loadVelocity() {
+        try {
+            const res = await fetch('/api/metrics/velocity');
+            const sprints = await res.json();
+            const canvas = document.getElementById('pipelineVelocity');
+            const empty = document.getElementById('velocityEmpty');
+            if (!sprints || sprints.length === 0) {
+                canvas.style.display = 'none'; empty.style.display = 'block'; return;
+            }
+            canvas.style.display = 'block'; empty.style.display = 'none';
+            const last12 = sprints.slice(-12);
+            if (velocityChart) velocityChart.destroy();
+            velocityChart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: last12.map(s => s.name || s.id.slice(0, 6)),
+                    datasets: [
+                        { label: 'Planned', data: last12.map(s => s.planned_sp || 0), backgroundColor: 'rgba(124,58,237,0.3)', borderRadius: 4 },
+                        { label: 'Actual', data: last12.map(s => s.velocity || 0), backgroundColor: 'rgba(124,58,237,0.7)', borderRadius: 4 },
+                    ],
+                },
+                options: { ...chartOpts, plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } } },
+            });
+        } catch(e) { console.warn('Velocity load failed:', e); }
+    }
+
+    async function loadCycleTime() {
+        const pid = document.getElementById('pipelineProject').value;
+        try {
+            const res = await fetch('/api/metrics/cycle-time?project_id=' + pid);
+            const ct = await res.json();
+            const canvas = document.getElementById('pipelineCycleTime');
+            const empty = document.getElementById('cycleTimeEmpty');
+            const stats = document.getElementById('cycleTimeStats');
+            const hist = ct.features.histogram || [];
+            if (hist.length === 0) {
+                canvas.style.display = 'none'; empty.style.display = 'block'; stats.innerHTML = ''; return;
+            }
+            canvas.style.display = 'block'; empty.style.display = 'none';
+            if (cycleTimeChart) cycleTimeChart.destroy();
+            cycleTimeChart = new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: hist.map(h => h.range + 'd'),
+                    datasets: [{ data: hist.map(h => h.count), backgroundColor: 'rgba(52,211,153,0.6)', borderRadius: 3 }],
+                },
+                options: { ...chartOpts, scales: {
+                    x: { ticks: { color: chartColors.text, font: { size: 9 } }, grid: { display: false } },
+                    y: { ticks: { color: chartColors.text, stepSize: 1 }, grid: { color: chartColors.grid } },
+                }},
+            });
+            stats.innerHTML = `Avg: ${ct.features.avg_days}d &middot; Median: ${ct.features.median_days}d &middot; ${ct.features.count} features`;
+        } catch(e) { console.warn('Cycle time load failed:', e); }
+    }
+
+    async function loadEpics() {
+        const pid = document.getElementById('pipelineProject').value;
+        const epicSelect = document.getElementById('pipelineEpic');
+        if (!pid) { epicSelect.style.display = 'none'; return; }
+        try {
+            const res = await fetch('/api/releases/' + pid);
+            const data = await res.json();
+            if (data.releases && data.releases.length > 0) {
+                epicSelect.style.display = 'inline-block';
+                epicSelect.innerHTML = '<option value="">Select Epic...</option>' +
+                    data.releases.map(r => `<option value="${r.epic_id}">${r.epic_name}</option>`).join('');
+            } else {
+                epicSelect.style.display = 'none';
+            }
+        } catch(e) { epicSelect.style.display = 'none'; }
+    }
+
+    window.loadBurndown = async function() {
+        const epicId = document.getElementById('pipelineEpic').value;
+        const canvas = document.getElementById('pipelineBurndown');
+        const empty = document.getElementById('burndownEmpty');
+        if (!epicId) {
+            canvas.style.display = 'none'; empty.style.display = 'block';
+            empty.textContent = 'Select an epic to view burndown'; return;
+        }
+        try {
+            const res = await fetch('/api/metrics/burndown/' + epicId);
+            const data = await res.json();
+            if (!data.burndown || data.burndown.length === 0) {
+                canvas.style.display = 'none'; empty.style.display = 'block';
+                empty.textContent = 'No burndown data for this epic'; return;
+            }
+            canvas.style.display = 'block'; empty.style.display = 'none';
+            if (burndownChart) burndownChart.destroy();
+            const ideal = data.burndown.map((_, i) => data.total_sp - (data.total_sp / data.burndown.length) * (i + 1));
+            burndownChart = new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: data.burndown.map(b => b.date),
+                    datasets: [
+                        { label: 'Remaining SP', data: data.burndown.map(b => b.remaining), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3, pointRadius: 3 },
+                        { label: 'Ideal', data: ideal, borderColor: 'rgba(255,255,255,0.2)', borderDash: [5, 5], pointRadius: 0, fill: false },
+                    ],
+                },
+                options: { ...chartOpts, plugins: { legend: { display: true, labels: { color: chartColors.text, font: { size: 11 } } } } },
+            });
+        } catch(e) { console.warn('Burndown load failed:', e); }
+    };
+
+    // Auto-load on partial mount
+    loadPipelineData();
+})();
+</script>
+</div>

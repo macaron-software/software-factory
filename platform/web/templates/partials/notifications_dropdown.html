@@ -1,0 +1,85 @@
+<div class="notif-header">
+    <h4>Notifications{% if unread %} ({{ unread }}){% endif %}</h4>
+    {% if unread %}
+    <button class="notif-mark-all"
+            id="notifMarkAllBtn"
+            hx-post="/api/notifications/read-all"
+            hx-swap="none">
+        Mark all read
+    </button>
+    {% endif %}
+</div>
+<div class="notif-list">
+    {% if notifications %}
+        {% for n in notifications %}
+        {% if n.type == 'checkpoint' %}
+        <div class="notif-item notif-checkpoint {% if not n.is_read %}unread{% endif %}">
+            <div class="notif-sev warning"></div>
+            {% if not n.is_read %}<div class="notif-dot"></div>{% endif %}
+            <div class="notif-body" style="flex:1">
+                <div class="notif-title" style="display:flex;align-items:center;gap:6px">
+                    <span style="font-size:15px">⏸</span> {{ n.title }}
+                </div>
+                {% if n.message %}<div class="notif-msg">{{ n.message }}</div>{% endif %}
+                <div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">
+                    <button class="notif-btn notif-btn-go"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"GO"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
+                            onclick="event.stopPropagation()"> GO</button>
+                    <button class="notif-btn notif-btn-nogo"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"NOGO"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
+                            onclick="event.stopPropagation()"> NOGO</button>
+                    <button class="notif-btn notif-btn-pivot"
+                            hx-post="/api/missions/{{ n.ref_id }}/validate"
+                            hx-vals='{"decision":"PIVOT"}'
+                            hx-swap="none"
+                            hx-on::after-request="htmx.ajax('POST','/api/notifications/{{ n.id }}/read',{swap:'none'}); htmx.trigger(document.getElementById('notifDropdown'),'notif-open'); htmx.trigger(document.getElementById('notifBadge'),'htmx:load')"
+                            onclick="event.stopPropagation()"> PIVOT</button>
+                    <a href="{{ n.url }}" style="font-size:11px;color:var(--purple-light);margin-left:auto" onclick="event.stopPropagation()">Voir la conversation →</a>
+                </div>
+                <div class="notif-time">{{ n.created_at | ts }}</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="notif-item {% if not n.is_read %}unread{% endif %}"
+             {% if n.url %}onclick="window.location='{{ n.url }}'"{% endif %}
+             {% if not n.is_read %}
+             hx-post="/api/notifications/{{ n.id }}/read"
+             hx-swap="none"
+             hx-trigger="click once"
+             {% endif %}>
+            <div class="notif-sev {{ n.severity }}"></div>
+            <div class="notif-dot"></div>
+            <div class="notif-body">
+                <div class="notif-title">{{ n.title }}</div>
+                {% if n.message %}<div class="notif-msg">{{ n.message }}</div>{% endif %}
+                <div class="notif-time">{{ n.created_at | ts }}</div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    {% else %}
+        <div class="notif-empty">No notifications yet</div>
+    {% endif %}
+</div>
+<div class="notif-footer">
+    <a href="/notifications">View all notifications</a>
+</div>
+<script>
+(function() {
+    var btn = document.getElementById('notifMarkAllBtn');
+    if (btn) {
+        btn.addEventListener('htmx:afterRequest', function() {
+            var dd = document.getElementById('notifDropdown');
+            var badge = document.getElementById('notifBadge');
+            if (dd) htmx.trigger(dd, 'notif-open');
+            if (badge) htmx.trigger(badge, 'htmx:load');
+        });
+    }
+})();
+</script>

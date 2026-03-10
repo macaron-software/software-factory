@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
+    <svg class="icon icon-sm"><use href="#icon-play"/></svg> Launch Epic
+</button>
+{% endblock %}
+
+{% block content %}
+<style>
+.epic-list{display:flex;flex-direction:column;gap:0.75rem;padding-bottom:2rem}
+.epic-card{display:grid;grid-template-columns:auto 1fr auto;gap:1rem;align-items:center;background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.epic-card:hover{border-color:var(--purple-dim);box-shadow:0 2px 12px rgba(124,58,237,.08)}
+.epic-card-wrap .epic-card{border-radius:10px 10px 0 0}
+
+.epic-status-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.epic-status-icon.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.epic-status-icon.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.epic-status-icon.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.epic-status-icon.paused,.epic-status-icon.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+
+.epic-body{min-width:0}
+.epic-title{font-size:0.92rem;font-weight:600;color:var(--text-primary);margin-bottom:0.2rem;display:flex;align-items:center;gap:0.5rem}
+.epic-brief{font-size:0.8rem;color:var(--text-secondary);white-space:normal;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:0.45rem}
+
+.epic-progress-row{display:flex;align-items:center;gap:0.6rem}
+.epic-progress-bar{flex:1;max-width:220px;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
+.epic-progress-fill{height:100%;border-radius:3px;transition:width .3s}
+.epic-progress-fill.running{background:var(--purple)}
+.epic-progress-fill.completed{background:var(--green)}
+.epic-progress-fill.failed{background:var(--red)}
+.epic-progress-fill.pending{background:var(--text-secondary)}
+.epic-progress-label{font-size:0.72rem;font-weight:600;color:var(--text-secondary);min-width:60px}
+
+.epic-meta{display:flex;flex-direction:column;align-items:flex-end;gap:0.3rem;flex-shrink:0}
+.epic-date{font-size:0.72rem;color:var(--text-secondary)}
+.epic-badge{font-size:0.68rem;padding:0.15rem 0.5rem;border-radius:4px;font-weight:600;text-transform:uppercase;letter-spacing:0.03em}
+.epic-badge.running{background:rgba(124,58,237,.15);color:var(--purple)}
+.epic-badge.completed{background:rgba(34,197,94,.12);color:var(--green)}
+.epic-badge.failed{background:rgba(239,68,68,.12);color:var(--red)}
+.epic-badge.paused,.epic-badge.pending{background:var(--bg-tertiary);color:var(--text-secondary)}
+.epic-card-wrap{display:flex;flex-direction:column;gap:0}
+.mission-child{margin-left:2rem;border-left:2px solid var(--purple-dim)}
+.mission-child .epic-card{border-left:none;border-radius:0 10px 0 0}
+.mission-child .epic-actions{border-left:none;border-radius:0 0 10px 0}
+.mission-child-badge{font-size:0.62rem;padding:0.1rem 0.35rem;border-radius:3px;background:rgba(124,58,237,.12);color:var(--purple);font-weight:600;text-transform:uppercase;letter-spacing:0.04em}
+.epic-actions{display:flex;gap:0.4rem;padding:0.4rem 1.2rem 0.6rem;background:var(--bg-secondary);border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;margin-top:-1px}
+.launch-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;display:none;align-items:center;justify-content:center}
+.launch-form{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:90%;max-width:520px}
+.launch-form h3{margin:0 0 1rem;color:var(--text-primary)}
+.lf-field{margin-bottom:0.85rem}
+.lf-field label{display:block;font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem}
+.lf-field select,.lf-field textarea{width:100%;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:6px;padding:0.5rem 0.75rem;font-size:0.85rem;font-family:inherit;outline:none}
+.lf-field select:focus,.lf-field textarea:focus{border-color:var(--purple)}
+.lf-field textarea{resize:vertical;min-height:80px}
+.lf-actions{display:flex;gap:0.5rem;justify-content:flex-end;margin-top:1rem}
+</style>
+
+{% if runs %}
+<div class="epic-list">
+    {% for run in runs %}
+    {% set done_count = run.phases|selectattr('status.value','equalto','done')|list|length %}
+    {% set total = run.phases|length %}
+    {% set pct = ((done_count / total) * 100)|round|int if total > 0 else 0 %}
+    {% set st = run.status.value %}
+    {% set is_child = run.parent_mission_id %}
+    {% set is_paused = (st == 'paused' and run.session_id and run.workflow_id) %}
+    <div class="epic-card-wrap {{ 'mission-child' if is_child else '' }}">
+    <a href="/epics/{{ run.id }}/control" class="epic-card">
+        <div class="epic-status-icon {{ st }}" {% if is_paused %}style="background:rgba(251,191,36,.12);color:#eab308"{% endif %}>
+            {% if st == 'running' %}<svg class="icon icon-xs"><use href="#icon-activity"/></svg>{% elif st == 'completed' %}<svg class="icon icon-xs"><use href="#icon-check"/></svg>{% elif st == 'failed' %}<svg class="icon icon-xs"><use href="#icon-x"/></svg>{% else %}<svg class="icon icon-xs"><use href="#icon-pause"/></svg>{% endif %}
+        </div>
+        <div class="epic-body">
+            {% set epic_name = run.brief.split(' - ')[0] if ' - ' in run.brief else run.brief[:50] %}
+            <div class="epic-title">
+                {% if is_child %}<span class="mission-child-badge">{{ _("feature") }}</span>{% endif %}
+                {{ epic_name }}
+                <span style="font-size:0.68rem;font-weight:400;color:var(--text-secondary);background:var(--bg-tertiary);padding:0.1rem 0.4rem;border-radius:4px">{{ run.workflow_name or run.workflow_id }}</span>
+                {% if is_paused %}<span style="font-size:0.65rem;font-weight:600;color:#eab308;background:rgba(234,179,8,0.15);padding:0.1rem 0.4rem;border-radius:4px;margin-left:0.3rem">⏸ GO/NO GO</span>{% endif %}
+            </div>
+            <div class="epic-brief">{{ run.brief[epic_name|length + 3:epic_name|length + 143] if ' - ' in run.brief else run.brief[:140] }}</div>
+            <div class="epic-progress-row">
+                <div class="epic-progress-bar">
+                    <div class="epic-progress-fill {{ st }}" style="width:{{ pct }}%"></div>
+                </div>
+                <span class="epic-progress-label">{{ done_count }}/{{ total }} phases</span>
+            </div>
+        </div>
+        <div class="epic-meta">
+            <span class="epic-badge {{ st }}" {% if is_paused %}style="background:rgba(234,179,8,.12);color:#eab308"{% endif %}>{{ st }}</span>
+            <span class="epic-date">{{ run.created_at[:16].replace('T',' ') if run.created_at is string else run.created_at.strftime('%d/%m %H:%M') }}</span>
+        </div>
+    </a>
+    <div class="epic-actions">
+        {% if is_paused %}
+        <button class="btn btn-sm" style="background:var(--green,#22c55e);color:#fff;border-color:var(--green,#22c55e)"
+                onclick="event.stopPropagation()"
+                hx-post="/api/workflow/{{ run.session_id }}/resume"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                title="Valider le checkpoint">
+            <svg class="icon icon-xs"><use href="#icon-check"/></svg> GO
+        </button>
+        <button class="btn btn-sm btn-danger"
+                onclick="event.stopPropagation();if(!confirm('Rejeter ce workflow ?')) return false;"
+                hx-post="/api/workflow/{{ run.session_id }}/nogo"
+                hx-swap="none"
+                hx-on::after-request="location.reload()"
+                title="Rejeter le checkpoint">
+            <svg class="icon icon-xs"><use href="#icon-x"/></svg> NO GO
+        </button>
+        {% elif st == 'running' and done_count < total %}
+        <button class="btn btn-sm" onclick="event.stopPropagation();runPhase('{{ run.id }}')" title="{{ _('launch_next_phase') }}">
+            <svg class="icon icon-xs"><use href="#icon-play"/></svg> {{ _('launch_phase', n=done_count + 1) }}
+        </button>
+        {% endif %}
+        <a href="/epics/{{ run.id }}/control" class="btn btn-sm btn-ghost" title="Epic Control">
+            <svg class="icon icon-xs"><use href="#icon-monitor"/></svg> Control
+        </a>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteRun('{{ run.id }}')" title="{{ _('delete') }}">
+            <svg class="icon icon-xs"><use href="#icon-trash"/></svg>
+        </button>
+    </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" style="text-align:center;padding:3rem;">
+    <p style="margin-bottom:0.5rem"><svg class="icon" style="width:2.5rem;height:2.5rem"><use href="#icon-rocket"/></svg></p>
+    <h3 style="color:var(--text-primary);margin-bottom:0.3rem">{{ _('no_epic') }}</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-bottom:1rem">{{ _("lancez_une_epic_pour_orchestrer_le") }}</p>
+    <button class="btn btn-primary" onclick="document.getElementById('launchModal').style.display='flex'">
+        <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch_epic') }}
+    </button>
+</div>
+{% endif %}
+
+<div id="launchModal" class="launch-overlay" onclick="if(event.target===this)this.style.display='none'">
+    <form class="launch-form" id="launchForm">
+        <h3><svg class="icon icon-sm" style="vertical-align:middle;margin-right:0.3rem"><use href="#icon-rocket"/></svg> {{ _('launch_epic') }}</h3>
+        <div class="lf-field">
+            <label>{{ _("project") }}</label>
+            <select name="project_id" required>
+                {% for p in projects %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lf-field">
+            <label>{{ _("ceremony_template_workflow") }}</label>
+            <select name="workflow_id" required>
+                {% for wf in workflows %}
+                <option value="{{ wf.id }}">{{ wf.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="lf-field">
+            <label>{{ _("brief_objectif_contexte_criteres_d_acceptance") }}</label>
+            <textarea name="brief" placeholder="Decrivez le besoin metier, le contexte projet, et les objectifs a atteindre..." required></textarea>
+        </div>
+        <div class="lf-actions">
+            <button type="button" class="btn btn-ghost" onclick="document.getElementById('launchModal').style.display='none'">{{ _("cancel") }}</button>
+            <button type="submit" class="btn btn-primary">
+                <svg class="icon icon-sm"><use href="#icon-play"/></svg> {{ _('launch') }}
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.getElementById('launchForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const btn = e.target.querySelector('[type=submit]');
+    btn.disabled = true; btn.textContent = 'Lancement...';
+    try {
+        const r = await fetch('/api/epics/start', {method:'POST', body: fd});
+        const j = await r.json();
+        if (j.redirect) location.href = j.redirect;
+        else { alert(j.error || _('error_generic')); btn.disabled = false; btn.textContent = _('launch'); }
+    } catch(err) { alert(err); btn.disabled = false; btn.textContent = _('launch'); }
+});
+
+async function runPhase(runId) {
+    try {
+        const r = await fetch(`/api/epics/${runId}/run`, {method:'POST'});
+        const j = await r.json();
+        if (j.status === 'started' || j.redirect) location.href = `/epics/${runId}/control`;
+        else alert(j.error || j.message || _('error_generic'));
+    } catch(err) { alert(err); }
+}
+
+async function deleteRun(runId) {
+    if (!confirm(_('delete_confirm_epic'))) return;
+    try {
+        const r = await fetch(`/api/mission-runs/${runId}`, {method:'DELETE'});
+        if (r.ok) location.reload();
+        else { const j = await r.json(); alert(j.error || _('error_generic')); }
+    } catch(err) { alert(err); }
+}
+</script>
+{% endblock %}

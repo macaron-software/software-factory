@@ -1,0 +1,41 @@
+{# Workflow templates list — partial loaded by /workflows/list (no tabs wrapper) #}
+<div class="tab-toolbar">
+    {% with page_title="workflows" %}{% include "partials/view_switcher.html" %}{% endwith %}
+</div>
+<div class="item-grid" data-view-grid data-view="card">
+    {% for wf in workflows %}
+    <a href="/workflows/{{ wf.id }}/edit" class="item-card" data-id="{{ wf.id }}" style="position:relative">
+        <div class="item-icon">
+            <svg class="icon icon-md" style="color:var(--purple-light)"><use href="#icon-{{ wf.icon or 'workflow' }}"/></svg>
+        </div>
+        <div class="item-main">
+            <div class="item-title">{{ wf.name }}</div>
+            <div class="item-subtitle">{{ wf.phases | length }} phase{{ 's' if wf.phases | length != 1 else '' }}</div>
+            <div class="item-detail">
+                {% if wf.description %}
+                <p class="item-desc">{{ wf.description[:120] }}{% if wf.description | length > 120 %}…{% endif %}</p>
+                {% endif %}
+                <div class="item-tags" style="margin-top:4px">
+                    {% for ph in wf.phases[:5] %}
+                    <span class="item-tag" style="font-size:0.6rem">{{ ph.name[:20] }}</span>
+                    {% endfor %}
+                    {% if wf.phases | length > 5 %}<span class="item-tag muted">+{{ wf.phases|length - 5 }}</span>{% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="item-meta">
+            {% if wf.is_builtin %}
+            <span class="item-badge muted">built-in</span>
+            {% endif %}
+            <a href="/workflows/{{ wf.id }}/graph" onclick="event.stopPropagation()" style="font-size:0.68rem;color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center;gap:0.2rem;margin-top:0.25rem" title="Visual graph">
+              <svg class="icon icon-xs"><use href="#icon-share"/></svg> Graph
+            </a>
+        </div>
+    </a>
+    {% endfor %}
+    {% if not workflows %}
+    <div class="empty-state">
+        <p>No workflow templates yet.</p>
+    </div>
+    {% endif %}
+</div>

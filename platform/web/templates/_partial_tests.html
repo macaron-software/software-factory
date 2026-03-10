@@ -1,0 +1,186 @@
+<div class="tests-container">
+<style>
+.tests-container { max-width: 1020px; margin: 0 auto; padding: 1.5rem 1rem; }
+.tests-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem; }
+.tests-header h3 { margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: .5rem; }
+.tests-meta { font-size: .78rem; color: var(--text-muted); }
+
+/* Summary strip */
+.tests-summary {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.tests-stat {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.25rem; text-align: center;
+}
+.tests-stat-value { font-size: 1.8rem; font-weight: 700; line-height: 1; }
+.tests-stat-label { font-size: .75rem; color: var(--text-muted); margin-top: .3rem; }
+.stat-pass { color: #4ade80; }
+.stat-fail { color: #f87171; }
+.stat-skip { color: #fbbf24; }
+.stat-rate { color: var(--text-primary); }
+
+/* Rate circle */
+.tests-rate-wrap {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1.5rem; display: flex; align-items: center;
+    gap: 1.5rem; margin-bottom: 1.5rem;
+}
+.rate-circle {
+    width: 88px; height: 88px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; font-weight: 800; border: 4px solid;
+}
+.rate-elite { color: #16a34a; border-color: #16a34a; }
+.rate-good  { color: #3b82f6; border-color: #3b82f6; }
+.rate-warn  { color: #ea580c; border-color: #ea580c; }
+.rate-bad   { color: #dc2626; border-color: #dc2626; }
+.rate-info h4 { margin: 0 0 .35rem; font-size: 1rem; }
+.rate-info p  { margin: 0; font-size: .8rem; color: var(--text-muted); }
+
+/* Spec table */
+.tests-specs-title { font-size: .95rem; font-weight: 600; margin-bottom: .75rem; }
+.tests-spec-row {
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    border-radius: 8px; padding: .65rem 1rem; margin-bottom: .5rem;
+    display: grid; grid-template-columns: 1fr 60px 60px 60px 70px;
+    align-items: center; gap: .5rem; font-size: .82rem;
+}
+.tests-spec-row:hover { border-color: var(--text-muted); }
+.spec-name { font-family: monospace; font-size: .78rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.spec-num { text-align: center; font-weight: 600; }
+.spec-p { color: #4ade80; }
+.spec-f { color: #f87171; }
+.spec-s { color: #fbbf24; }
+.spec-dur { text-align: right; color: var(--text-muted); font-size: .75rem; }
+
+/* Progress bar inside row */
+.spec-bar-wrap { grid-column: 1 / -1; height: 3px; background: var(--bg-primary); border-radius: 2px; overflow: hidden; margin-top: .2rem; }
+.spec-bar-inner { height: 100%; border-radius: 2px; background: #4ade80; transition: width .5s ease; }
+.spec-bar-inner.warn { background: #f87171; }
+
+/* History */
+.tests-history-title { font-size: .95rem; font-weight: 600; margin: 1.5rem 0 .75rem; }
+.tests-history-row {
+    display: grid; grid-template-columns: 160px 80px 1fr 80px;
+    align-items: center; gap: .5rem; padding: .5rem .75rem;
+    border-radius: 6px; font-size: .8rem;
+}
+.tests-history-row:nth-child(odd) { background: var(--bg-secondary); }
+.hist-date { color: var(--text-muted); font-size: .75rem; }
+.hist-rate { font-weight: 700; text-align: center; }
+.hist-bar { height: 8px; border-radius: 4px; background: var(--bg-primary); overflow: hidden; }
+.hist-bar-fill { height: 100%; border-radius: 4px; background: #4ade80; }
+.hist-counts { font-size: .73rem; color: var(--text-muted); text-align: right; }
+
+/* Run button */
+.tests-run-btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .45rem 1rem; border-radius: 6px; font-size: .8rem; cursor: pointer;
+    background: var(--bg-secondary); border: 1px solid var(--border);
+    color: var(--text-primary); text-decoration: none;
+}
+.tests-run-btn:hover { border-color: #a78bfa; color: #a78bfa; }
+.tests-cmd-box {
+    display: none; margin-top: .75rem; padding: .75rem 1rem;
+    background: var(--bg-primary); border-radius: 6px; border: 1px solid var(--border);
+    font-family: monospace; font-size: .75rem; color: #a5f3fc; white-space: pre-wrap;
+}
+</style>
+
+<!-- Header -->
+<div class="tests-header">
+  <h3>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    E2E Tests — Playwright
+  </h3>
+  <div style="display:flex;gap:.5rem;align-items:center">
+    {% if latest_run_at %}
+    <span class="tests-meta">Dernier run : {{ latest_run_at[:16].replace('T',' ') }}</span>
+    {% endif %}
+    <button class="tests-run-btn" onclick="document.getElementById('testsCmd').style.display=document.getElementById('testsCmd').style.display==='block'?'none':'block'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      Lancer les tests
+    </button>
+  </div>
+</div>
+
+<div id="testsCmd" class="tests-cmd-box">cd platform/tests/e2e
+BASE_URL=http://127.0.0.1:8099 npx playwright test --reporter=line --timeout=30000</div>
+
+<!-- Summary stats -->
+<div class="tests-summary">
+  <div class="tests-stat">
+    <div class="tests-stat-value stat-pass">{{ total_passed }}</div>
+    <div class="tests-stat-label">✓ Passed</div>
+  </div>
+  <div class="tests-stat">
+    <div class="tests-stat-value stat-fail">{{ total_failed }}</div>
+    <div class="tests-stat-label">✗ Failed</div>
+  </div>
+  <div class="tests-stat">
+    <div class="tests-stat-value stat-skip">{{ total_skipped }}</div>
+    <div class="tests-stat-label">⊘ Skipped</div>
+  </div>
+  <div class="tests-stat">
+    <div class="tests-stat-value stat-rate">{{ total_tests }}</div>
+    <div class="tests-stat-label">Total</div>
+  </div>
+</div>
+
+<!-- Pass rate circle -->
+{% set rate_class = 'rate-elite' if pass_rate >= 95 else ('rate-good' if pass_rate >= 80 else ('rate-warn' if pass_rate >= 60 else 'rate-bad')) %}
+<div class="tests-rate-wrap">
+  <div class="rate-circle {{ rate_class }}">{{ pass_rate }}%</div>
+  <div class="rate-info">
+    <h4>Taux de réussite global</h4>
+    <p>{{ total_passed }} tests passed sur {{ total_tests }} exécutés<br>
+    {% if total_failed == 0 %}
+      <span style="color:#4ade80">✓ Aucun test en échec</span>
+    {% else %}
+      <span style="color:#f87171">{{ total_failed }} test(s) en échec</span>
+    {% endif %}
+    {% if total_skipped > 0 %}
+     · {{ total_skipped }} skipped (env-dépendants){% endif %}</p>
+  </div>
+</div>
+
+<!-- Per-spec breakdown -->
+{% if specs %}
+<div class="tests-specs-title">Résultats par spec ({{ specs|length }} fichiers)</div>
+{% for s in specs %}
+{% set bar_pct = s.rate %}
+{% set bar_cls = 'warn' if s.failed > 0 else '' %}
+<div class="tests-spec-row">
+  <span class="spec-name" title="{{ s.spec }}">{{ s.spec }}</span>
+  <span class="spec-num spec-p" title="Passed">✓ {{ s.passed }}</span>
+  <span class="spec-num spec-f" title="Failed">{% if s.failed > 0 %}✗ {{ s.failed }}{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}</span>
+  <span class="spec-num spec-s" title="Skipped">{% if s.skipped > 0 %}⊘ {{ s.skipped }}{% else %}<span style="color:var(--text-muted)">—</span>{% endif %}</span>
+  <span class="spec-dur">{{ s.duration_s }}s</span>
+  <div class="spec-bar-wrap">
+    <div class="spec-bar-inner {{ bar_cls }}" style="width:{{ bar_pct }}%"></div>
+  </div>
+</div>
+{% endfor %}
+{% else %}
+<p style="color:var(--text-muted);text-align:center;padding:2rem">Aucun résultat de test disponible.<br>Lance les tests et utilise <code>POST /api/metrics/tests/record</code> pour enregistrer les résultats.</p>
+{% endif %}
+
+<!-- Run history -->
+{% if history %}
+<div class="tests-history-title">Historique des runs</div>
+{% for h in history %}
+<div class="tests-history-row">
+  <span class="hist-date">{{ h.run_at[:16].replace('T',' ') if h.run_at else '—' }}</span>
+  {% set hrc = 'stat-pass' if h.rate >= 95 else ('stat-skip' if h.rate >= 70 else 'stat-fail') %}
+  <span class="hist-rate {{ hrc }}">{{ h.rate }}%</span>
+  <div class="hist-bar"><div class="hist-bar-fill" style="width:{{ h.rate }}%"></div></div>
+  <span class="hist-counts">{{ h.passed }}✓ {% if h.failed %}{{ h.failed }}✗ {% endif %}{{ h.total }} total</span>
+</div>
+{% endfor %}
+{% endif %}
+
+</div>

@@ -1,0 +1,84 @@
+{# Fragment: cycle history rows for a given project — HTMX swap target #}
+{% if cycles %}
+<table class="ac-table" style="table-layout:auto">
+  <thead>
+    <tr>
+      <th style="width:28px">#</th>
+      <th style="width:56px">Git SHA</th>
+      {% for ph in phases %}<th title="{{ ph }}" style="width:40px">{{ ph[:7] }}</th>{% endfor %}
+      <th style="width:36px">Score</th>
+      <th style="width:36px">RL R</th>
+      <th style="width:32px">Def.</th>
+      <th>Améliorations du cycle</th>
+      <th style="width:52px">Img</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in cycles|reverse %}
+    {% set score = c.total_score|int %}
+    {% set score_cls = 'score-green' if score >= 80 else ('score-yellow' if score >= 60 else 'score-red') %}
+    {% set rl_r = c.rl_reward|float %}
+    {% set rl_cls = 'score-green' if rl_r > 0.2 else ('score-yellow' if rl_r > -0.2 else 'score-red') %}
+    {% set is_stub = score == 0 and not c.git_sha %}
+    <tr style="{% if is_stub %}opacity:.6{% endif %}">
+      <td style="font-family:monospace;font-weight:700;font-size:.8rem">{{ c.cycle_num }}</td>
+      <td>
+        {% if c.git_sha %}
+        <code style="font-size:.65rem;background:var(--bg-tertiary);padding:.1rem .25rem;border-radius:.2rem">{{ c.git_sha[:7] }}</code>
+        {% else %}<span style="color:var(--text-secondary)">—</span>{% endif %}
+      </td>
+      {% for ph in phases %}
+      {% set s = c.phase_scores_dict.get(ph) %}
+      <td class="{% if s is not none %}{% if s >= 80 %}phase-ok{% elif s >= 60 %}phase-warn{% else %}phase-fail{% endif %}{% else %}phase-none{% endif %}"
+          title="{{ ph }}: {{ s if s is not none else 'n/a' }}">{{ s if s is not none else '·' }}</td>
+      {% endfor %}
+      <td class="{{ score_cls }}" style="font-weight:700">{{ score if score > 0 else '—' }}</td>
+      <td class="{{ rl_cls }}" style="font-family:monospace;font-size:.65rem">{{ "%.2f"|format(rl_r) if rl_r != 0 else '—' }}</td>
+      <td class="{% if c.defect_count > 5 %}defect-high{% else %}defect-ok{% endif %}">{{ c.defect_count }}</td>
+      <td style="max-width:340px;font-size:.72rem;line-height:1.4;padding:.3rem .4rem">
+        {% if c.fix_summary %}
+          {# First line = main summary, rest in tooltip #}
+          {% set lines = c.fix_summary.split('\n') %}
+          {% set first_line = lines[0][:220] %}
+          <span title="{{ c.fix_summary }}" style="cursor:help">
+            {{ first_line }}{% if c.fix_summary|length > 220 %}&nbsp;<span style="color:var(--text-secondary)">[+{{ c.fix_summary|length - 220 }}c]</span>{% endif %}
+          </span>
+        {% elif is_stub %}
+          <span style="color:var(--text-secondary);font-style:italic">
+            Cycle {{ c.cycle_num }}
+            {% if c.phase_scores_dict %}
+              — {% for ph, s in c.phase_scores_dict.items() %}{{ ph[:3] }}:{{ s }}{% if not loop.last %} · {% endif %}{% endfor %}
+            {% else %}
+              — en attente de données agent CI/CD
+            {% endif %}
+          </span>
+        {% else %}
+          <span style="color:var(--text-secondary)">—</span>
+        {% endif %}
+      </td>
+      <td style="width:52px;padding:.15rem .3rem">
+        <a href="/api/improvement/screenshot/{{ project_id }}/{{ c.cycle_num }}" target="_blank"
+           title="Screenshot — cycle {{ c.cycle_num }}">
+          <img src="/api/improvement/screenshot/{{ project_id }}/{{ c.cycle_num }}"
+               style="width:48px;height:30px;object-fit:cover;border-radius:3px;border:1px solid var(--border);background:var(--bg-tertiary)"
+               loading="lazy"
+               onerror="this.style.display='none';this.parentElement.innerHTML='<span style=\'font-size:.6rem;color:var(--text-secondary)\'>—</span>'">
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div style="color:var(--text-secondary);font-size:.8rem;padding:1rem 0">Aucun cycle enregistré pour ce projet.</div>
+{% endif %}
+<div style="margin-top:.75rem;display:flex;align-items:center;gap:.75rem">
+  <button class="btn btn-ghost" style="font-size:.7rem;padding:.25rem .6rem"
+          hx-post="/api/improvement/backfill/{{ project_id }}"
+          hx-swap="none"
+          hx-on::after-request="window.location.reload()"
+          title="Efface les stubs sans score et force un recalcul depuis les missions">
+    Recalculer historique
+  </button>
+  <span style="color:var(--text-secondary);font-size:.65rem">{{ cycles|length }} cycle(s) — recalcul recharge les données depuis les missions</span>
+</div>
