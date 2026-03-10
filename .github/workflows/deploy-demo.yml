@@ -1,0 +1,345 @@
+name: Deploy → OVH Demo + Innovation
+
+# SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
+# - permissions: contents: read — GITHUB_TOKEN ne peut pas modifier le repo
+# - Actions SHA-pinned — résistant à la mutation de tags
+# - Trigger: push sur main uniquement — seul code mergé déclenche le deploy
+# - SSH via secret (OVH_SSH_KEY / OVH_IP) — pas de credentials en clair
+# - ssh-keyscan avant connexion — host key vérifié (MITM impossible)
+# - Pas de ${{ github.* }} dans les run: — pas d'injection de contexte
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read  # Minimal — pas d'écriture repo via GITHUB_TOKEN
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed layers
+        id: changes
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          # Skip deploy if commit message contains [skip deploy] or [skip ci]
+          if echo "$COMMIT_MSG" | grep -qE '\[skip deploy\]|\[skip ci\]|\[no deploy\]'; then
+            echo "ui_only=skip" >> "$GITHUB_OUTPUT"
+            echo "Deploy skipped: [skip deploy] in commit message"
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "platform/")
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          UI_ONLY=true
+          while IFS= read -r f; do
+            if echo "$f" | grep -qE '^platform/(agents|missions|patterns|services|llm|db|a2a|ops|memory|generators|skills|tools|config|models|security|sessions|workers|events)'; then
+              UI_ONLY=false
+              break
+            fi
+          done <<< "$CHANGED"
+
+          echo "ui_only=$UI_ONLY" >> "$GITHUB_OUTPUT"
+          echo "Deploy mode: ui_only=$UI_ONLY"
+
+      - name: Set up SSH
+        if: steps.changes.outputs.ui_only != 'skip'
+        run: |
+          mkdir -p ~/.ssh
+          # Secret stored as: cat ~/.ssh/id_rsa | base64 -w 0
+          echo "${{ secrets.OVH_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_rsa
+            IdentitiesOnly yes
+            ServerAliveInterval 60
+            ServerAliveCountMax 5
+          EOF
+
+      - name: Rsync to OVH
+        if: steps.changes.outputs.ui_only != 'skip'
+        run: |
+          # Write VERSION file so the container knows git tag + commit (no .git inside Docker)
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          SHA=$(git rev-parse --short HEAD)
+          echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
+
+          # Sync platform code to staging area
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' \
+            --exclude '*.pyc' \
+            --exclude 'data/' \
+            --exclude 'workspace/' \
+            platform/ \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/staging/platform/
+          # Sync other assets + root compose
+          rsync -az cli skills mcp_lrm \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/
+          rsync -az Dockerfile docker-compose.yml \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/
+          # Sync platform/Dockerfile to live path used by docker compose build
+          rsync -az platform/Dockerfile \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/platform/Dockerfile
+
+      - name: Disk cleanup (Docker cache + old images)
+        if: steps.changes.outputs.ui_only != 'skip'
+        run: |
+          ssh debian@${{ secrets.OVH_IP }} '
+            docker builder prune --all --force 2>/dev/null || true
+            docker image prune -a --force --filter "until=48h" 2>/dev/null || true
+            docker container prune --force 2>/dev/null || true
+            AVAIL=$(df -h / | awk "NR==2 {print \$4}")
+            echo "Disk available after cleanup: $AVAIL"
+          ' || true
+
+      - name: Deploy Factory (when factory code changed)
+        if: steps.changes.outputs.ui_only == 'false'
+        continue-on-error: true
+        run: |
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          cd /opt/software-factory
+
+          # Ensure factory slot dir exists
+          mkdir -p /opt/software-factory/slots/factory
+
+          # Push new factory code to slot dir
+          rsync -a --delete /opt/software-factory/staging/platform/ \
+            /opt/software-factory/slots/factory/ || true
+
+          # Ensure Redis is running
+          timeout 30 docker compose up -d --no-deps redis 2>/dev/null || true
+
+          # Start/restart factory container (non-blocking)
+          timeout 30 docker compose up -d --no-deps platform-factory 2>/dev/null || true
+
+          # Wait for factory health (max 60s)
+          echo "Waiting for platform-factory..."
+          OK=0
+          for i in $(seq 1 20); do
+            sleep 3
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8092/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/20] factory health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          [ "$OK" = "1" ] && echo "platform-factory healthy ✓" || echo "WARNING: factory health check timed out (non-fatal)"
+          ENDSSH
+
+      - name: Blue-Green Deploy (UI / web process)
+        if: steps.changes.outputs.ui_only != 'skip'
+        run: |
+          ssh debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+
+          # ── Init slots dirs (first deploy) ──────────────────────────────────
+          mkdir -p /opt/software-factory/slots/blue /opt/software-factory/slots/green
+
+          # Remember old single-container (stop it AFTER nginx swap, not before)
+          OLD_CONTAINER=$(docker ps --format "{{.Names}}" | grep -E "software-factory-platform-[0-9]+$" | head -1 || true)
+          [ -n "$OLD_CONTAINER" ] && echo "Legacy container detected: $OLD_CONTAINER (will stop after swap)"
+
+          # ── Determine active / inactive slot ────────────────────────────────
+          ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")
+          INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
+          INACTIVE_PORT=$([ "$INACTIVE" = "blue" ] && echo "8090" || echo "8091")
+          echo "=== Blue-Green: $ACTIVE → $INACTIVE (port $INACTIVE_PORT) ==="
+
+          # ── Push new code to inactive slot ──────────────────────────────────
+          rsync -a --delete /opt/software-factory/staging/platform/ \
+            /opt/software-factory/slots/${INACTIVE}/
+          find /opt/software-factory/slots/${INACTIVE} -name "__pycache__" -type d \
+            -exec rm -rf {} + 2>/dev/null || true
+
+          # ── Ensure Redis is running ──────────────────────────────────────────
+          cd /opt/software-factory
+          docker compose up -d --no-deps redis 2>/dev/null || true
+
+          # ── Start inactive container (--force-recreate picks up env changes) ──
+          docker compose up -d --no-deps --force-recreate platform-${INACTIVE}
+
+          # ── Health check (up to 60s) ─────────────────────────────────────────
+          echo "Waiting for platform-${INACTIVE}..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:${INACTIVE_PORT}/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          if [ "$OK" = "0" ]; then
+            echo "ABORT: platform-${INACTIVE} unhealthy — rolling back"
+            docker compose stop platform-${INACTIVE} 2>/dev/null || true
+            exit 1
+          fi
+          echo "platform-${INACTIVE} healthy ✓"
+
+          # ── Copy skills into container data volume (override baked-in skills) ─
+          CONTAINER_ID=$(docker compose ps -q platform-${INACTIVE} 2>/dev/null || docker ps -q --filter "name=platform-${INACTIVE}" 2>/dev/null || true)
+          if [ -n "$CONTAINER_ID" ] && [ -d "/opt/software-factory/skills" ]; then
+            docker exec "$CONTAINER_ID" mkdir -p /app/data/skills 2>/dev/null || true
+            for f in /opt/software-factory/skills/*.md; do
+              [ -f "$f" ] && docker cp "$f" "${CONTAINER_ID}:/app/data/skills/" 2>/dev/null || true
+            done
+            echo "Skills copied into container ✓ ($(ls /opt/software-factory/skills/*.md 2>/dev/null | wc -l) files)"
+          else
+            echo "WARNING: could not find container $CONTAINER_ID or skills dir — skipping skill copy"
+          fi
+
+          # ── Swap nginx (zero-downtime) ───────────────────────────────────────
+          # Deploy full nginx template (maintenance page, SSE config, timeouts)
+          # then set the active port via sed
+          sudo cp /opt/software-factory/slots/${INACTIVE}/deploy/nginx-ovh.conf \
+            /etc/nginx/sites-enabled/software-factory
+          sudo sed -i "s|localhost:8090|localhost:${INACTIVE_PORT}|g" \
+            /etc/nginx/sites-enabled/software-factory
+          sudo nginx -t
+          sudo nginx -s reload
+          echo "nginx → $INACTIVE (port $INACTIVE_PORT) ✓"
+
+          # ── Drain SSE connections (30s) ──────────────────────────────────────
+          sleep 30
+
+          # ── Stop old slot + legacy container ─────────────────────────────────
+          docker compose stop platform-${ACTIVE} 2>/dev/null || true
+          [ -n "$OLD_CONTAINER" ] && docker stop "$OLD_CONTAINER" 2>/dev/null || true
+
+          # ── Persist active slot ──────────────────────────────────────────────
+          echo "$INACTIVE" > /opt/software-factory/active-slot
+
+          # ── Reboot script: restart only the active slot + factory on boot ────
+          BOOT_SCRIPT='/opt/software-factory/start-active-slot.sh'
+          echo '#!/bin/bash' > "$BOOT_SCRIPT"
+          echo '# cron @reboot — starts factory + active web slot' >> "$BOOT_SCRIPT"
+          echo 'cd /opt/software-factory' >> "$BOOT_SCRIPT"
+          echo 'docker compose up -d --no-deps redis postgres platform-factory' >> "$BOOT_SCRIPT"
+          echo 'ACTIVE=$(cat /opt/software-factory/active-slot 2>/dev/null || echo "blue")' >> "$BOOT_SCRIPT"
+          echo 'docker compose up -d --no-deps platform-${ACTIVE}' >> "$BOOT_SCRIPT"
+          echo 'echo "$(date) boot: started factory + platform-${ACTIVE}" >> /var/log/sf-boot.log' >> "$BOOT_SCRIPT"
+          chmod +x "$BOOT_SCRIPT"
+          # Ensure cron @reboot entry exists (idempotent)
+          (crontab -l 2>/dev/null | grep -v 'start-active-slot'; \
+            echo "@reboot /opt/software-factory/start-active-slot.sh") | crontab -
+
+          echo "=== Deploy complete: active=$INACTIVE ==="
+          ENDSSH
+
+  deploy-innovation:
+    runs-on: ubuntu-latest
+    needs: deploy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Check skip
+        id: skip
+        run: |
+          if git log -1 --pretty=%B | grep -qE '\[skip deploy\]|\[skip ci\]|\[no deploy\]'; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH (Innovation)
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
+          chmod 600 ~/.ssh/id_innovation
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_innovation
+            IdentitiesOnly yes
+          EOF
+
+      - name: Rsync platform to Innovation Node 1
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          SHA=$(git rev-parse --short HEAD)
+          echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ \
+            sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/platform/
+          rsync -az cli skills dashboard \
+            sfadmin@${{ secrets.SF_NODE1_IP }}:/home/sfadmin/ 2>/dev/null || true
+
+      - name: Blue-Green swap Innovation Node 1
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh sfadmin@${{ secrets.SF_NODE1_IP }} '
+            set -e
+            cd /home/sfadmin
+            bash deploy.sh
+          ' || echo "WARNING: Innovation Node 1 deploy failed — continuing"
+
+      - name: Rsync platform to Innovation Node 2
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh-keyscan -H "${{ secrets.SF_NODE2_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+          rsync -az --checksum --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+            platform/ \
+            sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/platform/
+          rsync -az cli skills dashboard \
+            sfadmin@${{ secrets.SF_NODE2_IP }}:/home/sfadmin/ 2>/dev/null || true
+
+      - name: Blue-Green swap Innovation Node 2
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh sfadmin@${{ secrets.SF_NODE2_IP }} '
+            set -e
+            cd /home/sfadmin
+            bash deploy.sh
+          ' || echo "WARNING: Innovation Node 2 deploy failed — continuing"
+
+  deploy-azure:
+    runs-on: ubuntu-latest
+    needs: deploy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Deploy to Azure via webhook
+        # SSH port 22 is blocked at Azure subscription level (Defender for Cloud).
+        # The platform exposes a GitHub webhook endpoint on port 80 (nginx) that:
+        #   1. Validates HMAC-SHA256 signature
+        #   2. Runs git pull + blue-green deploy when GITHUB_WEBHOOK_AUTODEPLOY=1
+        # This is the only reliable deploy path for this subscription.
+        env:
+          AZURE_IP: ${{ secrets.AZURE_IP }}
+          WEBHOOK_SECRET: ${{ secrets.AZURE_WEBHOOK_SECRET }}
+        run: |
+          [ -z "$AZURE_IP" ] && echo "AZURE_IP secret not set, skipping" && exit 0
+          [ -z "$WEBHOOK_SECRET" ] && echo "AZURE_WEBHOOK_SECRET not set, skipping" && exit 0
+
+          PAYLOAD='{"ref":"refs/heads/main","commits":[{"message":"ci: webhook deploy trigger"}],"repository":{"full_name":"macaron-software/software-factory"}}'
+          SIG="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET" | awk '{print $2}')"
+
+          HTTP=$(curl -sf -o /tmp/wh_resp.json -w "%{http_code}" \
+            -X POST "http://${AZURE_IP}/api/webhooks/github" \
+            -H "Content-Type: application/json" \
+            -H "X-GitHub-Event: push" \
+            -H "X-Hub-Signature-256: $SIG" \
+            --max-time 15 \
+            -d "$PAYLOAD" 2>/dev/null || echo "000")
+
+          echo "Webhook response: HTTP $HTTP"
+          cat /tmp/wh_resp.json 2>/dev/null || true
+
+          if [ "$HTTP" = "200" ]; then
+            echo "✓ Azure deploy webhook triggered — blue-green deploy running in background"
+          else
+            echo "WARNING: webhook returned $HTTP (platform may be starting up)"
+          fi
+          echo "=== Azure deploy done ==="

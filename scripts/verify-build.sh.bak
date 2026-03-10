@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# scripts/verify-build.sh
+# Run install (npm ci), build (npm run build) and tests (npm test)
+# Collect logs to logs/verify-build-<timestamp>.log
+# Retries for install, timeouts for build/test
+
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+LOG_DIR="logs"
+mkdir -p "$LOG_DIR"
+LOGFILE="$LOG_DIR/verify-build-$TIMESTAMP.log"
+
+echo "Starting build verification: $(date)" | tee -a "$LOGFILE"
+echo "Logfile: $LOGFILE" | tee -a "$LOGFILE"
+
+# Helper: run a command with timeout (seconds) and tee to logfile
+run_with_timeout() {
+  local timeout_sec="$1"; shift
+  local cmd=("$@")
+
+  echo "\n--- Running: ${cmd[*]} (timeout=${timeout_sec}s) ---\n" | tee -a "$LOGFILE"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout --preserve-status "${timeout_sec}s" "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
+    return ${PIPESTATUS[0]}
+  else
+    # Fallback if timeout is not available: run normally
+    "${cmd[@]}" 2>&1 | tee -a "$LOGFILE"
+    return ${PIPESTATUS[0]}
+  fi
+}
+
+# Ensure npm is available
+if ! command -v npm >/dev/null 2>&1; then
+  echo "ERROR: npm not found in PATH. Please install Node/npm or run this script in an environment with npm." | tee -a "$LOGFILE"
+  echo "Exiting with code 2." | tee -a "$LOGFILE"
+  exit 2
+fi
+
+# Retry logic for npm ci
+MAX_RETRIES=2
+RETRY_DELAY=3
+attempt=0
+install_ok=1
+while [ $attempt -le $MAX_RETRIES ]; do
+  attempt=$((attempt+1))
+  echo "\nAttempt $attempt: npm ci" | tee -a "$LOGFILE"
+  if npm ci 2>&1 | tee -a "$LOGFILE"; then
+    install_ok=0
+    break
+  fi
+  echo "npm ci failed (attempt $attempt)." | tee -a "$LOGFILE"
+  if [ $attempt -le $MAX_RETRIES ]; then
+    echo "Retrying in ${RETRY_DELAY}s..." | tee -a "$LOGFILE"
+    sleep $RETRY_DELAY
+    RETRY_DELAY=$((RETRY_DELAY * 2))
+  fi
+done
+
+if [ $install_ok -ne 0 ]; then
+  echo "ERROR: npm ci failed after $MAX_RETRIES attempts." | tee -a "$LOGFILE"
+  echo "Tail of logfile:" | tee -a "$LOGFILE"
+  tail -n 200 "$LOGFILE" 2>/dev/null || true
+  exit 3
+fi
+
+# Build step with timeout (5 minutes)
+if ! run_with_timeout 300 npm run build; then
+  echo "ERROR: npm run build failed or timed out." | tee -a "$LOGFILE"
+  echo "Tail of logfile:" | tee -a "$LOGFILE"
+  tail -n 200 "$LOGFILE" 2>/dev/null || true
+  exit 4
+fi
+
+# Test step with timeout (5 minutes)
+if ! run_with_timeout 300 npm test; then
+  echo "ERROR: npm test failed or timed out." | tee -a "$LOGFILE"
+  echo "Tail of logfile:" | tee -a "$LOGFILE"
+  tail -n 200 "$LOGFILE" 2>/dev/null || true
+  exit 5
+fi
+
+echo "All steps succeeded: install, build, tests." | tee -a "$LOGFILE"
+exit 0

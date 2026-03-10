@@ -1,0 +1,26 @@
+# Project base image — Rust stable (for Rust/WASM projects)
+#
+# Used as the runtime container for Rust projects.
+# Agents exec into this container via `docker exec sf-{project_id} cmd`.
+#
+# Build: docker build -f Dockerfile.project.rust -t sf-project-rust:stable .
+
+FROM rust:1-slim-bookworm
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ripgrep pkg-config libssl-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Non-root agent user
+RUN groupadd -r agent && useradd -r -g agent -d /workspace agent \
+    && chown -R agent:agent /workspace \
+    && chown -R agent:agent /usr/local/cargo
+
+USER agent
+
+ENV CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+CMD ["sleep", "infinity"]

@@ -1,0 +1,1840 @@
+# Changelog
+
+Généré automatiquement par [git-cliff](https://git-cliff.org/).
+
+## [Unreleased]
+
+### Bug Fixes
+
+- **ac**: watch CLI fallback to session msgs/checkpoints when cockpit empty
+- **ac**: adversarial phase detection in store.py system_prompt
+- **ac**: adversarial phase detection — INCEPTION vs CODE mode
+- **ac**: block ac-architect from writing non-INCEPTION.md files
+- **ac**: add anti-SLOP and single-file rules to ac-architect skill
+- **ac**: route ac-codex to gpt-5.1 + anti-hallucination rule for ac-architect
+- **ac**: always update project workspace path in _ensure_pilot_project
+- **ac**: record failed/gated cycles in ac_cycles table for history UI
+- **ac**: add ac_inject_cycle + ac_get_project_state to PLATFORM_TOOLS so AC agents can record cycle results
+- **ac**: memory_retrieve handler + anti-SLOP ac-codex + workflow idle safety net
+- **ac-adversarial**: Ibrahim Kamel role classification + mandatory code_read protocol
+- **ac-codex**: explicit traceability format per language + no XXX + NotImplementedError rule
+- **ac-launch**: one-liner python auto-discovery (YAML parse fix)
+- **ac-launch**: auto-discover projects from /api/health (no hardcoded list)
+- **ac-launch**: use /api/auth/demo endpoint (no password) instead of broken /api/auth/login
+- **adversarial**: clarify L1 scoring scale + pause auto-heal during AC
+- **adversarial**: raise L1 pass threshold to 8 when agent wrote real files
+- **adversarial**: accept // and <--- traceability comments for JS/TS/HTML
+- **bench**: remove 8000 char truncation from judge — send full output
+- **bench**: restore direct LLM, full output to judge, bench_file param
+- **bench**: judge truncation 2500→8000, team bench direct LLM, dev checks
+- **bench**: response_format json_object for judge, fix dev checks
+- **bench**: direct LLM call instead of executor, fix judge model
+- **bench**: all_tool_calls NameError in team_bench, brain cases avoid content-policy
+- **bench**: timeout 240s, fix code-review checks, traceability hint, 3 new agent benches, 2 new team benches
+- **ci**: sync platform/Dockerfile to live path before docker compose build
+- **ci**: remove dashboard/ from rsync — dir deleted in 20b3ef15
+- **cli**: sf ac watch error resilience — retry on 5xx
+- **cli**: sf ac watch V2 — activity-based phase detection
+- **code_write**: v3 — add .vue/.svelte/.astro to no-inject list
+- **code_write**: v2 — add .md/.mdx to no-inject list, .rs/.cpp to // Why: list
+- **code_write**: skip # Why: comment injection for JSON/TOML/YAML/HTML/XML/SVG
+- **darwin**: leaderboard/evolution/okr endpoints for PostgreSQL + generic aggregation
+- **db**: guard idx_aal_resource behind table existence check to prevent migration transaction abort
+- **docker**: remove COPY dashboard/ — dir removed in 20b3ef15
+- **engine**: phase_outcomes + agent_scores PG column bugs + RL reward
+- **executor**: add assistant message before tool results in auto-verify loop
+- **llm**: replace gpt-5.1 defaults with gpt-5.2 (Azure deployment)
+- **llm**: tool_choice leaked into no-tools requests (broke judge)
+- **llm**: content policy fallback to gpt-5.2 + architect anti-SLOP rule
+- **llm**: MiniMax streaming path — native tool_calls M2.5 + strip name field
+- **llm**: use native tool_calls format for MiniMax M2.5
+- **macos**: MissionPhase helpers + actor isolation + optionals
+- **monitor**: use /api/missions for SAFe epics + teams leaderboard tweaks
+- **monitor**: scp+run approach + SAFe endpoints (epics/cockpit/teams)
+- **monitor**: show all sessions/missions (not just active) + infra stats
+- **monitor**: rewrite as YAML-valid single-line Python (no unindented heredoc content)
+- **monitor**: add inputs to workflow_dispatch + ASCII name
+- **pipeline**: bump WORKFLOW_TIMEOUT to 3600s — 30min too tight with rate-limit contention
+- **pipeline**: 5 bottlenecks — product prompt, adversarial hints, timeout, auto-resume
+- **tests**: add missing accessibility IDs to new views for XCUITests
+- **workspace**: handle symlinks in _reset_workspace to avoid rmtree OSError
+- pipeline full-cycle — AC isolation, phase resilience, LLM fail-fast, retry backoff, SQL compat
+- NO FALLBACK LLM + pipeline phase completion + PG adapter
+- exclude webhooks from API key middleware
+- truncate epic description on PI board
+- PhaseRun validation + context_json migration
+- import os + restore backup.py function def
+- PG decimal/datetime/julianday serialization + evolution Request import + AgeMem role memory injection
+- add version field to devops-pipeline, error-monitoring, incident-diagnosis skills
+- marathon preflight — PO in feature-design + BDD directives + DELIVERY_REPORT
+### CI/CD
+
+- test Azure webhook deploy
+### Chores
+
+- **tmp**: DB check single-line python3 -c
+- **tmp**: fix DB check use python3 sqlite3
+- **tmp**: DB introspection one-shot
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- gitignore platform.bak
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- regenerate CHANGELOG.md
+- remove all veligo/popinz/finary references
+- fix .gitignore — exclude node_modules, target/, workspace/, *.duckdb, nohup.out
+### Documentation
+
+- **CLAUDE**: roles/agents/skills/tools + AC bench architecture
+- **CLAUDE.md**: AC feedback loop + memory enrichment pipeline
+- **CLAUDE.md**: update pilot projects list 5→8 (add game-threejs, game-native, migration-php)
+- **claude**: AC bench sandbox + CLI commands + Azure infra update
+- **claude**: add mes-aides project — telegraphic EN style
+- AC hierarchy 7 layers — 136/139 (97.8%)
+- AC hierarchy full results — 110/111 (99.1%)
+- AC = SUPERVISION not EXECUTION — documented everywhere
+- update CLAUDE.md with cycle 7 bench results
+- update CLAUDE.md with MODEL_PROFILES, bench results, LLM config
+- MiniMax M2.5 tool_calls fix + AC deux niveaux cockpit graph
+- cockpit memory graph AgeMem 8 patterns + PG pitfalls + AgeMem in CLAUDE.md
+- add macOS app section to all 15 language READMEs — v0.01 download link + features
+- add macOS app section to README (EN/FR/ZH) — v0.01 download, features, build from source
+### Features
+
+- **ac**: reset workspace at start of each cycle (keep .git history)
+- **ac-memory**: auto-seed project context + mandate memory protocol in all AC skill files
+- **ac-skills**: mandatory memory_retrieve/store protocol in all AC skill files
+- **agents**: BM25 prompt-aware tool selector
+- **agents**: specialization — tools union + Darwin TeamSelector wired to engine
+- **app**: 8 new IHM views + all routes wired + model detection + build fixes
+- **app**: sf-engine v0.2 — seeding, LLM bridge, engine dot, 29 unit tests, 15 E2E XCUITest
+- **bench**: design taste bench with iterative refinement loop
+- **bench**: add specialized skill benches — Angular, FastAPI, React, Architect
+- **bench**: executor auto-code-write, multi-round skill eval, tool-based agent bench
+- **ci**: integrate git-cliff changelog generator
+- **cli**: sf bench + sf skill commands + 11 API methods
+- **cli**: sf ac watch + screenshot commands
+- **cli**: add sf ac commands (list/status/start/stop/rollback/cycles)
+- **cockpit**: security & isolation card (arXiv:2602.20021)
+- **db**: seed 5 pattern epics + 39 pattern features in migrations + cockpit memory/pattern cards
+- **e2e+seed**: CRUD journeys E2E tests + SF backlog seed V1-V5
+- **engine**: embedded Rust SF engine v0.1 — axum + SQLite + streaming LLM
+- **llm**: MODEL_PROFILES per-model config, fix reasoning token budget
+- **lsp**: add LSP tools (jedi) + lsp-navigator skill with bench eval_cases
+- **macos**: Missions + CTO Panel + Monitoring — 3 new views
+- **monitor**: add SF full monitor workflow (AC + PM + Teams + Sprints)
+- **rbac**: scope enforcement layer + agents scope badge + SQL tuple fix
+- **settings**: détection modèles Ollama + MLX en temps réel
+- **tests**: 12 new XCUITest journeys for new IHM views (E16-E27)
+- full AC bench coverage — 204 agents + 42 teams
+- AC SF bench (8/8) + 6 new team benches (9 total)
+- AC Memory (7/7) + AC Workflow (6/6) bench tools
+- AC LLM bench — 4 models × 8 cases, all 100%
+- register agent-bench + team-bench routers in server.py
+- loop pattern creates sprint DB records per iteration
+- AgeMem memory tools + phase_outcomes tracking + 3-stage memory RL
+### Performance
+
+- **db**: add 14 missing PostgreSQL indexes
+### Refactor
+
+- **ac**: dual-session architecture — BUILD + SUPERVISE in parallel
+### Tests
+
+- **macos**: F16-F20 unit tests + E38-E42 UITests — nouvelles vues
+- **unit**: 40 new unit tests V2 — 8 suites, 69 total (Route, Epic, Pattern, Workflow, Memory, WSJF, LLM)
+- **xcui*## [0.01] — 2026-03-07
+
+### Bug Fixes
+
+- **CLAUDE.md**: correct stale platform metrics
+- **a## [0.01] — 2026-03-07
+
+### Bug Fixes
+
+- **CLAUDE.md**: correct stale platform metrics
+- **ac**: add /api/improvement/project to AuthMiddleware PUBLIC_GET_PATHS
+- **ac**: register /api/improvement/project route + add to public paths
+- **ac**: handle 'escalated' status — stop workflow & reset project state
+- **ac**: align _AC_PROJECTS IDs with DB — docsign-clone, ecommerce-solaris
+- **ac**: mark session completed when cycle gated — prevent watchdog resume loop
+- **ac**: reset ac_project_state to idle on gated/failed cycle + inject INCEPTION.md into agent context
+- **ac**: use direct DB UPDATE for stop_existing_sessions (ss.list() doesn't exist)
+- **ac**: stop existing active sessions before starting new cycle
+- **ac**: use DEFAULT_PROVIDER for all AC agents — removes azure-openai hardcode
+- **ac**: auto-resume only most recent interrupted session per project [skip deploy]
+- **ac**: isolation responsabilités — watchdog, skills, system_prompts
+- **ac**: auto-resume interrupted AC sessions on platform restart
+- **ac**: api_improvement_start now creates session + launches workflow
+- **ac**: enrich backfill cycles with sprint phase scores + retro notes
+- **ac**: auto-backfill cycle history from missions + improve history table
+- **ac**: explicit tool steps in skills + synthesis nudge after writes
+- **ac**: inject-cycle SQL compat SQLite+PostgreSQL
+- **ac**: inject-cycle GREATEST() for PostgreSQL upsert
+- **ac**: restore broken Evolution tab button tag
+- **ac**: var instead of const for AC graph + openFiche fallback for virtual agents
+- **ac**: 6 fixes — remove Évolution+AC from Workflows, graph photos+fiche, always-open intel, multi-project, card modal, 3 new pilots
+- **ac**: fix PostgreSQL compatibility in inject-cycle endpoint
+- **ac-adversarial**: classify as reviewer not cto
+- **ac-architect**: use _EXEC_PROTOCOL instead of _REVIEW_PROTOCOL for AC Architect role
+- **ac-brief**: inject workspace path + force INCEPTION.md rewrite every cycle
+- **ac-improvement**: fix import path for project store (4 dots)
+- **ac-improvement**: set project_id in MissionDef and register workspace in project store
+- **ac-launch**: fix messages query (use config_json filter) + expand workspace file listing
+- **ac-launch**: correct ac_cycles column names in diagnostic query
+- **ac-launch**: fix workspace path query (path not workspace_path) + dynamic message query
+- **ac-pilots**: adversarial bypass removed — FAIL on score≥7, 3 retries, synthesis fix, all_approved gates
+- **ac-qa**: add QA scope enforcement to run_streaming path
+- **ac-qa**: enforce write scope at executor level — reject non-QA writes
+- **ac-qa**: forbid writing source code files in system_prompt
+- **ac-skills**: require code_read after code_write for adversarial evidence
+- **ac-ui**: spark bars use fixed 100-scale + launch workflow on start; skill(perf-audit): v1.1.0 clearer eval cases
+- **ac-ui**: auto-refresh metrics panel every 30s
+- **adversarial**: NEVER pass through rejected output — escalate to higher team
+- **adversarial**: load project-specific custom patterns per project_id
+- **analytics**: fix PG-incompatible queries + cost/agents/skills data gaps
+- **analytics**: fix old website ID in login.html and onboarding.html
+- **analytics**: add Umami tracking to login and onboarding pages
+- **api**: handle malformed JSON and oversized payloads gracefully
+- **art**: embed ig-node/idea-graph CSS for AC team graph (was only in ideation.css)
+- **art**: sync artSwitchTab function declaration to git
+- **art**: display avg duration in seconds when >= 1000ms
+- **art**: display avg duration as integer ms (no locale separator)
+- **art**: stats cards 4-col grid (1/4 width each)
+- **art**: clarify Darwin Teams tab as GA algorithm
+- **art**: stats cards 1/4 width (4 cards per row)
+- **art**: add missing endblock tag — fixes 500 on /art route
+- **auth**: enable demo login on all environments, always show Skip(Demo) button
+- **auth**: hide Skip(Demo) button in non-demo environments
+- **auth**: SBD-04/SBD-13 rate limiting + demo backdoor + error sanitization
+- **auth**: demo login fails with Invalid credentials when hash is stale
+- **auth**: plug PG connection leak on every authenticated request
+- **ci**: factory deploy SSH keepalive + continue-on-error + docker timeout
+- **ci**: remove unsafe-eval from CSP + add index.html for Pages build
+- **ci**: install full requirements.txt — was missing yaml, slowapi, redis, etc.
+- **ci**: use absolute paths /root/.ssh/* — tilde in double-quoted ssh -F arg not expanded by shell
+- **ci**: move ALL ssh setup into script block — kubernetes executor attach strategy doesn't share fs between before_script and script
+- **ci**: replace heredoc with printf for SSH config — heredoc with indented EOF fails in gitlab CI
+- **ci**: gitlab CI robustness — support File+Variable SSH key type, deploy-node1 waits for node-2
+- **ci**: fix GitLab CI azure deploy — wrong user/path/topology
+- **ci**: OVH deploy fallback to docker compose up if container is down
+- **ci/azure**: add || true to docker update --restart (container recreation race)
+- **ci/ovh**: cp nginx-ovh.conf from inactive slot path
+- **cluster**: disable heartbeat for slave/ui/factory nodes
+- **cluster**: auto-purge stale nodes from platform_nodes every heartbeat
+- **cockpit**: remove ⚡ and ♻ emojis from SVG text elements
+- **cockpit**: correct diagram metrics to actual filesystem values
+- **cockpit**: LLM provider status live — chain réelle, pas hardcoded
+- **cockpit**: LLM providers from real config, not hardcoded list
+- **cockpit**: update ecosystem diagram with accurate integration statuses
+- **cockpit**: badge Système pour agents builtins (brain, worker)
+- **cockpit**: activity feed shows agent full name + avatar + role
+- **cockpit**: remove all emojis from diagrams
+- **cockpit**: add /api/cockpit to PUBLIC_PATHS in auth middleware
+- **cockpit**: fix relative import (3→4 dots) + age threshold 60→180s
+- **cockpit**: active_missions typo + environments replaced by cluster nodes registry
+- **cockpit+docs**: remove emojis from SVG diagrams, fix counts
+- **code_write**: explicit workspace path instructions + better error messages
+- **csp**: add cdn.simpleicons.org to img-src whitelist
+- **csp+portfolio**: allow analytics, fix avatar icon 404s
+- **csp+routes**: add connect-src for analytics, register group_ideation router
+- **cto**: add list_by_config_type to SessionStore (Postgres JSONB query)
+- **dashboard**: AC team graph + Thompson skills data format
+- **db**: advisory lock on PG schema init to prevent multi-node race condition
+- **db**: schema_pg.sql sprints/tasks use mission_id not epic_id
+- **db**: schema_pg.sql uses epics/epic_runs (new table names)
+- **db**: PG executescript skips SQL after leading comments
+- **db**: increase PG pool max_size 20→50, reduce max_idle 300→120s, timeout 15s
+- **deploy**: strip trailing dashes from container name tag
+- **deploy**: auto-replace template Dockerfile on docker_deploy + improve template comments
+- **deploy**: replace Azure SSH with GitHub webhook autodeploy
+- **deploy**: Azure job restart container on deploy + health check
+- **deploy**: nginx maintenance page 503 + OVH nginx template
+- **deploy**: sync compose+nginx conf to VM before docker compose up
+- **deploy**: resolve merge conflict + add analytics nginx setup script
+- **deploy-ovh**: docker cp skills into container after blue-green swap
+- **deploy/azure**: nginx default_server port 80 + disable auto_resume
+- **deploy/azure**: active-slot permission denied — use nginx conf as ground truth
+- **deploy/azure**: nginx directory bind-mount for writable conf swap
+- **deploy/azure**: use staging compose file + docker cp to nginx container
+- **deploy/demo**: fix YAML syntax error in reboot script (nested heredoc)
+- **deploy/ovh**: sudo sed to edit root-owned nginx config
+- **e2e**: fix test failures in platform-features spec
+- **e2e+migrations**: fix remaining test skips and missing tables
+- **engine**: restore lineage param in run_pattern (lost in rsync)
+- **engine**: explicit Dockerfile templates per stack in EXEC_PROTOCOL
+- **engine**: TDD minimum deliverables + multi-file mandate in _EXEC_PROTOCOL
+- **engine**: inject WORKSPACE path + fix _EXEC_PROTOCOL for ac-codex
+- **engine**: adversarial retry prompt includes written files + explicit tool-call obligation
+- **engine**: fallback workspace path from DATA_DIR/workspaces/{session_id}
+- **exec-protocol**: add Dockerfile templates and enforce stack from INCEPTION.md
+- **executor**: init write_count=0 before loop to prevent UnboundLocalError
+- **executor**: allow Claude alias read tools in write-only nudge mode
+- **executor**: multi-file write nudge — 3 files min, TDD test-first hint
+- **executor**: force code_write when agent halts without tool calls
+- **executor**: append write nudge to read-tool results instead of blocking
+- **executor**: extend read-tool redirect to include code_search, file_search
+- **executor**: penultimate round write-forcing + read tool redirect after schema strip
+- **executor**: extend tool nudge to 4 rounds, remove length threshold
+- **executor**: extend tool nudge to round<=1, raise threshold to 400 chars
+- **executor**: nudge MiniMax to call tools when round-0 returns short text
+- **executor**: plug PG connection leaks — use context manager everywhere
+- **hub**: remove emojis (SVG icons), add personas tab, remove useless buttons, add refresh
+- **i18n**: add 5 missing keys to all 20 locales (grade, epic_brief, 3 long keys)
+- **ideation**: use get_connection (PG) instead of get_db (SQLite) for DB persistence
+- **ideation**: Jarvis creates 6 missions autonomously from ideation session
+- **jarvis**: fix conversation history loss when >200 sessions exist
+- **js**: IIFE wrap mkt_ideation + ideation templates, fix portfolio classList null check
+- **launch**: respect mission semaphore in /launch endpoint
+- **launch**: use DATA_DIR from config for workspace path
+- **llm**: add model+provider to content policy LLMResponse (TypeError fix)
+- **llm**: skip CB on HTTP 4xx + strip orphaned tool messages on resume
+- **llm**: return synthetic neutral response on Azure HTTP 400 content policy
+- **llm**: zero fallback on Azure prod — fail fast, no opencode/kimi/minimax
+- **llm**: add gpt-4.1 to azure-openai models list and deployment map
+- **llm**: azure config gpt-5.1 + responses api for codex + routing priority
+- **llm**: opencode-go improvements — key file detection, reasoning_content fallback
+- **llm**: quota-exhausted → 3600s cooldown + skip retry immediately
+- **llm**: reduce quota-exceeded cooldown to 60s (window resets every ~4h, not daily)
+- **llm**: long cooldown (1h) on quota-exhausted 429 vs generic rate-limit
+- **llm**: opencode models + no-store cache header
+- **llm**: force MiniMax tool_choice required/specific to fix tc=0
+- **llm**: apply MiniMax tool→user conversion in non-streaming path too
+- **llm**: MiniMax streaming now shows tool call results to model
+- **llm**: opencode provider — default to 'coding' model type
+- **llm**: local-mlx primary detection + routing reset button
+- **llm**: health check timeout 1s→5s, _env_flag('0'=False), refactor _ensure_mlx_server
+- **llm**: respect PLATFORM_LLM_FALLBACK env var to disable/override fallback chain
+- **llm**: azure-only fallback chain when AZURE_DEPLOY=1; fix(store): status.value safe for str
+- **llm**: trace streaming calls + fix Decimal JSON serialization
+- **llm**: RTK compress in stream() path + local multi-LLM routing
+- **memory**: platform_memory_search uses project_search/global_search instead of mem.search()
+- **metier**: group epics by project + fix agent avatar photos
+- **metrics**: 500s on modules/llm tabs + JS error 'epic'
+- **metrics**: null-safe updateStats + HTMX error handler on tab load failure
+- **migrations**: use IF NOT EXISTS for PostgreSQL ALTER TABLE ADD COLUMN
+- **missions**: graceful resume_attempts reset — handle older DB schemas
+- **missions**: survive server restarts — checkpoint sync + resume_attempts reset
+- **modules**: chaos toggle + runtime enforcement audit
+- **modules**: SVG feather icons + builtins ON by default + toggle tooltip
+- **modules**: REGISTRY_PATH wrong depth (3 parents instead of 4)
+- **modules**: register modules router — /api/modules was returning 404
+- **modules**: remove landlock duplicate + instant _is_installed (no subprocess)
+- **modules**: show 'Coming soon' for unimplemented scrapers
+- **monitor**: show last msgs from interrupted sessions for error diagnosis
+- **monitor**: extend AC session window to 24h + add fullstack-rs messages
+- **nav**: remove Marketplace from sidebar menu
+- **nav**: remove duplicate tool-builder entry, register marketplace router
+- **nginx**: HTTPS-by-IP → redirect to canonical domain, remove HSTS on HTTP
+- **nginx**: block 443 default_server to prevent Umami leaking on IP access
+- **notifs**: CSP eval + auto-heal idle status
+- **openapi**: resolve ForwardRef body params for Pydantic v2 openapi generation
+- **ops**: add AC scores, message counts, workspace files diagnostics [skip deploy]
+- **ops**: add AC session config + active sessions diagnostics [skip deploy]
+- **ops**: add session messages + LLM error diagnostics [skip deploy]
+- **ops**: add DB/session diagnostics to AC status workflow [skip deploy]
+- **ops**: curl || true to prevent set -e abort on port probe [skip deploy]
+- **ops**: fix YAML syntax in AC workflow diagnostics [skip deploy]
+- **ops**: add live diagnostics to AC status workflow [skip deploy]
+- **ops**: cookie-based auth for AC cycle launch [skip deploy]
+- **ops**: JWT auth for AC cycle launch [skip deploy]
+- **ops**: use PostgreSQL psql for API key creation [skip deploy]
+- **ops**: get DB path from process env DATABASE_URL [skip deploy]
+- **ops**: log DB tables + users for auth debugging [skip deploy]
+- **ops**: create temp API key in DB if none found [skip deploy]
+- **ops**: platform on port 8091, add to port detection [skip deploy]
+- **ops**: remove -f from curl + drop JWT attempt [skip deploy]
+- **ops**: auto-detect platform port on node [skip deploy]
+- **ops**: query DB for API key + robust curl helper [skip deploy]
+- **ops**: enumerate API key names + show process env keys [skip deploy]
+- **ops**: add /tmp/sf-node.env to API key search [skip deploy]
+- **ops**: broaden API key search + probe process env [skip deploy]
+- **ops**: release PG pool connection before async awaits — prevent pool exhaustion
+- **orchestrator**: yolo_mode skips human-in-the-loop checkpoint
+- **orchestrator**: import helpers from missions.internal not package root
+- **otel**: move prometheus scrape endpoint to /api/metrics/prometheus
+- **pages**: add .nojekyll to skip Jekyll build on GitHub Pages
+- **paths**: wrong parent depth in metrics.py and screens.py
+- **pg**: auto_resume pg_run_lock — use ? placeholders not %s
+- **pg**: watchdog naive UTC datetime + strftime PG compat
+- **platform**: slot-switch stability — aclose crash + AC resume
+- **portfolio**: p.missions -> p.epics in template (UndefinedError 500)
+- **projects**: git-status 500 — GitStatus is dataclass not dict, use attributes
+- **projects**: create_project is now idempotent — returns existing project if same name exists
+- **qa-protocol**: add mandatory docker_deploy as step 0 in QA
+- **qa-protocol**: add docker_deploy() as mandatory step 1 in _QA_PROTOCOL
+- **quality**: enforce docker_deploy in env-setup + fix E2E false-positives
+- **routes**: include CTO router in web routes
+- **routes**: register group_ideation_router — fixes 404 on /group/* tabs
+- **routing**: hardcode AC agent model routing on Azure
+- **routing**: all light tiers use gpt-5-mini
+- **routing**: add minimax to TOOL_CAPABLE_PROVIDERS + no azure escalation on OVH
+- **routing**: respect PLATFORM_LLM_PROVIDER=minimax for reasoning agents
+- **run**: smart resume — skip DONE phases, reset only FAILED/PENDING
+- **security**: add HSTS + Permissions-Policy + X-Permitted headers to nginx
+- **settings**: showSettingsTab crash when called without click event
+- **settings**: IndexError dans _builtin_providers quand models=[]
+- **settings**: routing defaults dynamiques selon _primary provider
+- **settings**: hide deploy target modal on load
+- **settings**: remove useless 30s auto-poll on orchestrator tab
+- **settings**: simpleicons 404, password autocomplete, skeleton loading, auto-poll
+- **settings**: deploy target modal always visible on load
+- **settings**: modules tab was always empty — wrong REGISTRY_PATH
+- **settings/modules**: show all 25 modules + add MCP LRM section
+- **skill**: use localhost:80 (nginx) in ac-architect for platform API calls
+- **skill-eval**: remove stray commas causing SyntaxError in eval tool
+- **skill-eval**: wire skill_eval router into api/__init__.py
+- **skill-eval**: fix relative import path (....tools) + error handling + JS response check
+- **skill-eval**: replace emojis with Feather SVG icons + ASCII CLI
+- **skills**: remove hardcoded azure-openai/GPT-5 and wrong tool names
+- **skills**: agent-reward v1.2.0 — simulation-based cases 2+3
+- **skills**: tdd v1.2.0 — simulation-based RED phase + no-trigger fix
+- **skills**: tdd v1.1.0 — fix eval cases for full RED+GREEN+REFACTOR
+- **skills**: perf-audit v1.3.0 — explicit 'no-tool-rerun' in case 2
+- **skills**: DATA_DIR/skills/ override survives container rotation
+- **skills**: align devops/e2e skills with docker_deploy requirement
+- **skills**: e2e_ihm — screenshots adaptés au projet, pas hardcodés CRUD
+- **skills-health**: intégrer dans /art de la SF platform, pas dashboard séparé
+- **skills-health**: read from filesystem, support id/prompt eval_cases format
+- **stability**: 6 root-cause fixes for 504/freeze on OVH + Azure
+- **sync**: reset GitLab to origin/main BEFORE rsync to prevent drift
+- **tdd**: auto-run CICDRunnerTool after each writer iteration in loop
+- **test**: backup glob pattern *.sql.gz (was sf_*.sql.gz)
+- **tests**: role format is 'Product Manager' not 'product-manager' (live data)
+- **tests**: nginx failover - use docker stop with wait loop instead of time.sleep
+- **toast**: remove always-visible bug — display:flex was overriding display:none
+- **tool-mapping**: ac-cicd-agent → devops role + add git_push
+- **toolbox**: replace iframe /docs with inline Swagger UI
+- **tools**: add Claude alias tools to dev/reviewer/qa role maps
+- **tools**: add docker_deploy + docker_status to qa role tool mapping
+- **ui**: remove emoji from module categories + JS apostrophe in pi_board
+- **ui**: allow project/item names to wrap 2 lines in card mode
+- **ux**: stop 401 polling flood + fix password-not-in-form warnings
+- **ux**: tokenize error pages + cockpit SVG diagrams for light/dark mode
+- **watchdog**: use project_id+escalation_at as run_id (current_run_id=NULL after escalation)
+- **watchdog**: extract escalation reason from any failed phase, not just escalated=True
+- **watchdog**: capture AdversarialEscalation to store last_escalation_reason
+- **watchdog**: 15s delay before startup AC resume — prevent double-resume race
+- **watchdog**: stagger AC cycle resumption by 60s to avoid rate-limit collisions
+- **watchdog**: correct session_id lookup + add missing current_run_id migration
+- **watchdog**: resolve correct session_id for AC cycle resume
+- **watchdog**: import _run_workflow_background from correct module
+- **watchdog**: fix broken import + add AC cycle auto-resume on restart
+- **webhook**: correct db import path in github_webhook handler
+- **workflow**: pass project_path through run_workflow → run_pattern
+- **workflow**: restore ac-tdd-sprint as separate phase with ac-codex agent
+- **workflow**: nogo endpoint — use string 'failed' not SessionStatus enum
+- **workflow**: human-in-the-loop now truly pauses — no more premature 'completed'
+- **workflows**: replace iframe with direct link for improvement board
+- **world**: brighten night/dark mode — scene was all black
+- MAX(COUNT(*),1) -> GREATEST() — PostgreSQL-only syntax
+- AC cycle failures — route away from gpt-5.2 + fix LLMResponse TypeError + stack-aware codex
+- watchdog crash loop + ac-codex/adversarial agent skills
+- richer synthesis prompt after code_write on last rounds
+- MiniMax tool_choice forced mode on nudge rounds
+- store.py syntax errors + skill-creator v1.1.0 pass_rate=1.0 + LLM judge retry
+- resolve 3 browser errors
+- chat windows no longer grow infinitely — bounded layout + flex scroll
+- settings LLM providers crash when key_env is None (local-mlx, ollama)
+- evidence gate — npm-test no-op + build-produces-js + critical phase hard fail
+- MCP watchdog fcntl lock — prevent double-manager race on blue/green slots
+- jarvis_acp.py - use httpx instead of urllib for HTTP calls
+- pg advisory lock timeout + jarvis ACP server
+- sessions/store config_json + agents/store JSON resilience + CI/CD node-2
+- add context field to EpicRun model (missing — caused AttributeError on all missions)
+- migrations.py icon UPDATE use ? placeholders not %s for PgConnectionWrapper
+- CSP img-src + password autocomplete warnings
+- /api/ready bypass auth middleware (health probe must be public)
+- Infisical via REST API (no SDK) + PG ON CONFLICT composite keys
+- restore /projects/{id}/hub route + fix onboarding middleware operator precedence
+- hide demo projects on remote/prod installs (only show when SF_LOCAL=1)
+- update missions→epics module paths in orchestrator/context
+- restore _translate_sql definition lost in previous edit
+- PostgreSQL boolean type mismatch for starred column
+- starred column must be bool not int for PostgreSQL compatibility
+- correct PG schema bugs (confluence_pages, support_tickets, memory columns, team_fitness constraints)
+- allow code_write to workspace paths relative to cwd (systemd deployments)
+- lint errors from SAFe epic rename (EpicDef->MissionDef, EpicsStatusResponse->MissionsStatusResponse, remove unused import)
+- sandbox + hard gates for SF quality
+- schema/adapter/env REX improvements
+- landlock-runner src comment fix
+- local-mlx skipped — no_auth bypass + default provider + tool-capable
+- 'Annoter cette page' activates inline annotation mode + refresh memory/workspaces screenshots (all 8 langs)
+- Annotation toolbar + popover fully theme-aware (CSS vars, no dark hardcodes)
+- Annotation toolbar always visible — no Settings required
+- Annotation mode — auto-activate + capture click interceptor + mode banner
+- Spec bar + wireframe skeleton use CSS vars (light/dark adaptive)
+- Wireframe skeleton — TreeWalker text replacement + proper contrast
+- inject _EXEC_PROTOCOL for worker/tdd/coder roles
+- PG compat — costs f-string + user_project_roles table + auth/me resilience
+- never stop on timeout — phase 48h, agent 1h retry, rate-limiter 24h retry
+- PG-compat for Knowledge/LLM/Ops/Tests tabs
+- Evolution tab — dark mode + phase name truncation
+- 429 rate limit on fast tab switching + agent graph resize
+- remove phantom 'fantôme' badge on all projects
+- /projects 500 — add missing template context vars (total_pages, page, q…)
+- expose /api/health in factory mode (endurance watchdog 404)
+- filter env-noise false positives in auto-QA TMA ticket creation
+- TMA JS errors - IIFE wrap partials + missing overview-quality endpoint
+- add _migrate_pg github_tool seed + ALTER TABLE IF NOT EXISTS for category/icon columns
+- home page height chain — input bar at bottom for all ideation tabs
+- PG compatibility - skills_cache → llm_cache, health sqlite_master → pg_tables
+- Active Epics count (missions table, not runs) + add Features/Tasks cards
+- register metrics router (tests+llm tabs 404) + fix knowledge 500
+- analytics/costs 500 — DATE() PG serialization + 401 middleware
+- DORA charts — safeChart() destroy + proper empty-state handling
+- quality scorecard — create tables in PostgreSQL + manual scan trigger
+- wrap DORA dashboard script in IIFE to prevent 'trend' re-declaration
+- create platform_settings table in PG migration
+- tool_builder use _templates(request) instead of local Jinja2Templates
+- toolbox skills panel — collapsible + no content overlay
+- auto_heal scans all open incidents, not just mission_id IS NULL
+- skip scaffold on read-only project paths (e.g. /app/platform bind-mount)
+- executor auto-lint uses role=user instead of orphan role=tool
+- GO/NO GO buttons + paused badge + padding fix in mission lists
+- add /auth/github + /auth/azure to public paths
+- skip Umami analytics on localhost (no 403 noise in dev)
+- add llm_cost_usd column to mission_runs PG migration
+- photorealistic avatars via pravatar.cc + embedded layout height
+- agent_world — switch Three.js from unpkg to jsdelivr, drop broken WebGPU import
+- /evals 500 — use app templates (with i18n globals) instead of local Jinja2Templates
+- PG connection leaks — _cleanup_disk, _load_po_kanban, tool_runner support ticket, mission_orchestrator features kanban
+- PG pool exhaustion — connection leaks + factory pool 10→20
+- stability tests + CI force-recreate + rsync --checksum
+- deduplicate platform incidents by upsert (count+last_seen_at)
+- CI Azure — sudo mkdir factory slot + first-deploy via docker cp
+- respect PLATFORM_AUTO_RESUME_ENABLED=0 in watchdog _resume_batch
+- register mkt_ideation and group_ideation routers in server.py
+- correct Umami website ID in base.html (218aebc5 for sf.macaron-software.com)
+- builtin docker-local not marked as default when DB has a default target
+- PG schema + datetime compat for mission_runs auto-resume
+- deduplicate docker-local in list_targets when registered in DB
+- TMA stalled — reset phantom running runs + clean PG pool
+- sqlite db lock on restart — timeout + busy_timeout + WAL checkpoint
+- tool_builder + evals templates path — use __file__ relative path
+- CSP analytics URL via PLATFORM_ANALYTICS_URL env var
+- cto E2E tests — cto_jarvis 12/12, cto_full_journey 14/14
+- workspace-features E2E — 39/43 passing, 4 skipped
+- workspace E2E tests — 47/47 passing
+- register /api/sessions/{id}/sse route + E2E tests for group tabs
+- prevent SVG flash on home tab switch
+- auth import + timeline error handling
+### CI/CD
+
+- **azure**: fix deploy paths + blue-green swap for sfadmin@sf-node-1
+- deploy ac auto-resume fix to prod
+- add [skip deploy] support to avoid killing running AC cycles [skip deploy]
+- trigger redeploy — fix Azure SSH key (SF_INNOVATION_SSH_KEY renewed)
+- pages workflow — remove paths filter, trigger on every main push
+- add explicit GitHub Pages workflow (replaces failing auto-build)
+- remplace workflow Node.js par CI Python (ruff E9 + py_compile)
+- fix Innovation Node 1 deploy — sfadmin user, uvicorn restart
+- fix deploy-innovation SSH user (sfadmin) + path + systemd restart
+- add workflow_dispatch trigger to deploy workflow
+- add Innovation Node 1 deploy job to CI/CD workflow
+- add Azure deploy job to GitHub Actions (skills + platform rsync)
+- replace Azure deploy with Innovation cluster blue-green
+- add deploy-innovation blue/green job for Innovation cluster
+### Chores
+
+- **cockpit**: update diagrams with latest platform metrics
+- **db**: add mercato tables to schema_pg.sql for fresh deployments
+- **refactor**: remove dead files security.py and workspaces.py
+- supprime dashboard/ — les fonctionnalités vont dans /art amélioration continue
+- add pre-built landlock-runner binary for OVH x86_64
+### Documentation
+
+- **CLAUDE**: deploy auto via GH/GL Actions, Azure auth, skill eval state
+- **CLAUDE**: update skill quality loop — add skill-improver + A/B test, état actuel 2026-03-06
+- **CLAUDE.md**: clarify AC two-level architecture
+- **CLAUDE.md**: AC 7-phase cycle, Skills Health, adversarial 13 dims, reward 14 dims
+- **ac**: isolation responsabilités scopes couche-projet vs couche-SF
+- **arch**: fix SQLite refs, add anti-patterns & missing sections
+- **claude**: add Docker Bubble section — docker exec pattern, socket proxy, lifecycle
+- **claude**: orchestration tools implemented, agents reconfigured
+- **claude**: game-sprint v2 + orchestration gap + LLM metrics fix
+- **cockpit**: remove all emojis and symbols from diagrams and JS labels
+- **cockpit**: remove emojis from SVG diagram labels
+- **cockpit**: update all SVG diagrams with latest platform state
+- **cockpit**: add philschmid.de/testing-skills ref in AC diagram Thompson+SkillEval box
+- **llm**: document SF Innovation model routing and Azure/MiniMax fallback
+- add SF PATTERNS catalogue section to CLAUDE.md
+- clarify ac-improvement-cycle scope in YAML and pages.py
+- update all multilingual READMEs with latest platform metrics
+- add mermaid sprint loop diagram to platform CLAUDE.md (Copilot instructions)
+- trace complète des inspirations externes dans code + CLAUDE.md + REFERENCES.md
+- update CLAUDE.md — Azure sfadmin user, systemd service, OVH blue-green
+- v3.1.0 release notes — cluster, sandbox, DeerFlow, multi-model routing (all 19 languages)
+- add architectural decision log to epic_orchestrator.py
+- document security rationale in workflow files
+- Add Annotation Studio wiki page to SF built-in knowledge base
+- SF internal wiki — user-oriented rewrite + screenshots + 3 new pages
+- update multilingual READMEs + add 8 new screenshots (settings, cockpit, missions, memory, workflows, ops, rbac, backlog)
+### Features
+
+- **a2a**: add A2A/ACP server for Jarvis + Toolbox tab + MCP bridge
+- **ac**: improve cycle history — richer fix_summary, defect_count, screenshot discovery, refresh button
+- **ac**: add ac_inject_cycle + ac_get_project_state tools
+- **ac**: cross-project Thompson tier fallback + import order fix [skip deploy]
+- **ac**: Thompson feedback in inject-cycle + close A/B loop [skip deploy]
+- **ac**: user stories + a11y + design tokens dans les projets AC
+- **ac**: Thompson A/B skills v2 + AC status in /api/health
+- **ac**: add ac-coach phase + experiments module + graph update
+- **ac**: live modal — agents actifs, tools appelés, events feed
+- **ac**: cycle/status + controls pinned to card bottom
+- **ac**: per-card play/stop controls, rich live modal, stop endpoint
+- **ac**: add phases 6 (Refactoring) and 7 (Security/SecureByDesign) to AC cycle
+- **ac**: enrich improvement dashboard with RL/convergence/Thompson metrics
+- **ac**: wire RL + convergence + Thompson + GA trigger into inject-cycle
+- **ac**: équipe amélioration continue + workflow + skills GPT-5.2 Codex
+- **ac**: hardening sprint auto-trigger when total_score < 85
+- **ac+opencode**: specbar live per sub-tab + OpenCode Go real API + specbar external update API
+- **ac-board**: 12 adversarial checks + traceability matrix + 7-tab board
+- **ac-coach**: add ac-coach agent to store (Jade Moreau)
+- **ac-coach**: skill + rollback/experiment APIs + architect reads STRATEGY_N.md
+- **ac-history**: add prod screenshots to cycle history table
+- **admin**: add /api/admin/skills/update endpoint for hot-patching skill files
+- **agents**: photorealistic avatars via pravatar.cc fallback
+- **analytics**: add RTK context compression stats to /metrics?tab=analytics
+- **analytics**: dynamic website ID by hostname + HTMX event tracking
+- **analytics**: Umami events — nav, tabs, chat (SF + dashboard)
+- **analytics**: add HTTPS vhost for analytics.macaron-software.com on Azure
+- **art**: add AC team graph card (7 system agents + flows)
+- **art**: add AC team graph card to ART view
+- **art**: Self Healing sub-tab in Amélioration Continue
+- **art**: AC sub-tabs + explainer cards (Cycles/Skills/Thompson/Darwin/Evolution/RL)
+- **bmad**: port BMAD concepts 1+3 to SF + add to modules registry (MIT)
+- **bubble**: Platform Bubble architecture — docker exec on persistent project containers
+- **cli**: migrate DBBackend from SQLite to PostgreSQL
+- **cli**: add 'sf jarvis' command — routes CTO calls via /api/cto/message
+- **cluster**: PG NOTIFY/LISTEN cross-node MessageBus + SSE reconnect + remove SQLite refs
+- **cockpit**: add SF patterns catalogue SVG graph card
+- **cockpit**: add AC intelligence loop + self-healing diagrams
+- **cockpit**: add Eval Skill Engine to diagrams (philschmid.de/testing-skills)
+- **cockpit**: add third-party integrations ecosystem diagram
+- **cockpit**: vue synthétique SF — pipeline, envs, daemons, LLM, projets, activité, KPIs
+- **confluence**: support CONFLUENCE_TOKEN env var (fallback to .key file)
+- **darwin-ga**: full Darwin Teams GA panel with explanation + live data
+- **dashboard**: Skills Health board — eval AC, checks déterministes, LLM judge
+- **dashboard**: Amélioration Continue board — live cycles, D3 agents, Thompson/RL/GA
+- **deploy**: blue-green zero-downtime deployment on Azure + OVH
+- **fractal**: vertical fractal stack + traceability system
+- **game**: add create_sprint tool + SprintDef type/quality_score/team_agents fields
+- **hooks**: instinct system + ECC module + skill-stocktake + agent hook assignments
+- **hooks**: add hook system (PRE/POST_TOOL, SESSION, PRE_COMPACT) + RBAC + API
+- **hub**: PM/PO agent card + docs sub-tabs + RTK stats DB
+- **ideation**: value-driven mission structuring (LEAN/SAFe/WSJF)
+- **integrations**: proper logos via Simple Icons CDN + richer descriptions
+- **integrations**: RTK compression toggle + stats modal
+- **jarvis**: create_domain + platform_tma tools + CTO awareness
+- **jarvis**: add launch_ideation/mkt_ideation/group_ideation tools to strat-cto
+- **llm**: POST /api/llm/local/ensure + '▶ Start' button in Settings
+- **llm**: configurable timeouts via env vars, bump defaults
+- **llm**: auto-launch local-mlx server when needed
+- **llm**: opencode go provider + live model fetch pour Azure/ollama/opencode/mlx
+- **llm**: RTK compression enabled by default for all providers
+- **memory**: always-on memory consolidation + inbox watcher + QueryAgent
+- **memory**: add POST project memory endpoint + fix datetime serialization
+- **metrics**: add Modules tab — RTK stats + module activation overview
+- **modules**: add agent-reward module — reward scoring + ART readiness
+- **modules**: add incident-diag agent — structured RCA with 6 diagnostic tools
+- **modules**: add perf-auditor agent — chrome-devtools-mcp + Lighthouse + CWV
+- **modules**: port spec-kit quality gates as spec-driven-quality skill
+- **modules**: set all 21 modules builtin: true (ON by default)
+- **modules**: add skill-creator module to registry (Anthropic, MIT)
+- **modules**: cable tous les modules — 18 modules entièrement câblés
+- **modules**: wire enabled_modules to runtime — live, no restart needed
+- **modules**: add missing real integrations + REFERENCES.md
+- **modules**: LEAN registry — remove 13 placeholders, add 7 real integrations
+- **monitor**: add agent distribution + timestamps to AC diagnostics
+- **notifications**: GO/NOGO checkpoint actions in notification bell
+- **onboarding**: add Select all / Unselect all buttons on projects step
+- **ops**: AC launch & monitor workflow_dispatch [skip deploy]
+- **ops**: move Ops to Metrics tab, remove duplicate route
+- **ops**: nightly E2E scheduler + TMA incidents on failure
+- **orchestration**: add launch_epic_run, resume_run, check_run_status tools
+- **otel**: add /metrics Prometheus scrape endpoint
+- **otel**: enable OpenTelemetry on all servers
+- **patterns**: fractal-worktree + backprop-merge patterns (TinyAGI/fractals port)
+- **platform**: YAML migration cleanup + auto-resume backoff + cost analytics + domain defaults
+- **projects**: sections par domaine client + champ client_domain
+- **projects**: add logs/veligo/ldp projects with starred + container_url
+- **quality**: 4 QA gates — tool scoping, AC from epic DB, game criteria, deploy HTTP gate
+- **quality**: anti-slop + anti-cheat rules — adversarial.py + skills
+- **reasoning**: semi-formal reasoning arXiv:2603.01896
+- **routing**: update Azure LLM tier routing
+- **security**: complete arXiv:2602.20021 coverage — CS3/CS6/CS10/CS11 gaps
+- **security**: harden platform against arXiv:2602.20021 vulnerabilities
+- **security**: integrate SecureByDesign patterns + QA adversarial LLM skill
+- **self-improvement**: allow platform/ writes + ac-skill-tuning absolute paths
+- **settings**: AC quality thresholds live-editable in Settings/Orchestrator
+- **settings**: remove Deploy Targets section (panel, modal, provision VM, JS)
+- **settings**: distributed infra section + update worker nodes description
+- **settings**: add Gemini Image (Nano Banana) as image gen provider
+- **settings**: Image Generation section in LLM tab
+- **settings**: 'Reprendre tous les workflows pausés' button
+- **simplify**: sf simplify — 3-agent parallel code analysis command
+- **skill-eval**: history tracking + stronger checks on 3 skills
+- **skill-eval**: real tool execution — no mock, no simulation
+- **skill-eval**: testing pipeline diagram + deterministic checks for 6 skills
+- **skill-eval**: deterministic + LLM-as-judge eval harness for SF skills
+- **skills**: add description + triggers to all 120 skills (batch)
+- **skills**: bulk port 884 skills from antigravity-awesome-skills (MIT) + update agent assignments
+- **skills**: port 7 skills from antigravity-awesome-skills (MIT) + assign to 12 agents
+- **skills**: final eval hardening — error-monitoring + devops-pipeline + spec-driven-quality all 1.0
+- **skills**: security-audit + llm-integration evals hardened
+- **skills**: tech skills visible in AC skills health tab
+- **skills**: perf-audit v1.2.0 — simulation-based eval cases (pass_rate 0.0→1.0)
+- **skills**: agent-reward v1.1.0 — A/B tested, pass_rate 0.0→0.667 (+67pp)
+- **skills**: add skill-improver + skill-ab-test workflow
+- **skills**: full eval grid — run per skill + run all + case detail (det+judge)
+- **skills**: eval_cases pour 7 skills critiques — coverage 12→19 skills avec evals
+- **skills**: skill eval engine diagram + AC tokenization
+- **skills**: add llm-integration skill (Anthropic claude-api, Apache 2.0)
+- **skills**: skill-creator eval loop inspired by Anthropic skill-creator (MIT)
+- **skills**: e2e_ihm — screenshot mandatory at every CRUD journey step
+- **skills-health**: add /api/skills/eval + /api/skills/list endpoints + fix JS
+- **swift**: macOS SwiftUI app — 27 source files, 12 views implemented, 22 unit tests
+- **tools**: /workspace path alias → project workspace
+- **tools**: add Claude Code-compatible tool aliases
+- **tools**: add PlatformGuideTool — wire sf guide to Jarvis
+- **ui**: instincts sub-tab in art > amélioration-continue
+- **ui**: enforce strict design standards — no emoji, no gradients, Feather SVG, tokens only
+- **ux**: custom error pages + HTMX error toast
+- **ux+modules**: Laws of UX skill + Landlock + laws-of-ux registry entries
+- **watchdog**: detect escalated AC runs and auto-trigger skill fixes
+- **watchdog**: scan AC cycles for structural issues → trigger quality-improvement on SF
+- **workflow**: YOLO mode + GO/NO GO buttons on paused workflow
+- **workflows**: add Amelioration Continue tab linking to dashboard improvement board
+- **workflows+i18n**: Evolution + Amélioration Continue tabs, 20 languages
+- **workspace**: add 14 missing workspace API endpoints
+- **workspace**: PTY terminal + package manager = Replit parity
+- pattern improvements A-F — composite, adaptive timeout, A/B, recommender, veto analytics, cockpit live
+- pattern observability — phase_outcomes writes + analytics endpoint + cockpit stats
+- protected projects (PILOTE/LA POSTE/SF domains) + is_protected field + SF self seed
+- amélioration continue tab native dans platform /workflows
+- platform quality team — 5 agents GPT-5.2-Codex + workflow câblé
+- platform quality watchdog — recursive self-improvement loop
+- veto_keywords hook, chaos module scenarios, GAEngine schema fixes
+- complete settings to 100% — slot gate, TTL run pause, worker endpoint
+- add project hub chat stream endpoint
+- git_create_branch + workspace_path propagation + target_branch in create_mission
+- project onboarding — git_clone tool + create_project git_url + confluence_write + workflow
+- distributed patterns — PG advisory lock, Redis rate limit, leader election, graceful drain
+- migrate all remaining SQLite → PostgreSQL
+- add agents/skills/tools/teams/workflows/workspace diagram on cockpit
+- hub as default project view + full SAFe tabs + integrated chat
+- add SF internal architecture diagram card on cockpit page
+- PATCH /api/projects/:id endpoint + inline domain editor in projects list
+- include client_domain in /api/projects list response
+- accept client_domain in POST /api/projects
+- auto-execute CI/CD pipeline for devops agents in feature-deploy
+- cluster node badge popover with details on click
+- cluster node registry + topbar heartbeat badges
+- slave mode + node_id in health endpoint
+- pentest tools (nmap/subfinder/whatweb/schemathesis/inject/auth/ssrf) + executor heartbeat
+- DeerFlow-inspired context summarization, memory extraction, agent plan tools
+- infra escalation — detect tool-not-found, run ft-infra-lead before sprint retry
+- LLM code quality hardening (SAST + complexity + memory rules)
+- auto-escalate feature-sprint → epic-decompose
+- add env-setup phase to feature-sprint workflow
+- SAFe terminology in portfolio stats (epics/features/tasks)
+- Security settings tab + Landlock toggle API
+- Landlock filesystem sandbox for agent shell execution
+- dynamic route sync script + fix emojis in retro
+- Rust evidence gate + QA agents forced cargo test + M04 MINI FEATURE
+- Full SAFe retro-engineering — all SF pages with Persona + RBAC in spec bar
+- Annotation Studio — SAFe traceability bar + retro-engineering + multilingual docs
+- Spec/Persona bar in SF topbar (persistent traceability)
+- Wireframe skeleton shimmer + Annotation help panel
+- Wireframe mode toggle in SF topbar
+- Self-Annotation Mode toggle in Settings + Traceability bar in Annotation Studio
+- multi-model routing Azure gpt-5.2/gpt-5.1-codex/gpt-5-mini + MiniMax M2.5
+- Ollama provider + fix _is_azure detection + Qwen3 thinking strip
+- faster LLM fallback on 429 + active features in dashboard
+- cockpit speaks SAFe — Epics/Features/Tasks hierarchy
+- RTK prompt compression + deploy_targets schema update
+- add local-mlx provider + Thompson Sampling vs MiniMax
+- add /api/admin/self-update endpoint for remote git pull
+- add 16 GitHub OSS tool integrations to settings
+- generate realistic headshots for 95 missing agents via NVIDIA SDXL
+- OAuth spaces isolation — owner_id per project + user_id on ideation sessions
+- wiki i18n (wiki_translations table) + content update (archi, déploiement, résilience) + 5 traductions FR
+- auto-detect browser lang (Accept-Language > cookie) + feather icons in cockpit
+- capture server log errors + console.error as TMA incidents
+- auto-push to origin after agent git_commit
+- persist tab conversations with DOM cache (no reload on switch)
+- decouple IHM/Factory — Redis pub/sub, PLATFORM_MODE, smart CI, stability tests
+- loading spinner on Skip (Demo) button click
+- Azure VM provisioning — token + Service Principal → VM auto-créée
+- get_target() resolves DB default (is_default=1) when name=None
+- Deploy Platform Selector — pluggable deploy targets
+- workspace preview proxy — iframe routes through server-side proxy
+- onglet Tests dans Metrics — E2E Playwright dashboard
+- RTK stats — read real token savings from rtk history.db
+- RTK proxy stats — persist to DB, expose in live dashboard
+- RTK proxy in sandbox.py — 15 command rewrite rules for agent token compression
+- i18n — add 10 new languages (hi, ru, ar, id, tr, it, nl, vi, pl, sv)
+- add 9 remaining README translations (ru, ar, id, tr, nl, vi, pl, sv, it)
+- 18-language README navigation + 10 new wiki pages
+- replace all emojis with Feather SVGs + E2E tests for new workspace features
+- 10 workspace features — Replit parity
+- add mcp_platform/ — Software Factory MCP control server
+- guardrails + workspace path normalization
+- 9 improvements — security, analytics, compliance, yaml-migration, workspace
+### Performance
+
+- **startup**: async heal_epics+seed_memories, configurable heartbeat interval
+- increase mission semaphore from 2 to 3 concurrent runs
+### Refactor
+
+- **ac**: replace hardcoded CSS values with design tokens in workflows_improvement.html
+- **db**: remove SQLite — full PostgreSQL only
+- **monitoring**: remove bare LLM calls from ops/ → agent tools
+- **routing**: non-Azure deployments respect Settings→LLM DB config
+- **simplify**: apply self-simplify findings
+- **tests**: merge all unit tests into single test_suite.py
+- evolve→YAML write, promote instincts, dedup _run, dead code
+- déduplification générale — dead code, routes fantômes, helpers partagés
+- split tool_schemas.py (3313L) en package + fix doublons pages.py
+- consolider get_db imports + extract sse_utils + fix traceability store
+- rename missions → epics (SAFe terminology)
+- rename mission -> epic in UI (CSS, text, routes, API aliases)
+- SAFe hierarchy — rename Missions→Epics in UI + i18n
+- replace DbGate iframe with clean native DB browser
+### Style
+
+- **ac**: ruff auto-format live endpoint
+- **ui**: remove all emoji from HTML templates — replace with text/SVG
+- replace all emoji with Feather SVG icons across all templates
+- remove emojis from Security settings tab
+### Tests
+
+- **chaos**: add module unit + live + stress tests
+- **reasoning**: TU arXiv:2603.01896 semi-formal reasoning — 30 new tests
+- **security**: 50/50 unit tests arXiv:2602.20021 — all attack vectors verified
+- CI réel avec pytest + vraies API (no mock, no fake data)
+- stability test suite (23 tests) for multi-node cluster
+### Merge
+
+- bring SAST quality hardening from agent branch to main
+### Revert
+
+- remove _coerce_params from adapter.py
+### Security
+
+- harden GitHub Actions workflows (supply chain)
+- fix 4 vulnerabilities — auth bypass, SSRF, path traversal, headers## [3.0.0] — 2026-02-28
+
+### Features
+
+- **confluence**: live Confluence context injection via LRM + agent tools
+- **domain**: compliance critic agents post-milestone hook
+- **home**: 5 new ideation groups + 129 agent portrait SVG avatars
+- **org**: 10 new agents + 4 new ARTs + 19 new teams — 191 agents, 10 ARTs, 33 teams
+- **v3.0**: 8 major features — Marketplace, Replay UI, LLM Metrics, RBAC, Evals, Tool Builder, Workspaces, YAML agents
+- **workspace**: live SSE multi-channel + E2E tests
+- 7 platform improvements — GA auto-approve, workspace conflict guard, quality_score, LLM router, live dashboard, supabase-lite spec
+- 10 improvements — cost tracking, zombies, diff view, push, rate limits, quality scan, wallets
+- 8 platform improvements — compliance, analytics, auto-resume, YAML migration, live cost SSE## [2.8.0] — 2026-02-28
+
+### Features
+
+- agent direct chat + mission replay/debug + structured output validation
+- security audit log + API keys + webhook triggers## [2.7.0] — 2026-02-28
+
+### Bug Fixes
+
+- **ci**: deploy-azure.yml — target deploy-platform-1, full rsync, port 8090, stop old containers
+- **db**: add missing llm_cost_usd column + fix memory manager corruption
+- **memory**: agent_role in store + global in search + promote to global on mission complete
+- **migrations**: add memory_pattern relevance_score + access columns
+- **missions**: update mission_run status on workflow completion + cleanup active tasks
+- **phase_outcomes**: align PG schema with SQLite (add missing columns)
+- **phase_outcomes**: quality_score from agent global scores, not mission-scoped
+- mission_runs status race + watchdog infinite loop
+### Documentation
+
+- v2.7.0 — 181 agents, 42 workflows, Knowledge Management, memory intelligence
+### Features
+
+- **agents**: Codex-level long-run capabilities
+- **bscc**: domain:bscc projects + domain fallback fix in prompt_builder
+- **knowledge**: settings health badge + HTMX fragment on /api/knowledge/health
+- **memory**: compactor + health endpoint + 25 tests + role consistency fix
+- LLM cost tracking, mission timeline, quality score, export/import
+- 7 improvements — tests, memory, security, guidelines UI, multi-domain, azure dashboard, refactor## [2.6.0] — 2026-02-28
+
+### Bug Fixes
+
+- **db**: add phase_outcomes + agent_pair_scores to PostgreSQL migration
+- **ui**: replace emoji icons with SVG Feather in Notifications panel
+- RL hook — correct recommend() API + record_experience on phase outcome
+- GA P1 watchdog — auto-approve stalled proposals after 1h (not 24h)
+- GA bootstrap — auto-approve when no baseline exists (first run)
+- GA/RL datetime serialization for PostgreSQL (datetime objects → isoformat)
+### Features
+
+- **agents**: expose lrm_component_gallery_* tools to ux/product/architecture roles
+- **deploy**: volume mount live code — no image rebuild needed
+- **ga/rl**: complexity-aware multi-agent optimization
+- **guidelines**: Architecture wiki → SQLite → MCP → auto-inject in agent prompts
+- **jarvis**: 4 améliorations CTO agent
+- **mcp**: Component Gallery — 60 components, 2676 DS implementations
+- **mcp-lrm**: add component_gallery_* tools to MCPLRMServer (server_sse.py)
+- **platform**: mission auto-project + always-missions + SPECS.md + E2E Jarvis tests
+- **self-improve**: safe mode bootstrap + git credentials + Copilot task brief
+- **settings**: Optional Modules tab — 19 external MCP knowledge sources
+- **ux-agents**: Component Gallery knowledge base via MCP + git submodule
+- integrations hub all roles + domain-level guidelines
+### Performance
+
+- **world**: WebGPU support + GPU settings panel + FPS optimizations
+### Tests
+
+- **e2e**: fix remaining 4 failures → 182/192 pass## [2.5.0] — 2026-02-27
+
+### Bug Fixes
+
+- **analytics**: GROUP BY includes all non-aggregate cols (PG strict mode)
+- **auto_resume**: safer defaults + workspace container cleanup
+- **auto_resume**: 60s startup delay + PLATFORM_AUTO_RESUME_ENABLED env var
+- **db**: composite PK for team_fitness_history + stale missions LIKE via param
+- **db**: ALTER TABLE ADD COLUMN IF NOT EXISTS + disable auto_resume in compose
+- **dbgate**: use URL-based token auth instead of localStorage injection
+- **docker**: add group_add 989 (docker socket GID on OVH) to platform service
+- **docker**: install docker-ce-cli in platform container for workspace docker commands
+- **docker**: portainer --no-http-disabled flag + expose ports 9000/3002
+- **e2e**: uruk_rtk spec resilient auth + dedup + CORS font filter
+- **jarvis**: missions créées en PENDING (file d'attente) pas PAUSED
+- **pg**: normalize datetime to ISO string for sessions and releases
+- **pipeline**: wire velocity+cycle-time to real mission_runs data
+- **projects**: replace 'No scan' with infra badges (workspace/git/docker)
+- **rtk**: strip --no-pager git global flag before passing to rtk
+- **server**: Darwin cold-start in asyncio.to_thread — avoid blocking event loop
+- **sessions**: ts may be datetime object — coerce to string before slice
+- **sync**: git pull --rebase before push to handle postier commits on GitLab
+- **ui**: version badge from VERSION file (no .git in Docker)
+- **workspace**: replace Monaco with CodeMirror 6 — self-contained 769KB bundle
+- **workspace**: Monaco editor self-hosted — remove CDN dependency
+- **workspace**: backlog shows 0 missions - wrong store method + show type/goal
+- **workspace**: Monaco fallback textarea + CSP worker-src blob
+- **workspace**: CSP, DbGate 401, backlog 500
+- **workspace**: use docker service hostname for DbGate internal calls
+- **workspace**: 5 issues — Docker socket, DbGate auto-login, preview URL, DB tab default, Portainer stats
+- **workspace**: file content display + '..' back button for empty dirs
+- **workspace**: Code tab no longer duplicates file tree; Docker shows config files
+- releases 500 + htmx unsafe-eval CSP
+- SSE keepalive during tool calls — forward tool events to prevent nginx 60s timeout
+- restore multi-agent conversation with correct avatars/names
+- inject @mention project context into system prompt (not user msg)
+- CTO thinking dots — dotPulse animation (scale+opacity) like other chats
+- Chart.js never loaded — block head_extra doesn't exist in base.html
+- DORA mttr - replace julianday() with Python datetime diff (PG compat)
+- DORA trend - replace julianday() (SQLite-only) with Python datetime diff
+- RBAC audit stats - filter numeric-only values, skip array fields
+- backfill system mission category in PG migration
+- add PG migrations for project phases + mission category columns
+- remove @mention popup limit entirely
+- @mention popup limit 12→50 (was truncating project list)
+- @mention em-dash regex + best-match scoring + mcps table auto-create
+- docker port conflict + no-docker graceful handling
+- remove list_files/code_search/code_read from CTO tools
+- add missing extra_head block to base.html — workspace CSS never loaded
+- CTO uses project description/vision to answer — not SF missions
+- CTO answers on STANDALONE projects even with 0 missions
+### CI/CD
+
+- **gitlab**: fix AZURE_SSH_KEY file variable + STAGING_DIR expansion
+- ssh-keyscan || true + StrictHostKeyChecking=no in GHA
+- GitLab→dispatch GHA + workflow_dispatch + .gitlab-ci.yml in sync
+- restore GitHub Actions deploy-azure (GitLab CI vars not yet configured)
+- GitLab→Azure Prod, GitHub→OVH Demo (remove duplicate GHA deploy-azure)
+### Chores
+
+- untrack platform/VERSION (generated at deploy time, not committed)
+### Documentation
+
+- **watchlist**: add rtk (Rust Token Killer) to external tools watchlist
+- add Ecosystem section with rtk-ai/rtk cross-reference
+### Features
+
+- **cto**: retry interrupted conversation on reload
+- **dispatch**: multi-server mission dispatch coordinator
+- **gitlab**: wiki sync module — push SF wiki pages to GitLab via API
+- **jarvis**: create_project = full bootstrap (workspace+git+docker+TMA+sécu+dette)
+- **jarvis**: CTO can create projects/missions/teams + confirmation cards
+- **nav**: add World 3D globe icon to main sidebar navigation
+- **notifications**: add WhatsApp (Twilio) + Browser Web Push + Settings UI tab
+- **orchestrator**: project slots + container TTL in Settings
+- **projects**: ghost project filter + visual indicator
+- **projects**: search + type filter + pagination
+- **sessions**: full-text search + status filter + pagination
+- **settings**: add live cpu_now/ram_now metrics to orchestrator settings response
+- **ui**: display git version+commit badge in topbar header
+- **uruk**: scoped context by capability grade (organizer/executor)
+- **wiki**: auto-sync to GitLab on save
+- **workspace**: Launch Mission button + Search view + World 3D live refresh + DbGate URL auth
+- **workspace**: Search view + colored file icons + wsFileIcon helper
+- **workspace**: add Timeline view (9th activity bar) with git+missions+deploy events
+- **workspace**: Secrets vault + DbGate 5.2.0 + Portainer launcher + file navigation fixes
+- **workspace**: Monaco editor + Portainer + DbGate integration
+- **workspace**: Activity Bar + 7 isolated views redesign
+- **world3d**: live refresh every 15s via /api/world/live
+- enrich CLI + API with new features (phase, health, checkpoints, RTK, grade)
+- schema_version + LLM grade metrics + step-checkpoint UI + PM lifecycle tools
+- add AGPL v3 LICENSE (GitHub only — excluded from GitLab sync)
+- rtk savings metrics in monitoring dashboard
+- rtk_wrap utility + git tools integration
+- Architecture First workflow — docs templates, phase gates, PM tools
+- project phases + mission categories + Project Hub
+- heal_missions() — TMA+Sécu+Dette+MVP pour chaque projet
+- docker compose up button in workspace when no containers running
+- auto-scaffold every project (workspace + git + docker + docs + code)
+### Performance
+
+- **world3d**: filter by project + cap 10 missions for performance
+### Refactor
+
+- extract routing.py + split tool_schemas into 6 sub-functions
+### Tests
+
+- **e2e**: fix new-features.spec.ts — auth, locators, retries
+- **e2e**: add user-journeys spec + fix checkpoints response + grade in partial monitoring
+- **e2e**: fix CTO Jarvis E2E tests auth + selectors
+- **uruk+rtk**: E2E Playwright + pytest unit/integration tests
+- verify post-commit auto-push hook## [2.4.0] — 2026-02-27
+
+### Bug Fixes
+
+- **auto_resume**: revert 24h limit — wrong approach, use perf-based queuing instead
+- **cto**: remove duplicate cto_panel.html content causing double UI
+- **pg**: _init_pg() must call _migrate_pg() for incremental tables
+- **ui**: remove emojis from PI filter bar; remove Idéation tab from Backlog
+- **upload**: pypdf + python-docx + nginx 20MB + CI/CD pip install
+- drag-drop overlay hidden by default in CTO chat
+- reduce markdown line spacing in CTO chat bubbles
+- invited agent visual identity — distinct green bubble + no name repeat
+- add missing icon-192.png for PWA manifest
+- escape apostrophe in Docker empty state JS string
+- inline critical layout CSS workspace
+- create mcps table in SQLite migrations (was pg-only)
+- workspace fetch credentials + project ID + SVG syntax error
+- CTO tool restriction + project search + memory_search override
+- workspace full-height layout chain — 100vh to ws-layout
+- @ mention shows empty projects with warning, agent correctly explains project exists but has no content
+- projects page 500 - domains_json dict fallback to empty list
+- CTO role tool restriction — no code_write for project status queries
+- CTO Jarvis uses SF platform tools for project queries
+- add git_init tool + inject workspace cwd in @mention context
+- workspace SVG layout + preview URL input
+- auto_resume only resumes missions paused in last 24h (prevent infinite re-queue of 500+ old missions)
+- manifest.json blocked by onboarding + setup middlewares
+- favicon 404 + manifest.json auth redirect
+- workspace tool-calls — use db.migrations.get_db not db.connection
+- mkt-ideation 500 - datetime not subscriptable on PG
+- watchdog resume 401 + MissionRun.type crash + metrics sequence
+- watchdog PG compat + psycopg rollback warnings
+### CI/CD
+
+- add GitHub Actions deploy workflow for Azure Prod
+### Chores
+
+- bump CSS version to v5 for cache bust
+### Documentation
+
+- add inline screenshots for Jarvis and Business Ideation in all READMEs
+### Features
+
+- **cto**: @ mention projects dropdown in chat input
+- **llm**: add enable/disable toggle switches on provider cards
+- **orchestrator**: CPU/RAM backpressure queue + multi-server worker dispatch
+- **pi**: filter missions by type+status + pagination
+- **settings**: add dedicated Orchestrator tab with backpressure, queue + worker nodes
+- IDE 3-panel workspace layout (file tree + main + side + terminal)
+- invited agent real photo + name in CTO chat
+- add photorealistic avatars for mkt-ideation team agents
+- @project #agent display as colored badges in chat bubbles
+- @ for projects, # for agents in CTO chat
+- auto-invite colleague when project is @mentioned
+- workspace redesign — full layout, DS compliant, infobar, all tabs
+- multi-agent chat invite via @mention
+- retry/edit on failed CTO messages
+- resolve @Project mentions in CTO Jarvis chat
+- add project_workspace template and CSS
+- project workspace (Replit-style) — 10 API routes + nav button## [2.3.0] — 2026-02-26
+
+### Bug Fixes
+
+- **auth**: normalise created_at/last_login datetime→str pour PostgreSQL
+- **ci**: sync docker-compose.yml to OVH + fix port mapping 8090:8099
+- **ci**: rsync dirs without trailing slash to preserve subdir structure + docker build from correct context
+- **ci**: docker compose service name is 'platform' not 'software-factory-platform-1'
+- **ci**: exclude patches/ from rsync --delete (permission denied on OVH)
+- **ci**: SSH key stored as base64 in OVH_SSH_KEY secret
+- **ci**: handle literal \n in OVH_SSH_KEY secret (sed replacement)
+- **ci**: SSH IdentitiesOnly=yes to avoid too-many-auth-failures
+- **ci**: SSH key format — printf+tr instead of echo to preserve newlines
+- **datetime**: filtre Jinja2 `ts` + normalise [:16]/[:10] datetime PostgreSQL
+- **db**: pool PG — max_size 20→50, timeout 30→5s, auto-return `__del__` sur PgConnectionWrapper
+- **db**: complete schema_pg.sql with all missing columns
+- **db**: strip NUL bytes from text values during PG migration
+- **db**: migrate script supports SQLITE_PATH env var for Docker
+- **htmx**: replace top-level const/let with var in partials to allow re-injection
+- **mkt-ideation**: remove base.html extends (htmx partial), fix graph init event
+- **mkt-ideation**: replace all emojis with inline Feather SVG icons
+- **pg**: ROUND() requires CAST AS NUMERIC in PostgreSQL
+- **pg**: create mcps table in _migrate_pg — no such table: mcps
+- **thompson**: ART Thompson tab uses real llm_traces data (22 agents, 232 calls)
+- fromisoformat crash when PostgreSQL returns datetime objects
+- AgentInstance missing role_id in tool_runner.py
+- throttle auto-resume to prevent server saturation
+- CTO Jarvis tools — platform_missions, create_project, create_mission schemas
+- daily report chaos_runs.ts → ran_at (correct column name)
+- watchdog health URL default 8090→8099 (internal container port)
+- remove ENV PLATFORM_LLM_PROVIDER=demo from platform/Dockerfile (the actual image)
+- remove ENV PLATFORM_LLM_PROVIDER=demo from Dockerfile
+- change default LLM provider from demo to minimax in docker-compose
+- add Darwin tables to migrations (team_fitness, team_fitness_history, team_selections, team_ab_tests, team_okr)
+- add CANCELLED to MissionStatus enum
+- restore LLM cooldown_until fix reverted by force push
+- prevent duplicate TMA incident creation on startup restart
+- done_with_issues phases count as COMPLETED + fix pending runs accumulation
+### CI/CD
+
+- auto disk cleanup on each OVH deploy (builder prune + image prune + container prune)
+- trigger deploy after fixing OVH_SSH_KEY secret
+### Chores
+
+- **db**: add SQLite → PostgreSQL migration script
+- **deploy**: add Azure PG migration deployment script
+- **verification**: Verification — 9188 files
+### Documentation
+
+- **wiki**: v2.2.0 — Darwin Teams page + updated LLM config + Home nav
+- add Jarvis example questions to all READMEs (9 languages)
+- add Jarvis tool capabilities and quick-action chips to all READMEs
+- update READMEs with CTO Jarvis, Idéation Business, nav restructure v2.3.0
+### Features
+
+- **analytics**: add Umami tracking scripts
+- **analytics**: LLM cost tracking — rates table + /api/analytics/costs + UI
+- **cto**: streaming SSE + chip data-prompt fix + label truncation removed
+- **cto**: full toolset access — code, git, deploy, security, MCPs
+- **cto**: sidebar historique conversations style ChatGPT
+- **darwin**: wire fitness update on mission completion
+- **deploy**: add PostgreSQL to Azure VM docker-compose
+- **deploy**: add PostgreSQL service to docker-compose
+- **marketing**: add Business Ideation tab with marketing team
+- **metrics**: Adaptive Intelligence dashboard — Thompson + GA + RL layers
+- **mkt-ideation**: replace circle graph with ig-node card graph (same as ideation)
+- **nav**: Home (CTO/Mkt/Ideation tabs) + Dashboard (Overview/DSI/Business)
+- **orchestrator**: adaptive evidence gate with timeout + partial completion
+- **ui**: version badge + Darwin Teams tab in /art — remove duplicate /teams nav
+- **ui**: add Workflow Graph tab to mission control + phase previews
+- CTO chat — drag-drop upload, 11 chips projets/dette/E2E/Jira/Wiki
+- mission concurrency settings in UI
+- Chat CTO — Jarvis de la SF (onglet Portfolio)
+- PostgreSQL full migration — adapter fixes + schema completion
+- sync Darwin seed + warmup routes + migrations from SF
+- remove demo/mock LLM mode — real LLM or error
+- hourly disk auto-cleanup (workspaces + LLM traces + cancelled runs)
+- /ops dashboard + adaptive intelligence tests + PWA manifest
+- P1 skill: workflows + P4 workflow visual graph builder + P5 memory RAG (global_search)
+- 9 improvements — AI, ops dashboard, Gantt, PWA, tests, XAI
+- add Evolution tab to Workflows page (GA proposals + RL stats)
+- Adaptive Intelligence — GA evolution engine + RL policy + simulator
+- PR auto-review — code-reviewer agent + notifications + Darwin feedback loop
+- P3 auto-close + quality_score réel + A/B dashboard + tests + git_url detect
+### Performance
+
+- **db**: add 40+ PostgreSQL indexes on hot query paths
+### Style
+
+- **workflows**: remplace emojis par icônes Feather SVG inline## [2.2.0] — 2026-02-26
+
+### Bug Fixes
+
+- **adversarial**: add STACK_MISMATCH detection — reject backend code in wrong language
+- **adversarial**: L1b Security model + orphan process cleanup
+- **analytics**: live data + 5-min cache for analytics/monitoring charts
+- **analytics**: replace nav.html include with inline nav
+- **analytics**: add timezone import
+- **avatar**: replace CDP initials avatar with realistic photo in correct directory
+- **chat**: robust think-block filtering for streaming chunks
+- **chat**: correct model, disable tools, filter think blocks, add missing method
+- **chat**: proper LLM error handling + miniMarkdown + resilient JS
+- **chat**: add miniMarkdown function + realistic avatar + evtType scope fix
+- **chat**: DS-conformant chat modal with streaming cursor, animated dots, proper bubbles
+- **ci**: backup OVH simplifié + timeout 30s non-bloquant
+- **ci**: simplifier backup SSH (guillemets simples, non-fatal)
+- **ci**: rsync code 23 non-fatal (permissions sur quelques fichiers OVH)
+- **ci**: SSH key base64-decode (OVH_SSH_KEY stocké en base64)
+- **ci**: use StrictHostKeyChecking=no au lieu de ssh-keyscan
+- **ci**: SSH key format + IdentitiesOnly pour GitHub Action OVH
+- **ci**: add eslint-plugin-react to devDependencies
+- **cli**: correct get_db import and add TMA error reporting
+- **cli**: correct import path in __init__.py
+- **cli**: Fix CLI toolbox command execution
+- **cli**: replace relative imports with absolute imports in sf_commands
+- **confluence**: sync all 5 tabs — emoji strip, unclosed UL, mission_runs lookup
+- **dashboard**: Chart.js local bundle + interval cleanup on tab switch
+- **db**: defensive ALTER TABLE for quality_reports/snapshots columns
+- **deploy**: mount workspace as volume in project docker containers
+- **deps**: add psutil to requirements for monitoring
+- **ds**: remove all CSS fallbacks and emoji from templates
+- **dsi**: agent popover — use JS array index instead of inline JSON
+- **exec**: chain build+run for launch cmd, adaptive timeout for builds
+- **figma**: proxy SSE support + socket-based health check
+- **hitl**: GO decision no longer blocked by pattern errors + fix false VETO detection
+- **mission**: auto-commit after every phase + CDP tools enabled
+- **mission**: retry loop for all phases on adversarial rejection
+- **mission**: populate sidebar with memory, PRs, features from agent data
+- **mission**: sprint looping + QA tools + popover delegation + recursion limit
+- **mission**: stop on phase failure instead of continuing blindly
+- **mission**: SSE events now reach Mission Control frontend
+- **mission**: redesign mission-control list with progress bars and proper styling
+- **mission**: use list_all() instead of list() on AgentStore
+- **mission**: fix SessionDef constructor and message_type in mission start
+- **missions**: decode double-encoded UTF-8 in brief field
+- **missions**: use workflow-based creation with brief + phases
+- **monitoring**: prime psutil cpu_percent at module load for accurate readings
+- **monitoring**: show historical agent stats instead of runtime-only zeros
+- **monitoring**: disk space, Azure costs, time range, data bugs
+- **monitoring**: fix CSS vars, layout, empty states, icons
+- **nginx**: add no-cache headers to prevent stale content
+- **org**: use real agent personas with names, avatars, taglines
+- **pi**: fix run button + add auto-refresh every 15s
+- **pi**: remove project selector from mission modal — workflow + brief only
+- **pi**: proper mission creation with workflow/project/brief modal
+- **pipeline**: prevent LLM hangs from blocking phase cascade
+- **platform**: Add uname to stdlib platform workaround + deployment script
+- **platform**: sort conversations by date descending (most recent first)
+- **platform**: tooltip SVG icons oversized — scope svg 100% to #liveSvg only
+- **platform**: prevent agent tool loop (max rounds reached)
+- **projects**: handle malformed domains_json dict in _row_to_project
+- **quality**: support git repo in parent dir and Python --user install
+- **registry**: add figma field parsing to ProjectConfig
+- **result**: exclusive project type detection, filter placeholder screenshots
+- **security**: XSS escape, prompt injection guards, CSP tighten, info redaction
+- **self-heal**: fix import path + agent role tools for auto-heal pipeline
+- **sse**: route events to correct phase via phase_id
+- **streaming**: initialize delta_count — streaming was crashing and falling back to non-streaming
+- **streaming**: enable real token-by-token streaming for agent responses
+- **streaming**: SSE queue overflow killed listener — no more chunks
+- **streaming**: handle stream_end + remove 3000 char truncation
+- **teams**: fix JS ↔ API data format mismatches on /teams page
+- **teams**: correct teams dir path + make /api/teams public
+- **tma**: restore column headers visibility in list/compact modes
+- **tma**: preserve column headers and structure in list/compact modes
+- **ui**: force template refresh - update CSS cache version to 20260222
+- **ui**: add 9 missing SVG icons to sprite sheet
+- **wiggum**: make Figma check mandatory for svelte/frontend tasks
+- **wiki**: remove scroll frame, fix missing SVG icons (edit/printer)
+- **wiki**: sidebar links load content only, no duplicate menu
+- **workflows**: tabs in tabs — use dedicated list partials
+- **workflows**: upsert missing builtins instead of skipping seed
+- auto-detect azure-openai provider when AZURE_OPENAI_API_KEY present
+- DORA velocity uses started_at + releases from completed mission_runs
+- analytics overview uses tool_calls for skills + active agent count
+- add missing block head_extra to base.html
+- set git identity env vars in git_commit subprocess
+- git init workspace on creation + missing subprocess import
+- semaphore release() instead of _value to wake up waiting coroutines
+- git_commit cwd resolution + code_edit fuzzy whitespace matching
+- move semaphore hot-patch inside watchdog loop (runs every 5min)
+- hot-patch semaphore to 10 on watchdog start (no restart needed)
+- semaphore(2→10) + LLM stream timeout 180→300s + chat() fallback
+- git init in auto_launch workspaces + MissionRun.type AttributeError
+- sessions INSERT needs name column (NOT NULL constraint)
+- create session row before launching mission run (FOREIGN KEY constraint)
+- minimax default model MiniMax-M1-80k → MiniMax-M2.5
+- heartbeat visibility on startup
+- auto-heal resilience + TMA notifications
+- New Epic → New Mission + bridge JS errors to auto-heal
+- view mode switcher + rename New Epic to New Mission
+- auto-generate agent graphs + add 6 E2E journey tests
+- JS errors — add client-side i18n _(), SortableJS in base, auto-TMA tickets
+- Playwright MCP screenshot pipeline fully working
+- adversarial guard — larger evidence window, hierarchical lead bypass
+- sf-pipeline TDD phase uses hierarchical pattern + portfolio template safe defaults
+- pydantic v2 regex→pattern in tma.py
+- use mission workspace_path for permissions, not project registry path
+- result variable shadowing in post-phase hooks — CompletedProcess vs dict
+- remove obsolete dashboard/platform/web/templates/toolbox.html
+- default workflow → product-lifecycle + add QA phase to feature-request
+- sidebar contrast — white on deep purple active, gray-light inactive
+- add /workflows/{id} route (redirect to edit)
+- evidence gate only for TDD sprints, E2E max 2 iterations
+- non-blocking phases — max sprints exhausted continues pipeline
+- Playwright browser path in Dockerfile
+- Python playwright everywhere, no auto-resume, working screenshots
+- disable auto-resume + install node playwright in container
+- pipeline reaches deploy+screenshots — evidence gate non-blocking
+- always reseed builtin workflows + log max_sprints
+- healthcheck tolerance + stale missions paused not failed
+- use WARNING for auto-provision logs, fix stale mission status to 'failed'
+- orchestrator lifecycle — stop agent loops, fix logging, reset stale missions
+- auto-create workspace directory for new projects
+- auto-create project + provision TMA/Security/Debt on mission start
+- auto-provision TMA/Security/Debt on mission creation
+- feedback hooks phase_id, CWD resolution, placeholder rejection
+- feedback hooks for deploy-feature + .gitignore + STACK_MISMATCH false positive
+- false STACK_MISMATCH for web projects + deduplicate _extract_features_from_phase
+- pipeline improvements — phase prompt mapping, evidence gate, adversarial retry
+- resolve dynamic_team agents from workflow graph nodes
+- CLAUDE.md — remove stale refs to deleted core/factory CLI, fix pattern count
+- template Jinja2 syntax errors — replace backslash escape with HTML entity
+- memory noise filter — skip adversarial warnings, catch JSON blobs, track auto-store
+- memory noise filter — catch 'Now calling', 'Searching', 'I will now'
+- memory quality — noise filter, role-based injection, mandatory store
+- TMA list/compact views flatten to single column
+- sf wrapper sets MACARON_URL=8099 + SF_DB_PATH for any cwd
+- CLI ideation shortcut with --url flag + robust health detection
+- project detail shows real PM agent with photo
+- HITL validation — belt-and-suspenders DB update + enum comparison robustness
+- eliminate Swift bias in agent prompts — stack-aware platform detection
+- homepage layout — graph toggle, epics filtering, gantt bars, div nesting
+- collapse governance flow graph by default on homepage
+- E2E specs — missions API format, page paths
+- endurance/chaos tests — API response format, endpoint paths
+- adversarial catches fake builds + specialized leads per techno
+- redirect Android builds to android-builder container
+- skip adversarial L1 for discussion patterns (network/debate/aggregator)
+- auto-resume all missions (running+paused) on restart
+- more resilient healthcheck (30s interval, 5 retries)
+- auto-resume only first mission + path doubling edge cases
+- NodeStatus.DONE → COMPLETED (enum value doesn't exist)
+- i18n + agent definitions + healthcheck tolerance + path doubling guard
+- disable adversarial retry loops + fix auto-resume
+- MCP bridge port 9500→9501 — point to unified SF server
+- reduce adversarial retries to 1 + cancel task on reset
+- force azure-openai provider on Azure + reduce rate to 6 req/min
+- zero-downtime deploy + nginx resilience
+- filter personal projects from list_all() on Azure
+- Docker DNS resolution + health endpoint import
+- replace all mock/demo data with live DB queries
+- world 3D syncs with site light/dark theme
+- prevent auto-resume crash loop, increase rate limit retry delay
+- exclude personal projects from Azure deploy via AZURE_DEPLOY env var
+- mission completion — IndexError, phase timeout, auto-resume
+- live DORA metrics from phases, backlog completed_at migration, ideation error handling
+- throttle auto-resume to max 2 missions with 60s gaps
+- auto-heal pipeline — agent IDs, session status, dedup, kanban
+- remove nginx basic auth for public access
+- exclude personal projects from Azure deploy + api syntax fix
+- ideation graph empty in backlog tab + rename Discovery→Idéation
+- MCP bridge endpoint + tool call DB logging
+- MCP module paths for Docker + add mcp_lrm to image
+- Docker env — .env keys, factory-keys mount path, logs dir
+- MCP watchdog auto-restart + embedding endpoint fix
+- LLM retry with backoff for rate limits + WAL checkpoint loop
+- PG restore — autocommit + progress, validated round-trip
+- project route imports + Azure deploy config
+- INSERT OR REPLACE → ON CONFLICT upsert for PostgreSQL
+- SLOP→veto blocking, GPT-5-mini fallback, Playwright in Docker
+- harder build gate (5 iterations, FAIL if never passes)
+- remove stray Jinja tags from extracted partials
+- reloop handles dev-sprint self-failure (< → <=)
+- swift path, metadata attr, /run route, build output
+- epic names from brief + fix UTF-8 double-encoding
+- brighter 3D world + autonomous agent life simulation
+- replace all emoticons with SVG feather icons in product line view
+- CDP agent now uses tools instead of just describing actions
+- visible streaming in mission phase discussions
+- stream chunks in mission phase discussions
+- mission execution — 3 bugs causing silent crash on launch
+- non-destructive seed — upsert agents/patterns on restart
+- remove duplicate MISSION_ID declaration causing JS crash
+- OOM prevention + adversarial cumulative tool_calls + L1 tuning
+- prevent OOM by limiting message window and truncating tool results
+- skip L1 adversarial for coordinator nodes + hierarchical pattern context
+- tune adversarial guard — skip L1 for non-dev roles, raise repetition threshold
+- rebuild phase summary when non-blocking phase downgrades to DONE
+- consistent message formatting in mission control
+- _sse() was calling itself instead of _push_sse() — infinite recursion
+- honest phase error reporting — no more fake success on LLM failure
+- use correct method name get_messages (not list_messages)
+- unified message rendering — filter think/tool, SVG icons, animated dots
+- epic creation progress feedback during LLM wait
+- await in non-async handler — use .then() instead
+- SSE resilience — thinking heartbeat, pattern_end fallback, read timeout
+- SSE queue overflow causing ideation to stop early
+- session_live streaming — unique bubble IDs, initials instead of emoji, metadata tags
+- populate agents/graph in session live for all workflow types
+- animated typing dots, all agents on MiniMax-M2.5
+- add Sessions link to sidebar navigation
+- ideation agents discuss instead of coding, robust SSE handling
+- agent collaboration - disable tools for strategic agents, improve delegation prompts
+- DSI workflow messages, projects seed, agent ping-pong limits
+- agent loop multi-agent collaboration (14 bugs fixed)
+- accept GET+POST on workflow start/next-phase routes
+- DSI workflow start — create_session→create, start_loop→start_agent
+- separate builtins.append calls for DSI workflow
+- seed workflows at startup (was missing)
+- workflow phases persistence + seed builtin DSI workflow
+- bus persistence + schema + DSI route
+- FRACTAL sequential execution + opencode thinking enabled
+- correct server.py auto-resume (edit had silently failed)
+- metrics tabs — remove stray endblock, add missing style tag, slow refresh
+### CI/CD
+
+- **github**: backup SQLite avant deploy OVH demo
+- **github**: GitHub Action deploy OVH Demo sur push main
+- GitHub Action OVH deploy + GitLab CI Azure deploy
+### CLAUDE.md
+
+- document pattern-based protocol, nav done, file tree
+### Chores
+
+- **release**: bump version to 2.1.0 + Darwin team fitness in all READMEs
+- **security**: redact sensitive data from public GitHub repo
+- **sync**: commit message = dernier commit GitHub + retrait emoji
+- version git hooks + install script
+- update CLAUDE.md dual-repo strategy + SSH remote in sync script
+- untrack _SOFTWARE_FACTORY/ (already in .gitignore)
+- track .claude/settings.local.json
+- gitignore _SOFTWARE_FACTORY-old backup
+- update .gitignore — exclude data/, __pycache__, *.db, *.log
+- symlink .github/copilot-instructions.md → CLAUDE.md
+### Documentation
+
+- **ci**: add workflows documentation
+- **wiki**: add Darwin Teams page to SF wiki
+- update multilingual READMEs with v2.2.0 LLM routing + Darwin LLM Thompson Sampling
+- add GIT dual-repo section to platform/CLAUDE.md
+- clarify repo structure — runtime vs git repo in CLAUDE.md
+- update multilingual READMEs with new features
+- Add CLI fix deployment guide
+- update to 158 agents + port 8099 + complete screenshots
+- update all 8 README files (multilingual) to v1.2.0
+- restore multilingual READMEs (7 languages) + screenshots
+- clean bilingual README + add dashboard/CLI/Swagger screenshots
+- update CLAUDE.md with PM features, API JSON support, deploy info
+- update CLAUDE.md — métier live dashboard, auto-heal persistence plan, mobile epics, deploy notes, htmx patterns
+- add auto-heal section to CLAUDE.md
+- add infra hardening section to CLAUDE.md
+- expand DR section in CLAUDE.md — full L3 context, commands, RTO/RPO
+- add DR ops section to CLAUDE.md
+- compress CLAUDE.md 1968→281 lines
+- add Azure infrastructure section to CLAUDE.md
+- update CLAUDE.md with SAFe backbone, 133 agents, 19 workflows
+- update CLAUDE.md — compressed context, accurate stats
+- document adversarial retry loop in CLAUDE.md
+- add .github/copilot-instructions.md for Copilot sessions
+- CRITICAL — never rm platform.db, never use dummy API keys
+- update CLAUDE.md with Mission Control, pattern engine, dual SSE
+- update CLAUDE.md with platform features (views, ideation, memory, retros)
+- update copilot-instructions with multi-agent runtime context
+- add Copilot instructions for monorepo
+- update CLAUDE.md with MCP-based Brain architecture
+- add wiki pages (8 languages), remove CLAUDE.md from repo
+### Features
+
+- **P0**: externalize secrets + PG connection pool
+- **P1-P3**: CORS, security headers, Docker USER, circuit breaker, async bus, structured logging, PG rate limit
+- **P3+P1**: OpenTelemetry instrumentation + tighten exception handling
+- **adversarial**: switch L1a/L1b to NVIDIA Kimi K2 (free tier)
+- **adversarial**: add cyclomatic complexity check (KISS enforcement)
+- **analytics**: show agent avatar photo in Agent Performance leaderboard
+- **analytics**: agent cards with avatar, role, color + real tool_calls count
+- **analytics**: agent-pattern scoring — track (agent, pattern) combos
+- **analytics**: team-score endpoint — 4-dimensional agent scoring
+- **analytics**: use SF design system via base.html extends
+- **analytics**: Add real-time analytics dashboard
+- **api**: add CLI command execution endpoint with security whitelist
+- **auth**: complete RBAC authentication system with JWT
+- **auto-resume**: auto-launch unstarted continuous missions + fix watchdog integration
+- **auto-resume**: handle_failed_runs — repair 107 failed + TMA incidents
+- **auto-resume**: periodic watchdog loop + retry failed continuous missions
+- **chat**: role-aware tools — agents can read/write files and commit
+- **chat**: enable tools for CDP chat (read-only + phase management)
+- **ci**: optimize CI/CD pipeline with matrix testing and PR gates
+- **ci**: add GitHub Actions quality pipeline
+- **cli**: add Darwin Teams commands to sf CLI
+- **cli**: implement real streaming ideation in web CLI with SSE support
+- **cli**: add ideation command with auto-redirect to /ideation page
+- **cli**: add workflows, patterns, memory commands and remove all emojis from web CLI
+- **cli**: add workflows and patterns commands
+- **cli**: remove all emojis and add help command support
+- **cli**: remove emojis and add ideation guidance
+- **cli**: enrich welcome message with all SF platform commands
+- **cli**: add welcome message with command examples and usage tips
+- **cli**: add SF native commands - platform, missions, agents, skills, projects, db
+- **cli**: add interactive terminal interface in toolbox
+- **confluence**: SVG workflow graphs + screenshots in sync
+- **confluence**: sync mission control tabs to Confluence
+- **core**: update stores, LLM client, security, routes
+- **core**: direct E2E execution + ProjectContext RAG + enhanced workers
+- **darwin**: add 9 Darwin Teams API endpoints
+- **darwin**: Darwin team fitness selection — Thompson Sampling + IHM /teams
+- **ds**: add 4 complete template showcases to Design System
+- **ds**: tokenize CSS — replace hardcoded values with design tokens
+- **dsi**: DSI project + 2 workflows (Features/TMA) + 12 specialist agents
+- **dsi**: agent popover cards on click — skills/tools/persona/model
+- **graph**: rich agent nodes with avatar, skills, tools, MCPs, model
+- **i18n**: update all 8 locale files (de/en/es/fr/ja/ko/pt/zh)
+- **i18n,llm**: add locale detection + custom AI providers GUI
+- **ideation**: parallel debate rounds + unique bubble IDs
+- **ideation**: dynamic metadata tags from DB, not hardcoded
+- **ideation**: hybrid hierarchical→network→judge pattern
+- **ideation**: full persistence - sessions, messages, findings + history sidebar & page
+- **ideation**: PO agent creates project + epic + features + user stories
+- **ideation**: add interactive agent graph with flow patterns
+- **llm**: multi-model routing — gpt-5.2 / gpt-5.1-codex / gpt-5-mini
+- **llm**: streaming progress + 40min timeout
+- **mcp**: add Figma MCP integration for design-to-code validation
+- **mcp+config**: enhanced MCP server + project configs update
+- **migration-factory**: implement complete migration architecture
+- **mission**: per-tab agent cards with generic chat modal
+- **mission**: add Architecture + Wiki tabs, auto-update docs per phase
+- **mission**: platform-aware QA + executable commands
+- **mission**: 5-tab mission control (Phases/Dev/PO/QA/Projet)
+- **mission**: add result banner with screenshots, build/run commands, deploy URL
+- **mission**: auto-screenshots + sprint backlog context
+- **mission**: cross-phase context + Playwright tools + output chain + CDP awareness
+- **mission**: add reset button + fix recursion depth
+- **mission**: wire real workspace + tools + CI/CD hooks
+- **mission**: real pattern engine execution with streaming
+- **mission**: CDP mega-workflow execution with phase-by-phase progression
+- **mission**: SVG flow graphs per phase, taller accordion, CDP active status
+- **mission**: timeline accordion with agent discussions, memory & git panels
+- **mission-control**: phase discussion summaries visible when collapsed
+- **mission-control**: mini-wiki memory + PR section + agent popovers
+- **mission-control**: agent popover cards on graph node click
+- **mission-control**: multi-pattern organizational graphs + hierarchy ranks
+- **missions**: auto-resume stuck missions on startup + tool activity feedback
+- **mobile**: iOS & Android epic workflows + agents + android builder
+- **monitoring**: git activity for all workspaces + 5min cache for git & docker
+- **monitoring**: comprehensive Docker monitoring with CPU/mem/net/disk
+- **monitoring**: Docker socket GID fix, phase_name field, VERSION file, P95 latency
+- **monitoring**: add Azure VM, backup, costs, servers sections
+- **monitoring**: real metrics instrumentation
+- **monitoring**: add DB/vector/MCP/incidents monitoring
+- **nginx**: page maintenance 502/503/504 avec auto-retry 8s
+- **patterns**: add 7 new collaboration patterns
+- **patterns**: multi-pattern edges with leader detection
+- **phase9**: DS meta-cycle workflow + workflow chaining + project settings API
+- **pi**: add Epics section to PI board with SAFe hierarchy
+- **pi**: detect stuck missions + resume button
+- **pi**: workflow cards for mission creation — 4 clear choices
+- **pi**: unified mission list with 'Nouvelle Mission' button
+- **pi**: action buttons on epic cards + delete endpoint
+- **pi-board**: add card/list/compact view modes per section with localStorage
+- **pipeline**: error reloop — QA/deploy failures loop back to dev sprint
+- **platform**: dynamic composition tools + sub-mission hierarchy UI
+- **platform**: realistic CDP avatar + full agent profile card
+- **platform**: CDP agent card + chat modal on mission control
+- **platform**: screenshot tools + inline rendering in mission control
+- **platform**: add Design System page with tokens, colors, icons, atoms, molecules
+- **platform**: adversarial guards + security tools + SI blueprint + self-improvement
+- **platform**: Mission Control — CDP orchestrator + dashboard
+- **platform**: org tree, memory seeder, WSJF, DORA in DSI board
+- **platform**: unified intake flow — mission type + workflow routing
+- **platform**: RBAC sidebar view-switch, interactive graph, agent chat, SVG icons
+- **platform**: DiceBear avatar photos, web_search tool, graph fix, thread roles
+- **platform**: real DSI team personas, gpt-5.1 models, fix New button UX
+- **platform**: multi-agent runtime loop + live session IHM
+- **platform**: per-project agents instead of shared Brain
+- **platform**: agent avatars + taglines + 8 built-in agents with emoji identity
+- **platform**: chat persistence, conversation history & context compression
+- **platform**: upgrade to MiniMax-M2.5 (released 2025-02-12)
+- **platform**: LLM runtime, project-centric model, real agent responses
+- **po**: features table + auto-extraction from agent discussions
+- **portfolio**: add epics progression table + milestones Gantt
+- **product-line**: include mission_runs as epics in product line
+- **projects**: vision + workflow nav on project page
+- **qa**: redesign QA tab — tests, results, screenshots, adversarial collapsible
+- **qa**: multi-step journey screenshots — routes, interactions, RBAC
+- **qa**: auto-screenshot pipeline — deterministic build+capture per platform
+- **quality**: clickable heatmap cards → project quality sheet
+- **quality**: add dependencies installer and skills injection tests
+- **quality**: add post-commit hook and security configs
+- **quality**: add Git hooks quality pipeline with linters
+- **safe**: implement 12 SAFe conformity improvements
+- **skills**: collapsible preview pane with toggle button
+- **skills**: add keyword-based fallback matcher and demo skills loader
+- **solaris**: MCP server as stdio subprocess with knowledge base
+- **solaris**: integrate Solaris DS MCP + agents + project
+- **teams**: team template export/import API + teams/ library
+- **tma**: implement full CRUD operations with editable modal
+- **tma**: add clickable tickets with modal details view
+- **toolbox**: add API and CLI tabs with interactive command execution
+- **tools**: platform introspection tools — agents can query their own server
+- **tools**: add simulator_screenshot+build to QA/dev role tools
+- **ui**: remove view mode switcher - force 'all' view permanently
+- **ui**: update all templates — views, partials, CSS
+- **wiki**: auto-seed 29 pages on startup, auto-navigate to getting-started
+- Darwin LLM Thompson Sampling + Settings LLM tab + Teams LLM A/B tab
+- Thompson Sampling + TMA git integration + provider auto-detect
+- Thompson Sampling tab in Teams/ART page
+- Thompson Sampling analytics dashboard in /metrics
+- Thompson Sampling selection + TMA git integration
+- add 8 SAFe user guide pages to platform wiki
+- Jira Server integration tools
+- TMA heartbeat hover popover with full stats
+- backlog persistence, AO traceability, and design system phases
+- animated ECG heartbeat indicator for TMA status
+- TMA ticket status notifications + bug/tool SVG icons
+- in-app notification system with bell icon + dropdown
+- 10 platform improvements — P0 fixes + P1 quality + P2 features
+- multi-page screenshots, auto-launch orchestrator, EXPOSE port detection
+- pipeline Cargo/Rust build support, Deploy phase, adversarial guard fix
+- add browse/take_screenshot/inspect_page aliases for QA agents
+- add role-specific tool instructions to QA/security agent prompts
+- build gate improvements — Python support, result tracking, workspace validation
+- auto-create platform_incidents + real E2E test runner
+- real DORA metrics — all 4 metrics + LLM cost from actual DB data
+- view modes (card/list/list-compact) for Ceremonies tabs
+- integrate Playwright MCP for QA screenshots
+- Add skills injection system - semantic enrichment for agents
+- real CI/CD pipeline — npm build/test after sprint, docker deploy, playwright screenshots
+- add Playwright, SAST tools, create_ticket, local_ci to Docker + docs
+- LLM config docs, streaming retry fix, pattern store fallback, Docker port fix
+- add VPS deployment with Docker + security
+- real Docker deploy pipeline — auto-Dockerfile, build, run, health check, TMA on failure
+- close last 3 audit gaps — AO compliance, IaC, data migration
+- add 10 agents + 10 workflows to close audit gaps
+- rename back to Software Factory + add 20 Swagger/OpenAPI schemas
+- inject MCP tools into agent schemas + fix tool message truncation
+- MCP server registry — store, manager, dynamic tool dispatch
+- cascade delete with DigitalOcean-style confirmation modal
+- stories list + spinner animations + markdown table rendering
+- CLI tests (52) + MCP tools (6 new) + MCP tests (20)
+- full CLI (sf) — 40+ commands, dual API/DB mode, SSE streaming
+- endurance + chaos test suite, ops watchdog, LLM persistence
+- WSJF scoring, backlog CRUD, feature dependencies
+- add Makefile, CLI, deploy scripts, cache, demo, notifications
+- fix RLM/deep_search workspace fallback + explore-first protocol
+- increase mission concurrency to 2, add GET /api/missions
+- project agents are Product Managers with real personas and tools
+- auto-provision TMA/Security/Debt missions for all projects
+- card/list/compact view modes for Projects and Epics on portfolio
+- plugin integrations, search, export CSV, burndown metrics
+- add plugin interfaces, git worktree isolation, and reaction engine
+- portfolio project badges — TMA, Sécu, CI/CD, running phases
+- LLM rate limiter + Azure-only provider chain
+- portfolio — collapsible sections + governance graph 50% height
+- PI Board — SVG icons, collapsible sections, 3-col TMA board
+- LEAN/SAFe project lifecycle — auto-provision TMA/security/debt, feedback loops, CI/CD templates, unified board
+- add healthcheck + /api/health endpoint for container resilience
+- live velocity chart, predictability, and retro in sprint sidebar
+- i18n system with FR/EN dynamic translation
+- add TMA section to PI board with self-healing tickets
+- world 3D campus layout — mission buildings with conveyor belts
+- world 3D — day/night mode, live data, enriched environment
+- rewrite métier tab — live SAFe/LEAN product dashboard
+- live phase-based progress on Portfolio + DSI dashboards
+- auto-heal engine — incidents → epics → TMA workflow pipeline
+- full DR ops suite — backup/restore/health/runbook
+- pgvector native search + SQLite→PG data migration script
+- dual SQLite/PostgreSQL database adapter
+- live monitoring dashboard with system/LLM/agent metrics
+- add Confluence/Jira MCP tools with anonymization
+- env-driven LLM provider — GPT-5-mini on Azure, MiniMax local
+- RMO agents, workflows, and agentic patterns diagram
+- enforce TDD in dev-sprint + coverage metrics in QA tab
+- live PO backlog in mission control
+- load API keys from .env via python-dotenv
+- light/dark theme toggle with design tokens
+- TMA contextual tabs with ticket system
+- contextual Epic Control tabs by workflow type
+- ART team & agent detail modals
+- add photos for 13 platform & compliance agents
+- ART dashboard + RSE team + Security/Platform org
+- add realistic photo avatars for 11 security agents
+- dynamic orchestrator per workflow + security mission wiring
+- security audit agents — 11 Red/Blue/Purple team members with skills
+- 3D Agent World — Three.js Sims-like visualization
+- Product Line Manager view — produits, roadmap, milestones, DORA metrics
+- 5-layer agent isolation — memory scope, git branches, rate limits, path guard
+- agent permission enforcement — tool ACL, path sandbox, audit log
+- LLM observability, vector memory, Docker sandbox
+- add MCP platform tools to CDP + key agents, green badge
+- MCP Platform Server — internal tools via SSE (port 9501)
+- display mission brief at top of control page
+- adversarial retry loop — re-run agent with feedback on rejection
+- compressed agent prompts + write-only tool stripping
+- multi-pattern graphs with per-edge colored arrows
+- memory storage + pattern-topology graphs in Mission Control
+- ideation-style discussions + 400px graphs in Mission Control
+- upgrade Mission Control graphs to session_live style
+- add product-lifecycle mega-workflow + router/aggregator/human-in-the-loop patterns
+- synthesis panel populated on pattern_end, flow_step in stream_end SSE
+- add QA, TMA, and CICD teams with workflows
+- suggestion badges + custom agent dropdown with photos
+- add Reprendre button for interrupted/failed sessions
+- show pattern type (network/hierarchical) in agent messages
+- agent photos, roles and target info in unified messages
+- research tools for ideation agents + SSE race fix
+- streaming in pattern engine, session lifecycle, multi-agent conversation
+- streaming LLM responses token-by-token via SSE
+- unified message component (.mu) across all views
+- agentic E2E pipeline — ideation → code → build → deploy Azure
+- phased DSI workflow with timeline, agent graph & live tracking
+- meeting flow with roles/@mentions, retrospectives, auto-memory population
+- add Vue Métier + Project Board views, fix DSI route
+- realistic photos + real names for all 63 agents
+- SVG icons, gpt-5.1/codex models, memory panel, markdown
+- MCP single daemon + FRACTAL 3-concerns + process cleanup + self-improvement
+- OpenCode RLM client for MiniMax sub-calls with MCP tools
+- Deep Recursive Brain RLM per MIT CSAIL arXiv:2512.24601
+- FRACTAL forced L1 decomposition with 3 parallel sub-agents
+- XP Agent self-modified factory - 5 adversarial patterns + improve CLI
+- XP full cycle - chaos/security/journeys/logs
+- XP Agent + semantic compression
+- auto-resume paused missions on container restart
+- add wiki to toolbox with 17 seed pages
+- unified metrics page merging DORA, Quality, Analytics, Monitoring, Pipeline
+### Fix
+
+- lead_dev/qa_lead were classified as strategic — no tools, no code
+### Performance
+
+- dashboard TTL cache + asyncio.to_thread for blocking calls
+- increase rate limit 6→15 rpm, reduce phase retries
+- DB indexes + monitoring cache + unified MCP server
+### Refactor
+
+- **platform**: replace emoji avatars with Feather SVG icons
+- **workflows**: extract 39 builtins to YAML (7920 → 64 lines)
+- remove legacy factory CLI + core (moved to _SOFTWARE_FACTORY-old)
+- extract business logic from missions.py into service modules
+- split mission_control.html (3300 LOC) into 7 partials
+- split routes.py (8800 LOC) into 10 sub-modules
+- rename macaron-platform → software-factory
+- Brain uses claude/opencode CLI with MCP tools
+- cleanup unwanted tech references
+- rename /ceremonies → /workflows — honest naming
+### Style
+
+- remove all gradients and emojis from UI
+- remove emoji from tool labels in CDP chat
+- remove all emojis from UI and backend messages
+### Tests
+
+- **e2e**: update i18n and ideation E2E specs
+- add 90 TU + E2E tests (43 pytest + 47 Playwright)
+### Cleanup
+
+- remove dead _IDEATION_SYSTEM fake prompt
+### Deploy
+
+- add MINIMAX_API_KEY to docker-compose env
+### Ops
+
+- resize Azure VM disk 30GB → 64GB, update cost estimates
+### Rename
+
+- Software Factory → Macaron Agent Platform + rewrite README
+### Ui
+
+- governance graph — compact height + circle avatar nodes## [2.0.2] — 2026-02-25
+
+### Bug Fixes
+
+- **agents**: resolve default model from provider settings
+- **analytics**: Python-based error classification for accurate failure analysis
+- **analytics**: improve failure classification and phase name extraction
+- **analytics+watchdog**: accurate error classification, watchdog stall query
+- **auth**: explicit analytics API bypass in auth middleware
+- **auth**: add /api/analytics to PUBLIC_PATHS for dashboard access
+- **dashboard**: replace emojis with feather SVG icons + add sparkline/gauge graphs
+- **dashboard**: perspective-aware endpoints, fix sprints/backlog crashes
+- **llm**: use env-driven model config instead of hardcoded MiniMax-M2.5
+- **missions**: add workspace creation to launch endpoint
+- **missions**: create MissionRun in launch endpoint
+- **otel**: move OTEL setup to module-level, fix middleware crash
+- **portfolio**: increase epics display limit from 20 to 100, mission_runs from 50 to 500
+- **quality**: async subprocess, tempdir, skipped dims, workspace validation
+- **quality**: async subprocess, tempdir, skipped dims, workspace validation
+- **registry**: always load demo projects alongside local ones
+- **routes**: move resume-all route before {wf_id} catch-all
+- **security**: add /api/analytics to public GET paths
+- **self-heal**: fix import path + agent role tools for auto-heal pipeline
+- **ux**: correct route/label mismatches in quick actions and sidebar
+- **watchdog**: use resume-all API endpoint, remove unused vars
+- sidebar empty for overview/DSI/business perspectives, auto-load portfolio tabs
+- DSI/Overview/Business perspectives route to portfolio dashboard
+- sync platform/ with _SOFTWARE_FACTORY/platform/ — 58 files out of date
+- SF routing and notification service imports
+- use correct notification service function name
+- correct notification service import path
+- remove notifications route (missing service module)
+- Playwright MCP screenshots working + QA auto-execution + tool aliases
+- Playwright browser path in Dockerfile + platform updates
+- auto-create workspace for new projects — enables agent tools
+### Chores
+
+- clean up whitespace and ensure all notification imports fixed
+- gitignore _SOFTWARE_FACTORY-old backup
+- symlink .github/copilot-instructions.md → CLAUDE.md
+### Documentation
+
+- **readme**: fix hallucinated claims across 8 READMEs
+- **readme**: remove incorrect free tier claims from LLM provider tables — 5 languages
+- **readme**: add v2.2.0 features (OTEL, watchdog, failure analysis, sandbox build) — 8 languages
+- **readme**: update agent count 158→161, add LLM resilience feature — 8 languages
+- **readme**: add quality metrics, 4 missions, continuous improvement — 8 languages
+- complete multilingual documentation (8 languages)
+- revert SVG diagrams to ASCII art in all 8 READMEs
+- add translated SVG diagrams for FR, ES, DE READMEs
+- add Mermaid SVG architecture diagrams to all 8 READMEs
+- fix install instructions in all 8 README translations
+- add Getting Started section — user journey after install
+- update screenshots + add missing feature sections (self-healing, perspectives, mercato, auto-doc)
+- fix README for new users + add .env.example at root
+- add Azure infrastructure section to CLAUDE.md
+- add Copilot instructions for monorepo
+### Features
+
+- **dashboard**: perspective-aware /metrics and /quality pages
+- **dashboard**: per-profile metric summary cards + open /metrics to all SAFe roles
+- **demo**: contextual role/phase-aware demo responses
+- **events**: event sourcing lite — append-only audit trail
+- **migration-factory**: implement complete migration architecture
+- **otel**: complete OpenTelemetry integration with Jaeger
+- **pipeline**: failure analysis API, continuous watchdog, sandbox build validation
+- **pipeline**: phase timeout, stuck-running fix, auto-resume, error capture
+- **pipeline**: phase checkpointing, smart resume, 3x retry with backoff
+- **pipeline+otel**: phase retry/skip, OTEL dashboard in IHM
+- **projects**: add 3 new projects + self-healing mission type
+- **quality**: add quality badge, mission scorecard, radar chart
+- **quality**: add phase metrics, quality heatmap, fix route order
+- **quality-gate**: add quality gates to workflow phases
+- **quality-ui**: integrate quality across all views
+- **resilience**: add LLM error retry with jittered backoff in executor
+- **ux**: perspective-aware backlog, ceremonies, monitoring, projects
+- **v2.1**: quality metrics & continuous improvement system
+- **v2.1**: quality metrics & continuous improvement system
+- platform stabilisation + architecture improvements (12 chantiers)
+- replace personal projects with credible demo projects
+- improve code quality pipeline — deps, build verify, sandbox, resilience
+- dual-provider LLM routing for tool-calling agents
+- per-perspective adaptive dashboard
+- add DSI + Overview perspectives, multi-project onboarding, demo site link
+- re-add notifications route with correct import
+- integrate Playwright MCP for QA screenshots
+- Playwright, SAST, create_ticket, local_ci in Docker + multilingual docs
+- LLM config docs, streaming retry fix, pattern store fallback, Docker port fix
+### Refactor
+
+- **ui**: replace emojis with SVG Feather icons
+- split api.py (3365 lines) into 10 themed sub-modules
+- split missions.py (5131 lines) into 8 sub-modules
+### Style
+
+- remove all emojis from READMEs
+### Merge
+
+- integrate origin/main with RBAC and Jira features
+- integrate SF CLI from master - keep main structure
+### Security
+
+- remove leaked private monorepo dirs from public repo

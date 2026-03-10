@@ -1,0 +1,54 @@
+# docker-compose.windows.yml — Windows/Dev standalone (no external volumes)
+# Usage: docker-compose -f docker-compose.windows.yml up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  platform:
+    build:
+      context: .
+      dockerfile: platform/Dockerfile.windows
+    ports:
+      - "8090:8099"
+    env_file:
+      - .env
+    environment:
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-demo}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - REDIS_URL=redis://redis:6379/0
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+    volumes:
+      - platform-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  platform-data:
+  pg-data:

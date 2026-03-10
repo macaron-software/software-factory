@@ -1,0 +1,34 @@
+# Domaine E-Commerce — OVH Demo
+name: "E-Commerce"
+env: demo
+color: "#F59E0B"
+
+description: >
+  Plateformes e-commerce et marketplaces (démo OVH).
+  Stack orientée SEO, conversion, catalogue produit et gestion commandes.
+
+stack:
+  backend: "Node.js 20 + TypeScript + Medusa.js (ou NestJS)"
+  frontend: "Next.js 14 + TypeScript + Tailwind CSS"
+  database: "PostgreSQL 16"
+  database_forbidden: ["SQLite"]
+  cache: "Redis 7"
+  infra: "Docker + docker-compose / Vercel (frontend) + Railway (backend)"
+  ci: "GitHub Actions"
+  auth: "NextAuth.js / Medusa Auth"
+  extra:
+    - "Paiements : Stripe"
+    - "Images : Cloudflare R2 / S3"
+    - "Search : Meilisearch"
+    - "Email : Resend / SendGrid"
+
+compliance:
+  - "RGPD (données clients, newsletter)"
+  - "Mentions légales e-commerce (CGV, délai rétractation)"
+  - "OWASP Top 10"
+
+conventions: |
+  - SSR/SSG Next.js pour SEO (pas de SPA pure)
+  - Optimisation images obligatoire (next/image)
+  - Pagination cursor-based pour les catalogues > 100 produits
+  - Tests Playwright pour le tunnel d'achat complet

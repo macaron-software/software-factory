@@ -1,0 +1,33 @@
+# Template domaine — copier et adapter
+# =====================================
+# Champs disponibles : name, env, description, stack, design_system,
+#                      compliance, mcp_tools, confluence_space, conventions,
+#                      color, extends
+
+name: "Nom du domaine"
+env: any          # "demo" | "prod" | "any"
+description: >
+  Description courte du domaine et de ses contraintes.
+
+# Héritage optionnel
+# extends: la-poste
+
+stack:
+  backend: ""         # ex: "Java 17 + Spring Boot 3"
+  frontend: ""        # ex: "Angular 17+"
+  database: ""        # ex: "PostgreSQL 15+"
+  database_forbidden: []  # ex: ["SQLite", "MongoDB"]
+  cache: ""           # ex: "Redis 7"
+  infra: ""           # ex: "Docker + Helm + Azure AKS"
+  ci: ""              # ex: "GitLab CI"
+  auth: ""            # ex: "SAML2 / SSO"
+  extra: []           # lignes libres supplémentaires
+
+design_system: ""     # ex: "Solaris (La Poste)"
+compliance: []        # ex: ["RGPD", "RGAA 4.1", "ANSSI"]
+mcp_tools: []         # ex: ["mcp-solaris"]
+confluence_space: ""  # ex: "IAN"
+color: "#6B7280"      # couleur badge UI (hex)
+
+conventions: |
+  Conventions spécifiques au domaine injectées dans chaque agent.

@@ -1,0 +1,1136 @@
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.zh-CN.md">中文</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.pt.md">Português</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
+</p>
+
+<div align="center">
+
+# Software Factory
+
+**멀티 에이전트 소프트웨어 팩토리 — 전체 제품 라이프사이클을 오케스트레이션하는 자율 AI 에이전트**
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
+
+[기능](#기능) · [빠른 시작](#빠른-시작) · [스크린샷](#스크린샷) · [아키텍처](#아키텍처) · [기여하기](#기여하기)
+
+</div>
+
+---
+
+## 이것은 무엇인가?
+
+Software Factory는 아이디어 구상부터 배포까지 전체 소프트웨어 개발 라이프사이클을 오케스트레이션하는 **자율 멀티 에이전트 플랫폼**입니다. 전문화된 AI 에이전트들이 협업하여 작업을 수행합니다.
+
+**가상 소프트웨어 공장**으로 생각하면 됩니다. 192개의 AI 에이전트가 구조화된 워크플로우를 통해 협업하며, SAFe 방법론, TDD 실천, 자동화된 품질 게이트를 따릅니다.
+
+### 주요 특징
+
+- **192개 전문 에이전트** — 아키텍트, 개발자, 테스터, SRE, 보안 분석가, 프로덕트 오너
+- **36개 내장 워크플로우** — SAFe 세리머니, 품질 게이트, 야간 유지보수, 보안, 지식 관리
+- **지식 관리** — 4개 전용 에이전트, ART 지식 팀, 야간 `knowledge-maintenance` 워크플로우
+- **메모리 인텔리전스** — 관련성 점수, 접근 추적, 오래된 항목 자동 삭제
+- **LLM 비용 추적** — 미션 타임라인 탭 헤더에 미션별 비용 표시
+- **미션 타임라인** — Mission Control의 수영 레인 타임라인 탭으로 단계 지속 시간 표시
+- **10가지 오케스트레이션 패턴** — solo, sequential, parallel, hierarchical, network, loop, router, aggregator, wave, human-in-the-loop
+- **SAFe 정렬 라이프사이클** — Portfolio → Epic → Feature → Story (PI 주기 포함)
+- **자동 복구** — 자율적 인시던트 감지, 분류 및 자가 수리
+- **LLM 회복력** — 다중 공급자 폴백, 지터 재시도, 속도 제한 인식; gpt-5.2(추론/아키텍처), gpt-5.2-codex(코드/TDD), gpt-5-mini(문서/토론)
+- **OpenTelemetry 관측성** — Jaeger를 통한 분산 추적, 파이프라인 분석 대시보드
+- **지속적 감시견** — 일시 중지된 실행 자동 재개, 비활성 세션 복구, 실패 정리
+- **보안 우선** — 프롬프트 주입 방어, RBAC, 비밀 정보 제거, 연결 풀링
+- **DORA 메트릭** — 배포 빈도, 리드 타임, MTTR, 변경 실패율
+- **멀티노드 클러스터** — 마스터/슬레이브 토폴로지, 공유 PostgreSQL, 패시브 페일오버, 상단바 실시간 노드 배지
+
+## 스크린샷
+
+<table>
+<tr>
+<td width="50%">
+<strong>대시보드 — 적응형 SAFe 관점</strong><br>
+<img src="docs/screenshots/en/dashboard.png" alt="Dashboard" width="100%">
+</td>
+<td width="50%">
+<strong>포트폴리오 — 전략적 백로그 & WSJF</strong><br>
+<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>PI 보드 — 프로그램 인크리먼트 계획</strong><br>
+<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
+</td>
+<td width="50%">
+<strong>아이디에이션 워크숍 — AI 기반 브레인스토밍</strong><br>
+<img src="docs/screenshots/en/ideation.png" alt="Ideation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ART — 애자일 릴리스 트레인 & 에이전트 팀</strong><br>
+<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
+</td>
+<td width="50%">
+<strong>세레모니 — 워크플로우 템플릿 & 패턴</strong><br>
+<img src="docs/screenshots/en/ceremonies.png" alt="Ceremonies" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>모니터링 — DORA 메트릭 & 시스템 헬스</strong><br>
+<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
+</td>
+<td width="50%">
+<strong>온보딩 — SAFe 역할 선택 마법사</strong><br>
+<img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>홈 — CTO Jarvis / 비즈니스 아이디어 / 프로젝트 아이디어 탭</strong><br>
+<img src="docs/screenshots/en/home.png" alt="홈" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 전략적 AI 어드바이저</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>비즈니스 아이디어 — 6에이전트 마케팅 팀</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="비즈니스 아이디어" width="100%">
+</td>
+<td width="50%">
+<strong>프로젝트 아이디어 — 멀티 에이전트 기술 팀</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="프로젝트 아이디어" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>설정 허브 — 동시성, 예산 & YOLO 모드 (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="설정" width="100%">
+</td>
+<td width="50%">
+<strong>미션 지휘 센터 — 실시간 콕핏 (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="미션 콕핏" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>미션 보드 — 전체 미션 & 실행 목록 (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="미션 보드" width="100%">
+</td>
+<td width="50%">
+<strong>메모리 & 지식 — 4계층 RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="메모리" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>워크플로우 — 36개 기본 파이프라인 (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="워크플로우" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — 자동 복구 & 인프라 (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS 대시보드" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — 역할 기반 접근 제어 (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>제품 백로그 — Epics, Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="백로그" width="100%">
+</td>
+</tr>
+</table>
+
+## macOS 앱
+
+**네이티브 SwiftUI macOS 앱** (Apple Silicon 및 Rosetta 2 지원)이 웹 플랫폼과 함께 제공됩니다. 완전 오프라인 로컬 SF 인스턴스와 OVH, Azure 원격 커넥터를 지원합니다.
+
+### 다운로드
+
+[![macOS v0.01](https://img.shields.io/badge/macOS-v0.01-purple.svg)](https://github.com/macaron-software/software-factory/releases/tag/v0.01)
+
+```bash
+curl -L https://github.com/macaron-software/software-factory/releases/download/v0.01/SFApp-macos-arm64.zip -o SFApp.zip
+unzip SFApp.zip && ./SFApp
+```
+
+> macOS가 차단할 경우: **시스템 설정 → 개인 정보 보호 및 보안 → 그래도 열기**
+
+### 기능
+- **내장 로컬 SF** — Ollama/MLX(Qwen, Llama 등) 또는 API 키로 에이전트 실행
+- **3개의 원격 커넥터** — 로컬 SF / OVH 데모 / Azure 운영(HA 2노드)
+- **웹과 100% 동일** — 에이전트, 미션, 프로젝트, TMA, Wiki, 분석, DORA, Evals, 아이디에이션, RBAC
+- **22개 단위 테스트** — WSJF, LLMConfig, 온보딩, 인스턴스 관리
+
+---
+
+## 빠른 시작
+
+### 옵션 1: Docker (권장)
+
+Docker 이미지 포함: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+make setup   # .env.example → .env 복사 (LLM API 키를 편집하여 추가)
+make run     # 빌드 및 플랫폼 시작
+```
+
+http://localhost:8090 열기 — API 키 없이 탐색하려면 **"Skip (Demo)"**를 클릭하세요.
+
+### 옵션 2: 로컬 설치
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # 설정 파일 생성 (LLM 키 추가 — 3단계 참조)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+
+# 플랫폼 시작
+make dev
+# 또는 수동: PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+```
+
+http://localhost:8090 열기 — 첫 실행 시 **온보딩 마법사**가 나타납니다.
+SAFe 역할을 선택하거나 **"Skip (Demo)"**를 클릭하여 즉시 탐색하세요.
+
+### 3단계: LLM 공급자 구성
+
+API 키가 없으면 플랫폼은 **데모 모드**로 실행됩니다 — 에이전트가 모의 응답을 반환합니다.
+UI 탐색에는 유용하지만, 에이전트가 실제 코드나 분석을 생성하지 않습니다.
+
+실제 AI 에이전트를 활성화하려면 `.env`를 편집하고 **하나의** API 키를 추가하세요:
+
+```bash
+# 옵션 A: MiniMax (시작에 권장)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# 옵션 B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# 옵션 C: NVIDIA NIM
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
+```
+
+재시작: `make run` (Docker) 또는 `make dev` (로컬)
+
+| 공급자 | 환경 변수 | 모델 |
+|--------|----------|------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
+
+플랫폼은 기본 공급자가 실패하면 다른 구성된 공급자로 자동 폴백합니다.
+대시보드의 **Settings** 페이지(`/settings`)에서도 공급자를 구성할 수 있습니다.
+
+## 시작하기 — 첫 번째 프로젝트
+
+설치 후 아이디어에서 실제 프로젝트까지의 진행 방법:
+
+### 경로 A: CTO Jarvis에게 묻기 (가장 빠름)
+
+1. **홈 페이지 열기** (`/`) — 플랫폼이 CTO Jarvis 탭에서 시작됩니다
+2. **프로젝트 아이디어 입력** — 예: *"React와 Python을 사용한 기업용 카풀 앱 새 프로젝트 생성해줘"*
+3. **Jarvis (Gabriel Mercier, 전략적 오케스트레이터)** 가 요청을 분석하고, 프로젝트를 생성하고, SAFe 백로그를 프로비저닝하고 첫 번째 미션을 시작합니다 — 모두 한 번의 대화에서
+
+이것이 모든 새 프로젝트의 **권장 진입점**입니다.
+
+### 경로 B: 수동으로 프로젝트 생성
+
+1. `/projects`로 이동하여 **"New Project"** 클릭
+2. 입력: 이름, 설명, 기술 스택, 저장소 경로
+3. 플랫폼이 자동으로 생성:
+   - 프로젝트에 할당된 **프로덕트 매니저 에이전트**
+   - **TMA 미션** (지속적 유지보수 — 헬스 모니터링, 인시던트 생성)
+   - **보안 미션** (주간 보안 감사 — SAST, 의존성 검사)
+   - **기술 부채 미션** (월간 부채 감소 — 계획됨)
+
+### 그 다음: 에픽 & 기능 생성
+
+- **포트폴리오** 페이지(`/portfolio`)에서 WSJF 우선순위화로 에픽 생성
+- 에픽에서 **기능**을 추가하고 **사용자 스토리**로 분해
+- **PI 보드**(`/pi-board`)를 사용하여 프로그램 인크리먼트를 계획하고 기능을 스프린트에 할당
+
+### 미션 실행
+
+- 미션에서 **"Start"**를 클릭하여 에이전트 실행 시작
+- **오케스트레이션 패턴** 선택 (hierarchical, network, parallel...)
+- **Mission Control**에서 에이전트 작업을 실시간으로 관찰
+- 에이전트가 도구(code_read, git, build, test, security scan)를 자율적으로 사용
+
+### TMA & 보안 — 항상 활성
+
+모든 프로젝트에 대해 **자동으로 활성화** — 별도 구성 불필요:
+
+| 미션 | 유형 | 일정 | 설명 |
+|------|------|------|------|
+| **TMA** | 프로그램 | 지속적 | 헬스 모니터링, 인시던트 감지, 자동 복구, 티켓 생성 |
+| **보안** | 리뷰 | 주간 | SAST 스캔(bandit/semgrep), 의존성 감사, 비밀 정보 탐지 |
+| **기술 부채** | 감소 | 월간 | 코드 품질 분석, 리팩토링 권장 사항 |
+| **셀프 힐링** | 프로그램 | 지속적 | 5xx/크래시 자동 감지 → TMA 미션 → 에이전트 진단 → 코드 수정 → 검증 |
+
+네 가지 모두 프로젝트와 함께 생성됩니다. TMA, 보안, 셀프 힐링은 **활성** 상태로 시작하고, 기술 부채는 **계획** 상태로 시작합니다(준비되면 활성화).
+
+## 기능
+
+### 192개 전문 AI 에이전트
+
+에이전트는 실제 소프트웨어 조직을 반영하는 팀으로 구성됩니다:
+
+| 팀 | 에이전트 | 역할 |
+|----|---------|------|
+| **프로덕트** | Product Manager, Business Analyst, PO | SAFe 계획, WSJF 우선순위화 |
+| **아키텍처** | Solution Architect, Tech Lead, System Architect | 아키텍처 결정, 디자인 패턴 |
+| **개발** | Backend/Frontend/Mobile/Data Engineers | 스택별 TDD 구현 |
+| **품질** | QA Engineers, Security Analysts, Test Automation | 테스트, 보안 감사, 침투 테스트 |
+| **디자인** | UX Designer, UI Designer | 사용자 경험, 비주얼 디자인 |
+| **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD, 모니터링, 인프라 |
+| **관리** | Scrum Master, RTE, Agile Coach | 세레모니, 퍼실리테이션, 장애물 제거 |
+
+### 10가지 오케스트레이션 패턴
+
+- **Solo** — 단순 작업을 위한 단일 에이전트
+- **Sequential** — 순서대로 실행하는 에이전트 파이프라인
+- **Parallel** — 여러 에이전트가 동시에 작업
+- **Hierarchical** — 관리자가 하위 에이전트에 위임
+- **Network** — 에이전트 간 피어 투 피어 협업
+- **Loop** — 조건이 충족될 때까지 에이전트가 반복
+- **Router** — 단일 에이전트가 입력에 따라 전문가에게 라우팅
+- **Aggregator** — 여러 입력을 단일 집계자가 병합
+- **Wave** — 웨이브 내 병렬, 웨이브 간 순차
+- **Human-in-the-loop** — 에이전트가 제안하고 사람이 검증
+
+### SAFe 정렬 라이프사이클
+
+완전한 Portfolio → Epic → Feature → Story 계층 구조:
+
+- **전략적 포트폴리오** — 포트폴리오 캔버스, 전략 테마, 가치 스트림
+- **프로그램 인크리먼트** — PI 계획, 목표, 의존성
+- **팀 백로그** — 사용자 스토리, 작업, 인수 기준
+- **스프린트 실행** — 데일리 스탠드업, 스프린트 리뷰, 회고
+
+### 보안 & 컴플라이언스
+
+- **인증** — RBAC 기반 JWT 인증
+- **프롬프트 주입 방어** — 악성 프롬프트 감지 및 차단
+- **비밀 정보 제거** — 민감 데이터 자동 삭제
+- **CSP (콘텐츠 보안 정책)** — 강화된 헤더
+- **속도 제한** — 사용자별 API 할당량
+- **감사 로깅** — 포괄적 활동 로그
+
+### DORA 메트릭 & 모니터링
+
+- **배포 빈도** — 코드가 프로덕션에 도달하는 빈도
+- **리드 타임** — 커밋에서 배포까지의 기간
+- **MTTR** — 인시던트 복구 평균 시간
+- **변경 실패율** — 실패한 배포 비율
+- **실시간 대시보드** — Chart.js 시각화
+- **Prometheus 메트릭** — /metrics 엔드포인트
+
+### 품질 메트릭 — 산업적 모니터링
+
+결정론적 품질 스캔(LLM 불필요), 생산 라인처럼 10개 차원:
+
+| 차원 | 도구 | 측정 항목 |
+|------|------|----------|
+| **복잡도** | radon, lizard | 순환 복잡도, 인지 복잡도 |
+| **유닛 테스트 커버리지** | coverage.py, nyc | 라인/브랜치 커버리지 비율 |
+| **E2E 테스트 커버리지** | Playwright | 테스트 파일 수, 스펙 커버리지 |
+| **보안** | bandit, semgrep | 심각도별 SAST 결과 (critical/high/medium/low) |
+| **접근성** | pa11y | WCAG 2.1 AA 위반 |
+| **성능** | Lighthouse | Core Web Vitals 점수 |
+| **문서화** | interrogate | README, changelog, API 문서, docstring 커버리지 |
+| **아키텍처** | madge, jscpd, mypy | 순환 의존성, 코드 중복, 타입 오류 |
+| **유지보수성** | custom | 파일 크기 분포, 대형 파일 비율 |
+| **적대적 검증** | built-in | 인시던트 비율, 적대적 거부율 |
+
+**워크플로우 단계의 품질 게이트** — 각 워크플로우 단계에 게이트 유형별 구성된 임계값에 따라 품질 배지(PASS/FAIL/PENDING) 표시:
+
+| 게이트 유형 | 임계값 | 사용처 |
+|------------|--------|--------|
+| `always` | 0% | 분석, 계획 단계 |
+| `no_veto` | 50% | 구현, 스프린트 단계 |
+| `all_approved` | 70% | 리뷰, 릴리스 단계 |
+| `quality_gate` | 80% | 배포, 프로덕션 단계 |
+
+**품질 대시보드** (`/quality`) — 전체 스코어카드, 프로젝트별 점수, 트렌드 스냅샷.
+품질 배지는 미션 상세, 프로젝트 보드, 워크플로우 단계, 메인 대시보드에서 확인 가능.
+
+### 지속적 개선 워크플로우
+
+자가 개선을 위한 3개 내장 워크플로우:
+
+| 워크플로우 | 목적 | 에이전트 |
+|-----------|------|---------|
+| **quality-improvement** | 메트릭 스캔 → 최약 차원 식별 → 개선 계획 및 실행 | QA Lead, Dev, Architect |
+| **retrospective-quality** | 스프린트 종료 회고: ROTI, 인시던트, 품질 데이터 수집 → 액션 아이템 | Scrum Master, QA, Dev |
+| **skill-evolution** | 에이전트 성능 분석 → 시스템 프롬프트 업데이트 → 기술 진화 | Brain, Lead Dev, QA |
+
+이러한 워크플로우는 **피드백 루프**를 생성합니다: 메트릭 → 분석 → 개선 → 재스캔 → 진행 추적.
+
+### 내장 에이전트 도구
+
+Docker 이미지에는 에이전트가 자율적으로 작업하는 데 필요한 모든 것이 포함:
+
+| 카테고리 | 도구 | 설명 |
+|---------|------|------|
+| **코드** | `code_read`, `code_write`, `code_edit`, `code_search`, `list_files` | 프로젝트 파일 읽기, 쓰기, 검색 |
+| **빌드** | `build`, `test`, `local_ci` | 빌드, 테스트, 로컬 CI 파이프라인 실행 (npm/pip/cargo 자동 감지) |
+| **Git** | `git_commit`, `git_diff`, `git_log`, `git_status` | 에이전트 브랜치 격리를 통한 버전 관리 |
+| **보안** | `sast_scan`, `dependency_audit`, `secrets_scan` | bandit/semgrep을 통한 SAST, CVE 감사, 비밀 정보 탐지 |
+| **QA** | `playwright_test`, `browser_screenshot`, `screenshot` | Playwright E2E 테스트 및 스크린샷 (Chromium 포함) |
+| **티켓** | `create_ticket`, `jira_search`, `jira_create` | TMA 추적을 위한 인시던트/티켓 생성 |
+| **배포** | `docker_deploy`, `docker_status`, `github_actions` | 컨테이너 배포 및 CI/CD 상태 |
+| **메모리** | `memory_store`, `memory_search`, `deep_search` | 세션 간 영구 프로젝트 메모리 |
+
+### 자동 복구 & 자가 수리 (TMA)
+
+자율적 인시던트 감지, 분류 및 자가 수리 주기:
+
+- **하트비트 모니터링** — 실행 중인 모든 미션과 서비스에 대한 지속적 헬스 체크
+- **인시던트 자동 감지** — HTTP 5xx, 타임아웃, 에이전트 크래시 → 자동 인시던트 생성
+- **분류 & 등급화** — 심각도(P0-P3), 영향 분석, 근본 원인 가설
+- **자가 수리** — 에이전트가 자율적으로 문제를 진단하고 수정 (코드 패치, 구성 변경, 재시작)
+- **티켓 생성** — 해결되지 않은 인시던트는 사람이 검토할 수 있는 추적 티켓 자동 생성
+- **에스컬레이션** — P0/P1 인시던트는 당직 팀에 Slack/이메일 알림 트리거
+- **회고 루프** — 인시던트 후 교훈을 메모리에 저장하고 향후 스프린트에 주입
+
+### SAFe 관점 & 온보딩
+
+실제 SAFe 조직을 반영하는 역할 기반 적응형 UI:
+
+- **9개 SAFe 관점** — Portfolio Manager, RTE, Product Owner, Scrum Master, Developer, Architect, QA/Security, Business Owner, Admin
+- **적응형 대시보드** — 선택한 역할에 따라 KPI, 빠른 액션, 사이드바 링크가 변경
+- **온보딩 마법사** — 3단계 첫 사용자 플로우 (역할 선택 → 프로젝트 선택 → 시작)
+- **관점 선택기** — 상단 바 드롭다운에서 언제든지 SAFe 역할 전환
+- **동적 사이드바** — 현재 관점에 관련된 네비게이션만 표시
+
+### 4계층 메모리 & RLM 딥 서치
+
+지능적 검색이 가능한 세션 간 영구 지식:
+
+- **세션 메모리** — 단일 세션 내 대화 컨텍스트
+- **패턴 메모리** — 오케스트레이션 패턴 실행에서의 학습
+- **프로젝트 메모리** — 프로젝트별 지식 (결정, 규칙, 아키텍처)
+- **글로벌 메모리** — 프로젝트 간 조직 지식 (FTS5 전문 검색)
+- **프로젝트 파일 자동 로드** — CLAUDE.md, SPECS.md, VISION.md, README.md가 모든 LLM 프롬프트에 주입 (최대 8K)
+- **RLM 딥 서치** — Recursive Language Model (arXiv:2512.24601) — 최대 10회 탐색 반복의 반복적 WRITE-EXECUTE-OBSERVE-DECIDE 루프
+
+### 에이전트 메르카토 (이적 시장)
+
+팀 구성을 위한 토큰 기반 에이전트 마켓플레이스:
+
+- **에이전트 등록** — 희망 가격으로 에이전트를 이적 리스트에 등록
+- **프리 에이전트 풀** — 미배정 에이전트 드래프트 가능
+- **이적 & 임대** — 프로젝트 간 에이전트 매매 또는 임대
+- **시장 가치 평가** — 기술, 경험, 성과에 기반한 자동 에이전트 가치 평가
+- **지갑 시스템** — 프로젝트별 토큰 지갑 및 거래 내역
+- **드래프트 시스템** — 프로젝트에 프리 에이전트 영입
+
+### 적대적 품질 가드
+
+가짜/플레이스홀더 코드의 통과를 차단하는 2계층 품질 게이트:
+
+- **L0 결정론적** — 슬롭(lorem ipsum, TBD), 모의(NotImplementedError, TODO), 가짜 빌드, 환각, 스택 불일치 즉시 탐지
+- **L1 LLM 시맨틱** — 별도 LLM이 실행 패턴의 출력 품질 검토
+- **점수 산정** — 점수 < 5 통과, 5-6 경고와 함께 통과, 7+ 거부
+- **강제 거부** — 환각, 슬롭, 스택 불일치, 가짜 빌드는 점수에 관계없이 항상 거부
+
+### 자동 문서화 & 위키
+
+라이프사이클 전반에 걸친 자동 문서 생성:
+
+- **스프린트 회고** — LLM이 생성한 회고 노트를 DB와 메모리에 저장하고, 다음 스프린트 프롬프트에 주입 (학습 루프)
+- **단계 요약** — 각 미션 단계에서 결정과 결과에 대한 LLM 생성 요약 생성
+- **아키텍처 결정 기록** — 아키텍처 패턴이 설계 결정을 프로젝트 메모리에 자동 기록
+- **프로젝트 컨텍스트 파일** — 자동 로드되는 지침 파일(CLAUDE.md, SPECS.md, CONVENTIONS.md)이 살아있는 문서 역할
+- **Confluence 동기화** — 엔터프라이즈 문서를 위한 Confluence 위키 페이지 양방향 동기화
+- **Swagger 자동 문서** — `/docs`에서 OpenAPI 스키마로 94개 REST 엔드포인트 자동 문서화
+
+## 네 가지 인터페이스
+
+### 1. 웹 대시보드 (HTMX + SSE)
+
+http://localhost:8090 의 메인 UI:
+
+- **실시간 멀티 에이전트 대화** (SSE 스트리밍)
+- **PI 보드** — 프로그램 인크리먼트 계획
+- **Mission Control** — 실행 모니터링
+- **에이전트 관리** — 에이전트 조회, 구성, 모니터링
+- **인시던트 대시보드** — 자동 복구 분류
+- **모바일 반응형** — 태블릿과 휴대폰에서 작동
+
+### 2. CLI (`sf`)
+
+전체 기능을 갖춘 커맨드라인 인터페이스:
+
+```bash
+# 설치 (PATH에 추가)
+ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
+
+# 조회
+sf status                              # 플랫폼 상태
+sf projects list                       # 모든 프로젝트
+sf missions list                       # WSJF 점수가 있는 미션
+sf agents list                         # 145개 에이전트
+sf features list <epic_id>             # 에픽 기능
+sf stories list --feature <id>         # 사용자 스토리
+
+# 작업
+sf ideation "e-commerce app in React"  # 멀티 에이전트 아이디에이션 (스트리밍)
+sf missions start <id>                 # 미션 실행 시작
+sf metrics dora                        # DORA 메트릭
+
+# 모니터링
+sf incidents list                      # 인시던트
+sf llm stats                           # LLM 사용량 (토큰, 비용)
+sf chaos status                        # 카오스 엔지니어링
+```
+
+**22개 명령 그룹** · 이중 모드: API (라이브 서버) 또는 DB (오프라인) · JSON 출력 (`--json`) · 스피너 애니메이션 · 마크다운 테이블 렌더링
+
+### 3. REST API + Swagger
+
+`/docs` (Swagger UI)에서 자동 문서화된 94개 API 엔드포인트:
+
+```bash
+# 예시
+curl http://localhost:8090/api/projects
+curl http://localhost:8090/api/agents
+curl http://localhost:8090/api/missions
+curl -X POST http://localhost:8090/api/ideation \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "bike GPS tracker app"}'
+```
+
+Swagger UI: http://localhost:8090/docs
+
+### 4. MCP 서버 (Model Context Protocol)
+
+AI 에이전트 통합을 위한 24개 MCP 도구 (포트 9501):
+
+```bash
+# MCP 서버 시작
+python3 -m platform.mcp_platform.server
+
+# 사용 가능한 도구:
+# platform_agents, platform_projects, platform_missions,
+# platform_features, platform_sprints, platform_stories,
+# platform_incidents, platform_llm, platform_search, ...
+```
+
+## 아키텍처
+
+### 플랫폼 개요
+
+```
+                        ┌──────────────────────┐
+                        │   CLI (sf) / Web UI  │
+                        │   REST API :8090     │
+                        └──────────┬───────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │     FastAPI Server           │
+                    │  Auth (JWT + RBAC + OAuth)   │
+                    │  17 route modules            │
+                    └──┬──────────┬────────────┬───┘
+                       │          │            │
+          ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+          │ Agent Engine │   │ Workflow │   │   Mission    │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
+          │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
+          └──────┬───────┘   │ phases   │   │ Epic/Feature │
+                 │           │ retry    │   │ Story/Sprint │
+                 │           │ skip     │   └──────────────┘
+                 │           │ ckpoint  │
+                 │           └────┬─────┘
+                 │                │
+     ┌───────────┴────────────────┴───────────────┐
+     │              Services                       │
+     │  LLM Client (multi-provider fallback)       │
+     │  Tools (code, git, deploy, memory, security)│
+     │  MCP Bridge (fetch, memory, playwright)     │
+     │  Quality Engine (10 dimensions)             │
+     │  Notifications (Slack, Email, Webhook)      │
+     └───────────────────┬─────────────────────────┘
+                         │
+     ┌───────────────────┴─────────────────────────┐
+     │              Operations                      │
+     │  Watchdog (auto-resume, stall detection)     │
+     │  Auto-Heal (incident > triage > fix)         │
+     │  OpenTelemetry (tracing + metrics > Jaeger)  │
+     └───────────────────┬─────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │   SQLite + Memory   │
+              │   4-layer memory    │
+              │   FTS5 search       │
+              └─────────────────────┘
+```
+
+### 파이프라인 흐름
+
+```
+Mission Created
+     │
+     ▼
+┌─────────────┐     ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Select     │────▶│sequential│    │ parallel │    │hierarchic│
+│  Pattern    │────▶│          │    │          │    │          │
+└─────────────┘────▶│ adversar.│    │          │    │          │
+                    └────┬─────┘    └────┬─────┘    └────┬─────┘
+                         └───────────────┴───────────────┘
+                                         │
+                    ┌────────────────────────────────────────┐
+                    │         Phase Execution                 │
+                    │                                        │
+                    │  Agent ──▶ LLM Call ──▶ Result         │
+                    │                          │             │
+                    │              ┌───success──┴──failure──┐│
+                    │              ▼                        ▼│
+                    │         Code phase?            Retries? │
+                    │           │ yes                  │ yes │
+                    │           ▼                      ▼     │
+                    │     Sandbox Build         Retry w/     │
+                    │     Validation            backoff      │
+                    │           │                      │ no  │
+                    │           ▼                      ▼     │
+                    │     Quality Gate          skip_on_fail?│
+                    │      │        │            │yes  │no   │
+                    │    pass     fail            │     │     │
+                    │      │        │             │     ▼     │
+                    │      ▼        ▼             │   PAUSED  │
+                    │  Checkpoint  PAUSED ◀───────┘     │     │
+                    └──────┬─────────────────────────────┘    │
+                           │                                  │
+                    More phases? ──yes──▶ next phase          │
+                           │ no                               │
+                           ▼                    watchdog      │
+                    Mission Completed     auto-resume ◀───────┘
+```
+
+### 관측성
+
+```
+┌──────────────────────┐    ┌────────────────────────────────┐
+│   OTEL Middleware     │    │     Continuous Watchdog         │
+│   (every request)     │    │                                │
+│   spans + metrics     │    │  health check    every 60s     │
+│         │             │    │  stall detection  phases>60min │
+│         ▼             │    │  auto-resume     5/batch 5min  │
+│   OTLP/HTTP export    │    │  session recovery  >30min      │
+│         │             │    │  failed cleanup   zombies      │
+│         ▼             │    └────────────────────────────────┘
+│   Jaeger :16686       │
+└──────────────────────┘    ┌────────────────────────────────┐
+                            │     Failure Analysis            │
+┌──────────────────────┐    │                                │
+│   Quality Engine      │    │  error classification          │
+│   10 dimensions       │    │  phase heatmap                 │
+│   quality gates       │    │  recommendations               │
+│   radar chart         │    │  resume-all button             │
+│   badge + scorecard   │    └────────────────────────────────┘
+└──────────────────────┘
+                            ┌────────────────────────────────┐
+         All data ─────────▶│  Dashboard /analytics           │
+                            │  tracing stats + latency chart  │
+                            │  error doughnut + phase bars    │
+                            │  quality radar + scorecard      │
+                            └────────────────────────────────┘
+```
+
+### 배포
+
+```
+Docker (권장) → http://localhost:8090
+로컬 (개발)   → http://localhost:8090
+프로덕션      → 자체 인프라
+```
+
+## 프로젝트 구성
+
+프로젝트는 `projects/*.yaml`에 정의됩니다:
+
+```yaml
+project:
+  name: my-project
+  root_path: /path/to/project
+  vision_doc: CLAUDE.md
+
+agents:
+  - product_manager
+  - solution_architect
+  - backend_dev
+  - qa_engineer
+
+patterns:
+  ideation: hierarchical
+  development: parallel
+  review: adversarial-pair
+
+deployment:
+  strategy: blue-green
+  auto_prod: true
+  health_check_url: /health
+
+monitoring:
+  prometheus: true
+  grafana_dashboard: project-metrics
+```
+
+## 디렉토리 구조
+
+```
+├── platform/                # 에이전트 플랫폼 (152개 Python 파일)
+│   ├── server.py            # FastAPI 앱, 포트 8090
+│   ├── agents/              # 에이전트 루프, 실행기, 저장소
+│   ├── a2a/                 # 에이전트 간 메시징 버스
+│   ├── patterns/            # 10개 오케스트레이션 패턴
+│   ├── missions/            # SAFe 미션 라이프사이클
+│   ├── sessions/            # 대화 실행기 + SSE
+│   ├── web/                 # 라우트 + Jinja2 템플릿
+│   ├── mcp_platform/        # MCP 서버 (23개 도구)
+│   └── tools/               # 에이전트 도구 (코드, git, 배포)
+│
+├── cli/                     # CLI 'sf' (6개 파일, 2100+ LOC)
+│   ├── sf.py                # 22개 명령 그룹, 40+ 하위 명령
+│   ├── _api.py              # httpx REST 클라이언트
+│   ├── _db.py               # sqlite3 오프라인 백엔드
+│   ├── _output.py           # ANSI 테이블, 마크다운 렌더링
+│   └── _stream.py           # 스피너가 있는 SSE 스트리밍
+│
+├── dashboard/               # 프론트엔드 HTMX
+├── deploy/                  # Helm 차트, Docker, K8s
+├── tests/                   # E2E Playwright 테스트
+├── skills/                  # 에이전트 기술 라이브러리
+├── projects/                # 프로젝트 YAML 구성
+└── data/                    # SQLite 데이터베이스
+```
+
+## 테스트
+
+```bash
+# 모든 테스트 실행
+make test
+
+# E2E 테스트 (Playwright — 먼저 설치 필요)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+
+# 유닛 테스트
+pytest tests/
+
+# 카오스 엔지니어링
+python3 tests/test_chaos.py
+
+# 내구성 테스트
+python3 tests/test_endurance.py
+```
+
+## 배포
+
+### Docker
+
+Docker 이미지 포함: **Node.js 20**, **Playwright + Chromium**, **bandit**, **semgrep**, **ripgrep**.
+에이전트는 기본적으로 프로젝트 빌드, 스크린샷이 포함된 E2E 테스트 실행, SAST 보안 스캔을 수행할 수 있습니다.
+
+```bash
+docker-compose up -d
+```
+
+### Kubernetes (Helm)
+
+```bash
+helm install software-factory ./deploy/helm/
+```
+
+### 환경 변수
+
+전체 목록은 [`.env.example`](.env.example)을 참조하세요. 주요 변수:
+
+```bash
+# LLM 공급자 (실제 에이전트에 필요)
+PLATFORM_LLM_PROVIDER=minimax        # minimax | azure-openai | azure-ai | nvidia | demo
+MINIMAX_API_KEY=sk-...               # MiniMax API 키
+
+# 인증 (선택사항)
+GITHUB_CLIENT_ID=...                 # GitHub OAuth
+GITHUB_CLIENT_SECRET=...
+AZURE_AD_CLIENT_ID=...               # Azure AD OAuth
+AZURE_AD_CLIENT_SECRET=...
+AZURE_AD_TENANT_ID=...
+
+# 통합 (선택사항)
+JIRA_URL=https://your-jira.atlassian.net
+ATLASSIAN_TOKEN=your-token
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+## 적응형 인텔리전스 — GA · RL · Thompson 샘플링 · OKR
+
+플랫폼은 세 가지 보완적인 AI 엔진을 통해 자가 최적화됩니다.
+
+### Thompson 샘플링 — 확률적 팀 선택
+- 컨텍스트 `(agent_id, pattern_id, technology, phase_type)`별 `Beta(wins+1, losses+1)` 유지
+- 세밀한 적합도 점수 — 컨텍스트별 독립 점수, 교차 컨텍스트 오염 없음
+- 콜드 스타트 폴백: 기술 접두사 체인(`angular_19` → `angular_*` → `generic`) 순차 적용
+- 소프트 퇴역: 약한 팀에 `weight_multiplier=0.1` 적용, 회복 가능
+- 자동 A/B 섀도우 실행; 중립 평가자가 승자 결정
+- **Darwin LLM**: Thompson 샘플링을 컨텍스트별 LLM 모델 선택으로 확장
+
+### 유전 알고리즘 — 워크플로우 진화
+- 게놈 = PhaseSpec(pattern, agents, gate)의 순서 있는 목록
+- 개체군: 40개 게놈, 최대 30세대, 엘리트=2, 변이율=15%, 토너먼트 k=3
+- 적합도: 페이즈 성공률 × 에이전트 적합도 × (1 − 거부율) × 리드 타임 보너스
+- 상위 3개 제안을 `evolution_proposals`에 저장, 적용 전 인간 검토
+- 수동 트리거: `POST /api/evolution/run/{wf_id}` — Workflows → Evolution 탭에서 확인
+- 야간 스케줄러; 5개 미만의 미션은 건너뜀
+
+### 강화 학습 — 미션 중 패턴 적응
+- Q-러닝 정책 (`platform/agents/rl_policy.py`)
+- 액션: keep, switch_parallel, switch_sequential, switch_hierarchical, switch_debate, add_agent, remove_agent
+- 상태: `(wf_id, phase_position, rejection_pct, quality_score)` 버킷화
+- Q 업데이트: α=0.1, γ=0.9, ε=0.1 — `rl_experience` 테이블에서 오프라인 배치 처리
+- 신뢰도 ≥ 70% 및 상태 방문 ≥ 3회일 때만 발동; 점진적 성능 저하 지원
+
+### OKR / KPI 시스템
+- 8개 기본 시드: code/migration, security/audit, architecture/design, testing, docs
+- OKR 달성도가 GA 적합도와 RL 보상 신호에 직접 반영
+- `/teams`에서 인라인 편집, 녹색/황색/빨간색 상태 표시
+- 설정에서 프로젝트별 OKR 재정의 가능
+
+---
+
+## v2.7.0의 새로운 기능 (2026년)
+
+### 지식 관리 시스템
+- **4개의 새 에이전트** — `knowledge-manager`, `knowledge-curator`, `knowledge-seeder`, `wiki-maintainer`
+- **ART 지식 팀** — 지식 운영 전용 Agile Release Train
+- **야간 `knowledge-maintenance` 워크플로우** — 자동 큐레이션, 중복 제거, 신선도 점수 매기기
+- **메모리 건강 대시보드** — 메트릭 탭의 지식 건강 메트릭 패널
+- **지식 건강 배지** — 설정 페이지에 표시
+
+### 메모리 인텔리전스
+- **관련성 점수** — `신뢰도 × 최신성 × 접근 부스트` 공식으로 순위 검색
+- **접근 추적** — 각 메모리 항목의 `access_count` 및 `last_read_at` 필드
+- **자동 삭제** — 야간 실행마다 임계값 미만의 오래된 항목 제거
+
+### LLM 비용 추적
+- **미션별 비용** — 미션 타임라인 탭 헤더에 표시
+- **자동 합산** — `llm_traces` 테이블에서 집계
+
+### 미션 타임라인
+- **수영 레인 타임라인 탭** — Mission Control에서 에이전트 단계를 수평 수영 레인으로 표시
+- **단계 지속 시간** — 각 단계에 소요된 시간의 시각적 표현
+
+### 품질 점수
+- **PhaseRun의 `quality_score` 필드** — 각 단계 후 적대적 가드가 채움
+
+### 프로젝트 내보내기/가져오기
+- **ZIP 아카이브** — `project.json` + 모든 미션 + 실행 + 메모리 포함
+
+### 입력 유효성 검사
+- **Pydantic 모델** — 모든 POST/PATCH 라우트에 엄격한 입력 스키마 적용
+
+- **도메인 아키텍처 가이드라인** — 프로젝트 도메인별로 Confluence/Solaris 가이드라인 적용
+
+### 설정 통합 허브
+- **설정 가능한 도구 통합** — Jira, Confluence, SonarQube를 모든 에이전트에서 사용 가능
+
+### 브라우저 푸시 알림
+- **Web Push API (VAPID)** — 미션 이벤트를 위한 네이티브 브라우저 푸시 알림
+
+## v2.1.0의 새로운 기능 (2026년 2월)
+
+### 품질 메트릭 — 산업적 모니터링
+- **10개 결정론적 차원** — 복잡도, 커버리지(UT/E2E), 보안, 접근성, 성능, 문서화, 아키텍처, 유지보수성, 적대적 검증
+- **워크플로우 단계의 품질 게이트** — 구성 가능한 임계값(always/no_veto/all_approved/quality_gate)으로 단계별 PASS/FAIL 배지
+- **품질 대시보드** (`/quality`) — 전체 스코어카드, 프로젝트별 점수, 트렌드 스냅샷
+- **모든 곳에 품질 배지** — 미션 상세, 프로젝트 보드, 워크플로우 단계, 메인 대시보드
+- **LLM 불필요** — 모든 메트릭은 오픈소스 도구(radon, bandit, semgrep, coverage.py, pa11y, madge)를 사용하여 결정론적으로 산출
+
+### 프로젝트당 4개 자동 프로비저닝 미션
+모든 프로젝트에 4개의 운영 미션이 자동 제공:
+- **MCO/TMA** — 지속적 유지보수: 헬스 모니터링, 인시던트 분류(P0-P4), TDD 수정, 비회귀 검증
+- **보안** — 주간 SAST 스캔, 의존성 감사, CVE 감시, 코드 리뷰
+- **기술 부채** — 월간 부채 감소: 복잡도 감사, WSJF 우선순위화, 리팩토링 스프린트
+- **셀프 힐링** — 자율 인시던트 파이프라인: 5xx 감지 → TMA 미션 생성 → 에이전트 진단 → 코드 수정 → 검증
+
+### 지속적 개선
+- **quality-improvement 워크플로우** — 스캔 → 최약 차원 식별 → 개선 계획 및 실행
+- **retrospective-quality 워크플로우** — ROTI, 인시던트, 품질 메트릭이 포함된 스프린트 회고 → 액션 아이템
+- **skill-evolution 워크플로우** — 에이전트 성능 분석 → 프롬프트 업데이트 → 기술 진화
+- **피드백 루프** — 메트릭 → 분석 → 개선 → 재스캔 → 진행 추적
+
+### SAFe 관점 & 온보딩
+- **9개 SAFe 역할 관점** — 역할별 적응형 대시보드, 사이드바, KPI
+- **온보딩 마법사** — 역할 및 프로젝트 선택이 포함된 3단계 첫 사용자 플로우
+- **관점 선택기** — 상단 바에서 언제든지 SAFe 역할 전환
+
+### 자동 복구 & 자가 수리
+- **TMA 하트비트** — 자동 인시던트 생성이 포함된 지속적 헬스 모니터링
+- **자가 수리 에이전트** — 일반적인 장애에 대한 자율적 진단 및 수정
+- **티켓 에스컬레이션** — 미해결 인시던트가 알림이 포함된 추적 티켓 생성
+
+### 4계층 메모리 & RLM
+- **영구 지식** — FTS5가 포함된 세션, 패턴, 프로젝트, 글로벌 메모리 계층
+- **RLM 딥 서치** — 복잡한 코드베이스 분석을 위한 재귀적 탐색 루프 (최대 10회 반복)
+- **프로젝트 컨텍스트 자동 로드** — CLAUDE.md, SPECS.md, VISION.md가 모든 에이전트 프롬프트에 주입
+
+### 적대적 품질 가드
+- **L0 결정론적** — 슬롭, 모의, 가짜 빌드, 환각 즉시 탐지
+- **L1 시맨틱** — 실행 출력에 대한 LLM 기반 품질 검토
+- **강제 거부** — 환각 및 스택 불일치는 항상 차단
+
+### 에이전트 메르카토
+- **토큰 기반 마켓플레이스** — 에이전트 등록, 이적, 임대, 프리 에이전트 드래프트
+- **시장 가치 평가** — 기술과 성과에 기반한 자동 에이전트 가격 산정
+- **지갑 시스템** — 거래 내역이 포함된 프로젝트별 토큰 경제
+
+### 인증 & 보안
+- **JWT 기반 인증** — 로그인/가입/갱신/로그아웃
+- **RBAC** — admin, project_manager, developer, viewer 역할
+- **OAuth** — GitHub 및 Azure AD SSO 로그인
+- **관리자 패널** — 사용자 관리 UI (`/admin/users`)
+- **데모 모드** — 즉시 접근을 위한 원클릭 "Skip" 버튼
+
+### 자동 문서화
+- **스프린트 회고** — 학습 루프가 포함된 LLM 생성 회고 노트
+- **단계 요약** — 미션 단계 결과 자동 문서화
+- **Confluence 동기화** — 양방향 위키 통합
+
+### LLM 공급자
+- **다중 공급자** — 자동 폴백 체인
+- MiniMax M2.5, Azure OpenAI GPT-5-mini, Azure AI Foundry, NVIDIA NIM
+- API 키 없이 UI 탐색을 위한 **데모 모드**
+
+### 플랫폼 개선사항
+- LLM 비용 추적이 포함된 DORA 메트릭 대시보드
+- Jira 양방향 동기화
+- Playwright E2E 테스트 스위트 (11개 스펙 파일)
+- 국제화 (EN/FR)
+- 실시간 알림 (Slack, Email, Webhook)
+- 워크플로우 내 디자인 시스템 파이프라인 (UX → dev → review)
+- 3D Agent World 시각화
+
+### Darwin — 진화적 팀 선택
+- **Thompson Sampling 선택** — `Beta(wins+1, losses+1)` 기반 확률적 agent+pattern 팀 선택 (`agent_id, pattern_id, 기술, 단계_유형` 차원)
+- **세밀한 적합도 추적** — 컨텍스트별 독립 점수: Angular 마이그레이션에 강한 팀이 Angular 신기능에는 약할 수 있음
+- **유사도 폴백** — 기술 접두사 매칭으로 콜드 스타트 해결 (`angular_19` → `angular_*` → `generic`)
+- **소프트 은퇴** — 지속 저성과 팀에 `weight_multiplier=0.1` 적용, 우선순위 하향이지만 복구 가능
+- **OKR / KPI 시스템** — 도메인과 단계 유형별 목표 및 지표; 기본 시드 8개
+- **A/B 섀도우 테스트** — 두 팀의 적합도 차이가 10 미만이거나 10% 확률로 자동 병렬 실행
+- **Teams 대시보드** `/teams` — champion/rising/declining/retired 배지 리더보드, 인라인 OKR 편집, 진화 차트, 선택 이력, A/B 결과
+- **논브레이킹 옵트인** — 패턴에서 `agent_id: "skill:developer"` 사용 시 Darwin 활성화; 명시적 ID 변경 없음
+
+## v2.2.0의 새로운 기능 (2026년 2월)
+
+### OpenTelemetry & 분산 추적
+- **OTEL 통합** — Jaeger로의 OTLP/HTTP 익스포터가 포함된 OpenTelemetry SDK
+- **ASGI 추적 미들웨어** — 모든 HTTP 요청에 대해 스팬, 지연 시간, 상태 추적
+- **추적 대시보드** (`/analytics`) — 요청 통계, 지연 시간 차트, 작업 테이블
+- **Jaeger UI** — 포트 16686에서 전체 분산 추적 탐색
+
+### 파이프라인 실패 분석
+- **실패 분류** — Python 기반 오류 분류 (setup_failed, llm_provider, timeout, phase_error 등)
+- **단계 실패 히트맵** — 가장 자주 실패하는 파이프라인 단계 식별
+- **추천 엔진** — 실패 패턴에 기반한 실행 가능한 제안
+- **전체 재개 버튼** — 대시보드에서 일시 중지된 실행을 원클릭으로 대량 재개
+
+### 지속적 감시견
+- **자동 재개** — 일시 중지된 실행을 배치로 자동 재개 (5개/배치, 5분마다, 최대 10개 동시)
+- **비활성 세션 복구** — 30분 이상 비활성 세션 감지, 재시도를 위해 중단 표시
+- **실패 세션 정리** — 파이프라인 진행을 차단하는 좀비 세션 정리
+- **정체 감지** — 60분 이상 단계에 정체된 미션에 자동 재시도
+
+### 단계 회복력
+- **단계별 재시도** — 단계별 지수 백오프가 포함된 구성 가능한 재시도 횟수 (기본 3회)
+- **skip_on_failure** — 단계를 선택적으로 설정하여 실패 시 파이프라인 계속 실행 가능
+- **체크포인팅** — 완료된 단계 저장, 스마트 재개로 완료된 작업 건너뛰기
+- **단계 타임아웃** — 10분 제한으로 무한 중단 방지
+
+### 샌드박스 빌드 검증
+- **코드 후 빌드 검사** — 코드 생성 단계 후 자동으로 빌드/린트 실행
+- **빌드 시스템 자동 감지** — npm, cargo, go, maven, python, docker
+- **오류 주입** — 빌드 실패를 에이전트 컨텍스트에 주입하여 자가 수정
+
+### 품질 UI 개선
+- **레이더 차트** — `/quality`에서 품질 차원의 Chart.js 레이더 시각화
+- **품질 배지** — 프로젝트 헤더에 컬러 점수 원 (`/api/dashboard/quality-badge`)
+- **미션 스코어카드** — 미션 상세 사이드바의 품질 메트릭 (`/api/dashboard/quality-mission`)
+
+### 멀티 모델 LLM 라우팅
+- **3개의 전문 모델** — `gpt-5.2` 는 무거운 추론, `gpt-5.1-codex` 는 코드/테스트, `gpt-5-mini` 는 경량 작업용
+- **역할 기반 라우팅** — 에이전트는 태그(`reasoner`, `architect`, `developer`, `tester`, `doc_writer`…)를 기반으로 자동으로 올바른 모델을 받음
+- **실시간 구성 가능** — 재시작 없이 설정 → LLM에서 라우팅 매트릭스 편집
+
+### Darwin LLM — 모델에 대한 Thompson Sampling
+- **모델 A/B 테스트** — 동일한 팀(에이전트 + 패턴)이 다른 LLM으로 경쟁; 최고의 모델이 컨텍스트별로 자동 승리
+- **베타 분포** — `(agent_id, pattern_id, technology, phase_type, llm_model)`당 `Beta(wins+1, losses+1)`
+- **/teams의 LLM A/B 탭** — 모델별 피트니스 순위 및 A/B 테스트 기록
+- **우선순위 체인** — Darwin LLM → DB 구성 → 기본값 (우아한 성능 저하)
+
+### 설정 — LLM 탭
+- **프로바이더 그리드** — 활성/비활성 상태 및 누락된 API 키 힌트 표시
+- **라우팅 매트릭스** — 카테고리별(추론, 생산/코드, 작업, 문서 작성) 무거운/가벼운 모델 구성
+- **Darwin LLM A/B 섹션** — 진행 중인 모델 실험의 실시간 보기
+
+## v3.0.0의 새로운 기능 (2026년)
+
+### 에이전트 마켓플레이스
+- **192개 에이전트 카탈로그화** — `/marketplace`에서 전체 텍스트 검색, ART/역할/스킬 필터링
+- **에이전트 프로파일** — 도구, 스킬 및 최근 세션 기록이 있는 상세 보기
+- **원클릭 시작** — 프로파일 페이지에서 모든 에이전트와 직접 세션 시작
+
+### 미션 리플레이
+- **단계별 리플레이** — `/missions/{id}/replay`에서 모든 에이전트 턴과 도구 호출 재생
+- **단계별 비용 및 토큰** — 에이전트별 세분화된 LLM 지출 내역
+- **내보낼 수 있는 기록** — 디버깅 및 감사를 위한 JSON 리플레이 다운로드
+
+### 설정 허브
+
+`/settings`에서의 중앙 집중식 플랫폼 설정:
+
+- **미션 동시성** — 실행 세마포어를 실시간 조정 (1–10 병렬 미션)
+- **예산 한도** — 미션 실행당 최대 LLM 지출 설정; 예산 초과 실행은 일시 중지
+- **자동 재개 와치독** — 플랫폼 재시작 시 일시 중지된 미션 자동 재개
+- **YOLO 모드** — 완전 자율 실행을 위한 Human-in-the-loop 검증 비활성화
+- **지속성** — 모든 설정은 DB에 저장되어 서버 재시작 후에도 유지
+
+### 미션 콕핏
+
+`/cockpit`에서의 실시간 지휘 센터:
+
+- **라이브 파이프라인 뷰** — 아이디에이션 → 미션 → 실행 중 → 테스트 → 배포됨
+- **미션별 상태** — 에이전트, 진행 중인 도구 호출, 현재까지의 LLM 비용
+- **세마포어 게이지** — 사용 가능한 슬롯과 사용 중인 슬롯을 한눈에 확인
+- **빠른 제어** — 콕핏에서 미션 일시 중지, 재개, 취소
+
+### 미션별 LLM 비용 추적
+
+실행별 세분화된 지출 가시성:
+
+- **실행당 `llm_cost_usd`** — 모든 실행에서 정확한 LLM 지출을 USD로 기록
+- **예산 경고** — 미션이 한도에 도달하면 경고 또는 강제 중지
+- **공급자 비교** — minimax / azure / openai에서 동일 작업 비용 비교
+- **누적 대시보드** — 프로젝트, 스프린트 또는 날짜 범위별 비용 집계
+
+### 어노테이션 스튜디오 — 모든 페이지에서 시각적 피드백
+
+모든 SF 페이지를 협업 검토 캔버스로 변환하는 내장 시각 어노테이션 레이어:
+
+- **✏️ 어노테이트 버튼** — 클릭하여 어노테이션 모드 활성화; 각 페이지에 플로팅 툴바 표시
+- **클릭하여 어노테이트** — 임의 요소 클릭: 버그 🐛, 댓글 💬, 기능 ✨, 디자인 🎨 또는 텍스트 수정 📝
+- **SAFe 추적성 바** — 상단바의 페르소나 아이콘 → **프로그램 → 에픽 → 피처 → 스토리**
+- **와이어프레임 모드** — 그리드 아이콘 → UX 검사를 위한 스켈레톤/시머 뷰
+- **티켓 생성** — 각 어노테이션에서 수정 미션 직접 시작 가능
+- **테마 적응형** — CSS 변수 사용, 라이트/다크 테마에 자동 적응
+
+
+### LLM 메트릭 대시보드
+- **비용/지연시간/프로바이더 실시간 모니터링** (`/metrics`)
+- **에이전트 및 미션별 지출** — 비용이 높은 에이전트 식별 및 최적화
+- **프로바이더 비교** — 프로바이더별 P50/P95 지연시간 및 비용 비교
+
+### RBAC + 속도 제한
+- **워크스페이스 범위 RBAC** — 플랫폼 전체가 아닌 워크스페이스별 역할 할당
+- **사용자별 속도 제한** — 역할별 구성 가능한 토큰/요청 쿼터
+- **감사 추적** — 모든 RBAC 변경 사항을 행위자, 타임스탬프, 변경 상세와 함께 기록
+
+### 에이전트 평가 프레임워크
+- **LLM-as-judge 채점** — `/evals`에서 골든 데이터셋에 대한 자동 평가
+- **에이전트별 벤치마크** — 시간 경과에 따른 품질 추적 및 회귀 감지
+- **구성 가능한 판사** — 설정된 모든 LLM 프로바이더를 평가 판사로 사용
+
+### 도구 빌더
+- **노코드 도구 생성** (`/tool-builder`) — HTTP, SQL, 셸 도구
+- **즉시 활성화** — 저장 즉시 에이전트에게 도구 제공
+- **파라미터 템플릿** — 타입과 검증이 포함된 입력 스키마 정의
+
+### 멀티테넌트 워크스페이스
+- **격리된 네임스페이스** (`/workspaces`) — 워크스페이스별로 분리된 데이터, 에이전트, 메모리
+- **클라이언트별 배포** — 교차 오염 없이 여러 클라이언트 온보딩
+- **워크스페이스별 RBAC** — 네임스페이스별 세분화된 역할 할당
+
+### YAML 에이전트 핫 리로드
+- **라이브 에이전트 업데이트** — 에이전트 YAML 파일을 편집하고 플랫폼 재시작 없이 리로드
+- **무중단** — 진행 중인 미션은 이전 에이전트 정의로 계속 실행
+
+## v3.1.0의 새로운 기능 (2026년 3월)
+
+### 멀티노드 클러스터
+
+- **마스터/슬레이브 토폴로지** — IHM + SSE는 마스터 전용; API 호출은 nginx `least_conn`을 통해 모든 노드에 부하 분산
+- **공유 PostgreSQL** — 100% PostgreSQL, SQLite 제로; 모든 노드가 동일한 데이터베이스 공유; advisory lock으로 동시 시작 시 스키마 경쟁 조건 방지
+- **패시브 페일오버** — nginx가 3번 연속 실패 후 노드를 다운으로 표시; 트래픽이 자동으로 정상 노드로 라우팅, 10초 후 복구
+- **클러스터 노드 레지스트리** — `platform_nodes` 테이블이 각 노드 추적: 역할, 모드, URL, CPU%, MEM%, 버전, 하트비트 경과 시간
+- **실시간 상단바 배지** — 각 노드가 색상 점 배지로 표시; 초록 = 온라인 (< 60초), 빨강 = 오래됨; HTMX를 통해 30초마다 폴링
+- **클릭 시 팝오버 상세 정보** — 노드 배지를 클릭하면 전체 진단 정보 표시: 역할/모드, URL, CPU, MEM, 마지막 확인 시간, 버전
+- **에이전트 도구 `platform_cluster`** — Jarvis와 모든 에이전트가 자연어로 클러스터 상태 및 부하 분산 조회 가능
+
+### 보안 및 샌드박스
+
+- **Landlock 파일시스템 샌드박스** — Linux Landlock LSM (커널 5.13+)을 사용하여 에이전트 셸 실행을 워크스페이스 디렉토리로 제한; 비Linux 호스트에 영향 없음
+- **보안 설정 탭** — 설정 → 보안에서 샌드박스 켜기/끄기, Landlock 커널 지원 상태 확인
+- **펜테스트 에이전트 도구** — nmap 포트 스캐닝, subfinder 서브도메인 열거, whatweb 기술 핑거프린팅, schemathesis API 퍼징, SQL 인젝션, 인증 우회, SSRF 탐지
+
+### 코드 품질 및 LLM
+
+- **LLM 코드 품질 강화** — SAST (bandit/semgrep) + 순환 복잡도 분석이 모든 코드 리뷰 단계 전에 에이전트 컨텍스트에 주입
+- **DeerFlow 컨텍스트 요약** — 재귀적 컨텍스트 압축 + 자동 메모리 추출 (arXiv:2503.09516); 장시간 에이전트 세션의 토큰 소비 감소
+- **멀티모델 라우팅 업그레이드** — 추론/아키텍처에 `gpt-5.2`, 코드/TDD에 `gpt-5.2-codex`, 토론/문서에 `gpt-5-mini`; 역할 기반, `AZURE_CODEX_MODEL`로 구성 가능
+
+### 플랫폼 및 SAFe
+
+- **SAFe 용어** — 모든 UI 페이지에서 미션이 에픽으로 개명; 포트폴리오 통계에 SAFe 용어 표시 (Epics / Features / Stories / Tasks)
+- **인프라 에스컬레이션** — 스프린트가 필요한 빌드 도구를 찾지 못하면 `ft-infra-lead`가 자동으로 생성되어 재시도 전에 설치
+- **에이전트 플랜 도구** — 에이전트가 마일스톤과 하위 작업이 포함된 구조화된 계획을 생성하여 단계 간 연속성을 위해 메모리에 저장
+
+## 기여하기
+
+기여를 환영합니다! 가이드라인은 [CONTRIBUTING.md](CONTRIBUTING.md)를 참조하세요.
+
+## 라이선스
+
+이 프로젝트는 AGPL v3 라이선스 하에 배포됩니다 - 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요.
+
+## 지원
+
+- Live: https://sf.macaron-software.com
+- 이슈: https://github.com/macaron-software/software-factory/issues
+- 토론: https://github.com/macaron-software/software-factory/discussions

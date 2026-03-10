@@ -1,0 +1,9 @@
+id: example
+name: Example Plugin
+version: 1.0.0
+description: Demonstration plugin with a custom agent and tool
+author: macaron-software
+agents:
+  - agents/data-analyst.yaml
+tools:
+  - DataFormatTool

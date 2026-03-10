@@ -1,0 +1,24 @@
+# Project base image — Node.js LTS (for web/JS/TS projects)
+#
+# Used as the runtime container for JavaScript/TypeScript projects.
+# Agents exec into this container via `docker exec sf-{project_id} cmd`.
+# Landlock is available (Debian bookworm kernel 6.x).
+#
+# Build: docker build -f Dockerfile.project.node -t sf-project-node:lts .
+
+FROM node:lts-bookworm-slim
+
+WORKDIR /workspace
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl ripgrep python3 make g++ \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Non-root agent user
+RUN groupadd -r agent && useradd -r -g agent -d /workspace agent \
+    && chown -R agent:agent /workspace
+
+USER agent
+
+# Keep container alive — agents exec into it
+CMD ["sleep", "infinity"]

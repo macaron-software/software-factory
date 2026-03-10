@@ -1,0 +1,38 @@
+# Domaine HealthTech — OVH Demo
+name: "HealthTech"
+env: demo
+color: "#EF4444"
+
+description: >
+  Applications santé et médical (démo OVH).
+  Stack orientée conformité RGPD renforcée, sécurité des données de santé,
+  interopérabilité FHIR.
+
+stack:
+  backend: "Python 3.12 + FastAPI (ou Java 17 + Spring Boot)"
+  frontend: "React 18 + TypeScript + Tailwind CSS"
+  database: "PostgreSQL 16 avec chiffrement at-rest"
+  database_forbidden: ["SQLite", "MongoDB"]
+  cache: "Redis 7 (données non sensibles uniquement)"
+  infra: "Docker + Kubernetes / Azure (données en Europe)"
+  ci: "GitHub Actions"
+  auth: "OAuth2 + MFA obligatoire + RBAC granulaire"
+  extra:
+    - "Interopérabilité : FHIR R4 (HL7)"
+    - "Audit trail : log immuable de toutes les consultations"
+    - "Chiffrement : AES-256 at-rest, TLS 1.3 in-transit"
+    - "Tests : pytest + tests de sécurité (bandit, safety)"
+    - "DPI : pas de données patient en logs"
+
+compliance:
+  - "RGPD — données de santé (catégorie sensible Art. 9)"
+  - "HDS (Hébergeur Données de Santé) si prod France"
+  - "OWASP Top 10"
+  - "Pseudonymisation des données pour les tests"
+
+conventions: |
+  - Aucune donnée patient en clair dans les logs
+  - Tout accès aux données patient loggé avec user + timestamp + motif
+  - Consentement explicite requis avant toute collecte
+  - Tests avec données synthétiques uniquement (faker avec seed)
+  - Review sécurité obligatoire avant tout déploiement

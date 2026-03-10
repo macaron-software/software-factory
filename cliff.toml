@@ -1,0 +1,71 @@
+# git-cliff configuration — Macaron Software Factory
+# Generates CHANGELOG.md from Conventional Commits history.
+# Run: git cliff -o CHANGELOG.md
+# Ref: https://git-cliff.org/docs/configuration
+
+[changelog]
+header = """# Changelog
+
+Généré automatiquement par [git-cliff](https://git-cliff.org/).
+
+"""
+body = """
+{%- macro remote_url() -%}
+  https://github.com/macaron-software/software-factory
+{%- endmacro -%}
+
+{% if version -%}
+## [{{ version | trim_start_matches(pat="v") }}] — {{ timestamp | date(format="%Y-%m-%d") }}
+{% else -%}
+## [Unreleased]
+{% endif -%}
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim | upper_first }}
+{% for commit in commits
+| filter(attribute="scope")
+| sort(attribute="scope") %}
+  - **{{ commit.scope }}**: {{ commit.message }}
+    {%- if commit.breaking %} [**BREAKING**]{% endif -%}
+{%- endfor -%}
+{% for commit in commits %}
+  {%- if not commit.scope %}
+  - {{ commit.message }}
+    {%- if commit.breaking %} [**BREAKING**]{% endif -%}
+  {% endif -%}
+{%- endfor -%}
+{% endfor %}
+"""
+trim = true
+footer = ""
+postprocessors = [
+  { pattern = '\(hierarchical\)', replace = "" },
+]
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_preprocessors = [
+  # Strip trailing Co-authored-by lines from message body
+  { pattern = '\n\nCo-authored-by:.*', replace = "" },
+]
+commit_parsers = [
+  { message = "^feat",     group = "Features" },
+  { message = "^fix",      group = "Bug Fixes" },
+  { message = "^refactor", group = "Refactor" },
+  { message = "^perf",     group = "Performance" },
+  { message = "^docs",     group = "Documentation" },
+  { message = "^style",    group = "Style" },
+  { message = "^test",     group = "Tests" },
+  { message = "^ci",       group = "CI/CD" },
+  { message = "^chore",    group = "Chores" },
+  { message = "^build",    group = "Build" },
+  # Skip merge commits and auto-generated changelog commits
+  { message = "^Merge",    skip = true },
+  { message = "^chore: regenerate", skip = true },
+]
+protect_breaking_commits = false
+filter_commits = false
+topo_order = false
+sort_commits = "newest"

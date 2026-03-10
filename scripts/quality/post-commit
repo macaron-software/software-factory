@@ -1,0 +1,49 @@
+#!/bin/bash
+# Post-commit hook - Quick tests on modified files (non-blocking)
+# Runs after successful commit, provides feedback but doesn't block
+
+echo "📊 Running post-commit checks..."
+
+# Get files modified in last commit
+CHANGED_PY=$(git diff HEAD~1 --name-only | grep '\.py$' || true)
+CHANGED_JS=$(git diff HEAD~1 --name-only | grep '\.\(js\|ts\|jsx\|tsx\)$' || true)
+
+# ============================================================================
+# Python: Quick unit tests on modified files
+# ============================================================================
+if [ -n "$CHANGED_PY" ]; then
+  echo "🧪 Running quick Python tests..."
+  if command -v pytest &> /dev/null; then
+    # Run tests related to modified files (fast, fail-fast)
+    if ! pytest --maxfail=3 --tb=short -x -q 2>&1 | tail -5; then
+      echo "⚠️  Some tests failed (non-blocking)"
+    else
+      echo "✅ Quick tests passed"
+    fi
+  fi
+fi
+
+# ============================================================================
+# JavaScript: Quick tests on modified files
+# ============================================================================
+if [ -n "$CHANGED_JS" ]; then
+  echo "🧪 Running quick JavaScript tests..."
+  if command -v jest &> /dev/null; then
+    if ! jest --bail --silent 2>&1 | tail -5; then
+      echo "⚠️  Some tests failed (non-blocking)"
+    else
+      echo "✅ Quick tests passed"
+    fi
+  fi
+fi
+
+# ============================================================================
+# Update project stats (optional)
+# ============================================================================
+echo ""
+echo "📈 Commit statistics:"
+git log -1 --stat | tail -3
+
+echo ""
+echo "✅ Post-commit checks complete"
+exit 0

@@ -1,0 +1,104 @@
+stages:
+  - deploy
+
+# Deploy to Innovation cluster — sf-node-1 (SF_NODE1_IP) + sf-node-2 (SF_NODE2_IP)
+#
+# Required GitLab CI/CD variables (Settings -> CI/CD -> Variables):
+#   SSH_DEPLOY_KEY  -- private key content or file (File OR Variable type)
+#                      Content of ~/.ssh/sf_innovation_ed25519 (sfadmin on both nodes)
+#   NODE1_IP        -- SF_NODE1_IP (sf-node-1, behind VNet — accessed via node-2 proxy)
+#   NODE2_IP        -- SF_NODE2_IP  (sf-node-2, direct public SSH)
+#
+# NOTE: all SSH setup is in script (not before_script) to avoid filesystem isolation
+# issues with Kubernetes executor attach strategy.
+
+deploy-node2:
+  stage: deploy
+  image: alpine
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      apk add --no-cache openssh-client rsync
+      mkdir -p /root/.ssh && chmod 700 /root/.ssh
+
+      if [ -f "${SSH_DEPLOY_KEY}" ]; then
+        cp "${SSH_DEPLOY_KEY}" /root/.ssh/id_ed25519
+      else
+        printf '%s\n' "${SSH_DEPLOY_KEY}" > /root/.ssh/id_ed25519
+      fi
+      chmod 600 /root/.ssh/id_ed25519
+      ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null && echo "SSH key OK" || { echo "ERROR: invalid SSH_DEPLOY_KEY"; exit 1; }
+
+      NODE2="${NODE2_IP:-SF_NODE2_IP}"
+      ssh-keyscan -H "$NODE2" >> /root/.ssh/known_hosts 2>/dev/null || true
+      echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
+
+      echo "=== Deploying to sf-node-2 ($NODE2) ==="
+
+      rsync -az --checksum \
+        --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+        -e "ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+        platform/ \
+        sfadmin@${NODE2}:/home/sfadmin/platform/
+
+      rsync -az \
+        -e "ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no" \
+        skills/ \
+        sfadmin@${NODE2}:/home/sfadmin/skills/ 2>/dev/null || true
+
+      ssh -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no \
+        sfadmin@${NODE2} "cd /home/sfadmin && bash deploy.sh" \
+        || echo "WARNING: node-2 deploy.sh failed (non-fatal)"
+
+      echo "=== node-2 deploy done ==="
+
+deploy-node1:
+  stage: deploy
+  image: alpine
+  needs: [deploy-node2]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+  script:
+    - |
+      apk add --no-cache openssh-client rsync
+      mkdir -p /root/.ssh && chmod 700 /root/.ssh
+
+      # SSH key: support File type (var = path) and Variable type (var = key content)
+      if [ -f "${SSH_DEPLOY_KEY}" ]; then
+        cp "${SSH_DEPLOY_KEY}" /root/.ssh/id_ed25519
+      else
+        printf '%s\n' "${SSH_DEPLOY_KEY}" > /root/.ssh/id_ed25519
+      fi
+      chmod 600 /root/.ssh/id_ed25519
+      ssh-keygen -y -f /root/.ssh/id_ed25519 > /dev/null && echo "SSH key OK" || { echo "ERROR: invalid SSH_DEPLOY_KEY"; exit 1; }
+
+      NODE2="${NODE2_IP:-SF_NODE2_IP}"
+      NODE1="${NODE1_IP:-SF_NODE1_IP}"
+
+      ssh-keyscan -H "$NODE2" >> /root/.ssh/known_hosts 2>/dev/null || true
+      echo "${CI_COMMIT_TAG:-${CI_COMMIT_SHORT_SHA}}:${CI_COMMIT_SHORT_SHA}" > platform/VERSION
+
+      SSH_CFG=/root/.ssh/node1_config
+      printf 'Host %s\n  ProxyCommand ssh -W %%h:%%p -i /root/.ssh/id_ed25519 -o StrictHostKeyChecking=no sfadmin@%s\n  IdentityFile /root/.ssh/id_ed25519\n  StrictHostKeyChecking no\n' \
+        "$NODE1" "$NODE2" > "$SSH_CFG"
+      echo "--- SSH config ($SSH_CFG) ---" && cat "$SSH_CFG"
+
+      echo "=== Deploying to sf-node-1 ($NODE1) via node-2 proxy ==="
+
+      rsync -az --checksum \
+        --exclude '__pycache__' --exclude '*.pyc' --exclude 'data/' \
+        -e "ssh -F $SSH_CFG" \
+        platform/ \
+        sfadmin@${NODE1}:/home/sfadmin/platform/
+
+      rsync -az \
+        -e "ssh -F $SSH_CFG" \
+        skills/ \
+        sfadmin@${NODE1}:/home/sfadmin/skills/ 2>/dev/null || true
+
+      ssh -F "$SSH_CFG" sfadmin@${NODE1} \
+        "cd /home/sfadmin && bash deploy.sh" \
+        || echo "WARNING: node-1 deploy.sh failed (non-fatal)"
+
+      echo "=== node-1 deploy done ==="

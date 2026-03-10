@@ -1,0 +1,134 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron} -d ${PG_DB:-macaron_platform}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Factory process (headless — agents, missions, watchdog, A2A bus) ──────
+  platform-factory: &platform
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
+    ports:
+      - "8092:8099"
+    env_file:
+      - .env
+    environment:
+      - PLATFORM_MODE=factory
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
+      - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - REDIS_URL=redis://redis:6379/0
+      - PG_POOL_MAX_SIZE=10
+    volumes:
+      - platform-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/factory:/app/platform
+    group_add:
+      - "989"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── UI process blue/green (IHM — web routes, templates, static) ─────────
+  platform-blue: &platform-web
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
+    ports:
+      - "8090:8099"
+    env_file:
+      - .env
+    environment:
+      - PLATFORM_MODE=ui
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-minimax}
+      - PLATFORM_LLM_MODEL=${PLATFORM_LLM_MODEL:-}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - DBGATE_URL=http://dbgate:3000
+      - DBGATE_PASSWORD=dbgate2024
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - REDIS_URL=redis://redis:6379/0
+      - PG_POOL_MAX_SIZE=5
+    volumes:
+      - platform-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/blue:/app/platform
+    group_add:
+      - "989"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  platform-green:
+    <<: *platform-web
+    ports:
+      - "8091:8099"
+    volumes:
+      - platform-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/green:/app/platform
+
+  portainer:
+    image: portainer/portainer-ce:latest
+    command: --no-http-disabled --base-url=/portainer
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+    restart: unless-stopped
+
+  dbgate:
+    image: dbgate/dbgate:5.2.0
+    ports:
+      - "3002:3000"
+    environment:
+      - ROOT_PATH=/dbgate
+      - LOGIN=admin
+      - PASSWORD=dbgate2024
+    volumes:
+      - dbgate-data:/root/.dbgate
+    restart: unless-stopped
+
+volumes:
+  platform-data:
+  pg-data:
+  portainer-data:
+  dbgate-data:

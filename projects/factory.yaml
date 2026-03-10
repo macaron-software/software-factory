@@ -1,0 +1,208 @@
+# Software Factory - Self-Improvement Configuration
+# =================================================
+# The factory treats itself as a project for continuous improvement
+
+project:
+  name: factory
+  display_name: "Software Factory (Self)"
+  root_path: /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY
+  vision_doc: CLAUDE.md
+
+domains:
+  python:
+    paths:
+      - core/
+      - mcp_lrm/
+      - cli/
+      - analyzers/
+    extensions:
+      - .py
+    build_cmd: python3 -m py_compile
+    test_cmd: python3 -m pytest tests/ -v
+    lint_cmd: python3 -m ruff check
+
+  config:
+    paths:
+      - projects/
+    extensions:
+      - .yaml
+    build_cmd: "python3 -c \"import yaml; [yaml.safe_load(open(f)) for f in __import__('glob').glob('projects/*.yaml')]\""
+    test_cmd: "true"
+    lint_cmd: "true"
+
+# Self-improvement: validation only (no auto-deploy)
+deploy:
+  strategy: validation-only
+  auto_prod: false
+  rollback_on_fail: true
+
+# FRACTAL for self-improvement tasks
+fractal:
+  enabled: true
+  force_level1: true
+  max_files: 3
+  max_loc: 200
+  max_items: 5
+  max_depth: 2
+
+# Adversarial patterns specific to factory code
+adversarial:
+  threshold: 5
+  core_patterns: true
+  security_check: true
+  custom_patterns:
+    # Duplication detection
+    - pattern: 'def (get_task|lock_task|update_task)'
+      score: 0
+      message: "Task operation detected - check for duplication across modules"
+      audit: true
+
+    # Hardcoded paths
+    - pattern: '/Users/sylvain/[^"'']+(?<!\.yaml)'
+      score: 3
+      message: "Hardcoded absolute path - should use config or env var"
+
+    # Inline LLM prompts (should be in templates)
+    - pattern: 'You are a (TDD|Brain|Deploy) agent'
+      score: 2
+      message: "Inline prompt detected - consider extracting to template"
+      max_occurrences: 3
+
+    # Missing error handling
+    - pattern: 'except:\s*$'
+      score: 4
+      message: "Bare except clause - specify exception type"
+
+    # Process management
+    - pattern: 'subprocess\.(run|call|Popen)\('
+      score: 0
+      message: "Subprocess call - verify process group cleanup"
+      audit: true
+
+# Self-improvement specific concerns
+self_improvement:
+  enabled: true
+
+  # Refactoring triggers
+  refactoring:
+    # Code duplication detection
+    duplication:
+      enabled: true
+      min_lines: 10          # Minimum lines to flag as duplicate
+      similarity: 0.85       # Similarity threshold
+      scan_paths:
+        - core/
+        - mcp_lrm/
+
+    # Complexity thresholds
+    complexity:
+      max_cyclomatic: 10
+      max_cognitive: 15
+      max_lines_per_function: 100
+      max_params: 5
+
+    # Service consolidation
+    consolidation:
+      # Services that should be singletons
+      singletons:
+        - TaskStore
+        - LLMClient
+        - MCPServer
+      # Functions to consider merging
+      merge_candidates:
+        - pattern: "_run_(tests|build|lint)"
+          reason: "Similar subprocess patterns"
+        - pattern: "(wiggum|cycle)_worker"
+          reason: "Similar worker patterns"
+
+  # Code sharing / mutualization
+  mutualization:
+    # Common utilities to extract
+    extract_candidates:
+      - name: process_utils
+        patterns:
+          - "start_new_session=True"
+          - "os.killpg"
+          - "asyncio.wait_for.*timeout"
+        target: core/utils/process.py
+
+      - name: llm_utils
+        patterns:
+          - "fallback.*chain"
+          - "rate.*limit"
+        target: core/utils/llm.py
+
+      - name: logging_utils
+        patterns:
+          - "logging.getLogger"
+          - "RotatingFileHandler"
+        target: core/utils/logging.py
+
+  # Architecture improvements
+  architecture:
+    # Dependency injection points
+    di_candidates:
+      - TaskStore
+      - LLMClient
+      - Adversarial
+
+    # Interface extraction
+    interfaces:
+      - name: Worker
+        implementations:
+          - WiggumTDD
+          - CycleWorker
+          - BuildWorker
+          - DeployWorker
+      - name: Analyzer
+        implementations:
+          - RustAnalyzer
+          - TypeScriptAnalyzer
+          - PlaywrightAnalyzer
+
+# Error capture for self-improvement
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+
+  build:
+    enabled: true
+    domains: [python]
+
+  e2e:
+    enabled: false  # No E2E for factory itself
+
+  mobile:
+    enabled: false
+
+  severity:
+    create_task_min: medium
+
+# Analyzers for factory code
+analyzers:
+  - python
+  - security
+
+# Metrics to track for self-improvement
+metrics:
+  track:
+    - code_duplication_ratio
+    - avg_cyclomatic_complexity
+    - test_coverage
+    - avg_task_completion_time
+    - llm_token_usage
+    - error_rate_by_module
+
+  alerts:
+    - metric: code_duplication_ratio
+      threshold: 0.15
+      action: create_refactor_task
+
+    - metric: avg_cyclomatic_complexity
+      threshold: 12
+      action: create_refactor_task
+
+    - metric: error_rate_by_module
+      threshold: 0.20
+      action: prioritize_fixes

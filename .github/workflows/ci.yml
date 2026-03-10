@@ -1,0 +1,65 @@
+name: CI
+
+# SECURITY HARDENING (ref: hackerbot-claw campaign, Feb 2026 — aquasecurity/trivy incident)
+# - permissions: contents: read — GITHUB_TOKEN minimal scope (no write access)
+# - Actions pinned to SHA (not mutable tags) — prevents supply chain via tag mutation
+# - No pull_request_target — prevents pwn-request fork attacks
+# - No ${{ github.* }} variables in run: steps — prevents context injection
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read  # Minimal — no write access to repo via GITHUB_TOKEN
+
+jobs:
+  test:
+    name: Python tests (real endpoints, live data)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: sfplatform
+          POSTGRES_PASSWORD: sf_pg_pass_2026
+          POSTGRES_DB: sfplatform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U sfplatform"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
+
+    env:
+      DATABASE_URL: postgresql://sfplatform:sf_pg_pass_2026@localhost:5432/sfplatform
+      PLATFORM_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install --quiet -r requirements.txt pytest pytest-asyncio ruff
+
+      - name: Ruff lint (syntax errors only)
+        run: ruff check platform/ --select E9 --quiet
+
+      - name: Syntax check (py_compile)
+        run: |
+          find platform/ -name '*.py' -not -path '*/__pycache__/*' \
+            | xargs python -m py_compile \
+            && echo "All Python files compile OK"
+
+      - name: Run platform API tests (real endpoints, no mocks)
+        run: python -m pytest tests/test_platform_api.py -v --tb=short -q

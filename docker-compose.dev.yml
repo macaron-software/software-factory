@@ -1,0 +1,49 @@
+# docker-compose.dev.yml — Local dev (Windows/Linux/macOS)
+# Usage: docker-compose -f docker-compose.dev.yml up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-macaron_platform}
+      POSTGRES_USER: ${PG_USER:-macaron}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-macaron_pg}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-macaron}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 3
+
+  platform:
+    build:
+      context: .
+      dockerfile: platform/Dockerfile.dev
+    ports:
+      - "8090:8099"
+    env_file:
+      - .env
+    environment:
+      - PLATFORM_LLM_PROVIDER=${PLATFORM_LLM_PROVIDER:-demo}
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg}@postgres:5432/${PG_DB:-macaron_platform}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - platform-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  platform-data:
+  pg-data:

@@ -1,0 +1,36 @@
+name: "SF -- Monitor All (AC + SAFe + Teams)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: "Verbose output"
+        required: false
+        default: "false"
+  schedule:
+    - cron: '*/30 * * * *'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
+          chmod 600 ~/.ssh/id_innovation
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Copy monitor script to Node 1
+        run: |
+          scp -i ~/.ssh/id_innovation -o StrictHostKeyChecking=no \
+            .github/scripts/sf_monitor.py \
+            sfadmin@${{ secrets.SF_NODE1_IP }}:/tmp/sf_monitor.py
+
+      - name: Run monitor on Node 1
+        run: |
+          ssh -i ~/.ssh/id_innovation -o StrictHostKeyChecking=no \
+            sfadmin@${{ secrets.SF_NODE1_IP }} \
+            'python3 /tmp/sf_monitor.py'

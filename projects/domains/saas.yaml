@@ -1,0 +1,35 @@
+# Domaine SaaS — OVH Demo
+name: "SaaS"
+env: demo
+color: "#8B5CF6"
+
+description: >
+  Applications SaaS multi-tenant (démo OVH).
+  Stack orientée scalabilité, multi-tenancy, abonnements.
+
+stack:
+  backend: "Node.js 20 + TypeScript + NestJS"
+  frontend: "React 18 + TypeScript + Tailwind CSS + shadcn/ui"
+  database: "PostgreSQL 16 (multi-tenant par schema)"
+  database_forbidden: ["SQLite"]
+  cache: "Redis 7"
+  infra: "Docker + Kubernetes / Railway"
+  ci: "GitHub Actions"
+  auth: "Clerk (ou Auth0) + JWT"
+  extra:
+    - "Abonnements : Stripe Billing"
+    - "Emails : Resend + React Email"
+    - "Analytics : PostHog (open-source)"
+    - "Feature flags : Unleash"
+    - "Tests : Vitest + Playwright"
+
+compliance:
+  - "RGPD (multi-tenant — isolation données)"
+  - "SOC2 Type II (objectif)"
+  - "OWASP Top 10"
+
+conventions: |
+  - Isolation tenant obligatoire — Row Level Security PostgreSQL
+  - Toute feature derrière un feature flag
+  - Webhook idempotents (Stripe events)
+  - Dashboard usage/metrics exposé aux admins

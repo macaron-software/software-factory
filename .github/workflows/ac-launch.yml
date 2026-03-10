@@ -1,0 +1,164 @@
+name: AC — Launch & Monitor Cycles
+
+on:
+  workflow_dispatch:
+    inputs:
+      projects:
+        description: "Comma-separated project IDs, or 'all' to auto-discover from /api/health"
+        required: false
+        default: "all"
+      action:
+        description: "Action to perform"
+        required: false
+        default: "start-or-resume"
+        type: choice
+        options:
+          - start-or-resume
+          - status-only
+          - force-restart
+
+jobs:
+  ac-launch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_INNOVATION_SSH_KEY }}" | base64 -d > ~/.ssh/id_innovation
+          chmod 600 ~/.ssh/id_innovation
+          ssh-keyscan -H "${{ secrets.SF_NODE1_IP }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Check & Launch AC cycles on Node 1
+        run: |
+          ssh -i ~/.ssh/id_innovation -o StrictHostKeyChecking=no \
+            sfadmin@${{ secrets.SF_NODE1_IP }} << 'REMOTE'
+          set -e
+          echo "=== AC Cycle Status ==="
+          
+          # Detect platform port
+          BASE_URL="http://localhost:8091"
+          for PORT in 8091 8090 8099 8080 80; do
+            RESP=$(curl -sf --max-time 3 "http://localhost:$PORT/api/health" 2>/dev/null || true)
+            if echo "$RESP" | grep -q '"status"'; then
+              BASE_URL="http://localhost:$PORT"
+              echo "Platform on port $PORT"
+              break
+            fi
+          done
+          echo "Using: $BASE_URL"
+          
+          # Auth: /api/auth/demo (public endpoint, no password required)
+          AUTH_OPTS=""
+          DEMO_RESP=$(curl -s -X POST "$BASE_URL/api/auth/demo" \
+            -H "Content-Type: application/json" -d '{}' \
+            -c /tmp/sf-cookies.txt 2>/dev/null || echo "{}")
+          if grep -q "access_token" /tmp/sf-cookies.txt 2>/dev/null; then
+            echo "Auth: OK via /api/auth/demo"
+            AUTH_OPTS="-b /tmp/sf-cookies.txt"
+          else
+            echo "Auth: FAILED (demo endpoint) — $DEMO_RESP"
+            echo "Continuing without auth (read-only endpoints only)"
+          fi
+          
+          # Helper: curl with cookie auth, never fails script
+          do_api() {
+            METHOD="$1"; URL="$2"; shift 2
+            curl -s -X "$METHOD" "$URL" $AUTH_OPTS "$@" 2>/dev/null || true
+          }
+          
+          # Check health
+          echo ""
+          HEALTH=$(curl -sf "$BASE_URL/api/health" 2>/dev/null || echo "{}")
+          echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (health parse error)"
+          
+          PROJECTS="${{ inputs.projects }}"
+          ACTION="${{ inputs.action }}"
+
+          # Auto-discover projects from /api/health when "all" (no hardcoded list)
+          if [ "$PROJECTS" = "all" ] || [ -z "$PROJECTS" ]; then
+            PROJECTS=$(echo "$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(c['project'] for c in d.get('ac_cycles',[])))" 2>/dev/null || echo "")
+            echo "Auto-discovered projects: $PROJECTS"
+          fi
+          
+          IFS=',' read -ra PROJ_LIST <<< "$PROJECTS"
+          for PROJECT in "${PROJ_LIST[@]}"; do
+            PROJECT=$(echo "$PROJECT" | tr -d ' ')
+            echo ""
+            echo "=== Processing: $PROJECT ==="
+            
+            # Get current project status
+            STATUS=$(do_api GET "$BASE_URL/api/improvement/projects" | \
+              python3 -c "import sys,json; d=json.load(sys.stdin); p=[x for x in d.get('projects',[]) if x['id']=='$PROJECT']; print(p[0]['status'] if p else 'unknown')" 2>/dev/null || echo "unknown")
+            echo "  Current status: $STATUS"
+            
+            if [ "$ACTION" = "status-only" ]; then
+              continue
+            fi
+            
+            # Start or resume based on status
+            if [ "$STATUS" = "idle" ] || [ "$STATUS" = "completed" ] || [ "$STATUS" = "unknown" ] || [ "$ACTION" = "force-restart" ]; then
+              echo "  Starting cycle for $PROJECT..."
+              RESP=$(do_api POST "$BASE_URL/api/improvement/start/$PROJECT" \
+                -H "Content-Type: application/json" -d '{}')
+              echo "  Response: $RESP"
+            elif [ "$STATUS" = "paused" ] || [ "$STATUS" = "running" ]; then
+              echo "  Resuming/injecting cycle for $PROJECT..."
+              RESP=$(do_api POST "$BASE_URL/api/improvement/inject-cycle/$PROJECT" \
+                -H "Content-Type: application/json" -d '{}')
+              echo "  Inject response: $RESP"
+            fi
+          done
+          
+          echo ""
+          echo "=== Final Status ==="
+          curl -sf "$BASE_URL/api/health" 2>/dev/null | \
+            python3 -c "import sys,json; d=json.load(sys.stdin); [print(f'  {c[\"project\"]}: cycle {c[\"cycle\"]} status={c[\"status\"]} updated={c[\"updated_at\"]}') for c in d.get('ac_cycles', [])]" 2>/dev/null || echo "  (could not parse)"
+          
+          echo ""
+          echo "=== DB Diagnostics ==="
+          PID=$(pgrep -f "uvicorn.*platform" | head -1 || echo "")
+          DB_URL=$(cat /proc/$PID/environ 2>/dev/null | tr '\0' '\n' | grep "^DATABASE_URL=" | cut -d= -f2- | head -1 || true)
+          if [ -n "$DB_URL" ]; then
+            echo "Recent sessions:"
+            psql "$DB_URL" -t -c "SELECT id, LEFT(name,40), status, created_at FROM sessions ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "Epic runs (last 5):"
+            psql "$DB_URL" -t -c "SELECT id, session_id, status, started_at FROM epic_runs ORDER BY started_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "Agent distribution in hello-html session (phase detection):"
+            psql "$DB_URL" -t -c "SELECT from_agent, COUNT(*) as msgs, MAX(timestamp) as last_seen FROM messages WHERE session_id=(SELECT id FROM sessions WHERE config_json::text LIKE '%ac-hello-html%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) GROUP BY from_agent ORDER BY last_seen DESC LIMIT 15;" 2>/dev/null | grep -v "^$" || echo "  (no data)"
+            echo "Agent distribution in fullstack-rs session:"
+            psql "$DB_URL" -t -c "SELECT from_agent, COUNT(*) as msgs, MAX(timestamp) as last_seen FROM messages WHERE session_id=(SELECT id FROM sessions WHERE config_json::text LIKE '%ac-fullstack-rs%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) GROUP BY from_agent ORDER BY last_seen DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no data)"
+            echo "LLM errors (last 10 min):"
+            psql "$DB_URL" -t -c "SELECT provider, error_type, created_at FROM llm_errors ORDER BY created_at DESC LIMIT 3;" 2>/dev/null | grep -v "^$" || echo "  (no llm_errors table)"
+            echo "AC sessions config check:"
+            psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status, LEFT(config_json,80) FROM sessions WHERE status='interrupted' AND created_at >= NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "Active/running sessions:"
+            psql "$DB_URL" -t -c "SELECT id, LEFT(name,30), status FROM sessions WHERE status IN ('active','running') ORDER BY created_at DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || true
+            echo "AC cycles scores:"
+            psql "$DB_URL" -t -c "SELECT project_id, cycle_num, total_score, status, defect_count, veto_count, LEFT(phase_scores::text,200) FROM ac_cycles ORDER BY created_at DESC LIMIT 10;" 2>/dev/null | grep -v "^$" || echo "  (no ac_cycles table or empty)"
+            echo "Message count per AC session:"
+            psql "$DB_URL" -t -c "SELECT s.id, LEFT(s.name,30), s.status, COUNT(m.id) as msgs, MAX(m.timestamp) as last_msg FROM sessions s LEFT JOIN messages m ON m.session_id=s.id WHERE s.config_json LIKE '%ac-improvement-cycle%' AND s.created_at >= NOW() - INTERVAL '24 hours' GROUP BY s.id, s.name, s.status ORDER BY s.created_at DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || true
+            echo "Last 8 msgs of most recent hello-html session (any status):"
+            psql "$DB_URL" -t -c "SELECT m.from_agent, m.timestamp::time(0), LEFT(m.content,150), m.message_type FROM messages m WHERE m.session_id=(SELECT id FROM sessions WHERE config_json::text LIKE '%ac-hello-html%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) ORDER BY m.timestamp DESC LIMIT 8;" 2>/dev/null | grep -v "^$" || echo "  (no hello-html session found)"
+            echo "Last 5 msgs of most recent fullstack-rs session (any status):"
+            psql "$DB_URL" -t -c "SELECT m.from_agent, m.timestamp::time(0), LEFT(m.content,150), m.message_type FROM messages m WHERE m.session_id=(SELECT id FROM sessions WHERE config_json::text LIKE '%ac-fullstack-rs%' AND config_json::text LIKE '%ac-improvement%' ORDER BY created_at DESC LIMIT 1) ORDER BY m.timestamp DESC LIMIT 5;" 2>/dev/null | grep -v "^$" || echo "  (no fullstack-rs session found)"
+            echo "Workspace paths:"
+            psql "$DB_URL" -t -c "SELECT id, path, is_protected, client_domain FROM projects WHERE id IN ('ac-hello-html','ac-fullstack-rs','software-factory');" 2>/dev/null | grep -v "^$" || true
+          fi
+          
+          echo "=== Docker Containers ==="
+          docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null | grep -E "ac-|proj-|macaron-app" || echo "(no AC containers)"
+          
+          echo "=== Workspace Files ==="
+          # Check DB-registered workspace path first
+          WS_PATH=$(psql "$DB_URL" -t -c "SELECT path FROM projects WHERE id='ac-hello-html';" 2>/dev/null | tr -d '[:space:]' || true)
+          for WS in "$WS_PATH" /home/sfadmin/data/workspaces/ac-hello-html /opt/software-factory/workspaces/ac-hello-html /opt/macaron/workspaces/ac-hello-html /home/sfadmin/workspaces/ac-hello-html; do
+            if [ -n "$WS" ] && [ -d "$WS" ]; then
+              echo "Found workspace: $WS"
+              find "$WS" -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.ts" -o -name "*.rs" -o -name "*.svelte" -o -name "Dockerfile" -o -name "*.md" -o -name "*.toml" -o -name "*.py" \) 2>/dev/null | head -30
+              echo "All files:"
+              find "$WS" -type f 2>/dev/null | head -30
+              echo "Git status:"
+              git -C "$WS" log --oneline -3 2>/dev/null || echo "  (no git)"
+              break
+            fi
+          done

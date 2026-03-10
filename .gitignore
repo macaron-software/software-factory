@@ -1,0 +1,79 @@
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+*.key
+CLAUDE.md
+.github/copilot-instructions.md
+
+# IDE
+.idea/
+.vscode/
+
+# Logs & runtime output
+*.log
+nohup.out
+logs/
+
+# Databases & data
+*.db
+*.db-shm
+*.db-wal
+*.duckdb
+data/
+platform/VERSION
+data/component_gallery.db
+
+# Monorepo — private dirs (NEVER push)
+_FINARY/
+_FACTORY_CORE/
+_MIGRATION_FACTORY/
+_SOFTWARE_FACTORY-old/
+_SOFTWARE_FACTORY/
+
+# Node / JS build artifacts
+node_modules/
+.next/
+.nuxt/
+.svelte-kit/
+
+# Rust build artifacts
+target/
+*.rlib
+*.rmeta
+*.d
+Cargo.lock
+
+# workspace/ — runtime data, not source
+workspace/
+!workspace/factory/
+
+# Deployment credentials
+deploy/.env
+deploy/credentials.txt
+deploy/deploy-vps.sh
+deploy/MANUAL_DEPLOY.md
+deploy/QUICK_DEPLOY.md
+deploy/setup-dns.sh
+
+# Test artifacts
+platform/tests/e2e/playwright-report/
+platform/tests/e2e/test-results/
+platform.bak

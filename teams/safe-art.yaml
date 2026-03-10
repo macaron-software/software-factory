@@ -1,0 +1,14 @@
+name: Équipe SAFe ART
+description: >
+  Équipe SAFe complète au niveau ART (Agile Release Train).
+  Pattern hiérarchique piloté par le RTE.
+pattern: hierarchical
+tags: [safe, art, portfolio, agile]
+
+agents:
+  - id: rte
+  - id: product-manager-art
+  - id: system-architect-art
+  - id: scrum_master
+  - id: chef_de_programme
+  - id: lean_portfolio_manager

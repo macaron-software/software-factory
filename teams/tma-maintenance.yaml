@@ -1,0 +1,13 @@
+name: Équipe TMA / Maintenance
+description: >
+  Équipe dédiée à la TMA et auto-heal. Idéale pour projets en production nécessitant
+  une surveillance continue, incidents et dette technique.
+pattern: wave
+tags: [tma, maintenance, production, auto-heal]
+
+agents:
+  - id: responsable_tma
+  - id: plat-tma-lead
+  - id: monitoring-ops
+  - id: backup-ops
+  - id: canary-deployer

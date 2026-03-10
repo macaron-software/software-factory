@@ -1,0 +1,14 @@
+name: Équipe Audit Sécurité
+description: >
+  Équipe spécialisée pour les audits de sécurité offensifs et défensifs.
+  Pattern cascade adversariale — le red team attaque, le blue team défend.
+pattern: adversarial-cascade
+tags: [securite, audit, pentest, compliance]
+
+agents:
+  - id: ciso
+  - id: pentester-lead
+  - id: security-architect
+  - id: compliance-officer
+  - id: security-researcher
+  - id: threat-analyst

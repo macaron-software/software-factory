@@ -1,0 +1,366 @@
+================================================================================
+SF PIPELINE INVESTIGATION — CRITICAL FINDINGS
+================================================================================
+
+INVESTIGATED AREAS (8/8):
+✓ RTE agent skill (release_train_engineer)
+✓ Product agent skill
+✓ FT-infra-lead agent (env-setup)
+✓ Worker agent (TDD sprint)
+✓ Adversarial quality system (platform/agents/adversarial.py)
+✓ Auto-resume logic (platform/services/auto_resume.py)
+✓ Session lifecycle management
+✓ RTE facilitation in platform/workflows/store.py
+
+================================================================================
+CRITICAL GAPS CAUSING STALLS
+================================================================================
+
+1. RTE AGENT — NO PHASE TRANSITION KNOWLEDGE
+   • System prompt: 4 lines, no detail on phase IDs, gates, or checkpoints
+   • Has NO TOOLS — can only speak, cannot verify criteria or trigger transitions
+   • RTE output is text-only → system ignores it and follows hard-coded phase loop
+   • Result: RTE appears powerless; cannot unblock stalled phases
+
+2. PRODUCT AGENT — UNDERSPECIFIED
+   • NO explicit system prompt (defaults to empty)
+   • Low hierarchy rank (50 = junior, can be overridden by others)
+   • Skills listed but not defined: "brainstorming", "spec-driven-quality"
+   • No template for user stories, acceptance criteria, or WSJF scoring
+   • Result: Feature-design phase produces vague requirements → downstream chaos
+
+3. WORKER AGENT — NO FEEDBACK LOOP
+   • Adversarial guard rejects output: "REJECTED (score=7): SLOP/ECHO/MOCK"
+   • Does NOT return fix suggestions or root cause
+   • Worker repeats same mistakes because system only says "rejected"
+   • No learning mechanism or corrective guidance
+   • Result: Infinite retry loops on same bad patterns
+
+4. ADVERSARIAL GUARD — LACKS GUIDANCE
+   • L0 (deterministic): Returns score only, no "here's how to fix it"
+   • L1 (semantic LLM): Requires DIFFERENT LLM — likely unavailable
+   • Rejections are BINARY: pass/fail, no actionable recommendations
+   • Result: Workers stuck; guard filters but doesn't teach
+
+5. AUTO-RESUME — HARD CEILING EFFECTS
+   • Paused runs >48h: NEVER resumed (silent abandonment)
+   • Stuck pending: Force resumed after 10 min (may interfere with normal scheduling)
+   • Failed runs: Stop retrying after 5 attempts (escalation path unknown)
+   • Slot gate: If max_active_projects hit, ALL launches blocked (no priority queue)
+   • Result: Long-stalled projects disappear; short-lived projects starve
+
+6. SESSION LIFECYCLE — NO TIMEOUT
+   • Only per-phase timeouts (PHASE_TIMEOUT_SECONDS undefined in this code)
+   • NO session-level timeout (no "mark failed after 8 hours")
+   • If last phase hangs, entire session hangs indefinitely
+   • Zombie sessions consume resources, never marked "failed"
+   • Result: Silent accumulation of stuck sessions
+
+7. RTE FACILITATION — ILLUSION OF CONTROL
+   • _rte_facilitate() sends text messages → stored in message history
+   • Does NOT trigger actual phase transitions or gating logic
+   • Phase loop continues regardless of RTE output
+   • RTE has no way to say "phase criteria not met, hold here"
+   • Result: RTE appears to orchestrate but is actually decorative
+
+================================================================================
+SCORING BREAKDOWN: ADVERSARIAL "SCORE=7" EXAMPLE
+================================================================================
+
+L0 Deterministic Checks (line 471-806 in adversarial.py):
+
+Pattern            Score  Example
+────────────────────────────────────────────────────────────────
+SLOP               +3     "lorem ipsum", "TBD", "XXX", example.com
+MOCK               +4     raise NotImplementedError, pass # TODO
+FAKE_BUILD         +7     echo "BUILD SUCCESS" (fake build script)
+TEST_CHEAT         +5     test.skip(), except: pass, coverage=0
+CODE_SLOP          +2     @ts-ignore, # type:ignore, dead code
+HALLUCINATION      +5     "I created file X" (no code_write tool)
+LIE                +5     "Ran test" (no test tool call)
+NO_TESTS           +4     3+ source files, 0 test files
+STACK_MISMATCH     +7     "Rust task" + TypeScript code
+TOO_SHORT          +2     <100 chars (role-dependent)
+ECHO               +4     >70% quoted text
+HIGH_COMPLEXITY    +3     >6 indent levels or >120 lines/function
+MISSING_DEPS       +2     Wrote Python, no requirements.txt
+FAKE_TESTS         +6     .md files in /tests/ directory
+HARDCODED_SECRET   +8     API key in source code (not test)
+SECURITY_VULN      varies  unsafe operations in production code
+
+Rejection Threshold: score >= 5 → output is REJECTED
+
+Example rejection "ADVERSARIAL REJECT score=7: SLOP/ECHO/MOCK":
+  - test.skip() found in test file: +5 (TEST_CHEAT)
+  - Placeholder comments "TODO": +2 (SLOP)
+  - Total: 7 → REJECTED
+
+L1 Semantic LLM Check (line 808+ in adversarial.py):
+  • Only runs if L0 passed AND different LLM available
+  • Uses semi-formal reasoning (arXiv:2603.01896):
+    PREMISES → TRACE → VERDICT
+  • Detects hallucinations by mapping claims to tool evidence
+  • Threshold: score >= 7 OR verdict=REJECT
+  • Gap: Likely never runs (requires different LLM provider)
+
+================================================================================
+AUTO-RESUME CANDIDATES EXAMPLE
+================================================================================
+
+Log: "auto_resume: 3 candidates (paused-continuous=1, paused-other=1, stuck-pending=1, failed-continuous=0)"
+
+Breakdown (auto_resume.py line 350):
+  • paused-continuous=1   → 1 continuous mission (TMA/security/tech-debt) paused
+  • paused-other=1        → 1 non-continuous mission paused
+  • stuck-pending=1       → 1 mission stuck pending >10 min
+  • failed-continuous=0   → 0 continuous missions with latest failure
+
+Candidate Selection Criteria (line 334-338):
+  → Pool = continuous_paused + others_paused + stuck_pending + continuous_failed
+  → Filter by exponential backoff (attempt 0-2: retry, 3+: skip or stop)
+  → Cap batch if startup stagger applied
+  → Result: 3 final candidates to resume
+
+Resume Process Per Candidate (line 387-431):
+  1. Slot gate: active containers < max_active_projects?
+  2. CPU check: system CPU < 80%?
+  3. RAM check: system RAM < 75%?
+  4. Worker dispatch: send to remote worker or run locally?
+  5. If all pass: resume the run
+
+Failure Scenarios:
+  ✗ Container limit hit: batch stops (even low-resource missions blocked)
+  ✗ CPU/RAM high: launch skipped this cycle (no backoff, just skip)
+  ✗ Worker unreachable: try local launch
+  ✗ Local launch fails: log error, try next candidate
+
+================================================================================
+PRODUCT AGENT DEFINITION (Line 418-433 in store.py)
+================================================================================
+
+AgentDef(
+    id="product",
+    name="Laura Vidal",
+    role="Product Owner",
+    description="Business value, user stories, acceptance criteria. WSJF prioritization.",
+    provider=DEFAULT_PROVIDER,
+    model=DEFAULT_MODEL,
+    temperature=0.5,  # ← moderate, can hallucinate
+    icon="clipboard",
+    color="#f78166",
+    avatar="LV",
+    tagline="Value over features",
+    is_builtin=True,
+    tags=["product", "business"],
+    skills=["brainstorming", "spec-driven-quality"],  # ← undefined skills
+    system_prompt="",  # ← MISSING! Defaults to empty string
+)
+
+Consequence:
+  • Agent relies on pure LLM behavior (temperature 0.5)
+  • No guardrails on output format
+  • No template for user stories or acceptance criteria
+  • No WSJF scoring logic
+  • Later phases inherit ambiguous requirements
+
+================================================================================
+FT-INFRA-LEAD: THE ONLY WELL-SPECIFIED AGENT
+================================================================================
+
+Why ft-infra-lead succeeds where others fail:
+
+System Prompt (Line 1189-1200):
+  "Lead DevOps. Docker, nginx, CI/CD, monitoring, Azure. Multi-tenant.
+   DEPLOY PHASE — quand phase_id contient 'deploy': après chaque déploiement réussi,
+   émettre obligatoirement un DELIVERY_REPORT avec le format suivant :
+   ```
+   DELIVERY_REPORT
+   image: <nom_image:version>
+   url: <url_deployed>
+   health: OK|FAIL
+   smoke_tests: PASS|FAIL
+   rollback_available: true|false
+   ```
+   Sans DELIVERY_REPORT, le deploy est considéré incomplet et retourne VETO."
+
+Key Differences:
+  ✓ EXPLICIT phase trigger: "quand phase_id contient 'deploy'"
+  ✓ MANDATORY output format: "émettre obligatoirement un DELIVERY_REPORT"
+  ✓ CLEAR gate: "Sans DELIVERY_REPORT, le deploy retourne VETO"
+  ✓ ACTIONABLE: System can parse DELIVERY_REPORT and validate completeness
+
+Result: Deploy phase is unambiguous. Agent knows exactly what's expected.
+        System can validate output against template.
+        This is the ONLY agent with such rigor.
+
+================================================================================
+RTE FACILITATION: THE ILLUSION
+================================================================================
+
+RTE System Prompt (Line 741-744):
+  "Tu es le Release Train Engineer (RTE). Tu orchestre l'ART.
+   Responsabilités: PI Planning, Scrum of Scrums, Inspect & Adapt.
+   Tu coordonnes 8 Feature Teams. WIP max 4 features en //.
+   PI = 5 jours. Sprints = 4h. Daily sync cross-team."
+
+RTE Capabilities:
+  • Can speak (LLM generation)
+  • Can read context (session history)
+  • CAN'T verify phase criteria (no tools)
+  • CAN'T trigger transitions (no way to signal to system)
+  • CAN'T access workspace (no code_read/list_files)
+  • CAN'T make decisions (output is advisory, system ignores it)
+
+How RTE Is Actually Used (Line 201-300 in store.py):
+
+1. Workflow engine reaches phase X
+2. Calls _rte_facilitate(prompt="Phase X starting. Kick off...")
+3. RTE generates text response via LLM
+4. Response stored in message history (SSE stream to UI)
+5. Workflow engine ignores response and continues with hard-coded logic
+
+RTE's Perceived Power vs. Actual Power:
+  PERCEIVED: "RTE orchestrates phases, facilitates team"
+  ACTUAL: "RTE sends cute messages; system marches on regardless"
+
+Example:
+  RTE prompt: "La phase X n'est pas prete a commencer. Attendez criterion Y."
+  RTE response: "D'accord, j'attends que criterion Y soit satisfait..."
+  System action: (ignores RTE, checks gate condition, moves to phase X anyway)
+  User sees: RTE message in chat history (feels like RTE is involved)
+  Reality: Phase transition was deterministic, RTE was decorative
+
+================================================================================
+PHASE TIMEOUT MYSTERY
+================================================================================
+
+Referenced: PHASE_TIMEOUT_SECONDS (line 674 in store.py)
+Defined: NOT FOUND in provided code
+Likely: Global constant or config parameter
+
+Code snippet (line 686):
+  phase_timeout = phase.timeout if phase.timeout > 0 else PHASE_TIMEOUT_SECONDS
+
+This means:
+  • Each phase can override timeout via phase.timeout
+  • If phase.timeout = 0 (or not set), use global PHASE_TIMEOUT_SECONDS
+  • Timeout reached → phase marked FAILED
+  • For "critical phases": continue anyway (line 855)
+
+Critical Phase Handling (line 855-858):
+  "# Critical phase timeout — always continue (industrial pipeline, never stop)"
+  → Even if phase times out, workflow doesn't stop
+  → Just logs warning and continues
+  → Result: Timeout is advisory, not enforced
+
+================================================================================
+WORKFLOW STATUS TRANSITIONS (Line 1045-1056 in store.py)
+================================================================================
+
+After all phases complete:
+
+1. Pipeline DoD Check (line 1012-1043):
+   Check for mandatory deliverables:
+   - INCEPTION.md
+   - Dockerfile
+   - Source code files (.vue, .js, .ts, .rs, .py, .go, .html, .jsx, .tsx)
+   - Test files (any file with "test" or "spec")
+
+2. Status Resolution:
+   if run.status == "running":
+       run.status = "completed"
+   
+   # Map to session status
+   session_status = {
+       "completed": "completed",
+       "completed_with_gaps": "completed",  # ← missing deliverables
+       "failed": "failed",
+       "gated": "interrupted",
+       "paused": "interrupted",
+       "escalated": "interrupted",
+   }.get(run.status, "completed")
+
+3. Session Update:
+   store.update_status(session_id, session_status)
+
+4. RTE Closing (line 1073-1080):
+   RTE sends final summary message (text, not a gating event)
+
+Gap: No session-level timeout. Session can remain "running" forever.
+
+================================================================================
+SUMMARY: WHY THE PIPELINE STALLS
+================================================================================
+
+ROOT CAUSE CHAIN:
+
+1. Worker produces output
+   ↓
+2. Adversarial guard checks output
+   ↓
+3. If score >= 5:
+   a. Output REJECTED
+   b. Worker gets score but NO fix suggestions
+   c. Worker retries with same pattern
+   d. Score likely remains >=5
+   e. Loop continues indefinitely
+   ↓
+4. Meanwhile:
+   a. Product agent (no system prompt) produces vague requirements
+   b. RTE (no tools) can't verify requirements
+   c. Downstream phases inherit unclear spec
+   d. Workers struggle with unclear acceptance criteria
+   ↓
+5. Phase timeouts kick in:
+   a. Per-phase timeout reached (likely hours)
+   b. Phase marked FAILED but "critical phases" continue anyway
+   c. Workflow has no session-level timeout
+   d. Session hangs in "running" state
+   ↓
+6. Auto-resume watchdog runs:
+   a. Sees stalled run, tries to resume
+   b. Hit exponential backoff ceiling (attempt 5+)
+   c. Run abandoned silently (no escalation)
+   ↓
+7. Result: STALL
+   • Workers looping on rejected output
+   • Product spec unclear
+   • RTE powerless
+   • Auto-resume gives up
+   • Session hangs indefinitely
+
+================================================================================
+RECOMMENDED IMMEDIATE FIXES
+================================================================================
+
+PRIORITY 1 (Unblock workers):
+  1. Modify adversarial guard to return fix suggestions
+  2. Add structured "retry with this guidance" response
+  3. Example: {"score": 7, "fix": "Remove test.skip(), add real test body"}
+
+PRIORITY 2 (Empower RTE):
+  1. Add tools to RTE: verify_phase_criteria(), advance_phase()
+  2. RTE system prompt: "Use tools to validate, then advance"
+  3. System: honor RTE phase transitions (not just hard-coded loop)
+
+PRIORITY 3 (Specify product):
+  1. Add detailed system prompt to product agent
+  2. Template: "Output must be JSON with array of user stories"
+  3. Acceptance criteria: "Each story must have Given/When/Then"
+
+PRIORITY 4 (Session timeout):
+  1. Add WORKFLOW_TIMEOUT_SECONDS (default 8h)
+  2. Check at workflow start: if time > timeout, mark "failed"
+  3. Zombie session cleanup job
+
+PRIORITY 5 (Auto-resume thresholds):
+  1. Extend paused run window from 48h to 7 days
+  2. Increase exponential backoff ceiling from 5 to 10 attempts
+  3. Add escalation path (alert human after attempt 8)
+
+================================================================================
+FULL INVESTIGATION REPORT
+================================================================================
+See: /Users/sylvain/_MACARON-SOFTWARE/_SOFTWARE_FACTORY/dashboard/INVESTIGATION_SF_PIPELINE.md
+     (757 lines, detailed findings for all 8 areas)
+

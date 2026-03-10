@@ -1,0 +1,1138 @@
+<p align="center">
+  <a href="README.md">English</a> |
+  <a href="README.fr.md">Français</a> |
+  <a href="README.zh-CN.md">中文</a> |
+  <a href="README.es.md">Español</a> |
+  <a href="README.ja.md">日本語</a> |
+  <a href="README.pt.md">Português</a> |
+  <a href="README.de.md">Deutsch</a> |
+  <a href="README.ko.md">한국어</a> |
+  <a href="README.hi.md">हिन्दी</a> |
+  <a href="README.ru.md">Русский</a> |
+  <a href="README.ar.md">العربية</a> |
+  <a href="README.id.md">Bahasa</a> |
+  <a href="README.tr.md">Türkçe</a> |
+  <a href="README.it.md">Italiano</a> |
+  <a href="README.nl.md">Nederlands</a> |
+  <a href="README.vi.md">Tiếng Việt</a> |
+  <a href="README.pl.md">Polski</a> |
+  <a href="README.sv.md">Svenska</a>
+</p>
+
+<div align="center">
+
+# Software Factory
+
+**多智能体软件工厂 — 自主 AI 智能体编排完整产品生命周期**
+
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-green.svg)](https://fastapi.tiangolo.com/)
+
+**[Live: sf.macaron-software.com](https://sf.macaron-software.com)**
+
+[功能特性](#功能特性) · [快速开始](#快速开始) · [截图预览](#截图预览) · [架构设计](#架构设计) · [参与贡献](#参与贡献)
+
+</div>
+
+---
+
+## 这是什么？
+
+Software Factory 是一个**自主多智能体平台**，它编排整个软件开发生命周期 — 从构思到部署 — 使用专业化 AI 智能体协同工作。
+
+可以将其视为一个**虚拟软件工厂**，其中 192 个 AI 智能体通过结构化工作流进行协作，遵循 SAFe 方法论、TDD 实践和自动化质量门控。
+
+### 核心亮点
+
+- **192 个专业智能体** — 架构师、开发者、测试工程师、SRE、安全分析师、产品负责人
+- **46 个内置工作流** — SAFe 仪式、质量门控、夜间维护、安全、知识管理
+- **知识管理** — 4 个专用智能体、ART 知识团队、夜间 `knowledge-maintenance` 工作流
+- **内存智能** — 相关性评分、访问追踪、自动清除过期条目
+- **LLM 成本追踪** — 任务时间线标签页标题中显示每个任务的成本
+- **任务时间线** — Mission Control 中以泳道方式显示阶段持续时间的时间线标签页
+- **10 种编排模式** — 单智能体、顺序、并行、层级、网络、循环、路由、聚合、波次、人机协作
+- **SAFe 对齐生命周期** — Portfolio → Epic → Feature → Story，PI 节奏驱动
+- **自动修复** — 自主事件检测、分类和自修复
+- **LLM 弹性** — 多提供商回退、抖动重试、速率限制感知；gpt-5.2 用于推理/架构，gpt-5.2-codex 用于代码/TDD，gpt-5-mini 用于文档/讨论
+- **OpenTelemetry 可观测性** — Jaeger 分布式追踪、流水线分析仪表盘
+- **持续看门狗** — 自动恢复暂停运行、过期会话恢复、失败清理
+- **安全优先** — 提示注入防护、RBAC、密钥清洗、连接池
+- **DORA 指标** — 部署频率、前置时间、MTTR、变更失败率
+- **多节点集群** — 主/从拓扑、共享 PostgreSQL、被动故障切换、顶栏实时节点徽章
+
+## 截图预览
+
+<table>
+<tr>
+<td width="50%">
+<strong>仪表盘 — 自适应 SAFe 视角</strong><br>
+<img src="docs/screenshots/en/dashboard.png" alt="Dashboard" width="100%">
+</td>
+<td width="50%">
+<strong>Portfolio — 战略待办与 WSJF</strong><br>
+<img src="docs/screenshots/en/portfolio.png" alt="Portfolio Dashboard" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>PI 看板 — 项目增量规划</strong><br>
+<img src="docs/screenshots/en/pi_board.png" alt="PI Board" width="100%">
+</td>
+<td width="50%">
+<strong>创意工坊 — AI 驱动的头脑风暴</strong><br>
+<img src="docs/screenshots/en/ideation.png" alt="Ideation" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>ART — 敏捷发布列车与智能体团队</strong><br>
+<img src="docs/screenshots/en/agents.png" alt="Agent Teams" width="100%">
+</td>
+<td width="50%">
+<strong>仪式 — 工作流模板与模式</strong><br>
+<img src="docs/screenshots/en/ceremonies.png" alt="Ceremonies" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>监控 — DORA 指标与系统健康</strong><br>
+<img src="docs/screenshots/en/monitoring.png" alt="Monitoring" width="100%">
+</td>
+<td width="50%">
+<strong>新手引导 — SAFe 角色选择向导</strong><br>
+<img src="docs/screenshots/en/onboarding.png" alt="Onboarding" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>首页 — CTO Jarvis / 业务创意 / 项目创意 标签页</strong><br>
+<img src="docs/screenshots/en/home.png" alt="首页" width="100%">
+</td>
+<td width="50%">
+<strong>CTO Jarvis — 战略AI顾问</strong><br>
+<img src="docs/screenshots/en/jarvis.png" alt="CTO Jarvis" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>业务创意 — 6智能体营销团队</strong><br>
+<img src="docs/screenshots/en/mkt_ideation.png" alt="业务创意" width="100%">
+</td>
+<td width="50%">
+<strong>项目创意 — 多智能体技术团队</strong><br>
+<img src="docs/screenshots/en/ideation_projet.png" alt="项目创意" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>设置中心 — 并发数、预算 & YOLO 模式 (/settings)</strong><br>
+<img src="docs/screenshots/en/settings.png" alt="设置" width="100%">
+</td>
+<td width="50%">
+<strong>任务指挥中心 — 实时驾驶舱 (/cockpit)</strong><br>
+<img src="docs/screenshots/en/cockpit.png" alt="任务驾驶舱" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>任务看板 — 全部任务与执行记录 (/missions)</strong><br>
+<img src="docs/screenshots/en/missions.png" alt="任务看板" width="100%">
+</td>
+<td width="50%">
+<strong>记忆 & 知识 — 四层 RAG (/memory)</strong><br>
+<img src="docs/screenshots/en/memory.png" alt="记忆" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>工作流 — 46 条内置流水线 (/workflows)</strong><br>
+<img src="docs/screenshots/en/workflows.png" alt="工作流" width="100%">
+</td>
+<td width="50%">
+<strong>OPS — 自动修复 & 基础设施 (/ops)</strong><br>
+<img src="docs/screenshots/en/ops.png" alt="OPS 仪表盘" width="100%">
+</td>
+</tr>
+<tr>
+<td width="50%">
+<strong>RBAC — 基于角色的访问控制 (/rbac)</strong><br>
+<img src="docs/screenshots/en/rbac.png" alt="RBAC" width="100%">
+</td>
+<td width="50%">
+<strong>产品待办列表 — Epics、Features & Stories (/backlog)</strong><br>
+<img src="docs/screenshots/en/backlog.png" alt="待办列表" width="100%">
+</td>
+</tr>
+</table>
+
+## macOS 应用程序
+
+提供一款**原生 SwiftUI macOS 应用**（支持 Apple Silicon 和 Rosetta 2），可配合 Web 平台使用，支持完全离线的本地 SF 实例，以及连接 OVH 和 Azure 部署的远程连接器。
+
+### 下载
+
+[![macOS v0.01](https://img.shields.io/badge/macOS-v0.01-purple.svg)](https://github.com/macaron-software/software-factory/releases/tag/v0.01)
+
+```bash
+# 下载并运行（Apple Silicon）
+curl -L https://github.com/macaron-software/software-factory/releases/download/v0.01/SFApp-macos-arm64.zip -o SFApp.zip
+unzip SFApp.zip && ./SFApp
+```
+
+> 若 macOS 阻止运行：**系统设置 → 隐私与安全性 → 仍然打开**
+
+### 功能特性
+- **内置本地 SF** — 使用 Ollama/MLX（Qwen、Llama 等）或 API 密钥运行 Agent，无需服务器
+- **3 个远程连接器** — 本地 SF / OVH 演示 / Azure 生产（双节点 HA）
+- **100% 与 Web 功能一致** — Agent、任务、项目、TMA、Wiki、分析、DORA、评估、创意、RBAC
+- **引导向导** — 自动检测 MLX/Ollama 模型，无需配置文件
+- **22 项单元测试** — WSJF 评分、LLM 配置、引导流程、实例管理
+
+---
+
+## 快速开始
+
+### 方式一：Docker（推荐）
+
+Docker 镜像包含：**Node.js 20**、**Playwright + Chromium**、**bandit**、**semgrep**、**ripgrep**。
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+make setup   # copies .env.example → .env (edit it to add your LLM API key)
+make run     # builds & starts the platform
+```
+
+打开 http://localhost:8090 — 点击 **"Skip (Demo)"** 即可无需 API 密钥进行探索。
+
+### 方式二：本地安装
+
+```bash
+git clone https://github.com/macaron-software/software-factory.git
+cd software-factory
+cp .env.example .env                # create your config (edit to add LLM key — see Step 3)
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r platform/requirements.txt
+
+# Start platform
+make dev
+# or manually: PYTHONPATH=$(pwd) python3 -m uvicorn platform.server:app --host 0.0.0.0 --port 8090 --ws none
+```
+
+打开 http://localhost:8090 — 首次启动时将看到**新手引导向导**。
+选择您的 SAFe 角色或点击 **"Skip (Demo)"** 立即开始探索。
+
+### 步骤三：配置 LLM 提供商
+
+如果没有 API 密钥，平台将以**演示模式**运行 — 智能体以模拟答案进行响应。
+这对于探索 UI 很有用，但智能体不会生成真正的代码或分析结果。
+
+要启用真正的 AI 智能体，请编辑 `.env` 并添加**一个** API 密钥：
+
+```bash
+# Option A: MiniMax (recommended for getting started)
+PLATFORM_LLM_PROVIDER=minimax
+MINIMAX_API_KEY=sk-your-key-here
+
+# Option B: Azure OpenAI
+PLATFORM_LLM_PROVIDER=azure-openai
+AZURE_OPENAI_API_KEY=your-key
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+
+# Option C: NVIDIA NIM
+PLATFORM_LLM_PROVIDER=nvidia
+NVIDIA_API_KEY=nvapi-your-key-here
+```
+
+然后重启：`make run`（Docker）或 `make dev`（本地）
+
+| Provider | Env Variable | Models |
+|----------|-------------|--------|
+| **MiniMax** | `MINIMAX_API_KEY` | MiniMax-M2.5 |
+| **Azure OpenAI** | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-5-mini |
+| **Azure AI Foundry** | `AZURE_AI_API_KEY` + `AZURE_AI_ENDPOINT` | GPT-5.2 |
+| **NVIDIA NIM** | `NVIDIA_API_KEY` | Kimi K2 |
+
+平台会自动回退到其他已配置的提供商（当主提供商失败时）。
+您也可以在仪表盘的**设置**页面（`/settings`）中配置提供商。
+
+## 入门指南 — 您的第一个项目
+
+安装完成后，以下是从创意到可用项目的流程：
+
+### 路径 A：询问 CTO Jarvis（最快）
+
+1. **打开首页** (`/`) — 平台从 CTO Jarvis 标签启动
+2. **输入您的项目想法** — 例如 *"用 React 和 Python 创建一个企业拼车应用的新项目"*
+3. **Jarvis（Gabriel Mercier，战略编排者）** 分析请求、创建项目、配置 SAFe 待办事项列表并启动首个任务 — 全在一次对话中完成
+
+这是所有新项目的**推荐入口**。
+
+### 路径 B：手动创建项目
+
+1. 前往 `/projects` 并点击 **"New Project"**
+2. 填写：名称、描述、技术栈、仓库路径
+3. 平台自动创建：
+   - 分配到项目的**产品经理智能体**
+   - **TMA 任务**（持续运维 — 监控健康状态、创建事件）
+   - **安全任务**（每周安全审计 — SAST、依赖检查）
+   - **技术债务任务**（每月债务消减 — 规划中）
+
+### 接下来：创建史诗和功能特性
+
+- 从 **Portfolio** 页面（`/portfolio`），创建带有 WSJF 优先级的史诗
+- 从史诗中添加**功能特性**，并将其分解为**用户故事**
+- 使用 **PI 看板**（`/pi-board`）规划项目增量，将功能特性分配到冲刺中
+
+### 运行任务
+
+- 点击任意任务上的 **"Start"** 启动智能体执行
+- 选择**编排模式**（层级、网络、并行...）
+- 在**任务控制中心**实时观察智能体工作
+- 智能体自主使用工具（code_read、git、build、test、安全扫描）
+
+### TMA 与安全 — 始终在线
+
+这些功能为每个项目**自动启用** — 无需配置：
+
+| Mission | Type | Schedule | What it does |
+|---------|------|----------|-------------|
+| **TMA** | Program | Continuous | 健康监控、事件检测、自动修复、工单创建 |
+| **Security** | Review | Weekly | SAST 扫描（bandit/semgrep）、依赖审计、密钥检测 |
+| **Tech Debt** | Reduction | Monthly | 代码质量分析、重构建议 |
+| **Self-Healing** | Program | Continuous | 自动检测 5xx/崩溃 → TMA 任务 → 智能体诊断 → 代码修复 → 验证 |
+
+四个任务随项目一起创建。TMA、安全和自修复以**活跃**状态启动，技术债务以**规划**状态启动（准备好时激活）。
+
+## 功能特性
+
+### 192 个专业 AI 智能体
+
+智能体按团队组织，镜像真实软件组织结构：
+
+| Team | Agents | Role |
+|------|--------|------|
+| **Product** | Product Manager, Business Analyst, PO | SAFe 规划、WSJF 优先级排序 |
+| **Architecture** | Solution Architect, Tech Lead, System Architect | 架构决策、设计模式 |
+| **Development** | Backend/Frontend/Mobile/Data Engineers | 按技术栈 TDD 实现 |
+| **Quality** | QA Engineers, Security Analysts, Test Automation | 测试、安全审计、渗透测试 |
+| **Design** | UX Designer, UI Designer | 用户体验、视觉设计 |
+| **DevOps** | DevOps Engineer, SRE, Platform Engineer | CI/CD、监控、基础设施 |
+| **Management** | Scrum Master, RTE, Agile Coach | 仪式、促进、障碍移除 |
+
+### 10 种编排模式
+
+- **Solo** — 单智能体执行简单任务
+- **Sequential** — 智能体按顺序依次执行的流水线
+- **Parallel** — 多个智能体同时工作
+- **Hierarchical** — 管理者向子智能体委派任务
+- **Network** — 智能体点对点协作
+- **Loop** — 智能体迭代执行直到满足条件
+- **Router** — 单智能体根据输入路由到专家
+- **Aggregator** — 多个输入由单个聚合器合并
+- **Wave** — 波次内并行，波次间顺序执行
+- **Human-in-the-loop** — 智能体提议，人类验证
+
+### SAFe 对齐生命周期
+
+完整的 Portfolio → Epic → Feature → Story 层级体系，包含：
+
+- **战略 Portfolio** — 投资组合画布、战略主题、价值流
+- **项目增量** — PI 规划、目标、依赖关系
+- **团队待办** — 用户故事、任务、验收标准
+- **冲刺执行** — 每日站会、冲刺评审、回顾
+
+### 安全与合规
+
+- **身份认证** — 基于 JWT 的认证，支持 RBAC
+- **提示注入防护** — 检测并阻止恶意提示
+- **密钥清洗** — 自动脱敏处理敏感数据
+- **CSP（内容安全策略）** — 加固的响应头
+- **速率限制** — 按用户的 API 配额
+- **审计日志** — 全面的活动日志记录
+
+### DORA 指标与监控
+
+- **部署频率** — 代码到达生产环境的频率
+- **前置时间** — 从提交到部署的时间
+- **MTTR** — 事件恢复的平均时间
+- **变更失败率** — 失败部署的百分比
+- **实时仪表盘** — Chart.js 可视化
+- **Prometheus 指标** — /metrics 端点
+
+### 质量指标 — 工业化监控
+
+确定性质量扫描（无需 LLM），涵盖 10 个维度，如同生产流水线：
+
+| Dimension | Tools | What it measures |
+|-----------|-------|-----------------|
+| **Complexity** | radon, lizard | 圈复杂度、认知复杂度 |
+| **Unit Test Coverage** | coverage.py, nyc | 行/分支覆盖率百分比 |
+| **E2E Test Coverage** | Playwright | 测试文件数量、规格覆盖 |
+| **Security** | bandit, semgrep | 按严重级别的 SAST 发现（严重/高/中/低） |
+| **Accessibility** | pa11y | WCAG 2.1 AA 违规 |
+| **Performance** | Lighthouse | Core Web Vitals 评分 |
+| **Documentation** | interrogate | README、变更日志、API 文档、文档字符串覆盖 |
+| **Architecture** | madge, jscpd, mypy | 循环依赖、代码重复、类型错误 |
+| **Maintainability** | custom | 文件大小分布、大文件比例 |
+| **Adversarial** | built-in | 事件率、对抗性拒绝率 |
+
+**工作流阶段的质量门控** — 每个工作流阶段显示质量徽章（PASS/FAIL/PENDING），基于按门控类型配置的维度阈值：
+
+| Gate Type | Threshold | Used in |
+|-----------|-----------|---------|
+| `always` | 0% | 分析、规划阶段 |
+| `no_veto` | 50% | 实现、冲刺阶段 |
+| `all_approved` | 70% | 评审、发布阶段 |
+| `quality_gate` | 80% | 部署、生产阶段 |
+
+**质量仪表盘**位于 `/quality` — 全局记分卡、项目分数、趋势快照。
+质量徽章显示在任务详情、项目看板、工作流阶段和主仪表盘上。
+
+### 持续改进工作流
+
+三个用于自我改进的内置工作流：
+
+| Workflow | Purpose | Agents |
+|----------|---------|--------|
+| **quality-improvement** | 扫描指标 → 识别最差维度 → 规划并执行改进 | QA Lead, Dev, Architect |
+| **retrospective-quality** | 冲刺结束回顾：收集 ROTI、事件、质量数据 → 行动项 | Scrum Master, QA, Dev |
+| **skill-evolution** | 分析智能体表现 → 更新系统提示 → 进化技能 | Brain, Lead Dev, QA |
+
+这些工作流创建了一个**反馈循环**：指标 → 分析 → 改进 → 重新扫描 → 跟踪进度。
+
+### 内置智能体工具
+
+Docker 镜像包含智能体自主工作所需的一切：
+
+| Category | Tools | Description |
+|----------|-------|-------------|
+| **Code** | `code_read`, `code_write`, `code_edit`, `code_search`, `list_files` | 读取、写入和搜索项目文件 |
+| **Build** | `build`, `test`, `local_ci` | 运行构建、测试和本地 CI 流水线（自动检测 npm/pip/cargo） |
+| **Git** | `git_commit`, `git_diff`, `git_log`, `git_status` | 版本控制，智能体分支隔离 |
+| **Security** | `sast_scan`, `dependency_audit`, `secrets_scan` | 通过 bandit/semgrep 进行 SAST、CVE 审计、密钥检测 |
+| **QA** | `playwright_test`, `browser_screenshot`, `screenshot` | Playwright 端到端测试和截图（包含 Chromium） |
+| **Tickets** | `create_ticket`, `jira_search`, `jira_create` | 为 TMA 跟踪创建事件/工单 |
+| **Deploy** | `docker_deploy`, `docker_status`, `github_actions` | 容器部署和 CI/CD 状态 |
+| **Memory** | `memory_store`, `memory_search`, `deep_search` | 跨会话的持久化项目记忆 |
+
+### 自动修复与自修复（TMA）
+
+自主事件检测、分类和自修复循环：
+
+- **心跳监控** — 对所有运行中的任务和服务进行持续健康检查
+- **事件自动检测** — HTTP 5xx、超时、智能体崩溃 → 自动创建事件
+- **分类与归类** — 严重级别（P0-P3）、影响分析、根因假设
+- **自修复** — 智能体自主诊断并修复问题（代码补丁、配置变更、重启）
+- **工单创建** — 未解决的事件自动创建跟踪工单供人工审查
+- **升级** — P0/P1 事件触发 Slack/邮件通知给值班团队
+- **回顾循环** — 事后复盘经验存储在记忆中，注入到后续冲刺
+
+### SAFe 视角与新手引导
+
+基于角色的自适应 UI，镜像真实 SAFe 组织：
+
+- **9 个 SAFe 视角** — Portfolio 经理、RTE、产品负责人、Scrum Master、开发者、架构师、QA/安全、业务负责人、管理员
+- **自适应仪表盘** — KPI、快捷操作和侧边栏链接随所选角色变化
+- **新手引导向导** — 3 步首次用户流程（选择角色 → 选择项目 → 开始）
+- **视角选择器** — 随时从顶部下拉菜单切换 SAFe 角色
+- **动态侧边栏** — 仅显示与当前视角相关的导航
+
+### 4 层记忆与 RLM 深度搜索
+
+跨会话的持久化知识与智能检索：
+
+- **会话记忆** — 单次会话内的对话上下文
+- **模式记忆** — 编排模式执行中的经验学习
+- **项目记忆** — 项目级知识（决策、约定、架构）
+- **全局记忆** — 跨项目的组织级知识（FTS5 全文搜索）
+- **自动加载项目文件** — CLAUDE.md、SPECS.md、VISION.md、README.md 注入到每次 LLM 提示中（最大 8K）
+- **RLM 深度搜索** — 递归语言模型（arXiv:2512.24601）— 迭代 WRITE-EXECUTE-OBSERVE-DECIDE 循环，最多 10 次探索迭代
+
+### 智能体交易市场（Mercato）
+
+基于代币的智能体市场，用于团队组成：
+
+- **智能体列表** — 列出待转让的智能体及要价
+- **自由智能体池** — 未分配的可选秀智能体
+- **转会与租借** — 在项目之间买入、卖出或租借智能体
+- **市场估值** — 基于技能、经验和表现的自动智能体估值
+- **钱包系统** — 每个项目的代币钱包及交易历史
+- **选秀系统** — 为您的项目认领自由智能体
+
+### 对抗性质量守卫
+
+双层质量门控，阻止虚假/占位代码通过：
+
+- **L0 确定性** — 即时检测虚假内容（lorem ipsum、TBD）、模拟代码（NotImplementedError、TODO）、假构建、幻觉、技术栈不匹配
+- **L1 LLM 语义** — 独立 LLM 审查执行模式的输出质量
+- **评分** — 分数 < 5 通过，5-6 软通过并带警告，7+ 拒绝
+- **强制拒绝** — 幻觉、虚假内容、技术栈不匹配、假构建始终被拒绝，不论分数
+
+### 自动文档与 Wiki
+
+整个生命周期中的自动文档生成：
+
+- **冲刺回顾** — LLM 生成的回顾笔记存储在数据库和记忆中，注入到下一个冲刺提示中（学习循环）
+- **阶段摘要** — 每个任务阶段产生 LLM 生成的决策和结果摘要
+- **架构决策记录** — 架构模式自动将设计决策记录在项目记忆中
+- **项目上下文文件** — 自动加载的指令文件（CLAUDE.md、SPECS.md、CONVENTIONS.md）作为活文档
+- **Confluence 同步** — 与 Confluence wiki 页面的双向同步，用于企业文档管理
+- **Swagger 自动文档** — 94 个 REST 端点在 `/docs` 自动生成 OpenAPI 规范文档
+
+## 四种接口
+
+### 1. Web 仪表盘（HTMX + SSE）
+
+主 UI 地址 http://localhost:8090：
+
+- **实时多智能体对话**，SSE 流式传输
+- **PI 看板** — 项目增量规划
+- **任务控制中心** — 执行监控
+- **智能体管理** — 查看、配置、监控智能体
+- **事件仪表盘** — 自动修复分类
+- **移动端响应** — 支持平板和手机
+
+### 2. CLI (`sf`)
+
+功能齐全的命令行界面：
+
+```bash
+# Install (add to PATH)
+ln -s $(pwd)/cli/sf.py ~/.local/bin/sf
+
+# Browse
+sf status                              # Platform health
+sf projects list                       # All projects
+sf missions list                       # Missions with WSJF scores
+sf agents list                         # 192 agents
+sf features list <epic_id>             # Epic features
+sf stories list --feature <id>         # User stories
+
+# Work
+sf ideation "e-commerce app in React"  # Multi-agent ideation (streamed)
+sf missions start <id>                 # Start mission run
+sf metrics dora                        # DORA metrics
+
+# Monitor
+sf incidents list                      # Incidents
+sf llm stats                           # LLM usage (tokens, cost)
+sf chaos status                        # Chaos engineering
+```
+
+**22 个命令组** · 双模式：API（在线服务器）或 DB（离线） · JSON 输出（`--json`） · 加载动画 · Markdown 表格渲染
+
+### 3. REST API + Swagger
+
+94 个 API 端点在 `/docs`（Swagger UI）自动文档化：
+
+```bash
+# Examples
+curl http://localhost:8090/api/projects
+curl http://localhost:8090/api/agents
+curl http://localhost:8090/api/missions
+curl -X POST http://localhost:8090/api/ideation \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "bike GPS tracker app"}'
+```
+
+Swagger UI: http://localhost:8090/docs
+
+### 4. MCP 服务器（Model Context Protocol）
+
+24 个 MCP 工具用于 AI 智能体集成（端口 9501）：
+
+```bash
+# Start MCP server
+python3 -m platform.mcp_platform.server
+
+# Tools available:
+# platform_agents, platform_projects, platform_missions,
+# platform_features, platform_sprints, platform_stories,
+# platform_incidents, platform_llm, platform_search, ...
+```
+
+## 架构设计
+
+### 平台概览
+
+```
+                        ┌──────────────────────┐
+                        │   CLI (sf) / Web UI  │
+                        │   REST API :8090     │
+                        └──────────┬───────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │     FastAPI Server           │
+                    │  Auth (JWT + RBAC + OAuth)   │
+                    │  17 route modules            │
+                    └──┬──────────┬────────────┬───┘
+                       │          │            │
+          ┌────────────┴┐   ┌────┴─────┐   ┌──┴───────────┐
+          │ Agent Engine │   │ Workflow │   │   Mission    │
+          │ 192 agents   │   │  Engine  │   │    Layer     │
+          │ executor     │   │ 46 defs  │   │ SAFe cycle   │
+          │ loop+retry   │   │ 10 ptrns │   │ Portfolio    │
+          └──────┬───────┘   │ phases   │   │ Epic/Feature │
+                 │           │ retry    │   │ Story/Sprint │
+                 │           │ skip     │   └──────────────┘
+                 │           │ ckpoint  │
+                 │           └────┬─────┘
+                 │                │
+     ┌───────────┴────────────────┴───────────────┐
+     │              Services                       │
+     │  LLM Client (multi-provider fallback)       │
+     │  Tools (code, git, deploy, memory, security)│
+     │  MCP Bridge (fetch, memory, playwright)     │
+     │  Quality Engine (10 dimensions)             │
+     │  Notifications (Slack, Email, Webhook)      │
+     └───────────────────┬─────────────────────────┘
+                         │
+     ┌───────────────────┴─────────────────────────┐
+     │              Operations                      │
+     │  Watchdog (auto-resume, stall detection)     │
+     │  Auto-Heal (incident > triage > fix)         │
+     │  OpenTelemetry (tracing + metrics > Jaeger)  │
+     └───────────────────┬─────────────────────────┘
+                         │
+              ┌──────────┴──────────┐
+              │   SQLite + Memory   │
+              │   4-layer memory    │
+              │   FTS5 search       │
+              └─────────────────────┘
+```
+
+### 流水线流程
+
+```
+Mission Created
+     │
+     ▼
+┌─────────────┐     ┌──────────┐    ┌──────────┐    ┌──────────┐
+│  Select     │────▶│sequential│    │ parallel │    │hierarchic│
+│  Pattern    │────▶│          │    │          │    │          │
+└─────────────┘────▶│ adversar.│    │          │    │          │
+                    └────┬─────┘    └────┬─────┘    └────┬─────┘
+                         └───────────────┴───────────────┘
+                                         │
+                    ┌────────────────────────────────────────┐
+                    │         Phase Execution                 │
+                    │                                        │
+                    │  Agent ──▶ LLM Call ──▶ Result         │
+                    │                          │             │
+                    │              ┌───success──┴──failure──┐│
+                    │              ▼                        ▼│
+                    │         Code phase?            Retries? │
+                    │           │ yes                  │ yes │
+                    │           ▼                      ▼     │
+                    │     Sandbox Build         Retry w/     │
+                    │     Validation            backoff      │
+                    │           │                      │ no  │
+                    │           ▼                      ▼     │
+                    │     Quality Gate          skip_on_fail?│
+                    │      │        │            │yes  │no   │
+                    │    pass     fail            │     │     │
+                    │      │        │             │     ▼     │
+                    │      ▼        ▼             │   PAUSED  │
+                    │  Checkpoint  PAUSED ◀───────┘     │     │
+                    └──────┬─────────────────────────────┘    │
+                           │                                  │
+                    More phases? ──yes──▶ next phase          │
+                           │ no                               │
+                           ▼                    watchdog      │
+                    Mission Completed     auto-resume ◀───────┘
+```
+
+### 可观测性
+
+```
+┌──────────────────────┐    ┌────────────────────────────────┐
+│   OTEL Middleware     │    │     Continuous Watchdog         │
+│   (every request)     │    │                                │
+│   spans + metrics     │    │  health check    every 60s     │
+│         │             │    │  stall detection  phases>60min │
+│         ▼             │    │  auto-resume     5/batch 5min  │
+│   OTLP/HTTP export    │    │  session recovery  >30min      │
+│         │             │    │  failed cleanup   zombies      │
+│         ▼             │    └────────────────────────────────┘
+│   Jaeger :16686       │
+└──────────────────────┘    ┌────────────────────────────────┐
+                            │     Failure Analysis            │
+┌──────────────────────┐    │                                │
+│   Quality Engine      │    │  error classification          │
+│   10 dimensions       │    │  phase heatmap                 │
+│   quality gates       │    │  recommendations               │
+│   radar chart         │    │  resume-all button             │
+│   badge + scorecard   │    └────────────────────────────────┘
+└──────────────────────┘
+                            ┌────────────────────────────────┐
+         All data ─────────▶│  Dashboard /analytics           │
+                            │  tracing stats + latency chart  │
+                            │  error doughnut + phase bars    │
+                            │  quality radar + scorecard      │
+                            └────────────────────────────────┘
+```
+
+### 部署架构
+
+```
+Docker（推荐）→ http://localhost:8090
+本地（开发） → http://localhost:8090
+生产环境      → 您自己的基础设施
+```
+
+## 项目配置
+
+项目定义在 `projects/*.yaml` 中：
+
+```yaml
+project:
+  name: my-project
+  root_path: /path/to/project
+  vision_doc: CLAUDE.md
+
+agents:
+  - product_manager
+  - solution_architect
+  - backend_dev
+  - qa_engineer
+
+patterns:
+  ideation: hierarchical
+  development: parallel
+  review: adversarial-pair
+
+deployment:
+  strategy: blue-green
+  auto_prod: true
+  health_check_url: /health
+
+monitoring:
+  prometheus: true
+  grafana_dashboard: project-metrics
+```
+
+## 目录结构
+
+```
+├── platform/                # Agent Platform (152 Python files)
+│   ├── server.py            # FastAPI app, port 8090
+│   ├── agents/              # Agent loop, executor, store
+│   ├── a2a/                 # Agent-to-agent messaging bus
+│   ├── patterns/            # 10 orchestration patterns
+│   ├── missions/            # SAFe mission lifecycle
+│   ├── sessions/            # Conversation runner + SSE
+│   ├── web/                 # Routes + Jinja2 templates
+│   ├── mcp_platform/        # MCP server (23 tools)
+│   └── tools/               # Agent tools (code, git, deploy)
+│
+├── cli/                     # CLI 'sf' (6 files, 2100+ LOC)
+│   ├── sf.py                # 22 command groups, 40+ subcommands
+│   ├── _api.py              # httpx REST client
+│   ├── _db.py               # sqlite3 offline backend
+│   ├── _output.py           # ANSI tables, markdown rendering
+│   └── _stream.py           # SSE streaming with spinner
+│
+├── dashboard/               # Frontend HTMX
+├── deploy/                  # Helm charts, Docker, K8s
+├── tests/                   # E2E Playwright tests
+├── skills/                  # Agent skills library
+├── projects/                # Project YAML configurations
+└── data/                    # SQLite database
+```
+
+## 测试
+
+```bash
+# Run all tests
+make test
+
+# E2E tests (Playwright — requires install first)
+cd platform/tests/e2e
+npm install
+npx playwright install --with-deps chromium
+npm test
+
+# Unit tests
+pytest tests/
+
+# Chaos engineering
+python3 tests/test_chaos.py
+
+# Endurance tests
+python3 tests/test_endurance.py
+```
+
+## 部署
+
+### Docker
+
+Docker 镜像包含：**Node.js 20**、**Playwright + Chromium**、**bandit**、**semgrep**、**ripgrep**。
+智能体可以开箱即用地构建项目、运行端到端测试并截图、执行 SAST 安全扫描。
+
+```bash
+docker-compose up -d
+```
+
+### Kubernetes (Helm)
+
+```bash
+helm install software-factory ./deploy/helm/
+```
+
+### 环境变量
+
+完整列表请参见 [`.env.example`](.env.example)。关键变量：
+
+```bash
+# LLM Provider (required for real agents)
+PLATFORM_LLM_PROVIDER=minimax        # minimax | azure-openai | azure-ai | nvidia | demo
+MINIMAX_API_KEY=sk-...               # MiniMax API key
+
+# Authentication (optional)
+GITHUB_CLIENT_ID=...                 # GitHub OAuth
+GITHUB_CLIENT_SECRET=...
+AZURE_AD_CLIENT_ID=...               # Azure AD OAuth
+AZURE_AD_CLIENT_SECRET=...
+AZURE_AD_TENANT_ID=...
+
+# Integrations (optional)
+JIRA_URL=https://your-jira.atlassian.net
+ATLASSIAN_TOKEN=your-token
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+## 自适应智能 — GA · RL · Thompson采样 · OKR
+
+平台通过三个互补的 AI 引擎实现自我优化。
+
+### Thompson采样 — 概率化团队选择
+- 每个上下文 `(agent_id, pattern_id, technology, phase_type)` 维护 `Beta(wins+1, losses+1)` 分布
+- 细粒度适应度评分 — 每个上下文独立评分，无跨上下文污染
+- 冷启动回退：通过技术前缀链（`angular_19` → `angular_*` → `generic`）逐级降级
+- 软淘汰：弱团队设 `weight_multiplier=0.1`，可恢复
+- 自动 A/B 影子运行；中立评估器决定胜者
+- **Darwin LLM**：将 Thompson采样扩展至每个上下文的 LLM 模型选择
+
+### 遗传算法 — 工作流演化
+- 基因组 = PhaseSpec（pattern, agents, gate）的有序列表
+- 种群：40 个基因组，最多 30 代，精英保留=2，突变率=15%，锦标赛 k=3
+- 适应度：阶段成功率 × 智能体适应度 × (1 − 否决率) × 交付周期奖励
+- Top-3 提案保存至 `evolution_proposals`，供人工审核后再应用
+- 手动触发：`POST /api/evolution/run/{wf_id}` — 在 Workflows → Evolution 标签页查看
+- 夜间调度器；不足 5 个任务时跳过
+
+### 强化学习 — 任务中途模式自适应
+- Q-learning 策略（`platform/agents/rl_policy.py`）
+- 动作：keep、switch_parallel、switch_sequential、switch_hierarchical、switch_debate、add_agent、remove_agent
+- 状态：`(wf_id, phase_position, rejection_pct, quality_score)` 分桶表示
+- Q 更新：α=0.1，γ=0.9，ε=0.1 — 在 `rl_experience` 表上离线批量训练
+- 仅在置信度 ≥ 70% 且状态访问次数 ≥ 3 时触发；支持优雅降级
+
+### OKR / KPI 系统
+- 8 个默认种子：code/migration、security/audit、architecture/design、testing、docs
+- OKR 完成率直接作为 GA 适应度和 RL 奖励信号的输入
+- 在 `/teams` 页面内联编辑，显示绿色/琥珀色/红色状态
+- 可通过设置为每个项目配置 OKR 覆盖项
+
+---
+
+## v2.1.0 新特性（2026 年 2 月）
+
+### 质量指标 — 工业化监控
+- **10 个确定性维度** — 复杂度、覆盖率（UT/E2E）、安全、可访问性、性能、文档、架构、可维护性、对抗性
+- **工作流阶段质量门控** — 按阶段的 PASS/FAIL 徽章，可配置阈值（always/no_veto/all_approved/quality_gate）
+- **质量仪表盘**位于 `/quality` — 全局记分卡、项目分数、趋势快照
+- **质量徽章无处不在** — 任务详情、项目看板、工作流阶段、主仪表盘
+- **无需 LLM** — 所有指标使用开源工具确定性计算（radon、bandit、semgrep、coverage.py、pa11y、madge）
+
+### 每个项目自动配置 4 个任务
+每个项目自动获得 4 个运维任务：
+- **MCO/TMA** — 持续运维：健康监控、事件分类（P0-P4）、TDD 修复、非回归验证
+- **Security** — 每周 SAST 扫描、依赖审计、CVE 监控、代码审查
+- **Tech Debt** — 每月债务消减：复杂度审计、WSJF 优先级排序、重构冲刺
+- **Self-Healing** — 自主事件流水线：5xx 检测 → TMA 任务创建 → 智能体诊断 → 代码修复 → 验证
+
+### 持续改进
+- **quality-improvement 工作流** — 扫描 → 识别最差维度 → 规划并执行改进
+- **retrospective-quality 工作流** — 冲刺回顾，包含 ROTI、事件、质量指标 → 行动项
+- **skill-evolution 工作流** — 分析智能体表现 → 更新提示 → 进化技能
+- **反馈循环** — 指标 → 分析 → 改进 → 重新扫描 → 跟踪进度
+
+### SAFe 视角与新手引导
+- **9 个 SAFe 角色视角** — 自适应仪表盘、侧边栏和每角色 KPI
+- **新手引导向导** — 3 步首次用户流程，含角色和项目选择
+- **视角选择器** — 随时从顶栏切换 SAFe 角色
+
+### 自动修复与自修复
+- **TMA 心跳** — 持续健康监控，自动创建事件
+- **自修复智能体** — 自主诊断和修复常见故障
+- **工单升级** — 未解决的事件创建跟踪工单并发送通知
+
+### 4 层记忆与 RLM
+- **持久化知识** — 会话、模式、项目和全局记忆层，FTS5 支持
+- **RLM 深度搜索** — 递归探索循环（最多 10 次迭代），用于复杂代码库分析
+- **自动加载项目上下文** — CLAUDE.md、SPECS.md、VISION.md 注入到每个智能体提示中
+
+### 对抗性质量守卫
+- **L0 确定性** — 即时检测虚假内容、模拟代码、假构建、幻觉
+- **L1 语义** — 基于 LLM 的执行输出质量审查
+- **强制拒绝** — 幻觉和技术栈不匹配始终被阻止
+
+### 智能体交易市场
+- **基于代币的市场**，含智能体列表、转会、租借和自由智能体选秀
+- **市场估值** — 基于技能和表现的自动智能体定价
+- **钱包系统** — 每个项目的代币经济和交易历史
+
+### 身份认证与安全
+- **基于 JWT 的认证**，支持登录/注册/刷新/注销
+- **RBAC** — admin、project_manager、developer、viewer 角色
+- **OAuth** — GitHub 和 Azure AD SSO 登录
+- **管理面板** — 用户管理 UI（`/admin/users`）
+- **演示模式** — 一键 "Skip" 按钮即时访问
+
+### 自动文档
+- **冲刺回顾** — LLM 生成的回顾笔记，带学习循环
+- **阶段摘要** — 自动记录任务阶段结果
+- **Confluence 同步** — 双向 Wiki 集成
+
+### LLM 提供商
+- **多提供商**支持自动回退链
+- MiniMax M2.5、Azure OpenAI GPT-5-mini、Azure AI Foundry、NVIDIA NIM
+- **演示模式**，无需 API 密钥即可探索 UI
+
+### 平台改进
+- DORA 指标仪表盘，含 LLM 成本追踪
+- Jira 双向同步
+- Playwright 端到端测试套件（11 个规格文件）
+- 国际化（EN/FR）
+- 实时通知（Slack、Email、Webhook）
+- 工作流中的设计系统流水线（UX → 开发 → 评审）
+- 3D 智能体世界可视化
+
+### Darwin — 进化式团队选择
+- **Thompson Sampling 选择** — 基于 `Beta(wins+1, losses+1)` 的概率性 agent+pattern 团队选择，维度：`(agent_id, pattern_id, 技术, 阶段类型)`
+- **细粒度适应度追踪** — 每个上下文独立评分：擅长 Angular 迁移的团队未必擅长 Angular 新功能开发
+- **相似度回退** — 冷启动通过技术前缀匹配处理（`angular_19` → `angular_*` → `generic`）
+- **软退休机制** — 表现持续较差的团队获得 `weight_multiplier=0.1`，降优先级但可恢复
+- **OKR / KPI 系统** — 按领域和阶段类型设置目标与指标；8 个默认种子
+- **A/B 影子测试** — 当两个团队适应度分数接近（delta < 10）或 10% 概率时，自动触发并行影子运行
+- **Teams 仪表板** `/teams` — 排行榜含 champion/rising/declining/retired 徽章、内联 OKR 编辑、Chart.js 进化曲线、选择历史、A/B 测试结果
+- **非破坏性可选** — 在 pattern 中使用 `agent_id: "skill:developer"` 即可启用 Darwin；显式 ID 不受影响
+
+## v2.2.0 新特性（2026 年 2 月）
+
+### OpenTelemetry 与分布式追踪
+- **OTEL 集成** — OpenTelemetry SDK，OTLP/HTTP 导出到 Jaeger
+- **ASGI 追踪中间件** — 每个 HTTP 请求都带有 span、延迟、状态追踪
+- **追踪仪表盘**位于 `/analytics` — 请求统计、延迟图表、操作表
+- **Jaeger UI** — 在端口 16686 进行完整的分布式追踪探索
+
+### 流水线故障分析
+- **故障分类** — 基于 Python 的错误分类（setup_failed、llm_provider、timeout、phase_error 等）
+- **阶段故障热力图** — 识别哪些流水线阶段最常失败
+- **建议引擎** — 基于故障模式的可操作建议
+- **全部恢复按钮** — 一键从仪表盘批量恢复暂停的运行
+
+### 持续看门狗
+- **自动恢复** — 自动批量恢复暂停的运行（每批 5 个，每 5 分钟，最多 10 个并发）
+- **过期会话恢复** — 检测不活跃 > 30 分钟的会话，标记为中断以便重试
+- **失败会话清理** — 清理阻塞流水线进度的僵尸会话
+- **卡顿检测** — 在某阶段停留 > 60 分钟的任务自动重试
+
+### 阶段弹性
+- **逐阶段重试** — 可配置的重试次数（默认 3 次），每阶段指数退避
+- **skip_on_failure** — 阶段可标记为可选，允许流水线继续执行
+- **检查点** — 已完成阶段被保存，智能恢复跳过已完成的工作
+- **阶段超时** — 10 分钟上限防止无限挂起
+
+### 沙箱构建验证
+- **代码后构建检查** — 代码生成阶段后自动运行构建/lint
+- **自动检测构建系统** — npm、cargo、go、maven、python、docker
+- **错误注入** — 构建失败注入到智能体上下文中以进行自我修正
+
+### 质量 UI 增强
+- **雷达图** — Chart.js 雷达可视化质量维度，位于 `/quality`
+- **质量徽章** — 项目头部的彩色分数圆圈（`/api/dashboard/quality-badge`）
+- **任务记分卡** — 任务详情侧边栏中的质量指标（`/api/dashboard/quality-mission`）
+
+### 多模型 LLM 路由
+- **3 个专用模型** — `gpt-5.2` 用于重度推理，`gpt-5.1-codex` 用于代码/测试，`gpt-5-mini` 用于轻量任务
+- **基于角色的路由** — 代理根据标签（`reasoner`、`architect`、`developer`、`tester`、`doc_writer`…）自动获得正确模型
+- **实时可配置** — 在设置 → LLM 中编辑路由矩阵，无需重启
+
+### Darwin LLM — 模型上的 Thompson Sampling
+- **模型 A/B 测试** — 同一团队（代理 + 模式）使用不同 LLM 竞争；最佳模型按上下文自动胜出
+- **Beta 分布** — 每 `(agent_id, pattern_id, technology, phase_type, llm_model)` 使用 `Beta(wins+1, losses+1)`
+- **/teams 上的 LLM A/B 标签** — 按模型的适应度排名和 A/B 测试历史
+- **优先链** — Darwin LLM → 数据库配置 → 默认值（优雅降级）
+
+### 设置 — LLM 标签
+- **提供商网格** — 显示启用/禁用状态及缺少 API 密钥的提示
+- **路由矩阵** — 按类别（推理、生产/代码、任务、撰写）配置重/轻模型
+- **Darwin LLM A/B 区域** — 正在进行的模型实验的实时视图
+
+## v2.7.0 新功能（2026 年）
+
+### 知识管理系统
+- **4 个新智能体** — `knowledge-manager`、`knowledge-curator`、`knowledge-seeder`、`wiki-maintainer`
+- **ART 知识团队** — 专注知识运营的敏捷发布火车
+- **夜间 `knowledge-maintenance` 工作流** — 自动整理、去重、新鲜度评分
+- **内存健康仪表盘** — 指标标签页中的知识健康指标面板
+- **知识健康徽章** — 在设置页面可见
+
+### 内存智能
+- **相关性评分** — `置信度 × 新近度 × 访问增益` 公式实现排序检索
+- **访问追踪** — 每个内存条目的 `access_count` 和 `last_read_at` 字段
+- **自动清除** — 每次夜间运行时删除低于阈值的过期条目
+
+### LLM 成本追踪
+- **每任务成本** — 显示在任务时间线标签页标题中
+- **自动汇总** — 从 `llm_traces` 表聚合
+
+### 任务时间线
+- **泳道时间线标签页** — 在 Mission Control 中以水平泳道展示智能体阶段
+- **阶段持续时间** — 每个阶段耗时的可视化展示
+
+### 质量评分
+- **PhaseRun 的 `quality_score` 字段** — 每个阶段后由对抗守卫填充
+
+### 项目导出/导入
+- **ZIP 压缩包** — 包含 `project.json` + 所有任务 + 运行 + 记忆
+
+### 输入验证
+- **Pydantic 模型** — 所有 POST/PATCH 路由使用严格的输入模式验证
+
+- **领域架构指南** — 按项目领域强制执行 Confluence/Solaris 指南
+
+### 设置集成中心
+- **可配置工具集成** — Jira、Confluence、SonarQube 可供所有智能体使用
+
+### 浏览器推送通知
+- **Web Push API (VAPID)** — 任务事件的原生浏览器推送通知
+
+## v3.0.0 新功能（2026 年）
+
+### 智能体市场
+- **192 个智能体已编目** — `/marketplace` 支持全文搜索，按 ART/角色/技能筛选
+- **智能体档案** — 包含工具、技能和近期会话历史的详细视图
+- **一键启动** — 从档案页面直接与任意智能体发起会话
+
+### 任务回放界面
+- **逐步回放** — 在 `/missions/{id}/replay` 重放每个智能体轮次和工具调用
+- **每步成本和令牌** — 按智能体细分的 LLM 花费明细
+- **可导出历史** — 以 JSON 格式下载回放用于调试和审计
+
+### 设置中心
+
+`/settings` 的集中化平台配置：
+
+- **任务并发数** — 实时调整执行信号量（1–10 个并行任务）
+- **预算上限** — 设置每次运行的最大 LLM 支出；超出预算的运行将被暂停
+- **自动恢复看门狗** — 平台重启时自动恢复已暂停的任务
+- **YOLO 模式** — 禁用人机交互验证，实现完全自主运行
+- **持久化** — 所有设置存储在数据库中，服务器重启后仍有效
+
+### 任务驾驶舱
+
+`/cockpit` 的实时指挥中心：
+
+- **实时流水线视图** — 构思 → 任务 → 运行中 → 测试 → 已部署
+- **每个任务的状态** — 智能体、进行中的工具调用、当前 LLM 费用
+- **信号量仪表盘** — 一目了然地查看空闲与忙碌的槽位
+- **快速控制** — 从驾驶舱暂停、恢复、取消任何任务
+
+### 每个任务的 LLM 成本追踪
+
+每次运行的细粒度支出可见性：
+
+- **每次运行的 `llm_cost_usd`** — 每次执行记录精确的 LLM 支出（美元）
+- **预算警报** — 当任务达到上限时发出警告或强制停止
+- **提供商对比** — 比较 minimax / azure / openai 执行相同任务的费用
+- **累计仪表盘** — 按项目、迭代或日期范围汇总费用
+
+### 注释工作室 — 任意页面的可视化反馈
+
+内置可视化注释层，将每个 SF 页面转变为协作审查画布：
+
+- **✏️ 注释按钮** — 点击激活注释模式；每个页面出现浮动工具栏
+- **点击注释** — 点击任意元素：Bug 🐛、评论 💬、功能 ✨、设计 🎨 或文本修正 📝
+- **SAFe 可追溯性栏** — 顶栏中的角色图标 → **项目群 → 史诗 → 特性 → 故事**
+- **线框模式** — 网格图标 → 骨架/shimmer 视图用于 UX 检查
+- **工单生成** — 每个注释可直接启动修复任务
+- **主题自适应** — 使用 CSS 变量，自动适应亮色/暗色主题
+
+
+### LLM 指标仪表盘
+- **成本/延迟/提供商实时监控** (`/metrics`)
+- **按智能体和任务的花费** — 识别高成本智能体并优化
+- **提供商对比** — 各提供商 P50/P95 延迟和成本并排比较
+
+### RBAC + 速率限制
+- **工作区范围的 RBAC** — 按工作区（而非仅按平台）分配角色
+- **按用户速率限制** — 按角色配置可调的令牌/请求配额
+- **审计跟踪** — 所有 RBAC 变更均记录行为者、时间戳和变更详情
+
+### 智能体评估框架
+- **LLM 即评判者评分** — 在 `/evals` 对黄金数据集进行自动评估
+- **按智能体基准** — 追踪随时间变化的质量并检测回归
+- **可配置评判者** — 使用任意已配置的 LLM 提供商作为评估评判者
+
+### 工具构建器
+- **无代码工具创建** (`/tool-builder`) — HTTP、SQL 和 Shell 工具
+- **即时激活** — 工具保存后立即对智能体可用
+- **参数模板** — 定义带类型和验证的输入架构
+
+### 多租户工作区
+- **隔离命名空间** (`/workspaces`) — 每个工作区拥有独立的数据、智能体和记忆
+- **按客户部署** — 无交叉污染地接入多个客户
+- **按工作区的 RBAC** — 每个命名空间的细粒度角色分配
+
+### YAML 智能体热重载
+- **实时智能体更新** — 编辑智能体 YAML 文件并在不重启平台的情况下重新加载
+- **零停机** — 进行中的任务继续使用先前的智能体定义
+
+## v3.1.0 新功能（2026 年 3 月）
+
+### 多节点集群
+
+- **主/从拓扑** — IHM + SSE 仅在主节点；API 调用通过 nginx `least_conn` 在所有节点间负载均衡
+- **共享 PostgreSQL** — 100% PostgreSQL，零 SQLite；所有节点共享同一数据库；咨询锁防止同时启动时的模式竞争条件
+- **被动故障切换** — nginx 在连续 3 次失败后将节点标记为宕机；流量自动路由到健康节点，10 秒后恢复
+- **集群节点注册表** — `platform_nodes` 表追踪每个节点：角色、模式、URL、CPU%、MEM%、版本、心跳年龄
+- **顶栏实时徽章** — 每个节点显示为彩色圆点徽章；绿色 = 在线（< 60 秒），红色 = 过期；每 30 秒通过 HTMX 轮询
+- **点击弹出详情** — 点击任意节点徽章查看完整诊断：角色/模式、URL、CPU、MEM、最后在线时间、版本
+- **`platform_cluster` 智能体工具** — Jarvis 和所有智能体可用自然语言查询集群健康状况和负载分布
+
+### 安全与沙箱
+
+- **Landlock 文件系统沙箱** — 使用 Linux Landlock LSM（内核 5.13+）将智能体 Shell 执行限制在工作区目录；对非 Linux 主机零影响
+- **安全设置标签** — 在设置 → 安全中切换沙箱开/关，查看 Landlock 内核支持状态
+- **渗透测试智能体工具** — nmap 端口扫描、subfinder 子域枚举、whatweb 技术指纹识别、schemathesis API 模糊测试、SQL 注入、身份验证绕过、SSRF 检测
+
+### 代码质量与 LLM
+
+- **LLM 代码质量强化** — SAST（bandit/semgrep）+ 圈复杂度分析在每个代码审查阶段前注入智能体上下文
+- **DeerFlow 上下文摘要** — 递归上下文压缩 + 自动记忆提取（arXiv:2503.09516）；减少长时间运行智能体会话的令牌消耗
+- **多模型路由升级** — `gpt-5.2` 用于推理/架构，`gpt-5.2-codex` 用于代码/TDD，`gpt-5-mini` 用于讨论/文档；基于角色，通过 `AZURE_CODEX_MODEL` 可配置
+
+### 平台与 SAFe
+
+- **SAFe 术语** — 所有 UI 页面中任务重命名为史诗；项目集统计显示 SAFe 术语（Epics / Features / Stories / Tasks）
+- **基础设施升级** — 当迭代无法找到所需构建工具时，自动生成 `ft-infra-lead` 在重试前安装它们
+- **智能体计划工具** — 智能体创建带里程碑和子任务的结构化计划，存储在记忆中以实现跨阶段连续性
+
+## 参与贡献
+
+欢迎贡献！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解贡献指南。
+
+## 许可证
+
+本项目基于 AGPL v3 许可证发布 - 详见 [LICENSE](LICENSE) 文件。
+
+## 支持
+
+- Live: https://sf.macaron-software.com
+- 问题反馈: https://github.com/macaron-software/software-factory/issues
+- 讨论区: https://github.com/macaron-software/software-factory/discussions

@@ -1,0 +1,34 @@
+# Domaine IoT — OVH Demo
+name: "IoT & Embarqué"
+env: demo
+color: "#06B6D4"
+
+description: >
+  Plateformes IoT, capteurs et systèmes embarqués (démo OVH).
+  Stack orientée performance, temps-réel, ingestion de données à haute fréquence.
+
+stack:
+  backend: "Rust (axum) ou Python 3.12 + FastAPI"
+  frontend: "React 18 + TypeScript + Recharts / Grafana"
+  database: "TimescaleDB (PostgreSQL+) pour séries temporelles"
+  database_forbidden: ["SQLite en production"]
+  cache: "Redis 7"
+  infra: "Docker + docker-compose / Fly.io"
+  ci: "GitHub Actions"
+  auth: "JWT + API Keys pour devices"
+  extra:
+    - "Messaging : MQTT (Mosquitto) ou AMQP (RabbitMQ)"
+    - "Métriques : Prometheus + Grafana"
+    - "Streaming : Kafka ou Redis Streams"
+    - "Tests : pytest + tests d'intégration hardware simulé"
+
+compliance:
+  - "RGPD (si données personnelles collectées)"
+  - "Sécurité des communications : TLS 1.3 obligatoire"
+  - "Firmware : vérification d'intégrité"
+
+conventions: |
+  - Partitionnement TimescaleDB par temps (partition par mois)
+  - Compression automatique des données > 7 jours
+  - Retry exponentiel sur les connexions MQTT
+  - Dead Letter Queue pour les messages non traités
