@@ -177,11 +177,15 @@ async def agent_save(request: Request, agent_id: str = ""):
 
 
 @router.delete("/api/agents/{agent_id}")
-async def agent_delete(agent_id: str):
-    """Delete an agent."""
+async def agent_delete(agent_id: str, force: bool = False):
+    """Delete an agent. Use ?force=true to delete builtins."""
     from ...agents.store import get_agent_store
 
-    get_agent_store().delete(agent_id)
+    store = get_agent_store()
+    if force:
+        store.force_delete(agent_id)
+    else:
+        store.delete(agent_id)
     return HTMLResponse("")
 
 

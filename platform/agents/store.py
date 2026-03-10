@@ -250,6 +250,21 @@ class AgentStore:
             invalidate("agents:all")
         return deleted
 
+    def force_delete(self, agent_id: str) -> bool:
+        """Delete any agent regardless of is_builtin flag."""
+        from ..cache import invalidate
+
+        db = get_db()
+        try:
+            cur = db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+            db.commit()
+            deleted = cur.rowcount > 0
+        finally:
+            db.close()
+        if deleted:
+            invalidate("agents:all")
+        return deleted
+
     def count(self) -> int:
         db = get_db()
         try:

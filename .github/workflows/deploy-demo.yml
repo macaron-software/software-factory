@@ -119,8 +119,8 @@ jobs:
           # Ensure Redis is running
           timeout 30 docker compose up -d --no-deps redis 2>/dev/null || true
 
-          # Start/restart factory container (non-blocking)
-          timeout 30 docker compose up -d --no-deps platform-factory 2>/dev/null || true
+          # Start/restart factory container (force-recreate to pick up new code)
+          timeout 30 docker compose up -d --no-deps --force-recreate platform-factory 2>/dev/null || true
 
           # Wait for factory health (max 60s)
           echo "Waiting for platform-factory..."
