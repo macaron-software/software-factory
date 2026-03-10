@@ -258,9 +258,13 @@ class AgentStore:
             db.close()
 
     def seed_builtins(self):
-        """Seed built-in agents from hardcoded list + YAML definitions (upsert)."""
-        self._seed_hardcoded()
-        self._seed_from_yaml()
+        """Seed built-in agents from hardcoded list + YAML definitions (upsert).
+
+        Also removes stale builtins whose YAML definition no longer exists.
+        """
+        hardcoded_ids = self._seed_hardcoded()
+        yaml_ids = self._seed_from_yaml()
+        self._prune_stale_builtins(hardcoded_ids | yaml_ids)
 
     def _seed_hardcoded(self):
         builtins = [
@@ -2406,12 +2410,41 @@ class AgentStore:
             else:
                 self.create(agent)
 
+        return {a.id for a in builtins}
+
+    def _prune_stale_builtins(self, active_ids: set[str]):
+        """Remove built-in agents whose definitions no longer exist."""
+        import logging as _log
+
+        _logger = _log.getLogger(__name__)
+        db = get_db()
+        try:
+            rows = db.execute(
+                "SELECT id FROM agents WHERE is_builtin = 1"
+            ).fetchall()
+            stale = [r[0] for r in rows if r[0] not in active_ids]
+            for agent_id in stale:
+                db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
+                _logger.info("Pruned stale builtin agent: %s", agent_id)
+            if stale:
+                db.commit()
+                from ..cache import invalidate
+
+                invalidate("agents:all")
+                _logger.info("Pruned %d stale builtin agents", len(stale))
+        except Exception as exc:
+            _logger.warning("Prune stale builtins failed: %s", exc)
+        finally:
+            db.close()
+
     def _seed_from_yaml(self):
         """Load agent definitions from YAML files.
 
         Loads from (in order, later overrides earlier):
           1. platform/skills/definitions/*.yaml  (builtins)
           2. projects/{slug}/agents/*.yaml        (project-level overrides)
+
+        Returns set of seeded agent IDs (for stale cleanup).
         """
         import yaml
 
@@ -2437,6 +2470,8 @@ class AgentStore:
             "team": ("code", "#3fb950"),
             "transverse": ("settings", "#f78166"),
         }
+
+        seeded_ids: set[str] = set()
 
         for defs_dir, is_builtin in sources:
             for path in sorted(defs_dir.glob("*.yaml")):
@@ -2521,8 +2556,12 @@ class AgentStore:
                         self.update(agent)
                     else:
                         self.create(agent)
+                    if is_builtin:
+                        seeded_ids.add(agent_id)
                 except Exception:
                     pass
+
+        return seeded_ids
 
     def reload_yaml_agents(self) -> int:
         """Hot-reload all YAML agent definitions. Returns count of processed files."""
