@@ -58,6 +58,8 @@ class WorkflowDef:
     icon: str = "workflow"
     is_builtin: bool = False
     created_at: str = ""
+    category: str = ""
+    graph: dict = field(default_factory=dict)
 
 
 @dataclass

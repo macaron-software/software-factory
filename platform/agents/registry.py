@@ -67,6 +67,7 @@ class AgentRegistry:
 
         perms_raw = raw.get("permissions", {})
         permissions = AgentPermissions(
+            scope=perms_raw.get("scope", "project"),
             can_veto=perms_raw.get("can_veto", False),
             veto_level=perms_raw.get("veto_level", "advisory"),
             can_delegate=perms_raw.get("can_delegate", False),

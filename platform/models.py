@@ -97,6 +97,7 @@ class VetoLevel(str, Enum):
 class AgentPermissions(BaseModel):
     """What an agent is allowed to do."""
 
+    scope: str = "project"  # platform | project | art | self
     can_veto: bool = False
     veto_level: VetoLevel = VetoLevel.ADVISORY
     can_delegate: bool = False
