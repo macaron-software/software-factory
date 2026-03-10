@@ -15,12 +15,12 @@ Tools:
 Config (env or args):
   JIRA_URL      e.g. https://JIRA_HOST/jira
   JIRA_TOKEN    Personal Access Token
-  JIRA_PROJECT  Default project key (e.g. VELIGO)
+  JIRA_PROJECT  Default project key (e.g. MYPROJECT)
   JIRA_BOARD_ID Default board ID
 
 Usage:
   JIRA_URL=... JIRA_TOKEN=... python -m mcp_jira.server
-  python -m mcp_jira.server --project VELIGO
+  python -m mcp_jira.server --project MYPROJECT
 """
 
 import asyncio
@@ -233,7 +233,7 @@ def tool_jira_get_epics(project: str = "") -> str:
     proj = project or cfg["project"]
     if not proj:
         return "Erreur: JIRA_PROJECT non configuré"
-    # Veligo uses "Feature" as top-level type (not "Epic")
+    # Some projects use "Feature" as top-level type (not "Epic")
     jql = f"project = {proj} AND issuetype = Feature ORDER BY priority DESC"
     return tool_jira_search(jql, max_results=50)
 
@@ -253,7 +253,7 @@ TOOLS = [
                 },
                 "project": {
                     "type": "string",
-                    "description": "Clé projet (ex: VELIGO). Optionnel si JIRA_PROJECT est set.",
+                    "description": "Clé projet (ex: MYPROJECT). Optionnel si JIRA_PROJECT est set.",
                 },
                 "max_results": {
                     "type": "integer",
@@ -266,13 +266,13 @@ TOOLS = [
     },
     {
         "name": "jira_get_issue",
-        "description": "Détails d'une issue Jira par clé (ex: VELIGO-42). Commentaires inclus. Anonymisé.",
+        "description": "Détails d'une issue Jira par clé (ex: MYPROJECT-42). Commentaires inclus. Anonymisé.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "issue_key": {
                     "type": "string",
-                    "description": "Clé Jira (ex: VELIGO-42)",
+                    "description": "Clé Jira (ex: MYPROJECT-42)",
                 },
             },
             "required": ["issue_key"],

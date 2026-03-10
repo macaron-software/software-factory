@@ -13,7 +13,7 @@ Tools:
 Config (env):
   CONFLUENCE_URL    e.g. https://CONFLUENCE_HOST/confluence
   CONFLUENCE_TOKEN  Personal Access Token (same as Jira PAT usually)
-  CONFLUENCE_SPACE  Default space key (e.g. VELIGO)
+  CONFLUENCE_SPACE  Default space key (e.g. MYPROJECT)
 
 Usage:
   CONFLUENCE_URL=... CONFLUENCE_TOKEN=... python -m mcp_confluence.server
@@ -262,7 +262,7 @@ TOOLS = [
                 },
                 "space": {
                     "type": "string",
-                    "description": "Clé espace (ex: VELIGO). Optionnel si CONFLUENCE_SPACE set.",
+                    "description": "Clé espace (ex: MYPROJECT). Optionnel si CONFLUENCE_SPACE set.",
                 },
             },
         },
@@ -276,7 +276,7 @@ TOOLS = [
                 "query": {"type": "string", "description": "Texte à rechercher"},
                 "space": {
                     "type": "string",
-                    "description": "Clé espace pour filtrer (ex: VELIGO)",
+                    "description": "Clé espace pour filtrer (ex: MYPROJECT)",
                 },
                 "max_results": {"type": "integer", "default": 10},
             },

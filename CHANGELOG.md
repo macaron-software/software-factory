@@ -87,7 +87,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - regenerate CHANGELOG.md
 - regenerate CHANGELOG.md
 - regenerate CHANGELOG.md
-- remove all veligo/popinz/finary references
+- remove all demo project references
 - fix .gitignore — exclude node_modules, target/, workspace/, *.duckdb, nohup.out
 ### Documentation
 
@@ -664,7 +664,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - **patterns**: fractal-worktree + backprop-merge patterns (TinyAGI/fractals port)
 - **platform**: YAML migration cleanup + auto-resume backoff + cost analytics + domain defaults
 - **projects**: sections par domaine client + champ client_domain
-- **projects**: add logs/veligo/ldp projects with starred + container_url
+- **projects**: add logs/projects with starred + container_url
 - **quality**: 4 QA gates — tool scoping, AC from epic DB, game criteria, deploy HTTP gate
 - **quality**: anti-slop + anti-cheat rules — adversarial.py + skills
 - **reasoning**: semi-formal reasoning arXiv:2603.01896
@@ -717,7 +717,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 - **workspace**: PTY terminal + package manager = Replit parity
 - pattern improvements A-F — composite, adaptive timeout, A/B, recommender, veto analytics, cockpit live
 - pattern observability — phase_outcomes writes + analytics endpoint + cockpit stats
-- protected projects (PILOTE/LA POSTE/SF domains) + is_protected field + SF self seed
+- protected projects (PILOTE/SF domains) + is_protected field + SF self seed
 - amélioration continue tab native dans platform /workflows
 - platform quality team — 5 agents GPT-5.2-Codex + workflow câblé
 - platform quality watchdog — recursive self-improvement loop
@@ -865,7 +865,7 @@ Généré automatiquement par [git-cliff](https://git-cliff.org/).
 ### Features
 
 - **agents**: Codex-level long-run capabilities
-- **bscc**: domain:bscc projects + domain fallback fix in prompt_builder
+- **domains**: domain projects + domain fallback fix in prompt_builder
 - **knowledge**: settings health badge + HTMX fragment on /api/knowledge/health
 - **memory**: compactor + health endpoint + 25 tests + role consistency fix
 - LLM cost tracking, mission timeline, quality score, export/import

@@ -85,7 +85,7 @@ sf_secrets_catalog:
   integrations:
     - GITHUB_TOKEN
     - GITHUB_WEBHOOK_SECRET
-    - GITLAB_LAPOSTE_TOKEN
+    - GITLAB_ENTERPRISE_TOKEN
     - JIRA_TOKEN
     - JIRA_WEBHOOK_SECRET
     - ATLASSIAN_TOKEN

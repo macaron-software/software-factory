@@ -20,10 +20,10 @@ Database: data/guidelines.db
   • guideline_fts    — FTS5 virtual table
 
 Usage:
-    python -m mcp_lrm.guidelines_scraper --source confluence --space EXAMPLE --project bscc
+    python -m mcp_lrm.guidelines_scraper --source confluence --space EXAMPLE --project myproject
     python -m mcp_lrm.guidelines_scraper --source markdown --path /path/to/wiki --project myproject
-    python -m mcp_lrm.guidelines_scraper --stats --project bscc
-    python -m mcp_lrm.guidelines_scraper --summary --project bscc
+    python -m mcp_lrm.guidelines_scraper --stats --project myproject
+    python -m mcp_lrm.guidelines_scraper --summary --project myproject
 """
 
 from __future__ import annotations

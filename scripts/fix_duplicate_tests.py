@@ -51,5 +51,5 @@ def fix_duplicates(file_path: str):
     print(f"Fixed {sum(len(p)-1 for p in duplicates.values())} duplicate names")
 
 if __name__ == "__main__":
-    file_path = sys.argv[1] if len(sys.argv) > 1 else "/Users/sylvain/_LAPOSTE/_VELIGO2/veligo-platform/backend/src/modules/payment_module.rs"
+    file_path = sys.argv[1] if len(sys.argv) > 1 else "example_module.rs"
     fix_duplicates(file_path)

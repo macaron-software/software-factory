@@ -10,7 +10,7 @@ description: >
   Description courte du domaine et de ses contraintes.
 
 # Héritage optionnel
-# extends: la-poste
+# extends: parent-domain
 
 stack:
   backend: ""         # ex: "Java 17 + Spring Boot 3"
@@ -23,7 +23,7 @@ stack:
   auth: ""            # ex: "SAML2 / SSO"
   extra: []           # lignes libres supplémentaires
 
-design_system: ""     # ex: "Solaris (La Poste)"
+design_system: ""     # ex: "MyDS"
 compliance: []        # ex: ["RGPD", "RGAA 4.1", "ANSSI"]
 mcp_tools: []         # ex: ["mcp-solaris"]
 confluence_space: ""  # ex: "IAN"

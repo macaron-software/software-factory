@@ -415,7 +415,7 @@ class MCPLRMServer:
                     "properties": {
                         "project": {
                             "type": "string",
-                            "description": "Project ID (e.g. 'bscc', 'greenfleet')",
+                            "description": "Project ID (e.g. 'acme', 'greenfleet')",
                         },
                         "role": {
                             "type": "string",
