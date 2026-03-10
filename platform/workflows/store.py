@@ -501,6 +501,180 @@ def _find_main_py(workspace: str) -> str:
     return ""
 
 
+# ── PM Checkpoint — Dynamic Phase Orchestration ────────────────────────────
+
+
+_PM_DECISION_PROMPT = """\
+Tu es le **Product Manager** de ce projet. La phase "{phase_name}" vient de se terminer.
+
+## Résultat de la phase
+- **Statut** : {status}
+- **Résumé** : {summary}
+
+## Phases disponibles (catalogue)
+{phases_catalog}
+
+## Historique des phases exécutées
+{history}
+
+## Objectif du projet
+{goal}
+
+## Ta décision
+Analyse le résultat et décide de la prochaine étape. Tu peux :
+- **Passer à la phase suivante** si le résultat est satisfaisant
+- **Relancer une phase** (loop back) si le résultat est insuffisant (ex: QA KO → retour en sprint dev)
+- **Sauter des phases** si elles ne sont pas pertinentes
+- **Terminer** le workflow si le projet est livré et validé
+
+IMPORTANT : après un deploy, tu DOIS vérifier la qualité (QA, critères d'acceptation, user stories).
+Si la QA échoue, crée des tickets (findings) et relance un sprint dev.
+
+Réponds UNIQUEMENT avec ce JSON (pas de texte autour) :
+```json
+{{
+  "decision": "next|loop|done|skip",
+  "phase_id": "<id de la phase cible>",
+  "reason": "<explication courte de ta décision>",
+  "findings": "<si loop/next après QA: liste des problèmes à corriger>"
+}}
+```
+Si decision=done, phase_id peut être vide.
+Si decision=skip, phase_id est la phase à laquelle sauter (en sautant les intermédiaires).
+"""
+
+
+async def _pm_checkpoint(
+    session_id: str,
+    workflow: "WorkflowDef",
+    completed_phase: "WorkflowPhase",
+    phase_result: dict,
+    accumulated_context: list[str],
+    initial_task: str,
+    project_id: str = "",
+) -> dict:
+    """Ask the PM agent to decide the next phase after a completed phase.
+
+    Returns: {"decision": "next|loop|done|skip", "phase_id": "...", "reason": "...", "findings": "..."}
+    Fallback: returns {"decision": "next", "phase_id": "<linear next>"} if PM fails.
+    """
+    import json as _json
+
+    from ..agents.store import get_agent_store
+    from ..agents.executor import get_executor, ExecutionContext
+
+    store = get_session_store()
+    agent_store = get_agent_store()
+
+    # Find PM agent — try project-specific PM first, then generic
+    pm = agent_store.get(f"agent-{project_id}") if project_id else None
+    if not pm:
+        pm = agent_store.get("product")  # Laura Vidal — generic PO
+    if not pm:
+        pm = agent_store.get("ai-product-manager")
+
+    # Fallback: no PM agent → continue linearly
+    if not pm:
+        logger.warning("PM checkpoint: no PM agent found — continuing linearly")
+        return {"decision": "next", "phase_id": "", "reason": "no PM agent"}
+
+    # Build phases catalog
+    phases_catalog = "\n".join(
+        f"- `{p.id}` : {p.name} (pattern={p.pattern_id}, gate={p.gate})"
+        for p in workflow.phases
+    )
+
+    # Build history
+    history = "\n".join(
+        f"- {ctx}" for ctx in accumulated_context[-5:]
+    ) or "(première phase)"
+
+    # Phase result summary
+    status = "✅ Succès" if phase_result.get("success") else "❌ Échec"
+    summary = phase_result.get("reason", phase_result.get("error", "terminée"))
+
+    prompt = _PM_DECISION_PROMPT.format(
+        phase_name=completed_phase.name,
+        status=status,
+        summary=summary[:500],
+        phases_catalog=phases_catalog,
+        history=history,
+        goal=initial_task[:300],
+    )
+
+    ctx = ExecutionContext(
+        agent=pm,
+        session_id=session_id,
+        project_id=project_id,
+        tools_enabled=False,
+    )
+
+    # Push PM thinking status
+    await _push_sse(session_id, {
+        "type": "agent_status",
+        "agent_id": pm.id,
+        "status": "thinking",
+    })
+
+    executor = get_executor()
+    try:
+        result = await executor.run(ctx, prompt)
+        content = result.content or ""
+
+        # Store PM decision as message
+        store.add_message(MessageDef(
+            session_id=session_id,
+            from_agent=pm.id,
+            to_agent="all",
+            message_type="pm_decision",
+            content=content,
+        ))
+
+        await _push_sse(session_id, {
+            "type": "agent_status",
+            "agent_id": pm.id,
+            "status": "idle",
+        })
+
+        # Parse JSON from PM response (may be wrapped in ```json ... ```)
+        cleaned = content.strip()
+        if "```json" in cleaned:
+            cleaned = cleaned.split("```json", 1)[1].split("```", 1)[0].strip()
+        elif "```" in cleaned:
+            cleaned = cleaned.split("```", 1)[1].split("```", 1)[0].strip()
+        # Try to find JSON object in text
+        if not cleaned.startswith("{"):
+            start = cleaned.find("{")
+            if start >= 0:
+                end = cleaned.rfind("}") + 1
+                cleaned = cleaned[start:end]
+
+        decision = _json.loads(cleaned)
+
+        # Validate decision
+        if decision.get("decision") not in ("next", "loop", "done", "skip"):
+            raise ValueError(f"Invalid decision: {decision.get('decision')}")
+
+        logger.warning(
+            "PM_CHECKPOINT phase=%s decision=%s target=%s reason=%s",
+            completed_phase.id,
+            decision["decision"],
+            decision.get("phase_id", ""),
+            (decision.get("reason", ""))[:100],
+        )
+
+        return decision
+
+    except Exception as e:
+        logger.warning("PM checkpoint failed (%s) — continuing linearly", e)
+        await _push_sse(session_id, {
+            "type": "agent_status",
+            "agent_id": pm.id,
+            "status": "idle",
+        })
+        return {"decision": "next", "phase_id": "", "reason": f"PM error: {e}"}
+
+
 # ── Workflow Engine ──────────────────────────────────────────────
 
 
@@ -592,13 +766,31 @@ async def run_workflow(
     import time as _time
 
     _workflow_start = _time.monotonic()
-    for i, phase in enumerate(workflow.phases):
+
+    # PM-driven mode: PM decides next phase after each completion
+    _pm_driven = workflow.config.get("pm_driven", False)
+    _pm_loop_limit = 20  # prevent infinite PM loops
+    _pm_loop_count = 0
+    _pm_skip_to: str | None = None  # phase_id to jump to (set by PM decision)
+    _pm_findings: str = ""  # findings from PM to inject into next phase context
+
+    # Build a mutable phase queue — PM can append phases for loop-back
+    _phase_queue: list[WorkflowPhase] = list(workflow.phases)
+    _phase_catalog = {p.id: p for p in workflow.phases}  # original catalog for lookup
+
+    for i, phase in enumerate(_phase_queue):
         # Skip already-completed phases on resume
         if i < resume_from:
             run.phase_results.append(
                 {"phase": phase.name, "success": True, "skipped": True}
             )
             continue
+
+        # PM-driven skip: PM told us to jump to a specific phase
+        if _pm_skip_to and phase.id != _pm_skip_to:
+            continue
+        if _pm_skip_to and phase.id == _pm_skip_to:
+            _pm_skip_to = None  # reached target, resume normal execution
 
         # Scale-adaptive: skip phases requiring higher complexity than requested
         if phase.min_complexity:
@@ -1039,6 +1231,74 @@ async def run_workflow(
                 len(workflow.phases),
                 len(run.phase_results),
             )
+
+            # ── PM Checkpoint: PM decides next phase ──
+            if _pm_driven and run.status == "running" and _pm_loop_count < _pm_loop_limit:
+                _last_result = run.phase_results[-1] if run.phase_results else {}
+                try:
+                    _pm_decision = await _pm_checkpoint(
+                        session_id=session_id,
+                        workflow=workflow,
+                        completed_phase=phase,
+                        phase_result=_last_result,
+                        accumulated_context=accumulated_context,
+                        initial_task=initial_task,
+                        project_id=project_id,
+                    )
+
+                    _pm_dec = _pm_decision.get("decision", "next")
+                    _pm_target = _pm_decision.get("phase_id", "")
+                    _pm_findings = _pm_decision.get("findings", "")
+                    _pm_reason = _pm_decision.get("reason", "")
+
+                    _pm_done = False
+
+                    if _pm_dec == "done":
+                        logger.warning("PM_DECISION: done — reason=%s", _pm_reason[:100])
+                        accumulated_context.append(f"[PM] DONE: {_pm_reason}")
+                        _pm_done = True
+
+                    elif _pm_dec == "loop" and _pm_target:
+                        # PM wants to loop back to a previous phase
+                        _pm_loop_count += 1
+                        logger.warning(
+                            "PM_DECISION: loop → %s (loop %d/%d) — reason=%s",
+                            _pm_target, _pm_loop_count, _pm_loop_limit, _pm_reason[:100],
+                        )
+                        accumulated_context.append(
+                            f"[PM] LOOP → {_pm_target}: {_pm_reason}"
+                        )
+                        if _pm_findings:
+                            accumulated_context.append(
+                                f"[PM FINDINGS] {_pm_findings[:500]}"
+                            )
+                        # Append target phase (and subsequent) back to the queue
+                        if _pm_target in _phase_catalog:
+                            _phase_queue.append(_phase_catalog[_pm_target])
+                            logger.warning(
+                                "PM_LOOP: appended phase %s to queue (pos %d)",
+                                _pm_target, len(_phase_queue) - 1,
+                            )
+
+                    elif _pm_dec == "skip" and _pm_target:
+                        logger.warning(
+                            "PM_DECISION: skip → %s — reason=%s",
+                            _pm_target, _pm_reason[:100],
+                        )
+                        accumulated_context.append(f"[PM] SKIP → {_pm_target}: {_pm_reason}")
+                        _pm_skip_to = _pm_target
+
+                    # else: "next" — continue linearly (default behavior)
+                    else:
+                        if _pm_findings:
+                            accumulated_context.append(f"[PM FINDINGS] {_pm_findings[:500]}")
+
+                except Exception as _pm_err:
+                    logger.warning("PM checkpoint error: %s — continuing linearly", _pm_err)
+
+        # PM decided to stop the workflow — break OUTSIDE the finally block
+        if _pm_driven and locals().get("_pm_done"):
+            break
 
     # Pipeline DoD check — verify deliverables after all phases
     if _project_path and run.status in ("completed", "running"):

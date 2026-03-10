@@ -138,6 +138,7 @@ phases:
     agents:
     - ac-coach
 config:
+  pm_driven: true
   max_cycles: 20
   auto_restart: true
   default_scope: project
