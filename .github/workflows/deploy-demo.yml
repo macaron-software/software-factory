@@ -85,11 +85,8 @@ jobs:
           # Sync other assets + root compose
           rsync -az cli skills mcp_lrm \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
-          rsync -az Dockerfile docker-compose.yml \
+          rsync -az Dockerfile Dockerfile.platform docker-compose.yml \
             debian@${{ secrets.OVH_IP }}:/opt/software-factory/
-          # Sync platform/Dockerfile to live path used by docker compose build
-          rsync -az platform/Dockerfile \
-            debian@${{ secrets.OVH_IP }}:/opt/software-factory/platform/Dockerfile
 
       - name: Disk cleanup (Docker cache + old images)
         if: steps.changes.outputs.ui_only != 'skip'

@@ -624,27 +624,6 @@ async def session_live_page(request: Request, session_id: str):
                         "Analysez les performances et proposez des optimisations",
                     ),
                 ],
-                    (
-                        "refresh-cw",
-                        "Start Migration",
-                        "Launch Angular 16→17 migration starting with module inventory",
-                    ),
-                    (
-                        "check-square",
-                        "Verify Golden Files",
-                        "Compare legacy vs migration golden files to validate ISO 100%",
-                    ),
-                    (
-                        "package",
-                        "Migrer module",
-                        "Migrez le prochain module standalone avec les codemods",
-                    ),
-                    (
-                        "activity",
-                        "Regression Tests",
-                        "Run post-migration regression tests",
-                    ),
-                ],
                 "review-cycle": [
                     (
                         "eye",
