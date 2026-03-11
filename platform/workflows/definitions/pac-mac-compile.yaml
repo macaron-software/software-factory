@@ -1,0 +1,66 @@
+id: pac-mac-compile
+name: "Pac-Mac Full Pipeline (Arch→Dev→Adversarial→QA→Review)"
+description: "End-to-end pipeline for building the Pac-Mac macOS game: architecture review, dev sprints with code critic loop, adversarial security review, QA testing, and final PM review."
+icon: "🎮"
+
+phases:
+  - id: architecture
+    name: Architecture Review
+    pattern_id: solo
+    gate: always
+    config:
+      agents:
+        - id: architecte
+      instructions: >
+        Review the Swift/SpriteKit architecture. Examine Package.swift, src/ structure,
+        and SPECS.md. Provide architecture recommendations for the Pac-Man game implementation.
+
+  - id: development
+    name: Core Development Sprint
+    pattern_id: loop
+    gate: build_passes
+    config:
+      agents:
+        - id: dev_fullstack
+          label: writer
+        - id: code-critic
+          label: reviewer
+      max_iterations: 5
+      instructions: >
+        Implement and fix the Pac-Man game in Swift/SpriteKit. Read all existing code first.
+        Fix compilation errors, implement missing features per SPECS.md. Build with: swift build.
+        The writer codes, the critic reviews and vetoes if quality is poor.
+
+  - id: adversarial-review
+    name: Adversarial Security Review
+    pattern_id: sequential
+    gate: no_veto
+    config:
+      agents:
+        - id: code-critic
+        - id: security-critic
+      instructions: >
+        Review ALL Swift source files for quality and security. Check for hardcoded secrets,
+        input validation, memory safety. Veto if critical issues found.
+
+  - id: qa-testing
+    name: QA & Build Verification
+    pattern_id: solo
+    gate: build_passes
+    config:
+      agents:
+        - id: tester
+      instructions: >
+        Run: swift build && swift test. Verify compilation succeeds, all tests pass.
+        Check SPECS.md coverage target (>=80%). Report exact build output.
+
+  - id: final-review
+    name: Final QA Review
+    pattern_id: solo
+    gate: checkpoint
+    config:
+      agents:
+        - id: qa_lead
+      instructions: >
+        Final quality gate: verify SPECS.md acceptance criteria, compilation OK,
+        tests pass, code quality acceptable. Approve or reject.

@@ -274,13 +274,40 @@ async def api_mission_start(request: Request):
     epic_id = uuid.uuid4().hex[:8]
 
     # Create workspace directory for agent tools (code, git, docker)
+    import shutil
     import subprocess
 
     from ....config import DATA_DIR
 
     workspace_root = DATA_DIR / "workspaces" / epic_id
+
+    # If project has an existing workspace with source code, copy it
+    _project_ws_used = False
+    if project_id:
+        try:
+            from ....db.migrations import get_db as _ws_db
+            _db = _ws_db()
+            _row = _db.execute("SELECT path FROM projects WHERE id=?", (project_id,)).fetchone()
+            _db.close()
+            if _row:
+                from pathlib import Path as _Path
+                _raw_path = _row["path"] if hasattr(_row, "keys") else _row[0]
+                _proj_path = _Path(_raw_path)
+                if not _proj_path.is_absolute():
+                    # Resolve relative to FACTORY_ROOT (parent of DATA_DIR)
+                    from ....config import FACTORY_ROOT
+                    _proj_path = FACTORY_ROOT / _proj_path
+                if _proj_path.exists() and any(_proj_path.iterdir()):
+                    shutil.copytree(str(_proj_path), str(workspace_root),
+                                    ignore=shutil.ignore_patterns('.git', '__pycache__', 'node_modules', '.build', 'dist', 'build'),
+                                    dirs_exist_ok=True)
+                    _project_ws_used = True
+                    logger.warning("WORKSPACE: copied project %s workspace from %s", project_id, _proj_path)
+        except Exception as _we:
+            logger.warning("WORKSPACE: could not copy project workspace: %s", _we)
+
     workspace_root.mkdir(parents=True, exist_ok=True)
-    # Init git repo + README with brief
+    # Init git repo
     subprocess.run(["git", "init"], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "agents@macaron.ai"],
@@ -292,13 +319,15 @@ async def api_mission_start(request: Request):
         cwd=str(workspace_root),
         capture_output=True,
     )
-    readme = workspace_root / "README.md"
-    readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {epic_id}\n")
+    if not _project_ws_used:
+        readme = workspace_root / "README.md"
+        readme.write_text(f"# {wf.name}\n\n{brief}\n\nMission ID: {epic_id}\n")
     # Add .gitignore to prevent node_modules/dist/build from being committed
     gitignore = workspace_root / ".gitignore"
-    gitignore.write_text(
-        "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
-    )
+    if not gitignore.exists():
+        gitignore.write_text(
+            "node_modules/\ndist/\nbuild/\n.env\n*.bak\n__pycache__/\n.DS_Store\n"
+        )
     subprocess.run(["git", "add", "."], cwd=str(workspace_root), capture_output=True)
     subprocess.run(
         ["git", "commit", "-m", "Initial commit — mission workspace"],

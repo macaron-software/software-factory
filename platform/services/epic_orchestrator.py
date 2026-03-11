@@ -540,7 +540,13 @@ class EpicOrchestrator:
                 continue
 
             cfg = wf_phase.config or {}
-            aids = cfg.get("agent_ids", cfg.get("agents", []))
+            raw_aids = cfg.get("agent_ids", cfg.get("agents", []))
+            # Normalize: items may be dicts like {"id": "x"} or plain strings
+            aids = [
+                (a["id"] if isinstance(a, dict) and "id" in a else
+                 a.get("agent_id", str(a)) if isinstance(a, dict) else str(a))
+                for a in raw_aids
+            ]
             pattern_type = wf_phase.pattern_id
 
             # Dynamic team resolution: pick agents from graph nodes or defaults
