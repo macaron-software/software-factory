@@ -555,6 +555,9 @@ def _classify_agent_role(agent) -> str:
             "code review",
             "code-reviewer",
             "code_reviewer",
+            "code-critic",
+            "code_critic",
+            "critic",
             "adversarial",
         )
     ):

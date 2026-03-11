@@ -1081,74 +1081,16 @@ async def _legacy_scan(args: dict, ctx: ExecutionContext, project_id: str) -> st
     return "\n".join(lines)
 
 
+async def _tool_build_test(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Run build or test command in workspace via BuildTool/TestTool."""
+    from ..tools.build_tools import BuildTool, TestTool
 
-    """Run build or test command in workspace."""
-    command = args.get("command", "")
-    if not command:
-        return "Error: command is required"
-    workspace = ctx.project_path
-    if not workspace:
-        return "Error: no workspace available"
-    import os
-    import subprocess
-
-    # Intercept Android builds — redirect to android_build tool
-    if any(
-        kw in command
-        for kw in ["gradlew", "gradle ", "assembleDebug", "assembleRelease"]
-    ):
-        return (
-            "⚠️ WRONG TOOL: Do NOT use build() for Android/Gradle projects.\n"
-            "Use android_build() instead — it runs in the android-builder container with real SDK.\n"
-            "Generic build() has no Android SDK and will silently produce nothing."
-        )
-
-    # Fix swift command to use Apple Swift (not OpenStack python-swiftclient)
-    import re as _re
-    if os.path.isfile("/usr/bin/swift") and _re.search(r'\bswift\s+(?:build|test|package|run)\b', command):
-        command = _re.sub(r'\bswift\b', '/usr/bin/swift', command)
-    # Fix bare "python" → "python3" on macOS where only python3 exists
-    import shutil
-    if not shutil.which("python") and shutil.which("python3"):
-        command = _re.sub(r'\bpython\b(?!3)', 'python3', command)
-    try:
-        proc = subprocess.run(
-            command,
-            shell=True,
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            stdin=subprocess.DEVNULL,
-        )
-        out = (proc.stdout or "") + (proc.stderr or "")
-        status = (
-            "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
-        )
-        # Extract unique errors for actionable feedback
-        if proc.returncode != 0 and out:
-            seen_msgs = set()
-            unique_errors = []
-            for line in out.splitlines():
-                if "error:" in line.lower():
-                    # Deduplicate by the error message portion
-                    msg_part = line.split("error:")[-1].strip() if "error:" in line else line
-                    if msg_part not in seen_msgs:
-                        seen_msgs.add(msg_part)
-                        unique_errors.append(line.strip())
-            if unique_errors:
-                err_text = "\n".join(unique_errors[:5])
-                suffix = f"\n... and {len(unique_errors) - 5} more errors (fix above first, then rebuild)" if len(unique_errors) > 5 else ""
-                return (
-                    f"[{tool_name.upper()}] {status} ({len(unique_errors)} unique errors)\n$ {command}\n"
-                    f"{err_text}{suffix}\n\n"
-                    f"ACTION REQUIRED: Use code_edit(path=..., old_str=..., new_str=...) to fix each error above, then call build() again."
-                )
-        return f"[{tool_name.upper()}] {status}\n$ {command}\n{out[-3000:]}"
-    except subprocess.TimeoutExpired:
-        return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
-    except Exception as exc:
-        return f"[{tool_name.upper()}] ERROR: {exc}"
+    tool_cls = BuildTool if name == "build" else TestTool
+    tool = tool_cls()
+    params = dict(args)
+    if ctx.project_path:
+        params.setdefault("cwd", ctx.project_path)
+    return await tool.execute(params)
 
 
 async def _tool_browser_screenshot(args: dict, ctx: ExecutionContext) -> str:

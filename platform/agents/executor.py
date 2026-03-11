@@ -1165,7 +1165,7 @@ class AgentExecutor:
                 agent.id,
                 ctx.tools_enabled,
                 "YES" if tools else "NO",
-                ctx.allowed_tools[:3] if ctx.allowed_tools else "all",
+                f"{len(ctx.allowed_tools)} tools" if ctx.allowed_tools else "all",
             )
 
             # Route provider: Darwin LLM Thompson Sampling + routing config
