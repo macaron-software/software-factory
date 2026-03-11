@@ -257,6 +257,12 @@ def _get_tool_registry():
             register_perf_audit_tools(reg)
     except Exception:
         pass
+    try:
+        from ..tools.traceability_tools import register_traceability_tools
+
+        register_traceability_tools(reg)
+    except Exception:
+        pass
     return reg
 
 

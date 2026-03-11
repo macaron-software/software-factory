@@ -620,6 +620,19 @@ _PHASE_TEMPLATES = [
      "team_roles": ["architect", "developer", "qa"], "gate": "no_veto"},
     {"id": "mob-debug", "name": "Mob Debugging", "pattern": "mob",
      "team_roles": ["developer", "developer", "tech-lead"], "gate": "no_veto"},
+    {"id": "legacy-inventory", "name": "Legacy Inventory Scan", "pattern": "solo",
+     "team_roles": ["architect"], "gate": "all_approved",
+     "feedback": ["tools"]},
+    {"id": "story-from-legacy", "name": "Story Generation from Legacy", "pattern": "relay",
+     "team_roles": ["architect", "product", "qa"], "gate": "no_veto"},
+    {"id": "traceability-check", "name": "Traceability Validation", "pattern": "voting",
+     "team_roles": ["qa", "architect", "critic"], "gate": "all_approved",
+     "feedback": ["tools"]},
+    {"id": "migration-sprint", "name": "Migration Sprint", "pattern": "hierarchical",
+     "team_roles": ["tech-lead", "developer", "qa"], "gate": "all_approved"},
+    {"id": "migration-verify", "name": "Migration Verification", "pattern": "red-blue",
+     "team_roles": ["developer", "qa", "critic"], "gate": "all_approved",
+     "feedback": ["adversarial", "tools"]},
 ]
 
 

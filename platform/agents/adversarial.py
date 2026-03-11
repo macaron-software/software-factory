@@ -692,6 +692,25 @@ def check_l0(
             )
             score += 3  # warning: encourages but doesn't block
 
+    # MISSING_UUID_REF: for migration projects, code/tests must reference legacy item UUIDs
+    _UUID_REF_PATTERN = re.compile(
+        r"(?:li-|feat-|us-|ac-)[a-f0-9]{6,8}", re.IGNORECASE,
+    )
+    for tc in tool_calls:
+        if tc.get("name") not in ("code_write", "code_edit"):
+            continue
+        fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+        fc = str(tc.get("args", {}).get("content", "") or tc.get("args", {}).get("new_content", ""))
+        if not fc or not fp:
+            continue
+        is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec.", ".test."])
+        if is_test and not _UUID_REF_PATTERN.search(fc):
+            issues.append(
+                f"MISSING_UUID_REF: Test file {fp} has no traceability UUID reference "
+                f"(li-xxx, feat-xxx, us-xxx, ac-xxx) — add story/AC UUID in test name or comment"
+            )
+            score += 2  # soft encouragement
+
     # Check build tool failures — only flag if the LAST build/test call failed.
     # Earlier failures are OK if the agent self-corrected (iterative fix cycle).
     if tool_calls:

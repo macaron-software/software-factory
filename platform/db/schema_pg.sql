@@ -962,127 +962,36 @@ CREATE TABLE IF NOT EXISTS platform_nodes (
 );
 CREATE INDEX IF NOT EXISTS idx_pnodes_status ON platform_nodes(status);
 
--- Mercato (agent marketplace)
-CREATE TABLE IF NOT EXISTS project_wallets (
-    project_id TEXT PRIMARY KEY,
-    balance INTEGER NOT NULL DEFAULT 5000,
-    total_earned INTEGER NOT NULL DEFAULT 0,
-    total_spent INTEGER NOT NULL DEFAULT 0,
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-CREATE TABLE IF NOT EXISTS token_transactions (
-    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+-- Legacy Items inventory (migration traceability)
+CREATE TABLE IF NOT EXISTS legacy_items (
+    id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL,
-    amount INTEGER NOT NULL,
-    reason TEXT,
-    reference_id TEXT,
+    item_type TEXT NOT NULL,
+    name TEXT NOT NULL,
+    parent_id TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    metadata_json TEXT DEFAULT '{}',
+    source_file TEXT DEFAULT '',
+    source_line INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'identified',
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS agent_assignments (
-    agent_id TEXT PRIMARY KEY,
-    project_id TEXT NOT NULL,
-    assignment_type TEXT NOT NULL DEFAULT 'owned',
-    loan_expires_at TEXT,
-    loan_from_project TEXT,
+CREATE INDEX IF NOT EXISTS idx_legacy_project ON legacy_items(project_id);
+CREATE INDEX IF NOT EXISTS idx_legacy_type ON legacy_items(item_type);
+CREATE INDEX IF NOT EXISTS idx_legacy_parent ON legacy_items(parent_id);
+
+-- Traceability links (bidirectional: legacy↔story↔code↔test)
+CREATE TABLE IF NOT EXISTS traceability_links (
+    id SERIAL PRIMARY KEY,
+    source_id TEXT NOT NULL,
+    source_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    target_type TEXT NOT NULL,
+    link_type TEXT NOT NULL,
+    coverage_pct INTEGER DEFAULT 0,
+    notes TEXT DEFAULT '',
     created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
-CREATE TABLE IF NOT EXISTS mercato_listings (
-    id TEXT PRIMARY KEY,
-    agent_id TEXT NOT NULL,
-    seller_project TEXT NOT NULL,
-    listing_type TEXT NOT NULL DEFAULT 'transfer',
-    asking_price INTEGER NOT NULL DEFAULT 0,
-    loan_weeks INTEGER,
-    buyout_clause INTEGER,
-    status TEXT NOT NULL DEFAULT 'active',
-    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    expires_at TEXT
-);
-CREATE TABLE IF NOT EXISTS mercato_transfers (
-    id TEXT PRIMARY KEY,
-    listing_id TEXT,
-    agent_id TEXT NOT NULL,
-    from_project TEXT NOT NULL,
-    to_project TEXT NOT NULL,
-    transfer_type TEXT NOT NULL,
-    price INTEGER NOT NULL DEFAULT 0,
-    completed_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
--- ============================================================================
--- PERFORMANCE INDEXES v2 (added 2026-03-08)
--- ============================================================================
-
--- phase_outcomes: GA/RL empirical data (must exist before indexes)
-CREATE TABLE IF NOT EXISTS phase_outcomes (
-    id SERIAL PRIMARY KEY,
-    workflow_id TEXT NOT NULL,
-    pattern_id TEXT NOT NULL,
-    phase_id TEXT NOT NULL,
-    agent_ids TEXT NOT NULL,
-    team_size INTEGER DEFAULT 1,
-    success INTEGER DEFAULT 0,
-    quality_score REAL DEFAULT 0.0,
-    duration_s REAL DEFAULT 0.0,
-    complexity_tier TEXT DEFAULT 'simple',
-    ab_group TEXT DEFAULT '',
-    rejection_count INTEGER DEFAULT 0,
-    mem_store_count INTEGER DEFAULT 0,
-    mem_retrieve_count INTEGER DEFAULT 0,
-    mem_prune_count INTEGER DEFAULT 0,
-    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-);
-CREATE INDEX IF NOT EXISTS idx_po_pattern ON phase_outcomes(pattern_id);
-CREATE INDEX IF NOT EXISTS idx_po_created ON phase_outcomes(created_at DESC);
-
--- epic_runs: cockpit 24h/7d windows + engine UPDATE by session_id
-CREATE INDEX IF NOT EXISTS idx_epic_runs_created ON epic_runs(created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_epic_runs_session ON epic_runs(session_id);
-CREATE INDEX IF NOT EXISTS idx_epic_runs_status_created ON epic_runs(status, created_at DESC);
-
--- team_fitness_history: boards query WHERE technology=? (existing idx starts with agent_id)
-CREATE INDEX IF NOT EXISTS idx_tfh_technology ON team_fitness_history(technology, phase_type);
-CREATE INDEX IF NOT EXISTS idx_tfh_snapshot ON team_fitness_history(snapshot_date DESC);
-
--- team_okr: UPDATE WHERE technology=? AND kpi_name=? / ORDER BY team_key
-CREATE INDEX IF NOT EXISTS idx_tokr_tech ON team_okr(technology, kpi_name);
-CREATE INDEX IF NOT EXISTS idx_tokr_teamkey ON team_okr(team_key);
-
--- agent_assignments: WHERE project_id=? (only agent_id is PK)
-CREATE INDEX IF NOT EXISTS idx_asgn_project ON agent_assignments(project_id);
-
--- agent_scores: composite for WHERE agent_id=? AND epic_id=?
-CREATE INDEX IF NOT EXISTS idx_ascores_agent_epic ON agent_scores(agent_id, epic_id);
-
--- messages: cockpit WHERE from_agent NOT IN (...) AND timestamp >= NOW()-1h
-CREATE INDEX IF NOT EXISTS idx_messages_from_ts ON messages(from_agent, timestamp DESC);
-
--- llm_traces: per-session trace lookups ordered by time
-CREATE INDEX IF NOT EXISTS idx_llt_session_created ON llm_traces(session_id, created_at DESC);
-
--- rl_experience: created_at for future purge/window queries
-CREATE INDEX IF NOT EXISTS idx_rl_exp_created ON rl_experience(created_at DESC);
-
--- admin_audit_log: security audit log (must exist before indexes)
-CREATE TABLE IF NOT EXISTS admin_audit_log (
-    id SERIAL PRIMARY KEY,
-    actor TEXT,
-    action TEXT,
-    resource_type TEXT,
-    resource_id TEXT,
-    detail TEXT,
-    ip TEXT,
-    user_agent TEXT,
-    timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-    event_type TEXT,
-    actor_id TEXT,
-    target_type TEXT,
-    target_id TEXT,
-    severity TEXT,
-    blocked BOOLEAN DEFAULT false,
-    context_json TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_aal_resource ON admin_audit_log(resource_type, resource_id);
-
--- tool_calls: agent activity windows
-CREATE INDEX IF NOT EXISTS idx_toolcalls_agent_ts ON tool_calls(agent_id, timestamp DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tlink_pair ON traceability_links(source_id, target_id, link_type);
+CREATE INDEX IF NOT EXISTS idx_tlink_source ON traceability_links(source_id);
+CREATE INDEX IF NOT EXISTS idx_tlink_target ON traceability_links(target_id);

@@ -81,13 +81,9 @@ def _init_pg():
 
     _log = _logging.getLogger(__name__)
     conn = get_connection()
-    # Acquire exclusive advisory lock — serialize migrations across nodes.
-    # Use a 30s lock_timeout so we never block forever if a prior process crashed
-    # mid-migration and left a zombie PG session holding the lock.
+    # Acquire exclusive advisory lock — other nodes block here until migration done
     try:
-        conn.execute("SET lock_timeout = '30s'")
         conn.execute("SELECT pg_advisory_lock(20260301)")
-        conn.execute("SET lock_timeout = '0'")  # reset
         _log.info("DB migration: advisory lock acquired")
     except Exception:
         pass  # non-fatal if advisory locks not supported
@@ -122,8 +118,8 @@ def _migrate_pg(conn):
             project_id TEXT,
             mission_id TEXT,
             marketing_plan TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute("""
@@ -135,7 +131,7 @@ def _migrate_pg(conn):
             content TEXT,
             color TEXT,
             avatar_url TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute(
@@ -147,7 +143,7 @@ def _migrate_pg(conn):
             session_id TEXT NOT NULL REFERENCES mkt_ideation_sessions(id) ON DELETE CASCADE,
             type TEXT,
             text TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute(
@@ -218,7 +214,7 @@ def _migrate_pg(conn):
             quality_score REAL DEFAULT 0.0,
             duration_s REAL DEFAULT 0.0,
             complexity_tier TEXT DEFAULT 'simple',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute(
@@ -236,37 +232,6 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS ab_group TEXT DEFAULT ''"
-        )
-    except Exception:
-        pass
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS rejection_count INTEGER DEFAULT 0"
-        )
-    except Exception:
-        pass
-    # AgeMem: memory op counts per pattern run — feeds memory RL stage training
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS mem_store_count INTEGER DEFAULT 0"
-        )
-    except Exception:
-        pass
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS mem_retrieve_count INTEGER DEFAULT 0"
-        )
-    except Exception:
-        pass
-    try:
-        conn.execute(
-            "ALTER TABLE phase_outcomes ADD COLUMN IF NOT EXISTS mem_prune_count INTEGER DEFAULT 0"
-        )
-    except Exception:
-        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS agent_pair_scores (
             id SERIAL PRIMARY KEY,
@@ -275,7 +240,7 @@ def _migrate_pg(conn):
             co_appearances INTEGER DEFAULT 0,
             joint_successes INTEGER DEFAULT 0,
             joint_quality_sum REAL DEFAULT 0.0,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMPTZ DEFAULT NOW(),
             UNIQUE(agent_a, agent_b)
         )
     """)
@@ -305,10 +270,8 @@ def _migrate_pg(conn):
         ("last_resume_at", "TEXT"),
         ("human_input_required", "INTEGER DEFAULT 0"),
         ("llm_cost_usd", "DOUBLE PRECISION DEFAULT 0.0"),
-        # pattern_type: which orchestration pattern ran for this epic (added 2026-03)
-        ("pattern_type", "TEXT DEFAULT ''"),
-        # context_json: epic run context (added 2026-03)
-        ("context_json", "TEXT DEFAULT '{}'"),
+        ("cancel_reason", "TEXT"),
+        ("started_at", "TIMESTAMP"),
     ]:
         try:
             conn.execute(f"ALTER TABLE epic_runs ADD COLUMN IF NOT EXISTS {col} {defn}")
@@ -383,7 +346,9 @@ def _migrate_pg(conn):
             cmd_prefix TEXT DEFAULT ''
         )
     """)
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_rtk_ts ON rtk_compression_stats(ts)"
+    )
     _bump_schema_version(conn, _SCHEMA_VERSION)
     # memory_project / memory_global: access tracking columns (added 2026-03)
     for col, defn in [
@@ -633,12 +598,12 @@ def _migrate_pg(conn):
             role TEXT NOT NULL DEFAULT 'slave',
             mode TEXT NOT NULL DEFAULT 'slave',
             url TEXT NOT NULL DEFAULT '',
-            last_seen TEXT DEFAULT CURRENT_TIMESTAMP,
+            last_seen TIMESTAMPTZ DEFAULT NOW(),
             status TEXT NOT NULL DEFAULT 'online',
             cpu_pct DOUBLE PRECISION DEFAULT 0,
             mem_pct DOUBLE PRECISION DEFAULT 0,
             version TEXT DEFAULT '',
-            registered_at TEXT DEFAULT CURRENT_TIMESTAMP
+            registered_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.execute(
@@ -657,535 +622,8 @@ def _migrate_pg(conn):
         )
     except Exception:
         pass
-    # Projects: is_protected (added 2026-03)
-    try:
-        conn.execute(
-            "ALTER TABLE projects ADD COLUMN IF NOT EXISTS is_protected BOOLEAN DEFAULT FALSE"
-        )
-    except Exception:
-        pass
 
-    # Hook system (2026-03)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS hook_registrations (
-            id TEXT PRIMARY KEY,
-            hook_type TEXT NOT NULL,
-            handler_name TEXT NOT NULL,
-            agent_id TEXT,
-            priority INTEGER DEFAULT 0,
-            enabled BOOLEAN DEFAULT TRUE,
-            can_block BOOLEAN DEFAULT FALSE,
-            required_role TEXT,
-            config_json TEXT DEFAULT '{}',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS hook_log (
-            id TEXT PRIMARY KEY,
-            hook_type TEXT,
-            handler_name TEXT,
-            agent_id TEXT,
-            session_id TEXT,
-            tool_name TEXT,
-            blocked BOOLEAN DEFAULT FALSE,
-            message TEXT,
-            duration_ms INTEGER,
-            ts TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # ── Performance indexes (added 2026-03-08) ────────────────────────────────
-    # phase_outcomes: engine reads AVG(duration_s) WHERE pattern_id=? on every phase
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_po_pattern ON phase_outcomes(pattern_id)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_po_created ON phase_outcomes(created_at DESC)"
-    )
-    # epic_runs: cockpit queries by created_at (24h/7d windows) + engine UPDATE by session_id
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_epic_runs_created ON epic_runs(created_at DESC)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_epic_runs_session ON epic_runs(session_id)"
-    )
-    # epic_runs: combined status + created_at for cockpit failure counts
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_epic_runs_status_created ON epic_runs(status, created_at DESC)"
-    )
-    # team_fitness_history: boards query WHERE technology=? and WHERE technology=? AND phase_type=?
-    # existing idx_tfh_key starts with agent_id — unusable for tech-only filter
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tfh_technology ON team_fitness_history(technology, phase_type)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tfh_snapshot ON team_fitness_history(snapshot_date DESC)"
-    )
-    # team_okr: UPDATE WHERE technology=? AND kpi_name=?  / ORDER BY team_key, kpi_name
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tokr_tech ON team_okr(technology, kpi_name)"
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_tokr_teamkey ON team_okr(team_key)")
-    # agent_assignments: WHERE project_id=? (only agent_id is PK — no index on project_id)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_asgn_project ON agent_assignments(project_id)"
-    )
-    # agent_scores: composite for WHERE agent_id=? AND epic_id=? queries in selection.py
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_ascores_agent_epic ON agent_scores(agent_id, epic_id)"
-    )
-    # messages: cockpit query WHERE from_agent NOT IN (...) AND timestamp >= NOW()-1h
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_messages_from_ts ON messages(from_agent, timestamp DESC)"
-    )
-    # llm_traces: combined session+created_at for per-session trace lookups
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_llt_session_created ON llm_traces(session_id, created_at DESC)"
-    )
-    # rl_experience: training reads latest N rows — PK covers ORDER BY id DESC; add created_at for purge
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_rl_exp_created ON rl_experience(created_at DESC)"
-    )
-    # admin_audit_log: composite for resource lookups (table created later in this migration)
-    if _pg_table_exists(conn, "admin_audit_log"):
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_aal_resource ON admin_audit_log(resource_type, resource_id)"
-        )
-    # tool_calls: combined (agent_id, timestamp) for agent activity windows
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_toolcalls_agent_ts ON tool_calls(agent_id, timestamp DESC)"
-    )
-
-    _seed_sf_patterns(conn)
     conn.commit()
-
-
-def _seed_sf_patterns(conn) -> None:
-    """Seed 5 pattern epics + 39 pattern features into the factory (self-SF) project.
-    Added 2026-03-08 — ref: pattern observability + AgeMem (arXiv:2601.01885).
-    Uses ON CONFLICT DO NOTHING so safe to re-run on existing DBs.
-    """
-    epics = [
-        (
-            "pat-orch",
-            "factory",
-            "Orchestration Patterns — SF Platform",
-            "18 patterns moteur: sequential, parallel, hierarchical, loop, debate, router, aggregator, wave, fractal_*, backprop_merge, HITL, adversarial-cascade, saga, sf-tdd, map-reduce, blackboard, swarm, solo-chat",
-            9,
-            9,
-        ),
-        (
-            "pat-learn",
-            "factory",
-            "Learning Patterns — SF Platform",
-            "5 patterns apprentissage: InstinctObserver, ConsolidateAgent, EvolutionScheduler (GA), RLPolicy (Q-learning + MemoryRLPolicy AgeMem), evolve_instincts hook",
-            8,
-            8,
-        ),
-        (
-            "pat-qs",
-            "factory",
-            "Quality & Safety Patterns — SF Platform",
-            "4 patterns qualité/sécurité: AdversarialGuard (Swiss Cheese), Guardrails, HookSystem (ECC lifecycle), SkillStocktake",
-            9,
-            9,
-        ),
-        (
-            "pat-mem",
-            "factory",
-            "Memory Patterns — SF Platform",
-            "8 patterns mémoire: MemoryManager 4-layer, AgeMem mem-1/2/3 (arXiv:2601.01885), VectorMemory, MemoryCompactor, InboxWatcher, QueryAgent",
-            8,
-            8,
-        ),
-        (
-            "pat-ops",
-            "factory",
-            "Ops Patterns — SF Platform",
-            "4 patterns ops: AutoHeal, ChaosEndurance, EnduranceWatchdog, A2A Bus (LF A2A v1.0)",
-            7,
-            7,
-        ),
-    ]
-    for epic_id, project_id, name, desc, bv, wsjf in epics:
-        conn.execute(
-            """
-            INSERT INTO epics (id, project_id, name, description, status, business_value, wsjf_score, created_at)
-            VALUES (?, ?, ?, ?, 'active', ?, ?, NOW())
-            ON CONFLICT (id) DO NOTHING
-        """,
-            (epic_id, project_id, name, desc, bv, wsjf),
-        )
-
-    # (epic_id, feature_id, name, description, acceptance_criteria, priority, story_points)
-    features = [
-        # pat-orch (18)
-        (
-            "pat-orch",
-            "fp-sequential",
-            "Pattern: Sequential (Pipeline)",
-            "Agents chaînés, output de chacun → input du suivant. Implémentation: engine.py run_sequential(). Cas: feature-sprint, cicd-pipeline.",
-            "GIVEN un workflow séquentiel WHEN lancé THEN chaque phase reçoit le contexte précédent · output final = output dernière phase",
-            1,
-            3,
-        ),
-        (
-            "pat-orch",
-            "fp-parallel",
-            "Pattern: Parallel (Fan-out)",
-            "N agents en parallèle, résultats mergés. Implémentation: patterns/impls/parallel.py. Cas: research multi-source, code review multi-facettes.",
-            "GIVEN N branches WHEN lancées THEN exécution concurrente · merge de tous les résultats",
-            2,
-            3,
-        ),
-        (
-            "pat-orch",
-            "fp-hierarchical",
-            "Pattern: Hierarchical",
-            "PM agent délègue à des spécialistes. Implémentation: patterns/impls/hierarchical.py. Cascade top-down avec synthèse remontante.",
-            "GIVEN 1 PM + N specialists WHEN PM reçoit tâche THEN délègue · chaque specialist rend compte · PM synthétise",
-            2,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-loop",
-            "Pattern: Loop (Adversarial Pair)",
-            "Writer/Reviewer itèrent jusqu'à approbation ou max_iter. Implémentation: patterns/impls/loop.py. Sprint DB record créé par itération.",
-            "GIVEN writer + reviewer WHEN launched THEN iterates · sprint record créé/cloturé · approval ou max_iter exit",
-            2,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-debate",
-            "Pattern: Débat (Network)",
-            "N agents débattent, vote majoritaire ou consensus. Implémentation: patterns/impls/debate.py. Cas: ideation 5 agents.",
-            "GIVEN N agents WHEN debate launched THEN rounds de débat · vote final · position gagnante retournée",
-            2,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-router",
-            "Pattern: Router",
-            "Routage dynamique selon contenu/contexte. Implémentation: patterns/impls/router.py. pub-sub variant pour event-driven.",
-            "GIVEN input + routing rules WHEN message arrives THEN correct agent selected · routing logged · fallback si no match",
-            2,
-            3,
-        ),
-        (
-            "pat-orch",
-            "fp-aggregator",
-            "Pattern: Agrégateur",
-            "Fan-out vers N agents, merge des résultats. Consensus variant = vote majoritaire. Implémentation: patterns/impls/aggregator.py.",
-            "GIVEN N agents WHEN all complete THEN results merged · consensus vote computed si activé",
-            3,
-            3,
-        ),
-        (
-            "pat-orch",
-            "fp-wave",
-            "Pattern: Wave",
-            "Phases parallèles avec barrière de synchronisation entre chaque wave. Implémentation: patterns/impls/wave.py.",
-            "GIVEN wave config WHEN launched THEN parallel agents per wave · sync barrier before next wave · results accumulated",
-            3,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-fractal-stories",
-            "Pattern: Fractal Stories",
-            "Décomposition épic → features → user stories. Implémentation: patterns/impls/fractal_stories.py.",
-            "GIVEN epic WHEN fractal-stories launched THEN features + user stories générés · AC définis · points estimés",
-            2,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-fractal-tests",
-            "Pattern: Fractal Tests",
-            "Suite de tests fractale: BDD GIVEN/WHEN/THEN. Implémentation: patterns/impls/fractal_tests.py.",
-            "GIVEN codebase WHEN fractal-tests launched THEN unit + integration + e2e generated · coverage estimé",
-            3,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-fractal-qa",
-            "Pattern: Fractal QA",
-            "Décomposition QA fractale: test plans → test suites → cas de test. Implémentation: patterns/impls/fractal_qa.py.",
-            "GIVEN feature WHEN fractal-qa launched THEN hierarchical test decomposition · QA agent at each level",
-            2,
-            8,
-        ),
-        (
-            "pat-orch",
-            "fp-fractal-worktree",
-            "Pattern: Fractal Worktree",
-            "Workspace Git isolé par nœud fractal. Implémentation: patterns/impls/fractal_worktree.py.",
-            "GIVEN fractal task WHEN launched THEN git worktree isolé créé · each node works in isolation · merge final",
-            2,
-            8,
-        ),
-        (
-            "pat-orch",
-            "fp-backprop",
-            "Pattern: Backpropagation Merge",
-            "Résolution de conflits par backprop entre agents. Implémentation: patterns/impls/backprop_merge.py.",
-            "GIVEN N outputs with conflicts WHEN backprop THEN conflicts resolved · merged output coherent",
-            3,
-            8,
-        ),
-        (
-            "pat-orch",
-            "fp-hitl",
-            "Pattern: Human-in-the-Loop",
-            "Gate humain: GO/NOGO avant poursuite. Implémentation: patterns/impls/human_in_the_loop.py. HITL_TIMEOUT configurable.",
-            "GIVEN workflow avec HITL gate WHEN reached THEN pause · notif envoyée · wait human decision · timeout auto-GO si configuré",
-            1,
-            3,
-        ),
-        (
-            "pat-orch",
-            "fp-adv-cascade",
-            "Pattern: Adversarial Cascade",
-            "Cascade d'agents adversariaux: chacun challenge le précédent. Implémentation: patterns/impls/adversarial_cascade.py.",
-            "GIVEN N adversarial agents WHEN cascade THEN each challenges previous · final output survives all challenges",
-            2,
-            5,
-        ),
-        (
-            "pat-orch",
-            "fp-saga",
-            "Pattern: Checkpoint / Saga",
-            "Rollback sur échec via checkpoints. Implémentation: patterns/impls/saga.py.",
-            "GIVEN multi-step workflow WHEN failure THEN compensating actions run · state restored to last checkpoint",
-            2,
-            8,
-        ),
-        (
-            "pat-orch",
-            "fp-sf-tdd",
-            "Pattern: SF TDD Pipeline",
-            "Pipeline TDD SF: RED → GREEN → REFACTOR + CI/CD. Implémentation: patterns/impls/sf_tdd.py + feature-sprint.yaml.",
-            "GIVEN feature WHEN sf-tdd launched THEN failing tests → implementation → passing tests → review · sprint record created",
-            1,
-            13,
-        ),
-        (
-            "pat-orch",
-            "fp-supervisor-retry",
-            "Pattern: Supervisor Retry",
-            "Supervisor relance un agent en cas d'échec, avec correction de prompt. Implémentation: patterns/impls/loop.py (variant).",
-            "GIVEN agent + supervisor WHEN failure THEN supervisor corrects + retries · max 3 retries · quality score propagé",
-            3,
-            3,
-        ),
-        # pat-learn (5)
-        (
-            "pat-learn",
-            "fp-instinct-obs",
-            "Pattern: InstinctObserver",
-            "Observer post-session: extrait instincts comportementaux depuis logs. hooks/instinct_observer.py. On: post_session.",
-            "GIVEN session terminée WHEN observer runs THEN insights extraits · instinct_insights table populated",
-            2,
-            5,
-        ),
-        (
-            "pat-learn",
-            "fp-consolidate",
-            "Pattern: ConsolidateAgent",
-            "Consolide instincts en YAML skill amélioré. agents/consolidate.py. Appelé par EvolutionScheduler.",
-            "GIVEN instinct_insights WHEN consolidate THEN skill YAML updated · version incrémentée · quality_score computed",
-            2,
-            5,
-        ),
-        (
-            "pat-learn",
-            "fp-ga-evolution",
-            "Pattern: EvolutionScheduler (GA)",
-            "Genetic Algorithm sur prompts/skills: mutation + crossover + selection. agents/evolution.py. POST /api/darwin/evolve.",
-            "GIVEN skill pool WHEN GA run THEN mutations générées · fitness evaluated · best kept · POST /api/darwin/seed",
-            2,
-            8,
-        ),
-        (
-            "pat-learn",
-            "fp-rl-policy",
-            "Pattern: RLPolicy (Q-learning)",
-            "Q-table tabular pour sélection pattern optimal. agents/rl_policy.py. Feedback: session quality_score. + MemoryRLPolicy 3-stage (AgeMem).",
-            "GIVEN session outcome WHEN update THEN Q-table updated · next pattern recommendation améliorée · mem-3 stages 1→2→3",
-            2,
-            8,
-        ),
-        (
-            "pat-learn",
-            "fp-evolve-hook",
-            "Pattern: evolve_instincts hook",
-            "Hook post_session qui déclenche automatiquement l'évolution des instincts. hooks/lifecycle.py.",
-            "GIVEN session end WHEN hook fires THEN instinct observer run · consolidation triggered si threshold atteint",
-            3,
-            3,
-        ),
-        # pat-qs (4)
-        (
-            "pat-qs",
-            "fp-adv-guard",
-            "Pattern: AdversarialGuard (Swiss Cheese)",
-            "Vérification adversariale avant memory_store. engine.py::_execute_node() before store. Swiss Cheese: chaque couche rattrape ce que la précédente laisse passer.",
-            "GIVEN agent output WHEN AdversarialGuard activated THEN hallucination/injection checked · blocked si flagged · logged",
-            1,
-            5,
-        ),
-        (
-            "pat-qs",
-            "fp-guardrails",
-            "Pattern: Guardrails",
-            "Content filter: PII, prompt injection, toxicity. hooks/guardrails.py. Pre-agent et post-agent gates.",
-            "GIVEN any agent message WHEN guardrail runs THEN PII detected/masked · injection blocked · toxicity filtered · AC_SCORE impact",
-            1,
-            5,
-        ),
-        (
-            "pat-qs",
-            "fp-hook-system",
-            "Pattern: HookSystem (ECC)",
-            "Event-driven hooks: pre_agent, post_agent, pre_phase, post_phase, post_session, veto. hooks/lifecycle.py. ECC = Error Correction Code.",
-            "GIVEN workflow run WHEN hooks registered THEN each lifecycle event fires correct hooks · veto stops execution · hooks chainable",
-            2,
-            8,
-        ),
-        (
-            "pat-qs",
-            "fp-skill-stocktake",
-            "Pattern: SkillStocktake",
-            "Audit automatique des skills: version check, eval harness (deterministic + LLM-judge). instincts.py::run_skill_eval(). Version frontmatter requis.",
-            "GIVEN skill YAML WHEN stocktake THEN version présente · deterministic checks run · LLM-judge optionnel · score retourné",
-            2,
-            5,
-        ),
-        # pat-mem (8)
-        (
-            "pat-mem",
-            "fp-mem-manager",
-            "Pattern: MemoryManager 4-layer",
-            "4 couches: session(ephemeral) · pattern(run) · project(persistent) · global(cross-project). manager.py. _serialize_row() datetime+Decimal safe (PG compat).",
-            "GIVEN agent execution WHEN memory used THEN correct layer targeted · project_get() retourne bien filtrés · _serialize_row() no TypeError",
-            1,
-            8,
-        ),
-        (
-            "pat-mem",
-            "fp-agemem-1",
-            "Pattern: AgeMem mem-1 (explicit tools)",
-            "memory_store / memory_retrieve / memory_prune exposés comme tools explicites dans ExecutionContext. prompt_builder: auto-inject role-scoped mem si ctx vide. Ref: arXiv:2601.01885.",
-            "GIVEN agent with project_id WHEN no project_context THEN role-scoped mem auto-retrieved via project_get() · mem tools available in tool schemas",
-            1,
-            8,
-        ),
-        (
-            "pat-mem",
-            "fp-agemem-2",
-            "Pattern: AgeMem mem-2 (phase_outcomes tracking)",
-            "_make_memory_op_counter(run) dans engine.py: on_tool_call hook incrémente mem_store_count / mem_retrieve_count / mem_prune_count. 15 colonnes dans phase_outcomes. Ref: arXiv:2601.01885.",
-            "GIVEN pattern run WHEN memory tools called THEN counters incrémentés · 3 cols dans phase_outcomes · stats disponibles via /api/rl/memory/stats",
-            1,
-            5,
-        ),
-        (
-            "pat-mem",
-            "fp-agemem-3",
-            "Pattern: AgeMem mem-3 (MemoryRLPolicy)",
-            "3-stage progressive RL (Q-table tabular): stage-1=LTM quality, stage-2=STM efficiency, stage-3=joint. agents/rl_policy.py::MemoryRLPolicy. POST /api/rl/memory/train. Ref: arXiv:2601.01885.",
-            "GIVEN phase_outcomes data WHEN train_stage(N) called THEN Q-table updated · stage 1→2→3 progressif · recommend_memory_ops() retourne action",
-            1,
-            8,
-        ),
-        (
-            "pat-mem",
-            "fp-vector-mem",
-            "Pattern: VectorMemory",
-            "Embeddings OpenAI-compat + cosine similarity search. memory/vectors.py. Fallback FTS5/tsvector si pas de provider.",
-            "GIVEN query WHEN vector search THEN cosine sim ranking · fallback FTS5 si no embedding provider · results merged",
-            2,
-            5,
-        ),
-        (
-            "pat-mem",
-            "fp-compactor",
-            "Pattern: MemoryCompactor",
-            "Nightly 03:00: prune stale (NOW()-INTERVAL PG), compress oversized (>2000 chars), dedup global (HAVING COUNT(*)), re-score relevance. memory/compactor.py.",
-            "GIVEN memory tables WHEN compaction THEN stale pruned · oversized compressed · duplicates merged · scores recalculated · 0 errors",
-            2,
-            5,
-        ),
-        (
-            "pat-mem",
-            "fp-inbox",
-            "Pattern: InboxWatcher (AOMA)",
-            "Poll ./inbox/ toutes les 10s, LLM extract → memory_global. POST /api/memory/ingest. Source: Google Always-On Memory Agent pattern.",
-            "GIVEN file in inbox/ WHEN watcher runs THEN LLM extracts facts · stored in memory_global · file moved to processed/",
-            3,
-            3,
-        ),
-        (
-            "pat-mem",
-            "fp-query-agent",
-            "Pattern: QueryAgent",
-            "GET /api/memory/query?q= : recherche multi-layer + LLM synthesis. Citations [MEM-N]/[INST-N]. memory/api.py.",
-            "GIVEN query string WHEN GET /api/memory/query THEN all layers searched · results ranked · LLM synthesizes · citations incluses",
-            2,
-            5,
-        ),
-        # pat-ops (4)
-        (
-            "pat-ops",
-            "fp-autoheal",
-            "Pattern: AutoHeal",
-            "Scan platform_incidents toutes les 60s, groupe par error_type, lance epic TMA auto: diagnose→fix→verify→close. ops/auto_heal.py.",
-            "GIVEN incident in platform_incidents WHEN autoheal scan THEN epic TMA lancé · agents assignés · ticket clos si fix validé",
-            1,
-            8,
-        ),
-        (
-            "pat-ops",
-            "fp-chaos",
-            "Pattern: ChaosEndurance",
-            "Chaos monkey: scenarios VM1/VM2/MODULES aléatoires 2-6h, MTTR mesuré. 80% infra + 20% modules. ops/chaos_endurance.py.",
-            "GIVEN running platform WHEN chaos scenario fires THEN platform survives · MTTR < 5min · chaos_runs table populated · alert si MTTR > seuil",
-            2,
-            8,
-        ),
-        (
-            "pat-ops",
-            "fp-watchdog",
-            "Pattern: EnduranceWatchdog",
-            "Toutes les 60s: stalls >15min → retry, zombies → kill, disk >90% → cleanup, LLM health probe, rapport daily. ops/endurance_watchdog.py.",
-            "GIVEN running platform WHEN watchdog scan THEN stalls detected · zombies killed · disk cleaned si > 90% · daily report generated",
-            1,
-            5,
-        ),
-        (
-            "pat-ops",
-            "fp-a2a-bus",
-            "Pattern: A2A Bus",
-            "Pub/sub agent-to-agent: queues par agent + DB persistence + SSE bridge. Redis pub/sub optionnel. PG NOTIFY/LISTEN cross-node. a2a/bus.py. Linux Foundation A2A v1.0.",
-            "GIVEN N agents WHEN message published THEN correct subscriber receives · DB persistence garantie · SSE bridge live · cross-node si Redis/PG NOTIFY",
-            1,
-            8,
-        ),
-    ]
-    for epic_id, feat_id, name, desc, ac, priority, sp in features:
-        conn.execute(
-            """
-            INSERT INTO features (id, epic_id, name, description, acceptance_criteria, priority, status, story_points, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, 'done', ?, NOW())
-            ON CONFLICT (id) DO NOTHING
-        """,
-            (feat_id, epic_id, name, desc, ac, priority, sp),
-        )
 
 
 def _ensure_darwin_tables(conn) -> None:
@@ -1452,6 +890,107 @@ def _ensure_darwin_tables(conn) -> None:
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS adversarial_events (
+            id SERIAL PRIMARY KEY,
+            run_id TEXT,
+            agent_name TEXT,
+            agent_role TEXT,
+            check_type TEXT,
+            score INTEGER DEFAULT 0,
+            passed BOOLEAN DEFAULT TRUE,
+            issues_json TEXT DEFAULT '[]',
+            level TEXT DEFAULT 'L0',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_adv_run_id ON adversarial_events(run_id)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_adv_check_type ON adversarial_events(check_type, created_at)
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS code_traceability (
+            id SERIAL PRIMARY KEY,
+            run_id TEXT DEFAULT '',
+            epic_id TEXT DEFAULT '',
+            feature_id TEXT DEFAULT '',
+            user_story_id TEXT DEFAULT '',
+            file_path TEXT NOT NULL,
+            rationale TEXT DEFAULT '',
+            ref_tag TEXT DEFAULT '',
+            agent_name TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trace_file ON code_traceability(file_path)
+    """)
+    conn.execute("""
+        CREATE INDEX IF NOT EXISTS idx_trace_feature ON code_traceability(feature_id)
+    """)
+
+    # Add traceability columns to features and user_stories if missing
+    for col, defn in [
+        ("rationale", "TEXT DEFAULT ''"),
+        ("why_text", "TEXT DEFAULT ''"),
+        ("req_ref", "TEXT DEFAULT ''"),
+        ("wsjf_score", "REAL DEFAULT 0"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE features ADD COLUMN IF NOT EXISTS {col} {defn}")
+        except Exception:
+            pass
+    for col, defn in [
+        ("rationale", "TEXT DEFAULT ''"),
+        ("why_text", "TEXT DEFAULT ''"),
+        ("req_ref", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE user_stories ADD COLUMN IF NOT EXISTS {col} {defn}")
+        except Exception:
+            pass
+
+    # ── Legacy Items inventory (migration traceability) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS legacy_items (
+            id TEXT PRIMARY KEY,
+            project_id TEXT NOT NULL,
+            item_type TEXT NOT NULL,
+            name TEXT NOT NULL,
+            parent_id TEXT DEFAULT '',
+            description TEXT DEFAULT '',
+            metadata_json TEXT DEFAULT '{}',
+            source_file TEXT DEFAULT '',
+            source_line INTEGER DEFAULT 0,
+            status TEXT DEFAULT 'identified',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_legacy_project ON legacy_items(project_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_legacy_type ON legacy_items(item_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_legacy_parent ON legacy_items(parent_id)")
+
+    # ── Traceability links (bidirectional: legacy↔story↔code↔test) ──
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS traceability_links (
+            id SERIAL PRIMARY KEY,
+            source_id TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            target_type TEXT NOT NULL,
+            link_type TEXT NOT NULL,
+            coverage_pct INTEGER DEFAULT 0,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tlink_pair ON traceability_links(source_id, target_id, link_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tlink_source ON traceability_links(source_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_tlink_target ON traceability_links(target_id)")
+
     # Seed RTK integration
     conn.execute("""
         INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
@@ -1524,207 +1063,6 @@ def _ensure_darwin_tables(conn) -> None:
         """,
             img_integ,
         )
-
-    conn.commit()
-
-    # GAEngine: evolution_proposals schema fix (added 2026-03)
-    # The original evolution_proposals table was created with column names that
-    # diverged from the GAEngine _save_proposal() code (genome_json vs mutated_config,
-    # fitness vs fitness_score). Added missing columns here so evolve_all() can persist
-    # proposals to DB. Source: platform/agents/evolution.py _save_proposal().
-    # Also dropped NOT NULL on legacy columns (workflow_id, mutated_config) to allow
-    # the new column-based INSERT without breaking existing schema.
-    conn.execute(
-        "ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS genome_json TEXT"
-    )
-    conn.execute(
-        "ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS fitness REAL DEFAULT 0.0"
-    )
-    conn.execute("ALTER TABLE evolution_proposals ADD COLUMN IF NOT EXISTS run_id TEXT")
-    conn.execute("ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS wf_id TEXT")
-    conn.execute(
-        "ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS generations INT DEFAULT 0"
-    )
-    conn.execute(
-        "ALTER TABLE evolution_runs ADD COLUMN IF NOT EXISTS fitness_history_json TEXT"
-    )
-    # Drop legacy NOT NULL constraints — old code populated mutated_config/workflow_id,
-    # new code uses genome_json/wf_id. Both columns coexist; constraint removed so INSERT
-    # doesn't fail when only the new column is populated.
-    conn.execute("ALTER TABLE evolution_runs ALTER COLUMN workflow_id DROP NOT NULL")
-    conn.execute(
-        "ALTER TABLE evolution_proposals ALTER COLUMN mutated_config DROP NOT NULL"
-    )
-    # agents.project_id FK (added 2026-03) — links ft-* project agents back to their project
-    # Rationale: needed for project-scoped agent queries (ADR-0009 project isolation).
-    conn.execute("ALTER TABLE agents ADD COLUMN IF NOT EXISTS project_id TEXT")
-
-    # Hook system (2026-03) — pre/post tool hooks with RBAC
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS hook_registrations (
-            id TEXT PRIMARY KEY,
-            hook_type TEXT NOT NULL,
-            handler_name TEXT NOT NULL,
-            agent_id TEXT,
-            priority INTEGER DEFAULT 0,
-            enabled INTEGER DEFAULT 1,
-            can_block INTEGER DEFAULT 0,
-            required_role TEXT,
-            config_json TEXT DEFAULT '{}',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS hook_log (
-            id TEXT PRIMARY KEY,
-            hook_type TEXT,
-            handler_name TEXT,
-            agent_id TEXT,
-            session_id TEXT,
-            tool_name TEXT,
-            blocked INTEGER DEFAULT 0,
-            message TEXT,
-            duration_ms INTEGER,
-            ts TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # Instinct system — ECC continuous-learning-v2 adapted for server-side
-    # SOURCE: https://github.com/affaan-m/everything-claude-code/tree/main/skills/continuous-learning-v2
-    # WHY: Atomic learned behaviors extracted from sessions, with confidence scoring and project scoping.
-    #      Allows agents to evolve skills from observed patterns rather than manual curation.
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS instinct_observations (
-            id TEXT PRIMARY KEY,
-            agent_id TEXT NOT NULL,
-            session_id TEXT,
-            project_id TEXT,
-            tool_name TEXT,
-            args_json TEXT DEFAULT '{}',
-            outcome TEXT,
-            ts TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS instinct_insights (
-            id TEXT PRIMARY KEY,
-            type TEXT NOT NULL,
-            instinct_ids TEXT NOT NULL,
-            summary TEXT NOT NULL,
-            domains TEXT NOT NULL,
-            confidence REAL DEFAULT 0.5,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_insights_type ON instinct_insights(type)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_insights_conf ON instinct_insights(confidence DESC)"
-    )
-
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS instincts (
-            id TEXT PRIMARY KEY,
-            agent_id TEXT,
-            project_id TEXT,
-            trigger TEXT NOT NULL,
-            action TEXT NOT NULL,
-            confidence REAL DEFAULT 0.5,
-            domain TEXT DEFAULT 'general',
-            scope TEXT DEFAULT 'project',
-            evidence_json TEXT DEFAULT '[]',
-            source TEXT DEFAULT 'session-observation',
-            evolved_into TEXT,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    # ECC — external module integration entry
-    # SOURCE: https://github.com/affaan-m/everything-claude-code
-    # WHY: Allow admins to toggle ECC-inspired features on/off without code changes.
-    conn.execute("""
-        INSERT OR IGNORE INTO integrations (id, name, type, category, icon, description, enabled, status, config_json, agent_roles)
-        VALUES (
-            'ecc-everything-claude',
-            'Everything Claude Code (ECC)',
-            'external',
-            'platform',
-            '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
-            'ECC-inspired features: instinct system (continuous learning from sessions), skill-stocktake auditor, hook profiles. Source: github.com/affaan-m/everything-claude-code',
-            1,
-            'connected',
-            '{"repo": "https://github.com/affaan-m/everything-claude-code", "features": ["instinct-observer", "skill-stocktake", "quality-gate", "pre-compact"], "hook_profile": "standard", "observer_enabled": true, "min_observations": 10}',
-            '["ac-architect", "platform"]'
-        )
-    """)
-
-    # Agent-specific hook assignments (seeded defaults)
-    # SOURCE: ECC hooks.json — maps agent roles to appropriate hook types
-    # WHY: security agents watch PRE_TOOL (can potentially block), QA runs quality-gate,
-    #      ac-architect + ac-codex run instinct observer to accumulate learning.
-    for _agent, _htype, _hname, _can_block, _role in [
-        # AC agents: instinct observer fires at SESSION_END
-        ("ac-architect", "session_end", "instinct_observer", 0, None),
-        ("ac-codex", "session_end", "instinct_observer", 0, None),
-        # QA agents: quality gate fires POST_TOOL
-        ("qa-security", "post_tool", "quality_gate", 0, "quality"),
-        ("ciso", "post_tool", "quality_gate", 0, "security"),
-        # Security agents: PRE_TOOL hook (non-blocking by default — security-critic decides)
-        ("security-critic", "pre_tool", "security_scan_noop", 0, "security"),
-        ("security-architect", "pre_tool", "security_scan_noop", 0, "security"),
-    ]:
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO hook_registrations
-            (id, hook_type, handler_name, agent_id, priority, enabled, can_block, required_role, config_json)
-            VALUES (?,?,?,?,?,1,?,?,?)
-        """,
-            (
-                f"builtin-{_agent}-{_htype}",
-                _htype,
-                _hname,
-                _agent,
-                5,
-                _can_block,
-                _role,
-                "{}",
-            ),
-        )
-
-    # Security audit log — used by security/audit.py and agents/guardrails.py
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS admin_audit_log (
-            id SERIAL PRIMARY KEY,
-            actor TEXT,
-            action TEXT,
-            resource_type TEXT,
-            resource_id TEXT,
-            detail TEXT,
-            ip TEXT,
-            user_agent TEXT,
-            timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
-            event_type TEXT,
-            actor_id TEXT,
-            target_type TEXT,
-            target_id TEXT,
-            severity TEXT,
-            blocked BOOLEAN DEFAULT false,
-            context_json TEXT
-        )
-    """)
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_aal_timestamp ON admin_audit_log(timestamp DESC)"
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_aal_actor ON admin_audit_log(actor)")
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_aal_event_type ON admin_audit_log(event_type)"
-    )
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_aal_resource ON admin_audit_log(resource_type, resource_id)"
-    )
 
     conn.commit()
 

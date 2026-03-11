@@ -1,8 +1,9 @@
 id: data-migration
 name: Data Migration Pipeline
-description: 'Generic data migration: schema mapping, ETL, validation, zero-downtime with rollback.'
+description: 'Generic data migration: schema mapping, ETL, validation, zero-downtime with rollback. PM-driven for dynamic phase composition.'
 icon: 🔄
 is_builtin: true
+pm_driven: true
 phases:
 - id: migration-plan
   pattern_id: network
