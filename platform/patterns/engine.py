@@ -95,6 +95,14 @@ class WorkflowPaused(Exception):
         super().__init__("Workflow paused at checkpoint")
 
 
+class AdversarialEscalation(Exception):
+    """Raised when an agent exhausts adversarial retries without passing.
+
+    NEVER pass through rejected output. Propagates up to the workflow/AC runner,
+    which must escalate to a higher-level team or abort the current cycle phase.
+    """
+
+
 async def _sse(run: PatternRun, event: dict):
     """Push SSE event with automatic phase_id injection."""
     if run.phase_id and "phase_id" not in event:
