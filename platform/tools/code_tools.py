@@ -27,9 +27,6 @@ _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
     _BASE_DIR / "workspace",  # local dev project workspaces (singular)
     _CWD_DATA / "workspace",
     _BASE_DIR / "tests",  # test files
-    _BASE_DIR
-    / "platform",  # SF self-improvement: quality-improvement workflow can edit platform source
-    _CWD_DATA / "platform",  # systemd deployments
     Path("/tmp"),  # scratch
 )
 

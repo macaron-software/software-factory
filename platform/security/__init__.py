@@ -36,6 +36,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         "/api/i18n/",
         "/api/auth",
         "/api/webhooks/",
+        "/api/cto",
+        "/a2a",
+        "/.well-known",
     )
     PUBLIC_GET_PATHS = (
         "/api/projects",

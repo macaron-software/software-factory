@@ -959,6 +959,15 @@ async def run_workflow(
             # Collect tool_calls from all nodes for PM evidence
             _phase_tool_calls = list(result.all_tool_calls or [])
 
+            # Record phase result — success path
+            run.phase_results.append(
+                {
+                    "phase": phase.name,
+                    "success": result.success,
+                    "error": result.error or None,
+                }
+            )
+
             # RTE reacts to gate results
             if phase.gate == "all_approved" and not result.success:
                 if phase.skip_on_failure:
@@ -1304,7 +1313,8 @@ async def run_workflow(
                             _pm_target, _pm_loop_count, _pm_loop_limit, _pm_reason[:100],
                         )
                         if _pm_target in _phase_catalog:
-                            _phase_queue.append(_phase_catalog[_pm_target])
+                            # Insert right after current phase so it runs NEXT
+                            _phase_queue.insert(i + 1, _phase_catalog[_pm_target])
                             accumulated_context.append(
                                 f"[PM] LOOP → {_pm_target}: {_pm_reason}"
                             )
@@ -1331,7 +1341,7 @@ async def run_workflow(
                         )
                     )
                 except Exception as _pm_err:
-                    logger.warning("PM checkpoint error: %s — continuing linearly", _pm_err)
+                    logger.error("PM checkpoint error: %s — continuing linearly", _pm_err, exc_info=True)
 
         # PM decided to stop the workflow — break OUTSIDE the finally block
         if _pm_done:

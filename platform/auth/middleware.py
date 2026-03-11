@@ -247,6 +247,7 @@ PUBLIC_PATHS = {
     "/auth/azure",
     "/.well-known",
     "/a2a",
+    "/api/cto",
 }
 
 
