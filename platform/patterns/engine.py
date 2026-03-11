@@ -77,6 +77,15 @@ class PatternRun:
     error: str = ""
     flow_step: str = ""
 
+    @property
+    def all_tool_calls(self) -> list:
+        """Aggregate tool_calls from all nodes for PM evidence."""
+        calls = []
+        for ns in self.nodes.values():
+            if ns.result and hasattr(ns.result, "tool_calls") and ns.result.tool_calls:
+                calls.extend(ns.result.tool_calls)
+        return calls
+
 
 # SSE push (import from runner to share the same queues)
 from ..sessions.runner import _push_sse
