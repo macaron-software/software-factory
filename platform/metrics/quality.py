@@ -41,6 +41,46 @@ WEIGHTS = {
 
 _TIMEOUT = 120  # seconds per tool run
 
+# Control-flow keywords for cognitive complexity (language-agnostic)
+_COGN_CONTROL_RE = re.compile(
+    r"\b(if|else\s+if|elif|else|for|while|do|switch|case|catch|except|"
+    r"guard|repeat)\b"
+)
+
+
+def _cognitive_complexity_scan(source: str) -> int:
+    """Lightweight cognitive complexity (SonarQube-style).
+    Each control-flow keyword adds 1 + current nesting depth.
+    """
+    score = 0
+    nesting = 0
+    prev_indent = 0
+    for line in source.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//") or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if indent > prev_indent:
+            nesting += 1
+        elif indent < prev_indent:
+            nesting = max(0, nesting - max(1, (prev_indent - indent) // 4))
+        prev_indent = indent
+        hits = _COGN_CONTROL_RE.findall(stripped)
+        score += len(hits) * (1 + nesting)
+    return score
+
+
+def _max_nesting_scan(source: str) -> int:
+    """Max nesting depth via indent tracking."""
+    max_depth = 0
+    for line in source.split("\n"):
+        if not line.strip():
+            continue
+        depth = (len(line) - len(line.lstrip())) // 4
+        if depth > max_depth:
+            max_depth = depth
+    return max_depth
+
 
 @dataclass
 class DimensionResult:
@@ -807,13 +847,16 @@ class QualityScanner:
                 + issues["type_errors"] * 2
             )
 
-            # KISS checks — deterministic file size and god-file detection
+            # KISS checks — deterministic file size, god-file, cognitive complexity, coupling
             _code_exts = {
                 ".py", ".ts", ".tsx", ".js", ".jsx", ".swift", ".kt",
                 ".rs", ".go", ".java", ".c", ".cpp", ".h", ".cs",
             }
             large_files = []
             god_files = []
+            high_cog_files = []
+            deep_nest_files = []
+            high_coupling_files = []
             total_source = 0
             for root, _dirs, files in os.walk(workspace):
                 # Skip build dirs, node_modules, .build, etc.
@@ -831,9 +874,10 @@ class QualityScanner:
                     try:
                         with open(fpath) as fh:
                             content = fh.read()
+                        rel = os.path.relpath(fpath, workspace)
                         line_count = content.count("\n") + 1
+                        # LOC check
                         if line_count > 200:
-                            rel = os.path.relpath(fpath, workspace)
                             large_files.append(f"{rel} ({line_count} lines)")
                         # God-file: >3 type declarations
                         type_decls = len(re.findall(
@@ -842,13 +886,30 @@ class QualityScanner:
                             content, re.MULTILINE
                         ))
                         if type_decls > 3:
-                            rel = os.path.relpath(fpath, workspace)
                             god_files.append(f"{rel} ({type_decls} types)")
+                        # Cognitive complexity
+                        cog = _cognitive_complexity_scan(content)
+                        if cog > 25:
+                            high_cog_files.append(f"{rel} (cog={cog})")
+                        # Nesting depth
+                        max_nest = _max_nesting_scan(content)
+                        if max_nest > 5:
+                            deep_nest_files.append(f"{rel} (depth={max_nest})")
+                        # Coupling (import fan-in)
+                        imports = len(re.findall(
+                            r"^\s*(?:import |from .+ import |require\(|use |#include )",
+                            content, re.MULTILINE
+                        ))
+                        if imports > 12:
+                            high_coupling_files.append(f"{rel} ({imports} imports)")
                     except Exception:
                         pass
 
             issues["large_files"] = len(large_files)
             issues["god_files"] = len(god_files)
+            issues["high_cognitive_complexity"] = len(high_cog_files)
+            issues["deep_nesting"] = len(deep_nest_files)
+            issues["high_coupling"] = len(high_coupling_files)
             issues["total_source_files"] = total_source
             if large_files:
                 issues["large_file_list"] = large_files[:5]
@@ -856,6 +917,15 @@ class QualityScanner:
             if god_files:
                 issues["god_file_list"] = god_files[:5]
                 penalty += len(god_files) * 8
+            if high_cog_files:
+                issues["high_cog_list"] = high_cog_files[:5]
+                penalty += len(high_cog_files) * 4
+            if deep_nest_files:
+                issues["deep_nest_list"] = deep_nest_files[:5]
+                penalty += len(deep_nest_files) * 3
+            if high_coupling_files:
+                issues["high_coupling_list"] = high_coupling_files[:5]
+                penalty += len(high_coupling_files) * 2
 
             score = max(0, min(100, 100 - penalty))
 

@@ -288,6 +288,63 @@ _STACK_RULES = {
 }
 
 
+# --- Deterministic complexity helpers (no external deps) ---
+
+# Control-flow keywords that add cognitive complexity increments
+_CONTROL_FLOW_RE = re.compile(
+    r"\b(if|else\s+if|elif|else|for|while|do|switch|case|catch|except|"
+    r"guard|repeat|&&|\|\||ternary|\?.*:)\b"
+)
+
+
+def _cognitive_complexity(source: str) -> int:
+    """Lightweight cognitive complexity score (SonarQube-style).
+
+    Each control-flow keyword adds 1 + current nesting depth.
+    Nesting increments on blocks (braces or indent increase).
+    """
+    score = 0
+    nesting = 0
+    prev_indent = 0
+    for line in source.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("//") or stripped.startswith("#"):
+            continue
+        # Track nesting by indent level (language-agnostic)
+        indent = len(line) - len(line.lstrip())
+        if indent > prev_indent:
+            nesting += 1
+        elif indent < prev_indent:
+            nesting = max(0, nesting - (prev_indent - indent) // 4)
+        prev_indent = indent
+        # Each control flow keyword adds 1 + nesting level
+        hits = _CONTROL_FLOW_RE.findall(stripped)
+        score += len(hits) * (1 + nesting)
+    return score
+
+
+def _max_nesting_depth(source: str) -> int:
+    """Max nesting depth via indent tracking (works for any language)."""
+    max_depth = 0
+    for line in source.split("\n"):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        indent = len(line) - len(line.lstrip())
+        depth = indent // 4  # 4-space or 1-tab = 1 level
+        if depth > max_depth:
+            max_depth = depth
+    return max_depth
+
+
+def _count_imports(source: str) -> int:
+    """Count import statements (fan-in coupling proxy)."""
+    return len(re.findall(
+        r"^\s*(?:import |from .+ import |require\(|use |#include )",
+        source, re.MULTILINE
+    ))
+
+
 def _check_stack_mismatch(tool_calls: list, task: str) -> list[str]:
     """Check if code_write tool calls use the wrong language for the declared stack."""
     if not tool_calls or not task:
@@ -439,21 +496,40 @@ def check_l0(
                 test_files += 1
             elif fp.endswith((".py", ".ts", ".js", ".rs", ".go", ".kt", ".swift")):
                 source_files += 1
-            # HIGH_COMPLEXITY: single function >80 lines or deep nesting
-            if lines > 120:
-                indent_depth = max(
-                    (
-                        len(line) - len(line.lstrip())
-                        for line in fc.split("\n")
-                        if line.strip()
-                    ),
-                    default=0,
-                )
-                if indent_depth > 24:  # >6 levels of 4-space indent
+            # COGNITIVE_COMPLEXITY: nesting × control-flow increments
+            # (SonarQube-style: each if/for/while/catch adds 1 + current nesting level)
+            if lines > 30:
+                cog_score = _cognitive_complexity(fc)
+                if cog_score > 25:
                     issues.append(
-                        f"HIGH_COMPLEXITY: Deep nesting ({indent_depth // 4} levels) in {fp}"
+                        f"HIGH_COGNITIVE_COMPLEXITY: score {cog_score} in {fp} "
+                        f"(max 25) — simplify control flow, extract functions."
+                    )
+                    score += 4
+                elif cog_score > 15:
+                    issues.append(
+                        f"MODERATE_COGNITIVE_COMPLEXITY: score {cog_score} in {fp} "
+                        f"— consider splitting complex functions."
+                    )
+                    score += 2
+            # DEEP_NESTING: >4 levels = hard to read
+            if lines > 50:
+                max_depth = _max_nesting_depth(fc)
+                if max_depth > 4:
+                    issues.append(
+                        f"DEEP_NESTING: {max_depth} levels in {fp} "
+                        f"(max 4) — extract inner logic to helper functions."
                     )
                     score += 3
+            # HIGH_COUPLING: too many imports = tightly coupled
+            if lines > 30:
+                import_count = _count_imports(fc)
+                if import_count > 12:
+                    issues.append(
+                        f"HIGH_COUPLING: {import_count} imports in {fp} "
+                        f"— reduce dependencies, apply Interface Segregation."
+                    )
+                    score += 2
             # KISS: file too large — hard to review, edit, and maintain
             if lines > 200 and tc.get("name") == "code_write":
                 issues.append(
