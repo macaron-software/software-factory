@@ -35,27 +35,27 @@ def get_builtin_workflows() -> list[WorkflowDef]:
 
             phases = []
             for p in raw.get("phases", []):
-                phases.append(
-                    WorkflowPhase(
-                        id=p.get("id", ""),
-                        pattern_id=p.get("pattern_id", ""),
-                        name=p.get("name", ""),
-                        description=p.get("description", ""),
-                        gate=p.get("gate", ""),
-                        config=p.get("config", {}),
-                        retry_count=p.get("retry_count", 1),
-                        skip_on_failure=p.get("skip_on_failure", False),
-                        timeout=p.get("timeout", 0),
-                        min_complexity=p.get("min_complexity", ""),
-                    )
-                )
+                phases.append(WorkflowPhase(
+                    id=p.get("id", ""),
+                    pattern_id=p.get("pattern_id", ""),
+                    name=p.get("name", ""),
+                    description=p.get("description", ""),
+                    gate=p.get("gate", ""),
+                    config=p.get("config", {}),
+                    retry_count=p.get("retry_count", 1),
+                    skip_on_failure=p.get("skip_on_failure", False),
+                    timeout=p.get("timeout", 0),
+                    min_complexity=p.get("min_complexity", ""),
+                ))
 
             wf = WorkflowDef(
                 id=raw["id"],
                 name=raw.get("name", ""),
                 description=raw.get("description", ""),
                 phases=phases,
-                config=raw.get("config", {}),
+                config={**raw.get("config", {}), **({
+                    "pm_driven": True,
+                } if raw.get("pm_driven") else {})},
                 icon=raw.get("icon", "workflow"),
                 is_builtin=True,
             )

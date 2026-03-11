@@ -4,6 +4,7 @@ description: Workflow réutilisable pour chaque Feature d'un Epic. Design → TD
   Utilisé par chaque Feature Team dans le cadre d'un epic-decompose.
 icon: repeat
 is_builtin: true
+pm_driven: true
 phases:
 - id: feature-design
   pattern_id: aggregator
@@ -25,11 +26,8 @@ phases:
     4. DEFINITION OF DONE : build Docker OK + tests E2E passent + screenshots capturés
     Sans ces 4 éléments, la phase n'est pas terminée.
   gate: always
-  skip_on_failure: true
-  timeout: 600
   config:
     agents:
-    - product
     - system-architect-art
     dynamic_lead: true
 - id: env-setup
@@ -46,8 +44,6 @@ phases:
     BLOQUANT : la phase tdd-sprint ne démarre pas tant que docker_deploy ne retourne pas OK.
     Ne jamais utiliser uniquement build() (cargo/npm natif) — toujours docker_deploy().
   gate: always
-  skip_on_failure: true
-  timeout: 600
   config:
     agents:
     - ft-infra-lead
@@ -56,8 +52,6 @@ phases:
   name: TDD Sprint
   description: 'Devs implémentent en TDD. RED→GREEN→REFACTOR. FRACTAL: feature/guards/failures.'
   gate: no_veto
-  skip_on_failure: true
-  timeout: 1200
   config:
     agents: []
     max_iterations: 3
@@ -67,8 +61,6 @@ phases:
   name: Adversarial Review
   description: L0 fast checks → L1 code critic → L2 architecture critic. Multi-vendor cascade.
   gate: all_approved
-  skip_on_failure: false
-  timeout: 600
   config:
     agents:
     - system-architect-art
@@ -87,8 +79,6 @@ phases:
     Un résultat {"status":"failed","failedTests":[]} signifie que le serveur n'était PAS démarré
     — c'est un ÉCHEC, pas un succès. Toujours vérifier status="passed" ET failedTests=[].
   gate: all_approved
-  skip_on_failure: true
-  timeout: 900
   config:
     agents:
     - ft-e2e-api
@@ -99,14 +89,11 @@ phases:
   name: Deploy Feature
   description: Build → Staging → Canary. Rollback auto si erreur.
   gate: no_veto
-  skip_on_failure: true
-  timeout: 600
   config:
     agents:
     - ft-infra-lead
     dynamic_deployer: true
 config:
-  pm_driven: true
   graph:
     nodes:
     - id: n0
