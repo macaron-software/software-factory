@@ -19,9 +19,7 @@ except ImportError:
     psycopg = None  # type: ignore
 
 _PG_URL = os.environ.get("DATABASE_URL", "")
-# _USE_PG: True ONLY when DATABASE_URL is set and psycopg is available.
-# Hardcoding True caused silent PG pool failures on local dev (SQLite).
-_USE_PG = bool(_PG_URL) and psycopg is not None
+_USE_PG = bool(_PG_URL and psycopg is not None)
 
 # Connection pool for PostgreSQL (lazy initialized)
 _pg_pool = None
@@ -125,19 +123,11 @@ def _translate_upsert(sql: str) -> str:
     cols_str = m.group(2)
     cols = [c.strip() for c in cols_str.split(",")]
 
-    # Tables with composite primary keys (conflict targets for ON CONFLICT clause)
+    # Tables with composite primary keys
     _COMPOSITE_PKS = {
         "org_team_members": ["team_id", "agent_id"],
         "confluence_pages": ["mission_id", "tab"],
         "feature_deps": ["feature_id", "depends_on"],
-        "team_fitness_history": [
-            "agent_id",
-            "pattern_id",
-            "technology",
-            "phase_type",
-            "snapshot_date",
-        ],
-        "user_project_roles": ["user_id", "project_id"],
     }
 
     pk_cols = _COMPOSITE_PKS.get(table, [cols[0]])
@@ -426,7 +416,6 @@ class PgConnectionWrapper:
                         psycopg.errors.DuplicateColumn,
                         psycopg.errors.DuplicateObject,
                         psycopg.errors.UniqueViolation,
-                        psycopg.errors.UndefinedTable,
                     ),
                 )
                 if is_harmless:
@@ -516,15 +505,26 @@ class _NullCursor:
 
 
 def is_postgresql() -> bool:
-    """Check if using PostgreSQL backend (True only when DATABASE_URL is set + psycopg available)."""
+    """Check if using PostgreSQL backend."""
     return _USE_PG
 
 
 def get_connection() -> Any:
-    """Get a PostgreSQL database connection."""
-    conn = _get_pg_connection()
-    conn.autocommit = False
-    return PgConnectionWrapper(conn)
+    """Get a database connection (PostgreSQL or SQLite)."""
+    if _USE_PG:
+        conn = _get_pg_connection()
+        conn.autocommit = False
+        return PgConnectionWrapper(conn)
+    # SQLite fallback
+    import sqlite3
+    from ..config import DB_PATH
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    return conn
 
 
 def return_connection(conn):

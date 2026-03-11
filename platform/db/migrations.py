@@ -66,8 +66,12 @@ def init_db(db_path: Path = DB_PATH):
     import logging as _logging
 
     _log = _logging.getLogger(__name__)
-    conn = _init_pg()
-    _log.info("DB (PostgreSQL) schema v%s ready", _SCHEMA_VERSION)
+    if _USE_PG:
+        conn = _init_pg()
+        _log.info("DB (PostgreSQL) schema v%s ready", _SCHEMA_VERSION)
+    else:
+        conn = _init_sqlite(db_path)
+        _log.info("DB (SQLite) schema v%s ready at %s", _SCHEMA_VERSION, db_path)
     return conn
 
 
@@ -98,6 +102,33 @@ def _init_pg():
             conn.execute("SELECT pg_advisory_unlock(20260301)")
         except Exception:
             pass
+    return conn
+
+
+def _init_sqlite(db_path: Path = DB_PATH):
+    """Initialize SQLite database with schema."""
+    import sqlite3
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), timeout=30)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA foreign_keys=ON")
+    schema = SCHEMA_PATH.read_text()
+    conn.executescript(schema)
+    conn.commit()
+    # Align SQLite with PG schema — add missing columns
+    _add_missing_columns = [
+        ("projects", "owner_id", "TEXT DEFAULT ''"),
+        ("projects", "starred", "INTEGER DEFAULT 0"),
+        ("projects", "container_url", "TEXT DEFAULT ''"),
+    ]
+    for table, col, typedef in _add_missing_columns:
+        try:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typedef}")
+            conn.commit()
+        except Exception:
+            pass  # column already exists
     return conn
 
 
