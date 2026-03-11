@@ -554,6 +554,13 @@ _PATTERN_CATALOG = {
     "map_reduce": "Map task to N workers, reduce results into synthesis. Use for: large codebase analysis, multi-file refactoring",
     "blackboard": "Agents read/write shared knowledge board iteratively. Use for: complex design convergence, multi-agent brainstorming",
     "composite": "Chain of sub-patterns executed sequentially. Use for: complex workflows needing mixed patterns",
+    "tournament": "N agents solve same task independently, judge picks best. Use for: creative tasks, design alternatives, approach diversity",
+    "escalation": "Tiered: try junior→senior→expert, stop at first success. Use for: cost optimization, progressive difficulty, fallback chains",
+    "voting": "N agents independently evaluate, majority wins. Use for: go/no-go decisions, quality scoring, risk assessment",
+    "speculative": "Parallel race: multiple approaches, first valid result wins. Use for: uncertain solutions, multiple strategies, time-critical tasks",
+    "red-blue": "Red team attacks, blue team defends, iterate. Use for: security audits, penetration testing, resilience validation",
+    "relay": "Baton passing: each agent enriches previous output incrementally. Use for: skeleton→tests→docs→review progressive build",
+    "mob": "Mob programming: rotate driver/navigators, all see same code. Use for: complex debugging, knowledge sharing, collaborative design",
 }
 
 _FEEDBACK_TYPES = {
@@ -598,6 +605,21 @@ _PHASE_TEMPLATES = [
      "team_roles": ["tech-lead", "developer"], "gate": "no_veto"},
     {"id": "bug-triage", "name": "Bug Triage & Routing", "pattern": "router",
      "team_roles": ["lead", "developer", "sre"], "gate": "no_veto"},
+    {"id": "creative-tournament", "name": "Creative Tournament", "pattern": "tournament",
+     "team_roles": ["developer", "developer", "architect"], "gate": "no_veto"},
+    {"id": "tiered-fix", "name": "Tiered Fix (Escalation)", "pattern": "escalation",
+     "team_roles": ["developer", "tech-lead", "architect"], "gate": "no_veto"},
+    {"id": "quality-vote", "name": "Quality Vote", "pattern": "voting",
+     "team_roles": ["qa", "critic", "architect"], "gate": "all_approved"},
+    {"id": "speculative-fix", "name": "Speculative Fix", "pattern": "speculative",
+     "team_roles": ["developer", "developer"], "gate": "no_veto"},
+    {"id": "security-audit", "name": "Security Audit (Red/Blue)", "pattern": "red-blue",
+     "team_roles": ["developer", "security-critic"], "gate": "all_approved",
+     "feedback": ["adversarial"]},
+    {"id": "progressive-build", "name": "Progressive Build (Relay)", "pattern": "relay",
+     "team_roles": ["architect", "developer", "qa"], "gate": "no_veto"},
+    {"id": "mob-debug", "name": "Mob Debugging", "pattern": "mob",
+     "team_roles": ["developer", "developer", "tech-lead"], "gate": "no_veto"},
 ]
 
 

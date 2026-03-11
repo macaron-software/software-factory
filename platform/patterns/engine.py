@@ -707,6 +707,20 @@ async def run_pattern(
             await _impl_composite(_engine_proxy, run, initial_task)
         elif ptype == "map_reduce":
             await _impl_map_reduce(_engine_proxy, run, initial_task)
+        elif ptype == "tournament":
+            await _impl_tournament(_engine_proxy, run, initial_task)
+        elif ptype == "escalation":
+            await _impl_escalation(_engine_proxy, run, initial_task)
+        elif ptype == "voting":
+            await _impl_voting(_engine_proxy, run, initial_task)
+        elif ptype == "speculative":
+            await _impl_speculative(_engine_proxy, run, initial_task)
+        elif ptype == "red-blue":
+            await _impl_red_blue(_engine_proxy, run, initial_task)
+        elif ptype == "relay":
+            await _impl_relay(_engine_proxy, run, initial_task)
+        elif ptype == "mob":
+            await _impl_mob(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -1849,6 +1863,13 @@ from .impls.wave import run_wave as _impl_wave
 from .impls.blackboard import run_blackboard as _impl_blackboard
 from .impls.composite import run_composite as _impl_composite
 from .impls.map_reduce import run_map_reduce as _impl_map_reduce
+from .impls.tournament import run_tournament as _impl_tournament
+from .impls.escalation import run_escalation as _impl_escalation
+from .impls.voting import run_voting as _impl_voting
+from .impls.speculative import run_speculative as _impl_speculative
+from .impls.red_blue import run_red_blue as _impl_red_blue
+from .impls.relay import run_relay as _impl_relay
+from .impls.mob import run_mob as _impl_mob
 
 
 class _EngineProxy:
