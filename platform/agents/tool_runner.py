@@ -1018,8 +1018,18 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
         )
 
     # Fix swift command to use Apple Swift (not OpenStack CLI)
-    if command.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
-        command = "/usr/bin/" + command.strip()
+    # Handle both direct "swift build" and chained "cd /path && swift build"
+    import re as _re_bt
+    if _re_bt.search(r'(?:^|&&\s*|;\s*)swift\s', command) and os.path.isfile("/usr/bin/swift"):
+        command = _re_bt.sub(
+            r'(?:(?<=&&\s)|(?<=;\s)|(?:^))swift\s',
+            '/usr/bin/swift ',
+            command,
+        )
+        # Simpler approach: replace standalone 'swift' with full path
+        command = command.replace(' swift ', ' /usr/bin/swift ').replace('&& swift ', '&& /usr/bin/swift ')
+        if command.strip().startswith('swift '):
+            command = '/usr/bin/' + command.strip()
     try:
         proc = subprocess.run(
             command,

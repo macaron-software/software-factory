@@ -494,7 +494,9 @@ def _detect_build_cmd(workspace: str) -> list[str]:
     import os
 
     if os.path.isfile(os.path.join(workspace, "Package.swift")):
-        return ["swift", "build"]
+        # Use full path to Apple Swift (avoid OpenStack swift CLI)
+        swift_bin = "/usr/bin/swift" if os.path.isfile("/usr/bin/swift") else "swift"
+        return [swift_bin, "build"]
     if os.path.isfile(os.path.join(workspace, "package.json")):
         # Check if node_modules exists (deps installed)
         if os.path.isdir(os.path.join(workspace, "node_modules")):
