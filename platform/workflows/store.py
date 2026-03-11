@@ -535,45 +535,246 @@ def _find_main_py(workspace: str) -> str:
     return ""
 
 
-# ── PM Checkpoint (dynamic workflow decisions) ───────────────────
+# ── PM v2 Orchestrator (Lego-brick phases) ──────────────────────
 
-_PM_DECISION_PROMPT = """\
-You are the Product Manager for project "{project_id}".
+_PATTERN_CATALOG = {
+    "solo": "Single agent works alone",
+    "sequential": "Agents pipeline, one after another",
+    "parallel": "Dispatcher → workers → aggregator",
+    "loop": "Writer-reviewer iterate until gate passes",
+    "hierarchical": "Manager → devs → QA validates",
+    "network": "Debaters argue, judge decides",
+    "router": "Route to best specialist",
+    "aggregator": "Workers parallel → consolidate",
+    "wave": "Dependency-based execution waves",
+    "human-in-the-loop": "Agent + human validation checkpoints",
+    "composite": "Sequential sub-patterns (meta)",
+    "blackboard": "Shared-knowledge iterative convergence",
+    "map_reduce": "Map to workers → reduce results",
+}
+
+_FEEDBACK_TYPES = {
+    "adversarial": "Adversarial guard reviews output quality/security",
+    "tools": "Require build/test tool execution before validation",
+    "judge": "Network debate with judge LLM for decision",
+    "human": "Human-in-the-loop checkpoint for manual review",
+}
+
+_GATE_TYPES = {
+    "all_approved": "All reviewers must approve",
+    "no_veto": "Proceed unless someone vetoes",
+    "always": "Always proceed regardless",
+    "best_effort": "Continue despite partial failures",
+}
+
+_PHASE_TEMPLATES = [
+    {"id": "inception", "name": "Inception & Stories", "pattern": "solo",
+     "team_roles": ["product"], "gate": "no_veto"},
+    {"id": "design", "name": "Architecture Design", "pattern": "sequential",
+     "team_roles": ["architect", "tech-lead"], "gate": "no_veto"},
+    {"id": "dev-sprint", "name": "Development Sprint", "pattern": "hierarchical",
+     "team_roles": ["tech-lead", "developer", "qa"], "gate": "no_veto"},
+    {"id": "tdd-sprint", "name": "TDD Sprint", "pattern": "loop",
+     "team_roles": ["developer", "qa"], "gate": "all_approved"},
+    {"id": "code-review", "name": "Code Review", "pattern": "loop",
+     "team_roles": ["reviewer", "developer"], "gate": "all_approved"},
+    {"id": "qa-acceptance", "name": "QA & Acceptance", "pattern": "loop",
+     "team_roles": ["qa", "critic"], "gate": "all_approved",
+     "feedback": ["adversarial", "tools"]},
+    {"id": "deploy", "name": "Deploy & Verify", "pattern": "sequential",
+     "team_roles": ["infra", "qa"], "gate": "always"},
+    {"id": "rework", "name": "Rework Sprint", "pattern": "hierarchical",
+     "team_roles": ["tech-lead", "developer"], "gate": "no_veto"},
+]
+
+
+def _build_agent_catalog() -> str:
+    """Build compact agent catalog grouped by role for PM prompt."""
+    try:
+        from ..agents.store import get_agent_store
+        agents = get_agent_store().list_all()
+    except Exception:
+        return "  (agent catalog unavailable)"
+    by_role: dict[str, list] = {}
+    for ag in agents:
+        role = ag.role or "worker"
+        by_role.setdefault(role, []).append(ag)
+    lines = []
+    for role in sorted(by_role):
+        ags = by_role[role]
+        ids = []
+        for a in ags[:8]:
+            label = a.id
+            if a.skills:
+                label += f"({','.join(a.skills[:3])})"
+            ids.append(label)
+        lines.append(f"  [{role}] {', '.join(ids)}")
+    return "\n".join(lines) or "  (no agents)"
+
+
+def _format_catalog_section(d: dict) -> str:
+    return "\n".join(f"  {k}: {v}" for k, v in d.items())
+
+
+def _format_templates_section() -> str:
+    lines = []
+    for t in _PHASE_TEMPLATES:
+        fb = f", feedback={t['feedback']}" if t.get("feedback") else ""
+        lines.append(
+            f"  {t['id']}: pattern={t['pattern']}, "
+            f"roles={t['team_roles']}, gate={t['gate']}{fb}"
+        )
+    return "\n".join(lines)
+
+
+_PM_DECISION_PROMPT_V2 = """\
+You are the Product Manager orchestrating project "{project_id}".
 Phase "{phase_name}" just completed.
 
-Phase evidence:
+## Evidence
 {phase_evidence}
 
-Execution history so far:
+## Execution History
 {history}
 
-Available phases catalog:
+## Current Workflow Phases
 {catalog}
 
-Project goal: {goal}
+## Project Goal
+{goal}
 
-Based on the evidence and project state, decide what to do next.
-Respond with ONLY a JSON object (no markdown, no explanation):
+## Available Patterns
+{patterns}
+
+## Available Agents (by role)
+{agents}
+
+## Phase Templates
+{templates}
+
+## Feedback Types
+{feedback_types}
+
+## Gate Types
+{gate_types}
+
+Decide what happens next. Respond ONLY with JSON.
+
+Option A — Flow control:
+{{"decision": "next", "reason": "..."}}
+{{"decision": "loop", "phase_id": "<phase to re-run>", "reason": "...", "findings": "..."}}
+{{"decision": "skip", "phase_id": "<phase to jump to>", "reason": "...", "findings": "..."}}
+{{"decision": "done", "reason": "...", "findings": "..."}}
+
+Option B — Compose a dynamic phase:
 {{
-  "decision": "next" | "loop" | "done" | "skip",
-  "phase_id": "<target phase id if loop or skip, next phase id if next>",
-  "reason": "<brief explanation>",
-  "findings": "<any issues or context to inject into next phase>"
+  "decision": "phase",
+  "phase": {{
+    "name": "<name>",
+    "pattern": "<pattern type from catalog>",
+    "team": ["<agent_id>", ...],
+    "gate": "<gate type>",
+    "feedback": ["<type>", ...],
+    "max_iterations": <int>,
+    "task": "<specific instructions>"
+  }},
+  "reason": "..."
 }}
 
 Rules:
-- "next": continue to the next phase in sequence
-- "loop": re-run a previous phase (e.g. QA failed, build broken → loop back to dev/tdd phase)
-- "done": all acceptance criteria are met AND build compiles AND tests pass
-- "skip": skip ahead to a specific phase
+- "next": continue linearly
+- "loop": re-run a previous phase (QA fail → loop to dev)
+- "done": ALL acceptance criteria met AND build OK AND tests pass
+- "skip": jump to a specific phase
+- "phase": compose NEW dynamic phase with custom pattern/team/feedback
 
-CRITICAL — NEVER say "done" if:
-- Build/compilation was never run or failed
-- Tests were not executed or failed
-- Source files are incomplete (< 3 source files for non-trivial projects)
-- Adversarial guard rejected with score >= 7
-Instead, use "loop" to send back to the appropriate phase for fixing.
+CRITICAL — NEVER "done" if:
+- Build never ran or failed
+- Tests not executed or failed
+- Source files incomplete (< 3 for non-trivial)
+- Adversarial guard rejected (score >= 7)
+Use "loop" or "phase" instead.
 """
+
+
+def _build_dynamic_phase(pm_block: dict) -> tuple:
+    """Build (WorkflowPhase, PatternDef) from PM phase block."""
+    import uuid
+    from ..patterns.store import PatternDef
+
+    spec = pm_block.get("phase", {})
+    phase_id = spec.get("id") or f"pm-{uuid.uuid4().hex[:8]}"
+    pattern_type = spec.get("pattern", "sequential")
+    team = spec.get("team", [])
+    gate = spec.get("gate", "no_veto")
+    feedback = spec.get("feedback", [])
+    max_iter = spec.get("max_iterations", 5)
+    task = spec.get("task", "")
+    timeout = spec.get("timeout", 0)
+
+    if pattern_type not in _PATTERN_CATALOG:
+        logger.warning("PM_PHASE: unknown pattern %s → sequential", pattern_type)
+        pattern_type = "sequential"
+
+    config: dict = {"max_iterations": max_iter}
+    if "adversarial" in feedback:
+        config["adversarial_guard"] = True
+    if "tools" in feedback:
+        config["require_tool_validation"] = True
+
+    agents = [{"id": f"n{j}", "agent_id": aid} for j, aid in enumerate(team)]
+    if not agents:
+        agents = [{"id": "n0", "agent_id": "dev_fullstack"}]
+
+    pat_id = f"pm-pat-{phase_id}"
+    phase_name = spec.get("name", phase_id)
+
+    pattern_def = PatternDef(
+        id=pat_id,
+        name=phase_name,
+        description=task or phase_name,
+        type=pattern_type,
+        agents=agents,
+        edges=[],
+        config=config,
+    )
+
+    workflow_phase = WorkflowPhase(
+        id=phase_id,
+        pattern_id=pat_id,
+        name=phase_name,
+        description=task,
+        gate=gate,
+        config={"agents": team, **config},
+        timeout=timeout,
+    )
+
+    return workflow_phase, pattern_def
+
+
+def _build_evidence(phase_result: str, tool_calls: list | None) -> str:
+    """Build phase evidence string from result + tool calls."""
+    lines = [f"Result: {phase_result}"]
+    if tool_calls:
+        src, builds, tests = [], [], []
+        for tc in tool_calls:
+            tn = tc.get("name", "")
+            if tn in ("code_write", "code_edit"):
+                fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+                if fp:
+                    src.append(fp.rsplit("/", 1)[-1])
+            elif tn in ("build", "docker_build", "docker_build_verify", "cicd_runner"):
+                r = str(tc.get("result", ""))[:200]
+                c = str(tc.get("args", {}).get("command", ""))[:80]
+                builds.append(f"{tn}({c}): {r}")
+            elif tn in ("test", "playwright_test", "android_test"):
+                r = str(tc.get("result", ""))[:200]
+                c = str(tc.get("args", {}).get("command", ""))[:80]
+                tests.append(f"{tn}({c}): {r}")
+        lines.append(f"Files created ({len(src)}): {', '.join(src[:10])}" if src else "Files: NONE")
+        lines.append(f"Build: {'; '.join(builds[:3])}" if builds else "Build: NOT EXECUTED")
+        lines.append(f"Tests: {'; '.join(tests[:3])}" if tests else "Tests: NOT EXECUTED")
+    return "\n".join(lines)
 
 
 async def _pm_checkpoint(
@@ -587,77 +788,44 @@ async def _pm_checkpoint(
     goal: str,
     phase_tool_calls: list | None = None,
 ) -> dict:
-    """Ask the PM agent to decide the next workflow phase."""
+    """Ask PM agent to decide next workflow phase (v2: supports dynamic phases)."""
     import json as _json
 
-    # Build evidence from phase result + tool calls
-    evidence_lines = [f"Result: {phase_result}"]
-    if phase_tool_calls:
-        source_files = []
-        build_results = []
-        test_results = []
-        for tc in phase_tool_calls:
-            tn = tc.get("name", "")
-            if tn in ("code_write", "code_edit"):
-                fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
-                if fp:
-                    source_files.append(fp.rsplit("/", 1)[-1])
-            elif tn in ("build", "docker_build", "docker_build_verify", "cicd_runner"):
-                result_str = str(tc.get("result", ""))[:200]
-                cmd = str(tc.get("args", {}).get("command", ""))[:80]
-                build_results.append(f"{tn}({cmd}): {result_str}")
-            elif tn in ("test", "playwright_test", "android_test"):
-                result_str = str(tc.get("result", ""))[:200]
-                cmd = str(tc.get("args", {}).get("command", ""))[:80]
-                test_results.append(f"{tn}({cmd}): {result_str}")
-        if source_files:
-            evidence_lines.append(f"Files created ({len(source_files)}): {', '.join(source_files[:10])}")
-        else:
-            evidence_lines.append("Files created: NONE")
-        if build_results:
-            evidence_lines.append(f"Build results: {'; '.join(build_results[:3])}")
-        else:
-            evidence_lines.append("Build: NOT EXECUTED ⚠️")
-        if test_results:
-            evidence_lines.append(f"Test results: {'; '.join(test_results[:3])}")
-        else:
-            evidence_lines.append("Tests: NOT EXECUTED ⚠️")
+    phase_evidence = _build_evidence(phase_result, phase_tool_calls)
 
-    phase_evidence = "\n".join(evidence_lines)
-
-    # Find the PM agent
+    # Find PM agent
     from ..agents.store import get_agent_store
-
     _agent_store = get_agent_store()
     _pm_agent_id = None
     for candidate in ("product", "ai-product-manager"):
         try:
-            ag = _agent_store.get(candidate)
-            if ag:
+            if _agent_store.get(candidate):
                 _pm_agent_id = candidate
                 break
         except Exception:
             continue
 
     if not _pm_agent_id:
-        logger.warning("PM_CHECKPOINT: no PM agent found — continuing linearly")
+        logger.warning("PM_CHECKPOINT: no PM agent — continuing linearly")
         return {"decision": "next", "phase_id": "", "reason": "no PM agent", "findings": ""}
 
-    prompt = _PM_DECISION_PROMPT.format(
+    prompt = _PM_DECISION_PROMPT_V2.format(
         project_id=project_id,
         phase_name=phase_name,
         phase_evidence=phase_evidence,
         history="\n".join(f"  - {h}" for h in history[-10:]),
         catalog="\n".join(f"  - {c}" for c in catalog),
         goal=goal[:500],
+        patterns=_format_catalog_section(_PATTERN_CATALOG),
+        agents=_build_agent_catalog(),
+        templates=_format_templates_section(),
+        feedback_types=_format_catalog_section(_FEEDBACK_TYPES),
+        gate_types=_format_catalog_section(_GATE_TYPES),
     )
 
     try:
-        from ..llm.client import get_llm_client
-
+        from ..llm.client import get_llm_client, LLMMessage
         llm = get_llm_client()
-        from ..llm.client import LLMMessage
-
         msgs = [
             LLMMessage(role="system", content="You are a Product Manager. Respond ONLY with JSON."),
             LLMMessage(role="user", content=prompt),
@@ -665,20 +833,18 @@ async def _pm_checkpoint(
         result = await llm.chat(msgs)
         raw = result.content.strip()
 
-        # Parse JSON — handle markdown fences
         if "```" in raw:
             import re
-
             m = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", raw, re.DOTALL)
             if m:
                 raw = m.group(1).strip()
 
         decision = _json.loads(raw)
+        dec_type = decision.get("decision", "?")
         logger.warning(
             "PM_CHECKPOINT phase=%s decision=%s target=%s reason=%s",
-            phase_name,
-            decision.get("decision", "?"),
-            decision.get("phase_id", ""),
+            phase_name, dec_type,
+            decision.get("phase_id", "") or decision.get("phase", {}).get("name", ""),
             decision.get("reason", "")[:100],
         )
         return decision
@@ -805,6 +971,7 @@ async def run_workflow(
     _pm_loop_limit = 20
     _pm_skip_to = None
     _pm_done = False
+    _dynamic_patterns: dict = {}  # PM-created patterns (phase_id → PatternDef)
 
     for i, phase in enumerate(_phase_queue):
         # Skip already-completed phases on resume
@@ -877,7 +1044,7 @@ async def run_workflow(
             project_id=project_id,
         )
 
-        pattern = pattern_store.get(phase.pattern_id)
+        pattern = _dynamic_patterns.get(phase.id) or pattern_store.get(phase.pattern_id)
         if not pattern:
             await _rte_facilitate(
                 session_id,
@@ -1314,6 +1481,27 @@ async def run_workflow(
                         accumulated_context.append(f"[PM] DONE: {_pm_reason}")
                         _pm_done = True
 
+                    elif _pm_dec == "phase":
+                        # v2: PM composed a dynamic phase
+                        _pm_loop_count += 1
+                        try:
+                            _dyn_phase, _dyn_pattern = _build_dynamic_phase(_pm_decision)
+                            _dynamic_patterns[_dyn_phase.id] = _dyn_pattern
+                            _phase_catalog[_dyn_phase.id] = _dyn_phase
+                            _phase_queue.insert(i + 1, _dyn_phase)
+                            logger.warning(
+                                "PM_DECISION: phase → %s pattern=%s team=%s (dyn %d/%d)",
+                                _dyn_phase.name, _dyn_pattern.type,
+                                [a["agent_id"] for a in _dyn_pattern.agents],
+                                _pm_loop_count, _pm_loop_limit,
+                            )
+                            accumulated_context.append(
+                                f"[PM] PHASE → {_dyn_phase.name} "
+                                f"(pattern={_dyn_pattern.type}): {_pm_reason}"
+                            )
+                        except Exception as _dyn_err:
+                            logger.error("PM dynamic phase build failed: %s", _dyn_err)
+
                     elif _pm_dec == "loop" and _pm_target:
                         _pm_loop_count += 1
                         logger.warning(
@@ -1321,7 +1509,6 @@ async def run_workflow(
                             _pm_target, _pm_loop_count, _pm_loop_limit, _pm_reason[:100],
                         )
                         if _pm_target in _phase_catalog:
-                            # Insert right after current phase so it runs NEXT
                             _phase_queue.insert(i + 1, _phase_catalog[_pm_target])
                             accumulated_context.append(
                                 f"[PM] LOOP → {_pm_target}: {_pm_reason}"
