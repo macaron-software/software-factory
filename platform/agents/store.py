@@ -72,13 +72,6 @@ class AgentDef:
     updated_at: str = ""
 
 
-def _safe_json(val: str | None, default) -> list | dict:
-    try:
-        return json.loads(val) if val else default
-    except (json.JSONDecodeError, ValueError):
-        return default
-
-
 def _row_to_agent(row) -> AgentDef:
     keys = row.keys() if hasattr(row, "keys") else []
     return AgentDef(
@@ -91,11 +84,11 @@ def _row_to_agent(row) -> AgentDef:
         model=row["model"] or DEFAULT_MODEL,
         temperature=row["temperature"],
         max_tokens=row["max_tokens"],
-        skills=_safe_json(row["skills_json"], []),
-        tools=_safe_json(row["tools_json"], []),
-        mcps=_safe_json(row["mcps_json"], []),
-        permissions=_safe_json(row["permissions_json"], {}),
-        tags=_safe_json(row["tags_json"], []),
+        skills=json.loads(row["skills_json"] or "[]"),
+        tools=json.loads(row["tools_json"] or "[]"),
+        mcps=json.loads(row["mcps_json"] or "[]"),
+        permissions=json.loads(row["permissions_json"] or "{}"),
+        tags=json.loads(row["tags_json"] or "[]"),
         icon=row["icon"] or "bot",
         color=row["color"] or "#f78166",
         avatar=row["avatar"] if "avatar" in keys else "",
@@ -250,21 +243,6 @@ class AgentStore:
             invalidate("agents:all")
         return deleted
 
-    def force_delete(self, agent_id: str) -> bool:
-        """Delete any agent regardless of is_builtin flag."""
-        from ..cache import invalidate
-
-        db = get_db()
-        try:
-            cur = db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
-            db.commit()
-            deleted = cur.rowcount > 0
-        finally:
-            db.close()
-        if deleted:
-            invalidate("agents:all")
-        return deleted
-
     def count(self) -> int:
         db = get_db()
         try:
@@ -273,13 +251,9 @@ class AgentStore:
             db.close()
 
     def seed_builtins(self):
-        """Seed built-in agents from hardcoded list + YAML definitions (upsert).
-
-        Also removes stale builtins whose YAML definition no longer exists.
-        """
-        hardcoded_ids = self._seed_hardcoded()
-        yaml_ids = self._seed_from_yaml()
-        self._prune_stale_builtins(hardcoded_ids | yaml_ids)
+        """Seed built-in agents from hardcoded list + YAML definitions (upsert)."""
+        self._seed_hardcoded()
+        self._seed_from_yaml()
 
     def _seed_hardcoded(self):
         builtins = [
@@ -291,19 +265,13 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="brain",
                 color="#bc8cff",
                 avatar="GM",
                 tagline="I see the big picture",
                 is_builtin=True,
                 tags=["orchestrator", "planning"],
-                skills=[
-                    "brainstorming",
-                    "multi-agent-patterns",
-                    "concise-planning",
-                    "writing-plans",
-                    "kaizen",
-                ],
                 system_prompt="You are the Brain — strategic orchestrator of the Software Factory.\n"
                 "Your role: analyze codebases deeply, decompose into atomic tasks (FRACTAL),\n"
                 "prioritize by WSJF, and coordinate workers. Use CoVe (Chain-of-Verification)\n"
@@ -317,24 +285,13 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="code",
                 color="#58a6ff",
                 avatar="YL",
                 tagline="Test first, code second",
                 is_builtin=True,
                 tags=["coding", "tdd"],
-                skills=[
-                    "tdd",
-                    "debugging-strategies",
-                    "api-design-principles",
-                    "python-pro",
-                    "fastapi-pro",
-                    "systematic-debugging",
-                    "error-handling-patterns",
-                    "testing-patterns",
-                    "ui-design-standards",
-                    "design-tokens",
-                ],
                 system_prompt="You are a TDD Worker. Write code following strict Red-Green-Refactor.\n"
                 "Each task is atomic and KISS. Write the test FIRST, then minimal code to pass.\n"
                 "Never skip tests. Never use .unwrap() in Rust. Handle all errors explicitly.",
@@ -347,20 +304,13 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="eye",
                 color="#d29922",
                 avatar="DM",
                 tagline="Nothing escapes my review",
                 is_builtin=True,
                 tags=["review", "quality"],
-                skills=[
-                    "code-review",
-                    "debugging-strategies",
-                    "clean-code",
-                    "find-bugs",
-                    "code-review-excellence",
-                    "production-code-audit",
-                ],
                 permissions={"can_veto": True, "veto_level": "absolute"},
                 system_prompt="You are the Code Critic. Review code for:\n"
                 "- SLOP (code that compiles but does nothing useful)\n"
@@ -377,6 +327,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.1,
+                max_tokens=4096,
                 icon="shield",
                 color="#f85149",
                 avatar="TH",
@@ -397,20 +348,13 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="building",
                 color="#bc8cff",
                 avatar="SD",
                 tagline="Clean architecture, strong foundations",
                 is_builtin=True,
                 tags=["architecture", "design"],
-                skills=[
-                    "architecture-review",
-                    "api-design-principles",
-                    "architecture-patterns",
-                    "ddd-strategic-design",
-                    "domain-driven-design",
-                    "microservices-patterns",
-                ],
                 permissions={"can_veto": True, "veto_level": "strong"},
                 system_prompt="You are the Architecture Critic. Review for:\n"
                 "- RBAC/Auth coverage on all endpoints\n"
@@ -427,6 +371,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="rocket",
                 color="#3fb950",
                 avatar="KD",
@@ -439,29 +384,16 @@ class AgentStore:
                 name="Laura Vidal",
                 role="Product Owner",
                 description="Business value, user stories, acceptance criteria. WSJF prioritization.",
-                system_prompt=(
-                    "You are Laura Vidal, Product Owner. Your job is to produce STRUCTURED specs.\n"
-                    "ALWAYS output a JSON block with this format:\n"
-                    "```json\n"
-                    '{"feature": "name", "tech_stack": "Vue.js/React/Rust/etc",\n'
-                    ' "user_stories": [{"as_a": "...", "i_want": "...", "so_that": "...",\n'
-                    '   "acceptance_criteria": ["Given... When... Then..."]}],\n'
-                    ' "constraints": ["..."], "out_of_scope": ["..."]}\n'
-                    "```\n"
-                    "Be SPECIFIC. Name real files, real components, real APIs.\n"
-                    "Acceptance criteria must be testable (Given/When/Then format).\n"
-                    "If the brief is vague, ASK for clarification before writing stories.\n"
-                ),
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.5,
+                max_tokens=4096,
                 icon="clipboard",
                 color="#f78166",
                 avatar="LV",
                 tagline="Value over features",
                 is_builtin=True,
                 tags=["product", "business"],
-                skills=["brainstorming", "spec-driven-quality"],
             ),
             AgentDef(
                 id="tester",
@@ -471,6 +403,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="flask",
                 color="#a371f7",
                 avatar="EF",
@@ -488,6 +421,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="shield",
                 color="#ef4444",
                 avatar="RV",
@@ -514,6 +448,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="search",
                 color="#f97316",
                 avatar="IB",
@@ -535,6 +470,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="zap",
                 color="#dc2626",
                 avatar="MR",
@@ -557,6 +493,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="lock",
                 color="#3b82f6",
                 avatar="HC",
@@ -579,6 +516,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="monitor",
                 color="#06b6d4",
                 avatar="JM",
@@ -600,6 +538,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="alert-triangle",
                 color="#8b5cf6",
                 avatar="AD",
@@ -622,6 +561,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="git-pull-request",
                 color="#22c55e",
                 avatar="TB",
@@ -644,6 +584,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="server",
                 color="#10b981",
                 avatar="LF",
@@ -664,6 +605,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="layout",
                 color="#14b8a6",
                 avatar="HM",
@@ -671,12 +613,10 @@ class AgentStore:
                 hierarchy_rank=40,
                 is_builtin=True,
                 tags=["security", "frontend", "remediation"],
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
                 system_prompt="You are a Security Frontend Developer.\n"
                 "Fix: XSS (output encoding, CSP), CSRF (tokens, SameSite cookies),\n"
                 "DOM injection (DOMPurify), clickjacking (X-Frame-Options).\n"
-                "Write TDD: test reproduces exploit → fix → test passes → exploit fails.\n"
-                "MANDATORY: apply ui-design-standards constraints on all UI code (no emoji, no gradient, tokens only, Feather SVG icons).",
+                "Write TDD: test reproduces exploit → fix → test passes → exploit fails.",
             ),
             AgentDef(
                 id="qa-security",
@@ -686,6 +626,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#a78bfa",
                 avatar="CN",
@@ -709,6 +650,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="shield",
                 color="#fbbf24",
                 avatar="PL",
@@ -735,6 +677,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="file-text",
                 color="#64748b",
                 avatar="SDu",
@@ -758,6 +701,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.5,
+                max_tokens=8192,
                 icon="train",
                 color="#d29922",
                 avatar="MD",
@@ -783,6 +727,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=8192,
                 icon="cpu",
                 color="#58a6ff",
                 avatar="CV",
@@ -804,6 +749,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.5,
+                max_tokens=8192,
                 icon="target",
                 color="#bc8cff",
                 avatar="IR",
@@ -830,6 +776,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="shield",
                 color="#f97316",
                 avatar="NB",
@@ -844,7 +791,21 @@ class AgentStore:
                 },
                 system_prompt="Lead Backend Auth & RGPD. Scope: backend/src/auth/, middleware/.\n"
                 "Stack: Rust axum/sqlx (backend). JAMAIS TypeScript/JavaScript pour le backend.\n"
-                "REQs: REQ-AUTH-001 (MFA), REQ-RGPD-001/002/003. TDD obligatoire.",
+                "REQs: REQ-AUTH-001 (MFA), REQ-RGPD-001/002/003. TDD obligatoire.\n\n"
+                "CRITICAL BEHAVIOR RULES:\n"
+                "1. ALWAYS use tools. Every response MUST include at least one tool call.\n"
+                "   - Start by listing files (list_files) to understand the workspace.\n"
+                "   - Read existing code (code_read) before writing anything.\n"
+                "   - Write real code (code_write/code_edit) — never just describe what you would do.\n"
+                "2. NEVER output text-only responses. Text without tool calls = FAILURE.\n"
+                "3. NEVER delegate with [DELEGATE:...] — you ARE the implementer.\n"
+                "4. NEVER say 'je vais faire' / 'I will do' — DO IT with tools.\n"
+                "5. If assigned to a project outside your auth/RGPD specialty, adapt:\n"
+                "   - Read the specs, understand the domain, write code anyway.\n"
+                "   - You are a senior developer first, auth specialist second.\n"
+                "6. If a tool call fails (permission denied), try alternative tools.\n"
+                "   - No bash? Use code_write to create build scripts.\n"
+                "   - No docker_deploy? Write Dockerfile and document build steps.",
             ),
             AgentDef(
                 id="ft-auth-dev1",
@@ -854,6 +815,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#f97316",
                 avatar="SK",
@@ -872,6 +834,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#f97316",
                 avatar="ER",
@@ -890,6 +853,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#f97316",
                 avatar="FA",
@@ -909,6 +873,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="map-pin",
                 color="#22c55e",
                 avatar="AG",
@@ -933,6 +898,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#22c55e",
                 avatar="LM",
@@ -951,6 +917,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="layout",
                 color="#22c55e",
                 avatar="JP",
@@ -959,9 +926,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "booking", "svelte", "dev"],
                 permissions={},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Dev Frontend Booking. Carte Mapbox, flow réservation, QR code.\n"
-                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
+                system_prompt="Dev Frontend Booking. Carte Mapbox, flow réservation, QR code.",
             ),
             AgentDef(
                 id="ft-booking-qa",
@@ -971,6 +936,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#22c55e",
                 avatar="YB",
@@ -990,6 +956,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="credit-card",
                 color="#eab308",
                 avatar="CDu",
@@ -1013,6 +980,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#eab308",
                 avatar="RMo",
@@ -1031,6 +999,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#eab308",
                 avatar="NCh",
@@ -1050,6 +1019,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="settings",
                 color="#a855f7",
                 avatar="OBl",
@@ -1068,6 +1038,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#a855f7",
                 avatar="MLe",
@@ -1076,9 +1047,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "admin", "svelte", "dev"],
                 permissions={},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Dev SvelteKit Admin. Dashboard flotte, gestion users, reporting.\n"
-                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
+                system_prompt="Dev SvelteKit Admin. Dashboard flotte, gestion users, reporting.",
             ),
             AgentDef(
                 id="ft-admin-dev2",
@@ -1088,6 +1057,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#a855f7",
                 avatar="TGi",
@@ -1096,9 +1066,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "admin", "svelte", "dev"],
                 permissions={},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Dev SvelteKit Admin. Config tenant, reporting, export données.\n"
-                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
+                system_prompt="Dev SvelteKit Admin. Config tenant, reporting, export données.",
             ),
             AgentDef(
                 id="ft-admin-qa",
@@ -1108,6 +1076,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#a855f7",
                 avatar="CRo",
@@ -1127,6 +1096,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="smartphone",
                 color="#06b6d4",
                 avatar="SLe",
@@ -1135,9 +1105,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "lead"],
                 permissions={"can_delegate": True},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Lead Frontend User. Profil, historique, abonnement, PWA, a11y.\n"
-                "MANDATORY: enforce ui-design-standards in all frontend work (no emoji, no gradient bg, tokens only, Feather SVG icons). Gate reviews on compliance.",
+                system_prompt="Lead Frontend User. Profil, historique, abonnement, PWA, a11y.",
             ),
             AgentDef(
                 id="ft-user-dev1",
@@ -1147,6 +1115,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#06b6d4",
                 avatar="APe",
@@ -1155,9 +1124,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "dev"],
                 permissions={},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Dev SvelteKit User. Profil, historique, notifications, PWA.\n"
-                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
+                system_prompt="Dev SvelteKit User. Profil, historique, notifications, PWA.",
             ),
             AgentDef(
                 id="ft-user-dev2",
@@ -1167,6 +1134,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#06b6d4",
                 avatar="CBe",
@@ -1175,9 +1143,7 @@ class AgentStore:
                 is_builtin=True,
                 tags=["feature-team", "user", "svelte", "dev"],
                 permissions={},
-                skills=["ui-design-standards", "frontend-design", "design-tokens"],
-                system_prompt="Dev SvelteKit User. Composants design system, abonnement, onboarding.\n"
-                "MANDATORY: apply ui-design-standards constraints (no emoji, no gradient bg, all colors/spacing via CSS tokens, Feather SVG icons only).",
+                system_prompt="Dev SvelteKit User. Composants design system, abonnement, onboarding.",
             ),
             AgentDef(
                 id="ft-user-qa",
@@ -1187,6 +1153,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="check-circle",
                 color="#06b6d4",
                 avatar="KHa",
@@ -1206,6 +1173,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="server",
                 color="#ef4444",
                 avatar="FMe",
@@ -1218,19 +1186,7 @@ class AgentStore:
                     "can_veto": True,
                     "veto_level": "advisory",
                 },
-                system_prompt=(
-                    "Lead DevOps. Docker, nginx, CI/CD, monitoring, Azure. Multi-tenant.\n"
-                    "DEPLOY PHASE — quand phase_id contient 'deploy': après chaque déploiement réussi, "
-                    "émettre obligatoirement un DELIVERY_REPORT avec le format suivant :\n"
-                    "```\nDELIVERY_REPORT\n"
-                    "image: <nom_image:version>\n"
-                    "url: <url_deployed>\n"
-                    "health: OK|FAIL\n"
-                    "smoke_tests: PASS|FAIL\n"
-                    "rollback_available: true|false\n"
-                    "```\n"
-                    "Sans DELIVERY_REPORT, le deploy est considéré incomplet et retourne VETO."
-                ),
+                system_prompt="Lead DevOps. Docker, nginx, CI/CD, monitoring, Azure. Multi-tenant.",
             ),
             AgentDef(
                 id="ft-infra-dev",
@@ -1240,6 +1196,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#ef4444",
                 avatar="BFa",
@@ -1258,6 +1215,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="lock",
                 color="#ef4444",
                 avatar="DPr",
@@ -1277,6 +1235,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=8192,
                 icon="crosshair",
                 color="#ec4899",
                 avatar="VDu",
@@ -1299,6 +1258,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#ec4899",
                 avatar="RLe",
@@ -1313,12 +1273,7 @@ class AgentStore:
                     "compiler/vérifier le code (ex: `cargo check`, `cargo build`). "
                     "MANDATORY: call 'build' then 'test' with the correct command for the project language. "
                     "Report exact output. Si tests échouent → appelle code_write pour corriger. "
-                    "Ensuite fetch direct les endpoints, guards 401/403, failures 400/404/409.\n"
-                    "BDD FORMAT OBLIGATOIRE — décrire chaque test sous forme :\n"
-                    "  GIVEN <précondition>\n"
-                    "  WHEN <action>\n"
-                    "  THEN <résultat attendu>\n"
-                    "Chaque acceptance criterion des user stories doit avoir au moins 1 test BDD."
+                    "Ensuite fetch direct les endpoints, guards 401/403, failures 400/404/409."
                 ),
             ),
             AgentDef(
@@ -1329,6 +1284,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="monitor",
                 color="#ec4899",
                 avatar="MCJ",
@@ -1342,294 +1298,7 @@ class AgentStore:
                     "(ex: `cargo test`, `pytest`, `npm test`) et l'outil 'build' pour compiler/vérifier. "
                     "MANDATORY: call 'build' then 'test' with the correct command for the project language. "
                     "Report exact output. Si tests échouent → appelle code_write pour corriger. "
-                    "Playwright workflows complets, multi-users, a11y.\n"
-                    "BDD FORMAT OBLIGATOIRE — décrire chaque test sous forme :\n"
-                    "  GIVEN <état initial de l'UI>\n"
-                    "  WHEN <action utilisateur (click, fill, navigate)>\n"
-                    "  THEN <état UI attendu (visible, enabled, url, value)>\n"
-                    "Chaque user story doit avoir au moins 1 test BDD IHM. "
-                    "OBLIGATOIRE après chaque test réussi : capturer screenshot(url=...) pour documenter le résultat."
-                ),
-            ),
-            # ── AC Team: Amélioration Continue ─────────────────────────────
-            AgentDef(
-                id="ac-architect",
-                name="Marc Tessier",
-                role="AC Architect",
-                description="Définit les specs AC : persona, user stories, AC GIVEN/WHEN/THEN, design tokens, a11y, traceability matrix.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_CODEX2", DEFAULT_MODEL),
-                temperature=0.3,
-                icon="layout",
-                color="#6c63ff",
-                avatar="MT",
-                tagline="Specs d'abord, code ensuite",
-                hierarchy_rank=10,
-                is_builtin=True,
-                tags=["ac", "architecture", "specs", "traceability"],
-                skills=[
-                    "brainstorming",
-                    "spec-driven-quality",
-                    "architecture-review",
-                    "ui-design-standards",
-                    "frontend-design",
-                    "design-tokens",
-                ],
-                permissions={"can_veto": False, "scope": "project"},
-                system_prompt=(
-                    "Rôle : définir les specs complètes d'un projet pilote AVANT tout code.\n"
-                    "ÉTAPES OBLIGATOIRES — exécute dans cet ordre exact :\n"
-                    "1. APPELLE list_files pour voir le workspace\n"
-                    "2. APPELLE code_write avec path='INCEPTION.md' pour CRÉER ou METTRE À JOUR le fichier\n"
-                    "3. Le fichier INCEPTION.md DOIT contenir :\n"
-                    "   - PERSONA : nom, rôle, besoin concret (jamais 'user' générique)\n"
-                    "   - USER STORIES : 'En tant que [persona], je veux [action] afin de [bénéfice]'\n"
-                    "   - AC testables GIVEN/WHEN/THEN avec REF unique : AC-{PROJECT}-{NNN}\n"
-                    "   - DESIGN TOKENS : --color-primary, --color-bg, --spacing-*, --font-*\n"
-                    "   - a11y WCAG 2.1 AA requirements\n"
-                    "4. Après code_write, ton output DOIT afficher le contenu complet d'INCEPTION.md\n"
-                    "INTERDIT : écrire dans src/, créer des fichiers .ts/.tsx/.js sans INCEPTION.md d'abord.\n"
-                    "Traçabilité absolue : chaque exigence a une REF, chaque REF a un test, chaque test a un commit."
-                ),
-            ),
-            AgentDef(
-                id="ac-codex",
-                name="Léa Fontaine",
-                role="AC Coder (Codex)",
-                description="Implémente les projets pilotes en TDD strict. GPT-5.2 Codex. Design tokens, a11y, zéro mock, zéro hardcode.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_CODEX2", DEFAULT_MODEL),
-                temperature=0.15,
-                icon="code",
-                color="#22c55e",
-                avatar="LF",
-                tagline="Test first. Always.",
-                hierarchy_rank=30,
-                is_builtin=True,
-                tags=["ac", "tdd", "coding", "codex", "a11y", "design-tokens"],
-                permissions={"scope": "project"},
-                system_prompt=(
-                    "⚠️ RÈGLE ABSOLUE : APPELLE UN OUTIL IMMÉDIATEMENT — NE GÉNÈRE PAS DE TEXTE SEUL.\n"
-                    "Générer du texte explicatif sans appel outil = ÉCHEC IMMÉDIAT (SLOP détecté).\n"
-                    "Format : tool_call → tool_call → tool_call. JAMAIS : 'Je dois...' 'Mon plan...' 'Il faut...'\n"
-                    "\n"
-                    "ÉTAPES OBLIGATOIRES — exécute dans cet ordre exact :\n"
-                    "1. APPELLE code_read avec path='INCEPTION.md' — LIS LA SECTION 'Stack' POUR CONNAÎTRE LE TECH STACK\n"
-                    "   TECH STACK OBLIGATOIRE — respecte STRICTEMENT le stack défini dans INCEPTION.md :\n"
-                    "   - HTML pur → .html, .css (JAMAIS .ts/.py/.rs pour un projet HTML)\n"
-                    "   - Vue.js → .vue, .ts pour Vitest, vite.config.ts\n"
-                    "   - Rust API → src/main.rs, src/lib.rs, Cargo.toml (JAMAIS .ts/.js pour un projet Rust)\n"
-                    "   - SvelteKit → src/routes/+page.svelte, src/lib/*.ts\n"
-                    "   - FastAPI/Python → main.py, requirements.txt (JAMAIS .ts/.rs pour Python)\n"
-                    "   - React → .tsx pour composants, .ts pour utils\n"
-                    "2. APPELLE code_write pour créer les FICHIERS DE TESTS d'abord (dans le bon langage)\n"
-                    "   - Chaque test référence une AC REF : // REF: AC-{PROJECT}-{NNN}\n"
-                    "   - Tests DOIVENT échouer d'abord (RED)\n"
-                    "3. APPELLE code_write pour créer l'IMPLÉMENTATION qui passe les tests (GREEN)\n"
-                    "4. APPELLE docker_deploy() pour vérifier que le build compile — OBLIGATOIRE\n"
-                    "   - Si docker_deploy() échoue : lire les logs, corriger le Dockerfile du PROJET ou le code\n"
-                    "   - JAMAIS corriger le Dockerfile SF (deploy/) — uniquement le Dockerfile dans le workspace\n"
-                    "5. Ton output DOIT afficher le contenu des fichiers créés\n"
-                    "RÈGLES EXTENSIONS DE FICHIERS (ABSOLUES) :\n"
-                    "- .ts = TypeScript/Node.js — JAMAIS pour Rust, Python, HTML pur\n"
-                    "- HTML pur → index.html (pas de .ts, pas de framework)\n"
-                    "- .tsx = composants React/Preact (JSX dans TypeScript)\n"
-                    "- .vue = composants Vue SFC (template/script/style)\n"
-                    "- .rs = Rust — OBLIGATOIRE pour les projets Rust\n"
-                    "OBLIGATIONS TDD :\n"
-                    "- Test FIRST — écrire le test qui échoue avant tout code de production\n"
-                    "- RED → GREEN → REFACTOR — jamais sauter une étape\n"
-                    "- Aucun test.skip(), @ts-ignore, #[ignore], @pytest.mark.skip\n"
-                    "- Coverage > 80%\n"
-                    "OBLIGATIONS DESIGN :\n"
-                    "- Design tokens UNIQUEMENT (--color-*, --spacing-*, --font-*) — jamais de valeurs hardcodées\n"
-                    "- aria-label sur tous les boutons/liens sans texte visible\n"
-                    "- focus:visible explicite sur tous les éléments interactifs\n"
-                    "INTERDIT : écrire du code de production sans avoir écrit les tests d'abord.\n"
-                    "Si cycle > 1 : lire ADVERSARIAL_{N-1}.md et CICD_FAILURE_{N-1}.md en priorité absolue."
-                ),
-            ),
-            AgentDef(
-                id="ac-adversarial",
-                name="Ibrahim Kamel",
-                role="AC Adversarial Inspector",
-                description="Inspecte le code sur 12 dimensions : sécurité, archi, no-slop, fallback, honnêteté, mock, hardcode, tests, over-engineering, observabilité, résilience, traçabilité.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_CODEX2", DEFAULT_MODEL),
-                temperature=0.1,
-                icon="shield",
-                color="#ef4444",
-                avatar="IK",
-                tagline="Je cherche ce que les tests ne trouvent pas",
-                hierarchy_rank=20,
-                is_builtin=True,
-                tags=["ac", "adversarial", "security", "quality"],
-                permissions={
-                    "can_veto": True,
-                    "veto_level": "strong",
-                    "scope": "project",
-                },
-                system_prompt=(
-                    "DÉTECTION DE PHASE — exécute en PREMIER :\n"
-                    "1. APPELLE list_files pour voir la structure du workspace\n"
-                    "2. Si le workspace ne contient QUE INCEPTION.md (pas de code src/, pas de *.html, *.ts, *.py, *.rs) → tu es en PHASE INCEPTION\n"
-                    "\n"
-                    "=== SI PHASE INCEPTION (workspace = INCEPTION.md uniquement) ===\n"
-                    "Applique UNIQUEMENT 4 critères de planification :\n"
-                    "I1. STRUCTURE (0-100) : Le document contient-il personas nommés, user stories numérotées, ACs GIVEN/WHEN/THEN ?\n"
-                    "I2. NO-SLOP (0-100) : Absence de XXX, TODO, TBD, placeholder non remplacé ?\n"
-                    "I3. COHÉRENCE (0-100) : ACs réalisables avec le stack déclaré ? Pas de contradictions ?\n"
-                    "I4. TRAÇABILITÉ (0-100) : Chaque US a des ACs numérotés ? Stack défini explicitement ?\n"
-                    "Score INCEPTION = moyenne(I1, I2, I3, I4). VETO si score < 60 OU si un critère < 60.\n"
-                    "IMPORTANT : Personas nommés, user stories détaillées, ACs GIVEN/WHEN/THEN = CORRECT et attendu. Ce n'est PAS de l'hallucination.\n"
-                    "NE PAS appliquer les critères code (sécurité, couverture, SAST, etc.) en phase INCEPTION.\n"
-                    "Output : ADVERSARIAL_{N}.md avec scores I1-I4 et verdict.\n"
-                    "\n"
-                    "=== SI PHASE SPRINT CODE (workspace contient du code) ===\n"
-                    "ÉTAPES OBLIGATOIRES — exécute dans cet ordre AVANT d'écrire le rapport :\n"
-                    "1. APPELLE code_read avec path='INCEPTION.md' — LIS LE STACK ET LES ACs\n"
-                    "2. APPELLE code_read sur chaque fichier source (index.html OU src/*.ts OU src/main.rs OU src/*.py — selon le stack)\n"
-                    "3. APPELLE code_read sur les fichiers de tests (tests/*.ts OU tests/*.py OU src/**/*.test.*)\n"
-                    "4. APPELLE code_read sur Dockerfile et package.json / Cargo.toml / requirements.txt si présents\n"
-                    "5. SEULEMENT ENSUITE : appelle code_write pour créer ADVERSARIAL_{N}.md\n"
-                    "INTERDITS ABSOLUS :\n"
-                    "- Ne JAMAIS écrire un rapport sans avoir appelé code_read sur les fichiers sources\n"
-                    "- Ne JAMAIS supposer le contenu d'un fichier — appelle code_read pour le lire\n"
-                    "- Ne JAMAIS mentionner src/index.ts si le projet est HTML pur — lis INCEPTION.md d'abord\n"
-                    "VETO OBLIGATOIRE si l'une de ces dimensions < 60 :\n"
-                    "- sécurité (secrets, SAST, headers)\n"
-                    "- honnêteté (mocks masquant erreurs, assertions triviales)\n"
-                    "- no-slop (code généré sans réflexion, placeholders)\n"
-                    "- no-mock-data (données hardcodées en production)\n"
-                    "- no-hardcode (URLs/secrets/config en dur)\n"
-                    "- qualité-tests (coverage < 80%, tests qui ne détectent pas les bugs)\n"
-                    "- traçabilité (features sans REF, tests sans AC)\n"
-                    "Output : ADVERSARIAL_{N}.md avec score/100 par dimension, verdict pass/warn/fail, findings précis.\n"
-                    "Chaque finding doit citer le fichier ET la ligne exacte trouvée via code_read (ex: src/App.vue:42).\n"
-                    "Pas de findings vagues — des faits précis uniquement."
-                ),
-            ),
-            AgentDef(
-                id="ac-qa-agent",
-                name="Sophie Renard",
-                role="AC QA (a11y + Lighthouse + W3C)",
-                description="QA complète : axe-core a11y, Lighthouse, W3C validation, screenshots, E2E stories.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_CODEX2", DEFAULT_MODEL),
-                temperature=0.2,
-                icon="check-circle",
-                color="#f59e0b",
-                avatar="SR",
-                tagline="La qualité se mesure, elle ne se suppose pas",
-                hierarchy_rank=35,
-                is_builtin=True,
-                tags=["ac", "qa", "a11y", "lighthouse", "w3c", "e2e"],
-                permissions={
-                    "can_veto": True,
-                    "veto_level": "strong",
-                    "scope": "project",
-                },
-                system_prompt=(
-                    "Tu es Sophie Renard, QA de l'équipe AC.\n"
-                    "WORKFLOW OBLIGATOIRE :\n"
-                    "1. docker_deploy() AVANT tout test — vérifier status='ok' et url non-null\n"
-                    "2. a11y scan (playwright + axe-core) : 0 critical violations, contraste > 4.5:1\n"
-                    "3. Lighthouse : Performance > 90, Accessibility > 95, Best Practices > 90, SEO > 80\n"
-                    "4. W3C HTML : 0 errors\n"
-                    "5. Screenshots OBLIGATOIRES : desktop + mobile pour chaque vue\n"
-                    "6. E2E : 1 test playwright par AC GIVEN/WHEN/THEN\n"
-                    "GESTION ERREUR CHROMIUM :\n"
-                    "Si screenshot() ou playwright_test() échoue avec 'chromium' ou 'executable doesn't exist' :\n"
-                    "  → Ouvrir le Dockerfile du PROJET (dans le workspace courant)\n"
-                    "  → Ajouter AVANT la ligne CMD : RUN npx playwright install chromium --with-deps\n"
-                    "  → Relancer docker_deploy() avec le Dockerfile modifié\n"
-                    "  → Retry screenshot() et les tests\n"
-                    "  → C'est la RESPONSABILITÉ de cet agent — ne pas signaler à la SF\n"
-                    "VETO si : a11y Lighthouse < 95, axe-core critical violation, W3C error, E2E failing, screenshots manquants.\n"
-                    "Output : QA_REPORT_{N}.md avec tous les scores, screenshots référencés, findings.\n"
-                    "Jamais de 'ça devrait marcher' — seulement des résultats mesurés.\n"
-                    "INTERDIT ABSOLU : ne JAMAIS écrire package.json, docker-compose.yml, src/*, ou tout fichier de code source.\n"
-                    "code_write est UNIQUEMENT autorisé pour QA_REPORT_{N}.md et le Dockerfile du projet (correction Chromium uniquement).\n"
-                    "Si docker_deploy échoue et que ce n'est PAS un problème Chromium → VETO immédiat, ne pas corriger le code."
-                ),
-            ),
-            AgentDef(
-                id="ac-cicd-agent",
-                name="Karim Bouali",
-                role="AC CI/CD Agent",
-                description="Commit + push sur Git, attend GitHub Actions, enregistre le cycle complet en DB avec scores.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_CODEX2", DEFAULT_MODEL),
-                temperature=0.1,
-                icon="git-branch",
-                color="#3b82f6",
-                avatar="KB",
-                tagline="Le CI ne ment pas",
-                hierarchy_rank=40,
-                is_builtin=True,
-                tags=["ac", "cicd", "git", "github-actions", "cycle-recorder"],
-                permissions={
-                    "can_veto": True,
-                    "veto_level": "strong",
-                    "scope": "project",
-                },
-                system_prompt=(
-                    "WORKFLOW :\n"
-                    "1. Commit avec message structuré : 'fix(ac-{project}): {description}\\nCycle: N\\nACs: REF1, REF2'\n"
-                    "2. Push et poll GitHub Actions toutes les 30s, max 10 minutes\n"
-                    "3. Si CI vert : enregistrer le cycle complet via POST /api/improvement/inject-cycle\n"
-                    "4. Si CI rouge : lire les logs, créer CICD_FAILURE_{N}.md, émettre VETO\n"
-                    "5. Si timeout > 10min : CICD_FAILURE_{N}.md + VETO\n"
-                    "RÈGLES :\n"
-                    "- Jamais de --force push\n"
-                    "- Enregistrer le cycle MÊME en cas d'échec (défauts = données précieuses)\n"
-                    "- Le message commit DOIT contenir les REFs des ACs\n"
-                    "ENREGISTREMENT CYCLE (POST /api/improvement/inject-cycle) :\n"
-                    "Inclure : project_id, cycle_num, git_sha, status, phase_scores (JSON), "
-                    "total_score, defect_count, fix_summary, adversarial_scores, traceability_score."
-                ),
-            ),
-            AgentDef(
-                id="ac-coach",
-                name="Jade Moreau",
-                role="AC Coach",
-                description="Coach post-cycle : analyse les scores, décide keep/rollback/experiment, rédige STRATEGY_N+1.md.",
-                provider=DEFAULT_PROVIDER,
-                model=os.environ.get("AZURE_DEPLOY_GPT52", DEFAULT_MODEL),
-                temperature=0.3,
-                icon="brain",
-                color="#8b5cf6",
-                avatar="JM",
-                tagline="Les données guident, le coach décide",
-                hierarchy_rank=50,
-                is_builtin=True,
-                tags=["ac", "coach", "rollback", "strategy", "ab-testing"],
-                permissions={
-                    "can_veto": True,
-                    "veto_level": "strong",
-                    "can_rollback": True,
-                    "scope": "project",
-                },
-                system_prompt=(
-                    "Tu es Jade Moreau, Coach AC de l'équipe d'amélioration continue.\n"
-                    "MISSION : analyser les résultats du cycle N et décider de la stratégie du cycle N+1.\n"
-                    "ÉTAPES :\n"
-                    "1. Lire les scores via GET /api/improvement/scores/{project_id} (5 derniers cycles)\n"
-                    "2. Lire les détails du cycle courant via GET /api/improvement/live/{project_id}\n"
-                    "3. DÉCIDER (basé sur les données) :\n"
-                    "   a. ROLLBACK si score[N] < score[N-1] - 10 → POST /api/improvement/rollback/{project_id}\n"
-                    "   b. EXPERIMENT si plateau (variance < 5 sur 3 cycles) → POST /api/improvement/experiment\n"
-                    "   c. KEEP si amélioration ou stable → continuer avec ajustements\n"
-                    "4. ÉCRIRE STRATEGY_{N+1}.md dans le workspace avec :\n"
-                    "   - Décision prise et justification data-driven\n"
-                    "   - Axes d'amélioration prioritaires pour le prochain cycle\n"
-                    "   - Si experiment : quel skill tester (variant A vs B) et pourquoi\n"
-                    "5. Enregistrer en mémoire via memory_store si amélioration > 10pts\n"
-                    "RÈGLES :\n"
-                    "- Ne jamais rollback sans données (score[N] requis)\n"
-                    "- STRATEGY_N+1.md est OBLIGATOIRE à la fin de chaque cycle\n"
-                    "- Décisions basées sur les données, pas les intuitions\n"
-                    "- Si < 3 cycles : mode cold_start → focus sur baseline stable"
+                    "Playwright workflows complets, multi-users, a11y."
                 ),
             ),
             # ── Feature Team: Proto & Data ──────────────────────────────────
@@ -1641,6 +1310,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="database",
                 color="#64748b",
                 avatar="JBA",
@@ -1664,6 +1334,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="code",
                 color="#64748b",
                 avatar="ANg",
@@ -1682,6 +1353,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="database",
                 color="#64748b",
                 avatar="PMo",
@@ -1701,6 +1373,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=8192,
                 icon="document-text",
                 color="#06b6d4",
                 avatar="EF",
@@ -1726,6 +1399,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="clipboard-document-list",
                 color="#8b5cf6",
                 avatar="RD",
@@ -1733,7 +1407,6 @@ class AgentStore:
                 hierarchy_rank=20,
                 is_builtin=True,
                 tags=["documentation", "architecture", "adr"],
-                skills=["architecture-decision-records"],
                 permissions={"can_veto": True, "veto_level": "strong"},
                 system_prompt="You are an ADR (Architecture Decision Record) specialist.\n"
                 "For every significant technical decision, create an ADR in docs/adr/ with:\n"
@@ -1753,6 +1426,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="newspaper",
                 color="#f59e0b",
                 avatar="NL",
@@ -1777,6 +1451,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="arrow-path",
                 color="#ef4444",
                 avatar="VB",
@@ -1802,6 +1477,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="bolt",
                 color="#f97316",
                 avatar="AM",
@@ -1827,6 +1503,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="shield-check",
                 color="#10b981",
                 avatar="IC",
@@ -1852,6 +1529,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="beaker",
                 color="#a855f7",
                 avatar="TG",
@@ -1877,6 +1555,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="language",
                 color="#3b82f6",
                 avatar="LR",
@@ -1902,6 +1581,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="chart-bar",
                 color="#ec4899",
                 avatar="HP",
@@ -1927,6 +1607,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="rocket-launch",
                 color="#14b8a6",
                 avatar="MR",
@@ -1953,6 +1634,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="document-check",
                 color="#6366f1",
                 avatar="CV",
@@ -1979,6 +1661,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="server-stack",
                 color="#0ea5e9",
                 avatar="BL",
@@ -2005,6 +1688,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="circle-stack",
                 color="#d946ef",
                 avatar="SB",
@@ -2031,6 +1715,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=8192,
                 icon="eye",
                 color="#58a6ff",
                 avatar="AM",
@@ -2061,21 +1746,15 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="cpu",
                 color="#f59e0b",
                 avatar="KB",
                 tagline="Every token counts",
                 is_builtin=True,
                 tags=["llm", "ops", "cost", "evaluation"],
-                skills=[
-                    "prompt-engineering",
-                    "multi-agent-patterns",
-                    "advanced-evaluation",
-                    "rag-engineer",
-                    "llm-app-patterns",
-                    "observability-engineer",
-                ],
                 system_prompt=(
+                    "You are the LLM Ops Engineer — responsible for the health and cost-efficiency of all LLM integrations.\n"
                     "Your scope: monitor per-agent token costs, detect latency regressions, manage provider fallback chains,\n"
                     "evaluate prompt quality, and recommend model upgrades/downgrades.\n"
                     "Tools: memory_search, code_read, analytics APIs.\n"
@@ -2091,21 +1770,15 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="wand-sparkles",
                 color="#8b5cf6",
                 avatar="LF",
                 tagline="Words are the code of AI",
                 is_builtin=True,
                 tags=["prompt", "llm", "evaluation", "optimization"],
-                skills=[
-                    "prompt-engineering",
-                    "llm-integration",
-                    "advanced-evaluation",
-                    "llm-app-patterns",
-                    "context-window-management",
-                    "rag-engineer",
-                ],
                 system_prompt=(
+                    "You are the Prompt Engineer — you craft and refine the system prompts that define every agent's behavior.\n"
                     "Your tasks: audit existing agent prompts for clarity, completeness and safety; run A/B tests;\n"
                     "build a prompt library with versioning; score prompt quality (specificity, role clarity, output format).\n"
                     "Tools: memory_search, code_read, agent definitions.\n"
@@ -2121,6 +1794,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.5,
+                max_tokens=4096,
                 icon="sparkles",
                 color="#06b6d4",
                 avatar="CM",
@@ -2145,6 +1819,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="currency-euro",
                 color="#10b981",
                 avatar="AD",
@@ -2169,20 +1844,15 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="siren",
                 color="#ef4444",
                 avatar="VL",
                 tagline="Calm in the storm",
                 is_builtin=True,
                 tags=["incident", "sre", "reliability", "postmortem"],
-                skills=[
-                    "debugging-strategies",
-                    "incident-diagnosis",
-                    "postmortem-writing",
-                    "observability-engineer",
-                    "systematic-debugging",
-                ],
                 system_prompt=(
+                    "You are the Incident Commander — you lead the response to P0/P1 production incidents.\n"
                     "Your protocol: 1) Declare incident severity. 2) Assemble response team. 3) Establish timeline.\n"
                     "4) Coordinate diagnosis across SRE/DevOps/Security. 5) Communicate status to stakeholders.\n"
                     "6) Drive resolution. 7) Write post-mortem with 5-whys and action items.\n"
@@ -2200,6 +1870,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.6,
+                max_tokens=4096,
                 icon="users",
                 color="#f97316",
                 avatar="EG",
@@ -2224,6 +1895,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.5,
+                max_tokens=4096,
                 icon="heart",
                 color="#ec4899",
                 avatar="IM",
@@ -2248,14 +1920,15 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="plug",
                 color="#3b82f6",
                 avatar="JC",
                 tagline="API first, always",
                 is_builtin=True,
                 tags=["api", "openapi", "design", "contracts"],
-                skills=["api-design-principles"],
                 system_prompt=(
+                    "You are the API Designer — you own the design of all public and internal APIs.\n"
                     "Your tasks: design OpenAPI 3.1 specs, review PRs for API contract violations,\n"
                     "enforce naming conventions, versioning strategy (URI vs header), pagination standards,\n"
                     "error response format, authentication schemes.\n"
@@ -2272,21 +1945,15 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=8192,
                 icon="crown",
                 color="#d97706",
                 avatar="TB",
                 tagline="Architecture is responsibility",
                 is_builtin=True,
                 tags=["architecture", "principal", "adr", "governance"],
-                skills=[
-                    "architecture-decision-records",
-                    "architecture-review",
-                    "ddd-tactical-patterns",
-                    "event-sourcing-architect",
-                    "cqrs-implementation",
-                    "saga-orchestration",
-                ],
                 system_prompt=(
+                    "You are the Principal Engineer — you are the highest technical authority across all ARTs.\n"
                     "Your scope: review Architecture Decision Records (ADRs), challenge technology choices,\n"
                     "identify cross-team dependencies, prevent duplication of solutions, set technical standards.\n"
                     "Tools: code_read, memory_search, all architecture tools.\n"
@@ -2303,6 +1970,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="device-mobile",
                 color="#7c3aed",
                 avatar="NP",
@@ -2328,6 +1996,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.3,
+                max_tokens=4096,
                 icon="database",
                 color="#fbbf24",
                 avatar="SR",
@@ -2352,6 +2021,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.2,
+                max_tokens=4096,
                 icon="scissors",
                 color="#34d399",
                 avatar="MF",
@@ -2376,6 +2046,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="seedling",
                 color="#60a5fa",
                 avatar="LD",
@@ -2400,6 +2071,7 @@ class AgentStore:
                 provider=DEFAULT_PROVIDER,
                 model=DEFAULT_MODEL,
                 temperature=0.4,
+                max_tokens=4096,
                 icon="book-open",
                 color="#a78bfa",
                 avatar="HP",
@@ -2425,41 +2097,12 @@ class AgentStore:
             else:
                 self.create(agent)
 
-        return {a.id for a in builtins}
-
-    def _prune_stale_builtins(self, active_ids: set[str]):
-        """Remove built-in agents whose definitions no longer exist."""
-        import logging as _log
-
-        _logger = _log.getLogger(__name__)
-        db = get_db()
-        try:
-            rows = db.execute(
-                "SELECT id FROM agents WHERE is_builtin = 1"
-            ).fetchall()
-            stale = [r[0] for r in rows if r[0] not in active_ids]
-            for agent_id in stale:
-                db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
-                _logger.info("Pruned stale builtin agent: %s", agent_id)
-            if stale:
-                db.commit()
-                from ..cache import invalidate
-
-                invalidate("agents:all")
-                _logger.info("Pruned %d stale builtin agents", len(stale))
-        except Exception as exc:
-            _logger.warning("Prune stale builtins failed: %s", exc)
-        finally:
-            db.close()
-
     def _seed_from_yaml(self):
         """Load agent definitions from YAML files.
 
         Loads from (in order, later overrides earlier):
           1. platform/skills/definitions/*.yaml  (builtins)
           2. projects/{slug}/agents/*.yaml        (project-level overrides)
-
-        Returns set of seeded agent IDs (for stale cleanup).
         """
         import yaml
 
@@ -2486,8 +2129,6 @@ class AgentStore:
             "transverse": ("settings", "#f78166"),
         }
 
-        seeded_ids: set[str] = set()
-
         for defs_dir, is_builtin in sources:
             for path in sorted(defs_dir.glob("*.yaml")):
                 if path.stem.startswith("_"):
@@ -2513,8 +2154,6 @@ class AgentStore:
 
                     perms = raw.get("permissions", {})
                     perm_dict = {}
-                    if perms.get("scope"):
-                        perm_dict["scope"] = perms["scope"]
                     if perms.get("can_veto"):
                         perm_dict["can_veto"] = True
                     if perms.get("can_approve"):
@@ -2551,7 +2190,7 @@ class AgentStore:
                         provider=llm_cfg.get("provider", DEFAULT_PROVIDER),
                         model=llm_cfg.get("model", DEFAULT_MODEL),
                         temperature=llm_cfg.get("temperature", 0.7),
-                        max_tokens=llm_cfg.get("max_tokens", 0),
+                        max_tokens=llm_cfg.get("max_tokens", 4096),
                         skills=raw.get("skills", []),
                         tools=raw.get("tools", []),
                         mcps=raw.get("mcps", []),
@@ -2573,12 +2212,8 @@ class AgentStore:
                         self.update(agent)
                     else:
                         self.create(agent)
-                    if is_builtin:
-                        seeded_ids.add(agent_id)
                 except Exception:
                     pass
-
-        return seeded_ids
 
     def reload_yaml_agents(self) -> int:
         """Hot-reload all YAML agent definitions. Returns count of processed files."""

@@ -32,17 +32,34 @@ phases:
     dynamic_lead: true
 - id: env-setup
   pattern_id: sequential
-  name: Environment Setup
+  name: Environment Setup & Toolchain Provision
   description: >
-    DevOps lit le brief et détecte la stack technique (Rust/Node/Python/Go/etc.).
-    Écrit Dockerfile adapté à la stack (multi-stage si nécessaire). Attention aux versions :
-    Rust WASM nécessite rust:latest (pas 1.77), Node WASM nécessite node:20+.
-    OBLIGATOIRE — appeler docker_deploy(cwd=workspace, mission_id=...) pour vérifier que
-    le build Docker réussit réellement. Un Dockerfile "bien écrit" ne suffit PAS — il faut
-    que docker build + docker run + health check passent tous. Si docker_deploy retourne FAIL,
-    corriger les erreurs de compilation/configuration avant de passer à la suite.
-    BLOQUANT : la phase tdd-sprint ne démarre pas tant que docker_deploy ne retourne pas OK.
-    Ne jamais utiliser uniquement build() (cargo/npm natif) — toujours docker_deploy().
+    INFRA PROVISION — DevOps reads the brief and detects the required tech stack.
+    STEP 1 — STACK DETECTION: Analyze brief, specs, and any existing files to identify:
+      • Language: Rust/Swift/Go/Python/Node/Java/Kotlin/C++
+      • Frameworks: SpriteKit/SwiftUI/React/Angular/Axum/Spring etc.
+      • Build tools: cargo/swift build/npm/gradle/maven/go build
+      • Runtime deps: databases, message queues, external APIs
+    STEP 2 — DOCKERFILE WITH TOOLCHAIN: Write Dockerfile that INSTALLS the detected stack:
+      • Swift → use swift:latest or swiftlang/swift:nightly-main-jammy
+      • Rust → use rust:latest (NOT 1.77)
+      • Node → use node:20+
+      • Go → use golang:1.22+
+      • Java → use eclipse-temurin:21-jdk
+      • Python → use python:3.12-slim
+      • Multi-language → multi-stage build with all needed toolchains
+    STEP 3 — DEPENDENCY INSTALL: In Dockerfile, install project deps:
+      • Package.swift → swift package resolve
+      • Cargo.toml → cargo fetch
+      • package.json → npm ci
+      • requirements.txt → pip install
+    STEP 4 — BUILD VERIFY: Call docker_deploy(cwd=workspace, mission_id=...) to verify:
+      • Docker build succeeds (toolchain installed, deps resolved)
+      • Compilation passes (swift build / cargo build / npm run build)
+      • If docker_deploy FAILS → read error, fix Dockerfile/deps, retry
+    BLOQUANT: tdd-sprint does NOT start until docker_deploy returns OK.
+    NEVER skip toolchain installation. A generic python:3.12-slim Dockerfile for a Swift
+    project is WRONG — detect the actual stack and install the right toolchain.
   gate: always
   config:
     agents:

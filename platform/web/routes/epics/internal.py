@@ -1307,16 +1307,35 @@ async def _run_real_e2e_tests(
             pass
 
     return results
-    """Deterministic screenshot pipeline — build, run, capture. No LLM."""
+
+
+async def _auto_qa_screenshots(ws: Path, platform_type: str) -> list[str]:
+    """Deterministic screenshot pipeline — build, run, capture. No LLM.
+
+    Dispatches to platform-specific helpers. For native apps running in Docker
+    (no GUI), returns empty gracefully.
+    """
     screenshots_dir = ws / "screenshots"
     screenshots_dir.mkdir(exist_ok=True)
 
     if platform_type == "macos-native":
+        # macOS native needs screencapture/AppleScript — skip in Docker (no GUI)
+        import shutil
+        if not shutil.which("screencapture"):
+            logger.info("Skipping macOS screenshots — no GUI available (Docker)")
+            return []
         results = await _qa_screenshots_macos(ws, screenshots_dir)
     elif platform_type == "ios-native":
+        import shutil
+        if not shutil.which("xcrun"):
+            logger.info("Skipping iOS screenshots — no Xcode/simulator available")
+            return []
         results = await _qa_screenshots_ios(ws, screenshots_dir)
     elif platform_type in ("web-docker", "web-node", "web-static"):
         results = await _qa_screenshots_web(ws, screenshots_dir, platform_type)
+    elif platform_type == "android-native":
+        logger.info("Skipping Android screenshots — no emulator available in Docker")
+        return []
     else:
         return []
 

@@ -633,6 +633,13 @@ _PHASE_TEMPLATES = [
     {"id": "migration-verify", "name": "Migration Verification", "pattern": "red-blue",
      "team_roles": ["developer", "qa", "critic"], "gate": "all_approved",
      "feedback": ["adversarial", "tools"]},
+    {"id": "infra-provision", "name": "Infra Provision & Toolchain", "pattern": "sequential",
+     "team_roles": ["infra", "developer"], "gate": "always",
+     "description": "Detect stack → install toolchain → verify build. Must succeed before dev."},
+    {"id": "wave-build", "name": "Wave Build (Dependency Order)", "pattern": "wave",
+     "team_roles": ["developer", "developer", "infra"], "gate": "no_veto"},
+    {"id": "human-review", "name": "Human Review Gate", "pattern": "human-in-the-loop",
+     "team_roles": ["product", "architect"], "gate": "all_approved"},
 ]
 
 
