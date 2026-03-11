@@ -663,6 +663,33 @@ def check_l0(
                 )
                 score += 7  # hard reject — broken build cannot be approved
 
+    # NO_BUILD_RUN: dev wrote source files but never ran build/test
+    _SOURCE_EXTS = {
+        ".swift", ".rs", ".py", ".ts", ".tsx", ".js", ".jsx",
+        ".go", ".java", ".kt", ".c", ".cpp", ".cs", ".rb",
+    }
+    _BUILD_TOOLS = {"build", "test", "lint", "docker_build", "docker_build_verify",
+                    "cicd_runner", "android_build", "android_test", "playwright_test"}
+    if tool_calls and role_lower not in ("qa", "test", "tester", "validation"):
+        source_files_written = []
+        ran_build = False
+        for tc in tool_calls:
+            tn = tc.get("name", "")
+            if tn in ("code_write", "code_edit"):
+                fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+                ext = ("." + fp.rsplit(".", 1)[-1].lower()) if "." in fp else ""
+                if ext in _SOURCE_EXTS:
+                    source_files_written.append(fp.rsplit("/", 1)[-1])
+            if tn in _BUILD_TOOLS:
+                ran_build = True
+        if len(source_files_written) >= 2 and not ran_build:
+            issues.append(
+                f"NO_BUILD_RUN: Wrote {len(source_files_written)} source files "
+                f"({', '.join(source_files_written[:5])}) but never ran build/test — "
+                f"run the compiler to verify code works"
+            )
+            score += 4
+
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)

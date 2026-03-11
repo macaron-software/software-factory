@@ -9,3 +9,5 @@ dist/
 build/
 .DS_Store
 *.log
+generated_*.py
+*.bak

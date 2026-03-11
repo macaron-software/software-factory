@@ -541,16 +541,15 @@ class PlatformLaunchEpicRunTool(BaseTool):
             if not wf:
                 return _json.dumps({"error": f"Workflow '{wf_id}' not found"})
 
-            # Build phase runs
-            phases = wf.phases_json if isinstance(wf.phases_json, list) else []
+            # Build phase runs from WorkflowPhase objects
             phase_runs = [
                 PhaseRun(
-                    phase_id=p["id"],
-                    phase_name=p.get("name", p["id"]),
-                    pattern_id=p.get("pattern_id", "sequential"),
+                    phase_id=p.id,
+                    phase_name=p.name or p.id,
+                    pattern_id=p.pattern_id or "sequential",
                     status=PhaseStatus.PENDING,
                 )
-                for p in phases
+                for p in (wf.phases or [])
             ]
 
             run_id = str(uuid.uuid4())[:8]
@@ -566,32 +565,32 @@ class PlatformLaunchEpicRunTool(BaseTool):
                 phases_json=phase_runs,
             )
             run_store = get_epic_run_store()
-            run_store.create_run(run)
+            run_store.create(run)
 
             # Create session
             ss = get_session_store()
             s = SessionDef(
                 id=session_id,
                 project_id=mission.project_id,
-                title=f"{mission.name} — {wf.name}",
-                messages=[
-                    MessageDef(
-                        role="user",
-                        content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
-                    )
-                ],
+                name=f"{mission.name} — {wf.name}",
+                goal=f"Execute workflow '{wf.name}' for epic '{mission.name}'",
+                status="active",
             )
-            ss.create_session(s)
+            ss.create(s)
+            ss.add_message(
+                MessageDef(
+                    session_id=session_id,
+                    from_agent="user",
+                    content=f"Execute workflow '{wf.name}' for epic '{mission.name}'.",
+                )
+            )
 
-            # Resume immediately
+            # Resume immediately (async background task)
             from ..workflows.store import run_workflow
             import asyncio
 
-            loop = asyncio.get_event_loop()
-            loop.create_task(
-                asyncio.to_thread(
-                    run_workflow, wf, session_id, mission.name, mission.project_id
-                )
+            asyncio.get_event_loop().create_task(
+                run_workflow(wf, session_id, mission.name, mission.project_id)
             )
 
             return _json.dumps(
@@ -601,7 +600,7 @@ class PlatformLaunchEpicRunTool(BaseTool):
                     "session_id": session_id,
                     "workflow_id": wf_id,
                     "epic_id": epic_id,
-                    "phases": [p["id"] for p in phases],
+                    "phases": [p.id for p in wf.phases],
                 }
             )
         except Exception as e:
@@ -676,8 +675,14 @@ class PlatformCheckRunTool(BaseTool):
                 run = store.get(run_id)
                 if not run:
                     return _json.dumps({"error": f"Run '{run_id}' not found"})
-                phases = run.phases_json if isinstance(run.phases_json, list) else []
-                sprints = store.list_sprints(run.parent_epic_id or run_id)
+                phases = run.phases if isinstance(run.phases, list) else []
+                sprint_count = 0
+                try:
+                    from ..epics.store import get_epic_store
+                    sprints = get_epic_store().list_sprints(run.parent_epic_id or run_id)
+                    sprint_count = len(sprints)
+                except Exception:
+                    pass
                 return _json.dumps(
                     {
                         "run_id": run.id,
@@ -690,7 +695,7 @@ class PlatformCheckRunTool(BaseTool):
                         ]
                         if phases
                         else [],
-                        "sprint_count": len(sprints),
+                        "sprint_count": sprint_count,
                         "resume_attempts": getattr(run, "resume_attempts", 0),
                     }
                 )
@@ -761,7 +766,7 @@ class PlatformCreateProjectTool(BaseTool):
 
         store = get_project_store()
         # Idempotency: return existing active project if same name already exists
-        existing = store.list()
+        existing = store.list_all()
         for p in existing:
             if (
                 p.name.strip().lower() == name.lower()
@@ -1115,7 +1120,7 @@ class PlatformCreateMissionTool(BaseTool):
 
             asyncio.get_event_loop().create_task(_launch())
         except Exception as _e:
-            run_info = {"launch_warning": str(_e)}
+            run_info = {"launch_note": f"Auto-launch skipped ({_e}). Use launch_epic_run(epic_id=...) to start the mission manually."}
 
         return json.dumps(
             {

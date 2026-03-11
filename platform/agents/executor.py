@@ -629,8 +629,18 @@ class AgentExecutor:
             # BM25 prompt-aware tool selection — narrows role-filtered set to
             # the ~10-15 most relevant tools for the user's prompt.
             # Inspired by Agentica @agentica/vector-selector (wrtnlabs/agentica).
+            #
+            # CTO agents get higher top_k and guaranteed orchestration tools
+            _CTO_ALWAYS_TOOLS = {
+                "create_project", "create_mission", "compose_workflow",
+                "launch_epic_run", "check_run_status", "memory_search",
+                "memory_store", "create_team", "create_sub_mission",
+            }
+            _is_cto = agent.id in ("strat-cto", "cto", "jarvis") or agent.role == "cto"
             if tools and len(tools) > 15:
-                tools = _bm25_select(tools, user_message, top_k=10)
+                _top_k = 15 if _is_cto else 10
+                _always = _CTO_ALWAYS_TOOLS if _is_cto else set()
+                tools = _bm25_select(tools, user_message, top_k=_top_k, always_include=_always)
 
             # Fire SESSION_START hooks
             await _hook_registry.fire(
@@ -1423,8 +1433,16 @@ class AgentExecutor:
             )
 
             # BM25 prompt-aware tool selection (streaming path) — same as run()
+            _CTO_ALWAYS_TOOLS_S = {
+                "create_project", "create_mission", "compose_workflow",
+                "launch_epic_run", "check_run_status", "memory_search",
+                "memory_store", "create_team", "create_sub_mission",
+            }
+            _is_cto_s = agent.id in ("strat-cto", "cto", "jarvis") or agent.role == "cto"
             if tools and len(tools) > 15:
-                tools = _bm25_select(tools, user_message, top_k=10)
+                _top_k_s = 15 if _is_cto_s else 10
+                _always_s = _CTO_ALWAYS_TOOLS_S if _is_cto_s else set()
+                tools = _bm25_select(tools, user_message, top_k=_top_k_s, always_include=_always_s)
 
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False

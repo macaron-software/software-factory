@@ -129,18 +129,22 @@ class WorkflowStore:
                 wf.description,
                 json.dumps(
                     [
-                        {
-                            "id": p.id,
-                            "pattern_id": p.pattern_id,
-                            "name": p.name,
-                            "description": p.description,
-                            "gate": p.gate,
-                            "config": p.config,
-                            "retry_count": p.retry_count,
-                            "skip_on_failure": p.skip_on_failure,
-                            "timeout": p.timeout,
-                            "min_complexity": p.min_complexity,
-                        }
+                        (
+                            {
+                                "id": p.id,
+                                "pattern_id": p.pattern_id,
+                                "name": p.name,
+                                "description": p.description,
+                                "gate": p.gate,
+                                "config": p.config,
+                                "retry_count": p.retry_count,
+                                "skip_on_failure": p.skip_on_failure,
+                                "timeout": p.timeout,
+                                "min_complexity": p.min_complexity,
+                            }
+                            if isinstance(p, WorkflowPhase)
+                            else p  # already a dict (from compose_workflow)
+                        )
                         for p in wf.phases
                     ]
                 ),
@@ -176,11 +180,23 @@ class WorkflowStore:
 
     def _row_to_wf(self, row) -> WorkflowDef:
         phases_data = json.loads(row["phases_json"] or "[]")
+        # Known WorkflowPhase fields
+        _PHASE_FIELDS = {f.name for f in WorkflowPhase.__dataclass_fields__.values()}
+        cleaned_phases = []
+        for p in phases_data:
+            # Normalize: move top-level 'agents' into config.agents
+            if "agents" in p and "agents" not in p.get("config", {}):
+                p.setdefault("config", {})["agents"] = p.pop("agents")
+            elif "agents" in p:
+                p.pop("agents")
+            # Strip unknown keys to avoid __init__ crash
+            cleaned = {k: v for k, v in p.items() if k in _PHASE_FIELDS}
+            cleaned_phases.append(WorkflowPhase(**cleaned))
         return WorkflowDef(
             id=row["id"],
             name=row["name"],
             description=row["description"] or "",
-            phases=[WorkflowPhase(**p) for p in phases_data],
+            phases=cleaned_phases,
             config=json.loads(row["config_json"] or "{}"),
             icon=row["icon"] or "workflow",
             is_builtin=bool(row["is_builtin"]),
@@ -471,6 +487,8 @@ def _detect_build_cmd(workspace: str) -> list[str]:
     """Detect the build system from workspace files."""
     import os
 
+    if os.path.isfile(os.path.join(workspace, "Package.swift")):
+        return ["swift", "build"]
     if os.path.isfile(os.path.join(workspace, "package.json")):
         # Check if node_modules exists (deps installed)
         if os.path.isdir(os.path.join(workspace, "node_modules")):
@@ -482,8 +500,14 @@ def _detect_build_cmd(workspace: str) -> list[str]:
         return ["cargo", "check"]
     if os.path.isfile(os.path.join(workspace, "pom.xml")):
         return ["mvn", "-q", "compile", "-DskipTests"]
+    if os.path.isfile(os.path.join(workspace, "build.gradle")) or os.path.isfile(
+        os.path.join(workspace, "build.gradle.kts")
+    ):
+        return ["gradle", "compileJava"]
     if os.path.isfile(os.path.join(workspace, "go.mod")):
         return ["go", "build", "./..."]
+    if os.path.isfile(os.path.join(workspace, "Makefile")):
+        return ["make", "-n"]  # dry-run to check Makefile syntax
     if os.path.isfile(os.path.join(workspace, "Dockerfile")):
         return ["docker", "build", "--check", "."]
     return []
@@ -507,7 +531,10 @@ def _find_main_py(workspace: str) -> str:
 
 _PM_DECISION_PROMPT = """\
 You are the Product Manager for project "{project_id}".
-Phase "{phase_name}" just completed with result: {phase_result}.
+Phase "{phase_name}" just completed.
+
+Phase evidence:
+{phase_evidence}
 
 Execution history so far:
 {history}
@@ -517,7 +544,7 @@ Available phases catalog:
 
 Project goal: {goal}
 
-Based on the phase result and project state, decide what to do next.
+Based on the evidence and project state, decide what to do next.
 Respond with ONLY a JSON object (no markdown, no explanation):
 {{
   "decision": "next" | "loop" | "done" | "skip",
@@ -528,9 +555,16 @@ Respond with ONLY a JSON object (no markdown, no explanation):
 
 Rules:
 - "next": continue to the next phase in sequence
-- "loop": re-run a previous phase (e.g. QA failed → loop back to tdd-sprint)
-- "done": all acceptance criteria are met, stop the workflow
+- "loop": re-run a previous phase (e.g. QA failed, build broken → loop back to dev/tdd phase)
+- "done": all acceptance criteria are met AND build compiles AND tests pass
 - "skip": skip ahead to a specific phase
+
+CRITICAL — NEVER say "done" if:
+- Build/compilation was never run or failed
+- Tests were not executed or failed
+- Source files are incomplete (< 3 source files for non-trivial projects)
+- Adversarial guard rejected with score >= 7
+Instead, use "loop" to send back to the appropriate phase for fixing.
 """
 
 
@@ -543,15 +577,54 @@ async def _pm_checkpoint(
     history: list[str],
     catalog: list[str],
     goal: str,
+    phase_tool_calls: list | None = None,
 ) -> dict:
     """Ask the PM agent to decide the next workflow phase."""
     import json as _json
 
+    # Build evidence from phase result + tool calls
+    evidence_lines = [f"Result: {phase_result}"]
+    if phase_tool_calls:
+        source_files = []
+        build_results = []
+        test_results = []
+        for tc in phase_tool_calls:
+            tn = tc.get("name", "")
+            if tn in ("code_write", "code_edit"):
+                fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
+                if fp:
+                    source_files.append(fp.rsplit("/", 1)[-1])
+            elif tn in ("build", "docker_build", "docker_build_verify", "cicd_runner"):
+                result_str = str(tc.get("result", ""))[:200]
+                cmd = str(tc.get("args", {}).get("command", ""))[:80]
+                build_results.append(f"{tn}({cmd}): {result_str}")
+            elif tn in ("test", "playwright_test", "android_test"):
+                result_str = str(tc.get("result", ""))[:200]
+                cmd = str(tc.get("args", {}).get("command", ""))[:80]
+                test_results.append(f"{tn}({cmd}): {result_str}")
+        if source_files:
+            evidence_lines.append(f"Files created ({len(source_files)}): {', '.join(source_files[:10])}")
+        else:
+            evidence_lines.append("Files created: NONE")
+        if build_results:
+            evidence_lines.append(f"Build results: {'; '.join(build_results[:3])}")
+        else:
+            evidence_lines.append("Build: NOT EXECUTED ⚠️")
+        if test_results:
+            evidence_lines.append(f"Test results: {'; '.join(test_results[:3])}")
+        else:
+            evidence_lines.append("Tests: NOT EXECUTED ⚠️")
+
+    phase_evidence = "\n".join(evidence_lines)
+
     # Find the PM agent
+    from ..agents.store import get_agent_store
+
+    _agent_store = get_agent_store()
     _pm_agent_id = None
     for candidate in ("product", "ai-product-manager"):
         try:
-            ag = store.get_agent(candidate)
+            ag = _agent_store.get(candidate)
             if ag:
                 _pm_agent_id = candidate
                 break
@@ -565,35 +638,23 @@ async def _pm_checkpoint(
     prompt = _PM_DECISION_PROMPT.format(
         project_id=project_id,
         phase_name=phase_name,
-        phase_result=phase_result,
+        phase_evidence=phase_evidence,
         history="\n".join(f"  - {h}" for h in history[-10:]),
         catalog="\n".join(f"  - {c}" for c in catalog),
         goal=goal[:500],
     )
 
-    from .store import _rte_facilitate
-
-    # Use the PM agent to make the decision
-    from ..agents.executor import ExecutionContext
-
-    ctx = ExecutionContext(
-        session_id=session_id,
-        store=store,
-        agent_id=_pm_agent_id,
-        project_id=project_id,
-    )
-
     try:
-        from ..llm.client import LLMClient
+        from ..llm.client import get_llm_client
 
-        llm = LLMClient.get()
+        llm = get_llm_client()
         from ..llm.client import LLMMessage
 
         msgs = [
-            LLMMessage(role="system", content=f"You are a Product Manager. Respond ONLY with JSON."),
+            LLMMessage(role="system", content="You are a Product Manager. Respond ONLY with JSON."),
             LLMMessage(role="user", content=prompt),
         ]
-        result = await llm.complete(msgs, model=None, provider=None)
+        result = await llm.chat(msgs)
         raw = result.content.strip()
 
         # Parse JSON — handle markdown fences
@@ -660,6 +721,24 @@ async def run_workflow(
                 _project_path = _proj.path
         except Exception:
             pass
+        # Fallback: auto-discover workspace directory if DB lookup failed
+        if not _project_path:
+            import os as _os
+
+            _base = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+            for _candidate in [
+                _os.path.join(_base, "workspace", project_id),
+                _os.path.join(_base, "data", "workspaces", project_id),
+            ]:
+                if _os.path.isdir(_candidate):
+                    _project_path = _candidate
+                    logger.info("run_workflow: fallback project_path=%s", _project_path)
+                    break
+        if not _project_path:
+            logger.warning(
+                "run_workflow: no project_path for project_id=%s — agents will have NO tools",
+                project_id,
+            )
 
     store = get_session_store()
     pattern_store = get_pattern_store()
@@ -852,6 +931,9 @@ async def run_workflow(
             phase_timeout,
         )
 
+        # Collect tool_calls from phase for PM evidence
+        _phase_tool_calls: list[dict] = []
+
         # Build lineage for traceability: agents know WHY they exist in this workflow phase
         _lineage = []
         if run.workflow:
@@ -873,6 +955,9 @@ async def run_workflow(
                 ),
                 timeout=phase_timeout,
             )
+
+            # Collect tool_calls from all nodes for PM evidence
+            _phase_tool_calls = list(result.all_tool_calls or [])
 
             # RTE reacts to gate results
             if phase.gate == "all_approved" and not result.success:
@@ -918,6 +1003,12 @@ async def run_workflow(
                 build_ok, build_error = await _sandbox_build_check(
                     project_id, session_id
                 )
+                # Inject build result into tool_calls for PM evidence
+                _phase_tool_calls.append({
+                    "name": "build",
+                    "args": {"command": "auto_build_validation"},
+                    "result": "[OK] Build passed" if build_ok else f"[FAIL] {build_error[:300]}",
+                })
                 if not build_ok and build_error:
                     accumulated_context.append(
                         f"[BUILD] Erreur de build: {build_error[:200]}"
@@ -982,11 +1073,14 @@ async def run_workflow(
                 project_id=project_id,
             )
             _save_checkpoint(store, session_id, i)  # re-run this phase on next cycle
-            if not phase.skip_on_failure:
-                run.status = "escalated"
-                break
-            # skip_on_failure: log and continue
-            continue
+            # gate=always/best_effort/no_veto → continue despite escalation (QA still runs)
+            if phase.skip_on_failure or phase.gate in ("always", "best_effort", "no_veto"):
+                accumulated_context.append(
+                    f"[{phase.name}] ESCALATED: {ae.agent_name} failed adversarial (score={ae.score})"
+                )
+                continue
+            run.status = "escalated"
+            break
 
         except asyncio.TimeoutError:
             logger.error(
@@ -1108,7 +1202,7 @@ async def run_workflow(
                 continue
 
             # All retries exhausted — decide: skip or stop
-            if phase.skip_on_failure or phase.gate in ("always", "best_effort"):
+            if phase.skip_on_failure or phase.gate in ("always", "best_effort", "no_veto"):
                 run.phase_results.append(
                     {
                         "phase": phase.name,
@@ -1188,6 +1282,7 @@ async def run_workflow(
                         accumulated_context,
                         [p.id for p in workflow.phases],
                         initial_task or "",
+                        phase_tool_calls=_phase_tool_calls,
                     )
                     _pm_dec = _pm_decision.get("decision", "next")
                     _pm_target = _pm_decision.get("phase_id", "")
@@ -1227,10 +1322,13 @@ async def run_workflow(
 
                     # Store PM decision as a message for traceability
                     store.add_message(
-                        session_id=session_id,
-                        from_agent=_pm_decision.get("_agent", "product"),
-                        content=f"```json\n{__import__('json').dumps(_pm_decision, ensure_ascii=False)}\n```",
-                        message_type="text",
+                        MessageDef(
+                            session_id=session_id,
+                            from_agent=_pm_decision.get("_agent", "product"),
+                            to_agent="all",
+                            content=f"```json\n{__import__('json').dumps(_pm_decision, ensure_ascii=False)}\n```",
+                            message_type="text",
+                        )
                     )
                 except Exception as _pm_err:
                     logger.warning("PM checkpoint error: %s — continuing linearly", _pm_err)

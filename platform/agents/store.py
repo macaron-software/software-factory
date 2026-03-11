@@ -2513,6 +2513,8 @@ class AgentStore:
 
                     perms = raw.get("permissions", {})
                     perm_dict = {}
+                    if perms.get("scope"):
+                        perm_dict["scope"] = perms["scope"]
                     if perms.get("can_veto"):
                         perm_dict["can_veto"] = True
                     if perms.get("can_approve"):

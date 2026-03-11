@@ -131,6 +131,12 @@ TOOL_GROUPS: list[set[str]] = [
     {"lsp_goto_definition", "lsp_find_references", "lsp_hover", "lsp_completions"},
     {"build", "lrm_build"},
     {"screenshot", "simulator_screenshot"},
+    # Orchestration: CTO delegation tools must stay together
+    {
+        "create_project", "create_mission", "create_sub_mission",
+        "compose_workflow", "launch_epic_run", "check_run_status",
+        "resume_run", "create_sprint",
+    },
 ]
 
 # Reverse index: tool_name → group set

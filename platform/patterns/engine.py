@@ -93,6 +93,8 @@ class PatternRun:
     mem_store_count: int = 0
     mem_retrieve_count: int = 0
     mem_prune_count: int = 0
+    # Accumulated tool_calls across all nodes — used by PM checkpoint for evidence
+    all_tool_calls: list[dict] = field(default_factory=list)
 
 
 # SSE push (import from runner to share the same queues)
@@ -734,6 +736,14 @@ async def run_pattern(
                     )
                 except Exception:
                     pass
+            if agent is None:
+                # Last resort: use dev_fullstack as universal fallback
+                agent = agent_store.get("dev_fullstack")
+                if agent:
+                    import logging as _log_mod
+                    _log_mod.getLogger(__name__).warning(
+                        "Agent '%s' not found — falling back to dev_fullstack", agent_id,
+                    )
         run.nodes[nid] = NodeState(node_id=nid, agent_id=agent_id, agent=agent)
 
     # Determine pattern leader (first agent in the pattern)
@@ -1612,6 +1622,9 @@ This is BLOCKING: developers cannot start without your design tokens."""
     if state.status in (NodeStatus.VETOED, NodeStatus.FAILED):
         run.rejection_count += 1
 
+    # Accumulate tool_calls for PM checkpoint evidence
+    run.all_tool_calls.extend(cumulative_tool_calls)
+
     store.add_message(
         MessageDef(
             session_id=run.session_id,
@@ -2046,9 +2059,10 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             pass
 
     has_project = bool(run.project_id)
-    # Tools: every agent gets their configured tools when there's a project workspace
-    # No rank gating — a CTO can search the web, a DSI can read project files
-    tools_for_agent = has_project and bool(project_path)
+    # Tools: every agent gets their configured tools when there's a project.
+    # Even without project_path, agents need tools (web_search, memory, etc.)
+    # File tools will gracefully error if no workspace exists.
+    tools_for_agent = has_project
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
     from ..agents.tool_schemas import _get_tools_for_agent

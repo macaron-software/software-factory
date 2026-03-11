@@ -438,6 +438,44 @@ def _platform_schemas() -> list[dict]:
         {
             "type": "function",
             "function": {
+                "name": "launch_epic_run",
+                "description": "Launch the autonomous execution of an epic/mission. Creates a workflow run and starts phase execution in the background. Returns run_id and session_id. This is the ESSENTIAL step to start a mission after create_mission.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "epic_id": {
+                            "type": "string",
+                            "description": "The mission/epic ID returned by create_mission",
+                        },
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Optional: workflow ID (uses mission's default if omitted)",
+                        },
+                    },
+                    "required": ["epic_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "check_run_status",
+                "description": "Check the status of a running epic/mission. Returns phase progress, current phase, success/failure.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "run_id": {
+                            "type": "string",
+                            "description": "The run_id or session_id from launch_epic_run",
+                        },
+                    },
+                    "required": ["run_id"],
+                },
+            },
+        },
+        {
+            "type": "function",
+            "function": {
                 "name": "create_team",
                 "description": "Create a feature team with specialized agents. Each agent gets a prompt tailored to the domain and stack.",
                 "parameters": {

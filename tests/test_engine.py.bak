@@ -1,0 +1,464 @@
+# Ref: TEST-001 — Test Engine Implementation
+"""
+Test Engine - Core testing logic for the software factory.
+Implements real test execution, validation, and reporting.
+"""
+
+import pytest
+import time
+import subprocess
+import json
+import os
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, field
+from enum import Enum
+
+
+class TestStatus(Enum):
+    """Test execution status enumeration."""
+    PENDING = "pending"
+    RUNNING = "running"
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    ERROR = "error"
+
+
+class TestSeverity(Enum):
+    """Test severity levels."""
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
+@dataclass
+class TestResult:
+    """Represents a single test result."""
+    name: str
+    status: TestStatus
+    duration: float
+    message: str = ""
+    stack_trace: Optional[str] = None
+    severity: TestSeverity = TestSeverity.MEDIUM
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert result to dictionary."""
+        return {
+            "name": self.name,
+            "status": self.status.value,
+            "duration": self.duration,
+            "message": self.message,
+            "stack_trace": self.stack_trace,
+            "severity": self.severity.value,
+            "metadata": self.metadata
+        }
+
+
+@dataclass
+class TestSuite:
+    """Represents a collection of tests."""
+    name: str
+    tests: List[TestResult] = field(default_factory=list)
+    total: int = 0
+    passed: int = 0
+    failed: int = 0
+    skipped: int = 0
+    errors: int = 0
+
+    def add_result(self, result: TestResult):
+        """Add a test result to the suite."""
+        self.tests.append(result)
+        self.total += 1
+        if result.status == TestStatus.PASSED:
+            self.passed += 1
+        elif result.status == TestStatus.FAILED:
+            self.failed += 1
+        elif result.status == TestStatus.SKIPPED:
+            self.skipped += 1
+        elif result.status == TestStatus.ERROR:
+            self.errors += 1
+
+    def get_pass_rate(self) -> float:
+        """Calculate pass rate percentage."""
+        if self.total == 0:
+            return 0.0
+        return (self.passed / self.total) * 100
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert suite to dictionary."""
+        return {
+            "name": self.name,
+            "total": self.total,
+            "passed": self.passed,
+            "failed": self.failed,
+            "skipped": self.skipped,
+            "errors": self.errors,
+            "pass_rate": self.get_pass_rate(),
+            "tests": [t.to_dict() for t in self.tests]
+        }
+
+
+class TestEngine:
+    """
+    Core test engine for executing and managing tests.
+    Supports multiple test frameworks and provides unified reporting.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        """Initialize the test engine with configuration."""
+        self.config = config or {}
+        self.suites: Dict[str, TestSuite] = {}
+        self.current_suite: Optional[TestSuite] = None
+        self.execution_time: float = 0.0
+        self.verbose = self.config.get("verbose", False)
+        self.timeout = self.config.get("timeout", 300)
+        self.retry_count = self.config.get("retry_count", 0)
+
+    def create_suite(self, name: str) -> TestSuite:
+        """Create a new test suite."""
+        suite = TestSuite(name=name)
+        self.suites[name] = suite
+        self.current_suite = suite
+        return suite
+
+    def run_test(self, test_name: str, test_func: callable, 
+                 severity: TestSeverity = TestSeverity.MEDIUM) -> TestResult:
+        """
+        Run a single test function with error handling and retries.
+        
+        Args:
+            test_name: Name of the test
+            test_func: The test function to execute
+            severity: Test severity level
+            
+        Returns:
+            TestResult containing execution details
+        """
+        status = TestStatus.PENDING
+        message = ""
+        stack_trace = None
+        start_time = time.time()
+
+        for attempt in range(self.retry_count + 1):
+            try:
+                if self.verbose:
+                    print(f"[TEST] Running: {test_name} (attempt {attempt + 1})")
+                
+                status = TestStatus.RUNNING
+                result = test_func()
+                
+                if result is True or result is None:
+                    status = TestStatus.PASSED
+                    message = "Test passed successfully"
+                else:
+                    status = TestStatus.FAILED
+                    message = f"Test returned {result}"
+                
+                break  # Exit retry loop on success
+
+            except AssertionError as e:
+                status = TestStatus.FAILED
+                message = str(e)
+                stack_trace = self._format_stack_trace(e)
+                if attempt < self.retry_count:
+                    time.sleep(1)  # Wait before retry
+
+            except Exception as e:
+                status = TestStatus.ERROR
+                message = str(e)
+                stack_trace = self._format_stack_trace(e)
+                if attempt < self.retry_count:
+                    time.sleep(1)  # Wait before retry
+
+        duration = time.time() - start_time
+        
+        result = TestResult(
+            name=test_name,
+            status=status,
+            duration=duration,
+            message=message,
+            stack_trace=stack_trace,
+            severity=severity
+        )
+
+        if self.current_suite:
+            self.current_suite.add_result(result)
+
+        if self.verbose:
+            print(f"[RESULT] {test_name}: {status.value} ({duration:.2f}s)")
+
+        return result
+
+    def run_pytest(self, test_path: str, pytest_args: Optional[List[str]] = None) -> TestSuite:
+        """
+        Run tests using pytest framework.
+        
+        Args:
+            test_path: Path to test file or directory
+            pytest_args: Additional arguments for pytest
+            
+        Returns:
+            TestSuite with results
+        """
+        suite_name = os.path.basename(test_path)
+        suite = self.create_suite(suite_name)
+
+        cmd = ["pytest", test_path, "-v", "--tb=short"]
+        if pytest_args:
+            cmd.extend(pytest_args)
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout
+            )
+
+            # Parse pytest output
+            for line in result.stdout.split("\n"):
+                if "PASSED" in line or "FAILED" in line or "ERROR" in line:
+                    self._parse_pytest_line(line, suite)
+
+        except subprocess.TimeoutExpired:
+            suite.add_result(TestResult(
+                name="pytest_execution",
+                status=TestStatus.ERROR,
+                duration=self.timeout,
+                message=f"Test execution timed out after {self.timeout}s"
+            ))
+        except Exception as e:
+            suite.add_result(TestResult(
+                name="pytest_execution",
+                status=TestStatus.ERROR,
+                duration=0,
+                message=str(e)
+            ))
+
+        return suite
+
+    def _parse_pytest_line(self, line: str, suite: TestSuite):
+        """Parse a pytest output line into a TestResult."""
+        parts = line.split()
+        if len(parts) >= 2:
+            test_name = parts[0]
+            if "PASSED" in line:
+                status = TestStatus.PASSED
+            elif "FAILED" in line:
+                status = TestStatus.FAILED
+            elif "ERROR" in line:
+                status = TestStatus.ERROR
+            else:
+                return
+
+            suite.add_result(TestResult(
+                name=test_name,
+                status=status,
+                duration=0.0,
+                message=line
+            ))
+
+    def _format_stack_trace(self, exc: Exception) -> str:
+        """Format exception stack trace."""
+        import traceback
+        return "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+
+    def execute_all(self) -> Dict[str, Any]:
+        """Execute all test suites and return aggregated results."""
+        start_time = time.time()
+        
+        for suite in self.suites.values():
+            suite.run()
+
+        self.execution_time = time.time() - start_time
+        
+        return self.get_summary()
+
+    def get_summary(self) -> Dict[str, Any]:
+        """Get summary of all test executions."""
+        total_tests = sum(s.total for s in self.suites.values())
+        total_passed = sum(s.passed for s in self.suites.values())
+        total_failed = sum(s.failed for s in self.suites.values())
+        total_errors = sum(s.errors for s in self.suites.values())
+        
+        return {
+            "total_suites": len(self.suites),
+            "total_tests": total_tests,
+            "passed": total_passed,
+            "failed": total_failed,
+            "errors": total_errors,
+            "execution_time": self.execution_time,
+            "pass_rate": (total_passed / total_tests * 100) if total_tests > 0 else 0,
+            "suites": {name: suite.to_dict() for name, suite in self.suites.items()}
+        }
+
+    def generate_report(self, output_path: str, format: str = "json"):
+        """Generate test report in specified format."""
+        summary = self.get_summary()
+        
+        if format == "json":
+            with open(output_path, "w") as f:
+                json.dump(summary, f, indent=2)
+        elif format == "html":
+            self._generate_html_report(output_path, summary)
+        elif format == "junit":
+            self._generate_junit_report(output_path, summary)
+
+    def _generate_html_report(self, path: str, summary: Dict[str, Any]):
+        """Generate HTML test report."""
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Test Report</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                .summary {{ background: #f5f5f5; padding: 15px; border-radius: 5px; }}
+                .passed {{ color: green; }}
+                .failed {{ color: red; }}
+                .error {{ color: orange; }}
+            </style>
+        </head>
+        <body>
+            <h1>Test Execution Report</h1>
+            <div class="summary">
+                <h2>Summary</h2>
+                <p>Total Tests: {summary['total_tests']}</p>
+                <p class="passed">Passed: {summary['passed']}</p>
+                <p class="failed">Failed: {summary['failed']}</p>
+                <p class="error">Errors: {summary['errors']}</p>
+                <p>Pass Rate: {summary['pass_rate']:.2f}%</p>
+                <p>Execution Time: {summary['execution_time']:.2f}s</p>
+            </div>
+        </body>
+        </html>
+        """
+        with open(path, "w") as f:
+            f.write(html)
+
+    def _generate_junit_report(self, path: str, summary: Dict[str, Any]):
+        """Generate JUnit XML test report."""
+        import xml.etree.ElementTree as ET
+        
+        testsuite = ET.Element("testsuite")
+        testsuite.set("name", "TestEngine")
+        testsuite.set("tests", str(summary['total_tests']))
+        testsuite.set("failures", str(summary['failed']))
+        testsuite.set("errors", str(summary['errors']))
+        
+        tree = ET.ElementTree(testsuite)
+        tree.write(path, encoding="utf-8", xml_declaration=True)
+
+
+# Pytest integration
+def pytest_configure(config):
+    """Configure pytest with custom markers."""
+    config.addinivalue_line(
+        "markers", "critical: mark test as critical severity"
+    )
+    config.addinivalue_line(
+        "markers", "high: mark test as high severity"
+    )
+    config.addinivalue_line(
+        "markers", "medium: mark test as medium severity"
+    )
+    config.addinivalue_line(
+        "markers", "low: mark test as low severity"
+    )
+
+
+# Example usage and basic tests
+class TestEngineBasicTests:
+    """Basic unit tests for the TestEngine class."""
+
+    def test_create_suite(self):
+        """Test suite creation."""
+        engine = TestEngine()
+        suite = engine.create_suite("test_suite")
+        assert suite.name == "test_suite"
+        assert suite.total == 0
+
+    def test_add_result(self):
+        """Test adding results to suite."""
+        engine = TestEngine()
+        suite = engine.create_suite("test")
+        
+        result = TestResult(
+            name="test_1",
+            status=TestStatus.PASSED,
+            duration=1.5
+        )
+        suite.add_result(result)
+        
+        assert suite.total == 1
+        assert suite.passed == 1
+
+    def test_pass_rate(self):
+        """Test pass rate calculation."""
+        engine = TestEngine()
+        suite = engine.create_suite("test")
+        
+        suite.add_result(TestResult("t1", TestStatus.PASSED, 1.0))
+        suite.add_result(TestResult("t2", TestStatus.PASSED, 1.0))
+        suite.add_result(TestResult("t3", TestStatus.FAILED, 1.0))
+        suite.add_result(TestResult("t4", TestStatus.SKIPPED, 1.0))
+        
+        assert suite.get_pass_rate() == 50.0
+
+    def test_run_successful_test(self):
+        """Test running a test that passes."""
+        engine = TestEngine({"verbose": False})
+        engine.create_suite("test")
+        
+        def passing_test():
+            return True
+        
+        result = engine.run_test("passing_test", passing_test)
+        assert result.status == TestStatus.PASSED
+
+    def test_run_failing_test(self):
+        """Test running a test that fails."""
+        engine = TestEngine({"verbose": False})
+        engine.create_suite("test")
+        
+        def failing_test():
+            assert False, "Expected failure"
+        
+        result = engine.run_test("failing_test", failing_test)
+        assert result.status == TestStatus.FAILED
+
+    def test_run_test_with_exception(self):
+        """Test running a test that raises an exception."""
+        engine = TestEngine({"verbose": False})
+        engine.create_suite("test")
+        
+        def error_test():
+            raise ValueError("Test error")
+        
+        result = engine.run_test("error_test", error_test)
+        assert result.status == TestStatus.ERROR
+        assert "Test error" in result.message
+
+    def test_retry_mechanism(self):
+        """Test test retry on failure."""
+        engine = TestEngine({"verbose": False, "retry_count": 2})
+        engine.create_suite("test")
+        
+        attempt_count = [0]
+        
+        def flaky_test():
+            attempt_count[0] += 1
+            if attempt_count[0] < 3:
+                raise AssertionError("Not ready yet")
+            return True
+        
+        result = engine.run_test("flaky_test", flaky_test)
+        assert result.status == TestStatus.PASSED
+        assert attempt_count[0] == 3
+
+
+if __name__ == "__main__":
+    # Run basic tests
+    pytest.main([__file__, "-v"])

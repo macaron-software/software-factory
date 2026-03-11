@@ -41,7 +41,7 @@ class ComposeWorkflowTool(BaseTool):
             if not phases:
                 return "Error: 'phases' is required — list of {id, name, pattern, agents, config}"
 
-            # Build WorkflowDef
+            # Build WorkflowDef — pm_driven=True so PM reviews each phase
             wf = WorkflowDef(
                 id=wf_id,
                 name=name,
@@ -49,20 +49,70 @@ class ComposeWorkflowTool(BaseTool):
                 category="dynamic",
                 phases=[],
                 graph={"nodes": [], "edges": []},
+                config={"pm_driven": True},
             )
+
+            # Default agents per phase type — auto-assign when CTO omits agents
+            _PHASE_DEFAULTS = {
+                "spec": ["product"],
+                "design": ["solution_architect"],
+                "architecture": ["solution_architect"],
+                "archi": ["solution_architect"],
+                "implementation": ["dev_fullstack"],
+                "impl": ["dev_fullstack"],
+                "dev": ["dev_fullstack"],
+                "development": ["dev_fullstack"],
+                "code": ["dev_fullstack"],
+                "test": ["tester"],
+                "qa": ["tester"],
+                "quality": ["qa_lead"],
+                "review": ["code-reviewer"],
+                "deploy": ["devops"],
+                "security": ["secops-engineer"],
+            }
 
             nodes = []
             edges = []
+            # Validate agent IDs: resolve unknown to defaults
+            from ..agents.store import get_agent_store as _gas
+            _astore = _gas()
             for i, phase in enumerate(phases):
                 phase_id = phase.get("id", f"phase-{i + 1}")
                 phase_agents = phase.get("agents", [])
+
+                # Validate each agent ID — replace unknowns with phase-type default
+                validated = []
+                phase_lower = f"{phase.get('name', '')} {phase_id}".lower()
+                for aid in phase_agents:
+                    if _astore.get(aid):
+                        validated.append(aid)
+                    else:
+                        # Unknown agent ID — try to match phase type
+                        for key, defaults in _PHASE_DEFAULTS.items():
+                            if key in phase_lower:
+                                validated.extend(defaults)
+                                break
+                        if not validated:
+                            validated.append("dev_fullstack")
+                        break  # stop processing bad IDs
+                phase_agents = validated if validated else []
+
+                # Auto-assign default agents based on phase name/id
+                if not phase_agents:
+                    for key, defaults in _PHASE_DEFAULTS.items():
+                        if key in phase_lower:
+                            phase_agents = defaults
+                            break
+                    if not phase_agents:
+                        phase_agents = ["dev_fullstack"]
+                phase_config = phase.get("config", {})
+                phase_config["agents"] = phase_agents
                 wf.phases.append(
                     {
                         "id": phase_id,
                         "name": phase.get("name", f"Phase {i + 1}"),
                         "pattern_id": phase.get("pattern", "sequential"),
-                        "agents": phase_agents,
-                        "config": phase.get("config", {}),
+                        "config": phase_config,
                         "gate": phase.get("gate", "all_approved"),
                     }
                 )
@@ -87,8 +137,11 @@ class ComposeWorkflowTool(BaseTool):
                     "status": "created",
                     "workflow_id": wf_id,
                     "name": name,
-                    "phases": len(phases),
-                    "total_agents": sum(len(p.get("agents", [])) for p in phases),
+                    "phases": len(wf.phases),
+                    "total_agents": sum(
+                        len(p.get("config", {}).get("agents", []))
+                        for p in wf.phases
+                    ),
                 }
             )
         except Exception as e:

@@ -2117,6 +2117,46 @@ def _platform_schemas() -> list[dict]:
                 },
             },
         },
+        # ── Launch epic run ──
+        {
+            "type": "function",
+            "function": {
+                "name": "launch_epic_run",
+                "description": "Launch a workflow execution for an epic/mission. Creates a session and starts the orchestrator. Returns session_id and run status.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "epic_id": {
+                            "type": "string",
+                            "description": "Mission/epic ID to launch (required)",
+                        },
+                        "workflow_id": {
+                            "type": "string",
+                            "description": "Workflow ID to use (optional, defaults to mission's workflow)",
+                        },
+                    },
+                    "required": ["epic_id"],
+                },
+            },
+        },
+        # ── Check run status ──
+        {
+            "type": "function",
+            "function": {
+                "name": "check_run_status",
+                "description": "Check the status of a running mission/epic run. Returns phase progress, current status, and any errors.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "run_id": {
+                            "type": "string",
+                            "description": "Epic run ID to check",
+                        },
+                    },
+                    "required": ["run_id"],
+                },
+            },
+        },
         # ── Backlog tools (create features/stories for AO traceability) ──
         {
             "type": "function",
@@ -2797,6 +2837,10 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_team",
         "create_mission",
         "create_sub_mission",
+        "launch_epic_run",
+        "check_run_status",
+        "resume_run",
+        "create_sprint",
         "compose_workflow",
         "run_e2e_tests",
         "screenshot",

@@ -268,7 +268,13 @@ RULES:
                 pass
 
     if ctx.project_path:
-        parts.append(f"\n## Project Path\n{ctx.project_path}")
+        parts.append(
+            f"\n## Project Workspace (MANDATORY)\n"
+            f"WORKSPACE={ctx.project_path}\n"
+            f"ALL file paths in code_write, code_read, code_edit, list_files MUST start with: {ctx.project_path}/\n"
+            f"Example: {ctx.project_path}/src/main.swift\n"
+            f"NEVER use data/workspaces/ or any other directory."
+        )
 
     perms = agent.permissions or {}
     if perms.get("can_delegate"):

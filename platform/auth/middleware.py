@@ -246,6 +246,7 @@ PUBLIC_PATHS = {
     "/auth/github",
     "/auth/azure",
     "/.well-known",
+    "/a2a",
 }
 
 

@@ -24,6 +24,8 @@ _ALLOWED_WRITE_ROOTS: tuple[Path, ...] = (
     _CWD_DATA / "data" / "workspaces",  # systemd deployments (cwd != code dir)
     _BASE_DIR / "workspaces",  # project workspaces (supabase-lite etc.)
     _CWD_DATA / "workspaces",
+    _BASE_DIR / "workspace",  # local dev project workspaces (singular)
+    _CWD_DATA / "workspace",
     _BASE_DIR / "tests",  # test files
     _BASE_DIR
     / "platform",  # SF self-improvement: quality-improvement workflow can edit platform source
