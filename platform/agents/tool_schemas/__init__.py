@@ -17,7 +17,7 @@ from __future__ import annotations
 from ._core import _core_schemas, _phase_schemas, _web_schemas
 from ._mcp import _mcp_schemas
 from ._build import _build_schemas
-from ._platform import _platform_schemas
+from ._platform import _platform_schemas, TRACEABILITY_SCHEMAS
 from ._mapping import (
     ROLE_TOOL_MAP,
     _classify_agent_role,
@@ -57,5 +57,6 @@ def _get_tool_schemas() -> list[dict]:
         + _mcp_schemas()
         + _build_schemas()
         + _platform_schemas()
+        + TRACEABILITY_SCHEMAS
     )
     return _TOOL_SCHEMAS

@@ -970,3 +970,137 @@ def _platform_schemas() -> list[dict]:
     ]
 
 
+# ── Traceability tools ──
+
+TRACEABILITY_SCHEMAS: list[dict] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "legacy_scan",
+            "description": (
+                "Scan project source code to auto-discover legacy items "
+                "(tables, classes, endpoints, configs). Creates legacy_items entries."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID to scan",
+                    },
+                    "scope": {
+                        "type": "string",
+                        "description": "What to scan: 'all', 'db' (tables/columns/FK), 'code' (classes/methods), 'api' (endpoints)",
+                        "enum": ["all", "db", "code", "api"],
+                    },
+                    "path": {
+                        "type": "string",
+                        "description": "Subdirectory to scan (relative to project root). Omit for full project.",
+                    },
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_link",
+            "description": (
+                "Create or list bidirectional traceability links between items "
+                "(legacy_item↔story↔code↔test). Link types: migrates_from, implements, "
+                "tests, depends_on, covers, maps_to, replaces, references."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "Action to perform",
+                        "enum": ["create", "list"],
+                    },
+                    "source_id": {
+                        "type": "string",
+                        "description": "Source item ID (e.g. li-abc123, feat-xyz, us-456)",
+                    },
+                    "source_type": {
+                        "type": "string",
+                        "description": "Source type",
+                        "enum": ["legacy_item", "feature", "story", "code", "test", "epic"],
+                    },
+                    "target_id": {
+                        "type": "string",
+                        "description": "Target item ID (for create)",
+                    },
+                    "target_type": {
+                        "type": "string",
+                        "description": "Target type (for create)",
+                        "enum": ["legacy_item", "feature", "story", "code", "test", "epic"],
+                    },
+                    "link_type": {
+                        "type": "string",
+                        "description": "Type of link (for create/filter)",
+                        "enum": [
+                            "migrates_from", "implements", "tests",
+                            "depends_on", "covers", "maps_to", "replaces", "references",
+                        ],
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Optional notes about the link",
+                    },
+                },
+                "required": ["action", "source_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_coverage",
+            "description": (
+                "Get traceability coverage report for a project: % of legacy items "
+                "linked to stories/code/tests, plus orphan detection."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID",
+                    },
+                    "include_orphans": {
+                        "type": "boolean",
+                        "description": "Include list of orphaned items (unlinked). Default true.",
+                    },
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "traceability_validate",
+            "description": (
+                "Validate traceability completeness with full matrix view: "
+                "legacy_item → story → code → test chain per item."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "project_id": {
+                        "type": "string",
+                        "description": "Project ID",
+                    },
+                    "item_type": {
+                        "type": "string",
+                        "description": "Filter by legacy item type (table, class, endpoint...)",
+                    },
+                },
+                "required": ["project_id"],
+            },
+        },
+    },
+]
+

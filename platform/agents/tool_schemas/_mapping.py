@@ -495,6 +495,20 @@ for _mrole in ROLE_TOOL_MAP:
     if "memory_search" in ROLE_TOOL_MAP[_mrole]:
         ROLE_TOOL_MAP[_mrole].extend(_MEMORY_EXPLICIT_TOOLS)
 
+# Traceability tools — migration projects need full legacy↔story↔code↔test chain
+_TRACEABILITY_TOOLS_FULL = [
+    "legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate",
+]
+_TRACEABILITY_TOOLS_READONLY = ["traceability_coverage", "traceability_validate"]
+for _trole in ("cdp", "architecture", "product"):
+    if _trole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_trole].extend(_TRACEABILITY_TOOLS_FULL)
+for _trole in ("qa", "dev"):
+    if _trole in ROLE_TOOL_MAP:
+        ROLE_TOOL_MAP[_trole].extend(
+            _TRACEABILITY_TOOLS_FULL if _trole == "dev" else _TRACEABILITY_TOOLS_READONLY
+        )
+
 
 def _classify_agent_role(agent) -> str:
     """Classify an agent into a tool-mapping role category.
