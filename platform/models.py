@@ -97,7 +97,6 @@ class VetoLevel(str, Enum):
 class AgentPermissions(BaseModel):
     """What an agent is allowed to do."""
 
-    scope: str = "project"  # platform | project | art | self
     can_veto: bool = False
     veto_level: VetoLevel = VetoLevel.ADVISORY
     can_delegate: bool = False
@@ -134,9 +133,9 @@ class AgentTrigger(BaseModel):
 class AgentLLMConfig(BaseModel):
     """LLM configuration for an agent."""
 
-    model: str = "gpt-5.2"
+    model: str = "gpt-5.1"
     temperature: float = 0.7
-    max_tokens: int = 0
+    max_tokens: int = 4096
     fallback_model: Optional[str] = None
 
 
@@ -359,7 +358,7 @@ class EpicRun(BaseModel):
     """Tracks execution of a full mega-workflow (multi-phase mission)."""
 
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
-    workflow_id: str
+    workflow_id: str = ""
     workflow_name: str = ""
     session_id: str = ""
     cdp_agent_id: str = "chef_de_programme"
@@ -373,7 +372,8 @@ class EpicRun(BaseModel):
     phases: list[PhaseRun] = Field(default_factory=list)
     brief: str = ""
     llm_cost_usd: float = 0.0  # accumulated LLM cost for this mission
-    context: dict = Field(default_factory=dict)  # runtime context (e.g. target_branch)
+    cancel_reason: Optional[str] = None  # error/reason when failed or cancelled
+    started_at: Optional[datetime] = None  # when run first transitioned to running
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
