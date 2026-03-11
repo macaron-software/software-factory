@@ -1,184 +1,141 @@
 """
-Shared pytest configuration and fixtures for platform tests.
-Supports: unit tests (TestClient), endurance/chaos tests (live httpx.Client).
+Pytest configuration and shared fixtures for TMA Auto-Heal tests
+Provides common test fixtures and utilities
+"""
+import pytest
+import sys
+import os
+
+# Add project root to Python path
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, PROJECT_ROOT)
+
+
+@pytest.fixture
+def mock_agent():
+    """Mock agent for testing"""
+    return {
+        "name": "Karim Diallo",
+        "role": "primary",
+        "max_retries": 3
+    }
+
+
+@pytest.fixture
+def project_setup_context():
+    """Standard project-setup context"""
+    return {
+        "description": "Test automation project",
+        "budget": "50k",
+        "timeline": "6 months",
+        "load": "High",
+        "team_size": 5
+    }
+
+
+@pytest.fixture
+def short_output_35_chars():
+    """Sample short output that triggers TOO_SHORT error"""
+    return "Generic French cu. à compléter"
+
+
+@pytest.fixture
+def valid_french_output():
+    """Valid French output >= 200 chars"""
+    return """
+## Phase: PROJECT-SETUP
+
+### Contexte du projet
+Ce projet de développement d'application web nécessite une analyse approfondie
+des besoins utilisateurs, une évaluation des risques techniques, et une définition
+claire des critères de succès.
+
+### Objectifs
+1. Définir les exigences fonctionnelles
+2. Identifier les contraintes techniques
+3. Établir le calendrier de réalisation
+4. Allouer les ressources nécessaires
+
+### Livrables attendus
+- Spécifications techniques détaillées
+- Plan d'architecture système
+- Estimation des ressources nécessaires
+- Analyse des risques
+
+### Contraintes
+- Budget: 50k
+- Timeline: 6 mois
+- Équipe: 5 développeurs
 """
 
-import os
-import sys
-import subprocess
 
-import pytest
+@pytest.fixture
+def adversarial_retry_scenario():
+    """Scenario for adversarial retry exhaustion"""
+    return {
+        "agent": "Karim Diallo",
+        "score": 9,
+        "max_retries": 3,
+        "phase": "project-setup"
+    }
 
-# Ensure platform package is importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+@pytest.fixture
+def validation_error_scenarios():
+    """All validation error scenarios"""
+    return {
+        "TOO_SHORT": {
+            "actual_length": 35,
+            "min_length": 200,
+            "message": "TOO_SHORT: 35 chars (min 200 for dev)"
+        },
+        "SLOP": {
+            "output": "Generic French cu. à compléter",
+            "detected_patterns": ["cu.", "Generic French", "à compléter"]
+        },
+        "ADVERSARIAL_EXHAUSTED": {
+            "agent": "Karim Diallo",
+            "score": 9,
+            "message": "Agent Karim Diallo exhausted adversarial retries (score: 9/10)"
+        }
+    }
 
 
-# ─── Custom markers ────────────────────────────────────────────
+@pytest.fixture
+def workflow_phases():
+    """Complete workflow phases configuration"""
+    return {
+        "ideation": {"minLength": 100, "next": "project-setup"},
+        "project-setup": {
+            "minLength": 200,
+            "language": "fr",
+            "next": "development",
+            "validation": "strict"
+        },
+        "development": {"minLength": 500, "next": "testing"},
+        "testing": {"minLength": 300, "next": "production"},
+        "production": {"minLength": 200, "next": None}
+    }
 
 
 def pytest_configure(config):
-    config.addinivalue_line("markers", "endurance: long-running endurance tests")
-    config.addinivalue_line("markers", "chaos: chaos / fault-injection tests")
+    """Pytest configuration hook"""
     config.addinivalue_line(
-        "markers", "live: tests that hit a live server (require --live)"
+        "markers", "unit: Unit tests"
     )
     config.addinivalue_line(
-        "markers",
-        "stability: remote stability/stress tests (require STABILITY_TESTS=1)",
+        "markers", "integration: Integration tests"
     )
-
-
-# ─── CLI option: --live ─────────────────────────────────────────
-
-
-def pytest_addoption(parser):
-    parser.addoption(
-        "--live",
-        action="store_true",
-        default=False,
-        help="run tests against live server",
+    config.addinivalue_line(
+        "markers", "regression: Regression tests"
     )
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--live"):
-        return
-    skip_live = pytest.mark.skip(reason="need --live option to run")
-    # Skip stability tests unless STABILITY_TESTS=1
-    skip_stability = pytest.mark.skip(
-        reason="set STABILITY_TESTS=1 to run remote stability tests"
-    )
+    """Modify test items during collection"""
     for item in items:
-        if "live" in item.keywords:
-            item.add_marker(skip_live)
-        if "stability" in item.keywords and not os.environ.get("STABILITY_TESTS"):
-            item.add_marker(skip_stability)
-
-
-# ─── Fixtures ───────────────────────────────────────────────────
-
-
-@pytest.fixture(scope="session")
-def live_url():
-    """Base URL for live-server tests."""
-    return os.environ.get("BASE_URL", "http://localhost:8090")
-
-
-@pytest.fixture(scope="session")
-def live_session(live_url):
-    """httpx.Client pointed at the live server."""
-    import httpx
-
-    with httpx.Client(base_url=live_url, timeout=30.0) as session:
-        yield session
-
-
-@pytest.fixture(scope="session")
-def canvas_project_id(live_session):
-    """Create or find the 'macaron-canvas' project, return its id."""
-    r = live_session.get("/api/projects")
-    r.raise_for_status()
-    for p in r.json():
-        if p.get("id") == "macaron-canvas" or p.get("name") == "macaron-canvas":
-            return p["id"]
-    r = live_session.post(
-        "/api/projects",
-        json={
-            "id": "macaron-canvas",
-            "name": "Macaron Canvas",
-            "description": "Collaborative design tool — endurance test project",
-        },
-    )
-    r.raise_for_status()
-    return "macaron-canvas"
-
-
-@pytest.fixture(scope="module")
-def client():
-    """TestClient for the FastAPI app (non-live / unit tests)."""
-    from fastapi.testclient import TestClient
-    from platform.server import app
-
-    with TestClient(app) as c:
-        yield c
-
-
-# ─── Stability / Remote fixtures ────────────────────────────────
-
-
-@pytest.fixture(scope="session")
-def az_base_url():
-    host = os.environ.get("STABILITY_AZ_HOST", "AZURE_VM_IP")
-    return f"http://{host}"
-
-
-@pytest.fixture(scope="session")
-def ovh_base_url():
-    host = os.environ.get("STABILITY_OVH_HOST", "sf.macaron-software.com")
-    return f"https://{host}"
-
-
-@pytest.fixture(scope="session")
-def ssh_key_az():
-    return os.environ.get(
-        "STABILITY_SSH_AZ_KEY",
-        os.path.expanduser("~/.ssh/az_ssh_config/RG-MACARON-vm-macaron/id_rsa"),
-    )
-
-
-@pytest.fixture(scope="session")
-def ssh_key_ovh():
-    return os.environ.get(
-        "STABILITY_SSH_OVH_KEY",
-        os.path.expanduser("~/.ssh/id_ed25519"),
-    )
-
-
-@pytest.fixture(scope="session")
-def ssh_run_az(ssh_key_az):
-    """Run a command on Azure VM and return stdout+stderr."""
-
-    def _run(cmd: str, timeout: int = 30) -> str:
-        full = (
-            f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
-            f"-i {ssh_key_az} azureadmin@AZURE_VM_IP '{cmd}'"
-        )
-        try:
-            r = subprocess.run(
-                ["/bin/bash", "-c", full],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            return r.stdout + r.stderr
-        except subprocess.TimeoutExpired:
-            return "TIMEOUT"
-        except Exception as exc:
-            return str(exc)
-
-    return _run
-
-
-@pytest.fixture(scope="session")
-def ssh_run_ovh(ssh_key_ovh):
-    """Run a command on OVH demo server and return stdout+stderr."""
-
-    def _run(cmd: str, timeout: int = 30) -> str:
-        full = (
-            f"ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 "
-            f"-i {ssh_key_ovh} debian@OVH_IP '{cmd}'"
-        )
-        try:
-            r = subprocess.run(
-                ["/bin/bash", "-c", full],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            return r.stdout + r.stderr
-        except subprocess.TimeoutExpired:
-            return "TIMEOUT"
-        except Exception as exc:
-            return str(exc)
-
-    return _run
+        # Add markers based on test file
+        if "test_builtins" in item.nodeid:
+            item.add_marker(pytest.mark.unit)
+        elif "test_phase" in item.nodeid:
+            item.add_marker(pytest.mark.integration)

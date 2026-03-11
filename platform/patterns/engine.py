@@ -1433,6 +1433,14 @@ This is BLOCKING: developers cannot start without your design tokens."""
                         )
                     elif "NO_TESTS" in iu:
                         fix_hints.append("Add unit tests that cover the code you wrote")
+                    elif "NO_BUILD" in iu:
+                        fix_hints.append(
+                            "Run the build tool AFTER writing code — call 'build' to compile and verify"
+                        )
+                    elif "TRACEABILITY" in iu:
+                        fix_hints.append(
+                            "Add '# Ref: FEAT-xxx — feature name' comment at the top of source files"
+                        )
                 hints_str = (
                     "\n".join(f"  → {h}" for h in fix_hints) if fix_hints else ""
                 )

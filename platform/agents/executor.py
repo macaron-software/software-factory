@@ -318,6 +318,12 @@ async def _summarize_context(
     # Don't start tail with orphaned tool results
     while tail and getattr(tail[0], "role", "") == "tool":
         tail = tail[1:]
+    # Don't start tail with assistant that has tool_calls (results may be gone)
+    while tail and getattr(tail[0], "role", "") == "assistant" and getattr(tail[0], "tool_calls", None):
+        # Check if the tool results follow
+        if len(tail) > 1 and getattr(tail[1], "role", "") == "tool":
+            break  # paired — keep it
+        tail = tail[1:]
     middle = messages[len(header) : len(messages) - len(tail)]
 
     if not middle:

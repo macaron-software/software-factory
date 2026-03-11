@@ -647,7 +647,11 @@ def check_l0(
                 f"MISSING_TRACEABILITY: No # Ref/Feature/Story comment in {fp} "
                 f"({lines} lines) — add '# Ref: FEAT-xxx — <feature name>' at top"
             )
-            score += 2  # warning: encourages but doesn't block
+            score += 1  # soft warning: +1 per file, capped below
+    # Cap traceability at +3 — it should warn, never block alone
+    _trace_count = sum(1 for i in issues if i.startswith("MISSING_TRACEABILITY"))
+    if _trace_count > 3:
+        score -= (_trace_count - 3)  # undo excess points
 
     # Check build tool failures — if any build/test tool returned [FAIL], force rejection
     if tool_calls:

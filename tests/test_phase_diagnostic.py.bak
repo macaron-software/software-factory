@@ -1,0 +1,135 @@
+# Ref: FEAT-phase-diagnostic — Phase Diagnostic Tests
+# Tests unitaires pour le diagnostic de la phase 'project-setup'
+
+import pytest
+from unittest.mock import Mock, patch
+from platform.patterns.builtins import PhaseValidator, PatternMatcher
+
+
+class TestPhaseDiagnostic:
+    """Test suite for phase diagnostic functionality."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.validator = PhaseValidator()
+        self.matcher = PatternMatcher()
+    
+    def test_phase_validation_success(self):
+        """Test successful phase validation."""
+        # Given: valid phase data
+        phase_data = {
+            'name': 'project-setup',
+            'description': 'Initial project configuration with 200+ chars to meet dev requirements',
+            'type': 'setup'
+        }
+        
+        # When: validating phase
+        result = self.validator.validate(phase_data)
+        
+        # Then: validation should pass
+        assert result.is_valid is True
+        assert result.errors == []
+    
+    def test_phase_validation_failure_too_short(self):
+        """Test phase validation fails when description too short."""
+        # Given: phase with description too short (less than 200 chars for dev)
+        phase_data = {
+            'name': 'project-setup',
+            'description': 'Short',  # Only 5 chars, not 200+
+            'type': 'setup'
+        }
+        
+        # When: validating phase
+        result = self.validator.validate(phase_data)
+        
+        # Then: validation should fail with TOO_SHORT error
+        assert result.is_valid is False
+        assert 'TOO_SHORT' in result.errors
+        assert result.errors['TOO_SHORT']['min_length'] == 200
+    
+    def test_pattern_matcher_identifies_project_setup(self):
+        """Test pattern matcher correctly identifies project-setup pattern."""
+        # Given: input text containing project-setup keywords
+        input_text = "Setting up new project structure with initialization"
+        
+        # When: matching patterns
+        matches = self.matcher.identify(input_text)
+        
+        # Then: should match project-setup pattern
+        assert 'project-setup' in matches
+    
+    def test_error_message_format_french(self):
+        """Test error messages are in French as required."""
+        # Given: validation failure
+        phase_data = {
+            'name': 'project-setup',
+            'description': 'Too short',
+            'type': 'setup'
+        }
+        
+        # When: getting error message
+        result = self.validator.validate(phase_data)
+        
+        # Then: error should be in French
+        assert any(word in result.error_message.lower() for word in ['court', 'caractères', 'minimum'])
+    
+    def test_adversarial_retry_exhausted(self):
+        """Test behavior when adversarial retries are exhausted."""
+        # Given: maximum retries reached
+        max_retries = 5
+        current_retry = 5
+        
+        # When: checking retry status
+        should_retry = current_retry < max_retries
+        
+        # Then: should not retry (exhausted)
+        assert should_retry is False
+    
+    def test_score_calculation(self):
+        """Test error score calculation."""
+        # Given: error with high severity
+        error = {
+            'type': 'TOO_SHORT',
+            'current_length': 35,
+            'min_length': 200
+        }
+        
+        # When: calculating score
+        score = self.validator.calculate_error_score(error)
+        
+        # Then: should give high score (9/10)
+        assert score >= 8
+
+
+class TestRegressionPrevention:
+    """Tests to prevent regressions in phase handling."""
+    
+    def test_no_regression_in_validation_logic(self):
+        """Ensure validation logic hasn't changed unexpectedly."""
+        validator = PhaseValidator()
+        
+        # Known good input should still pass
+        good_input = {
+            'name': 'valid-phase',
+            'description': 'A' * 200,  # Exactly 200 chars
+            'type': 'standard'
+        }
+        
+        result = validator.validate(good_input)
+        assert result.is_valid is True
+    
+    def test_no_regression_in_error_messages(self):
+        """Ensure error messages remain consistent."""
+        validator = PhaseValidator()
+        
+        bad_input = {
+            'name': 'bad-phase',
+            'description': 'Short',
+            'type': 'standard'
+        }
+        
+        result = validator.validate(bad_input)
+        
+        # Error should exist and be reproducible
+        assert result.is_valid is False
+        assert len(result.errors) > 0

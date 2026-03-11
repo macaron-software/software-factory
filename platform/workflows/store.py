@@ -458,7 +458,13 @@ async def _sandbox_build_check(project_id: str, session_id: str) -> tuple[bool, 
         # Detect build system and run appropriate command
         build_cmd = _detect_build_cmd(workspace)
         if not build_cmd:
-            return True, ""
+            # No build system detected — report as inconclusive, not "passed"
+            import os
+            src_files = [f for f in os.listdir(workspace)
+                        if f.endswith(('.swift', '.rs', '.go', '.java', '.ts', '.tsx', '.py'))]
+            if src_files or os.path.isdir(os.path.join(workspace, "src")):
+                return False, "No build system detected (missing Package.swift / Cargo.toml / package.json / etc.) — cannot validate compilation"
+            return True, ""  # No source files = nothing to build
 
         proc = await asyncio.create_subprocess_exec(
             *build_cmd,
