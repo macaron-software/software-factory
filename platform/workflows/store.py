@@ -628,72 +628,59 @@ def _format_templates_section() -> str:
 
 
 _PM_DECISION_PROMPT_V2 = """\
-You are the Product Manager orchestrating project "{project_id}".
-Phase "{phase_name}" just completed.
+Project: {project_id}
+Phase completed: "{phase_name}"
+Loop: {loop_count}/{loop_limit}
 
 ## Evidence
 {phase_evidence}
 
-## Execution History
+## History (last 10)
 {history}
 
-## Current Workflow Phases
+## Workflow Phases
 {catalog}
 
-## Project Goal
+## Goal
 {goal}
 
-## Available Patterns
-{patterns}
+## Patterns: {patterns}
+## Agents: {agents}
+## Templates: {templates}
+## Feedback: {feedback_types}
+## Gates: {gate_types}
 
-## Available Agents (by role)
-{agents}
+─── DECISION ───
+Return ONE JSON object. Pick the BEST option:
 
-## Phase Templates
-{templates}
-
-## Feedback Types
-{feedback_types}
-
-## Gate Types
-{gate_types}
-
-Decide what happens next. Respond ONLY with JSON.
-
-Option A — Flow control:
+1. ADVANCE to next phase (phase succeeded):
 {{"decision": "next", "reason": "..."}}
-{{"decision": "loop", "phase_id": "<phase to re-run>", "reason": "...", "findings": "..."}}
-{{"decision": "skip", "phase_id": "<phase to jump to>", "reason": "...", "findings": "..."}}
+
+2. RE-RUN same phase (minor fix needed, max 2 loops):
+{{"decision": "loop", "phase_id": "<phase>", "reason": "...", "findings": "..."}}
+
+3. SKIP to a later phase:
+{{"decision": "skip", "phase_id": "<phase>", "reason": "...", "findings": "..."}}
+
+4. DONE (all AC met + build OK + tests pass):
 {{"decision": "done", "reason": "...", "findings": "..."}}
 
-Option B — Compose a dynamic phase:
-{{
-  "decision": "phase",
-  "phase": {{
-    "name": "<name>",
-    "pattern": "<pattern type from catalog>",
-    "team": ["<agent_id>", ...],
-    "gate": "<gate type>",
-    "feedback": ["<type>", ...],
-    "max_iterations": <int>,
-    "task": "<specific instructions>"
-  }},
-  "reason": "..."
-}}
+5. COMPOSE a new dynamic phase (preferred when stuck or need decomposition):
+{{"decision": "phase", "phase": {{"name": "qa-rework", "pattern": "loop", "team": ["dev_fullstack", "testeur"], "gate": "all_approved", "feedback": ["adversarial", "tools"], "max_iterations": 3, "task": "Fix failing tests and re-run build"}}, "reason": "..."}}
 
-Rules:
-- "next": continue linearly
-- "loop": re-run a previous phase (QA fail → loop to dev)
-- "done": ALL acceptance criteria met AND build OK AND tests pass
-- "skip": jump to a specific phase
-- "phase": compose NEW dynamic phase with custom pattern/team/feedback
+─── PROGRESSION RULES ───
+- After 2 loops of SAME phase → MUST use "next", "skip", or "phase" (compose new phase)
+- NEVER loop same phase 3+ times — decompose the problem instead
+- If agents keep failing design: compose a focused sub-phase with explicit task
+- If build/test never ran: compose a "build-verify" phase with pattern=sequential
+- After dev phase: compose "qa-acceptance" phase (pattern=loop, feedback=adversarial+tools)
+- After deploy: compose "verify-prod" phase to check deployment
 
-CRITICAL — NEVER "done" if:
+─── NEVER "done" IF ───
 - Build never ran or failed
 - Tests not executed or failed
-- Source files incomplete (< 3 for non-trivial)
+- Source files < 3 (non-trivial project)
 - Adversarial guard rejected (score >= 7)
-Use "loop" or "phase" instead.
 """
 
 
@@ -787,6 +774,8 @@ async def _pm_checkpoint(
     catalog: list[str],
     goal: str,
     phase_tool_calls: list | None = None,
+    loop_count: int = 0,
+    loop_limit: int = 20,
 ) -> dict:
     """Ask PM agent to decide next workflow phase (v2: supports dynamic phases)."""
     import json as _json
@@ -821,13 +810,21 @@ async def _pm_checkpoint(
         templates=_format_templates_section(),
         feedback_types=_format_catalog_section(_FEEDBACK_TYPES),
         gate_types=_format_catalog_section(_GATE_TYPES),
+        loop_count=loop_count,
+        loop_limit=loop_limit,
     )
 
     try:
         from ..llm.client import get_llm_client, LLMMessage
         llm = get_llm_client()
+        _sys = (
+            "You are a Product Manager orchestrating an agile software project. "
+            "You decide workflow progression: advance, loop, compose new phases, or finish. "
+            "Respond with a SINGLE JSON object, no markdown, no explanation. "
+            "Prefer composing new dynamic phases ('phase' decision) over looping the same phase repeatedly."
+        )
         msgs = [
-            LLMMessage(role="system", content="You are a Product Manager. Respond ONLY with JSON."),
+            LLMMessage(role="system", content=_sys),
             LLMMessage(role="user", content=prompt),
         ]
         result = await llm.chat(msgs)
@@ -971,6 +968,7 @@ async def run_workflow(
     _pm_loop_limit = 20
     _pm_skip_to = None
     _pm_done = False
+    _pm_consecutive_loops: dict[str, int] = {}  # track consecutive loops per phase
     _dynamic_patterns: dict = {}  # PM-created patterns (phase_id → PatternDef)
 
     for i, phase in enumerate(_phase_queue):
@@ -1467,6 +1465,8 @@ async def run_workflow(
                         [p.id for p in workflow.phases],
                         initial_task or "",
                         phase_tool_calls=_phase_tool_calls,
+                        loop_count=_pm_loop_count,
+                        loop_limit=_pm_loop_limit,
                     )
                     _pm_dec = _pm_decision.get("decision", "next")
                     _pm_target = _pm_decision.get("phase_id", "")
@@ -1480,10 +1480,12 @@ async def run_workflow(
                         logger.warning("PM_DECISION: done — reason=%s", _pm_reason[:100])
                         accumulated_context.append(f"[PM] DONE: {_pm_reason}")
                         _pm_done = True
+                        _pm_consecutive_loops.clear()
 
                     elif _pm_dec == "phase":
                         # v2: PM composed a dynamic phase
                         _pm_loop_count += 1
+                        _pm_consecutive_loops.clear()  # phase composition resets loop counter
                         try:
                             _dyn_phase, _dyn_pattern = _build_dynamic_phase(_pm_decision)
                             _dynamic_patterns[_dyn_phase.id] = _dyn_pattern
@@ -1504,15 +1506,29 @@ async def run_workflow(
 
                     elif _pm_dec == "loop" and _pm_target:
                         _pm_loop_count += 1
-                        logger.warning(
-                            "PM_DECISION: loop → %s (loop %d/%d) — reason=%s",
-                            _pm_target, _pm_loop_count, _pm_loop_limit, _pm_reason[:100],
-                        )
-                        if _pm_target in _phase_catalog:
-                            _phase_queue.insert(i + 1, _phase_catalog[_pm_target])
-                            accumulated_context.append(
-                                f"[PM] LOOP → {_pm_target}: {_pm_reason}"
+                        # Track consecutive loops per phase — force advance after 3
+                        _pm_consecutive_loops[_pm_target] = _pm_consecutive_loops.get(_pm_target, 0) + 1
+                        _consec = _pm_consecutive_loops[_pm_target]
+                        if _consec >= 3:
+                            logger.warning(
+                                "PM_DECISION: loop BREAKER → %s looped %d times, forcing next",
+                                _pm_target, _consec,
                             )
+                            accumulated_context.append(
+                                f"[PM] LOOP BREAKER: {_pm_target} looped {_consec}x — advancing"
+                            )
+                            # Reset counter and advance linearly
+                            _pm_consecutive_loops[_pm_target] = 0
+                        else:
+                            logger.warning(
+                                "PM_DECISION: loop → %s (loop %d/%d, consec %d/3) — reason=%s",
+                                _pm_target, _pm_loop_count, _pm_loop_limit, _consec, _pm_reason[:100],
+                            )
+                            if _pm_target in _phase_catalog:
+                                _phase_queue.insert(i + 1, _phase_catalog[_pm_target])
+                                accumulated_context.append(
+                                    f"[PM] LOOP → {_pm_target} ({_consec}/3): {_pm_reason}"
+                                )
 
                     elif _pm_dec == "skip" and _pm_target:
                         logger.warning(
@@ -1520,10 +1536,13 @@ async def run_workflow(
                             _pm_target, _pm_reason[:100],
                         )
                         _pm_skip_to = _pm_target
+                        _pm_consecutive_loops.clear()
                         accumulated_context.append(
                             f"[PM] SKIP → {_pm_target}: {_pm_reason}"
                         )
-                    # else: "next" — continue linearly (default)
+                    else:
+                        # "next" — continue linearly (default)
+                        _pm_consecutive_loops.clear()
 
                     # Store PM decision as a message for traceability
                     store.add_message(
