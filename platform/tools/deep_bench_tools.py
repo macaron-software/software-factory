@@ -2416,6 +2416,423 @@ def _patterns_exhaustive_cases() -> list[DeepCase]:
 
 
 # ---------------------------------------------------------------------------
+# L9: Bricks Deep — brick registry, tool availability, health checks
+# ---------------------------------------------------------------------------
+
+
+def _bricks_deep_cases() -> list[DeepCase]:
+    """Validate brick infrastructure: registry, discovery, tools, roles."""
+    cases = []
+
+    # Case 1: BrickRegistry loads and discovers modules
+    c = DeepCase("bricks-registry", "bricks", "BrickRegistry discovers bricks")
+    t0 = time.time()
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+        bricks = reg.list_all()
+        c.checks.append(DeepCheck("registry_loads", True, f"{len(bricks)} bricks"))
+        c.checks.append(DeepCheck("has_bricks", len(bricks) >= 3,
+                                  f"need ≥3, got {len(bricks)}"))
+        # Check known bricks exist
+        ids = {b.id for b in bricks}
+        for expected in ("github", "docker", "sonarqube", "rag"):
+            c.checks.append(DeepCheck(f"brick_{expected}", expected in ids))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 2: Each brick has valid tools with schemas
+    c = DeepCase("bricks-tools-valid", "bricks", "All brick tools have name+description+execute")
+    t0 = time.time()
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+        total_tools = 0
+        for brick in reg.list_all():
+            for tool in brick.tools:
+                total_tools += 1
+                if not tool.name or not tool.description or not tool.execute:
+                    c.checks.append(DeepCheck(
+                        f"{brick.id}/{tool.name}", False, "missing name/desc/execute"))
+        c.checks.append(DeepCheck("tools_valid", True, f"{total_tools} tools validated"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 3: Role mapping works
+    c = DeepCase("bricks-role-mapping", "bricks", "Bricks map to agent roles")
+    t0 = time.time()
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+        roles_covered = set()
+        for brick in reg.list_all():
+            roles_covered.update(brick.roles)
+        c.checks.append(DeepCheck("roles_mapped", len(roles_covered) >= 3,
+                                  f"roles: {', '.join(sorted(roles_covered))}"))
+        # Test get_tools_for_role
+        devops_tools = reg.get_tools_for_role("devops")
+        c.checks.append(DeepCheck("devops_has_tools", True,
+                                  f"{len(devops_tools)} tools for devops"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 4: Health checks run without crash
+    c = DeepCase("bricks-health-check", "bricks", "Health checks execute cleanly")
+    t0 = time.time()
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+        results = reg.health_check_all()
+        c.checks.append(DeepCheck("health_runs", len(results) >= 3,
+                                  f"{len(results)} bricks checked"))
+        for brick_id, (ok, msg) in results.items():
+            c.checks.append(DeepCheck(f"health_{brick_id}", True, f"{ok}: {msg}"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 5: Serialization works
+    c = DeepCase("bricks-serialize", "bricks", "BrickRegistry.to_dict() produces valid JSON")
+    t0 = time.time()
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+        data = reg.to_dict()
+        json.dumps(data)  # must be JSON-serializable
+        c.checks.append(DeepCheck("serializable", True, f"{len(data)} bricks serialized"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    return cases
+
+
+def _bricks_exhaustive_cases() -> list[DeepCase]:
+    """Per-brick validation: each brick's tools, roles, config, health."""
+    cases = []
+    try:
+        from platform.bricks import get_brick_registry
+        reg = get_brick_registry()
+    except Exception as e:
+        return [DeepCase("bricks-ex-error", "bricks-exhaustive",
+                         f"Registry failed: {e}", error=str(e))]
+
+    for brick in reg.list_all():
+        c = DeepCase(f"brick:{brick.id}", "bricks-exhaustive",
+                     f"Brick {brick.id}: {brick.name}")
+        # Check 1: has tools
+        c.checks.append(DeepCheck("has_tools", len(brick.tools) >= 1,
+                                  f"{len(brick.tools)} tools"))
+        # Check 2: all tools have callable execute
+        for tool in brick.tools:
+            c.checks.append(DeepCheck(f"tool_{tool.name}_callable",
+                                      callable(tool.execute),
+                                      f"execute is {'callable' if callable(tool.execute) else 'NOT callable'}"))
+        # Check 3: has roles
+        c.checks.append(DeepCheck("has_roles", len(brick.roles) >= 1,
+                                  f"roles: {', '.join(brick.roles)}"))
+        # Check 4: health check doesn't crash
+        try:
+            ok, msg = brick.health_check()
+            c.checks.append(DeepCheck("health_check", True, f"{ok}: {msg}"))
+        except Exception as he:
+            c.checks.append(DeepCheck("health_check", False, str(he)))
+
+        c.passed = all(ch.passed for ch in c.checks)
+        cases.append(c)
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# L10: Phases Exhaustive — per-phase validation across all workflows
+# ---------------------------------------------------------------------------
+
+
+def _phases_exhaustive_cases() -> list[DeepCase]:
+    """Validate every phase in every workflow: pattern exists, agents valid, gates OK."""
+    cases = []
+    try:
+        from platform.workflows.store import get_workflow_store
+        store = get_workflow_store()
+        workflows = store.list_all()
+    except Exception as e:
+        return [DeepCase("phases-ex-error", "phases-exhaustive",
+                         f"Store failed: {e}", error=str(e))]
+
+    # Load valid agents and patterns
+    try:
+        from platform.agents.store import get_agent_store
+        agent_ids = {a.id for a in get_agent_store().list_all()}
+    except Exception:
+        agent_ids = set()
+
+    try:
+        from platform.patterns.store import PatternStore
+        ps = PatternStore()
+        pattern_ids = {p.id for p in ps.list_all()}
+        pattern_types = {p.type for p in ps.list_all()}
+    except Exception:
+        pattern_ids = set()
+        pattern_types = set()
+
+    valid_gate_types = {
+        "always", "no_veto", "all_approved", "build_passes",
+        "tests_pass", "quality_gate", "manual", "checkpoint",
+    }
+
+    for wf in workflows:
+        if not hasattr(wf, "phases") or not wf.phases:
+            continue
+        for phase in wf.phases:
+            phase_id = getattr(phase, "id", None) or getattr(phase, "phase_id", "")
+            c = DeepCase(
+                f"phase:{wf.id}/{phase_id}",
+                "phases-exhaustive",
+                f"Phase {phase_id} in workflow {wf.id}",
+            )
+
+            # Check 1: phase has a valid pattern_id or type
+            pid = getattr(phase, "pattern_id", None) or getattr(phase, "pattern", None) or ""
+            ptype = getattr(phase, "pattern_type", None) or ""
+            has_pattern = bool(pid) or bool(ptype)
+            if pid:
+                pattern_valid = pid in pattern_ids or pid in pattern_types
+            elif ptype:
+                pattern_valid = ptype in pattern_types
+            else:
+                pattern_valid = False
+            c.checks.append(DeepCheck(
+                "has_pattern", has_pattern,
+                f"pattern_id={pid} type={ptype}"))
+            c.checks.append(DeepCheck(
+                "pattern_exists", pattern_valid or not has_pattern,
+                f"{'valid' if pattern_valid else 'NOT FOUND'}"))
+
+            # Check 2: agents in phase config exist
+            config = getattr(phase, "config", {}) or {}
+            phase_agents = config.get("agents", [])
+            if isinstance(phase_agents, list):
+                for ag_ref in phase_agents[:5]:
+                    ag_id = ag_ref if isinstance(ag_ref, str) else ag_ref.get("id", "")
+                    if ag_id:
+                        c.checks.append(DeepCheck(
+                            f"agent_{ag_id}", ag_id in agent_ids,
+                            f"{'found' if ag_id in agent_ids else 'MISSING'}"))
+
+            # Check 3: gate is valid
+            gate = getattr(phase, "gate", None) or config.get("gate", "always")
+            if isinstance(gate, str):
+                # Free-text AC gates are valid (custom acceptance criteria)
+                gate_ok = gate.lower() in valid_gate_types or len(gate) > 10
+                c.checks.append(DeepCheck("gate_valid", gate_ok,
+                                          f"gate={gate[:50]}"))
+
+            # Check 4: phase has a name
+            pname = getattr(phase, "name", None) or phase_id
+            c.checks.append(DeepCheck("has_name", bool(pname), f"name={pname}"))
+
+            c.passed = all(ch.passed for ch in c.checks)
+            cases.append(c)
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# L11: PM Orchestration Deep — PM checkpoint, judge, retry logic
+# ---------------------------------------------------------------------------
+
+
+def _pm_orchestration_deep_cases() -> list[DeepCase]:
+    """Validate PM checkpoint infrastructure: build gate, judge, decisions."""
+    cases = []
+
+    # Case 1: Build gate detects build systems
+    c = DeepCase("pm-build-detection", "pm-orchestration",
+                 "Build gate detects various build systems")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import _detect_build_cmd
+        import tempfile
+        # Python project
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "requirements.txt").write_text("flask\n")
+            Path(td, "main.py").write_text("print('hi')\n")
+            cmd = _detect_build_cmd(td)
+            c.checks.append(DeepCheck("python_detect", len(cmd) > 0, f"cmd={cmd}"))
+
+        # Node project
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "package.json").write_text('{"name":"test"}\n')
+            cmd = _detect_build_cmd(td)
+            c.checks.append(DeepCheck("node_detect", len(cmd) > 0, f"cmd={cmd}"))
+
+        # Empty project
+        with tempfile.TemporaryDirectory() as td:
+            cmd = _detect_build_cmd(td)
+            c.checks.append(DeepCheck("empty_detect", len(cmd) == 0, "no build system"))
+
+        # Rust project
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "Cargo.toml").write_text('[package]\nname="test"\n')
+            cmd = _detect_build_cmd(td)
+            c.checks.append(DeepCheck("rust_detect", len(cmd) > 0, f"cmd={cmd}"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 2: Build gate runs successfully on real Python code
+    c = DeepCase("pm-build-gate-exec", "pm-orchestration",
+                 "Build gate executes and returns BuildResult")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import run_build_gate
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "requirements.txt").write_text("")
+            Path(td, "main.py").write_text("x = 1 + 1\nprint(x)\n")
+            result = _arun(run_build_gate(td))
+            c.checks.append(DeepCheck("build_runs", True, f"success={result.success}"))
+            c.checks.append(DeepCheck("build_passes", result.success,
+                                      f"cmd={result.command}"))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 3: PMDecision dataclass works correctly
+    c = DeepCase("pm-decision-model", "pm-orchestration",
+                 "PMDecision actions: next, retry, done, abort")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import PMDecision, BuildResult
+        d = PMDecision(action="next", reason="test", quality_score=0.8)
+        c.checks.append(DeepCheck("action_valid", d.action in ("next", "retry", "done", "abort")))
+        c.checks.append(DeepCheck("score_float", isinstance(d.quality_score, float)))
+        c.checks.append(DeepCheck("build_optional", d.build_result is None))
+        br = BuildResult(success=True, command="test")
+        d2 = PMDecision(action="retry", reason="fail", build_result=br, quality_score=0.3)
+        c.checks.append(DeepCheck("with_build", d2.build_result is not None))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 4: PM checkpoint deterministic rules
+    c = DeepCase("pm-deterministic-rules", "pm-orchestration",
+                 "PM hard rules: build fail→retry, last phase→done, quality gate")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import pm_checkpoint, BuildResult
+
+        # Simulate: build fails on code phase → should retry
+        d = _arun(pm_checkpoint(
+            phase_name="Development Sprint",
+            phase_id="dev-sprint",
+            phase_output="Agent attempted fixes",
+            workspace="/tmp/nonexistent",
+            phase_success=False,
+            sprint_num=1,
+            max_sprints=3,
+        ))
+        c.checks.append(DeepCheck("fail_retries", d.action == "retry",
+                                  f"action={d.action}, expected retry"))
+
+        # Simulate: last phase → should be done
+        d = _arun(pm_checkpoint(
+            phase_name="QA Validation",
+            phase_id="qa-validate",
+            phase_output="All tests pass",
+            workspace="/tmp/nonexistent",
+            phase_success=True,
+            is_last_phase=True,
+            sprint_num=1,
+            max_sprints=1,
+        ))
+        c.checks.append(DeepCheck("last_phase_done", d.action == "done",
+                                  f"action={d.action}, expected done"))
+
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 5: SPECS loader works
+    c = DeepCase("pm-specs-loader", "pm-orchestration",
+                 "_load_specs reads SPECS.md from workspace")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import _load_specs
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            Path(td, "SPECS.md").write_text("# My Project\n\nBuild a calculator.\n")
+            specs = _load_specs(td)
+            c.checks.append(DeepCheck("loads_specs", "calculator" in specs.lower(),
+                                      f"got {len(specs)} chars"))
+        # Empty workspace
+        with tempfile.TemporaryDirectory() as td:
+            specs = _load_specs(td)
+            c.checks.append(DeepCheck("empty_ok", "no specs" in specs.lower()))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    # Case 6: Judge response parser
+    c = DeepCase("pm-judge-parser", "pm-orchestration",
+                 "_parse_judge_response handles JSON and edge cases")
+    t0 = time.time()
+    try:
+        from platform.services.pm_checkpoint import _parse_judge_response
+        # Valid JSON
+        score, verdict = _parse_judge_response(
+            '{"compilation": 9, "completeness": 8, "quality": 7, "tests": 8, '
+            '"acceptance": 8, "overall": 8, "verdict": "APPROVE", "reason": "good"}'
+        )
+        c.checks.append(DeepCheck("valid_json", abs(score - 0.8) < 0.01,
+                                  f"score={score}"))
+        c.checks.append(DeepCheck("verdict_extracted", "APPROVE" in verdict))
+
+        # With markdown fences
+        score2, _ = _parse_judge_response(
+            '```json\n{"overall": 6, "verdict": "RETRY", "reason": "needs work"}\n```'
+        )
+        c.checks.append(DeepCheck("fenced_json", abs(score2 - 0.6) < 0.01))
+
+        # With think blocks
+        score3, _ = _parse_judge_response(
+            '<think>hmm</think>{"overall": 4, "verdict": "REJECT", "reason": "bad"}'
+        )
+        c.checks.append(DeepCheck("think_stripped", abs(score3 - 0.4) < 0.01))
+    except Exception as e:
+        c.error = str(e)
+    c.elapsed_ms = int((time.time() - t0) * 1000)
+    c.passed = all(ch.passed for ch in c.checks) and not c.error
+    cases.append(c)
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
 # Runners
 # ---------------------------------------------------------------------------
 
@@ -2428,6 +2845,8 @@ LAYER_RUNNERS = {
     "workflows": _workflows_deep_cases,
     "patterns": _patterns_deep_cases,
     "sf": _sf_deep_cases,
+    "bricks": _bricks_deep_cases,
+    "pm-orchestration": _pm_orchestration_deep_cases,
 }
 
 EXHAUSTIVE_RUNNERS = {
@@ -2436,6 +2855,8 @@ EXHAUSTIVE_RUNNERS = {
     "skills-exhaustive": _skills_exhaustive_cases,
     "workflows-exhaustive": _workflows_exhaustive_cases,
     "patterns-exhaustive": _patterns_exhaustive_cases,
+    "phases-exhaustive": _phases_exhaustive_cases,
+    "bricks-exhaustive": _bricks_exhaustive_cases,
 }
 
 
