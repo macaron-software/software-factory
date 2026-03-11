@@ -61,5 +61,9 @@ jobs:
             | xargs python -m py_compile \
             && echo "All Python files compile OK"
 
+      - name: Complexity gate (radon CC + MI + LOC)
+        continue-on-error: true  # SOFT gate — report only, will enforce later
+        run: python scripts/complexity_gate.py platform/
+
       - name: Run platform API tests (real endpoints, no mocks)
         run: python -m pytest tests/test_platform_api.py -v --tb=short -q
