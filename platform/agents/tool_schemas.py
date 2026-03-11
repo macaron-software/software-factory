@@ -2916,51 +2916,24 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "lrm_component_gallery_ds",
     ],
     "dev": [
+        # Core coding tools — these are the ESSENTIAL tools for any dev agent
         "code_read",
         "code_write",
         "code_edit",
         "code_search",
-        "git_status",
-        "git_log",
-        "git_diff",
-        "git_clone",
-        "git_create_branch",
-        "git_commit",
-        "git_create_pr",
         "list_files",
-        "memory_search",
-        "memory_store",
-        "plan_create",
-        "plan_update",
-        "plan_get",
-        "get_project_context",
+        # Build & test
         "build",
         "test",
-        "docker_deploy",
-        "docker_status",
-        "screenshot",
-        "simulator_screenshot",
-        "create_ticket",
-        "lrm_locate",
-        "lrm_conventions",
-        "lrm_build",
-        "lrm_examples",
-        "lrm_confluence_search",
-        "lrm_confluence_read",
-        "lrm_jira_search",
-        "github_prs",
-        "github_code_search",
-        "android_build",
-        "android_test",
-        "android_lint",
-        "mcp_fetch_fetch",
-        "mcp_memory_create_entities",
-        "mcp_memory_search_nodes",
-        "mcp_memory_create_relations",
-        "lrm_guidelines_summary",
-        "lrm_guidelines_search",
-        "lrm_guidelines_get",
-        "lrm_guidelines_stack",
+        # Git essentials
+        "git_status",
+        "git_diff",
+        "git_commit",
+        # Memory & context
+        "memory_search",
+        "memory_store",
+        "deep_search",
+        "get_project_context",
     ],
     "qa": [
         "code_read",
@@ -3143,7 +3116,7 @@ for _qrole in ("qa", "devops", "architecture", "cdp"):
     if _qrole in ROLE_TOOL_MAP:
         ROLE_TOOL_MAP[_qrole].extend(_QUALITY_TOOLS)
 
-# Platform introspection tools — available to ALL agent roles
+# Platform introspection tools — available to management/review roles (NOT dev to keep context lean)
 _PLATFORM_TOOLS = [
     "platform_agents",
     "platform_missions",
@@ -3154,7 +3127,8 @@ _PLATFORM_TOOLS = [
     "platform_guide",  # BMAD /bmad-help inspired — context-aware next-step guidance
 ]
 for _role_key in ROLE_TOOL_MAP:
-    ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
+    if _role_key != "dev":
+        ROLE_TOOL_MAP[_role_key].extend(_PLATFORM_TOOLS)
 
 
 # Project lifecycle tools — available to CDP (PM) and architecture roles

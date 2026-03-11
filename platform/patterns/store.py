@@ -25,15 +25,9 @@ class PatternDef:
     is_builtin: bool = False
     created_at: str = ""
     updated_at: str = ""
-    # Composite: ordered list of {pattern_id, task_override?} steps
-    steps: list[dict] = field(default_factory=list)
-    # A/B testing: route ab_ratio fraction of runs to this alt pattern
-    ab_alt_id: str = ""
-    ab_ratio: float = 0.0
 
 
 def _row_to_pattern(row) -> PatternDef:
-    cfg = json.loads(row["config_json"] or "{}")
     return PatternDef(
         id=row["id"],
         name=row["name"],
@@ -41,15 +35,12 @@ def _row_to_pattern(row) -> PatternDef:
         type=row["type"] or "sequential",
         agents=json.loads(row["agents_json"] or "[]"),
         edges=json.loads(row["edges_json"] or "[]"),
-        config=cfg,
+        config=json.loads(row["config_json"] or "{}"),
         memory_config=json.loads(row["memory_config_json"] or "{}"),
         icon=row["icon"] or "workflow",
         is_builtin=bool(row["is_builtin"]),
         created_at=row["created_at"] or "",
         updated_at=row["updated_at"] or "",
-        steps=cfg.get("steps", []),
-        ab_alt_id=cfg.get("ab_alt_id", ""),
-        ab_ratio=float(cfg.get("ab_ratio", 0.0)),
     )
 
 
@@ -469,94 +460,112 @@ class PatternStore:
                 ],
                 config={"event_driven": True},
             ),
-            # ── Fractal Worktree: recursive decompose + git worktrees per leaf ──
-            # Source: TinyAGI/fractals (MIT) — https://github.com/TinyAGI/fractals
-            # Key innovation: classify gate (atomic vs composite) before decomposing,
-            # then each leaf runs in an isolated git worktree → no parallel file conflicts.
+            # ── New Agentic Patterns ─────────────────────────────────
             PatternDef(
-                id="fractal-worktree", name="Fractal Worktree", type="fractal-worktree",
-                description="Décomposition récursive d'une tâche en arbre + exécution des feuilles en git worktrees isolés. Idéal pour la génération de code parallèle sans conflits.",
-                icon="git-branch", is_builtin=True,
+                id="tournament", name="Tournoi", type="tournament",
+                description="N agents résolvent la même tâche indépendamment. Un juge choisit le meilleur résultat. Idéal pour la diversité d'approches.",
+                icon="award", is_builtin=True,
                 agents=[
-                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
-                    {"id": "n2", "agent_id": "worker", "label": "Worker A", "x": 150, "y": 260},
-                    {"id": "n3", "agent_id": "worker", "label": "Worker B", "x": 450, "y": 260},
+                    {"id": "n1", "agent_id": "brain", "label": "Candidat A", "x": 100, "y": 60},
+                    {"id": "n2", "agent_id": "lead_backend", "label": "Candidat B", "x": 300, "y": 60},
+                    {"id": "n3", "agent_id": "lead_frontend", "label": "Candidat C", "x": 500, "y": 60},
+                    {"id": "n4", "agent_id": "qa_lead", "label": "Juge", "x": 300, "y": 260},
                 ],
                 edges=[
-                    {"from": "n1", "to": "n2", "type": "delegation"},
-                    {"from": "n1", "to": "n3", "type": "delegation"},
+                    {"from": "n1", "to": "n4", "type": "submit"},
+                    {"from": "n2", "to": "n4", "type": "submit"},
+                    {"from": "n3", "to": "n4", "type": "submit"},
                 ],
-                config={"max_depth": 3, "max_children": 5},
             ),
-            # ── Backpropagation Merge: bottom-up merge after parallel execution ──
-            # Source: TinyAGI/fractals roadmap "Backpropagation (merge agent)" (MIT)
-            # After leaf agents complete, a merge agent synthesizes results bottom-up:
-            # leaf1+leaf2 → merge(composite1) → leaf3+leaf4 → merge(composite2) → merge(root)
             PatternDef(
-                id="backprop-merge", name="Backpropagation Merge", type="backprop-merge",
-                description="Décomposition fractale + fusion bottom-up des résultats. Chaque nœud composite reçoit la synthèse de ses enfants. Résout les conflits entre agents parallèles.",
-                icon="git-merge", is_builtin=True,
+                id="escalation", name="Escalade", type="escalation",
+                description="Approche en tiers : junior → senior → expert. Arrêt au premier succès. Optimise les coûts LLM.",
+                icon="trending-up", is_builtin=True,
                 agents=[
-                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
-                    {"id": "n2", "agent_id": "worker", "label": "Worker A", "x": 100, "y": 260},
-                    {"id": "n3", "agent_id": "worker", "label": "Worker B", "x": 300, "y": 260},
-                    {"id": "n4", "agent_id": "chef-projet", "label": "Merger", "x": 500, "y": 260},
+                    {"id": "n1", "agent_id": "worker", "label": "Junior", "x": 100, "y": 160},
+                    {"id": "n2", "agent_id": "brain", "label": "Senior", "x": 300, "y": 160},
+                    {"id": "n3", "agent_id": "architecte", "label": "Expert", "x": 500, "y": 160},
                 ],
                 edges=[
-                    {"from": "n1", "to": "n2", "type": "delegation"},
-                    {"from": "n1", "to": "n3", "type": "delegation"},
-                    {"from": "n2", "to": "n4", "type": "report"},
-                    {"from": "n3", "to": "n4", "type": "report"},
+                    {"from": "n1", "to": "n2", "type": "escalate"},
+                    {"from": "n2", "to": "n3", "type": "escalate"},
                 ],
-                config={"max_depth": 3, "max_children": 5},
             ),
-            # ── Fractal Stories: classify gate for product/story decomposition ──
             PatternDef(
-                id="fractal-stories", name="Fractal Stories", type="fractal-stories",
-                description="Décomposition produit récursive avec classify gate (livrable en 1 sprint ?). Vision → Epic → Feature → Story. Chaque feuille = story atomique avec sa lignée.",
-                icon="layers", is_builtin=True,
-                agents=[
-                    {"id": "n1", "agent_id": "brain", "label": "Planner", "x": 300, "y": 60},
-                    {"id": "n2", "agent_id": "chef-projet", "label": "Story Writer A", "x": 150, "y": 260},
-                    {"id": "n3", "agent_id": "expert-metier", "label": "Story Writer B", "x": 450, "y": 260},
-                ],
-                edges=[
-                    {"from": "n1", "to": "n2", "type": "delegation"},
-                    {"from": "n1", "to": "n3", "type": "delegation"},
-                ],
-                config={"max_depth": 3, "max_children": 6},
-            ),
-            # ── Fractal Tests: generate test cases from acceptance criteria ──
-            PatternDef(
-                id="fractal-tests", name="Fractal Tests", type="fractal-tests",
-                description="Génère des cas de test depuis les critères d'acception par décomposition récursive. Chaque test inclut sa lignée dans le docstring (Why: Feature → Suite → Case).",
-                icon="flask", is_builtin=True,
-                agents=[
-                    {"id": "n1", "agent_id": "brain", "label": "Test Planner", "x": 300, "y": 60},
-                    {"id": "n2", "agent_id": "testeur", "label": "Test Writer A", "x": 150, "y": 260},
-                    {"id": "n3", "agent_id": "testeur", "label": "Test Writer B", "x": 450, "y": 260},
-                ],
-                edges=[
-                    {"from": "n1", "to": "n2", "type": "delegation"},
-                    {"from": "n1", "to": "n3", "type": "delegation"},
-                ],
-                config={"max_depth": 3, "max_children": 5},
-            ),
-            # ── Fractal QA: atomic BDD/Gherkin scenarios from acceptance criteria ──
-            PatternDef(
-                id="fractal-qa", name="Fractal QA", type="fractal-qa",
-                description="Décompose les critères d'acception en scénarios BDD atomiques (Given/When/Then). Chaque scénario tracé avec son lineage complet. Rapport PASS/FAIL agrégé.",
+                id="voting", name="Vote", type="voting",
+                description="N agents évaluent indépendamment, majorité/moyenne gagne. Go/no-go, scoring qualité, évaluation risque.",
                 icon="check-circle", is_builtin=True,
                 agents=[
-                    {"id": "n1", "agent_id": "brain", "label": "QA Planner", "x": 300, "y": 60},
-                    {"id": "n2", "agent_id": "testeur", "label": "QA Agent A", "x": 150, "y": 260},
-                    {"id": "n3", "agent_id": "testeur", "label": "QA Agent B", "x": 450, "y": 260},
+                    {"id": "n1", "agent_id": "architecte", "label": "Votant A", "x": 100, "y": 60},
+                    {"id": "n2", "agent_id": "security-critic", "label": "Votant B", "x": 300, "y": 60},
+                    {"id": "n3", "agent_id": "qa_lead", "label": "Votant C", "x": 500, "y": 60},
                 ],
                 edges=[
-                    {"from": "n1", "to": "n2", "type": "delegation"},
-                    {"from": "n1", "to": "n3", "type": "delegation"},
+                    {"from": "n1", "to": "n2", "type": "parallel"},
+                    {"from": "n1", "to": "n3", "type": "parallel"},
                 ],
-                config={"max_depth": 3, "max_children": 5},
+            ),
+            PatternDef(
+                id="speculative", name="Spéculatif", type="speculative",
+                description="Course parallèle : plusieurs approches simultanées, le premier succès est retenu. Solutions incertaines.",
+                icon="zap", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Approche A", "x": 100, "y": 160},
+                    {"id": "n2", "agent_id": "lead_backend", "label": "Approche B", "x": 300, "y": 160},
+                    {"id": "n3", "agent_id": "lead_frontend", "label": "Approche C", "x": 500, "y": 160},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "parallel"},
+                    {"from": "n1", "to": "n3", "type": "parallel"},
+                ],
+                config={"race": True},
+            ),
+            PatternDef(
+                id="red-blue", name="Red Team / Blue Team", type="red-blue",
+                description="Adversarial structuré : red team attaque/trouve les failles, blue team défend/corrige. Audits sécurité, pentesting.",
+                icon="shield", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "security-critic", "label": "Red Team", "x": 100, "y": 160},
+                    {"id": "n2", "agent_id": "brain", "label": "Blue Team", "x": 400, "y": 160},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "attack"},
+                    {"from": "n2", "to": "n1", "type": "defend"},
+                ],
+                config={"max_rounds": 3},
+            ),
+            PatternDef(
+                id="relay", name="Relais", type="relay",
+                description="Passage de relais : chaque agent enrichit progressivement le résultat précédent. Skeleton → tests → docs → review.",
+                icon="repeat", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "architecte", "label": "Skeleton", "x": 100, "y": 160},
+                    {"id": "n2", "agent_id": "brain", "label": "Implementation", "x": 250, "y": 160},
+                    {"id": "n3", "agent_id": "tester", "label": "Tests", "x": 400, "y": 160},
+                    {"id": "n4", "agent_id": "code-reviewer", "label": "Review", "x": 550, "y": 160},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "relay"},
+                    {"from": "n2", "to": "n3", "type": "relay"},
+                    {"from": "n3", "to": "n4", "type": "relay"},
+                ],
+            ),
+            PatternDef(
+                id="mob", name="Mob Programming", type="mob",
+                description="Tous les agents voient le même code, rotation driver/navigateurs. Débogage complexe, partage de connaissances.",
+                icon="users", is_builtin=True,
+                agents=[
+                    {"id": "n1", "agent_id": "brain", "label": "Driver", "x": 300, "y": 60},
+                    {"id": "n2", "agent_id": "architecte", "label": "Navigator A", "x": 100, "y": 260},
+                    {"id": "n3", "agent_id": "security-critic", "label": "Navigator B", "x": 300, "y": 260},
+                    {"id": "n4", "agent_id": "code-reviewer", "label": "Navigator C", "x": 500, "y": 260},
+                ],
+                edges=[
+                    {"from": "n1", "to": "n2", "type": "mob"},
+                    {"from": "n1", "to": "n3", "type": "mob"},
+                    {"from": "n1", "to": "n4", "type": "mob"},
+                ],
+                config={"rotate_driver": True, "max_rounds": 4},
             ),
         ]
 

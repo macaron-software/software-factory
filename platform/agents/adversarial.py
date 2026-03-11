@@ -467,7 +467,7 @@ def check_l0(
                 issues.append(
                     f"NO_TESTS: {source_files} source files written but 0 test files"
                 )
-                score += 4
+                score += 2  # Warning level — not rejection-worthy for bug-fix tasks
 
         # NO_BUILD_RUN: agent wrote source files but never called build/test tool
         if source_files >= 1:

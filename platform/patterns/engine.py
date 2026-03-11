@@ -905,6 +905,17 @@ This is BLOCKING: developers cannot start without your design tokens."""
         else:
             full_task += _RESEARCH_PROTOCOL
 
+    # Log which protocol was injected for diagnostics
+    _proto_name = "EXEC" if _EXEC_PROTOCOL in full_task else (
+        "CICD" if _CICD_PROTOCOL in full_task else (
+            "QA" if _QA_PROTOCOL in full_task else (
+                "DECOMPOSE" if _DECOMPOSE_PROTOCOL in full_task else "OTHER")))
+    logger.warning(
+        "PROTOCOL agent=%s role=%s protocol=%s tools=%d",
+        agent.id, agent.role, _proto_name,
+        len(ctx.allowed_tools) if ctx.allowed_tools else -1,
+    )
+
     # Execute with streaming SSE
     executor = get_executor()
     result = None

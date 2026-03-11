@@ -899,12 +899,12 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
                         seen_msgs.add(msg_part)
                         unique_errors.append(line.strip())
             if unique_errors:
-                err_text = "\n".join(unique_errors[:15])
-                suffix = f"\n... and {len(unique_errors) - 15} more unique errors" if len(unique_errors) > 15 else ""
+                err_text = "\n".join(unique_errors[:5])
+                suffix = f"\n... and {len(unique_errors) - 5} more errors (fix above first, then rebuild)" if len(unique_errors) > 5 else ""
                 return (
                     f"[{tool_name.upper()}] {status} ({len(unique_errors)} unique errors)\n$ {command}\n"
                     f"{err_text}{suffix}\n\n"
-                    f"ACTION REQUIRED: Use code_edit to fix these errors. Read the failing files first with code_read."
+                    f"ACTION REQUIRED: Use code_edit(path=..., old_str=..., new_str=...) to fix each error above, then call build() again."
                 )
         return f"[{tool_name.upper()}] {status}\n$ {command}\n{out[-3000:]}"
     except subprocess.TimeoutExpired:

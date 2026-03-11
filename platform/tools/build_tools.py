@@ -31,25 +31,42 @@ class BuildTool(BaseTool):
                 return err
         except ImportError:
             pass
-        # Fix swift command to use Apple Swift (not OpenStack CLI)
+        # Fix swift command to use Apple Swift (not OpenStack python-swiftclient)
         import os
+        import re as _re
 
-        if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
-            cmd = "/usr/bin/" + cmd.strip()
+        if os.path.isfile("/usr/bin/swift") and _re.search(r'\bswift\s+(?:build|test|package|run)\b', cmd):
+            cmd = _re.sub(r'\bswift\b', '/usr/bin/swift', cmd)
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
-        output = (
-            result.stdout[-3000:]
-            if result.returncode == 0
-            else (result.stderr[-3000:] or result.stdout[-3000:])
-        )
-        status = (
-            "[OK] SUCCESS"
-            if result.returncode == 0
-            else f"[FAIL] FAILED (exit {result.returncode})"
-        )
         prefix = f"[sandbox:{result.image}] " if result.sandboxed else ""
-        return f"{prefix}{status}\n{output}"
+        if result.returncode == 0:
+            output = result.stdout[-3000:]
+            return f"{prefix}[BUILD] SUCCESS\n$ {cmd}\n{output}"
+        # Build failed — extract first unique errors for actionable feedback
+        raw = result.stderr or result.stdout or ""
+        error_lines = []
+        seen_errors = set()
+        for line in raw.splitlines():
+            if ": error:" in line or "error:" == line.strip()[:6:]:
+                # Deduplicate by error message (ignore file/line)
+                msg_part = line.split(": error:")[-1].strip() if ": error:" in line else line.strip()
+                if msg_part not in seen_errors:
+                    seen_errors.add(msg_part)
+                    error_lines.append(line.strip())
+        total_errors = len(seen_errors) if seen_errors else raw.count("error:")
+        # Show first 5 unique errors — keep it focused for the agent
+        shown = error_lines[:5]
+        output_parts = [f"{prefix}[BUILD] FAILED (exit {result.returncode})", f"$ {cmd}"]
+        output_parts.append(f"\n{total_errors} unique errors found. Showing first {len(shown)} — fix these first:")
+        for e in shown:
+            output_parts.append(f"  {e}")
+        if total_errors > 5:
+            output_parts.append(f"  ... and {total_errors - 5} more errors (fix above first, then rebuild)")
+        output_parts.append(
+            "\nACTION REQUIRED: Use code_edit(path=..., old_str=..., new_str=...) to fix each error above, then call build() again."
+        )
+        return "\n".join(output_parts)
 
 
 class TestTool(BaseTool):
@@ -71,11 +88,12 @@ class TestTool(BaseTool):
                 return err
         except ImportError:
             pass
-        # Fix swift command to use Apple Swift (not OpenStack CLI)
+        # Fix swift command to use Apple Swift (not OpenStack python-swiftclient)
         import os
+        import re as _re
 
-        if cmd.strip().startswith("swift ") and os.path.isfile("/usr/bin/swift"):
-            cmd = "/usr/bin/" + cmd.strip()
+        if os.path.isfile("/usr/bin/swift") and _re.search(r'\bswift\s+(?:build|test|package|run)\b', cmd):
+            cmd = _re.sub(r'\bswift\b', '/usr/bin/swift', cmd)
         sandbox = get_sandbox(cwd)
         result = sandbox.run(cmd, cwd=cwd, timeout=300)
         output = result.stdout[-3000:] + result.stderr[-1000:]
@@ -295,10 +313,7 @@ class DockerBuildVerifyTool(BaseTool):
             None,
             lambda: subprocess.run(
                 ["docker", "build", "-t", tag, "."],
-                cwd=cwd,
-                capture_output=True,
-                text=True,
-                timeout=600,
+                cwd=cwd, capture_output=True, text=True, timeout=600,
             ),
         )
 
@@ -306,7 +321,7 @@ class DockerBuildVerifyTool(BaseTool):
         subprocess.run(["docker", "rmi", "-f", tag], capture_output=True, timeout=15)
 
         if r.returncode == 0:
-            lines = [ln for ln in (r.stdout + r.stderr).splitlines() if ln.strip()]
+            lines = [l for l in (r.stdout + r.stderr).splitlines() if l.strip()]
             summary = "\n".join(lines[-5:]) if lines else "Build succeeded"
             return f"[OK] Docker build SUCCESS\n{summary}"
         else:
