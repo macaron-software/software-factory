@@ -603,6 +603,7 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
+    lineage: list[str] | None = None,
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
@@ -613,6 +614,10 @@ async def run_pattern(
         phase_id=phase_id,
         max_iterations=pattern.config.get("max_iterations", 5),
     )
+    # Lineage context: prepend to initial_task so agents know their place in the workflow
+    if lineage:
+        lineage_ctx = " | ".join(lineage)
+        initial_task = f"[{lineage_ctx}]\n{initial_task}"
 
     # Resolve agents for each node — Thompson Sampling when multiple candidates exist
     agent_store = get_agent_store()
