@@ -13,12 +13,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import re
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from ..agents.store import AgentDef
 from ..llm.client import LLMClient, LLMMessage, LLMResponse, get_llm_client
@@ -31,19 +29,11 @@ from .tool_runner import (
     _record_artifact,
 )
 from .tool_schemas import _filter_schemas, _get_tool_schemas
-from .tool_selector import select_tools as _bm25_select
-from ..db.migrations import get_db
-from ..hooks import HookContext, HookType, registry as _hook_registry
 
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-# Increased from 8→15: complex agents (devops, E2E) need more budget for
-# multi-step operations (read config → write Dockerfile → docker_deploy → check)
-MAX_TOOL_ROUNDS = 15
-
-# REF: arXiv:2602.20021 — SBD-05: per-run tool call budget to prevent resource exhaustion
-MAX_TOOL_CALLS_PER_RUN = int(os.getenv("MAX_TOOL_CALLS_PER_RUN", "50"))
+MAX_TOOL_ROUNDS = 8
 
 # Tools that produce code changes and should trigger auto-verification
 _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
@@ -116,9 +106,8 @@ class ExecutionContext:
     epic_run_id: str | None = None
     # Uruk capability grade: 'organizer' (full context) or 'executor' (task-scoped)
     capability_grade: str = "executor"
-    # Lineage chain: explains WHY this agent is being called (fractal vertical traceability)
-    # Format: ["Vision: <v>", "Epic: <e>", "Story: <s>", "Task: <t>"]
-    lineage: list[str] = field(default_factory=list)
+    # Max tool-calling rounds (0 = use global MAX_TOOL_ROUNDS)
+    max_rounds: int = 0
 
 
 @dataclass
@@ -153,6 +142,8 @@ def _get_rate_limit_setting(key: str, default: str) -> str:
     now = time.monotonic()
     if now - _settings_cache_ts > _SETTINGS_TTL:
         try:
+            from ..db.migrations import get_db
+
             with get_db() as db:
                 rows = db.execute(
                     "SELECT key, value FROM platform_settings WHERE key LIKE 'rate_limit_%'"
@@ -174,6 +165,7 @@ def _check_session_budget(session_id: str) -> None:
         cap = float(cap_str)
         if cap <= 0:
             return
+        from ..db.migrations import get_db
 
         with get_db() as db:
             row = db.execute(
@@ -208,6 +200,7 @@ def _write_llm_usage(
 ) -> None:
     """Insert one row into llm_usage. Never raises."""
     try:
+        from ..db.migrations import get_db
         from ..llm.observability import _estimate_cost
 
         cost = _estimate_cost(model, tokens_in, tokens_out)
@@ -237,6 +230,7 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
         return
     try:
         import uuid as _uuid_w
+        from ..db.migrations import get_db
 
         with get_db() as db:
             row = db.execute(
@@ -272,6 +266,8 @@ def _debit_project_wallet(project_id: str, cost_usd: float, reference_id: str) -
 def _update_mission_cost(session_id: str, epic_run_id: str | None) -> None:
     """Update epic_runs.llm_cost_usd from llm_traces. Never raises."""
     try:
+        from ..db.migrations import get_db
+
         with get_db() as db:
             mid = epic_run_id
             if not mid and session_id:
@@ -300,6 +296,34 @@ _CTX_KEEP_RECENT = 6
 _CTX_SUMMARIZE_THRESHOLD = 20
 
 
+def _sanitize_tool_pairs(messages: list) -> list:
+    """Remove orphaned tool results whose tool_call_id has no matching assistant tool_calls.
+
+    MiniMax returns HTTP 400 if a tool message references a tool_call_id that
+    doesn't exist in any prior assistant message's tool_calls list.
+    This happens after context summarization drops assistant messages.
+    """
+    # Collect all tool_call IDs from assistant messages
+    valid_ids: set[str] = set()
+    for m in messages:
+        tc = getattr(m, "tool_calls", None)
+        if tc:
+            for call in tc:
+                cid = call.get("id") if isinstance(call, dict) else getattr(call, "id", None)
+                if cid:
+                    valid_ids.add(cid)
+
+    # Filter out tool messages with orphaned tool_call_id
+    cleaned = []
+    for m in messages:
+        role = getattr(m, "role", "")
+        tcid = getattr(m, "tool_call_id", None)
+        if role == "tool" and tcid and tcid not in valid_ids:
+            continue  # drop orphaned tool result
+        cleaned.append(m)
+    return cleaned
+
+
 async def _summarize_context(
     messages: list, llm: "LLMClient", provider: str, model: str
 ) -> list:
@@ -317,12 +341,6 @@ async def _summarize_context(
     tail = messages[-_CTX_KEEP_RECENT:]
     # Don't start tail with orphaned tool results
     while tail and getattr(tail[0], "role", "") == "tool":
-        tail = tail[1:]
-    # Don't start tail with assistant that has tool_calls (results may be gone)
-    while tail and getattr(tail[0], "role", "") == "assistant" and getattr(tail[0], "tool_calls", None):
-        # Check if the tool results follow
-        if len(tail) > 1 and getattr(tail[1], "role", "") == "tool":
-            break  # paired — keep it
         tail = tail[1:]
     middle = messages[len(header) : len(messages) - len(tail)]
 
@@ -373,12 +391,12 @@ async def _summarize_context(
                 role="system",
                 content=f"[Context summary — earlier work]\n{summary_text}",
             )
-            return header + [summary_msg] + tail
+            return _sanitize_tool_pairs(header + [summary_msg] + tail)
     except Exception:
         pass
 
     # Fallback: simple truncation
-    return header + tail
+    return _sanitize_tool_pairs(header + tail)
 
 
 # Minimum messages before memory extraction runs (avoid trivial exchanges)
@@ -476,30 +494,6 @@ async def _extract_session_memory(
         logger.debug("Memory extraction failed (non-critical): %s", e)
 
 
-def _priority_tool_list(tools: list) -> list:
-    """Return single-item list with most important tool for forced calling.
-
-    Used on nudge rounds: shrinking to 1 tool triggers MiniMax's single-tool
-    forced mode (tool_choice by name) which is the only mode MiniMax respects.
-    Priority order matches AC agent roles (architect/codex → code_write,
-    qa-agent → docker_deploy, cicd → git_commit).
-    """
-    if not tools:
-        return tools
-    priority_names = (
-        "code_write",
-        "docker_deploy",
-        "git_commit",
-        "git_status",
-        "list_files",
-    )
-    for name in priority_names:
-        for t in tools:
-            if t.get("function", {}).get("name") == name:
-                return [t]
-    return [tools[0]]
-
-
 class AgentExecutor:
     """Executes agent logic: prompt → LLM → tool loop → response."""
 
@@ -522,9 +516,11 @@ class AgentExecutor:
                 while True:
                     await asyncio.sleep(30)
                     try:
+                        from ..db.migrations import get_db
+
                         with get_db() as db:
                             db.execute(
-                                "UPDATE epic_runs SET updated_at=NOW() WHERE id=?",
+                                "UPDATE epic_runs SET updated_at=datetime('now') WHERE id=?",
                                 (epic_run_id,),
                             )
                     except Exception:
@@ -563,6 +559,7 @@ class AgentExecutor:
         """
         try:
             import json as _json
+            from ..db.migrations import get_db
 
             with get_db() as db:
                 db.execute(
@@ -601,6 +598,9 @@ class AgentExecutor:
         total_tokens_out = 0
         all_tool_calls = []
 
+        if ctx.epic_run_id:
+            self._start_heartbeat(ctx.epic_run_id)
+
         # ── Prompt injection guard ──
         try:
             from ..security.prompt_guard import get_prompt_guard
@@ -632,33 +632,6 @@ class AgentExecutor:
                 else None
             )
 
-            # BM25 prompt-aware tool selection — narrows role-filtered set to
-            # the ~10-15 most relevant tools for the user's prompt.
-            # Inspired by Agentica @agentica/vector-selector (wrtnlabs/agentica).
-            #
-            # CTO agents get higher top_k and guaranteed orchestration tools
-            _CTO_ALWAYS_TOOLS = {
-                "create_project", "create_mission", "compose_workflow",
-                "launch_epic_run", "check_run_status", "memory_search",
-                "memory_store", "create_team", "create_sub_mission",
-            }
-            _is_cto = agent.id in ("strat-cto", "cto", "jarvis") or agent.role == "cto"
-            if tools and len(tools) > 15:
-                _top_k = 15 if _is_cto else 10
-                _always = _CTO_ALWAYS_TOOLS if _is_cto else set()
-                tools = _bm25_select(tools, user_message, top_k=_top_k, always_include=_always)
-
-            # Fire SESSION_START hooks
-            await _hook_registry.fire(
-                HookType.SESSION_START,
-                HookContext(
-                    hook_type=HookType.SESSION_START,
-                    agent_id=agent.id,
-                    session_id=ctx.session_id or "",
-                    project_id=ctx.project_id or "",
-                ),
-            )
-
             # Route provider: Darwin LLM Thompson Sampling + routing config
             # cheap_mode: if allowed_tools are all cheap (memory/read), use MiniMax
             from .routing import CHEAP_TOOLS as _CHEAP_TOOLS
@@ -674,9 +647,10 @@ class AgentExecutor:
 
             # Tool-calling loop
             deep_search_used = False
-            _run_tool_call_count = 0  # REF: arXiv:2602.20021 SBD-05 per-run tool budget
-            _active_tools = tools  # may be narrowed to 1 tool on nudge rounds
             for round_num in range(MAX_TOOL_ROUNDS):
+                # Sanitize tool pairs before every LLM call to prevent
+                # MiniMax HTTP 400 "tool result's tool id not found"
+                messages = _sanitize_tool_pairs(messages)
                 llm_resp = await self._llm.chat(
                     messages=messages,
                     provider=use_provider,
@@ -684,7 +658,7 @@ class AgentExecutor:
                     temperature=agent.temperature,
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
-                    tools=_active_tools,
+                    tools=tools,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
@@ -746,41 +720,7 @@ class AgentExecutor:
                 # No tool calls → final response
                 if not llm_resp.tool_calls:
                     content = llm_resp.content
-                    # Tool nudge: if tools are available and the model returned no tool calls,
-                    # inject a mandatory "call a tool NOW" message and retry (up to 3 times).
-                    # MiniMax M2.5 sometimes needs several nudges before it calls tools.
-                    if (
-                        tools
-                        and round_num <= 3
-                        and not any(
-                            t in (content or "").lower()
-                            for t in ["```", "result:", "output:", "error:"]
-                        )
-                    ):
-                        messages.append(
-                            LLMMessage(role="assistant", content=content or "")
-                        )
-                        messages.append(
-                            LLMMessage(
-                                role="user",
-                                content=(
-                                    "⚠️ ARRÊTE — ne décris pas ce que tu vas faire. "
-                                    "APPELLE UN OUTIL MAINTENANT. "
-                                    "Premier action = tool call obligatoire. "
-                                    "Si tu es développeur : appelle code_write. "
-                                    "Si tu es architecte : appelle code_write pour créer INCEPTION.md. "
-                                    "Si tu es QA : appelle docker_deploy. "
-                                    "Pas de texte introductif — agis directement."
-                                ),
-                            )
-                        )
-                        # Narrow to priority tool so MiniMax uses single-tool forced mode
-                        _active_tools = _priority_tool_list(tools)
-                        continue  # retry with nudge
                     break
-
-                # Tool was called → restore full tools for next round
-                _active_tools = tools
 
                 # Process tool calls
                 # Add assistant message with tool_calls to conversation
@@ -805,62 +745,6 @@ class AgentExecutor:
                 )
 
                 for tc in llm_resp.tool_calls:
-                    # Hard rejection: if active tools are narrowed (write-only nudge mode),
-                    # block read-tool calls to force the model to write instead
-                    _allowed_run_names = (
-                        {t.get("function", {}).get("name") for t in _active_tools}
-                        if _active_tools is not tools
-                        else None
-                    )
-                    _read_run_tools = {
-                        "code_read",
-                        "list_files",
-                        "code_search",
-                        "file_search",
-                    }
-                    if (
-                        _allowed_run_names is not None
-                        and tc.function_name not in _allowed_run_names
-                        and tc.function_name in _read_run_tools
-                    ):
-                        result = (
-                            f"Error: '{tc.function_name}' is not available. "
-                            "You have enough context. Call code_write NOW to create the files."
-                        )
-                        messages.append(
-                            LLMMessage(
-                                role="tool",
-                                content=result[:2000],
-                                tool_call_id=tc.id,
-                                name=tc.function_name,
-                            )
-                        )
-                        continue
-                    # ── QA scope enforcement: only allow writes to QA_REPORT_* and Dockerfile ──
-                    if tc.function_name in _CODE_WRITE_TOOLS:
-                        _role_l = (agent.role or "").lower()
-                        if "qa" in _role_l and "devops" not in _role_l:
-                            _write_path = str(tc.arguments.get("path", ""))
-                            _bn = _write_path.split("/")[-1]
-                            _qa_allowed = (
-                                _bn.startswith("QA_REPORT")
-                                or _bn == "Dockerfile"
-                                or _bn.startswith("Dockerfile.")
-                            )
-                            if not _qa_allowed:
-                                messages.append(
-                                    LLMMessage(
-                                        role="tool",
-                                        content=(
-                                            f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
-                                            "Only allowed: QA_REPORT_N.md, Dockerfile (Chromium fix). "
-                                            "If docker_deploy fails for non-Chromium reasons → call veto_cycle."
-                                        ),
-                                        tool_call_id=tc.id,
-                                        name=tc.function_name,
-                                    )
-                                )
-                                continue
                     # ── Workspace conflict guard: warn if another agent is writing this file ──
                     if tc.function_name in _CODE_WRITE_TOOLS and ctx.project_id:
                         import time as _time
@@ -879,34 +763,12 @@ class AgentExecutor:
                                     _existing,
                                     agent.id,
                                 )
-                    # PRE_TOOL hook (may block)
-                    _hook_ctx = HookContext(
-                        hook_type=HookType.PRE_TOOL,
-                        agent_id=agent.id,
-                        session_id=ctx.session_id or "",
-                        project_id=ctx.project_id or "",
-                        tool_name=tc.function_name,
-                        tool_args=dict(tc.arguments),
-                    )
-                    _pre_res = await _hook_registry.fire_pre(
-                        HookType.PRE_TOOL, _hook_ctx
-                    )
-                    if _pre_res.blocked:
-                        result = f"[BLOCKED by hook: {_pre_res.message}]"
-                    else:
-                        # REF: arXiv:2602.20021 SBD-05 — enforce per-run tool call budget
-                        _run_tool_call_count += 1
-                        if _run_tool_call_count > MAX_TOOL_CALLS_PER_RUN:
-                            raise BudgetExceededError(
-                                f"Tool call budget exceeded ({MAX_TOOL_CALLS_PER_RUN} calls/run). "
-                                "Increase MAX_TOOL_CALLS_PER_RUN env var if needed."
-                            )
-                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
-                    # POST_TOOL hook
-                    _hook_ctx.hook_type = HookType.POST_TOOL
-                    _hook_ctx.tool_result = result[:200]
-                    _hook_ctx.all_tool_calls = all_tool_calls
-                    await _hook_registry.fire(HookType.POST_TOOL, _hook_ctx)
+                        _file_write_locks[_lock_key] = ctx.session_id
+                        _file_write_lock_meta[_lock_key] = {
+                            "agent": agent.id,
+                            "ts": _time.time(),
+                        }
+                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     all_tool_calls.append(
                         {
                             "name": tc.function_name,
@@ -973,6 +835,20 @@ class AgentExecutor:
                                 )
                             )
 
+                        # Record traceability (best-effort)
+                        if tc.function_name == "code_write":
+                            try:
+                                from ..agents.adversarial import record_code_traceability
+                                record_code_traceability(
+                                    run_id=getattr(ctx, "run_id", "") or "",
+                                    agent_name=agent.id or "",
+                                    file_path=str(tc.arguments.get("path", tc.arguments.get("file_path", ""))),
+                                    content=_secret_content,
+                                    epic_id=getattr(ctx, "epic_id", "") or "",
+                                )
+                            except Exception:
+                                pass
+
                         for _repair_round in range(MAX_REPAIR_ROUNDS):
                             try:
                                 lint_tool = self._registry.get("lint")
@@ -1028,22 +904,13 @@ class AgentExecutor:
                                 total_tokens_out += fix_resp.tokens_out
                                 if not fix_resp.tool_calls:
                                     break
-                                # Add assistant message with tool_calls before tool results (OpenAI strict ordering)
+                                # Append assistant message with tool_calls BEFORE tool results
                                 messages.append(
                                     LLMMessage(
                                         role="assistant",
                                         content=fix_resp.content or "",
                                         tool_calls=[
-                                            {
-                                                "id": ftc.id,
-                                                "type": "function",
-                                                "function": {
-                                                    "name": ftc.function_name,
-                                                    "arguments": json.dumps(
-                                                        ftc.arguments
-                                                    ),
-                                                },
-                                            }
+                                            {"id": ftc.id, "type": "function", "function": {"name": ftc.function_name, "arguments": json.dumps(ftc.arguments)}}
                                             for ftc in fix_resp.tool_calls
                                         ],
                                     )
@@ -1144,132 +1011,21 @@ class AgentExecutor:
                 # Context summarization: when history grows large, summarize old messages
                 # instead of simply truncating (inspired by DeerFlow v2)
                 if len(messages) > 20:
-                    # PRE_COMPACT hook — let hooks save state before shrinkage
-                    await _hook_registry.fire(
-                        HookType.PRE_COMPACT,
-                        HookContext(
-                            hook_type=HookType.PRE_COMPACT,
-                            agent_id=agent.id,
-                            session_id=ctx.session_id or "",
-                            project_id=ctx.project_id or "",
-                            messages=messages,
-                            all_tool_calls=all_tool_calls,
-                        ),
-                    )
                     messages = await _summarize_context(
                         messages, self._llm, use_provider, use_model
                     )
 
-                # On penultimate round, force synthesis or code-write depending on agent type
+                # On penultimate round, disable tools to force synthesis next iteration
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    _has_write_tools = ctx.allowed_tools and any(
-                        t in (ctx.allowed_tools or [])
-                        for t in ["code_write", "code_edit"]
-                    )
-                    if _has_write_tools:
-                        # Keep tools enabled so the agent CAN call code_write
-                        messages.append(
-                            LLMMessage(
-                                role="system",
-                                content=(
-                                    "⚠️ DERNIER TOUR — tu dois maintenant ÉCRIRE le code avec code_write. "
-                                    "Crée chaque fichier requis (tests d'abord, puis implémentation). "
-                                    "Ne lis plus de fichiers — écris uniquement."
-                                ),
-                            )
-                        )
-                    else:
-                        tools = None
-                        messages.append(
-                            LLMMessage(
-                                role="system",
-                                content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
-                            )
-                        )
-            else:
-                content = llm_resp.content or "(Max tool rounds reached)"
-
-            # Auto-code-write: when agent has write tools but never called code_write,
-            # extract fenced code blocks from content and write them.
-            # MiniMax workaround — it sometimes puts code in text instead of tool calls.
-            _wrote_code = any(
-                tc.get("name") in ("code_write", "code_edit", "fractal_code")
-                for tc in all_tool_calls
-            )
-            _has_write_tools_final = ctx.allowed_tools and any(
-                t in ("code_write", "code_edit") for t in ctx.allowed_tools
-            )
-            if (
-                _has_write_tools_final
-                and not _wrote_code
-                and content
-                and "```" in content
-            ):
-                _code_blocks = re.findall(
-                    r"```(?:python|javascript|typescript|java|go|rust|)\n(.*?)```",
-                    content,
-                    re.DOTALL,
-                )
-                _ws = getattr(ctx, "workspace_path", None) or "."
-                for idx, code_block in enumerate(_code_blocks):
-                    code_block = code_block.strip()
-                    if len(code_block) < 50:
-                        continue
-                    _fname = f"generated_{idx}.py"
-                    if "def test_" in code_block or "class Test" in code_block:
-                        _fname = f"test_generated_{idx}.py"
-                    _fpath = os.path.join(_ws, _fname)
-                    try:
-                        _fp = Path(_fpath)
-                        _fp.parent.mkdir(parents=True, exist_ok=True)
-                        _fp.write_text(code_block)
-                        all_tool_calls.append(
-                            {
-                                "name": "code_write",
-                                "args": {"path": _fpath, "content": code_block},
-                                "result": f"Auto-written {len(code_block)} chars to {_fpath}",
-                            }
-                        )
-                        logger.info(
-                            "Auto-code-write: %d chars → %s", len(code_block), _fpath
-                        )
-                    except Exception as e:
-                        logger.warning("Auto-code-write failed: %s", e)
-
-            # Force synthesis if output is too short but tools were called
-            # Prevents adversarial REJECT due to TOO_SHORT when agent read files but didn't write
-            if content and len(content.strip()) < 80 and all_tool_calls:
-                try:
-                    messages.append(LLMMessage(role="assistant", content=content or ""))
+                    tools = None
                     messages.append(
                         LLMMessage(
                             role="system",
-                            content=(
-                                "Ton résumé est trop court. Rédige maintenant un rapport COMPLET de 200 mots :\n"
-                                "- Quels fichiers as-tu créés, analysés ou mis à jour ?\n"
-                                "- Quel contenu précis contiennent-ils ?\n"
-                                "- Comment répondent-ils aux exigences du cycle ?\n"
-                                "Minimum 200 mots. Rapport factuel direct, pas d'excuse."
-                            ),
+                            content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
                         )
                     )
-                    _synth = await self._llm.chat(
-                        messages=messages,
-                        provider=use_provider,
-                        model=use_model,
-                        temperature=agent.temperature,
-                        max_tokens=2000,
-                        system_prompt="",
-                        tools=None,
-                    )
-                    if _synth.content and len(_synth.content.strip()) > len(
-                        content.strip()
-                    ):
-                        content = _synth.content
-                        total_tokens_in += _synth.tokens_in
-                        total_tokens_out += _synth.tokens_out
-                except Exception as _se:
-                    logger.debug("Synthesis expansion failed: %s", _se)
+            else:
+                content = llm_resp.content or "(Max tool rounds reached)"
 
             elapsed = int((time.monotonic() - t0) * 1000)
             # Strip raw MiniMax tool-call tokens that leak into content
@@ -1313,19 +1069,6 @@ class AgentExecutor:
                 )
             if ctx.epic_run_id:
                 self._stop_heartbeat(ctx.epic_run_id)
-            # SESSION_END hook (fire-and-forget)
-            asyncio.ensure_future(
-                _hook_registry.fire(
-                    HookType.SESSION_END,
-                    HookContext(
-                        hook_type=HookType.SESSION_END,
-                        agent_id=agent.id,
-                        session_id=ctx.session_id or "",
-                        project_id=ctx.project_id or "",
-                        all_tool_calls=all_tool_calls,
-                    ),
-                )
-            )
             return result
 
         except Exception as exc:
@@ -1343,40 +1086,13 @@ class AgentExecutor:
             is_llm_error = (
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
-            # Retry up to 3 times with exponential backoff for transient LLM errors
-            # Skip retry if all providers are in long cooldown (quota exhaustion)
-            _retry_count = getattr(ctx, "_retry_count", 0)
-            if is_llm_error and _retry_count < 3:
-                min_cooldown = min(
-                    (
-                        max(0, cd - time.monotonic())
-                        for cd in self._llm._provider_cooldown.values()
-                    ),
-                    default=0,
-                )
-                if min_cooldown > 300:
-                    # All providers in quota cooldown — no point retrying soon
-                    elapsed = int((time.monotonic() - t0) * 1000)
-                    logger.warning(
-                        "Agent %s skipping retry — providers in cooldown for %ds",
-                        agent.id,
-                        int(min_cooldown),
-                    )
-                    return ExecutionResult(
-                        content=f"Error: {exc}",
-                        agent_id=agent.id,
-                        duration_ms=elapsed,
-                        error=str(exc),
-                    )
-                ctx._retry_count = _retry_count + 1  # type: ignore[attr-defined]
-                _backoffs = [5, 15, 45]
-                base_wait = _backoffs[min(_retry_count, len(_backoffs) - 1)]
-                import random
-                wait = base_wait * (0.8 + 0.4 * random.random())  # ±20% jitter
+            # Retry once with backoff for transient LLM errors
+            if is_llm_error and not getattr(ctx, "_retried", False):
+                ctx._retried = True  # type: ignore[attr-defined]
+                wait = 30 + (time.monotonic() % 30)  # 30-60s jittered backoff
                 logger.warning(
-                    "Agent %s LLM error, retry %d/3 in %ds: %s",
+                    "Agent %s LLM error, retrying in %ds: %s",
                     agent.id,
-                    _retry_count + 1,
                     int(wait),
                     err_str[:100],
                 )
@@ -1404,6 +1120,9 @@ class AgentExecutor:
         total_tokens_in = 0
         total_tokens_out = 0
         all_tool_calls = []
+
+        if ctx.epic_run_id:
+            self._start_heartbeat(ctx.epic_run_id)
 
         # ── Prompt injection guard ──
         try:
@@ -1438,22 +1157,9 @@ class AgentExecutor:
                 else None
             )
 
-            # BM25 prompt-aware tool selection (streaming path) — same as run()
-            _CTO_ALWAYS_TOOLS_S = {
-                "create_project", "create_mission", "compose_workflow",
-                "launch_epic_run", "check_run_status", "memory_search",
-                "memory_store", "create_team", "create_sub_mission",
-            }
-            _is_cto_s = agent.id in ("strat-cto", "cto", "jarvis") or agent.role == "cto"
-            if tools and len(tools) > 15:
-                _top_k_s = 15 if _is_cto_s else 10
-                _always_s = _CTO_ALWAYS_TOOLS_S if _is_cto_s else set()
-                tools = _bm25_select(tools, user_message, top_k=_top_k_s, always_include=_always_s)
-
             # Tool-calling rounds (non-streaming) — same as run()
             deep_search_used = False
             final_content = ""
-            write_count = 0  # track code_write calls so far (used in nudge condition)
             logger.warning(
                 "Agent %s: tools_enabled=%s, tools=%s, allowed=%s",
                 agent.id,
@@ -1474,9 +1180,9 @@ class AgentExecutor:
                 agent, tools, mission_id=ctx.epic_run_id, cheap_mode=_cheap_mode_2
             )
 
-            _active_tools_2 = tools  # may be narrowed to 1 tool on nudge rounds
-            for round_num in range(MAX_TOOL_ROUNDS):
-                is_last_possible = (round_num >= MAX_TOOL_ROUNDS - 1) or tools is None
+            _max_rounds = ctx.max_rounds if ctx.max_rounds > 0 else MAX_TOOL_ROUNDS
+            for round_num in range(_max_rounds):
+                is_last_possible = (round_num >= _max_rounds - 1) or tools is None
 
                 # On last round or no tools: use streaming
                 if is_last_possible or not ctx.tools_enabled:
@@ -1513,6 +1219,9 @@ class AgentExecutor:
                     break
 
                 # Non-streaming tool round
+                # Sanitize tool pairs before every LLM call to prevent
+                # MiniMax HTTP 400 "tool result's tool id not found"
+                messages = _sanitize_tool_pairs(messages)
                 llm_resp = await self._llm.chat(
                     messages=messages,
                     provider=use_provider,
@@ -1520,7 +1229,7 @@ class AgentExecutor:
                     temperature=agent.temperature,
                     max_tokens=agent.max_tokens,
                     system_prompt=system if round_num == 0 else "",
-                    tools=_active_tools_2,
+                    tools=tools,
                 )
 
                 total_tokens_in += llm_resp.tokens_in
@@ -1562,75 +1271,6 @@ class AgentExecutor:
                 # No tool calls → stream remaining content in chunks
                 if not llm_resp.tool_calls:
                     final_content = llm_resp.content or ""
-                    # Tool nudge: same as run() — if tools available and no tool calls returned,
-                    # inject a "call a tool NOW" message and retry (up to 3 rounds).
-                    if (
-                        tools
-                        and round_num <= 3
-                        and not any(
-                            t in final_content.lower()
-                            for t in ["```", "result:", "output:", "error:"]
-                        )
-                    ):
-                        messages.append(
-                            LLMMessage(role="assistant", content=final_content)
-                        )
-                        messages.append(
-                            LLMMessage(
-                                role="user",
-                                content=(
-                                    "⚠️ ARRÊTE — ne décris pas ce que tu vas faire. "
-                                    "APPELLE UN OUTIL MAINTENANT. "
-                                    "Premier action = tool call obligatoire. "
-                                    "Si tu es développeur : appelle code_write. "
-                                    "Si tu es architecte : appelle code_write pour créer INCEPTION.md. "
-                                    "Si tu es QA : appelle docker_deploy. "
-                                    "Pas de texte introductif — agis directement."
-                                ),
-                            )
-                        )
-                        # Narrow to priority tool so MiniMax uses single-tool forced mode
-                        _active_tools_2 = _priority_tool_list(tools)
-                        continue  # retry with nudge
-
-                    # If work was done (files written) but output is too short,
-                    # inject a synthesis prompt so the adversarial can evaluate.
-                    _written_count = sum(
-                        1
-                        for tc_rec in all_tool_calls
-                        if tc_rec["name"] in ("code_write", "code_edit", "fractal_code")
-                    )
-                    if (
-                        _written_count > 0
-                        and len(final_content.strip()) < 80
-                        and round_num < MAX_TOOL_ROUNDS - 1
-                    ):
-                        messages.append(
-                            LLMMessage(role="assistant", content=final_content)
-                        )
-                        written_files = list(
-                            {
-                                tc_rec["args"].get("path", "")
-                                for tc_rec in all_tool_calls
-                                if tc_rec["name"] in ("code_write", "code_edit")
-                                and tc_rec["args"].get("path")
-                            }
-                        )
-                        files_str = ", ".join(written_files[:3]) or "les fichiers créés"
-                        messages.append(
-                            LLMMessage(
-                                role="user",
-                                content=(
-                                    f"✅ Tu as écrit : {files_str}. "
-                                    "Maintenant affiche le CONTENU COMPLET de ce que tu as créé. "
-                                    "L'adversarial doit pouvoir lire et évaluer ton travail. "
-                                    "Minimum 200 mots décrivant ce qui a été produit."
-                                ),
-                            )
-                        )
-                        tools = None  # final synthesis round — no more tools
-                        continue
-
                     # Strip <think> blocks before chunking (tags would split across chunks)
                     import re as _re_exec
 
@@ -1660,8 +1300,6 @@ class AgentExecutor:
                     break
 
                 # Process tool calls (same as run())
-                # Tool was called → restore full tools for next round
-                _active_tools_2 = tools
                 tc_msg_data = [
                     {
                         "id": tc.id,
@@ -1684,87 +1322,7 @@ class AgentExecutor:
 
                 for tc in llm_resp.tool_calls:
                     yield ("tool", tc.function_name)
-                    # ── QA scope enforcement (streaming): only QA_REPORT_* and Dockerfile ──
-                    if tc.function_name in _CODE_WRITE_TOOLS:
-                        _role_l = (agent.role or "").lower()
-                        if "qa" in _role_l and "devops" not in _role_l:
-                            _write_path = str(tc.arguments.get("path", ""))
-                            _bn = _write_path.split("/")[-1]
-                            _qa_ok = (
-                                _bn.startswith("QA_REPORT")
-                                or _bn == "Dockerfile"
-                                or _bn.startswith("Dockerfile.")
-                            )
-                            if not _qa_ok:
-                                messages.append(
-                                    LLMMessage(
-                                        role="tool",
-                                        content=(
-                                            f"Error: SCOPE VIOLATION — QA agent cannot write '{_bn}'. "
-                                            "Allowed: QA_REPORT_N.md, Dockerfile (Chromium only). "
-                                            "If docker_deploy fails → VETO. Do not fix source code."
-                                        ),
-                                        tool_call_id=tc.id,
-                                        name=tc.function_name,
-                                    )
-                                )
-                                logger.warning(
-                                    "QA SCOPE VIOLATION agent=%s path=%s", agent.id, _bn
-                                )
-                                continue
-                    # PRE_TOOL hook (may block)
-                    _hook_ctx2 = HookContext(
-                        hook_type=HookType.PRE_TOOL,
-                        agent_id=agent.id,
-                        session_id=ctx.session_id or "",
-                        project_id=ctx.project_id or "",
-                        tool_name=tc.function_name,
-                        tool_args=dict(tc.arguments),
-                    )
-                    _pre_res2 = await _hook_registry.fire_pre(
-                        HookType.PRE_TOOL, _hook_ctx2
-                    )
-                    if _pre_res2.blocked:
-                        result = f"[BLOCKED by hook: {_pre_res2.message}]"
-                    else:
-                        result = await _execute_tool(tc, ctx, self._registry, self._llm)
-                    # POST_TOOL hook
-                    _hook_ctx2.hook_type = HookType.POST_TOOL
-                    _hook_ctx2.tool_result = result[:200]
-                    await _hook_registry.fire(HookType.POST_TOOL, _hook_ctx2)
-                    # If schema was stripped to write-only but model still calls read tools,
-                    # append a write reminder to the result (don't block, give context + nudge)
-                    _allowed_tc_names = (
-                        {t.get("function", {}).get("name") for t in tools}
-                        if tools is not None
-                        else None
-                    )
-                    _read_tools = {
-                        "code_read",
-                        "list_files",
-                        "code_search",
-                        "file_search",
-                    }
-                    if (
-                        _allowed_tc_names is not None
-                        and tc.function_name not in _allowed_tc_names
-                        and tc.function_name in _read_tools
-                    ):
-                        # Hard rejection: don't execute, return error + nudge
-                        result = (
-                            f"Error: '{tc.function_name}' is not available. "
-                            "You have enough context. Call code_write NOW to create the files."
-                        )
-                        messages.append(
-                            LLMMessage(
-                                role="tool",
-                                content=result[:2000],
-                                tool_call_id=tc.id,
-                                name=tc.function_name,
-                            )
-                        )
-                        yield ("tool", f"BLOCKED:{tc.function_name}")
-                        continue
+                    result = await _execute_tool(tc, ctx, self._registry, self._llm)
                     logger.warning(
                         "TOOL_EXEC agent=%s tool=%s args=%s result=%s",
                         agent.id,
@@ -1781,6 +1339,8 @@ class AgentExecutor:
                     )
                     # Persist tool call to DB for monitoring
                     try:
+                        from ..db.migrations import get_db
+
                         with get_db() as db:
                             db.execute(
                                 "INSERT INTO tool_calls (agent_id, session_id, tool_name, parameters_json, result_json, success, timestamp) "
@@ -1895,6 +1455,17 @@ class AgentExecutor:
                                 total_tokens_out += _sfix.tokens_out
                                 if not _sfix.tool_calls:
                                     break
+                                # Append assistant message with tool_calls BEFORE tool results
+                                messages.append(
+                                    LLMMessage(
+                                        role="assistant",
+                                        content=_sfix.content or "",
+                                        tool_calls=[
+                                            {"id": stc.id, "type": "function", "function": {"name": stc.function_name, "arguments": json.dumps(stc.arguments)}}
+                                            for stc in _sfix.tool_calls
+                                        ],
+                                    )
+                                )
                                 for _stc in _sfix.tool_calls:
                                     _sres = await _execute_tool(
                                         _stc, ctx, self._registry, self._llm
@@ -1926,7 +1497,7 @@ class AgentExecutor:
                     # Don't start tail with orphaned tool results
                     while tail and getattr(tail[0], "role", "") == "tool":
                         tail = tail[1:]
-                    messages = messages[:2] + tail
+                    messages = _sanitize_tool_pairs(messages[:2] + tail)
 
                 if deep_search_used:
                     tools = None
@@ -1949,21 +1520,12 @@ class AgentExecutor:
                     and tools is not None
                     and has_write_tools
                 ):
-                    # Strip read-only tools — force write (allow Claude aliases: read_file, write_file)
+                    # Strip read-only tools — force write
                     write_only_tools = [
                         t
                         for t in tools
                         if t.get("function", {}).get("name")
-                        in (
-                            "code_write",
-                            "code_edit",
-                            "fractal_code",
-                            "git_commit",
-                            "read_file",
-                            "write_file",
-                            "read_many_files",
-                            "edit_file",
-                        )
+                        in ("code_write", "code_edit", "fractal_code", "git_commit")
                     ]
                     if write_only_tools:
                         tools = write_only_tools
@@ -1977,51 +1539,21 @@ class AgentExecutor:
                 elif (
                     round_num >= 2
                     and has_written
-                    and write_count < 3
+                    and write_count < 2
                     and tools is not None
                 ):
-                    _last_written = next(
-                        (
-                            t["args"].get("path", "")
-                            for t in reversed(all_tool_calls)
-                            if t["name"] in ("code_write", "code_edit")
-                        ),
-                        "",
-                    )
                     messages.append(
                         LLMMessage(
-                            role="user",
-                            content=(
-                                f"✅ {_last_written or 'file'} written ({write_count}/3). "
-                                "Write the NEXT required file NOW. "
-                                "TDD: if no test file yet → code_write(path=WORKSPACE/tests/test_*.py, content=...) "
-                                "otherwise write next source file or Dockerfile. "
-                                "Call code_write IMMEDIATELY."
-                            ),
+                            role="system",
+                            content="⚠️ 1 file written. Call code_write for remaining files.",
                         )
                     )
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    if has_written and write_count >= 2:
+                    if has_written:
                         tools = None
-                        written_paths = list(
-                            {
-                                tc_rec["args"].get("path", "?")
-                                for tc_rec in all_tool_calls
-                                if tc_rec["name"] in ("code_write", "code_edit")
-                                and tc_rec["args"].get("path")
-                            }
-                        )
-                        files_str = ", ".join(written_paths[:4]) or "les fichiers"
                         messages.append(
                             LLMMessage(
-                                role="system",
-                                content=(
-                                    f"✅ Fichiers créés/mis à jour : {files_str}.\n"
-                                    "MAINTENANT : décris en détail ce que tu as produit. "
-                                    "Liste chaque fichier, son contenu clé, sa structure, "
-                                    "et comment il répond aux exigences. Minimum 200 mots. "
-                                    "C'est ton rapport final au comité de validation."
-                                ),
+                                role="system", content="Tools done. Summarize changes."
                             )
                         )
                     # else: keep write-only tools — agent MUST write code
@@ -2053,42 +1585,13 @@ class AgentExecutor:
             is_llm_error = (
                 "All LLM providers failed" in err_str or "rate" in err_str.lower()
             )
-            # Retry up to 3 times with exponential backoff for transient LLM errors
-            _stream_retry_count = getattr(ctx, "_stream_retry_count", 0)
-            if is_llm_error and _stream_retry_count < 3:
-                min_cooldown = min(
-                    (
-                        max(0, cd - time.monotonic())
-                        for cd in self._llm._provider_cooldown.values()
-                    ),
-                    default=0,
-                )
-                if min_cooldown > 300:
-                    elapsed = int((time.monotonic() - t0) * 1000)
-                    logger.warning(
-                        "Agent %s streaming: skipping retry — providers in cooldown for %ds",
-                        agent.id,
-                        int(min_cooldown),
-                    )
-                    yield (
-                        "result",
-                        ExecutionResult(
-                            content=f"Error: {exc}",
-                            agent_id=agent.id,
-                            duration_ms=elapsed,
-                            error=str(exc),
-                        ),
-                    )
-                    return
-                ctx._stream_retry_count = _stream_retry_count + 1  # type: ignore[attr-defined]
-                _backoffs = [5, 15, 45]
-                base_wait = _backoffs[min(_stream_retry_count, len(_backoffs) - 1)]
-                import random
-                wait = base_wait * (0.8 + 0.4 * random.random())
+            # Retry once with backoff for transient LLM errors
+            if is_llm_error and not getattr(ctx, "_stream_retried", False):
+                ctx._stream_retried = True  # type: ignore[attr-defined]
+                wait = 30 + (time.monotonic() % 30)
                 logger.warning(
-                    "Agent %s streaming LLM error, retry %d/3 in %ds: %s",
+                    "Agent %s streaming LLM error, retrying in %ds: %s",
                     agent.id,
-                    _stream_retry_count + 1,
                     int(wait),
                     err_str[:100],
                 )

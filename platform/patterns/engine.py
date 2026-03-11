@@ -16,12 +16,9 @@ Agents within a wave run in parallel, waves run sequentially.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-import os
 import sys
-import time as _time
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -79,22 +76,6 @@ class PatternRun:
     success: bool = False
     error: str = ""
     flow_step: str = ""
-    # Observability: timing + rejection tracking for phase_outcomes
-    started_at: float = field(default_factory=_time.monotonic)
-    rejection_count: int = 0
-    _ab_group: str = ""  # "control" | "treatment" | "" — set by A/B router
-    # D — Adaptive timeout: per-node timeout in seconds (0 = no limit)
-    # WHY: replace fixed timeouts with data-driven values from phase_outcomes.
-    # Set by run_pattern() before dispatch using _compute_adaptive_timeout().
-    node_timeout: float = 0.0
-    # AgeMem: memory op counters — tracked via on_tool_call, written to phase_outcomes
-    # WHY: feed mem RL stage training (store/retrieve/prune frequencies = learning signal)
-    # Ref: AgeMem arXiv:2601.01885, 2026-03.
-    mem_store_count: int = 0
-    mem_retrieve_count: int = 0
-    mem_prune_count: int = 0
-    # Accumulated tool_calls across all nodes — used by PM checkpoint for evidence
-    all_tool_calls: list[dict] = field(default_factory=list)
 
 
 # SSE push (import from runner to share the same queues)
@@ -112,23 +93,6 @@ class WorkflowPaused(Exception):
         self.phase_index = phase_index
         self.checkpoint_msg = checkpoint_msg
         super().__init__("Workflow paused at checkpoint")
-
-
-class AdversarialEscalation(Exception):
-    """Raised when an agent exhausts adversarial retries without passing.
-
-    NEVER pass through rejected output. Propagates up to the workflow/AC runner,
-    which must escalate to a higher-level team or abort the current cycle phase.
-    """
-
-    def __init__(self, agent_name: str, score: int, issues: list[str]):
-        self.agent_name = agent_name
-        self.score = score
-        self.issues = issues
-        super().__init__(
-            f"Agent '{agent_name}' exhausted adversarial retries (score={score}/10): "
-            + "; ".join(issues[:3])
-        )
 
 
 async def _sse(run: PatternRun, event: dict):
@@ -209,13 +173,6 @@ DEPENDENCY MANIFESTS (MANDATORY — generate BEFORE build):
 - Node.js/TS: code_write package.json with scripts + deps, then build(command="npm install")
 - Rust: code_write Cargo.toml with [dependencies] section
 - Docker: code_write Dockerfile with correct base image + COPY + RUN install
-  - Vue/React/TS SPA: FROM node:18-alpine AS build → npm ci && npm run build → FROM nginx:alpine, COPY --from=build /app/dist /usr/share/nginx/html, EXPOSE 80
-  - Node.js API: FROM node:18-alpine, COPY package.json, RUN npm ci, COPY . ., EXPOSE 3000, CMD ["node","index.js"]
-  - Python/FastAPI: FROM python:3.11-slim, COPY requirements.txt, RUN pip install -r requirements.txt, COPY . ., EXPOSE 8000, CMD ["uvicorn","main:app","--host","0.0.0.0","--port","8000"]
-  - Go: FROM golang:1.21-alpine AS build, go build -o /app, FROM alpine, COPY --from=build /app, EXPOSE 8080
-  - Rust: FROM rust:1.75 AS build, cargo build --release, FROM debian:slim, COPY --from=build, EXPOSE 8080
-  - NEVER mix stages unless you actually COPY --from the previous stage
-  - NEVER add a python backend stage to a frontend-only Vue/React project
 - NEVER leave deps empty. List EVERY import your code uses. Missing deps = build failure.
 
 BUILD VERIFICATION (MANDATORY — run AFTER writing code):
@@ -227,27 +184,31 @@ BUILD VERIFICATION (MANDATORY — run AFTER writing code):
 - Android tests: android_test() — runs real unit tests
 - Swift/iOS: build(command="swift build") — only for iOS/macOS projects
 - Docker: build(command="docker build -t test .")
-- If build fails, FIX the code and retry. Do NOT commit broken code.
 - Do NOT use generic build() for Android — use android_build() instead.
+- CRITICAL: You MUST call the build() tool. Writing a shell script is NOT a build. The build() tool runs the command and returns real compiler output.
+- If you skip the build() call, your work will be REJECTED by the adversarial guard.
+
+BUILD-FIX LOOP (CRITICAL — you will be REJECTED if you skip this):
+When build() returns errors, you MUST:
+1. Read the error messages from the build output
+2. Use code_edit(path="file.swift", old_content="broken code", new_content="fixed code") for EACH error
+3. Run build() again to verify the fix
+4. Repeat until build succeeds
+Do NOT stop and describe errors in text. FIX them with code_edit. Text-only responses = REJECTION.
+If existing code has compilation errors, your PRIMARY job is to FIX them, not describe them.
 
 COMPLETION CHECKLIST (before git_commit):
-1. All source files written via code_write
+1. All source files written via code_write or fixed via code_edit
 2. Dependency manifest exists and is complete (requirements.txt / package.json / go.mod / Cargo.toml)
-3. Dockerfile exists (if project uses Docker)
-4. Build command ran successfully
+3. Dockerfile exists (only if project uses Docker — NOT needed for native apps like Swift/macOS/iOS/Android)
+4. Build command ran successfully (zero errors)
 5. git_commit with meaningful message"""
 
 # Validation protocol — telegraphic
-# REF: arXiv:2603.01896 — semi-formal reasoning improves fault localization +5pp,
-# code QA 87% accuracy. Structured Premises/Trace/Verdict prevents skipped cases.
 _QA_PROTOCOL = """ROLE: QA Engineer. You MUST run actual tests, not just read code.
 
-⚠️ STEP 0 — MANDATORY FIRST: docker_deploy(cwd=".", mission_id="{project_id}-qa")
-   Deploy the app BEFORE any test. Tests on un-deployed code = INVALID.
-   If docker_deploy fails: read the error, fix the Dockerfile via code_write, retry.
-
 WORKFLOW:
-1. docker_deploy(cwd=".", mission_id="{project_id}-qa") → get URL
+1. list_files → find test files and source files
 2. Run REAL tests using the correct tools:
    - Android/Kotlin: android_build() → android_test() → android_lint()
    - Android E2E: android_emulator_test() — boots real emulator, runs instrumented tests
@@ -255,18 +216,13 @@ WORKFLOW:
    - Node.js: build(command="npm test")
    - Playwright: playwright_test(spec="tests/e2e.spec.js")
 3. For web projects: TAKE REAL SCREENSHOTS:
-   - browser_screenshot(url=<URL from docker_deploy>) → captures real browser rendering
+   - browser_screenshot() → captures real browser rendering
    - Minimum 2 screenshots: home page + key interaction
 4. code_read source files → check for obvious bugs
-5. SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
-   Premises: list each FACT from tool output (exit codes, test counts, error lines)
-   Trace: map each claim to a premise or mark UNVERIFIED
-   Conclusion: [APPROVE] or [VETO] derived ONLY from premises above
-6. Deliver verdict based on ACTUAL test results + screenshots
+5. Deliver verdict based on ACTUAL test results + screenshots
 
 RULES:
 - NEVER use generic build() for Android — use android_build() and android_test() instead.
-- You MUST call docker_deploy first for web projects. No deploy = INVALID QA.
 - You MUST call build/test tools at least once. Reading code alone is NOT testing.
 - For web projects, you MUST call browser_screenshot at least once.
 - Verify REAL compilation output — if build tool returns empty output, it's a fake wrapper.
@@ -276,14 +232,9 @@ RULES:
 - DO NOT fabricate screenshots or build scripts."""
 
 # Review protocol — telegraphic
-# REF: arXiv:2603.01896 — semi-formal reasoning improves patch equivalence 78%→93%
 _REVIEW_PROTOCOL = """ROLE: Reviewer. Verify claims via tools.
 
 DO: code_read files → code_search references → build(command="...") to verify.
-SEMI-FORMAL REASONING before verdict (arXiv:2603.01896):
-  Premises: what does each code_read / build result prove?
-  Trace: does the implementation match the requirement, step by step?
-  Verdict: [APPROVE] or [REQUEST_CHANGES] derived from above — no skipped cases.
 VERDICT: [APPROVE] or [REQUEST_CHANGES] with specific file:line issues.
 You MUST call build tool to verify the code compiles before approving."""
 
@@ -637,41 +588,6 @@ def _build_team_context(run: PatternRun, current_node: str, to_agent_id: str) ->
     return "\n".join(parts)
 
 
-_DEFAULT_NODE_TIMEOUT = float(
-    os.environ.get("PATTERN_NODE_TIMEOUT", "0")
-)  # 0 = no limit
-_TIMEOUT_FACTOR = float(os.environ.get("PATTERN_TIMEOUT_FACTOR", "2.0"))
-
-
-async def _compute_adaptive_timeout(pattern_id: str) -> float:
-    """Return per-node timeout in seconds based on phase_outcomes history.
-
-    D — Adaptive Timeout: AVG(duration_secs) * PATTERN_TIMEOUT_FACTOR.
-    Falls back to PATTERN_NODE_TIMEOUT env var (default 0 = no limit).
-    WHY: static timeouts cause premature failures on large projects and wasted
-    budget on small ones. phase_outcomes gives us empirical data.
-    Ref: SF pattern observability, 2026-03.
-    """
-    if _DEFAULT_NODE_TIMEOUT > 0 and _TIMEOUT_FACTOR == 0:
-        return _DEFAULT_NODE_TIMEOUT
-    try:
-        from ..db.migrations import get_db as _gdb
-
-        _db = _gdb()
-        row = _db.execute(
-            "SELECT AVG(duration_s) AS avg_s, COUNT(*) AS n FROM phase_outcomes WHERE pattern_id=?",
-            (pattern_id,),
-        ).fetchone()
-        _db.close()
-        if row and row["n"] and row["n"] >= 3 and row["avg_s"]:
-            computed = round(row["avg_s"] * _TIMEOUT_FACTOR, 1)
-            # Enforce sane bounds: 30s minimum, 1800s maximum
-            return max(30.0, min(computed, 1800.0))
-    except Exception:
-        pass
-    return _DEFAULT_NODE_TIMEOUT  # 0 = no limit
-
-
 async def run_pattern(
     pattern: PatternDef,
     session_id: str,
@@ -679,9 +595,6 @@ async def run_pattern(
     project_id: str = "",
     project_path: str = "",
     phase_id: str = "",
-    lineage: list[str] | None = None,
-    technology: str = "generic",
-    phase_type: str = "generic",
 ) -> PatternRun:
     """Execute a pattern graph in a session. Returns the run state."""
     run = PatternRun(
@@ -692,58 +605,26 @@ async def run_pattern(
         phase_id=phase_id,
         max_iterations=pattern.config.get("max_iterations", 5),
     )
-    # Attach technology/phase_type for Darwin fitness recording
-    run._technology = technology
-    run._phase_type = phase_type
 
-    # Resolve agents for each node — TeamSelector (Darwin/Thompson) when skill ref or
-    # agent_id not found in store (falls back to legacy role selection if needed)
+    # Resolve agents for each node — Thompson Sampling when multiple candidates exist
     agent_store = get_agent_store()
+    _task_domain = project_id or ""
     for node in pattern.agents:
         nid = node["id"]
         agent_id = node.get("agent_id") or ""
         agent = None
         if agent_id:
             agent = agent_store.get(agent_id)
+            # If not found by exact id, try Thompson role-based selection
             if agent is None:
-                # skill: reference (e.g. "skill:developer") or role fallback
-                try:
-                    from ..patterns.team_selector import TeamSelector
-
-                    skill = agent_id.removeprefix("skill:")
-                    selected_id = TeamSelector.select(
-                        skill=skill,
-                        pattern_id=pattern.id,
-                        task_domain=project_id or "",
-                        technology=technology,
-                        phase_type=phase_type,
-                        mission_id=session_id,
-                        workflow_id=project_id or "",
-                    )
-                    if selected_id:
-                        agent = agent_store.get(selected_id)
-                except Exception:
-                    pass
-            if agent is None:
-                # Final fallback: legacy role-based Thompson (agent_scores)
                 try:
                     from ..agents.selection import select_agent_for_role
 
                     agent = select_agent_for_role(
-                        agent_id,
-                        task_domain=project_id or "",
-                        project_id=project_id or "",
+                        agent_id, task_domain=_task_domain, project_id=project_id or ""
                     )
                 except Exception:
                     pass
-            if agent is None:
-                # Last resort: use dev_fullstack as universal fallback
-                agent = agent_store.get("dev_fullstack")
-                if agent:
-                    import logging as _log_mod
-                    _log_mod.getLogger(__name__).warning(
-                        "Agent '%s' not found — falling back to dev_fullstack", agent_id,
-                    )
         run.nodes[nid] = NodeState(node_id=nid, agent_id=agent_id, agent=agent)
 
     # Determine pattern leader (first agent in the pattern)
@@ -777,34 +658,6 @@ async def run_pattern(
         if sys.getrecursionlimit() < 3000:
             sys.setrecursionlimit(3000)
 
-        # A/B routing: redirect ab_ratio fraction of runs to the alt pattern
-        # WHY: measure quality delta between two pattern strategies on real traffic.
-        # Ref: SF pattern observability, 2026-03.
-        import random as _random
-
-        _ab_group = ""
-        if (
-            pattern.ab_alt_id
-            and pattern.ab_ratio > 0
-            and _random.random() < pattern.ab_ratio
-        ):
-            _alt = (
-                get_pattern_store().get(pattern.ab_alt_id)
-                if pattern.ab_alt_id
-                else None
-            )
-            if _alt:
-                pattern = _alt
-                _ab_group = "treatment"
-        elif pattern.ab_alt_id:
-            _ab_group = "control"
-        run._ab_group = _ab_group  # stored for phase_outcomes write
-
-        # D — Adaptive timeout: compute per-node budget from phase_outcomes history
-        # WHY: static timeouts cause premature failures on large projects.
-        # PATTERN_TIMEOUT_FACTOR controls multiplier (default 2.0 = 2x avg duration).
-        run.node_timeout = await _compute_adaptive_timeout(pattern.id)
-
         ptype = pattern.type
         if ptype == "solo":
             await _impl_solo(_engine_proxy, run, initial_task)
@@ -826,8 +679,6 @@ async def run_pattern(
             await _impl_wave(_engine_proxy, run, initial_task)
         elif ptype == "human-in-the-loop":
             await _impl_human_in_the_loop(_engine_proxy, run, initial_task)
-        elif ptype == "composite":
-            await _impl_composite(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -841,8 +692,6 @@ async def run_pattern(
     except Exception as e:
         if isinstance(e, WorkflowPaused):
             raise  # let it propagate to run_workflow
-        if isinstance(e, AdversarialEscalation):
-            raise  # let it propagate to AC runner for higher-team escalation
         run.finished = True
         run.error = str(e)
         has_vetoes = False
@@ -872,80 +721,6 @@ async def run_pattern(
             "error": run.error,
         },
     )
-
-    # Record phase outcome — feeds GA, RLPolicy, analytics
-    # WHY: phase_outcomes was created but never written by engine.py; all learning
-    #      patterns (EvolutionScheduler, RLPolicy, ConsolidateAgent) depend on it.
-    try:
-        from ..db.migrations import get_db as _get_phase_db
-
-        _pdb = _get_phase_db()
-        _agent_ids = [n.agent_id for n in run.nodes.values() if n.agent_id]
-        _completed = sum(
-            1 for n in run.nodes.values() if n.status == NodeStatus.COMPLETED
-        )
-        _quality = round(_completed / max(len(run.nodes), 1), 3)
-        _duration = round(_time.monotonic() - run.started_at, 2)
-        # Resolve mission_id: prefer session config, fall back to session_id
-        _mission_id = run.session_id
-        try:
-            _sess = get_session_store().get(run.session_id)
-            if _sess and getattr(_sess, "config", None):
-                _mission_id = _sess.config.get("mission_id", run.session_id)
-        except Exception:
-            pass
-        _pdb.execute(
-            """INSERT INTO phase_outcomes
-               (workflow_id, phase_id, pattern_id, agent_ids,
-                team_size, success, quality_score, rejection_count, duration_s, complexity_tier,
-                ab_group, mem_store_count, mem_retrieve_count, mem_prune_count)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-            (
-                run.project_id or _mission_id,
-                run.phase_id or run.pattern.id,
-                run.pattern.id,
-                json.dumps(_agent_ids),
-                len(_agent_ids),
-                1 if run.success else 0,
-                _quality,
-                run.rejection_count,
-                _duration,
-                "simple",
-                getattr(run, "_ab_group", ""),
-                run.mem_store_count,
-                run.mem_retrieve_count,
-                run.mem_prune_count,
-            ),
-        )
-        # Also stamp epic_runs with the pattern_type for quick lookup
-        _pdb.execute(
-            "UPDATE epic_runs SET pattern_type=? WHERE session_id=? AND (pattern_type IS NULL OR pattern_type='')",
-            (run.pattern.type, run.session_id),
-        )
-        _pdb.commit()
-        # Darwin fitness update — record outcome per agent × pattern × technology × phase
-        _technology = getattr(run, "_technology", "generic")
-        _phase_type_k = getattr(run, "_phase_type", "generic")
-        if _technology and _agent_ids:
-            try:
-                from ..patterns.team_selector import update_team_fitness
-
-                for _aid in _agent_ids:
-                    update_team_fitness(
-                        _pdb,
-                        _aid,
-                        run.pattern.id,
-                        _technology,
-                        _phase_type_k,
-                        won=run.success,
-                        iterations=run.rejection_count + 1,
-                    )
-                _pdb.commit()
-            except Exception:
-                pass
-        _pdb.close()
-    except Exception:
-        pass  # never block pattern execution on observability writes
 
     return run
 
@@ -1175,20 +950,10 @@ This is BLOCKING: developers cannot start without your design tokens."""
         )
     except Exception as exc:
         logger.error("Streaming failed for %s, falling back: %s", agent.id, exc)
-        _t = run.node_timeout
-        result = await (
-            asyncio.wait_for(executor.run(ctx, full_task), timeout=_t)
-            if _t > 0
-            else executor.run(ctx, full_task)
-        )
+        result = await executor.run(ctx, full_task)
 
     if result is None:
-        _t = run.node_timeout
-        result = await (
-            asyncio.wait_for(executor.run(ctx, full_task), timeout=_t)
-            if _t > 0
-            else executor.run(ctx, full_task)
-        )
+        result = await executor.run(ctx, full_task)
 
     # Strip <think> and tool-call artifacts from final content
     content = result.content or ""
@@ -1302,9 +1067,7 @@ This is BLOCKING: developers cannot start without your design tokens."""
     # If rejected, re-run agent with feedback (max 1 retry = 2 attempts total)
     # Coordinators and discussion patterns skip L1 (expensive LLM check)
     # Discussion patterns: agents brainstorm, quality varies — L1 wastes rate-limited calls
-    MAX_ADVERSARIAL_RETRIES = (
-        2  # 2 retries = 3 attempts total (was 1 → agents gave up too fast)
-    )
+    MAX_ADVERSARIAL_RETRIES = 1  # 1 retry = 2 attempts total for execution patterns
     is_coordinator = protocol_override and "DECOMPOSE" in protocol_override
     _discussion_patterns = {"network", "human-in-the-loop", "debate", "aggregator"}
     is_discussion = run.pattern.type in _discussion_patterns
@@ -1332,7 +1095,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
             # Record guard event for metrics (best-effort, non-blocking)
             try:
                 from ..agents.adversarial import record_guard_event
-
                 record_guard_event(
                     run_id=getattr(run, "run_id", "") or "",
                     agent_name=agent.name,
@@ -1350,12 +1112,19 @@ This is BLOCKING: developers cannot start without your design tokens."""
                         guard_result.score,
                         "; ".join(guard_result.issues[:3]),
                     )
+                else:
+                    logger.warning(
+                        "ADVERSARIAL PASS [%s] score=%d",
+                        agent.name,
+                        guard_result.score,
+                    )
                 break  # approved
 
             # Severity tiers: 5-6 = pass with warning, 7-8 = retry, 9-10 = hard reject
             # BUT: HALLUCINATION/SLOP/STACK_MISMATCH keywords always force retry (never soft-pass)
             has_critical_flags = any(
                 "HALLUCINATION" in i or "SLOP" in i or "STACK_MISMATCH" in i
+                or "NO_CODE_WRITE" in i or "FAKE_BUILD" in i
                 for i in guard_result.issues
             )
             if guard_result.score <= 6 and not has_critical_flags:
@@ -1397,58 +1166,12 @@ This is BLOCKING: developers cannot start without your design tokens."""
             )
 
             if _adv_attempt < MAX_ADVERSARIAL_RETRIES:
-                # Re-run agent with rejection feedback + actionable fix hints
+                # Re-run agent with rejection feedback
                 feedback = "\n".join(f"- {i}" for i in guard_result.issues[:5])
-                # Map issue categories to actionable fix instructions
-                fix_hints = []
-                for issue in guard_result.issues[:5]:
-                    iu = issue.upper()
-                    if "SLOP" in iu:
-                        fix_hints.append(
-                            "WRITE REAL implementation code specific to the task, not generic text"
-                        )
-                    elif "MOCK" in iu or "STUB" in iu:
-                        fix_hints.append(
-                            "IMPLEMENT real logic — no TODO, no pass, no NotImplementedError"
-                        )
-                    elif "ECHO" in iu:
-                        fix_hints.append(
-                            "DO NOT repeat the task description — produce actual deliverables"
-                        )
-                    elif "FAKE_BUILD" in iu:
-                        fix_hints.append(
-                            "Write a REAL build script that compiles/bundles the project"
-                        )
-                    elif "TEST_CHEAT" in iu:
-                        fix_hints.append(
-                            "Write REAL test assertions — no test.skip(), no empty tests"
-                        )
-                    elif "HALLUCINATION" in iu:
-                        fix_hints.append(
-                            "Only reference files/APIs that ACTUALLY exist in the workspace"
-                        )
-                    elif "STACK_MISMATCH" in iu:
-                        fix_hints.append(
-                            "Use the CORRECT language/framework for this project stack"
-                        )
-                    elif "NO_TESTS" in iu:
-                        fix_hints.append("Add unit tests that cover the code you wrote")
-                    elif "NO_BUILD" in iu:
-                        fix_hints.append(
-                            "Run the build tool AFTER writing code — call 'build' to compile and verify"
-                        )
-                    elif "TRACEABILITY" in iu:
-                        fix_hints.append(
-                            "Add '# Ref: FEAT-xxx — feature name' comment at the top of source files"
-                        )
-                hints_str = (
-                    "\n".join(f"  → {h}" for h in fix_hints) if fix_hints else ""
-                )
                 retry_task = (
-                    f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ (score={guard_result.score}/10)]\n"
-                    f"Problèmes détectés:\n{feedback}\n\n"
-                    + (f"Actions correctives:\n{hints_str}\n\n" if hints_str else "")
-                    + f"Corrige ces problèmes. Même tâche:\n{task}"
+                    f"[ADVERSARIAL FEEDBACK — ton output précédent a été REJETÉ]\n"
+                    f"Problèmes:\n{feedback}\n\n"
+                    f"Corrige ces problèmes. Même tâche:\n{task}"
                 )
                 if protocol_override:
                     retry_task += "\n\n" + protocol_override
@@ -1497,6 +1220,14 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     state.output = content
                     # Accumulate tool_calls from retry
                     cumulative_tool_calls.extend(retry_result.tool_calls or [])
+                    # If retry produced empty output, skip guard check — it's a failure
+                    if not content or len(content.strip()) < 10:
+                        logger.warning(
+                            "ADVERSARIAL RETRY [%s] produced empty output — marking FAILED",
+                            agent.name,
+                        )
+                        state.status = NodeStatus.FAILED
+                        break
                     logger.info(
                         "ADVERSARIAL RETRY [%s] attempt=%d — re-running agent",
                         agent.name,
@@ -1508,35 +1239,38 @@ This is BLOCKING: developers cannot start without your design tokens."""
                     )
                     break
             else:
-                # All retries exhausted — NEVER pass through: escalate to higher team
-                state.status = NodeStatus.FAILED
-                issues_str = "; ".join(guard_result.issues[:3])
-                logger.warning(
-                    "ADVERSARIAL ESCALATE [%s] score=%d — exhausted %d attempts: %s",
-                    agent.name,
-                    guard_result.score,
-                    MAX_ADVERSARIAL_RETRIES + 1,
-                    issues_str,
+                # All retries exhausted — check if critical flags warrant failure
+                has_critical = any(
+                    "NO_CODE_WRITE" in i or "HALLUCINATION" in i or "FAKE_BUILD" in i
+                    for i in guard_result.issues
                 )
-                await _sse(
-                    run,
-                    {
-                        "type": "adversarial",
-                        "agent_id": agent.id,
-                        "agent_name": agent.name,
-                        "passed": False,
-                        "escalated": True,
-                        "score": guard_result.score,
-                        "level": guard_result.level,
-                        "issues": guard_result.issues[:5],
-                        "node_id": node_id,
-                    },
-                )
-                raise AdversarialEscalation(
-                    agent_name=agent.name,
-                    score=guard_result.score,
-                    issues=guard_result.issues,
-                )
+                if has_critical:
+                    # Critical issues: mark as FAILED (don't pass through garbage)
+                    state.status = NodeStatus.FAILED
+                    msg_type = "system"
+                    rejection = (
+                        f"[ADVERSARIAL FAILURE — {guard_result.level}] "
+                        f"Score: {guard_result.score}/10\n"
+                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                        + "\n\n"
+                    )
+                    content = rejection + content
+                    logger.warning(
+                        "ADVERSARIAL EXHAUSTED [%s] FAILED (critical): %s",
+                        agent.name,
+                        "; ".join(guard_result.issues[:3]),
+                    )
+                else:
+                    # Non-critical: pass with rejection warning (forward progress > perfection)
+                    state.status = NodeStatus.COMPLETED
+                    msg_type = "agent"
+                    rejection = (
+                        f"[ADVERSARIAL WARNING — {guard_result.level}] "
+                        f"Score: {guard_result.score}/10\n"
+                        + "\n".join(f"- {i}" for i in guard_result.issues[:3])
+                        + "\n\n"
+                    )
+                    content = rejection + content
                 # Track rejection in agent scores + update quality_score
                 try:
                     from ..db.migrations import get_db
@@ -1548,10 +1282,10 @@ This is BLOCKING: developers cannot start without your design tokens."""
                                VALUES (?, ?, 1, ?, 0.1)
                                ON CONFLICT(agent_id, epic_id)
                                DO UPDATE SET
-                                 rejected = agent_scores.rejected + 1,
-                                 iterations = agent_scores.iterations + ?,
+                                 rejected = rejected + 1,
+                                 iterations = iterations + ?,
                                  quality_score = ROUND(
-                                   (CAST(agent_scores.accepted AS REAL) / GREATEST(agent_scores.accepted + agent_scores.rejected + 1, 1))::numeric, 3
+                                   CAST(accepted AS REAL) / MAX(accepted + rejected + 1, 1), 3
                                  )""",
                             (
                                 agent.id,
@@ -1625,13 +1359,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
                 "node_id": node_id,
             },
         )
-
-    # Track node rejections for phase_outcomes observability
-    if state.status in (NodeStatus.VETOED, NodeStatus.FAILED):
-        run.rejection_count += 1
-
-    # Accumulate tool_calls for PM checkpoint evidence
-    run.all_tool_calls.extend(cumulative_tool_calls)
 
     store.add_message(
         MessageDef(
@@ -1870,11 +1597,11 @@ This is BLOCKING: developers cannot start without your design tokens."""
                    VALUES (?, ?, 1, 1, ?)
                    ON CONFLICT(agent_id, epic_id)
                    DO UPDATE SET
-                     accepted = agent_scores.accepted + 1,
-                     iterations = agent_scores.iterations + 1,
-                     quality_score = ROUND(LEAST(1.0,
-                       CAST(agent_scores.accepted + 1 AS REAL) / GREATEST(agent_scores.accepted + agent_scores.rejected + 1, 1) + ?
-                     )::numeric, 3)""",
+                     accepted = accepted + 1,
+                     iterations = iterations + 1,
+                     quality_score = ROUND(MIN(1.0,
+                       CAST(accepted + 1 AS REAL) / MAX(accepted + rejected + 1, 1) + ?
+                     ), 3)""",
                 (agent.id, run.project_id, 0.5 + _quality_bonus, _quality_bonus),
             )
             db.commit()
@@ -1884,24 +1611,6 @@ This is BLOCKING: developers cannot start without your design tokens."""
         pass
 
     return content
-
-
-def _make_memory_op_counter(run: "PatternRun"):
-    """Return an on_tool_call hook that increments PatternRun memory op counters.
-
-    WHY: phase_outcomes needs mem_store/retrieve/prune counts to train the memory
-    RL stages (AgeMem arXiv:2601.01885). Counting here is zero-cost and non-blocking.
-    """
-
-    async def _counter(tool_name: str, args: dict, result: str) -> None:
-        if tool_name == "memory_store":
-            run.mem_store_count += 1
-        elif tool_name == "memory_retrieve":
-            run.mem_retrieve_count += 1
-        elif tool_name == "memory_prune":
-            run.mem_prune_count += 1
-
-    return _counter
 
 
 async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionContext:
@@ -2067,10 +1776,9 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
             pass
 
     has_project = bool(run.project_id)
-    # Tools: every agent gets their configured tools when there's a project.
-    # Even without project_path, agents need tools (web_search, memory, etc.)
-    # File tools will gracefully error if no workspace exists.
-    tools_for_agent = has_project
+    # Tools: every agent gets their configured tools when there's a project workspace
+    # No rank gating — a CTO can search the web, a DSI can read project files
+    tools_for_agent = has_project and bool(project_path)
 
     # Role-based tool filtering — each agent only sees tools relevant to their role
     from ..agents.tool_schemas import _get_tools_for_agent
@@ -2094,8 +1802,6 @@ async def _build_node_context(agent: AgentDef, run: PatternRun) -> ExecutionCont
         vision=vision,
         tools_enabled=tools_for_agent,
         allowed_tools=allowed_tools,
-        # AgeMem: count memory ops via tool call hook — feeds phase_outcomes + RL stage
-        on_tool_call=_make_memory_op_counter(run),
     )
 
 
@@ -2112,7 +1818,6 @@ from .impls.router import run_router as _impl_router
 from .impls.sequential import run_sequential as _impl_sequential
 from .impls.solo import run_solo as _impl_solo
 from .impls.wave import run_wave as _impl_wave
-from .impls.composite import run_composite as _impl_composite
 
 
 class _EngineProxy:
@@ -2150,10 +1855,6 @@ class _EngineProxy:
     @staticmethod
     def _compute_waves(pattern):
         return _compute_waves(pattern)
-
-    @staticmethod
-    def _get_pattern_store():
-        return get_pattern_store()
 
 
 _engine_proxy = _EngineProxy()

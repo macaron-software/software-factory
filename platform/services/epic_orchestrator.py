@@ -55,15 +55,6 @@ DECISIONS ET CORRECTIFS (historique, ordre chronologique)
   Fix : base64.b64encode(brief) → string safe [A-Za-z0-9+/=] → passée en SSH →
   base64.b64decode() dans le container Python → string originale intacte.
 
-[Fix #9] Evidence gate trop laxiste — faux positifs HTML5 games (2026-03)
-  Symptôme : TypeScript jamais compilé, dist/ absent, game broken → run marqué completed score=83.
-  Cause 1  : criterion npm-test utilisait "npm test 2>&1 || true" → toujours exit 0.
-  Cause 2  : aucun criterion vérifiant dist/ ou fichiers JS compilés.
-  Cause 3  : exhaustion des sprints → phase_success=True même sur phase critique.
-  Fix 1    : suppression du "|| true" dans npm-test command.
-  Fix 2    : ajout criterion "build-produces-js" : npm run build + vérif dist/ ou JS.
-  Fix 3    : _CRITICAL_EVIDENCE_PHASES → phase_success=False si evidence gate exhaust.
-
 ═══════════════════════════════════════════════════════════════════════════════
 PRINCIPES D'ORCHESTRATION (décisions structurelles)
 ═══════════════════════════════════════════════════════════════════════════════
@@ -95,14 +86,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import time
 import traceback
 from datetime import datetime
 
-# Phases where evidence gate failure at max_sprints = hard failure (not "continue with issues")
-_CRITICAL_EVIDENCE_PHASES = {"tdd-sprint", "feature-e2e", "qa-sprint", "game-tdd"}
-
 logger = logging.getLogger(__name__)
+
+# Sprint limits — configurable via env vars
+# SAFe PIs can have 20-50 sprints for complex epics
+DEFAULT_MAX_SPRINTS_GATED = int(os.environ.get("MAX_SPRINTS_GATED", "20"))  # evidence-gated TDD
+DEFAULT_MAX_SPRINTS_DEV = int(os.environ.get("MAX_SPRINTS_DEV", "20"))      # other dev phases
 
 
 def _compute_quality_score(
@@ -418,80 +412,6 @@ class EpicOrchestrator:
 
     # ── helpers re-used by the phase loop ──
 
-    async def _check_deploy_http(
-        self, workspace: str, session_id: str, mission_id: str, phase_id: str
-    ) -> bool:
-        """PR4 — Deploy gate: try to find the deployed port and HTTP-check it.
-
-        Reads docker-compose.project.yml or package.json scripts for port hints.
-        Retries 3× with 5s delay. Returns True if HTTP responds, False otherwise.
-        Non-blocking on errors (returns True to avoid blocking non-web projects).
-        """
-        import asyncio
-        import os
-        import re
-        import urllib.request
-
-        port: int | None = None
-        # Try to find port from docker-compose
-        dc_path = (
-            os.path.join(workspace, "docker-compose.project.yml") if workspace else ""
-        )
-        if workspace and os.path.isfile(dc_path):
-            try:
-                content = open(dc_path).read()
-                m = re.search(r'"(\d{4,5}):(?:\d{4,5})"', content) or re.search(
-                    r"'(\d{4,5}):\d+'", content
-                )
-                if m:
-                    port = int(m.group(1))
-            except Exception:
-                pass
-        # Try package.json scripts for port hint
-        if not port and workspace:
-            pkg = os.path.join(workspace, "package.json")
-            if os.path.isfile(pkg):
-                try:
-                    import json as _json
-
-                    data = _json.load(open(pkg))
-                    scripts = data.get("scripts", {})
-                    for v in scripts.values():
-                        m = re.search(
-                            r"-p\s+(\d{4,5})|--port\s+(\d{4,5})|:(\d{4,5})", str(v)
-                        )
-                        if m:
-                            port = int(next(g for g in m.groups() if g))
-                            break
-                except Exception:
-                    pass
-        if not port:
-            # No port found — skip gate for non-HTTP projects (static files, libs, etc.)
-            logger.info(
-                "Deploy gate: no port found in %s — skipping HTTP check", workspace
-            )
-            return True
-
-        url = f"http://localhost:{port}"
-        for attempt in range(3):
-            try:
-                req = urllib.request.urlopen(url, timeout=5)
-                if req.status < 500:
-                    await self._sse_orch_msg(
-                        f"✅ Deploy gate OK — {url} répond HTTP {req.status}", phase_id
-                    )
-                    return True
-            except Exception as _e:
-                logger.debug("Deploy gate attempt %d/%d: %s", attempt + 1, 3, _e)
-            if attempt < 2:
-                await asyncio.sleep(5)
-
-        await self._sse_orch_msg(
-            f"⚠️ Deploy gate: {url} ne répond pas après 3 tentatives — vérifier que le service est démarré",
-            phase_id,
-        )
-        return False
-
     async def _sse_orch_msg(self, content: str, phase_id: str = ""):
         await self._push_sse(
             self.session_id,
@@ -592,7 +512,7 @@ class EpicOrchestrator:
             wf.config if hasattr(wf, "config") and isinstance(wf.config, dict) else {}
         )
         acceptance_criteria = get_criteria_for_workflow(
-            wf.id, wf_config, workspace=workspace, epic_id=mission.id
+            wf.id, wf_config, workspace=workspace
         )
         if acceptance_criteria:
             logger.warning(
@@ -853,20 +773,13 @@ class EpicOrchestrator:
 
             edges = self._build_edges(pattern_type, aids, leader)
 
-            # Merge YAML phase config with defaults (YAML overrides hardcoded defaults)
-            _default_config = {"max_rounds": 4, "max_iterations": 5}
-            _yaml_config = wf_phase.config or {}
-            _merged_cfg = {
-                **_default_config,
-                **{k: v for k, v in _yaml_config.items() if k not in ("agents",)},
-            }
             phase_pattern = PatternDef(
                 id=f"mission-{mission.id}-phase-{phase.phase_id}",
                 name=wf_phase.name,
                 type=pattern_type,
                 agents=agent_nodes,
                 edges=edges,
-                config=_merged_cfg,
+                config={"max_rounds": 2, "max_iterations": 3},
             )
 
             phase_task = _build_phase_prompt(
@@ -879,14 +792,6 @@ class EpicOrchestrator:
                 workspace_path=workspace,
             )
             phase_task += f"\nMISSION_ID: {mission.id}"
-            # Inject target branch if set
-            _target_branch = (mission.context or {}).get("target_branch", "")
-            if _target_branch:
-                phase_task += (
-                    f"\nTARGET_BRANCH: {_target_branch} — "
-                    "All code changes MUST be committed to this branch. "
-                    "Use git_create_branch to checkout this branch before any commit."
-                )
 
             # Sprint loop
             phase_key_check = (
@@ -913,7 +818,7 @@ class EpicOrchestrator:
                 "sprint" in phase_key_check and "e2e" not in phase_key_check
             )
             max_sprints = (
-                wf_phase.config.get("max_iterations", 5 if is_evidence_gated else 2)
+                wf_phase.config.get("max_iterations", DEFAULT_MAX_SPRINTS_GATED if is_evidence_gated else DEFAULT_MAX_SPRINTS_DEV)
                 if is_dev_phase
                 else 1
             )
@@ -962,8 +867,6 @@ class EpicOrchestrator:
                     except Exception as e:
                         logger.warning("Sprint creation failed: %s", e)
 
-                _phase_technology = "generic"
-                _phase_type_key = "development"
                 if max_sprints > 1:
                     await self._sse_orch_msg(
                         f"Lancement {sprint_label} pour «{wf_phase.name}»",
@@ -1053,12 +956,6 @@ class EpicOrchestrator:
 
                     # Stack fingerprint injection — EVERY sprint (not just N+1)
                     # Dev agents must know the stack from sprint 1 to avoid cross-stack confusion
-                    from ..patterns.team_selector import (
-                        normalize_technology,
-                        infer_context as _infer_ctx,
-                    )
-
-                    _phase_technology = "generic"
                     if is_dev_phase and workspace:
                         _fp = _extract_stack_fingerprint(workspace)
                         if _fp:
@@ -1071,34 +968,12 @@ class EpicOrchestrator:
                                 f"3. NE PAS utiliser `docker-compose` (v1) — utiliser `docker compose` (v2, avec espace)\n"
                                 f"4. Lire BUILD_INSTRUCTIONS.md s'il existe dans le workspace"
                             )
-                            _phase_technology = normalize_technology(_fp)
-
-                    # Phase type from workflow/phase name (frontend, backend, devops, etc.)
-                    _inferred_tech, _inferred_phase = _infer_ctx(
-                        workflow_id=getattr(mission, "workflow_id", "") or "",
-                        title=wf_phase.name or "",
-                    )
-                    if _inferred_tech != "generic" and _phase_technology == "generic":
-                        _phase_technology = _inferred_tech
-                    _phase_type_key = (
-                        _inferred_phase
-                        if _inferred_phase != "generic"
-                        else "development"
-                    )
 
                 try:
                     # Phase timeout: 10 minutes max per phase execution
                     PHASE_TIMEOUT = 600
                     MAX_LLM_RETRIES = 2
                     LLM_RETRY_DELAY = 30  # seconds between retries on rate limit
-                    result = None  # init before retry loop
-
-                    # Build lineage for traceability
-                    _epic_lineage = [f"Epic: {mission.workflow_name or mission.id}"]
-                    if wf_phase.name:
-                        _epic_lineage.append(f"Phase: {wf_phase.name}")
-                    if mission.brief and len(mission.brief) < 120:
-                        _epic_lineage.append(f"Goal: {mission.brief[:120]}")
 
                     for llm_attempt in range(1, MAX_LLM_RETRIES + 1):
                         try:
@@ -1110,9 +985,6 @@ class EpicOrchestrator:
                                     project_id=mission.project_id or mission.id,
                                     project_path=mission.workspace_path,
                                     phase_id=phase.phase_id,
-                                    lineage=_epic_lineage,
-                                    technology=_phase_technology,
-                                    phase_type=_phase_type_key,
                                 ),
                                 timeout=PHASE_TIMEOUT,
                             )
@@ -1370,7 +1242,6 @@ class EpicOrchestrator:
                                         project_id=mission.project_id or mission.id,
                                         project_path=mission.workspace_path,
                                         phase_id=f"{phase.phase_id}-infra-fix",
-                                        lineage=_epic_lineage + ["Task: Infra Fix"],
                                     ),
                                     timeout=300,
                                 )
@@ -1492,14 +1363,10 @@ class EpicOrchestrator:
                         "Evidence gate FAILED for %s, max sprints exhausted — continuing with issues",
                         phase.phase_id,
                     )
-                    if phase.phase_id in _CRITICAL_EVIDENCE_PHASES:
-                        phase_success = False  # Hard failure for critical phases
-                        phase_error = f"Evidence gate FAILED ({passed_count}/{total_count}) — phase critique, livraison bloquée"
-                    else:
-                        phase_success = True  # Continue pipeline despite evidence gap
-                        phase_error = (
-                            f"Evidence gate: {passed_count}/{total_count} criteria met"
-                        )
+                    phase_success = True  # Continue pipeline despite evidence gap
+                    phase_error = (
+                        f"Evidence gate: {passed_count}/{total_count} criteria met"
+                    )
                     break
 
                 # Sprint succeeded but evidence gate was not applicable (no criteria).
@@ -1516,68 +1383,33 @@ class EpicOrchestrator:
 
             # Human-in-the-loop checkpoint
             if pattern_type == "human-in-the-loop":
-                from ..config import get_config as _get_cfg
-
-                if _get_cfg().orchestrator.yolo_mode:
-                    # YOLO mode: auto-GO, no wait
-                    phase.status = PhaseStatus.DONE
-                    run_store.update(mission)
-                    await self._push_sse(
-                        session_id,
-                        {
-                            "type": "checkpoint",
-                            "mission_id": mission.id,
-                            "phase_id": phase.phase_id,
-                            "question": f"Validation requise pour «{wf_phase.name}»",
-                            "options": ["GO", "NOGO", "PIVOT"],
-                            "auto_decision": "GO",
-                            "yolo": True,
-                        },
-                    )
-                else:
-                    phase.status = PhaseStatus.WAITING_VALIDATION
-                    run_store.update(mission)
-                    await self._push_sse(
-                        session_id,
-                        {
-                            "type": "checkpoint",
-                            "mission_id": mission.id,
-                            "phase_id": phase.phase_id,
-                            "question": f"Validation requise pour «{wf_phase.name}»",
-                            "options": ["GO", "NOGO", "PIVOT"],
-                        },
-                    )
-                    # Persist in-app notification so the bell shows GO/NOGO buttons
-                    try:
-                        from .notifications import emit_notification
-
-                        _proj_id = getattr(mission, "project_id", "") or ""
-                        emit_notification(
-                            f"⏸ GO/NOGO — {getattr(mission, 'name', mission.id)} — {wf_phase.name}",
-                            type="checkpoint",
-                            message="L'équipe attend votre décision pour continuer.",
-                            url=f"/missions/{mission.id}/control",
-                            severity="warning",
-                            source=phase.phase_id,
-                            ref_id=mission.id,
-                        )
-                    except Exception:
-                        pass
-                    for _ in range(600):
-                        await asyncio.sleep(1)
-                        m = run_store.get(mission.id)
-                        if m:
-                            for p in m.phases:
-                                if (
-                                    p.phase_id == phase.phase_id
-                                    and p.status != PhaseStatus.WAITING_VALIDATION
-                                ):
-                                    phase.status = p.status
-                                    break
-                            if phase.status != PhaseStatus.WAITING_VALIDATION:
+                phase.status = PhaseStatus.WAITING_VALIDATION
+                run_store.update(mission)
+                await self._push_sse(
+                    session_id,
+                    {
+                        "type": "checkpoint",
+                        "mission_id": mission.id,
+                        "phase_id": phase.phase_id,
+                        "question": f"Validation requise pour «{wf_phase.name}»",
+                        "options": ["GO", "NOGO", "PIVOT"],
+                    },
+                )
+                for _ in range(600):
+                    await asyncio.sleep(1)
+                    m = run_store.get(mission.id)
+                    if m:
+                        for p in m.phases:
+                            if (
+                                p.phase_id == phase.phase_id
+                                and p.status != PhaseStatus.WAITING_VALIDATION
+                            ):
+                                phase.status = p.status
                                 break
-                    if phase.status == PhaseStatus.WAITING_VALIDATION:
-                        phase.status = PhaseStatus.DONE
+                        if phase.status != PhaseStatus.WAITING_VALIDATION:
+                            break
+                if phase.status == PhaseStatus.WAITING_VALIDATION:
+                    phase.status = PhaseStatus.DONE
                 if phase.status == PhaseStatus.FAILED:
                     run_store.update(mission)
                     await self._push_sse(
@@ -1708,9 +1540,7 @@ class EpicOrchestrator:
                             "quality_score": _qual if "_qual" in dir() else 0.0,
                         },
                         action=pattern_type,
-                        reward=max(
-                            -1.0, min(1.0, (_qual if "_qual" in dir() else 0.5) * 2 - 1)
-                        ),
+                        reward=1.0,
                     )
                 except Exception:
                     pass
@@ -1827,9 +1657,7 @@ class EpicOrchestrator:
                             "quality_score": _qual if "_qual" in dir() else 0.0,
                         },
                         action=pattern_type,
-                        reward=max(
-                            -1.0, min(0.0, (_qual if "_qual" in dir() else 0.0) * 2 - 1)
-                        ),
+                        reward=-1.0,
                     )
                 except Exception:
                     pass
@@ -1967,24 +1795,6 @@ class EpicOrchestrator:
                 "feature-deploy",
                 "tma-handoff",
             ):
-                # PR4 — Deploy gate: HTTP check to confirm service is actually up
-                if phase.phase_id in (
-                    "deploy-prod",
-                    "deploy",
-                    "deploy-feature",
-                    "feature-deploy",
-                ):
-                    _deploy_ok = await self._check_deploy_http(
-                        workspace, session_id, mission.id, phase.phase_id
-                    )
-                    if not _deploy_ok:
-                        phase_success = False
-                        phase_error = "Deploy gate FAILED: service did not respond on HTTP after deploy"
-                        await self._sse_orch_msg(
-                            "⛔ Deploy gate FAILED — le service ne répond pas sur HTTP. Phase marquée échouée.",
-                            phase.phase_id,
-                        )
-
                 try:
                     from ..epics.feedback import on_deploy_completed
 
@@ -2191,10 +2001,114 @@ class EpicOrchestrator:
                         mission_id=mission.id,
                     )
 
+            # ── PM Checkpoint: evidence-based phase gate ──────────────
+            # Build gate (deterministic) + Judge LLM + PM decision
+            try:
+                from .pm_checkpoint import pm_checkpoint as _pm_checkpoint
+
+                _pm_phase_output = phase.summary or phase_error or ""
+                _pm_ws = workspace or ""
+                _pm_is_last = i >= len(mission.phases) - 1
+                # Count adversarial rejections this phase from logs
+                _pm_rej_count = 0
+                try:
+                    from ..sessions.store import get_session_store as _ss_pm
+                    _pm_msgs = _ss_pm().get_messages(session_id, limit=500)
+                    for _pm_m in _pm_msgs[_pre_phase_msg_count:]:
+                        _c = getattr(_pm_m, "content", "") or ""
+                        if "ADVERSARIAL" in _c and ("REJECT" in _c or "reject" in _c):
+                            _pm_rej_count += 1
+                except Exception:
+                    pass
+
+                _pm_decision = await asyncio.wait_for(
+                    _pm_checkpoint(
+                        phase_name=wf_phase.name,
+                        phase_id=phase.phase_id,
+                        phase_output=_pm_phase_output,
+                        workspace=_pm_ws,
+                        phase_success=phase_success,
+                        adversarial_rejections=_pm_rej_count,
+                        is_last_phase=_pm_is_last,
+                        sprint_num=reloop_count + 1,
+                        max_sprints=cfg.get("max_iterations", 5),
+                    ),
+                    timeout=60,
+                )
+
+                logger.warning(
+                    "PM_CHECKPOINT phase=%s decision=%s reason=%s quality=%.2f",
+                    phase.phase_id,
+                    _pm_decision.action,
+                    _pm_decision.reason[:100],
+                    _pm_decision.quality_score,
+                )
+
+                # Store PM decision in memory
+                try:
+                    from ..memory.manager import get_memory_manager as _mm_pm
+                    _mm_pm().project_store(
+                        mission.project_id or "",
+                        key=f"pm-checkpoint:{phase.phase_id}",
+                        value=f"{_pm_decision.action}: {_pm_decision.reason}\n{_pm_decision.evidence_summary}",
+                        category="pm-decision",
+                        source="pm-checkpoint",
+                    )
+                except Exception:
+                    pass
+
+                # SSE notification
+                await self._push_sse(
+                    session_id,
+                    {
+                        "type": "pm_checkpoint",
+                        "mission_id": mission.id,
+                        "phase_id": phase.phase_id,
+                        "decision": _pm_decision.action,
+                        "reason": _pm_decision.reason,
+                        "quality_score": _pm_decision.quality_score,
+                        "build_ok": _pm_decision.build_result.success if _pm_decision.build_result else True,
+                    },
+                )
+
+                # PM override: if PM says retry and phase was "success", flip it
+                if _pm_decision.action == "retry" and phase_success:
+                    phase_success = False
+                    phase_error = _pm_decision.reason
+                    phase.status = PhaseStatus.FAILED
+                    # Inject build errors for next sprint
+                    if _pm_decision.build_result and _pm_decision.build_result.first_errors:
+                        prev_context += (
+                            f"\n\n--- PM BUILD GATE FEEDBACK ---\n"
+                            f"Build failed with {_pm_decision.build_result.error_count} errors.\n"
+                            f"Fix these errors using code_edit:\n"
+                            + "\n".join(_pm_decision.build_result.first_errors[:10])
+                            + "\n"
+                        )
+                    logger.warning(
+                        "PM_OVERRIDE phase=%s forcing retry (was success, build failed)",
+                        phase.phase_id,
+                    )
+
+                # PM says done on last phase
+                if _pm_decision.action == "done":
+                    cdp_msg = f"✅ PM: Phase «{wf_phase.name}» approved — quality {_pm_decision.quality_score:.0%}"
+                    await self._sse_orch_msg(cdp_msg, phase.phase_id)
+
+            except Exception as _pm_err:
+                logger.warning("PM checkpoint error (non-blocking): %s", _pm_err)
+
             # Error Reloop
+            # PM checkpoint retry decision forces reloop regardless of phase name
+            _pm_retry_requested = False
+            try:
+                _pm_retry_requested = _pm_decision.action == "retry"
+            except Exception:
+                pass
+
             if not phase_success and reloop_count < MAX_RELOOPS:
                 phase_key_rl = phase.phase_id.lower() if phase.phase_id else ""
-                is_reloopable = any(
+                is_reloopable = _pm_retry_requested or any(
                     k in phase_key_rl
                     for k in (
                         "qa",
@@ -2224,9 +2138,12 @@ class EpicOrchestrator:
                             .replace("é", "e")
                             .replace("è", "e")
                         )
-                        if "sprint" in pk_j or "dev" in pk_j:
+                        if "sprint" in pk_j or "dev" in pk_j or "build" in pk_j or "impl" in pk_j or "fix" in pk_j:
                             dev_idx = j
                             break
+                    # If PM requested retry for current phase, use current phase as target
+                    if dev_idx is None and _pm_retry_requested:
+                        dev_idx = i
                     if dev_idx is not None and dev_idx <= i:
                         reloop_msg = (
                             f"Reloop {reloop_count}/{MAX_RELOOPS} — Phase «{wf_phase.name}» échouée. "

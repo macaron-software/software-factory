@@ -149,30 +149,21 @@ async def launch_mission_workflow(request: Request, epic_id: str):
     except Exception:
         pass
 
-    # Register project in project store with workspace path so tools_enabled works
-    _proj_id = mission.project_id or epic_id
+    # Use EpicOrchestrator for full phase tracking, build gates, and PM checkpoints
     try:
-        from ....projects.manager import Project, get_project_store
+        await _launch_orchestrator(session.id)
+    except Exception as e:
+        logger.error("Failed to launch orchestrator for %s: %s", session.id, e)
+        # Fallback to direct workflow execution (no phase tracking)
+        async def _guarded_workflow():
+            async with get_mission_semaphore():
+                await _run_workflow_background(
+                    wf, session.id, task_desc, mission.project_id or ""
+                )
 
-        _p_store = get_project_store()
-        _existing = _p_store.get(_proj_id)
-        if _existing:
-            _existing.path = str(workspace_root)
-            _p_store.update(_existing)
-        else:
-            _p_store.create(
-                Project(id=_proj_id, name=mission.name, path=str(workspace_root))
-            )
-    except Exception as _e:
-        logger.warning("Could not register project workspace for %s: %s", _proj_id, _e)
-
-    async def _guarded_workflow():
-        async with get_mission_semaphore():
-            await _run_workflow_background(wf, session.id, task_desc, _proj_id)
-
-    _wf_task = asyncio.create_task(_guarded_workflow())
-    _active_mission_tasks[session.id] = _wf_task
-    _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
+        _wf_task = asyncio.create_task(_guarded_workflow())
+        _active_mission_tasks[session.id] = _wf_task
+        _wf_task.add_done_callback(lambda t: _active_mission_tasks.pop(session.id, None))
 
     # If mission config has milestones, also launch the milestone pipeline in parallel
     milestones = (mission.config or {}).get("milestones")

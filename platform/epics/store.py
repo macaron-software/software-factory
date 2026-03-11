@@ -37,7 +37,7 @@ class MissionDef:
     goal: str = ""  # acceptance criteria
     status: str = "planning"  # planning|active|completed|failed|blocked
     type: str = "improvement"  # work category (NOT SAFe level): improvement|initiative|bug|debt|migration|security|architecture|program|review|tma
-    workflow_id: Optional[str] = None  # safe-ppz, safe-psy...
+    workflow_id: Optional[str] = None  # safe-veligo, safe-ppz...
     parent_epic_id: Optional[str] = None  # corrective mission → parent
     wsjf_score: float = 0.0
     business_value: float = 0
@@ -64,15 +64,12 @@ class SprintDef:
     number: int = 1
     name: str = ""
     goal: str = ""
-    status: str = "planning"  # planning|active|review|completed|failed|rejected
+    status: str = "planning"  # planning|active|review|completed|failed
     retro_notes: str = ""
     velocity: int = 0  # SAFe: story points completed
     planned_sp: int = 0  # SAFe: story points planned
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
-    type: str = "tdd"  # inception|infra|tdd|adversarial|qa|deploy
-    quality_score: int = 0
-    team_agents: str = "[]"  # JSON list of agent ids
 
 
 @dataclass
@@ -115,14 +112,7 @@ def _row_to_mission(row) -> MissionDef:
         time_criticality=row["time_criticality"] if "time_criticality" in keys else 0,
         risk_reduction=row["risk_reduction"] if "risk_reduction" in keys else 0,
         job_duration=row["job_duration"] if "job_duration" in keys else 1,
-        category=row["category"]
-        if "category" in keys
-        else (
-            "system"
-            if (row["type"] or "")
-            in ("tma", "security", "debt", "architecture", "program", "audit", "sast")
-            else "functional"
-        ),
+        category=row["category"] if "category" in keys else "functional",
         active_phases=json.loads(
             row["active_phases_json"] if "active_phases_json" in keys else "[]"
         )
@@ -147,13 +137,6 @@ def _row_to_sprint(row) -> SprintDef:
         planned_sp=row["planned_sp"] if "planned_sp" in cols else 0,
         started_at=row["started_at"],
         completed_at=row["completed_at"],
-        type=row["type"] if "type" in cols and row["type"] else "tdd",
-        quality_score=row["quality_score"]
-        if "quality_score" in cols and row["quality_score"]
-        else 0,
-        team_agents=row["team_agents"]
-        if "team_agents" in cols and row["team_agents"]
-        else "[]",
     )
 
 
@@ -402,7 +385,7 @@ class EpicStore:
                 FROM llm_traces lt
                 LEFT JOIN sessions s ON lt.session_id = s.id
                 WHERE lt.mission_id = ? AND lt.agent_id IS NOT NULL
-                GROUP BY lt.agent_id, s.pattern_id, lt.model, lt.provider
+                GROUP BY lt.agent_id, s.pattern_id, lt.model
                 """,
                 (mission_id,),
             ).fetchall()
@@ -528,9 +511,8 @@ class EpicStore:
         try:
             db.execute(
                 """INSERT INTO sprints (id, mission_id, number, name, goal, status,
-                   retro_notes, velocity, planned_sp, started_at, completed_at,
-                   type, quality_score, team_agents)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   retro_notes, velocity, planned_sp, started_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     s.id,
                     s.mission_id,
@@ -543,9 +525,6 @@ class EpicStore:
                     s.planned_sp,
                     s.started_at,
                     s.completed_at,
-                    s.type,
-                    s.quality_score,
-                    s.team_agents,
                 ),
             )
             db.commit()
@@ -793,19 +772,14 @@ def get_epic_store() -> EpicStore:
 
 def _row_to_epic_run(row) -> EpicRun:
     phases_raw = json.loads(row["phases_json"]) if row["phases_json"] else []
-    # Normalise legacy/workflow-sourced phase dicts → PhaseRun fields
+    # Ensure phase_name defaults to phase_id for legacy data
     phases = []
     for p in phases_raw:
+        # Map legacy 'id' → 'phase_id' for workflows that use 'id' key
         if "phase_id" not in p and "id" in p:
             p["phase_id"] = p.pop("id")
         if "phase_name" not in p:
-            p["phase_name"] = (
-                p.pop("name", "") if "name" in p else p.get("phase_id", "")
-            )
-        # Drop keys that PhaseRun doesn't accept
-        _extra = set(p) - set(PhaseRun.model_fields)
-        for k in _extra:
-            p.pop(k, None)
+            p["phase_name"] = p.get("phase_id", "")
         phases.append(PhaseRun(**p))
     # Safe access for columns that may not exist in older DBs
     wp = ""
@@ -823,12 +797,17 @@ def _row_to_epic_run(row) -> EpicRun:
         cost = float(row["llm_cost_usd"] or 0)
     except (IndexError, KeyError, TypeError, ValueError):
         pass
-    ctx: dict = {}
+    cancel_reason = None
     try:
-        raw_ctx = row["context_json"]
-        if raw_ctx:
-            ctx = json.loads(raw_ctx)
-    except (IndexError, KeyError, TypeError, ValueError):
+        cancel_reason = row["cancel_reason"] or None
+    except (IndexError, KeyError):
+        pass
+    started_at = None
+    try:
+        v = row["started_at"]
+        if v:
+            started_at = v if isinstance(v, datetime) else datetime.fromisoformat(str(v))
+    except (IndexError, KeyError, ValueError):
         pass
     return EpicRun(
         id=row["id"],
@@ -844,7 +823,8 @@ def _row_to_epic_run(row) -> EpicRun:
         phases=phases,
         brief=row["brief"] or "",
         llm_cost_usd=cost,
-        context=ctx,
+        cancel_reason=cancel_reason,
+        started_at=started_at,
         created_at=row["created_at"]
         if isinstance(row["created_at"], datetime)
         else (
@@ -876,8 +856,8 @@ class EpicRunStore:
             db.execute(
                 """INSERT INTO epic_runs (id, workflow_id, workflow_name, session_id,
                    cdp_agent_id, project_id, workspace_path, parent_epic_id, status,
-                   current_phase, phases_json, brief, context_json, created_at, updated_at, completed_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   current_phase, phases_json, brief, created_at, updated_at, completed_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     run.id,
                     run.workflow_id,
@@ -887,11 +867,10 @@ class EpicRunStore:
                     run.project_id,
                     run.workspace_path,
                     run.parent_epic_id or "",
-                    run.status.value if hasattr(run.status, "value") else run.status,
+                    run.status.value,
                     run.current_phase,
                     json.dumps([p.model_dump() for p in run.phases]),
                     run.brief,
-                    json.dumps(run.context or {}),
                     run.created_at.isoformat(),
                     run.updated_at.isoformat(),
                     run.completed_at.isoformat() if run.completed_at else None,
@@ -943,20 +922,24 @@ class EpicRunStore:
                     run.llm_cost_usd = float(row["total"] or 0)
             except Exception:
                 pass
+            # Set started_at when first transitioning to running
+            if run.status == EpicStatus.RUNNING and run.started_at is None:
+                run.started_at = datetime.utcnow()
             cur = db.execute(
                 """UPDATE epic_runs SET status=?, current_phase=?, phases_json=?,
-                   session_id=?, workspace_path=?, context_json=?, updated_at=?, completed_at=?,
-                   llm_cost_usd=? WHERE id=?""",
+                   session_id=?, workspace_path=?, updated_at=?, completed_at=?,
+                   llm_cost_usd=?, cancel_reason=?, started_at=COALESCE(started_at, ?) WHERE id=?""",
                 (
-                    run.status.value if hasattr(run.status, "value") else run.status,
+                    run.status.value,
                     run.current_phase,
                     json.dumps([p.model_dump() for p in run.phases], default=str),
                     run.session_id or "",
                     run.workspace_path or "",
-                    json.dumps(run.context or {}),
                     run.updated_at.isoformat(),
                     run.completed_at.isoformat() if run.completed_at else None,
                     run.llm_cost_usd,
+                    run.cancel_reason,
+                    run.started_at.isoformat() if run.started_at else None,
                     run.id,
                 ),
             )

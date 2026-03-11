@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 
@@ -460,6 +461,44 @@ def check_l0(
             )
             score += 4
 
+        # NO_BUILD_RUN: agent wrote source files but never called build/test tool
+        if source_files >= 1:
+            build_tools_used = {
+                tc.get("name")
+                for tc in tool_calls
+                if tc.get("name") in ("build", "test", "lint", "android_build", "android_test")
+            }
+            if not build_tools_used:
+                written_names = ", ".join(
+                    os.path.basename(
+                        str(tc.get("args", {}).get("path", ""))
+                    )
+                    for tc in tool_calls
+                    if tc.get("name") in ("code_write", "code_edit")
+                    and str(tc.get("args", {}).get("path", "")).endswith(
+                        (".py", ".ts", ".js", ".rs", ".go", ".kt", ".swift", ".java")
+                    )
+                )[:120]
+                issues.append(
+                    f"NO_BUILD_RUN: Wrote {source_files} source files ({written_names}) "
+                    f"but never ran build/test — run the compiler to verify code works"
+                )
+                score += 4
+
+        # NO_CODE_WRITE: dev/worker/fullstack agents MUST produce code changes
+    # If agent only read/listed/built but never wrote code, it's a failure
+    _dev_roles = ("dev", "fullstack", "backend", "frontend", "worker", "coder", "implementer", "lead")
+    _role_lower_adv = (agent_role or "").lower()
+    if any(r in _role_lower_adv for r in _dev_roles) and not has_write_tool and tool_calls:
+        read_only_tools = {tc.get("name") for tc in tool_calls}
+        if read_only_tools <= {"code_read", "list_files", "file_read", "code_search", "build", "test", "memory_search", "deep_search"}:
+            issues.append(
+                f"NO_CODE_WRITE: Dev agent used {len(tool_calls)} tool calls "
+                f"({', '.join(sorted(read_only_tools))}) but NEVER called code_write or code_edit. "
+                f"Reading code without fixing it is NOT acceptable."
+            )
+            score += 7  # hard reject — must produce code
+
     # Check hallucination — only flag if agent claims action WITHOUT corresponding tool call
     if not has_write_tool:
         for pattern, desc in _HALLUCINATION_PATTERNS:
@@ -618,22 +657,18 @@ def check_l0(
 
     # MISSING_TRACEABILITY: code written without any reference comment
     # Only for non-trivial source files (>30 lines), not config/migration/test files
-    # Deduplicate by file path — only flag each unique file once (last write wins)
     _TRACE_PATTERN = re.compile(
         r"#\s*(?:Ref|Feature|Story|Epic|Ticket|REQ|FEAT|US|EPIC|Traceability|TODO-\d+|JIRA)[\s:\-]",
         re.IGNORECASE,
     )
     _SKIP_TRACE_EXTS = {".md", ".txt", ".json", ".yml", ".yaml", ".env", ".toml", ".cfg", ".ini", ".lock"}
-    _trace_last_write: dict[str, str] = {}
     for tc in tool_calls:
-        if tc.get("name") != "code_write":
+        if tc.get("name") != "code_write":  # only NEW files, not edits
             continue
         fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
         fc = str(tc.get("args", {}).get("content", ""))
         if not fc or not fp:
             continue
-        _trace_last_write[fp] = fc  # keep last version only
-    for fp, fc in _trace_last_write.items():
         ext = "." + fp.rsplit(".", 1)[-1].lower() if "." in fp else ""
         is_config = any(kw in fp.lower() for kw in ["migration", "conftest", "settings", "__init__", "config."])
         is_test = any(kw in fp.lower() for kw in ["test_", "_test.", ".spec."])
@@ -647,11 +682,7 @@ def check_l0(
                 f"MISSING_TRACEABILITY: No # Ref/Feature/Story comment in {fp} "
                 f"({lines} lines) — add '# Ref: FEAT-xxx — <feature name>' at top"
             )
-            score += 1  # soft warning: +1 per file, capped below
-    # Cap traceability at +3 — it should warn, never block alone
-    _trace_count = sum(1 for i in issues if i.startswith("MISSING_TRACEABILITY"))
-    if _trace_count > 3:
-        score -= (_trace_count - 3)  # undo excess points
+            score += 3  # warning: encourages but doesn't block
 
     # Check build tool failures — if any build/test tool returned [FAIL], force rejection
     if tool_calls:
@@ -667,39 +698,11 @@ def check_l0(
                 )
                 score += 7  # hard reject — broken build cannot be approved
 
-    # NO_BUILD_RUN: dev wrote source files but never ran build/test
-    _SOURCE_EXTS = {
-        ".swift", ".rs", ".py", ".ts", ".tsx", ".js", ".jsx",
-        ".go", ".java", ".kt", ".c", ".cpp", ".cs", ".rb",
-    }
-    _BUILD_TOOLS = {"build", "test", "lint", "docker_build", "docker_build_verify",
-                    "cicd_runner", "android_build", "android_test", "playwright_test"}
-    if tool_calls and role_lower not in ("qa", "test", "tester", "validation"):
-        source_files_written = []
-        ran_build = False
-        for tc in tool_calls:
-            tn = tc.get("name", "")
-            if tn in ("code_write", "code_edit"):
-                fp = str(tc.get("args", {}).get("path", "") or tc.get("args", {}).get("file_path", ""))
-                ext = ("." + fp.rsplit(".", 1)[-1].lower()) if "." in fp else ""
-                if ext in _SOURCE_EXTS:
-                    source_files_written.append(fp.rsplit("/", 1)[-1])
-            if tn in _BUILD_TOOLS:
-                ran_build = True
-        if len(source_files_written) >= 2 and not ran_build:
-            issues.append(
-                f"NO_BUILD_RUN: Wrote {len(source_files_written)} source files "
-                f"({', '.join(source_files_written[:5])}) but never ran build/test — "
-                f"run the compiler to verify code works"
-            )
-            score += 4
-
     threshold = 5  # reject if score >= threshold
     # QA/test agents get a higher threshold — their auto-injected reports
     # trigger false positives for "hallucination" (claiming actions without tool calls)
     if any(k in role_lower for k in ("qa", "test", "validation", "e2e")):
         threshold = 8
-    score = min(score, 10)  # clamp to 0-10 scale
     return GuardResult(
         passed=score < threshold,
         score=score,
@@ -779,8 +782,9 @@ IMPORTANT CONTEXT:
 - If the agent used code_write/code_edit tools, the REAL work is in the tool calls, not the text.
 - A short text response is FINE if code_write was actually called with real content.
 - Only flag HALLUCINATION if claims are NOT visible in tool evidence above.
-- Only available tools: code_read, code_write, code_edit, list_files, deep_search. Do NOT penalize for not using tools that don't exist (build_tool, git_commit, deploy, etc).
-- If files already exist in the workspace, reading them IS valid work.{pattern_context}
+- Only available tools: code_read, code_write, code_edit, list_files, deep_search, build, test. Do NOT penalize for not using tools that don't exist (git_commit, deploy, docker_deploy, etc).
+- Do NOT penalize for missing Dockerfile if the project is a native app (Swift, macOS, iOS, Android, desktop). Docker is only relevant for web/server projects.
+- If the agent found build errors but did NOT use code_edit/code_write to fix them, that IS a valid reason to reject.{pattern_context}
 
 Check for:
 1. SLOP: Generic filler, placeholder text, no real substance
@@ -1016,7 +1020,7 @@ async def run_guard(
                 return l0
 
     if not l0.passed:
-        logger.warning(f"GUARD L0 REJECT [{agent_name}] score={l0.score}: {l0.summary}")
+        logger.info(f"GUARD L0 REJECT [{agent_name}]: {l0.summary}")
         return l0
 
     # L1: Semantic LLM check — only for execution patterns AND dev/ops roles
@@ -1048,7 +1052,7 @@ async def run_guard(
             content, task, agent_role, agent_name, tool_calls, pattern_type
         )
         if not l1.passed:
-            logger.warning(f"GUARD L1 REJECT [{agent_name}] score={l1.score}: {l1.summary}")
+            logger.info(f"GUARD L1 REJECT [{agent_name}]: {l1.summary}")
             # Merge L0 warnings with L1 issues
             l1.issues = l0.issues + l1.issues
             l1.score = max(l0.score, l1.score)

@@ -1385,13 +1385,13 @@ def _build_schemas() -> list[dict]:
             "type": "function",
             "function": {
                 "name": "build",
-                "description": "Run a build command in the project workspace. Use to compile, install dependencies, or run any build step. Returns stdout+stderr.",
+                "description": "Execute a build/compile command in the project workspace and return real compiler output (stdout+stderr). MANDATORY after writing source files — call this to verify code compiles. Example: build(command='swift build') or build(command='npm run build'). Do NOT write shell scripts instead — use this tool directly.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "command": {
                             "type": "string",
-                            "description": "Build command to run. Examples: 'pip install -r requirements.txt', 'npm install && npm run build', 'cargo build', 'make'",
+                            "description": "Shell command to execute. Examples: 'swift build', 'cargo build', 'npm install && npm run build', 'python3 -m py_compile main.py', 'go build ./...'",
                         },
                     },
                     "required": ["command"],
@@ -2117,46 +2117,6 @@ def _platform_schemas() -> list[dict]:
                 },
             },
         },
-        # ── Launch epic run ──
-        {
-            "type": "function",
-            "function": {
-                "name": "launch_epic_run",
-                "description": "Launch a workflow execution for an epic/mission. Creates a session and starts the orchestrator. Returns session_id and run status.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "epic_id": {
-                            "type": "string",
-                            "description": "Mission/epic ID to launch (required)",
-                        },
-                        "workflow_id": {
-                            "type": "string",
-                            "description": "Workflow ID to use (optional, defaults to mission's workflow)",
-                        },
-                    },
-                    "required": ["epic_id"],
-                },
-            },
-        },
-        # ── Check run status ──
-        {
-            "type": "function",
-            "function": {
-                "name": "check_run_status",
-                "description": "Check the status of a running mission/epic run. Returns phase progress, current status, and any errors.",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "run_id": {
-                            "type": "string",
-                            "description": "Epic run ID to check",
-                        },
-                    },
-                    "required": ["run_id"],
-                },
-            },
-        },
         # ── Backlog tools (create features/stories for AO traceability) ──
         {
             "type": "function",
@@ -2769,7 +2729,7 @@ def _platform_schemas() -> list[dict]:
                         },
                         "space": {
                             "type": "string",
-                            "description": "Confluence space key (default: MYPROJECT)",
+                            "description": "Confluence space key (default: VELIGO)",
                         },
                         "parent_title": {
                             "type": "string",
@@ -2837,10 +2797,6 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "create_team",
         "create_mission",
         "create_sub_mission",
-        "launch_epic_run",
-        "check_run_status",
-        "resume_run",
-        "create_sprint",
         "compose_workflow",
         "run_e2e_tests",
         "screenshot",
@@ -2905,6 +2861,8 @@ ROLE_TOOL_MAP: dict[str, list[str]] = {
         "code_search",
         "list_files",
         "deep_search",
+        "build",
+        "test",
         "memory_search",
         "memory_store",
         "plan_create",

@@ -213,13 +213,6 @@ def _get_tool_registry():
         register_rtk_tools(reg)
     except Exception:
         pass
-    # LSP tools — jedi-based symbol navigation + pyright diagnostics
-    try:
-        from ..tools.lsp_tools import register_lsp_tools
-
-        register_lsp_tools(reg)
-    except Exception:
-        pass
     # mflux image generation — guarded by mflux module (macOS Apple Silicon)
     try:
         if _is_module_enabled("mflux"):
@@ -262,29 +255,6 @@ def _get_tool_registry():
             from ..tools.perf_audit_tools import register_perf_audit_tools
 
             register_perf_audit_tools(reg)
-    except Exception:
-        pass
-    # Incident diagnosis tools — guarded by incident-diag module
-    try:
-        if _is_module_enabled("incident-diag"):
-            from ..tools.diag_tools import register_diag_tools
-
-            register_diag_tools(reg)
-    except Exception:
-        pass
-    # Agent reward tools — guarded by agent-reward module
-    try:
-        if _is_module_enabled("agent-reward"):
-            from ..tools.reward_tools import register_reward_tools
-
-            register_reward_tools(reg)
-    except Exception:
-        pass
-    # AC tools — always available (no module guard)
-    try:
-        from ..tools.ac_tools import register_ac_tools
-
-        register_ac_tools(reg)
     except Exception:
         pass
     return reg
@@ -369,28 +339,6 @@ def _parse_xml_tool_calls(content: str) -> list:
                 )
         except json.JSONDecodeError:
             pass
-
-    if calls:
-        return calls
-
-    # Format 4: <FunctionCall>tool_name: name\ntool_arguments: {...}</FunctionCall> (MiniMax variant)
-    fc_re = re.compile(
-        r"<FunctionCall>\s*tool_name:\s*(\S+)\s*\ntool_arguments:\s*(\{.*?\})\s*</FunctionCall>",
-        re.DOTALL,
-    )
-    for m in fc_re.finditer(content):
-        fn_name = m.group(1).strip()
-        try:
-            args = json.loads(m.group(2).strip())
-        except json.JSONDecodeError:
-            args = {}
-        calls.append(
-            _TC(
-                id=f"call_{_uuid.uuid4().hex[:12]}",
-                function_name=fn_name,
-                arguments=args if isinstance(args, dict) else {},
-            )
-        )
 
     return calls
 
@@ -558,48 +506,6 @@ async def _tool_memory_search(args: dict, ctx: ExecutionContext) -> str:
         return f"Memory search error: {e}"
 
 
-async def _tool_memory_retrieve(args: dict, ctx: "ExecutionContext") -> str:
-    """Retrieve memory by exact key (project-scoped, falls back to global)."""
-    from ..memory.manager import get_memory_manager
-
-    mem = get_memory_manager()
-    key = args.get("key", "")
-    if not key:
-        return "Error: 'key' parameter is required for memory_retrieve"
-    try:
-
-        def _fmt(r):
-            return (
-                "key="
-                + str(r.get("key"))
-                + "\ncategory="
-                + str(r.get("category"))
-                + "\nvalue="
-                + str(r.get("value"))
-            )
-
-        if ctx.project_id:
-            candidates = mem.project_search(ctx.project_id, key, limit=50)
-            exact = [r for r in candidates if r.get("key") == key]
-            if exact:
-                return _fmt(exact[0])
-            all_entries = mem.project_get(ctx.project_id, limit=200)
-            exact = [r for r in all_entries if r.get("key") == key]
-            if exact:
-                return _fmt(exact[0])
-        global_entries = mem.global_search(key, limit=50)
-        exact = [r for r in global_entries if r.get("key") == key]
-        if exact:
-            return _fmt(exact[0]) + " [global]"
-        return (
-            "No memory found for key='"
-            + key
-            + "'. Use memory_search to explore available keys."
-        )
-    except Exception as e:
-        return "memory_retrieve error: " + str(e)
-
-
 async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
     """Store a fact in project memory (scoped to project_id, tagged with agent_id)."""
     from ..memory.manager import get_memory_manager
@@ -631,64 +537,6 @@ async def _tool_memory_store(args: dict, ctx: ExecutionContext) -> str:
         return f"Stored in project memory: [{key}] (by {ctx.agent.id}, role={agent_role or 'generic'})"
     except Exception as e:
         return f"Memory store error: {e}"
-
-
-async def _tool_memory_retrieve(args: dict, ctx: ExecutionContext) -> str:
-    """Exact key lookup in project memory — explicit LTM retrieval (AgeMem pattern).
-
-    WHY: agents need deterministic retrieval for known keys, not just fuzzy search.
-    Ref: AgeMem arXiv:2601.01885 — tool-based memory ops in agent policy.
-    """
-    from ..memory.manager import get_memory_manager
-
-    key = args.get("key", "")
-    if not key:
-        return "Error: key required"
-    if not ctx.project_id:
-        return "Error: no project context"
-    try:
-        mem = get_memory_manager()
-        entry = mem.project_retrieve(ctx.project_id, key)
-        if entry is None:
-            return f"No memory entry found for key: {key!r}"
-        return f"[{entry.get('category', 'fact')}] {key}: {entry.get('value', '')}"
-    except Exception as e:
-        return f"Memory retrieve error: {e}"
-
-
-async def _tool_memory_prune(args: dict, ctx: ExecutionContext) -> str:
-    """Explicit memory pruning — agent decides what to forget (AgeMem pattern).
-
-    WHY: heuristic-only pruning discards rare-but-critical details; agents should
-    control what to remove from their LTM to keep it focused and accurate.
-    Ref: AgeMem arXiv:2601.01885 — unified LTM+STM management as tool actions.
-    """
-    from ..memory.manager import get_memory_manager
-
-    if not ctx.project_id:
-        return "Error: no project context"
-    key = args.get("key") or None
-    category = args.get("category") or None
-    older_than_days = args.get("older_than_days")
-    if older_than_days is not None:
-        try:
-            older_than_days = int(older_than_days)
-        except (TypeError, ValueError):
-            older_than_days = None
-    if not key and not category and older_than_days is None:
-        return "Error: at least one of key, category, or older_than_days required"
-    try:
-        mem = get_memory_manager()
-        deleted = mem.project_prune(
-            ctx.project_id,
-            key=key,
-            category=category,
-            older_than_days=older_than_days,
-            source=ctx.agent.id,  # agents can only prune their own entries
-        )
-        return f"Pruned {deleted} memory entr{'ies' if deleted != 1 else 'y'} from project {ctx.project_id}"
-    except Exception as e:
-        return f"Memory prune error: {e}"
 
 
 async def _tool_deep_search(args: dict, ctx: ExecutionContext) -> str:
@@ -1017,19 +865,10 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
             "Generic build() has no Android SDK and will silently produce nothing."
         )
 
-    # Fix swift command to use Apple Swift (not OpenStack CLI)
-    # Handle both direct "swift build" and chained "cd /path && swift build"
-    import re as _re_bt
-    if _re_bt.search(r'(?:^|&&\s*|;\s*)swift\s', command) and os.path.isfile("/usr/bin/swift"):
-        command = _re_bt.sub(
-            r'(?:(?<=&&\s)|(?<=;\s)|(?:^))swift\s',
-            '/usr/bin/swift ',
-            command,
-        )
-        # Simpler approach: replace standalone 'swift' with full path
-        command = command.replace(' swift ', ' /usr/bin/swift ').replace('&& swift ', '&& /usr/bin/swift ')
-        if command.strip().startswith('swift '):
-            command = '/usr/bin/' + command.strip()
+    # Fix swift command to use Apple Swift (not OpenStack python-swiftclient)
+    import re as _re
+    if os.path.isfile("/usr/bin/swift") and _re.search(r'\bswift\s+(?:build|test|package|run)\b', command):
+        command = _re.sub(r'\bswift\b', '/usr/bin/swift', command)
     try:
         proc = subprocess.run(
             command,
@@ -1043,6 +882,25 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
         status = (
             "SUCCESS" if proc.returncode == 0 else f"FAILED (exit {proc.returncode})"
         )
+        # Extract unique errors for actionable feedback
+        if proc.returncode != 0 and out:
+            seen_msgs = set()
+            unique_errors = []
+            for line in out.splitlines():
+                if "error:" in line.lower():
+                    # Deduplicate by the error message portion
+                    msg_part = line.split("error:")[-1].strip() if "error:" in line else line
+                    if msg_part not in seen_msgs:
+                        seen_msgs.add(msg_part)
+                        unique_errors.append(line.strip())
+            if unique_errors:
+                err_text = "\n".join(unique_errors[:15])
+                suffix = f"\n... and {len(unique_errors) - 15} more unique errors" if len(unique_errors) > 15 else ""
+                return (
+                    f"[{tool_name.upper()}] {status} ({len(unique_errors)} unique errors)\n$ {command}\n"
+                    f"{err_text}{suffix}\n\n"
+                    f"ACTION REQUIRED: Use code_edit to fix these errors. Read the failing files first with code_read."
+                )
         return f"[{tool_name.upper()}] {status}\n$ {command}\n{out[-3000:]}"
     except subprocess.TimeoutExpired:
         return f"[{tool_name.upper()}] TIMEOUT after 120s: {command}"
@@ -1283,7 +1141,7 @@ async def _tool_create_ticket(args: dict, ctx: ExecutionContext) -> str:
     """Create a support ticket in the platform DB."""
     import uuid
 
-    from ..db.migrations import get_db
+    from ..db import get_db
 
     title = args.get("title", "")
     desc = args.get("description", "")
@@ -2026,44 +1884,6 @@ async def _tool_pm_lifecycle(name: str, args: dict, ctx: ExecutionContext) -> st
 # ── Main tool dispatcher ─────────────────────────────────────────
 
 
-def _resolve_file_path(path: str, project_path: str | None) -> str:
-    """Resolve a file path from agent context to a real filesystem path.
-
-    Rules (applied in order):
-    1. /workspace  or /workspace/  → project_path
-    2. /workspace/<rest>           → project_path/<rest>
-    3. empty or "."                → project_path
-    4. absolute path inside project_path → kept as-is (already correct)
-    5. absolute path outside project_path → kept as-is (other allowed roots, /tmp…)
-    6. relative path               → project_path/<path> (strips ws_id prefix if present)
-    """
-    if not project_path:
-        return path
-    if not path or path == ".":
-        return project_path
-    # /workspace alias
-    if path in ("/workspace", "/workspace/"):
-        return project_path
-    if path.startswith("/workspace/"):
-        return project_path + "/" + path[len("/workspace/") :]
-    if os.path.isabs(path):
-        # already under project_path — strip and rejoin to normalize
-        if path.startswith(project_path + "/"):
-            return os.path.join(project_path, path[len(project_path) + 1 :])
-        if path == project_path:
-            return project_path
-        # external absolute path (another workspace, /tmp, /etc…) — don't touch
-        return path
-    # relative path
-    ws_id = os.path.basename(project_path)
-    if path.startswith(ws_id + "/"):
-        path = path[len(ws_id) + 1 :]
-    elif path.startswith("." + project_path):
-        path = path[1:]
-        return path
-    return os.path.join(project_path, path)
-
-
 async def _execute_tool(
     tc: LLMToolCall, ctx: ExecutionContext, registry, llm=None
 ) -> str:
@@ -2098,7 +1918,7 @@ async def _execute_tool(
                     args["cwd"] = ctx.project_path
                 else:
                     args["cwd"] = os.path.join(ctx.project_path, cwd_val)
-        # File tools: resolve relative/aliased paths to project root
+        # File tools: resolve relative paths to project root
         if name in (
             "code_read",
             "code_search",
@@ -2107,7 +1927,32 @@ async def _execute_tool(
             "list_files",
         ):
             path = args.get("path", "")
-            args["path"] = _resolve_file_path(path, ctx.project_path)
+            if not path or path == ".":
+                args["path"] = ctx.project_path
+            elif os.path.isabs(path) and ctx.project_path:
+                # Agent used absolute path — normalize to workspace-relative
+                # e.g. /app/data/workspaces/abc123/src/main.ts → src/main.ts
+                if path.startswith(ctx.project_path + "/"):
+                    path = path[len(ctx.project_path) + 1 :]
+                    args["path"] = os.path.join(ctx.project_path, path)
+                elif path.startswith(ctx.project_path):
+                    args["path"] = ctx.project_path
+                else:
+                    args["path"] = path  # truly external absolute path
+            elif not os.path.isabs(path):
+                # Strip workspace ID prefix if LLM included it (avoids path doubling)
+                if ctx.project_path:
+                    ws_id = os.path.basename(ctx.project_path)
+                    if path.startswith(ws_id + "/"):
+                        path = path[len(ws_id) + 1 :]
+                    # Strip project_path prefix if LLM used it as relative
+                    elif path.startswith("." + ctx.project_path):
+                        path = path[1:]  # remove leading dot, keep absolute
+                args["path"] = (
+                    os.path.join(ctx.project_path, path)
+                    if not os.path.isabs(path)
+                    else path
+                )
 
     # ── Permission enforcement ──
     try:
@@ -2129,7 +1974,6 @@ async def _execute_tool(
             project_path=ctx.project_path or "",
             permissions=perms_dict,
             session_id=ctx.session_id,
-            project_id=ctx.project_id or "",
         )
         if denied:
             return denied
@@ -2156,14 +2000,8 @@ async def _execute_tool(
         return await _tool_list_files(args)
     if name == "memory_search":
         return await _tool_memory_search(args, ctx)
-    if name == "memory_retrieve":
-        return await _tool_memory_retrieve(args, ctx)
     if name == "memory_store":
         return await _tool_memory_store(args, ctx)
-    if name == "memory_retrieve":
-        return await _tool_memory_retrieve(args, ctx)
-    if name == "memory_prune":
-        return await _tool_memory_prune(args, ctx)
     if name in ("plan_create", "plan_update", "plan_get"):
         from ..tools.plan_tools import (
             _tool_plan_create,
@@ -2332,82 +2170,6 @@ async def _execute_tool(
     # ── Dynamic MCP tools (mcp_<server-id>_<tool>) ──
     if name.startswith("mcp_"):
         return await _tool_mcp_dynamic(name, args, ctx)
-
-    # ── Lineage injection into generated artifacts (traceability) ──
-    # When an agent has a lineage chain (fractal vertical context), prepend a
-    # "Why:" comment to every code_write output so files are self-documenting.
-    # Source: our own practice of documenting sources in code (ADR-0015, TinyAGI/fractals).
-    if name == "code_write":
-        # Agent-specific path restriction: ac-architect may only write INCEPTION.md
-        _arch_id = getattr(ctx.agent, "id", "")
-        if _arch_id == "ac-architect":
-            import os as _os_cw
-
-            _write_path = args.get("path", "")
-            if _os_cw.path.basename(_write_path) != "INCEPTION.md":
-                return (
-                    f"Error: ac-architect is restricted to writing INCEPTION.md only. "
-                    f"Path '{_write_path}' is not allowed. "
-                    f"Write INCEPTION.md and stop. Do NOT create test files, Dockerfiles or any other files. "
-                    f"ac-codex writes all other files in the next phase."
-                )
-        lineage = getattr(ctx, "lineage", None)
-        content = args.get("content", "")
-        # Skip injection for files without comment support, or Markdown
-        _no_comment_exts = (
-            ".json",
-            ".toml",
-            ".lock",
-            ".xml",
-            ".svg",
-            ".yaml",
-            ".yml",
-            ".html",
-            ".htm",
-            ".md",
-            ".mdx",
-            ".vue",
-            ".svelte",
-            ".astro",
-        )
-        _double_slash_exts = (
-            ".js",
-            ".ts",
-            ".jsx",
-            ".tsx",
-            ".java",
-            ".cs",
-            ".go",
-            ".rs",
-            ".cpp",
-            ".c",
-            ".h",
-        )
-        if (
-            lineage
-            and content
-            and "# Why:" not in content
-            and "// Why:" not in content
-            and not args.get("path", "").endswith(_no_comment_exts)
-        ):
-            path = args.get("path", "")
-            chain = " → ".join(lineage)
-            comment = "// Why: " if path.endswith(_double_slash_exts) else "# Why: "
-            args["content"] = f"{comment}{chain}\n{content}"
-        # Log artifact to traceability store
-        if lineage and args.get("path"):
-            try:
-                from ..traceability.store import log_artifact
-
-                log_artifact(
-                    ctx.session_id or "",
-                    "code",
-                    args["path"],
-                    lineage,
-                    f"Written by agent {getattr(ctx.agent, 'id', '?')}",
-                )
-            except Exception:
-                pass
 
     # Registry tools
     # Inject agent context for git branch isolation
