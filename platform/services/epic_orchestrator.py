@@ -2032,6 +2032,7 @@ class EpicOrchestrator:
                         is_last_phase=_pm_is_last,
                         sprint_num=reloop_count + 1,
                         max_sprints=cfg.get("max_iterations", 5),
+                        prior_feedback=prev_context[-1000:] if prev_context else "",
                     ),
                     timeout=60,
                 )

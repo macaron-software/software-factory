@@ -130,12 +130,29 @@ async def run_build_gate(workspace: str, timeout: int = 300) -> BuildResult:
 # ── Judge LLM ──────────────────────────────────────────────────
 
 
+def _load_specs(workspace: str) -> str:
+    """Load project SPECS.md or acceptance criteria for judge context."""
+    for name in ("SPECS.md", "specs.md", "REQUIREMENTS.md", "README.md"):
+        path = os.path.join(workspace, name)
+        if os.path.isfile(path):
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read(2000)
+                return f"(from {name})\n{content}"
+            except Exception:
+                pass
+    return "(no specs found)"
+
+
 async def judge_phase_quality(
     phase_name: str,
     phase_output: str,
     build_result: BuildResult,
     workspace: str,
     adversarial_rejections: int = 0,
+    sprint_num: int = 1,
+    max_sprints: int = 1,
+    prior_feedback: str = "",
 ) -> tuple[float, str]:
     """Call judge LLM to evaluate phase deliverables quality.
 
@@ -146,16 +163,37 @@ async def judge_phase_quality(
 
     # Collect workspace evidence
     files_evidence = _list_deliverables(workspace)
+    specs_evidence = _load_specs(workspace)
 
     build_evidence = "BUILD: SUCCESS" if build_result.success else (
         f"BUILD: FAILED ({build_result.error_count} errors)\n"
         + "\n".join(build_result.first_errors[:10] if build_result.first_errors else [])
     )
 
+    # Sprint context for retry awareness
+    sprint_context = f"Sprint {sprint_num}/{max_sprints}"
+    if sprint_num > 1:
+        sprint_context += f" (this is retry #{sprint_num - 1} — be stricter: same issues recurring = lower score)"
+    if sprint_num >= max_sprints:
+        sprint_context += " — LAST SPRINT: score harshly, no more retries possible"
+
+    # Prior feedback for learning across retries
+    prior_section = ""
+    if prior_feedback:
+        prior_section = f"""
+## Prior Sprint Feedback (issues from previous attempts)
+{prior_feedback[:1000]}
+Check whether these issues have been FIXED. If they recur, score lower.
+"""
+
     prompt = f"""You are a strict QA judge evaluating a software development phase.
 Your job is to score the deliverables objectively based on EVIDENCE, not claims.
 
 ## Phase: {phase_name}
+## Sprint: {sprint_context}
+
+## Project Acceptance Criteria
+{specs_evidence}
 
 ## Build Result (DETERMINISTIC — ground truth)
 {build_evidence}
@@ -164,19 +202,23 @@ Your job is to score the deliverables objectively based on EVIDENCE, not claims.
 {files_evidence}
 
 ## Adversarial Rejections This Phase: {adversarial_rejections}
-
+{prior_section}
 ## Phase Output Summary
 {phase_output[:2000]}
 
 ## Evaluation Criteria
 Score each criterion 0-10:
-1. **Compilation**: Does the code compile? (BUILD result is ground truth)
-2. **Completeness**: Are required files present? (workspace listing is ground truth)
-3. **Quality**: Code structure, no obvious issues based on output
-4. **Tests**: Are test files present?
+1. **Compilation**: Does the code compile? (BUILD result is ground truth — if FAILED, compilation=0)
+2. **Completeness**: Are ALL required files present? Check against acceptance criteria above
+3. **Quality**: Code structure, no obvious issues, follows project specs
+4. **Tests**: Are test files present AND do they pass? (BUILD result is ground truth)
+5. **Acceptance**: Does the output meet the acceptance criteria from SPECS?
+
+IMPORTANT: Be strict. A score of 6/10 means "barely acceptable". 8+ means "good quality".
+If build FAILED, overall MUST be ≤3. If tests fail, overall MUST be ≤5.
 
 ## Response Format (JSON only)
-{{"compilation": 0-10, "completeness": 0-10, "quality": 0-10, "tests": 0-10, "overall": 0-10, "verdict": "APPROVE|RETRY|REJECT", "reason": "one sentence"}}
+{{"compilation": 0-10, "completeness": 0-10, "quality": 0-10, "tests": 0-10, "acceptance": 0-10, "overall": 0-10, "verdict": "APPROVE|RETRY|REJECT", "reason": "one sentence"}}
 """
 
     llm = get_llm_client()
@@ -184,8 +226,8 @@ Score each criterion 0-10:
         resp = await asyncio.wait_for(
             llm.chat(
                 [LLMMessage(role="user", content=prompt)],
-                temperature=0.1,  # Low temp for consistent judging
-                max_tokens=300,
+                temperature=0.1,
+                max_tokens=400,
             ),
             timeout=30,
         )
@@ -193,7 +235,6 @@ Score each criterion 0-10:
         return _parse_judge_response(content)
     except Exception as e:
         logger.warning("Judge LLM failed: %s", e)
-        # Fallback: use build result as score
         score = 1.0 if build_result.success else 0.2
         return score, f"Judge unavailable — build {'passed' if build_result.success else 'failed'}"
 
@@ -258,6 +299,7 @@ async def pm_checkpoint(
     is_last_phase: bool = False,
     sprint_num: int = 1,
     max_sprints: int = 1,
+    prior_feedback: str = "",
 ) -> PMDecision:
     """PM checkpoint: collect evidence, run build gate, call judge, decide.
 
@@ -266,6 +308,8 @@ async def pm_checkpoint(
     2. Judge LLM quality score (independent evaluation)
     3. Phase success flag from pattern engine
     4. Adversarial rejection count
+    5. Sprint count for retry awareness
+    6. Prior feedback for learning across retries
     """
     from ..llm.client import LLMMessage, get_llm_client
 
@@ -288,13 +332,18 @@ async def pm_checkpoint(
         build_result=build_result,
         workspace=workspace,
         adversarial_rejections=adversarial_rejections,
+        sprint_num=sprint_num,
+        max_sprints=max_sprints,
+        prior_feedback=prior_feedback,
     )
 
     logger.warning(
-        "PM_JUDGE score=%.2f verdict=%s phase=%s",
+        "PM_JUDGE score=%.2f verdict=%s phase=%s sprint=%d/%d",
         quality_score,
         judge_verdict[:80],
         phase_id,
+        sprint_num,
+        max_sprints,
     )
 
     # Step 3: PM decision based on evidence
@@ -307,7 +356,6 @@ async def pm_checkpoint(
     )
 
     # Hard rules (deterministic, no LLM needed):
-    # - Build fails on code phase → retry (if sprints left)
     is_code_phase = any(
         k in (phase_id or "").lower()
         for k in ("dev", "sprint", "impl", "code", "fix", "tdd")
@@ -327,7 +375,7 @@ async def pm_checkpoint(
             )
         else:
             return PMDecision(
-                action="next",  # Max sprints exhausted, move on with issues
+                action="next",
                 reason=f"Build still failing after {max_sprints} sprints — moving on with issues",
                 build_result=build_result,
                 quality_score=quality_score,
@@ -344,7 +392,10 @@ async def pm_checkpoint(
             evidence_summary=evidence_summary,
         )
 
-    if phase_success and quality_score >= 0.4:
+    # Quality threshold: 0.6 = 60% minimum to proceed
+    # Stricter on later sprints (already had chances to fix)
+    quality_threshold = 0.6 if sprint_num <= 1 else 0.5
+    if phase_success and quality_score >= quality_threshold:
         return PMDecision(
             action="next",
             reason=f"Phase approved — build OK, quality {quality_score:.0%}",
@@ -362,7 +413,16 @@ async def pm_checkpoint(
             evidence_summary=evidence_summary,
         )
 
-    # Default: proceed
+    if phase_success and quality_score < quality_threshold and sprint_num < max_sprints:
+        return PMDecision(
+            action="retry",
+            reason=f"Quality too low ({quality_score:.0%} < {quality_threshold:.0%}) — retrying sprint {sprint_num}/{max_sprints}",
+            build_result=build_result,
+            quality_score=quality_score,
+            evidence_summary=evidence_summary,
+        )
+
+    # Default: proceed (max sprints exhausted or non-code phase)
     return PMDecision(
         action="next",
         reason=f"Phase complete — quality {quality_score:.0%}",
