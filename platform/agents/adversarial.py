@@ -454,6 +454,25 @@ def check_l0(
                         f"HIGH_COMPLEXITY: Deep nesting ({indent_depth // 4} levels) in {fp}"
                     )
                     score += 3
+            # KISS: file too large — hard to review, edit, and maintain
+            if lines > 200 and tc.get("name") == "code_write":
+                issues.append(
+                    f"FILE_TOO_LARGE: {lines} lines in {fp} — max 200. "
+                    f"Split into focused modules (one class/struct per file)."
+                )
+                score += 4
+            # GOD_FILE: multiple classes/structs in one file
+            if tc.get("name") == "code_write" and lines > 50:
+                _type_decls = len(re.findall(
+                    r"^\s*(?:public |private |internal |final )?(?:class|struct|enum|protocol) \w+",
+                    fc, re.MULTILINE
+                ))
+                if _type_decls > 3:
+                    issues.append(
+                        f"GOD_FILE: {_type_decls} type declarations in {fp} — "
+                        f"split into one type per file for maintainability."
+                    )
+                    score += 3
         # NO_TESTS: agent wrote source code but zero test files
         # Also check if tests already exist via code_read calls (agent didn't write them)
         if source_files >= 3 and test_files == 0:

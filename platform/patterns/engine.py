@@ -154,23 +154,29 @@ RULES:
 - Last subtask MUST be: "Run build verification and fix any errors"."""
 
 # Execution protocol — telegraphic, code_write focused
-_EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write. No code_write = FAILURE.
+_EXEC_PROTOCOL = """ROLE: Developer. You MUST call code_write or code_edit. No code changes = FAILURE.
 
-WORKFLOW:
-1. EXPLORE FIRST: list_files + code_read existing files → understand what exists already
-2. deep_search(query="architecture, patterns, existing code") → discover project structure
-3. memory_search(query="conventions, decisions, design-system") → learn past decisions + design tokens
-4. THEN code_write per file → REAL build → git_commit
+WORKFLOW (FOLLOW THIS ORDER):
+1. list_files → see what exists
+2. build → see current compilation status (THIS IS STEP 2, NOT STEP 5)
+3. IF build fails: code_read the failing file → code_edit to fix each error → build again
+4. IF build passes or no existing code: code_write new files → build
+5. git_commit when build succeeds
 
+CRITICAL RULE: If build() returns errors, you MUST call code_edit() to fix them.
+Do NOT just read errors and describe them. Call code_edit(path=..., old_str=..., new_str=...).
+Text-only responses = AUTOMATIC REJECTION by adversarial guard.
+
+TOOL: code_edit(path="src/File.swift", old_str="the exact broken line", new_str="the fixed line")
 TOOL: code_write(path="src/module.ts", content="full source code here")
 
 RULES:
-- ALWAYS read existing code BEFORE writing. Do NOT recreate files that exist.
-- code_write EACH file. 30+ lines per file. No stubs. No placeholders. No fake scripts.
-- Use paths matching the project stack (src/ for web, app/ for mobile). Auto-resolved.
-- FOLLOW THE STACK DECIDED IN ARCHITECTURE PHASE. Do NOT switch language.
-- Do NOT describe changes. DO them via code_write.
-- NEVER create fake build scripts (gradlew, Makefile) that do nothing.
+- Read existing code BEFORE writing. Do NOT recreate files that exist.
+- code_write EACH new file. 30+ lines per file. No stubs.
+- MAX 150 lines per file. Split large logic into focused modules.
+- ONE class/struct per file. Use imports between files.
+- FOLLOW THE STACK FROM ARCHITECTURE PHASE. Do NOT switch language.
+- Do NOT describe changes. DO them via code_write/code_edit.
 
 UI/UX CONSTRAINTS (MANDATORY for frontend code):
 - IMPORT design tokens: @import './styles/tokens.css' or import '../styles/tokens.css'
@@ -208,11 +214,14 @@ BUILD VERIFICATION (MANDATORY — run AFTER writing code):
 BUILD-FIX LOOP (CRITICAL — you will be REJECTED if you skip this):
 When build() returns errors, you MUST:
 1. Read the error messages from the build output
-2. Use code_edit(path="file.swift", old_content="broken code", new_content="fixed code") for EACH error
-3. Run build() again to verify the fix
-4. Repeat until build succeeds
+2. code_read the file with the error to see surrounding code
+3. Call code_edit to fix EACH error. Example:
+   code_edit(path="src/GameScene.swift", old_str="let sprite = SKSprite()", new_str="let sprite = SKSpriteNode()")
+4. Run build() again to verify the fix
+5. Repeat until build succeeds or errors decrease
 Do NOT stop and describe errors in text. FIX them with code_edit. Text-only responses = REJECTION.
 If existing code has compilation errors, your PRIMARY job is to FIX them, not describe them.
+The code_edit tool takes: path (file), old_str (exact text to replace), new_str (replacement text).
 
 COMPLETION CHECKLIST (before git_commit):
 1. All source files written via code_write or fixed via code_edit

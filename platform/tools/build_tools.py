@@ -43,24 +43,39 @@ class BuildTool(BaseTool):
         if result.returncode == 0:
             output = result.stdout[-3000:]
             return f"{prefix}[BUILD] SUCCESS\n$ {cmd}\n{output}"
-        # Build failed — extract first unique errors for actionable feedback
-        raw = result.stderr or result.stdout or ""
+        # Build failed — combine stderr+stdout (Swift puts errors on stdout)
+        raw = ((result.stderr or "") + "\n" + (result.stdout or "")).strip()
         error_lines = []
         seen_errors = set()
-        for line in raw.splitlines():
+        # Collect error context: surrounding source lines from compiler output
+        _source_context: dict[str, list[str]] = {}  # file:line → context lines
+        _all_lines = raw.splitlines()
+        for idx, line in enumerate(_all_lines):
             if ": error:" in line or "error:" == line.strip()[:6:]:
                 # Deduplicate by error message (ignore file/line)
                 msg_part = line.split(": error:")[-1].strip() if ": error:" in line else line.strip()
                 if msg_part not in seen_errors:
                     seen_errors.add(msg_part)
                     error_lines.append(line.strip())
+                    # Grab 1 line before + 2 after for source context (Swift compiler shows code)
+                    ctx = []
+                    for ci in range(max(0, idx - 1), min(len(_all_lines), idx + 4)):
+                        cl = _all_lines[ci].rstrip()
+                        if cl and cl != line.strip() and not cl.startswith("Building for") and not cl.startswith("["):
+                            ctx.append(cl)
+                    if ctx:
+                        _source_context[line.strip()] = ctx[:3]
         total_errors = len(seen_errors) if seen_errors else raw.count("error:")
-        # Show first 5 unique errors — keep it focused for the agent
+        # Show first 5 unique errors with source context
         shown = error_lines[:5]
         output_parts = [f"{prefix}[BUILD] FAILED (exit {result.returncode})", f"$ {cmd}"]
         output_parts.append(f"\n{total_errors} unique errors found. Showing first {len(shown)} — fix these first:")
         for e in shown:
             output_parts.append(f"  {e}")
+            # Add source context lines to help agent know what to put in old_str
+            ctx = _source_context.get(e, [])
+            for cl in ctx:
+                output_parts.append(f"    {cl}")
         if total_errors > 5:
             output_parts.append(f"  ... and {total_errors - 5} more errors (fix above first, then rebuild)")
         output_parts.append(

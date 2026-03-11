@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import tempfile
 from dataclasses import dataclass, field
@@ -805,6 +806,57 @@ class QualityScanner:
                 + issues["duplicates"] * 5
                 + issues["type_errors"] * 2
             )
+
+            # KISS checks — deterministic file size and god-file detection
+            _code_exts = {
+                ".py", ".ts", ".tsx", ".js", ".jsx", ".swift", ".kt",
+                ".rs", ".go", ".java", ".c", ".cpp", ".h", ".cs",
+            }
+            large_files = []
+            god_files = []
+            total_source = 0
+            for root, _dirs, files in os.walk(workspace):
+                # Skip build dirs, node_modules, .build, etc.
+                if any(skip in root for skip in [
+                    "node_modules", ".build", "__pycache__", ".git",
+                    "vendor", "target", "dist", "build"
+                ]):
+                    continue
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext not in _code_exts:
+                        continue
+                    total_source += 1
+                    fpath = os.path.join(root, fname)
+                    try:
+                        with open(fpath) as fh:
+                            content = fh.read()
+                        line_count = content.count("\n") + 1
+                        if line_count > 200:
+                            rel = os.path.relpath(fpath, workspace)
+                            large_files.append(f"{rel} ({line_count} lines)")
+                        # God-file: >3 type declarations
+                        type_decls = len(re.findall(
+                            r"^\s*(?:public |private |internal |final )*"
+                            r"(?:class|struct|enum|protocol|interface) \w+",
+                            content, re.MULTILINE
+                        ))
+                        if type_decls > 3:
+                            rel = os.path.relpath(fpath, workspace)
+                            god_files.append(f"{rel} ({type_decls} types)")
+                    except Exception:
+                        pass
+
+            issues["large_files"] = len(large_files)
+            issues["god_files"] = len(god_files)
+            issues["total_source_files"] = total_source
+            if large_files:
+                issues["large_file_list"] = large_files[:5]
+                penalty += len(large_files) * 5
+            if god_files:
+                issues["god_file_list"] = god_files[:5]
+                penalty += len(god_files) * 8
+
             score = max(0, min(100, 100 - penalty))
 
             details = {**issues, "tools": tools_used}

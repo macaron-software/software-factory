@@ -33,7 +33,7 @@ from .tool_schemas import _filter_schemas, _get_tool_schemas
 logger = logging.getLogger(__name__)
 
 # Max tool-calling rounds to prevent infinite loops
-MAX_TOOL_ROUNDS = 8
+MAX_TOOL_ROUNDS = 15
 
 # Tools that produce code changes and should trigger auto-verification
 _CODE_WRITE_TOOLS = frozenset({"code_write", "code_edit", "code_create"})
@@ -1015,15 +1015,32 @@ class AgentExecutor:
                         messages, self._llm, use_provider, use_model
                     )
 
-                # On penultimate round, disable tools to force synthesis next iteration
+                # On penultimate round: nudge dev agents to edit; disable tools for others
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
-                    tools = None
-                    messages.append(
-                        LLMMessage(
-                            role="system",
-                            content="You have used many tool calls. Now synthesize your findings and respond to the user. Do not call more tools.",
+                    _role = _classify_agent_role(agent) if hasattr(agent, "tools") else "dev"
+                    if _role in ("dev", "devops"):
+                        # Keep tools enabled — dev agents need code_edit on final rounds
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content=(
+                                    "URGENT: You have used many rounds exploring. "
+                                    "You MUST call code_edit or code_write NOW to fix the errors you found. "
+                                    "Do NOT describe changes in text — call the tool."
+                                ),
+                            )
                         )
-                    )
+                    else:
+                        tools = None
+                        messages.append(
+                            LLMMessage(
+                                role="system",
+                                content=(
+                                    "You have used many tool calls. Now synthesize your findings "
+                                    "and respond to the user. Do not call more tools."
+                                ),
+                            )
+                        )
             else:
                 content = llm_resp.content or "(Max tool rounds reached)"
 
