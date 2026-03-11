@@ -869,6 +869,10 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
     import re as _re
     if os.path.isfile("/usr/bin/swift") and _re.search(r'\bswift\s+(?:build|test|package|run)\b', command):
         command = _re.sub(r'\bswift\b', '/usr/bin/swift', command)
+    # Fix bare "python" → "python3" on macOS where only python3 exists
+    import shutil
+    if not shutil.which("python") and shutil.which("python3"):
+        command = _re.sub(r'\bpython\b(?!3)', 'python3', command)
     try:
         proc = subprocess.run(
             command,
@@ -877,6 +881,7 @@ async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) ->
             capture_output=True,
             text=True,
             timeout=120,
+            stdin=subprocess.DEVNULL,
         )
         out = (proc.stdout or "") + (proc.stderr or "")
         status = (

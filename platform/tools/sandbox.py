@@ -301,6 +301,7 @@ class SandboxExecutor:
                 capture_output=True,
                 text=True,
                 timeout=timeout + 10,  # docker overhead
+                stdin=subprocess.DEVNULL,
             )
             return SandboxResult(
                 stdout=r.stdout[-5000:],
@@ -361,6 +362,12 @@ class SandboxExecutor:
                     "Landlock sandbox: workspace=%s cmd=%s", ws_abs, command[:80]
                 )
 
+        # Redirect stdin from /dev/null at shell level to prevent
+        # "Fatal Python error: init_sys_streams" when parent stdin is closed
+        if "< /dev/null" not in proxied:
+            proxied = f"{proxied} < /dev/null"
+
+
         try:
             r = subprocess.run(
                 proxied,
@@ -370,6 +377,7 @@ class SandboxExecutor:
                 cwd=effective_workspace,
                 timeout=timeout,
                 env=run_env,
+                stdin=subprocess.DEVNULL,
                 preexec_fn=lambda: os.nice(10),  # low CPU priority
             )
             _track_rtk_stats(was_proxied, len(r.stdout.encode()))
@@ -399,54 +407,3 @@ class SandboxExecutor:
 def get_sandbox(workspace: str = ".") -> SandboxExecutor:
     """Get a sandbox executor for the given workspace."""
     return SandboxExecutor(workspace)
-
-
-def run_in_project_docker(
-    project_id: str,
-    command: str,
-    cwd: Optional[str] = None,
-    timeout: int = SANDBOX_TIMEOUT,
-    env: Optional[dict] = None,
-    agent_id: Optional[str] = None,
-) -> SandboxResult:
-    """Run a command inside the persistent Docker container of the given project.
-
-    Platform Bubble pattern: uses `docker exec` on a long-running project container
-    instead of `docker run --rm` (ephemeral). The container persists between calls
-    so build caches, node_modules, venvs etc. accumulate normally.
-
-    Falls back to direct subprocess if Docker is unavailable.
-
-    Usage:
-        result = run_in_project_docker("software-factory", "pytest tests/")
-        result = run_in_project_docker("ac-hello-html", "npm test", cwd=workspace)
-    """
-    workspace = cwd or ""
-
-    try:
-        from ..projects.manager import get_project_store
-
-        proj = get_project_store().get(project_id)
-        if proj and proj.path:
-            workspace = workspace or proj.path
-    except Exception as e:
-        logger.debug("run_in_project_docker: project lookup failed: %s", e)
-
-    try:
-        from ..projects.container import get_project_container
-
-        pc = get_project_container(project_id, path=workspace)
-        exec_cwd = cwd if cwd else "/workspace"
-        result = pc.exec(command, cwd=exec_cwd, env=env, timeout=timeout)
-        return SandboxResult(
-            stdout=result.stdout,
-            stderr=result.stderr,
-            exit_code=result.exit_code,
-        )
-    except Exception as e:
-        logger.warning(
-            "run_in_project_docker: docker exec failed (%s) — falling back to direct", e
-        )
-
-    executor = SandboxExecutor(workspace or ".")
-    return executor._run_direct(command, cwd or workspace, timeout, env)

@@ -455,11 +455,19 @@ def check_l0(
                     )
                     score += 3
         # NO_TESTS: agent wrote source code but zero test files
+        # Also check if tests already exist via code_read calls (agent didn't write them)
         if source_files >= 3 and test_files == 0:
-            issues.append(
-                f"NO_TESTS: {source_files} source files written but 0 test files"
+            # Check if tests were READ (already exist in project)
+            tests_read = any(
+                any(kw in str(tc.get("args", {}).get("path", "")).lower() for kw in ["test", "spec", "__tests__"])
+                for tc in tool_calls
+                if tc.get("name") in ("code_read", "list_files")
             )
-            score += 4
+            if not tests_read:
+                issues.append(
+                    f"NO_TESTS: {source_files} source files written but 0 test files"
+                )
+                score += 4
 
         # NO_BUILD_RUN: agent wrote source files but never called build/test tool
         if source_files >= 1:
@@ -684,16 +692,19 @@ def check_l0(
             )
             score += 3  # warning: encourages but doesn't block
 
-    # Check build tool failures — if any build/test tool returned [FAIL], force rejection
+    # Check build tool failures — only flag if the LAST build/test call failed.
+    # Earlier failures are OK if the agent self-corrected (iterative fix cycle).
     if tool_calls:
+        last_build_result: dict | None = None
         for tc in tool_calls:
-            if tc.get("name") not in ("build", "test", "lint"):
-                continue
-            result_str = str(tc.get("result", ""))
+            if tc.get("name") in ("build", "test", "lint"):
+                last_build_result = tc
+        if last_build_result:
+            result_str = str(last_build_result.get("result", ""))
             if "[FAIL]" in result_str or "command not found" in result_str.lower():
-                cmd = str(tc.get("args", {}).get("command", "?"))[:80]
+                cmd = str(last_build_result.get("args", {}).get("command", "?"))[:80]
                 issues.append(
-                    f"BUILD_FAILED: Tool '{tc.get('name')}' failed: {cmd!r} — "
+                    f"BUILD_FAILED: Tool '{last_build_result.get('name')}' failed: {cmd!r} — "
                     f"fix errors before approving"
                 )
                 score += 7  # hard reject — broken build cannot be approved
