@@ -189,6 +189,9 @@ class WorkflowStore:
                 p.setdefault("config", {})["agents"] = p.pop("agents")
             elif "agents" in p:
                 p.pop("agents")
+            # Map common aliases to dataclass field names
+            if "pattern" in p and "pattern_id" not in p:
+                p["pattern_id"] = p.pop("pattern")
             # Strip unknown keys to avoid __init__ crash
             cleaned = {k: v for k, v in p.items() if k in _PHASE_FIELDS}
             cleaned_phases.append(WorkflowPhase(**cleaned))
@@ -538,19 +541,19 @@ def _find_main_py(workspace: str) -> str:
 # ── PM v2 Orchestrator (Lego-brick phases) ──────────────────────
 
 _PATTERN_CATALOG = {
-    "solo": "Single agent works alone",
-    "sequential": "Agents pipeline, one after another",
-    "parallel": "Dispatcher → workers → aggregator",
-    "loop": "Writer-reviewer iterate until gate passes",
-    "hierarchical": "Manager → devs → QA validates",
-    "network": "Debaters argue, judge decides",
-    "router": "Route to best specialist",
-    "aggregator": "Workers parallel → consolidate",
-    "wave": "Dependency-based execution waves",
-    "human-in-the-loop": "Agent + human validation checkpoints",
-    "composite": "Sequential sub-patterns (meta)",
-    "blackboard": "Shared-knowledge iterative convergence",
-    "map_reduce": "Map to workers → reduce results",
+    "solo": "Single agent works alone. Use for: inception, simple writes, single-skill tasks",
+    "sequential": "Agents pipeline A→B→C. Use for: design→review, build→test→deploy",
+    "parallel": "Dispatcher fans out to N workers, aggregator merges. Use for: multi-file coding, parallel tests, independent sub-tasks",
+    "loop": "Writer-reviewer iterate until gate passes (max N). Use for: TDD red-green-refactor, code-review cycles, fix-verify loops",
+    "hierarchical": "Manager delegates to devs, QA validates. Use for: dev sprints, feature implementation with oversight",
+    "network": "N debaters argue, judge LLM decides winner. Use for: architecture decisions, design trade-offs, adversarial review",
+    "router": "Analyze task → route to best specialist agent. Use for: bug triage, multi-domain tasks, skill-based dispatch",
+    "aggregator": "Workers run in parallel, results consolidated. Use for: specs from multiple perspectives, parallel analysis",
+    "wave": "Dependency DAG: execute in waves respecting deps. Use for: multi-module builds, ordered migrations",
+    "human-in-the-loop": "Agent proposes, human validates at checkpoints. Use for: critical deploys, security reviews",
+    "map_reduce": "Map task to N workers, reduce results into synthesis. Use for: large codebase analysis, multi-file refactoring",
+    "blackboard": "Agents read/write shared knowledge board iteratively. Use for: complex design convergence, multi-agent brainstorming",
+    "composite": "Chain of sub-patterns executed sequentially. Use for: complex workflows needing mixed patterns",
 }
 
 _FEEDBACK_TYPES = {
@@ -572,8 +575,12 @@ _PHASE_TEMPLATES = [
      "team_roles": ["product"], "gate": "no_veto"},
     {"id": "design", "name": "Architecture Design", "pattern": "sequential",
      "team_roles": ["architect", "tech-lead"], "gate": "no_veto"},
+    {"id": "design-debate", "name": "Architecture Debate", "pattern": "network",
+     "team_roles": ["architect", "tech-lead", "critic"], "gate": "no_veto"},
     {"id": "dev-sprint", "name": "Development Sprint", "pattern": "hierarchical",
      "team_roles": ["tech-lead", "developer", "qa"], "gate": "no_veto"},
+    {"id": "parallel-dev", "name": "Parallel Development", "pattern": "parallel",
+     "team_roles": ["developer", "developer", "developer"], "gate": "best_effort"},
     {"id": "tdd-sprint", "name": "TDD Sprint", "pattern": "loop",
      "team_roles": ["developer", "qa"], "gate": "all_approved"},
     {"id": "code-review", "name": "Code Review", "pattern": "loop",
@@ -581,10 +588,16 @@ _PHASE_TEMPLATES = [
     {"id": "qa-acceptance", "name": "QA & Acceptance", "pattern": "loop",
      "team_roles": ["qa", "critic"], "gate": "all_approved",
      "feedback": ["adversarial", "tools"]},
+    {"id": "multi-file-refactor", "name": "Multi-File Refactoring", "pattern": "map_reduce",
+     "team_roles": ["developer", "developer", "architect"], "gate": "no_veto"},
+    {"id": "design-convergence", "name": "Design Convergence", "pattern": "blackboard",
+     "team_roles": ["architect", "product", "tech-lead"], "gate": "no_veto"},
     {"id": "deploy", "name": "Deploy & Verify", "pattern": "sequential",
      "team_roles": ["infra", "qa"], "gate": "always"},
     {"id": "rework", "name": "Rework Sprint", "pattern": "hierarchical",
      "team_roles": ["tech-lead", "developer"], "gate": "no_veto"},
+    {"id": "bug-triage", "name": "Bug Triage & Routing", "pattern": "router",
+     "team_roles": ["lead", "developer", "sre"], "gate": "no_veto"},
 ]
 
 
@@ -665,16 +678,28 @@ Return ONE JSON object. Pick the BEST option:
 4. DONE (all AC met + build OK + tests pass):
 {{"decision": "done", "reason": "...", "findings": "..."}}
 
-5. COMPOSE a new dynamic phase (preferred when stuck or need decomposition):
-{{"decision": "phase", "phase": {{"name": "qa-rework", "pattern": "loop", "team": ["dev_fullstack", "testeur"], "gate": "all_approved", "feedback": ["adversarial", "tools"], "max_iterations": 3, "task": "Fix failing tests and re-run build"}}, "reason": "..."}}
+5. COMPOSE a new dynamic phase — PICK THE RIGHT PATTERN for the situation:
+{{"decision": "phase", "phase": {{"name": "<name>", "pattern": "<pattern>", "team": ["<agent_id>", ...], "gate": "<gate>", "feedback": ["<type>", ...], "max_iterations": <int>, "task": "<instructions>"}}, "reason": "..."}}
+
+─── PATTERN SELECTION GUIDE ───
+Pick the pattern that matches the situation:
+- Fix a bug or iterate code→review: "loop" (writer + reviewer)
+- Run build then test then deploy: "sequential" (pipeline)
+- Multiple independent files/tasks: "parallel" (fan-out workers)
+- Need manager oversight over devs: "hierarchical" (manager delegates)
+- Architecture trade-off or debate: "network" (debaters + judge)
+- Route to best specialist: "router" (triage + dispatch)
+- Large refactoring across files: "map_reduce" (workers + synthesizer)
+- Complex design needing convergence: "blackboard" (shared knowledge iterations)
+- Simple single-agent task: "solo" (one agent)
 
 ─── PROGRESSION RULES ───
-- After 2 loops of SAME phase → MUST use "next", "skip", or "phase" (compose new phase)
+- After 2 loops of SAME phase → MUST use "next", "skip", or "phase"
 - NEVER loop same phase 3+ times — decompose the problem instead
-- If agents keep failing design: compose a focused sub-phase with explicit task
-- If build/test never ran: compose a "build-verify" phase with pattern=sequential
-- After dev phase: compose "qa-acceptance" phase (pattern=loop, feedback=adversarial+tools)
-- After deploy: compose "verify-prod" phase to check deployment
+- Vary patterns: don't always use loop/sequential — match the problem shape
+- Multiple files to fix → parallel or map_reduce (not sequential)
+- Need debate/decision → network (not loop)
+- After dev phase: compose "qa-acceptance" with feedback=["adversarial","tools"]
 
 ─── NEVER "done" IF ───
 - Build never ran or failed

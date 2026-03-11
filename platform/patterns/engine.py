@@ -701,6 +701,12 @@ async def run_pattern(
             await _impl_wave(_engine_proxy, run, initial_task)
         elif ptype == "human-in-the-loop":
             await _impl_human_in_the_loop(_engine_proxy, run, initial_task)
+        elif ptype == "blackboard":
+            await _impl_blackboard(_engine_proxy, run, initial_task)
+        elif ptype == "composite":
+            await _impl_composite(_engine_proxy, run, initial_task)
+        elif ptype == "map_reduce":
+            await _impl_map_reduce(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -1840,6 +1846,9 @@ from .impls.router import run_router as _impl_router
 from .impls.sequential import run_sequential as _impl_sequential
 from .impls.solo import run_solo as _impl_solo
 from .impls.wave import run_wave as _impl_wave
+from .impls.blackboard import run_blackboard as _impl_blackboard
+from .impls.composite import run_composite as _impl_composite
+from .impls.map_reduce import run_map_reduce as _impl_map_reduce
 
 
 class _EngineProxy:
