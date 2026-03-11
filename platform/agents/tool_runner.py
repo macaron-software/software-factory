@@ -849,7 +849,239 @@ async def _tool_get_project_context(args: dict, ctx: ExecutionContext) -> str:
     return "\n\n".join(parts)
 
 
-async def _tool_build_test(tool_name: str, args: dict, ctx: ExecutionContext) -> str:
+async def _tool_traceability(name: str, args: dict, ctx: ExecutionContext) -> str:
+    """Dispatch traceability tools wrapping migration_store.py."""
+    from ..traceability.migration_store import (
+        create_legacy_item,
+        list_legacy_items,
+        count_legacy_items,
+        create_link,
+        get_links,
+        coverage_report,
+        orphan_report,
+        traceability_matrix,
+        LEGACY_ITEM_TYPES,
+    )
+    import re
+    from pathlib import Path
+
+    project_id = args.get("project_id", ctx.project_id or "")
+    if not project_id:
+        return "Error: project_id required"
+
+    try:
+        if name == "legacy_scan":
+            return await _legacy_scan(args, ctx, project_id)
+
+        if name == "traceability_link":
+            action = args.get("action", "list")
+            source_id = args.get("source_id", "")
+            if not source_id:
+                return "Error: source_id required"
+
+            if action == "create":
+                target_id = args.get("target_id", "")
+                source_type = args.get("source_type", "legacy_item")
+                target_type = args.get("target_type", "story")
+                link_type = args.get("link_type", "covers")
+                notes = args.get("notes", "")
+                if not target_id:
+                    return "Error: target_id required for create"
+                link_id = create_link(
+                    source_id, source_type, target_id, target_type,
+                    link_type, notes=notes,
+                )
+                return f"Link created (id={link_id}): {source_id} --[{link_type}]--> {target_id}"
+
+            # action == "list"
+            links = get_links(source_id)
+            if not links:
+                return f"No traceability links found for {source_id}"
+            lines = [f"## Links for {source_id} ({len(links)} total)"]
+            for lk in links:
+                direction = "→" if lk.source_id == source_id else "←"
+                other = lk.target_id if lk.source_id == source_id else lk.source_id
+                lines.append(f"- {direction} [{lk.link_type}] {other} ({lk.target_type})")
+                if lk.notes:
+                    lines.append(f"  Notes: {lk.notes}")
+            return "\n".join(lines)
+
+        if name == "traceability_coverage":
+            include_orphans = args.get("include_orphans", True)
+            cov = coverage_report(project_id)
+            lines = ["## Traceability Coverage"]
+            overall = cov.pop("_overall", {})
+            for itype, stats in sorted(cov.items()):
+                bar = "█" * (stats["pct"] // 10) + "░" * (10 - stats["pct"] // 10)
+                lines.append(f"- {itype}: {bar} {stats['pct']}% ({stats['covered']}/{stats['total']})")
+            if overall:
+                lines.append(f"\n**Overall: {overall['pct']}%** ({overall['covered']}/{overall['total']} items covered)")
+
+            if include_orphans:
+                orph = orphan_report(project_id)
+                lines.append(f"\n## Orphans")
+                lines.append(f"- Legacy items with no story: {orph['legacy_orphan_count']}")
+                lines.append(f"- Stories with no test: {orph['story_no_test_count']}")
+                lines.append(f"- Stories with no code: {orph['story_no_code_count']}")
+                if orph["legacy_no_story"][:5]:
+                    lines.append("\nTop unlinked legacy items:")
+                    for item in orph["legacy_no_story"][:5]:
+                        lines.append(f"  - {item.get('id', '?')}: {item.get('item_type', '?')} — {item.get('name', '?')}")
+            return "\n".join(lines)
+
+        if name == "traceability_validate":
+            item_type = args.get("item_type")
+            matrix = traceability_matrix(project_id)
+            if item_type:
+                matrix = [m for m in matrix if m["type"] == item_type]
+            if not matrix:
+                return f"No legacy items found for project {project_id}" + (f" (type={item_type})" if item_type else "")
+
+            lines = [f"## Traceability Matrix ({len(matrix)} items)"]
+            traced = sum(1 for m in matrix if m["fully_traced"])
+            lines.append(f"Fully traced: {traced}/{len(matrix)} ({round(100*traced/len(matrix))}%)\n")
+            for m in matrix[:20]:
+                status = "✅" if m["fully_traced"] else "❌"
+                lines.append(f"### {status} {m['name']} ({m['type']}) — {m['legacy_id']}")
+                lines.append(f"  Status: {m['status']}")
+                if m["stories"]:
+                    lines.append(f"  Stories: {', '.join(s['target_id'] for s in m['stories'])}")
+                else:
+                    lines.append(f"  Stories: ⚠️ NONE")
+                if m["code"]:
+                    lines.append(f"  Code: {', '.join(c['target_id'] for c in m['code'])}")
+                else:
+                    lines.append(f"  Code: ⚠️ NONE")
+                if m["tests"]:
+                    lines.append(f"  Tests: {', '.join(t['target_id'] for t in m['tests'])}")
+                else:
+                    lines.append(f"  Tests: ⚠️ NONE")
+            if len(matrix) > 20:
+                lines.append(f"\n... and {len(matrix) - 20} more items")
+            return "\n".join(lines)
+
+    except Exception as e:
+        logger.exception("Traceability tool error: %s", e)
+        return f"Error in {name}: {e}"
+
+    return f"Unknown traceability tool: {name}"
+
+
+async def _legacy_scan(args: dict, ctx: ExecutionContext, project_id: str) -> str:
+    """Auto-discover legacy items from project source code."""
+    import re
+    from pathlib import Path
+    from ..traceability.migration_store import create_legacy_item, count_legacy_items
+
+    scope = args.get("scope", "all")
+    sub_path = args.get("path", "")
+    workspace = ctx.project_path or ""
+    if not workspace:
+        return "Error: no project workspace configured"
+
+    scan_dir = Path(workspace)
+    if sub_path:
+        scan_dir = scan_dir / sub_path
+    if not scan_dir.exists():
+        return f"Error: directory {scan_dir} does not exist"
+
+    items_found: list[dict] = []
+    scan_db = scope in ("all", "db")
+    scan_code = scope in ("all", "code")
+    scan_api = scope in ("all", "api")
+
+    # Scan source files (limit to 500 files to avoid overload)
+    source_exts = {".py", ".java", ".kt", ".swift", ".ts", ".js", ".go", ".rs",
+                   ".sql", ".rb", ".cs", ".php", ".scala", ".yaml", ".yml"}
+    files = sorted(scan_dir.rglob("*"))[:2000]
+    source_files = [f for f in files if f.suffix in source_exts and f.is_file()][:500]
+
+    # DB patterns
+    _TABLE_RE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`\"]?(\w+)[`\"]?", re.I)
+    _FK_RE = re.compile(r"FOREIGN\s+KEY\s*\([`\"]?(\w+)[`\"]?\)\s+REFERENCES\s+[`\"]?(\w+)[`\"]?", re.I)
+    _MODEL_RE = re.compile(r"class\s+(\w+)\s*\(.*(?:Model|Entity|Base|Table)\)", re.I)
+
+    # Code patterns
+    _CLASS_RE = re.compile(r"(?:class|struct|enum|interface|protocol)\s+(\w+)")
+    _ENDPOINT_RE = re.compile(
+        r"""(?:@(?:Get|Post|Put|Delete|Patch|RequestMapping)\s*\(\s*["']([^"']+)["']|"""
+        r"""(?:app|router)\s*\.\s*(?:get|post|put|delete|patch)\s*\(\s*["']([^"']+)["'])""",
+        re.I,
+    )
+
+    for fpath in source_files:
+        try:
+            content = fpath.read_text(errors="ignore")[:10000]
+        except Exception:
+            continue
+        rel = str(fpath.relative_to(Path(workspace)))
+
+        if scan_db:
+            for m in _TABLE_RE.finditer(content):
+                items_found.append({"type": "table", "name": m.group(1),
+                                    "file": rel, "line": content[:m.start()].count("\n") + 1})
+            for m in _FK_RE.finditer(content):
+                items_found.append({"type": "fk", "name": f"{m.group(1)}→{m.group(2)}",
+                                    "file": rel, "line": content[:m.start()].count("\n") + 1})
+            for m in _MODEL_RE.finditer(content):
+                items_found.append({"type": "entity", "name": m.group(1),
+                                    "file": rel, "line": content[:m.start()].count("\n") + 1})
+
+        if scan_code:
+            for m in _CLASS_RE.finditer(content):
+                name = m.group(1)
+                if len(name) > 2 and name[0].isupper() and name not in ("True", "False", "None"):
+                    items_found.append({"type": "class", "name": name,
+                                        "file": rel, "line": content[:m.start()].count("\n") + 1})
+
+        if scan_api:
+            for m in _ENDPOINT_RE.finditer(content):
+                ep = m.group(1) or m.group(2)
+                if ep:
+                    items_found.append({"type": "endpoint", "name": ep,
+                                        "file": rel, "line": content[:m.start()].count("\n") + 1})
+
+    # Deduplicate by (type, name)
+    seen = set()
+    unique = []
+    for item in items_found:
+        key = (item["type"], item["name"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+
+    # Create legacy items in DB
+    created_ids = []
+    for item in unique[:200]:  # limit to 200 items per scan
+        try:
+            lid = create_legacy_item(
+                project_id=project_id,
+                item_type=item["type"],
+                name=item["name"],
+                source_file=item["file"],
+                source_line=item.get("line", 0),
+            )
+            created_ids.append(f"{lid}: {item['type']} — {item['name']}")
+        except Exception as e:
+            logger.warning("legacy_scan: skip %s: %s", item["name"], e)
+
+    counts = count_legacy_items(project_id)
+    lines = [f"## Legacy Scan Complete"]
+    lines.append(f"Scanned: {len(source_files)} files in {scan_dir}")
+    lines.append(f"Discovered: {len(unique)} unique items, created {len(created_ids)} new entries\n")
+    lines.append("### Items by type:")
+    for itype, cnt in sorted(counts.items(), key=lambda x: -x[1]):
+        lines.append(f"  - {itype}: {cnt}")
+    if created_ids[:10]:
+        lines.append("\n### New items (first 10):")
+        for cid in created_ids[:10]:
+            lines.append(f"  - {cid}")
+        if len(created_ids) > 10:
+            lines.append(f"  ... and {len(created_ids) - 10} more")
+    return "\n".join(lines)
+
+
+
     """Run build or test command in workspace."""
     command = args.get("command", "")
     if not command:
@@ -2038,6 +2270,9 @@ async def _execute_tool(
         return await _tool_request_validation(args, ctx)
     if name == "get_project_context":
         return await _tool_get_project_context(args, ctx)
+    # ── Traceability tools ──
+    if name in ("legacy_scan", "traceability_link", "traceability_coverage", "traceability_validate"):
+        return await _tool_traceability(name, args, ctx)
     if name == "fractal_code":
         return await _tool_fractal_code(args, ctx, registry, llm)
     if name in ("build", "test"):

@@ -3,7 +3,6 @@ name: "Alexandre Faure"
 avatar: "AF"
 role: "Product Manager"
 version: "1.0"
-description: "Product Manager SAFe."
 
 persona:
   description: >
@@ -28,8 +27,11 @@ system_prompt: |
 skills:
   - project-management
   - data-analysis
+  - traceability-management
 
 tools:
+  - traceability_coverage
+  - traceability_validate
   - code_read
   - code_search
 

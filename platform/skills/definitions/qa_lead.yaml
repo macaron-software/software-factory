@@ -4,7 +4,6 @@ role: "QA Lead"
 avatar: "CR"
 tagline: "Software quality, E2E tests, golden files ISO 100%"
 version: "1.0"
-description: "QA Lead — Software quality, E2E tests, golden files ISO 100%"
 
 persona:
   description: >
@@ -33,6 +32,7 @@ skills:
   - webapp-testing
   - tdd-mastery
   - code-review-excellence
+  - traceability-management
 
 tools:
   - web_search
@@ -43,6 +43,8 @@ tools:
   - code_search
   - test
   - build
+  - traceability_coverage
+  - traceability_validate
 
 llm:
   model: MiniMax-M2.5

@@ -3,7 +3,6 @@ name: "Moussa Traoré"
 avatar: "MT"
 role: "Database Administrator"
 version: "1.0"
-description: "DBA."
 
 persona:
   description: >
@@ -28,8 +27,15 @@ system_prompt: |
 skills:
   - data-analysis
   - security-audit
+  - traceability-management
+  - legacy-inventory-scan
+  - database-migration
 
 tools:
+  - legacy_scan
+  - traceability_link
+  - traceability_coverage
+  - traceability_validate
   - code_read
   - code_write
   - code_edit

@@ -3,7 +3,6 @@ name: "Pierre Duval"
 avatar: "PD"
 role: "Solution Architect"
 version: "1.0"
-description: "Architecte logiciel qui conçoit les systèmes à grande échelle."
 
 persona:
   description: >
@@ -31,8 +30,14 @@ skills:
   - architecture-review
   - code-review-excellence
   - security-audit
+  - traceability-management
+  - legacy-inventory-scan
 
 tools:
+  - legacy_scan
+  - traceability_link
+  - traceability_coverage
+  - traceability_validate
   - mcp:platform_agents
   - mcp:platform_missions
   - mcp:platform_phases
