@@ -1307,35 +1307,16 @@ async def _run_real_e2e_tests(
             pass
 
     return results
-
-
-async def _auto_qa_screenshots(ws: Path, platform_type: str) -> list[str]:
-    """Deterministic screenshot pipeline — build, run, capture. No LLM.
-
-    Dispatches to platform-specific helpers. For native apps running in Docker
-    (no GUI), returns empty gracefully.
-    """
+    """Deterministic screenshot pipeline — build, run, capture. No LLM."""
     screenshots_dir = ws / "screenshots"
     screenshots_dir.mkdir(exist_ok=True)
 
     if platform_type == "macos-native":
-        # macOS native needs screencapture/AppleScript — skip in Docker (no GUI)
-        import shutil
-        if not shutil.which("screencapture"):
-            logger.info("Skipping macOS screenshots — no GUI available (Docker)")
-            return []
         results = await _qa_screenshots_macos(ws, screenshots_dir)
     elif platform_type == "ios-native":
-        import shutil
-        if not shutil.which("xcrun"):
-            logger.info("Skipping iOS screenshots — no Xcode/simulator available")
-            return []
         results = await _qa_screenshots_ios(ws, screenshots_dir)
     elif platform_type in ("web-docker", "web-node", "web-static"):
         results = await _qa_screenshots_web(ws, screenshots_dir, platform_type)
-    elif platform_type == "android-native":
-        logger.info("Skipping Android screenshots — no emulator available in Docker")
-        return []
     else:
         return []
 
@@ -2363,6 +2344,9 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
         android_kw = ("android", "kotlin", "jetpack", "gradle")
         if any(kw in bl for kw in android_kw):
             return "android-native"
+        rust_kw = ("rust", "cargo", "macroquad", "bevy", "wgpu", "ggez", "winit")
+        if any(kw in bl for kw in rust_kw):
+            return "rust-native"
 
     # --- Priority 2: Check .stack file (written by ideation/architecture phase) ---
     if workspace_path:
@@ -2378,6 +2362,7 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
                     "ios-native",
                     "macos-native",
                     "android-native",
+                    "rust-native",
                 ):
                     return stack
             except Exception:
@@ -2404,6 +2389,11 @@ def _detect_project_platform(workspace_path: str, brief: str = "") -> str:
     )
     has_node = (ws / "package.json").exists()
     has_docker = (ws / "Dockerfile").exists() or (ws / "docker-compose.yml").exists()
+    has_rust = (ws / "Cargo.toml").exists()
+
+    # Rust detection first (specific stack, no ambiguity)
+    if has_rust:
+        return "rust-native"
 
     # Web indicators take priority over Swift (prevents accidental Swift bias)
     if has_node:
@@ -2569,9 +2559,41 @@ _PLATFORM_QA = {
             "PAS de Docker pour le build."
         ),
     },
+    "rust-native": {
+        "qa-campaign": (
+            "TYPE: Application Rust native (cargo/macroquad/bevy)\n"
+            "OUTILS QA — PAS de npm, PAS de Playwright :\n"
+            "1. list_files + code_read pour comprendre la structure\n"
+            "2. Créez tests/PLAN.md (code_write) — plan de test Rust\n"
+            "3. Build: build command='cargo build'\n"
+            "4. Tests: build command='cargo test'\n"
+            "5. Lint: build command='cargo clippy -- -D warnings' (si disponible)\n"
+            "6. Documentez bugs dans tests/BUGS.md, commitez\n"
+            "IMPORTANT: Utilisez UNIQUEMENT cargo. PAS de npm/node."
+        ),
+        "qa-execution": (
+            "TYPE: Application Rust native\n"
+            "1. build command='cargo test'\n"
+            "2. build command='cargo clippy' (si disponible)\n"
+            "3. tests/REPORT.md avec résultats\n"
+            "PAS de npm. PAS de Playwright. PAS de Docker."
+        ),
+        "deploy-prod": (
+            "TYPE: Application Rust native\n"
+            "1. build command='cargo build --release'\n"
+            "2. Binary dans target/release/\n"
+            "3. Documentez installation dans INSTALL.md\n"
+            "Distribution: binary natif ou cargo install."
+        ),
+        "cicd": (
+            "TYPE: Application Rust native\n"
+            "1. .github/workflows/ci.yml avec rustup + cargo\n"
+            "2. cargo build + cargo test + cargo clippy\n"
+            "3. git_commit\n"
+            "PAS de Dockerfile pour le build (sauf déploiement)."
+        ),
+    },
 }
-
-# Web fallback (docker / node / static)
 
 
 _WEB_QA = {
@@ -2741,6 +2763,7 @@ def _build_phase_prompt(
         "macos-native": "macOS native (Swift/SwiftUI)",
         "ios-native": "iOS native (Swift/SwiftUI/UIKit)",
         "android-native": "Android native (Kotlin/Java)",
+        "rust-native": "Rust native (cargo/macroquad/bevy)",
         "web-docker": "web (Docker)",
         "web-node": "web (Node.js)",
         "web-static": "web statique",
@@ -2792,6 +2815,7 @@ def _build_phase_prompt(
                 f"{'Utilisez HTML/CSS/JS ou TypeScript/Node.js. NE PAS écrire de Swift.' if platform in ('web-node', 'web-docker', 'web-static') else ''}\n"
                 f"{'Utilisez Swift/SwiftUI. NE PAS écrire de TypeScript.' if platform in ('ios-native', 'macos-native') else ''}\n"
                 f"{'Utilisez Kotlin/Java. NE PAS écrire de Swift.' if platform == 'android-native' else ''}\n"
+                f"{'Utilisez RUST (.rs files). NE PAS écrire de TypeScript/JavaScript/Python. Build: cargo build. Test: cargo test.' if platform == 'rust-native' else ''}\n"
                 if platform_label
                 else ""
             )
@@ -2799,23 +2823,46 @@ def _build_phase_prompt(
             "WORKFLOW OBLIGATOIRE:\n"
             "1. LIRE LE WORKSPACE: list_files + code_read sur les fichiers existants\n"
             "2. ECRIRE LE CODE avec code_write:\n"
-            "   - Créer les fichiers source (HTML, CSS, JS, package.json si Node.js)\n"
-            "   - Créer au moins un fichier de test\n"
-            "   - Minimum 5 fichiers source pour une application fonctionnelle\n"
-            "3. BUILDER avec l'outil build:\n"
-            "   - Appeler build(command='npm install && npm run build', cwd=WORKSPACE)\n"
-            "   - Ou build(command='npx tsc --noEmit', cwd=WORKSPACE) pour TypeScript\n"
-            "   - Pour du HTML/JS simple: build(command='node -e \"console.log(1)\"', cwd=WORKSPACE)\n"
-            "4. TESTER avec l'outil test:\n"
-            "   - Appeler test(command='npm test', cwd=WORKSPACE)\n"
-            "   - Ou test(command='node tests/run.js', cwd=WORKSPACE)\n"
-            "5. COMMITTER avec git_commit: message descriptif\n\n"
+            + (
+                "   - Créer Cargo.toml avec [dependencies]\n"
+                "   - Créer src/main.rs comme point d'entrée\n"
+                "   - Créer src/lib.rs et des modules src/*.rs\n"
+                "   - Créer au moins un test dans tests/ ou #[test] inline\n"
+                "   - Minimum 5 fichiers .rs pour une application fonctionnelle\n"
+                "   - NE PAS créer de package.json, tsconfig.json, ou tout fichier JS/TS\n"
+                if platform == "rust-native" else
+                "   - Créer les fichiers source (HTML, CSS, JS, package.json si Node.js)\n"
+                "   - Créer au moins un fichier de test\n"
+                "   - Minimum 5 fichiers source pour une application fonctionnelle\n"
+            )
+            + "3. BUILDER avec l'outil build:\n"
+            + (
+                "   - Appeler build(command='cargo check', cwd=WORKSPACE)\n"
+                "   - Ou build(command='cargo build', cwd=WORKSPACE)\n"
+                if platform == "rust-native" else
+                "   - Appeler build(command='npm install && npm run build', cwd=WORKSPACE)\n"
+                "   - Ou build(command='npx tsc --noEmit', cwd=WORKSPACE) pour TypeScript\n"
+                "   - Pour du HTML/JS simple: build(command='node -e \"console.log(1)\"', cwd=WORKSPACE)\n"
+            )
+            + "4. TESTER avec l'outil test:\n"
+            + (
+                "   - Appeler test(command='cargo test', cwd=WORKSPACE)\n"
+                if platform == "rust-native" else
+                "   - Appeler test(command='npm test', cwd=WORKSPACE)\n"
+                "   - Ou test(command='node tests/run.js', cwd=WORKSPACE)\n"
+            )
+            + "5. COMMITTER avec git_commit: message descriptif\n\n"
             "REGLES STRICTES:\n"
             "- Chaque dev DOIT appeler code_write au minimum 3 fois\n"
             "- Au moins UN appel à build() ou test() est OBLIGATOIRE\n"
             "- NE DISCUTEZ PAS du code. ECRIVEZ-LE avec code_write.\n"
             "- Pas de placeholder, pas de TODO, pas de mock — du vrai code fonctionnel\n"
-            "- Créez un package.json si c'est un projet Node.js"
+            + (
+                "- Créez un Cargo.toml avec les dependencies appropriées (macroquad, rand, etc.)\n"
+                "- Utilisez UNIQUEMENT des fichiers .rs dans src/"
+                if platform == "rust-native" else
+                "- Créez un package.json si c'est un projet Node.js"
+            )
         ),
         "cicd": _qa("cicd"),
         "qa-campaign": _qa("qa-campaign"),

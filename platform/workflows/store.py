@@ -1166,6 +1166,10 @@ async def run_workflow(
 
         # Inject detected tech stack so agents use correct build commands
         # Priority: project memory/description (authoritative) > filesystem (fallback)
+        import logging as _wf_log
+        _wf_log.getLogger(__name__).warning(
+            "STACK_DETECT project_id=%s project_path=%s", project_id, _project_path
+        )
         _declared_stack = ""
         if project_id:
             # 1. Search project memory for stack info
