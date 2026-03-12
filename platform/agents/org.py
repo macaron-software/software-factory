@@ -328,7 +328,7 @@ class OrgStore:
                 id="art-products",
                 name="ART Produits",
                 portfolio_id="portfolio-dsi",
-                description="Produits métier: PSY, YoloNow, Fervenza",
+                description="Produits métier: Popinz, YoloNow, Finary, Veligo, PSY",
                 lead_agent_id="release_train_engineer",
                 pi_cadence_weeks=10,
             )
@@ -340,7 +340,7 @@ class OrgStore:
                 id="art-services",
                 name="ART Services & Support",
                 portfolio_id="portfolio-dsi",
-                description="Services: Platform, IoT, Fervenza",
+                description="Services: LPD, Logs Facteur, Sharelook, Fervenza IoT",
                 lead_agent_id="release_train_engineer",
                 pi_cadence_weeks=10,
             )
@@ -380,7 +380,7 @@ class OrgStore:
                 id="team-design",
                 name="Team Design System",
                 art_id="art-platform",
-                description="Solaris Design System",
+                description="Solaris Design System for La Poste",
                 scrum_master_id="scrum_master",
                 members=[
                     {"agent_id": "ux_designer", "role": "lead"},
@@ -390,8 +390,50 @@ class OrgStore:
                 ],
             ),
         ]
-        product_teams = []
+        product_teams = [
+            Team(
+                id="team-popinz",
+                name="Team Popinz",
+                art_id="art-products",
+                description="Popinz SaaS — événementiel & ticketing",
+                scrum_master_id="agile_coach",
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_mobile", "role": "mobile"},
+                    {"agent_id": "dev_backend", "role": "backend"},
+                    {"agent_id": "tech_lead_mobile", "role": "tech-lead"},
+                    {"agent_id": "qa_lead", "role": "qa"},
+                ],
+            ),
+            Team(
+                id="team-veligo",
+                name="Team Veligo",
+                art_id="art-products",
+                description="Veligo Platform — mobilité douce",
+                scrum_master_id="scrum_master",
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_fullstack", "role": "fullstack"},
+                    {"agent_id": "dev_frontend", "role": "frontend"},
+                    {"agent_id": "qa_lead", "role": "qa"},
+                    {"agent_id": "data_analyst", "role": "data"},
+                ],
+            ),
+        ]
         service_teams = [
+            Team(
+                id="team-sharelook",
+                name="Team Sharelook",
+                art_id="art-services",
+                description="Sharelook — formation & partage vidéo",
+                scrum_master_id="scrum_master",
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_frontend", "role": "frontend"},
+                    {"agent_id": "devsecops", "role": "security"},
+                    {"agent_id": "testeur", "role": "qa"},
+                ],
+            ),
             Team(
                 id="team-services",
                 name="Team Services",
@@ -686,7 +728,7 @@ class OrgStore:
                 members=[
                     {"agent_id": "data_engineer", "role": "lead"},
                     {"agent_id": "dba", "role": "dba"},
-                    {"agent_id": "data_migration_engineer", "role": "migration"},
+                    {"agent_id": "data-migrator", "role": "migration"},
                     {"agent_id": "cloud_architect", "role": "infra"},
                 ],
             ),
@@ -716,7 +758,7 @@ class OrgStore:
                 members=[
                     {"agent_id": "ai-product-manager", "role": "lead"},
                     {"agent_id": "data_analyst", "role": "analyst"},
-                    {"agent_id": "test_data_engineer", "role": "data"},
+                    {"agent_id": "data_analyst", "role": "data"},
                 ],
             ),
         ]
@@ -729,7 +771,7 @@ class OrgStore:
                     id="art-mobile",
                     name="ART Mobile",
                     portfolio_id="portfolio-dsi",
-                    description="iOS and Android native development — YoloNow, Fervenza mobile apps.",
+                    description="iOS and Android native development — Popinz, Veligo, YoloNow mobile apps.",
                     lead_agent_id="tech_lead_mobile",
                     pi_cadence_weeks=10,
                 )
@@ -824,7 +866,7 @@ class OrgStore:
                     {"agent_id": "cloud_architect", "role": "lead"},
                     {"agent_id": "iac_engineer", "role": "iac"},
                     {"agent_id": "canary_specialist", "role": "deployment"},
-                    {"agent_id": "backup_engineer", "role": "backup"},
+                    {"agent_id": "backup-ops", "role": "backup"},
                 ],
             ),
             Team(
@@ -844,6 +886,31 @@ class OrgStore:
             ),
         ]
         all_new = all_new + infra_teams
+
+        # ── Team DBA MCO ────────────────────────────────────────────
+        dba_team = [
+            Team(
+                id="team-dba-mco",
+                name="Team DBA MCO",
+                art_id="art-infra",
+                description="Database MCO: multi-engine DBA (PG, MySQL, Oracle, MongoDB, Elastic, SQLite), backup, monitoring",
+                scrum_master_id="dba",
+                capacity=9,
+                wip_limit=4,
+                members=[
+                    {"agent_id": "dba", "role": "lead"},
+                    {"agent_id": "dba-postgres", "role": "postgresql"},
+                    {"agent_id": "dba-mysql", "role": "mysql"},
+                    {"agent_id": "dba-oracle", "role": "oracle"},
+                    {"agent_id": "dba-mongodb", "role": "mongodb"},
+                    {"agent_id": "dba-elastic", "role": "elasticsearch"},
+                    {"agent_id": "dba-sqlite", "role": "sqlite"},
+                    {"agent_id": "backup-ops", "role": "backup"},
+                    {"agent_id": "monitoring-ops", "role": "monitoring"},
+                ],
+            ),
+        ]
+        all_new = all_new + dba_team
 
         # ── ART Go-to-Market ─────────────────────────────────────────
         if "art-gtm" not in existing_arts:
@@ -908,6 +975,21 @@ class OrgStore:
                     {"agent_id": "dev_mobile", "role": "mobile"},
                     {"agent_id": "qa_lead", "role": "qa"},
                     {"agent_id": "ux_designer", "role": "ux"},
+                ],
+            ),
+            Team(
+                id="team-finary",
+                name="Team Finary",
+                art_id="art-products",
+                description="Finary — gestion patrimoine, finance personnelle, reporting",
+                scrum_master_id="scrum_master",
+                capacity=4,
+                wip_limit=3,
+                members=[
+                    {"agent_id": "lead_dev", "role": "lead"},
+                    {"agent_id": "dev_fullstack", "role": "fullstack"},
+                    {"agent_id": "data_analyst", "role": "data"},
+                    {"agent_id": "qa_lead", "role": "qa"},
                 ],
             ),
             Team(
