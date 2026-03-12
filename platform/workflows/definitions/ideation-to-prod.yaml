@@ -56,8 +56,12 @@ phases:
 - id: architecture
   pattern_id: aggregator
   name: Architecture & Design
-  description: L'architecte conçoit le système, UX les interfaces, Sécu le modèle de menaces, DevOps l'infra. Le Lead Dev
-    valide l'implémentabilité.
+  description: >
+    L'architecte conçoit le système, UX les interfaces, Sécu le modèle de menaces, DevOps l'infra.
+    Le Lead Dev valide l'implémentabilité.
+    DEEP RESEARCH: Each agent MUST call deep_search before contributing.
+    TRACEABILITY: All features tagged [FEAT-xxxxxx], all stories [US-xxxxxx],
+    all acceptance criteria [AC-yyyyyy] GIVEN/WHEN/THEN.
   gate: always
   config:
     agents:
@@ -66,6 +70,33 @@ phases:
     - securite
     - devops
     - lead_dev
+- id: story-decomposition
+  pattern_id: fractal-stories
+  name: Fractal Story Decomposition
+  description: >
+    Deep decomposition of the project into atomic implementable stories.
+    Recursive fractal: Vision → Epic → Feature → Story (max depth 3, max 6 children).
+    Each leaf = single-responsibility, independently testable, UUID-tagged.
+    MUST call deep_search per component to research APIs/patterns/pitfalls.
+    Output: tree of atomic stories with lineage + UUID refs.
+  gate: always
+  config:
+    agents:
+    - enterprise_architect
+    - product_manager
+    - lead_dev
+- id: qa-decomposition
+  pattern_id: fractal-qa
+  name: Fractal QA Scenarios
+  description: >
+    Decompose each story into atomic Gherkin BDD scenarios.
+    [AC-yyyyyy] GIVEN/WHEN/THEN for each [US-xxxxxx].
+    Happy path + edge cases. Each scenario independently executable.
+  gate: always
+  config:
+    agents:
+    - qa_lead
+    - enterprise_architect
 - id: dev-sprint
   pattern_id: hierarchical
   name: Sprint Dev

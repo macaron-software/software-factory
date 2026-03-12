@@ -21,15 +21,51 @@ phases:
     expliquant pourquoi.
     Sinon : définir OBLIGATOIREMENT pour chaque feature :
     1. PERSONA : qui utilise ce feature (nom, rôle, besoin concret) — pas "casual user"
-    2. USER STORIES : "En tant que [persona], je veux [action] afin de [bénéfice]"
-    3. ACCEPTANCE CRITERIA testables : conditions précises vérifiables par un test E2E
+    2. USER STORIES : "[US-xxxxxx] En tant que [persona], je veux [action] afin de [bénéfice]"
+    3. ACCEPTANCE CRITERIA testables : "[AC-yyyyyy] GIVEN <ctx> WHEN <action> THEN <result>"
     4. DEFINITION OF DONE : build Docker OK + tests E2E passent + screenshots capturés
+    All user stories and acceptance criteria MUST have unique UUID references (US-xxxxxx, AC-yyyyyy).
     Sans ces 4 éléments, la phase n'est pas terminée.
   gate: always
   config:
     agents:
     - system-architect-art
     dynamic_lead: true
+- id: story-decomposition
+  pattern_id: fractal-stories
+  name: Fractal Story Decomposition
+  description: >
+    MANDATORY deep decomposition of the feature into atomic sub-stories.
+    Uses recursive fractal pattern: Vision → Epic → Feature → Story (max depth 3).
+    Each leaf story must be:
+    - Single responsibility (one module, one component, one function group)
+    - Independently implementable and testable
+    - Tagged with UUID: [US-xxxxxx] or [FEAT-xxxxxx]
+    - Linked to parent feature via lineage chain
+    Output: tree of atomic stories ready for parallel implementation.
+    DEEP RESEARCH: call deep_search for each major component to understand
+    framework APIs, best practices, and reference implementations.
+  gate: always
+  config:
+    agents:
+    - system-architect-art
+    - product_manager
+- id: qa-decomposition
+  pattern_id: fractal-qa
+  name: Fractal QA Scenarios
+  description: >
+    Decompose each atomic story from previous phase into Gherkin acceptance tests.
+    Each test scenario MUST:
+    - Reference the story it validates: [AC-yyyyyy] for [US-xxxxxx]
+    - Be in Given/When/Then format
+    - Be independently executable
+    - Cover happy path + at least one edge case
+    Output: atomic BDD scenarios ready for TDD implementation.
+  gate: always
+  config:
+    agents:
+    - qa_lead
+    - system-architect-art
 - id: env-setup
   pattern_id: sequential
   name: Environment Setup & Toolchain Provision

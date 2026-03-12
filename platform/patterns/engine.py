@@ -737,6 +737,22 @@ async def run_pattern(
             await _impl_relay(_engine_proxy, run, initial_task)
         elif ptype == "mob":
             await _impl_mob(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-stories":
+            await _impl_fractal_stories(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-qa":
+            await _impl_fractal_qa(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-tests":
+            await _impl_fractal_tests(_engine_proxy, run, initial_task)
+        elif ptype == "fractal-worktree":
+            await _impl_fractal_worktree(_engine_proxy, run, initial_task)
+        elif ptype == "backprop-merge":
+            await _impl_backprop_merge(_engine_proxy, run, initial_task)
+        elif ptype in ("adversarial-pair", "adversarial-cascade"):
+            # adversarial-pair = loop with writer+critic; adversarial-cascade = sequential multi-layer
+            if ptype == "adversarial-pair":
+                await _impl_loop(_engine_proxy, run, initial_task)
+            else:
+                await _impl_sequential(_engine_proxy, run, initial_task)
         else:
             await _impl_sequential(_engine_proxy, run, initial_task)
 
@@ -1932,6 +1948,11 @@ from .impls.speculative import run_speculative as _impl_speculative
 from .impls.red_blue import run_red_blue as _impl_red_blue
 from .impls.relay import run_relay as _impl_relay
 from .impls.mob import run_mob as _impl_mob
+from .impls.fractal_stories import run_fractal_stories as _impl_fractal_stories
+from .impls.fractal_qa import run_fractal_qa as _impl_fractal_qa
+from .impls.fractal_tests import run_fractal_tests as _impl_fractal_tests
+from .impls.fractal_worktree import run_fractal_worktree as _impl_fractal_worktree
+from .impls.backprop_merge import run_backprop_merge as _impl_backprop_merge
 
 
 class _EngineProxy:
