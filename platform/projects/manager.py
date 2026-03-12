@@ -71,16 +71,15 @@ class Project:
     git_url: str = ""  # GitHub/GitLab remote URL for PR creation
     current_phase: str = ""  # ex: "discovery", "mvp", "v1", "run", "maintenance"
     arch_domain: str = (
-        ""  # Architectural domain — loads domain-level guidelines
+        ""  # Architectural domain (e.g. "bscc") — loads domain-level guidelines
     )
     phases: list[dict] = field(
         default_factory=list
     )  # [{id, name, icon, mission_types_active[]}]
     owner_id: str = ""  # User ID of the owner (empty = shared/admin-only)
     starred: bool = False  # Pinned/featured project
-    client_domain: str = ""  # Portfolio domain label (e.g. "MARATHON")
+    client_domain: str = ""  # Portfolio domain label (e.g. "LA POSTE", "MARATHON")
     container_url: str = ""  # Live URL (production VPS / container)
-    is_protected: bool = False  # Cannot be deleted (pilot, SF-self)
     created_at: str = ""
     updated_at: str = ""
 
@@ -593,7 +592,6 @@ class ProjectStore:
             ("phases_json", "'[]'"),
             ("owner_id", "''"),
             ("client_domain", "''"),
-            ("is_protected", "FALSE"),
         ]:
             if col not in cols:
                 try:
@@ -710,8 +708,8 @@ class ProjectStore:
             INSERT OR REPLACE INTO projects
             (id, name, path, description, factory_type, domains_json,
              vision, values_json, lead_agent_id, agents_json, active_pattern_id, status, git_url,
-             current_phase, phases_json, owner_id, starred, container_url, client_domain, is_protected)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             current_phase, phases_json, owner_id, starred, container_url, client_domain)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 p.id,
@@ -733,7 +731,6 @@ class ProjectStore:
                 bool(p.starred),
                 p.container_url or "",
                 p.client_domain or "",
-                bool(p.is_protected),
             ),
         )
         conn.commit()
@@ -1116,7 +1113,7 @@ class ProjectStore:
                 name=?, path=?, description=?, factory_type=?, domains_json=?,
                 vision=?, values_json=?, lead_agent_id=?, agents_json=?,
                 active_pattern_id=?, status=?, starred=?, container_url=?, client_domain=?,
-                is_protected=?,
+                git_url=?,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=?
         """,
@@ -1135,7 +1132,7 @@ class ProjectStore:
                 bool(p.starred),
                 p.container_url or "",
                 p.client_domain or "",
-                bool(p.is_protected),
+                p.git_url or "",
                 p.id,
             ),
         )
@@ -1345,7 +1342,6 @@ class ProjectStore:
                 "lean_portfolio_manager",
             ],
             status="active",
-            is_protected=True,
         )
         self.create(p)
         logger.info("Seeded DSI project: software-factory → %s", plat_path)
@@ -1449,7 +1445,6 @@ class ProjectStore:
             starred=bool(row["starred"]) if "starred" in keys else False,
             client_domain=row["client_domain"] if "client_domain" in keys else "",
             container_url=row["container_url"] if "container_url" in keys else "",
-            is_protected=bool(row["is_protected"]) if "is_protected" in keys else False,
             created_at=row["created_at"] or "",
             updated_at=row["updated_at"] or "",
             arch_domain=arch_domain,
@@ -1467,6 +1462,11 @@ _PROJECT_PM: dict[str, dict] = {
         "avatar": "user",
         "tagline": "Product Manager — Logs Facteur Support N1",
     },
+    "sharelook": {
+        "name": "Claire Dubois",
+        "avatar": "user",
+        "tagline": "Product Manager — Sharelook Platform",
+    },
     "software-factory": {
         "name": "Émilie Laurent",
         "avatar": "user",
@@ -1482,10 +1482,25 @@ _PROJECT_PM: dict[str, dict] = {
         "avatar": "user",
         "tagline": "Product Manager — Solaris Design System",
     },
+    "veligo": {
+        "name": "Antoine Lefèvre",
+        "avatar": "user",
+        "tagline": "Product Manager — Veligo Platform",
+    },
     "fervenza": {
         "name": "Lucas Morel",
         "avatar": "user",
         "tagline": "Product Manager — Fervenza IoT",
+    },
+    "finary": {
+        "name": "Sophie Blanc",
+        "avatar": "user",
+        "tagline": "Product Manager — Finary",
+    },
+    "popinz": {
+        "name": "Hugo Petit",
+        "avatar": "user",
+        "tagline": "Product Manager — Popinz SaaS",
     },
     "psy": {
         "name": "Camille Roux",
@@ -1496,6 +1511,11 @@ _PROJECT_PM: dict[str, dict] = {
         "name": "Léa Fournier",
         "avatar": "user",
         "tagline": "Product Manager — YoloNow",
+    },
+    "sharelook-2": {
+        "name": "Claire Dubois",
+        "avatar": "user",
+        "tagline": "Product Manager — Sharelook 2.0",
     },
     # Demo projects
     "neobank-api": {
@@ -1541,9 +1561,13 @@ def _project_color(project_id: str) -> str:
     colors = {
         "factory": "#bc8cff",
         "fervenza": "#f0883e",
+        "veligo": "#58a6ff",
+        "ppz": "#3fb950",
         "psy": "#a371f7",
         "yolonow": "#f85149",
         "solaris": "#d29922",
+        "sharelook": "#79c0ff",
+        "finary": "#56d364",
         "lpd": "#db6d28",
         "logs-facteur": "#8b949e",
         "software-factory": "#c084fc",

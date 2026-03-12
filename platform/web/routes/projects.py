@@ -945,6 +945,9 @@ async def api_projects():
                 "status": p.status,
                 "has_vision": bool(p.vision),
                 "values": p.values,
+                "git_url": p.git_url,
+                "agents": p.agents,
+                "container_url": p.container_url or "",
             }
             for p in store.list_all()
         ]
