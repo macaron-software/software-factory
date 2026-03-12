@@ -27,16 +27,6 @@ WEB_DIR = Path(__file__).parent / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 
-# prevent GC of fire-and-forget asyncio tasks (server lifetime)
-import asyncio as _asyncio_mod
-_bg_tasks: set[_asyncio_mod.Task] = set()
-
-def _keep_task(t: _asyncio_mod.Task) -> _asyncio_mod.Task:
-    """Store task reference to prevent GC, auto-discard on completion."""
-    _bg_tasks.add(t)
-    t.add_done_callback(_bg_tasks.discard)
-    return t
-
 
 # ── OpenTelemetry setup (module-level, before create_app) ──────────────────
 _otel_provider = None
@@ -331,41 +321,6 @@ async def lifespan(app: FastAPI):
     ps = get_project_store()
     ps.seed_from_registry()
 
-    # Seed SF self-project (the platform itself) — protected, domain SF
-    def _seed_sf_self():
-        from .projects.manager import Project
-        import os
-
-        sf_self_id = "software-factory"
-        existing = ps.get(sf_self_id)
-        sf_path = str(
-            os.environ.get("SF_ROOT", os.path.dirname(os.path.dirname(__file__)))
-        )
-        if not existing:
-            ps.create(
-                Project(
-                    id=sf_self_id,
-                    name="Software Factory Platform",
-                    description="La plateforme multi-agents AC — se code et s'améliore elle-même.",
-                    factory_type="sf",
-                    domains=["python", "fastapi", "htmx"],
-                    path=sf_path,
-                    client_domain="SF",
-                    is_protected=True,
-                )
-            )
-        elif not existing.is_protected or existing.client_domain != "SF":
-            existing.client_domain = "SF"
-            existing.is_protected = True
-            if not existing.path:
-                existing.path = sf_path
-            ps.update(existing)
-
-    try:
-        _seed_sf_self()
-    except Exception as _e:
-        logger.warning("seed_sf_self failed: %s", _e)
-
     async def _bg_heal_and_seed():
         import asyncio as _a
 
@@ -397,7 +352,7 @@ async def lifespan(app: FastAPI):
         except Exception as _e:
             logger.warning("Memory seeding skipped: %s", _e)
 
-    _keep_task(_asyncio.create_task(_bg_heal_and_seed()))
+    _asyncio.create_task(_bg_heal_and_seed())
 
     # Seed org tree (Portfolio → ART → Team)
     from .agents.org import get_org_store
@@ -421,14 +376,13 @@ async def lifespan(app: FastAPI):
 
         _sdb = _gdb_sync()
         # Only update agents that have a stale/wrong model or provider (not matching env)
-        # Exclude agents with custom model assignments (e.g. AC agents using gpt-5.2-codex)
         _stale_models = _sdb.execute(
-            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model') AND id NOT LIKE 'ac-%'",
+            "SELECT COUNT(*) FROM agents WHERE (model != ? OR provider != ?) AND model NOT IN ('', 'demo-model')",
             (_current_model, _current_provider),
         ).fetchone()[0]
         if _stale_models:
             _sdb.execute(
-                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model') AND id NOT LIKE 'ac-%'",
+                "UPDATE agents SET model = ?, provider = ? WHERE model NOT IN ('', 'demo-model')",
                 (_current_model, _current_provider),
             )
             _sdb.commit()
@@ -504,93 +458,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("Failed to reset stale missions: %s", e)
 
-    # Auto-resume interrupted AC (Amélioration Continue) sessions
-    try:
-        import asyncio as _asyncio
-
-        def _find_interrupted_ac_sessions():
-            from .db.migrations import get_db as _gdb_ac
-
-            _db_ac = _gdb_ac()
-            try:
-                # Only resume the most recent interrupted session PER PROJECT
-                rows = _db_ac.execute(
-                    "SELECT DISTINCT ON (project_id) id, goal, project_id, config_json"
-                    " FROM sessions"
-                    " WHERE status='interrupted' AND config_json LIKE '%\"ac\": true%'"
-                    " AND created_at >= datetime('now', '-24 hours')"
-                    " ORDER BY project_id, created_at DESC"
-                ).fetchall()
-            except Exception:
-                # SQLite fallback (DISTINCT ON not supported)
-                try:
-                    rows = _db_ac.execute(
-                        "SELECT id, goal, project_id, config_json FROM sessions"
-                        " WHERE status='interrupted' AND config_json LIKE '%\"ac\": true%'"
-                        " AND created_at >= datetime('now', '-24 hours')"
-                        " GROUP BY project_id"
-                        " HAVING created_at = MAX(created_at)"
-                    ).fetchall()
-                except Exception:
-                    rows = []
-            finally:
-                _db_ac.close()
-            return rows
-
-        _ac_interrupted = _find_interrupted_ac_sessions()
-        if _ac_interrupted:
-            import json as _json_ac
-            from .workflows.store import get_workflow_store as _gwfs_ac
-
-            async def _resume_ac_sessions():
-                from .web.routes.workflows import _run_workflow_background as _rwb
-                import asyncio as _a2
-
-                for _row in _ac_interrupted:
-                    try:
-                        _sid, _goal, _pid, _cfg_raw = _row
-                        _cfg = _json_ac.loads(_cfg_raw or "{}")
-                        _wf_id = _cfg.get("workflow_id", "ac-improvement-cycle")
-                        _ckpt = int(_cfg.get("workflow_checkpoint", 0))
-                        _wf = _gwfs_ac().get(_wf_id)
-                        if _wf:
-                            _keep_task(_a2.create_task(
-                                _rwb(
-                                    _wf,
-                                    _sid,
-                                    _goal or "",
-                                    _pid or "",
-                                    resume_from=_ckpt,
-                                )
-                            ))
-                            logger.warning(
-                                "AC auto-resume: session=%s project=%s from phase=%d",
-                                _sid,
-                                _pid,
-                                _ckpt,
-                            )
-                        await _a2.sleep(2)  # stagger
-                    except Exception as _e:
-                        logger.warning(
-                            "AC auto-resume failed for %s: %s",
-                            _row[0] if _row else "?",
-                            _e,
-                        )
-
-            _keep_task(_asyncio.create_task(_resume_ac_sessions()))
-            logger.warning(
-                "AC auto-resume: %d interrupted sessions scheduled",
-                len(_ac_interrupted),
-            )
-    except Exception as _ac_resume_err:
-        logger.warning("AC auto-resume startup hook failed: %s", _ac_resume_err)
-
     # Auto-resume watchdog: handles paused/failed runs + launches unstarted continuous missions
     import asyncio as _asyncio
     from .services.auto_resume import auto_resume_epics as _auto_resume_epics
 
     if _mode != "ui":
-        _keep_task(_asyncio.create_task(_auto_resume_epics()))
+        _asyncio.create_task(_auto_resume_epics())
         logger.warning("Auto-resume watchdog scheduled")
 
     # Start endurance watchdog (continuous auto-resume, session recovery, health)
@@ -599,7 +472,7 @@ async def lifespan(app: FastAPI):
             from .ops.endurance_watchdog import watchdog_loop, ENABLED as _wd_enabled
 
             if _wd_enabled:
-                _keep_task(_asyncio.create_task(watchdog_loop()))
+                _asyncio.create_task(watchdog_loop())
                 logger.info("Endurance watchdog started as background task")
         except Exception as e:
             logger.warning("Failed to start endurance watchdog: %s", e)
@@ -611,36 +484,10 @@ async def lifespan(app: FastAPI):
                 start_evolution_scheduler as _evo_sched,
             )
 
-            _keep_task(_asyncio.create_task(_evo_sched()))
+            _asyncio.create_task(_evo_sched())
             logger.info("Evolution scheduler started as background task")
         except Exception as e:
             logger.warning("Failed to start evolution scheduler: %s", e)
-
-    # Cross-instinct consolidation timer + inbox watcher
-    # SOURCE: GoogleCloudPlatform/generative-ai always-on-memory-agent
-    #   https://github.com/GoogleCloudPlatform/generative-ai/tree/main/gemini/agents/always-on-memory-agent
-    # WHY: ConsolidateAgent (every 30min) finds cross-agent instinct connections.
-    #      IngestAgent watches ./inbox/ for artifacts → structured memory_global.
-    if _mode != "ui":
-        try:
-            from .hooks.consolidate import start_consolidation_timer as _consol
-
-            _keep_task(_asyncio.create_task(_consol()))
-            logger.info(
-                "Instinct consolidation timer started (interval=%ds)",
-                int(os.environ.get("CONSOLIDATION_INTERVAL", 1800)),
-            )
-        except Exception as e:
-            logger.warning("Failed to start consolidation timer: %s", e)
-        try:
-            from .memory.inbox import start_inbox_watcher as _inbox
-
-            _keep_task(_asyncio.create_task(_inbox()))
-            logger.info(
-                "Inbox watcher started (dir=%s)", os.environ.get("INBOX_DIR", "./inbox")
-            )
-        except Exception as e:
-            logger.warning("Failed to start inbox watcher: %s", e)
 
     # Redis pub/sub: connect bus and start cross-process listener
     _redis_url = os.environ.get("REDIS_URL")
@@ -649,10 +496,10 @@ async def lifespan(app: FastAPI):
         from .a2a.bus import get_bus as _get_bus
 
         _bus = _get_bus()
-        _keep_task(_asyncio2.create_task(_bus.connect_redis(_redis_url)))
+        _asyncio2.create_task(_bus.connect_redis(_redis_url))
         if _mode in ("ui", "full"):
             # UI process subscribes to factory events via Redis
-            _keep_task(_asyncio2.create_task(_bus.start_redis_listener(_redis_url)))
+            _asyncio2.create_task(_bus.start_redis_listener(_redis_url))
             logger.info("Redis SSE listener scheduled")
 
     # PG NOTIFY/LISTEN: cross-node SSE fan-out (no Redis needed)
@@ -660,8 +507,8 @@ async def lifespan(app: FastAPI):
     from .a2a.bus import get_bus as _get_bus2
 
     _bus2 = _get_bus2()
-    _keep_task(_asyncio3.create_task(_bus2.connect_pg_notify()))
-    _keep_task(_asyncio3.create_task(_bus2.start_pg_listen()))
+    _asyncio3.create_task(_bus2.connect_pg_notify())
+    _asyncio3.create_task(_bus2.start_pg_listen())
     logger.warning("PG NOTIFY/LISTEN cross-node bus scheduled")
 
     # Seed simulator if agent_scores is empty (cold start)
@@ -685,7 +532,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Simulator cold-start failed: %s", e)
 
-    _keep_task(_asyncio.create_task(_seed_simulator_if_empty()))
+    _asyncio.create_task(_seed_simulator_if_empty())
 
     # Seed Darwin team_fitness if empty (cold start / fresh deployment)
     async def _seed_darwin_if_empty():
@@ -771,7 +618,7 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("Darwin cold-start failed: %s", e)
 
-    _keep_task(_asyncio.create_task(_seed_darwin_if_empty()))
+    _asyncio.create_task(_seed_darwin_if_empty())
 
     # Start unified MCP SF server (platform + LRM tools merged)
     _mcp_procs: dict[str, Any] = {}
@@ -882,16 +729,18 @@ async def lifespan(app: FastAPI):
 
     import asyncio
 
-    _keep_task(asyncio.create_task(_mcp_watchdog()))
+    asyncio.create_task(_mcp_watchdog())
 
     # Auto-heal loop: scan incidents → create epics → launch TMA workflows
     try:
         from .ops.auto_heal import ENABLED as _ah_enabled
         from .ops.auto_heal import auto_heal_loop
 
-        if _ah_enabled:
-            _keep_task(asyncio.create_task(auto_heal_loop()))
+        if _ah_enabled and _mode != "ui":
+            asyncio.create_task(auto_heal_loop())
             logger.info("Auto-heal loop enabled")
+        elif _mode == "ui":
+            logger.info("Auto-heal loop SKIPPED (PLATFORM_MODE=ui)")
     except Exception as e:
         logger.warning("Auto-heal loop failed to start: %s", e)
 
@@ -900,9 +749,11 @@ async def lifespan(app: FastAPI):
         from .ops.platform_watchdog import ENABLED as _pw_enabled
         from .ops.platform_watchdog import platform_watchdog_loop
 
-        if _pw_enabled:
-            _keep_task(asyncio.create_task(platform_watchdog_loop()))
+        if _pw_enabled and _mode != "ui":
+            asyncio.create_task(platform_watchdog_loop())
             logger.warning("Platform quality watchdog enabled")
+        elif _mode == "ui":
+            logger.warning("Platform watchdog SKIPPED (PLATFORM_MODE=ui)")
     except Exception as e:
         logger.warning("Platform watchdog failed to start: %s", e)
 
@@ -1014,7 +865,7 @@ async def lifespan(app: FastAPI):
                     int(_os_hb.environ.get("SF_HEARTBEAT_INTERVAL_S", "10"))
                 )
 
-        _keep_task(asyncio.create_task(_node_heartbeat_loop()))
+        asyncio.create_task(_node_heartbeat_loop())
         logger.info(
             "Node heartbeat started: %s (%s/%s)", _hb_node_id, _hb_role, _hb_mode
         )
@@ -1096,7 +947,9 @@ def create_app() -> FastAPI:
     # ── Security: CORS ──────────────────────────────────────────────────────
     from starlette.middleware.cors import CORSMiddleware
 
-    _cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:8090").split(",")
+    _cors_origins = os.environ.get(
+        "CORS_ORIGINS", "http://localhost:8090,http://4.233.64.30"
+    ).split(",")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[o.strip() for o in _cors_origins],
@@ -1328,6 +1181,14 @@ def create_app() -> FastAPI:
                     return JSONResponse(
                         {"detail": "Authentication required"}, status_code=401
                     )
+                # HTMX partial requests return 401 + HX-Redirect (avoids HTMX inserting login page)
+                if request.headers.get("HX-Request") == "true":
+                    from starlette.responses import Response
+
+                    return Response(
+                        status_code=401,
+                        headers={"HX-Redirect": f"/login?next={path}"},
+                    )
                 from starlette.responses import RedirectResponse
 
                 return RedirectResponse(url=f"/login?next={path}", status_code=302)
@@ -1362,8 +1223,11 @@ def create_app() -> FastAPI:
                 "/redoc",
             )
         )
+        # HTMX partial requests should never be redirected to onboarding
+        is_htmx = request.headers.get("HX-Request") == "true"
         if (
             not skip
+            and not is_htmx
             and not request.cookies.get("onboarding_done")
             and os.environ.get("PLATFORM_ENV") != "test"
         ):
@@ -1678,6 +1542,10 @@ def create_app() -> FastAPI:
             _sha, _tag = "unknown", ""
     templates.env.globals["app_commit"] = _sha
     templates.env.globals["app_version"] = _tag or _sha
+    # Simple UI mode — stripped-down sidebar for single-project instances
+    templates.env.globals["simple_ui"] = os.environ.get("PLATFORM_UI_SIMPLE", "").lower() in ("1", "true", "yes")
+    templates.env.globals["instance_name"] = os.environ.get("PLATFORM_INSTANCE_NAME", "")
+    templates.env.globals["instance_peer_url"] = os.environ.get("PLATFORM_INSTANCE_PEER_URL", "")
 
     # Middleware to set current language per-request
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -1783,8 +1651,6 @@ def create_app() -> FastAPI:
         ("modules", ".web.routes.api.modules", {}),
         ("traceability", ".web.routes.api.traceability", {}),
         ("skill-eval", ".web.routes.api.skill_eval", {}),
-        ("agent-bench", ".web.routes.api.agent_bench", {}),
-        ("team-bench", ".web.routes.api.team_bench", {}),
         ("mkt_ideation", ".web.routes.mkt_ideation", {}),
         ("group_ideation", ".web.routes.group_ideation", {}),
     ]
