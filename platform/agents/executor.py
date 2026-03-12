@@ -1017,6 +1017,7 @@ class AgentExecutor:
 
                 # On penultimate round: nudge dev agents to edit; disable tools for others
                 if round_num >= MAX_TOOL_ROUNDS - 2 and tools is not None:
+                    from .tool_schemas import _classify_agent_role
                     _role = _classify_agent_role(agent) if hasattr(agent, "tools") else "dev"
                     if _role in ("dev", "devops"):
                         # Keep tools enabled — dev agents need code_edit on final rounds
