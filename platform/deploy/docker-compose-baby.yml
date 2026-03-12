@@ -27,6 +27,9 @@ services:
       - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg_ovh_2024}@postgres:5432/macaron_baby
       - REDIS_URL=redis://redis:6379/2
       - PLATFORM_AUTO_RESUME_ENABLED=0
+      - PLATFORM_UI_SIMPLE=1
+      - PLATFORM_INSTANCE_NAME=Baby
+      - PLATFORM_INSTANCE_PEER_URL=https://sf.macaron-software.com
       - PG_POOL_MAX_SIZE=5
     volumes:
       - baby-data:/app/data
