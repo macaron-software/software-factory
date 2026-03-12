@@ -825,13 +825,37 @@ async def ideation_create_epic(request: Request):
     # ── Step 8: Auto-launch workflow (agents take over) ──
     session_id_live = None
     try:
+        import os
+        import subprocess
+        import uuid as _uuid
+
         from ...sessions.store import get_session_store, SessionDef, MessageDef
         from ...workflows.store import get_workflow_store
+        from ...models import EpicRun, EpicStatus, PhaseRun, PhaseStatus
+        from ...epics.store import get_epic_run_store
         from .workflows import _run_workflow_background
 
         wf_store = get_workflow_store()
         wf = wf_store.get(workflow_id)
         if wf:
+            # ── Create sandboxed workspace (like auto_resume) ──
+            run_id = _uuid.uuid4().hex[:8]
+            ws_base = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
+                "data", "workspaces", run_id,
+            )
+            os.makedirs(ws_base, exist_ok=True)
+            if not os.path.isdir(os.path.join(ws_base, ".git")):
+                subprocess.run(["git", "init"], cwd=ws_base, capture_output=True)
+                subprocess.run(
+                    ["git", "commit", "--allow-empty", "-m", "init workspace"],
+                    cwd=ws_base, capture_output=True,
+                    env={**os.environ, "GIT_AUTHOR_NAME": "agent",
+                         "GIT_AUTHOR_EMAIL": "agent@sf",
+                         "GIT_COMMITTER_NAME": "agent",
+                         "GIT_COMMITTER_EMAIL": "agent@sf"},
+                )
+
             session_store = get_session_store()
             session = SessionDef(
                 name=f"{mission.name}",
@@ -841,12 +865,48 @@ async def ideation_create_epic(request: Request):
                 config={"workflow_id": workflow_id, "mission_id": mission.id},
             )
             session = session_store.create(session)
+
+            # ── Create EpicRun with workspace_path ──
+            phases = [
+                PhaseRun(
+                    phase_id=wp.id,
+                    phase_name=wp.name,
+                    pattern_id=wp.pattern_id,
+                    status=PhaseStatus.PENDING,
+                )
+                for wp in wf.phases
+            ]
+            orchestrator_id = (wf.config or {}).get("orchestrator", "chef_de_programme")
+            epic_run = EpicRun(
+                id=run_id,
+                workflow_id=workflow_id,
+                workflow_name=wf.name,
+                brief=f"{mission.name}: {mission.goal or mission.description or ''}"[:500],
+                status=EpicStatus.PENDING,
+                phases=phases,
+                project_id=project_id,
+                workspace_path=ws_base,
+                cdp_agent_id=orchestrator_id,
+                session_id=session.id,
+            )
+            get_epic_run_store().create(epic_run)
+
+            # ── Store workspace_path in project memory ──
+            try:
+                from ...memory.manager import get_memory_manager
+                get_memory_manager().project_store(
+                    project_id, "workspace_path", ws_base,
+                    category="infrastructure", source="ideation", confidence=0.95,
+                )
+            except Exception:
+                pass
+
             session_store.add_message(
                 MessageDef(
                     session_id=session.id,
                     from_agent="system",
                     message_type="system",
-                    content=f"Workflow **{wf.name}** lancé pour l'epic **{mission.name}**.\nStack: {', '.join(stack)}\nGoal: {mission.goal or 'N/A'}",
+                    content=f"Workflow **{wf.name}** lancé pour l'epic **{mission.name}**.\nStack: {', '.join(stack)}\nGoal: {mission.goal or 'N/A'}\nWorkspace: {ws_base}",
                 )
             )
             task_desc = (
@@ -855,17 +915,15 @@ async def ideation_create_epic(request: Request):
                 f"Goal: {mission.goal or mission.description}\n"
                 f"Stack: {', '.join(stack)}\n"
                 f"Features: {', '.join(f.get('name', '') for f in features_data)}\n"
-                f"Répertoire projet: {str(FACTORY_ROOT.parent / project_id)}"
+                f"Workspace: {ws_base}"
             )
             asyncio.create_task(
                 _run_workflow_background(wf, session.id, task_desc, project_id)
             )
             session_id_live = session.id
             logger.info(
-                "Auto-launched workflow %s for project %s (session %s)",
-                workflow_id,
-                project_id,
-                session.id,
+                "Auto-launched workflow %s for project %s (session %s, workspace %s)",
+                workflow_id, project_id, session.id, ws_base,
             )
     except Exception as e:
         logger.warning("Auto-launch workflow: %s", e)
