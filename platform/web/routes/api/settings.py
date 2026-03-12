@@ -44,14 +44,24 @@ _AC_QUALITY_DEFAULTS: dict[str, tuple[str, str]] = {
 
 def _ensure_defaults(db) -> None:
     """Seed missing default settings into platform_settings."""
+    from ....db.adapter import is_postgresql
+
+    pg = is_postgresql()
     for key, (value, description) in {
         **_RATE_LIMIT_DEFAULTS,
         **_AC_QUALITY_DEFAULTS,
     }.items():
-        db.execute(
-            "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
-            (key, value, description),
-        )
+        if pg:
+            db.execute(
+                "INSERT INTO platform_settings (key, value, description)"
+                " VALUES (?, ?, ?) ON CONFLICT (key) DO NOTHING",
+                (key, value, description),
+            )
+        else:
+            db.execute(
+                "INSERT OR IGNORE INTO platform_settings (key, value, description) VALUES (?,?,?)",
+                (key, value, description),
+            )
     db.commit()
 
 
@@ -93,13 +103,17 @@ async def update_rate_limits(request: Request):
     if not updates:
         return {"ok": False, "error": "No valid keys provided"}
 
+    from ....db.adapter import is_postgresql
+
     db = get_db()
     try:
         _ensure_defaults(db)
+        pg = is_postgresql()
+        now_fn = "NOW()" if pg else "strftime('%Y-%m-%dT%H:%M:%SZ','now')"
         for key, value in updates.items():
             db.execute(
-                "UPDATE platform_settings SET value=?,"
-                " updated_at=strftime('%Y-%m-%dT%H:%M:%SZ','now') WHERE key=?",
+                f"UPDATE platform_settings SET value=?,"
+                f" updated_at={now_fn} WHERE key=?",
                 (value, key),
             )
         db.commit()
@@ -133,17 +147,29 @@ async def update_quality_settings(request: Request):
     if not updates:
         return {"ok": False, "error": "No valid keys provided"}
 
+    from ....db.adapter import is_postgresql
+
     db = get_db()
     try:
         _ensure_defaults(db)
+        pg = is_postgresql()
         for key, value in updates.items():
-            db.execute(
-                "INSERT INTO platform_settings (key, value, description)"
-                " VALUES (?,?,?)"
-                " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
-                " updated_at=CURRENT_TIMESTAMP",
-                (key, value, _AC_QUALITY_DEFAULTS[key][1]),
-            )
+            if pg:
+                db.execute(
+                    "INSERT INTO platform_settings (key, value, description)"
+                    " VALUES (?, ?, ?)"
+                    " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
+                    " updated_at=NOW()",
+                    (key, value, _AC_QUALITY_DEFAULTS[key][1]),
+                )
+            else:
+                db.execute(
+                    "INSERT INTO platform_settings (key, value, description)"
+                    " VALUES (?,?,?)"
+                    " ON CONFLICT(key) DO UPDATE SET value=excluded.value,"
+                    " updated_at=CURRENT_TIMESTAMP",
+                    (key, value, _AC_QUALITY_DEFAULTS[key][1]),
+                )
         db.commit()
         logger.info("AC quality settings updated: %s", updates)
         return {"ok": True, "updated": updates}
