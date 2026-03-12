@@ -200,36 +200,9 @@ class AgentLoop:
             if self._should_skip(msg):
                 continue
 
-            # Pre-LLM content veto gate (ADR-0015 — veto_triggers guardrail)
-            # Rationale: critical agents (CISO, Compliance, Architects) declare
-            # veto_keywords in permissions_json. If any keyword matches the incoming
-            # message, the agent emits an immediate VETO *before* the LLM is called.
-            # This is faster, deterministic, and tamper-resistant vs. asking the LLM.
-            # Source: ADR-0015, inspired by OWASP LLM01 (prompt injection guardrails).
-            _veto_kws: list = self.agent.permissions.get("veto_keywords", [])
-            if _veto_kws:
-                _content_lower = msg.content.lower()
-                _matched_kw = next(
-                    (kw for kw in _veto_kws if kw.lower() in _content_lower), None
-                )
-                if _matched_kw:
-                    logger.warning(
-                        "Agent %s: pre-LLM veto keyword=%r  session=%s",
-                        self.agent.id,
-                        _matched_kw,
-                        self.session_id,
-                    )
-                    await self.send_message(
-                        to=msg.from_agent,
-                        content=(
-                            f"[VETO:{_matched_kw}] "
-                            f"Requête bloquée par guardrail de sécurité "
-                            f"(mot-clé interdit pour {self.agent.role})."
-                        ),
-                        msg_type=MessageType.VETO,
-                        parent_id=msg.id or "",
-                    )
-                    continue
+            # Veto keyword pre-filter: auto-veto WITHOUT LLM call if content matches
+            if await self._keyword_veto_check(msg):
+                continue
 
             # Round limit to prevent infinite loops
             self._rounds += 1
@@ -446,6 +419,40 @@ class AgentLoop:
                 return True
         return False
 
+    async def _keyword_veto_check(self, msg: A2AMessage) -> bool:
+        """Pre-LLM veto gate: if message content matches a veto_keyword, emit VETO directly.
+
+        Critical agents (CISO, compliance, architects, security) declare forbidden topics in
+        ``permissions_json.veto_keywords``. This avoids wasting an LLM call when the answer
+        is deterministically "no" (e.g. "deploy without tests", "disable RGPD checks").
+
+        Source pattern: airweave-ai/error-monitoring-agent keyword-trigger approach, adapted
+        for the SF A2A bus (emits MessageType.VETO instead of raising an exception).
+        """
+        keywords: list[str] = self.agent.permissions.get("veto_keywords", [])
+        if not keywords or not msg.content:
+            return False
+        content_lower = msg.content.lower()
+        for kw in keywords:
+            if kw.lower() in content_lower:
+                reason = f"Mot-clé interdit détecté: '{kw}'"
+                await self.send_message(
+                    to=msg.from_agent,
+                    content=reason,
+                    msg_type=MessageType.VETO,
+                    parent_id=msg.id,
+                    metadata={"action_type": "veto", "trigger": "keyword", "keyword": kw},
+                )
+                logger.info(
+                    "Keyword-veto  agent=%s keyword=%s sender=%s session=%s",
+                    self.agent.id,
+                    kw,
+                    msg.from_agent,
+                    self.session_id,
+                )
+                return True
+        return False
+
     # ------------------------------------------------------------------
     # Context builder
     # ------------------------------------------------------------------
@@ -501,15 +508,17 @@ class AgentLoop:
             except Exception as exc:
                 logger.debug("Failed to load project context: %s", exc)
 
-        # Project memory files (CLAUDE.md, etc.) — organizers only
-        # Executors don't need the full project constitution to implement a task
+        # Project memory files (VISION.md, SPECS.md, CLAUDE.md, etc.)
+        # All agents need project context to know stack, goals, constraints.
+        # Organizers get full content (4000 chars), executors get condensed (1500 chars).
         project_memory_str = ""
-        if is_organizer and self.project_path:
+        if self.project_path:
             try:
                 from ..memory.project_files import get_project_memory
 
                 pmem = get_project_memory(self.project_id, self.project_path)
-                project_memory_str = pmem.combined
+                _max_chars = 4000 if is_organizer else 1500
+                project_memory_str = pmem.combined[:_max_chars]
             except Exception as exc:
                 logger.debug("Failed to load project memory files: %s", exc)
 

@@ -383,8 +383,10 @@ async def ideation_create_epic(request: Request):
     from ...config import FACTORY_ROOT
 
     data = await request.json()
-    idea = data.get("goal", "") or data.get("name", "")
+    idea = data.get("goal", "") or data.get("name", "") or data.get("idea", "")
     findings = data.get("description", "")
+    user_tech_stack = data.get("tech_stack", "")
+    user_project_name = data.get("project_name", "")
 
     # If session_id provided, try to load idea + findings from session store / DB
     session_id_in = data.get("session_id", "").strip()
@@ -471,19 +473,33 @@ async def ideation_create_epic(request: Request):
         plan = json.loads(raw)
     except Exception as e:
         logger.error("PO epic structuring failed: %s", e)
-        slug = idea[:30].lower().replace(" ", "-").replace("'", "")
+        # ── Create incident for TMA team ──
+        try:
+            from ...missions.feedback import create_platform_incident
+            create_platform_incident(
+                title=f"PO JSON parse fail: {str(e)[:80]}",
+                severity="P2",
+                source="ideation",
+                error_type="po_json_parse_error",
+                error_detail=f"idea={idea[:200]}\nraw_error={e}",
+            )
+        except Exception:
+            pass
+        # ── Fallback: use raw user input ──
+        slug = (user_project_name or idea[:30]).lower().replace(" ", "-").replace("'", "")
         slug = "".join(c for c in slug if c.isalnum() or c == "-").strip("-")
+        stack_list = [s.strip() for s in user_tech_stack.split(",") if s.strip()] if user_tech_stack else []
         plan = {
             "project": {
                 "id": slug or "new-project",
-                "name": idea[:60] or "New Project",
+                "name": user_project_name or idea[:60] or "New Project",
                 "description": idea,
-                "stack": [],
+                "stack": stack_list,
                 "factory_type": "standalone",
             },
             "epic": {
-                "name": data.get("name", idea[:100]),
-                "description": findings,
+                "name": user_project_name or idea[:100],
+                "description": findings or idea,
                 "goal": idea,
             },
             "features": [],
@@ -600,7 +616,7 @@ async def ideation_create_epic(request: Request):
         "new_feature": "feature-request",
         "bug_fix": "sf-pipeline",
         "tech_debt": "tech-debt-reduction",
-        "migration": "migration-angular",
+        "migration": "feature-request",
         "security_audit": "review-cycle",
     }
     mission_type = type_map.get(request_type, "epic")
