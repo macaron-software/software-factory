@@ -975,6 +975,7 @@ class EpicOrchestrator:
                                 f"4. Lire BUILD_INSTRUCTIONS.md s'il existe dans le workspace"
                             )
 
+                result = None  # init before try — used in escalation/tool-detect below
                 try:
                     # Phase timeout: 20 minutes max per phase execution
                     PHASE_TIMEOUT = 1200
