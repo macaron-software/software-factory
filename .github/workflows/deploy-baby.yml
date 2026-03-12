@@ -1,0 +1,121 @@
+name: Deploy → SF-Baby
+
+# Deploys SF-Baby instance on OVH VPS (same server as main SF demo)
+# Baby containers: baby-ui (8093), baby-factory (8094)
+# Uses same SSH key + OVH_IP as deploy-demo.yml
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-baby:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          fetch-depth: 2
+
+      - name: Check skip
+        id: skip
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          if echo "$COMMIT_MSG" | grep -qE '\[skip deploy\]|\[skip ci\]|\[no deploy\]|\[skip baby\]'; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Deploy skipped"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up SSH
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OVH_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "${{ secrets.OVH_IP }}" >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << 'EOF'
+          Host *
+            IdentityFile ~/.ssh/id_rsa
+            IdentitiesOnly yes
+            ServerAliveInterval 60
+            ServerAliveCountMax 5
+          EOF
+
+      - name: Rsync platform to OVH
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          SHA=$(git rev-parse --short HEAD)
+          echo "${TAG:-$SHA}:${SHA}" > platform/VERSION
+
+          # Sync platform code to baby slots
+          for SLOT in baby-ui baby-factory; do
+            rsync -az --checksum --delete \
+              --exclude '__pycache__' \
+              --exclude '*.pyc' \
+              --exclude 'data/' \
+              --exclude 'workspace/' \
+              platform/ \
+              debian@${{ secrets.OVH_IP }}:/opt/software-factory/slots/${SLOT}/
+          done
+
+          # Sync compose overlay + deploy configs
+          rsync -az platform/deploy/docker-compose-baby.yml \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/docker-compose-baby.yml
+          rsync -az platform/Dockerfile \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/platform/Dockerfile
+          rsync -az projects/baby.yaml \
+            debian@${{ secrets.OVH_IP }}:/opt/software-factory/projects/baby.yaml
+
+      - name: Restart baby containers
+        if: steps.skip.outputs.skipped != 'true'
+        run: |
+          ssh -o ConnectTimeout=30 debian@${{ secrets.OVH_IP }} << 'ENDSSH'
+          set -e
+          cd /opt/software-factory
+
+          # Clean pycache in slots
+          find slots/baby-ui slots/baby-factory -name "__pycache__" -type d \
+            -exec rm -rf {} + 2>/dev/null || true
+
+          # Restart baby containers
+          docker compose -f docker-compose.yml -f docker-compose-baby.yml \
+            up -d --no-deps --force-recreate baby-ui baby-factory
+
+          # Health check baby-ui (max 60s)
+          echo "Waiting for baby-ui..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8093/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] baby-ui health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          [ "$OK" = "1" ] && echo "baby-ui healthy ✓" || { echo "ABORT: baby-ui unhealthy"; exit 1; }
+
+          # Health check baby-factory (max 60s)
+          echo "Waiting for baby-factory..."
+          OK=0
+          for i in $(seq 1 30); do
+            sleep 2
+            HTTP=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8094/api/health 2>/dev/null || echo 000)
+            echo "  [${i}/30] baby-factory health=${HTTP}"
+            if [ "$HTTP" = "200" ] || [ "$HTTP" = "302" ]; then OK=1; break; fi
+          done
+          [ "$OK" = "1" ] && echo "baby-factory healthy ✓" || echo "WARNING: baby-factory unhealthy (non-fatal)"
+
+          # Update boot script to include baby containers
+          BOOT_SCRIPT='/opt/software-factory/start-active-slot.sh'
+          if [ -f "$BOOT_SCRIPT" ] && ! grep -q 'baby-ui' "$BOOT_SCRIPT"; then
+            echo '# SF-Baby containers' >> "$BOOT_SCRIPT"
+            echo 'docker compose -f docker-compose.yml -f docker-compose-baby.yml up -d --no-deps baby-ui baby-factory' >> "$BOOT_SCRIPT"
+            echo 'echo "$(date) boot: started baby-ui + baby-factory" >> /var/log/sf-boot.log' >> "$BOOT_SCRIPT"
+          fi
+
+          echo "=== SF-Baby deploy complete ==="
+          ENDSSH

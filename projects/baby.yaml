@@ -1,0 +1,86 @@
+# Baby — Evidence-based baby & parent tracker
+# Platforms: iOS (SwiftUI), Android (Kotlin), Web (SvelteKit+WASM)
+# Core: Rust (narabayby-core) via UniFFI (iOS/Android) + wasm-pack (Web)
+# Deploy: git tag v*.*.* → GitHub Actions → App Store + Google Play
+# Web: baby.macaron-software.com (SvelteKit static)
+
+project:
+  name: baby
+  display_name: "Baby"
+  root_path: /app/workspace/baby
+  vision_doc: CLAUDE.md
+  git_url: https://github.com/macaron-software/baby.git
+
+domains:
+  rust:
+    paths:
+      - core/
+      - backend/
+    extensions:
+      - .rs
+    build_cmd: cargo build --workspace
+    test_cmd: cargo test --workspace
+    lint_cmd: cargo clippy --workspace -- -D warnings
+
+  swift:
+    paths:
+      - ios/
+    extensions:
+      - .swift
+    build_cmd: xcodebuild -project ios/Baby.xcodeproj -scheme Baby -sdk iphonesimulator build
+    test_cmd: xcodebuild -project ios/Baby.xcodeproj -scheme Baby -sdk iphonesimulator test
+
+  kotlin:
+    paths:
+      - android/
+    extensions:
+      - .kt
+      - .kts
+    build_cmd: cd android && ./gradlew assembleDebug
+    test_cmd: cd android && ./gradlew test
+
+  svelte:
+    paths:
+      - web/
+    extensions:
+      - .svelte
+      - .ts
+      - .js
+    build_cmd: cd web && npm run build
+    test_cmd: cd web && npm run check
+    lint_cmd: cd web && npm run lint
+
+deploy:
+  strategy: validation-only
+  auto_prod: false
+  rollback_on_fail: true
+
+fractal:
+  max_files: 5
+  max_loc: 400
+  max_items: 10
+  max_depth: 3
+
+adversarial:
+  threshold: 5
+
+build_queue:
+  enabled: true
+  priority: 10
+  timeout: 600
+
+error_capture:
+  enabled: true
+  feedback_to_backlog: true
+  deduplicate: true
+  build:
+    enabled: true
+    domains: []
+  e2e:
+    enabled: true
+    playwright:
+      report_path: playwright-report/
+
+analyzers:
+  - rust
+  - security

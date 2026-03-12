@@ -1,0 +1,87 @@
+# SF-Baby — Private Software Factory for Baby project
+# Overlay for the main docker-compose.yml on OVH VPS
+#
+# Usage (from /opt/software-factory):
+#   docker compose -f docker-compose.yml -f docker-compose-baby.yml up -d baby-ui baby-factory
+#
+# Architecture: same as main SF but isolated DB + workspace + Redis DB
+#   - Shares: postgres service, redis service
+#   - Isolates: database (macaron_baby), redis db 2, workspace volume, data volume
+#   - LLM: MiniMax M2.5 (same provider, different API key in .env.baby)
+#   - Ports: 8093 (baby-ui), 8094 (baby-factory)
+
+services:
+  # ── Baby UI (web interface) — port 8093 ──────
+  baby-ui:
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
+    ports:
+      - "8093:8099"
+    env_file:
+      - .env.baby
+    environment:
+      - PLATFORM_MODE=ui
+      - PLATFORM_LLM_PROVIDER=minimax
+      - PLATFORM_LLM_MODEL=MiniMax-M2.5
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg_ovh_2024}@postgres:5432/macaron_baby
+      - REDIS_URL=redis://redis:6379/2
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - PG_POOL_MAX_SIZE=5
+    volumes:
+      - baby-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/baby-ui:/app/platform
+    group_add:
+      - "989"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ── Baby Factory (headless — agents, missions, watchdog) — port 8094 ──────
+  baby-factory:
+    build:
+      context: .
+      dockerfile: platform/Dockerfile
+    ports:
+      - "8094:8099"
+    env_file:
+      - .env.baby
+    environment:
+      - PLATFORM_MODE=factory
+      - PLATFORM_LLM_PROVIDER=minimax
+      - PLATFORM_LLM_MODEL=MiniMax-M2.5
+      - DATABASE_URL=postgresql://${PG_USER:-macaron}:${PG_PASSWORD:-macaron_pg_ovh_2024}@postgres:5432/macaron_baby
+      - REDIS_URL=redis://redis:6379/2
+      - PLATFORM_AUTO_RESUME_ENABLED=0
+      - SANDBOX_ENABLED=true
+      - WATCHDOG_HEALTH_URL=http://localhost:8099/api/health
+      - PG_POOL_MAX_SIZE=10
+    volumes:
+      - baby-data:/app/data
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/software-factory/slots/baby-factory:/app/platform
+    group_add:
+      - "989"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+volumes:
+  baby-data:
